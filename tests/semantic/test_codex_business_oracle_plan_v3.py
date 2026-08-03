@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 
+from tests.support.platform_filesystem import create_symlink_or_skip
 from tests.semantic.support import codex_business_oracle_plan_v3 as plan_module
 from tests.semantic.support.codex_business_oracle_plan_v3 import (
     BUSINESS_FAMILIES,
@@ -356,7 +357,7 @@ def test_reader_rejects_cross_scenario_root(tmp_path: Path) -> None:
 def test_writer_rejects_symlink_scenario_root(tmp_path: Path) -> None:
     real = _root(tmp_path, "real")
     alias = tmp_path / "alias"
-    alias.symlink_to(real, target_is_directory=True)
+    create_symlink_or_skip(alias, real, target_is_directory=True)
 
     with pytest.raises(BusinessOraclePlanError, match="scenario root must be a real"):
         write_business_oracle_plan(**_kwargs(alias))
@@ -367,7 +368,7 @@ def test_writer_rejects_symlink_evidence_root(tmp_path: Path) -> None:
     root.mkdir()
     actual = tmp_path / "actual-evidence"
     actual.mkdir()
-    (root / "evidence").symlink_to(actual, target_is_directory=True)
+    create_symlink_or_skip(root / "evidence", actual, target_is_directory=True)
 
     with pytest.raises(BusinessOraclePlanError, match="evidence root must be a real"):
         write_business_oracle_plan(**_kwargs(root))
@@ -378,7 +379,7 @@ def test_reader_does_not_follow_plan_symlink(tmp_path: Path) -> None:
     target = tmp_path / "target.json"
     target.write_bytes(b"{}\n")
     path = root / "evidence" / BUSINESS_ORACLE_PLAN_FILE
-    path.symlink_to(target)
+    create_symlink_or_skip(path, target)
 
     with pytest.raises(BusinessOraclePlanError, match="cannot open|path changed"):
         read_business_oracle_plan(path, **kwargs)

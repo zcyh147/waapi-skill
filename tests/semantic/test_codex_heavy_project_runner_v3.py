@@ -12,6 +12,7 @@ from types import MappingProxyType, SimpleNamespace
 
 import pytest
 
+from tests.support.platform_filesystem import create_symlink_or_skip
 from tests.destructive.support.sandbox_fixture import (
     ProjectHash,
     SandboxMetadata,
@@ -3353,9 +3354,21 @@ def test_custom_database_roundtrip_uses_plain_json_real_prefix_and_wine_path(
     dosdevices = wine_prefix / "dosdevices"
     dosdevices.mkdir(parents=True)
     (wine_prefix / "drive_c").mkdir()
-    os.symlink(runner.WINE_Z_DRIVE_TARGET, dosdevices / "z:")
-    os.symlink(runner.WINE_C_DRIVE_TARGET, dosdevices / "c:")
-    os.symlink(str(launch_home), dosdevices / "y:")
+    create_symlink_or_skip(
+        dosdevices / "z:",
+        runner.WINE_Z_DRIVE_TARGET,
+        target_is_directory=True,
+    )
+    create_symlink_or_skip(
+        dosdevices / "c:",
+        runner.WINE_C_DRIVE_TARGET,
+        target_is_directory=True,
+    )
+    create_symlink_or_skip(
+        dosdevices / "y:",
+        launch_home,
+        target_is_directory=True,
+    )
 
     real_home = tmp_path / "real-home"
     global_state = (

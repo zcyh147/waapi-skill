@@ -11,6 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from tests.support.platform_filesystem import create_symlink_or_skip
 from . import run_codex_skill_matrix as matrix
 from .support.codex_eval_fixtures import (
     AudioOracleSnapshot,
@@ -32,6 +33,18 @@ assert GATEWAY_SPEC is not None and GATEWAY_SPEC.loader is not None
 waapi_gateway = importlib.util.module_from_spec(GATEWAY_SPEC)
 sys.modules[GATEWAY_SPEC.name] = waapi_gateway
 GATEWAY_SPEC.loader.exec_module(waapi_gateway)
+
+
+def _require_skill_symlink_capability(tmp_path: Path) -> None:
+    """Skip POSIX workspace-link tests only for Windows privilege error 1314."""
+
+    probe = tmp_path / "skill-symlink-probe"
+    create_symlink_or_skip(
+        probe,
+        matrix.SKILL_ROOT,
+        target_is_directory=True,
+    )
+    probe.unlink()
 
 
 def _suite():
@@ -659,7 +672,7 @@ def test_dispatch_evidence_rejects_symlinked_record(tmp_path: Path) -> None:
     _write_dispatch_record(outside, api="ak.wwise.core.object.get")
     evidence = tmp_path / "evidence"
     evidence.mkdir()
-    (evidence / "linked.json").symlink_to(outside)
+    create_symlink_or_skip(evidence / "linked.json", outside)
 
     with pytest.raises(matrix.FixtureContractError, match="regular file"):
         matrix.read_dispatch_evidence(evidence)
@@ -1562,6 +1575,7 @@ def test_run_fresh_phase_archives_raw_evidence_for_each_failure_stage(
     failure_point: str,
     expected_stage: str,
 ) -> None:
+    _require_skill_symlink_capability(tmp_path)
     result = _fake_codex_result()
 
     class FakeHarness:
@@ -1631,6 +1645,7 @@ def test_pre_action_codex_infrastructure_failure_skips_grading_and_archives_resu
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    _require_skill_symlink_capability(tmp_path)
     result = _fake_codex_result()
     failure = CodexInfrastructureFailure(
         category="quota_or_rate_limit",

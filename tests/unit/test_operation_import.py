@@ -10,6 +10,8 @@ from typing import Any
 
 import pytest  # pyright: ignore[reportMissingImports]
 
+from tests.support.platform_filesystem import create_symlink_or_skip
+
 from wwise_waapi.operation_import import (  # pyright: ignore[reportMissingImports]
     AUDIO_IMPORT_PLAN_CONTRACT,
     AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS,
@@ -739,7 +741,7 @@ def test_regular_file_proof_rejects_relative_missing_directory_and_symlink(tmp_p
     assert directory.value.error_code == "INVALID_FILE"
 
     link = tmp_path / "link.wav"
-    link.symlink_to(media)
+    create_symlink_or_skip(link, media)
     with pytest.raises(ImportContractError) as symlink:
         regular_file_proof(link, field="media")
     assert symlink.value.error_code == "INVALID_FILE"
@@ -1098,7 +1100,7 @@ def test_tab_parser_rejects_bom_invalid_utf8_and_malformed_column_count(tmp_path
 def test_tab_parser_rejects_relative_missing_and_symlink_media_before_dispatch(tmp_path: Path) -> None:
     media = _write_media(tmp_path)
     link = tmp_path / "linked.wav"
-    link.symlink_to(media)
+    create_symlink_or_skip(link, media)
     cases = [
         ("relative.wav", "INVALID_FILE"),
         (str(tmp_path / "missing.wav"), "INPUT_FILE_NOT_FOUND"),

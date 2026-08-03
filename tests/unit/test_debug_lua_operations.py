@@ -6,6 +6,8 @@ from typing import Any, Mapping
 
 import pytest
 
+from tests.support.platform_filesystem import create_symlink_or_skip
+
 from wwise_waapi.builders.debug_lua import (
     LUA_SOURCE_AUTHORITY,
     DebugLuaContractError,
@@ -193,7 +195,7 @@ def test_lua_boundary_rejects_hidden_loaders_wrong_authority_and_paths(
         )
 
     symlink = isolated / "linked.lua"
-    symlink.symlink_to(outside)
+    create_symlink_or_skip(symlink, outside)
     with pytest.raises(OperationContractError, match="non-symlink"):
         parse_operation_request(
             _request(

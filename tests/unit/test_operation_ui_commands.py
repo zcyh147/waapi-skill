@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest  # pyright: ignore[reportMissingImports]
 
+from tests.support.platform_filesystem import create_symlink_or_skip
+
 import wwise_waapi.operation_ui_commands as ui_commands  # pyright: ignore[reportMissingImports]
 from wwise_waapi.canonical import canonical_sha256  # pyright: ignore[reportMissingImports]
 from wwise_waapi.operation_ui_commands import (  # pyright: ignore[reportMissingImports]
@@ -277,7 +279,7 @@ def test_execute_files_enforce_count_path_and_byte_limits(
     assert wrong_kind.value.error_code == "INVALID_PATH_KIND"
 
     symlink = tmp_path / "link.wav"
-    symlink.symlink_to(extra)
+    create_symlink_or_skip(symlink, extra)
     with pytest.raises(UiCommandContractError) as linked:
         build_ui_command_execute_plan(
             version="2025.1",

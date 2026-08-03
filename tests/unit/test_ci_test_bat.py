@@ -7,9 +7,21 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
+from ci.run_program_tests import (
+    PROGRAM_PYTEST_ARGS,
+    ProgramManifestError,
+    ProgramPytestArgsError,
+    load_program_nodes,
+    validate_program_pytest_args,
+)
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CI_TEST_BAT = REPO_ROOT / "ci" / "test.bat"
+CI_TEST_SH = REPO_ROOT / "ci" / "test.sh"
+PROGRAM_TEST_MANIFEST = REPO_ROOT / "ci" / "program-test-nodes.txt"
 
 
 def _write_fake_python(bin_dir: Path, fail_on: str | None = None) -> None:
@@ -20,8 +32,25 @@ def _write_fake_python(bin_dir: Path, fail_on: str | None = None) -> None:
         "from pathlib import Path\n"
         "log_path = Path(os.environ['CI_TEST_LOG'])\n"
         "argv = sys.argv[1:]\n"
+        "effective_argv = argv[2:] if argv[:2] == ['run', 'python'] else argv\n"
+        "program_manifest_nodes = None\n"
+        "if len(effective_argv) >= 2 and Path(effective_argv[0]).name == 'run_program_tests.py':\n"
+        "    manifest_path = Path(effective_argv[1])\n"
+        "    if manifest_path.name == 'program-test-nodes.txt':\n"
+        "        program_manifest_nodes = [\n"
+        "            line for line in manifest_path.read_text(encoding='utf-8-sig').splitlines()\n"
+        "            if line and not line.startswith('#')\n"
+        "        ]\n"
+        "    sys.path.insert(0, str(Path(effective_argv[0]).resolve().parents[1]))\n"
+        "    from ci.run_program_tests import ProgramPytestArgsError, validate_program_pytest_args\n"
+        "    try:\n"
+        "        validate_program_pytest_args(effective_argv[2:])\n"
+        "    except ProgramPytestArgsError as exc:\n"
+        "        print(str(exc), file=sys.stderr)\n"
+        "        sys.exit(1)\n"
         "entry = {\n"
         "    'argv': argv,\n"
+        "    'program_manifest_nodes': program_manifest_nodes,\n"
         "    'WWISE_VERSION': os.environ.get('WWISE_VERSION'),\n"
         "    'WWISE_LIVE': os.environ.get('WWISE_LIVE'),\n"
         "    'WWISE_DESTRUCTIVE': os.environ.get('WWISE_DESTRUCTIVE'),\n"
@@ -29,11 +58,11 @@ def _write_fake_python(bin_dir: Path, fail_on: str | None = None) -> None:
         "    'WWISE_CONSOLE': os.environ.get('WWISE_CONSOLE'),\n"
         "    'WWISE_SAMPLE_PROJECT_PATH': os.environ.get('WWISE_SAMPLE_PROJECT_PATH'),\n"
         "    'WWISE_SANDBOX_ROOT': os.environ.get('WWISE_SANDBOX_ROOT'),\n"
+        "    'PYTEST_ADDOPTS': os.environ.get('PYTEST_ADDOPTS'),\n"
         "}\n"
         "with log_path.open('a', encoding='utf-8') as handle:\n"
         "    handle.write(json.dumps(entry) + '\\n')\n"
         f"fail_on = {fail_on!r}\n"
-        "effective_argv = argv[2:] if argv[:2] == ['run', 'python'] else argv\n"
         "joined = ' '.join(argv)\n"
         "if fail_on == 'nonlive' and effective_argv[:4] == ['-m', 'pytest', '-m', 'not live and not destructive']:\n"
         "    sys.exit(7)\n"
@@ -56,9 +85,7 @@ def _write_fake_python(bin_dir: Path, fail_on: str | None = None) -> None:
     poetry_bat = bin_dir / "poetry.bat"
     poetry_bat.write_text(
         '@echo off\r\n'
-        'if /I "%~1"=="run" shift\r\n'
-        'if /I "%~1"=="python" shift\r\n'
-        f'"{sys.executable}" "{runner}" %1 %2 %3 %4 %5 %6 %7 %8 %9\r\nexit /b %%%%ERRORLEVEL%%%%\r\n',
+        f'"{sys.executable}" "{runner}" %*\r\nexit /b %%%%ERRORLEVEL%%%%\r\n',
         encoding="utf-8",
     )
 
@@ -129,6 +156,181 @@ def _smoke_argv(call: dict[str, object]) -> list[str]:
     if argv[:2] == ["run", "python"]:
         return argv[2:]
     return argv
+
+
+def _program_manifest_nodes() -> list[str]:
+    return [
+        line
+        for line in PROGRAM_TEST_MANIFEST.read_text(encoding="utf-8").splitlines()
+        if line and not line.startswith("#")
+    ]
+
+
+def test_program_manifest_is_the_single_ordered_cross_platform_node_source() -> None:
+    lines = PROGRAM_TEST_MANIFEST.read_text(encoding="utf-8").splitlines()
+    nodes = load_program_nodes(PROGRAM_TEST_MANIFEST)
+
+    assert len(nodes) == 121
+    assert nodes[0] == "tests/unit/test_gateway_session_context.py"
+    assert nodes[-1] == "tests/unit/test_public_route_registry_integrity.py"
+    assert len(nodes) == len(set(nodes))
+    for line in lines:
+        if not line or line.startswith("#"):
+            continue
+        assert line == line.strip()
+        assert not any(character.isspace() for character in line)
+        assert line.startswith("tests/unit/")
+        test_path = line.split("::", 1)[0]
+        assert "." not in Path(test_path).parts
+        assert ".." not in Path(test_path).parts
+        assert (REPO_ROOT / test_path).is_file()
+
+    shell_source = CI_TEST_SH.read_text(encoding="utf-8")
+    batch_source = CI_TEST_BAT.read_text(encoding="utf-8")
+    assert 'PROGRAM_TEST_MANIFEST="$ROOT_DIR/ci/program-test-nodes.txt"' in shell_source
+    assert 'python "$ROOT_DIR/ci/run_program_tests.py" "${program_args[@]}"' in shell_source
+    assert 'set "PROGRAM_TEST_MANIFEST=%SCRIPT_DIR%program-test-nodes.txt"' in batch_source
+    assert '"%ROOT_DIR%\\ci\\run_program_tests.py" "%PROGRAM_TEST_MANIFEST%"' in batch_source
+    assert shell_source.count("program-test-nodes.txt") == 1
+    assert batch_source.count("program-test-nodes.txt") == 1
+    assert "test_gateway_session_context.py" not in shell_source
+    assert "test_gateway_session_context.py" not in batch_source
+
+
+def test_program_manifest_loader_allows_comments_and_blank_lines(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    test_file = repo_root / "tests" / "unit" / "test_example.py"
+    test_file.parent.mkdir(parents=True)
+    test_file.write_text("def test_example(): pass\n", encoding="utf-8")
+    manifest = tmp_path / "program-test-nodes.txt"
+    manifest.write_text(
+        "# ordered program nodes\n\n"
+        "tests/unit/test_example.py\n"
+        "tests/unit/test_example.py::test_example\n",
+        encoding="utf-8",
+    )
+
+    assert load_program_nodes(manifest, repo_root=repo_root) == [
+        "tests/unit/test_example.py",
+        "tests/unit/test_example.py::test_example",
+    ]
+
+
+@pytest.mark.parametrize(
+    "contents",
+    [
+        "   \n",
+        " # indented comment\n",
+        " tests/unit/test_example.py\n",
+        "tests/unit/test example.py\n",
+        "tests/live/test_example.py\n",
+        "tests/unit/../live/test_example.py\n",
+        "tests\\unit\\test_example.py\n",
+        "tests/unit/test_example.py\ntests/unit/test_example.py\n",
+    ],
+)
+def test_program_manifest_loader_rejects_whitespace_escape_and_duplicates(
+    tmp_path: Path,
+    contents: str,
+) -> None:
+    repo_root = tmp_path / "repo"
+    test_file = repo_root / "tests" / "unit" / "test_example.py"
+    test_file.parent.mkdir(parents=True)
+    test_file.write_text("def test_example(): pass\n", encoding="utf-8")
+    manifest = tmp_path / "program-test-nodes.txt"
+    manifest.write_text(contents, encoding="utf-8")
+
+    with pytest.raises(ProgramManifestError):
+        load_program_nodes(manifest, repo_root=repo_root)
+
+
+def test_program_pytest_argument_validator_preserves_complex_filters() -> None:
+    arguments = [
+        "--collect-only",
+        "-k",
+        "transaction and (gateway or lock)",
+        "--maxfail",
+        "1",
+        "-q",
+        "-ra",
+    ]
+
+    assert validate_program_pytest_args(arguments) == arguments
+    assert PROGRAM_PYTEST_ARGS == (
+        "-m",
+        "not live and not destructive",
+        "--ignore=tests/semantic",
+        "--ignore=tests/live",
+        "--ignore=tests/destructive",
+    )
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["tests/unit/test_ci_test_bat.py"],
+        ["tests/unit/test_ci_test_bat.py::test_program_manifest_loader_allows_comments_and_blank_lines"],
+        ["--pyargs", "tests.unit.test_ci_test_bat"],
+        ["--pyargs=tests.unit.test_ci_test_bat"],
+        ["-k"],
+    ],
+)
+def test_program_pytest_argument_validator_rejects_collection_widening_and_missing_values(
+    arguments: list[str],
+) -> None:
+    with pytest.raises(ProgramPytestArgsError):
+        validate_program_pytest_args(arguments)
+
+
+def test_ci_test_bat_program_loads_every_shared_node_and_forwards_all_flags(tmp_path: Path) -> None:
+    env, log_path = _base_env(tmp_path)
+    expression = "transaction and (gateway or lock)"
+
+    result = _run_ci_test(
+        env,
+        "--mode",
+        "program",
+        "--",
+        "--collect-only",
+        "-k",
+        expression,
+        "-q",
+        "-ra",
+    )
+
+    assert result.returncode == 0, result.stderr
+    calls = _load_calls(log_path)
+    assert len(calls) == 1
+    call = calls[0]
+    argv = _pytest_argv(call)
+    assert Path(argv[0]).name == "run_program_tests.py"
+    assert Path(argv[1]).resolve() == PROGRAM_TEST_MANIFEST.resolve()
+    assert argv[2:] == [
+        "--collect-only",
+        "-k",
+        expression,
+        "-q",
+        "-ra",
+    ]
+    assert call["program_manifest_nodes"] == _program_manifest_nodes()
+    assert call["WWISE_VERSION"] is None
+    assert call["WWISE_CONSOLE"] is None
+    assert call["WWISE_SAMPLE_PROJECT_PATH"] is None
+    assert call["WWISE_SANDBOX_ROOT"] is None
+    assert call["PYTEST_ADDOPTS"] is None
+
+
+def test_ci_test_bat_program_rejects_extra_paths_and_incomplete_filter_flags(tmp_path: Path) -> None:
+    env, log_path = _base_env(tmp_path)
+
+    extra_path = _run_ci_test(env, "--mode", "program", "--", "tests/unit/test_ci_test_bat.py")
+    missing_filter = _run_ci_test(env, "--mode", "program", "--", "-k")
+
+    assert extra_path.returncode == 1
+    assert "accepts pytest flags and filters, not additional test paths" in extra_path.stderr
+    assert missing_filter.returncode == 1
+    assert "pytest option without its required value" in missing_filter.stderr
+    assert not log_path.exists()
 
 
 def test_ci_test_bat_help_matches_shell_parity_surface() -> None:

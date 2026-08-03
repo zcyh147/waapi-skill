@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest  # pyright: ignore[reportMissingImports]
 
+from tests.support.platform_filesystem import create_symlink_or_skip
+
 from wwise_waapi.metadata_cache import (
     DURABLE_METADATA_CACHE_DIRECTORY,
     DurableMetadataCache,
@@ -253,10 +255,7 @@ def test_durable_cache_corruption_and_unsafe_directory_are_best_effort_misses(
     outside = tmp_path / "outside"
     outside.mkdir()
     cache_directory = unsafe_state / DURABLE_METADATA_CACHE_DIRECTORY
-    try:
-        cache_directory.symlink_to(outside, target_is_directory=True)
-    except OSError:
-        pytest.skip("host does not permit symlink creation")
+    create_symlink_or_skip(cache_directory, outside, target_is_directory=True)
     unsafe = DurableMetadataCache(state_dir=unsafe_state)
     assert unsafe.get(_identity(), lookup) is None
     assert unsafe.put(_identity(), lookup, value) is False
@@ -270,10 +269,7 @@ def test_durable_cache_unsafe_managed_entry_blocks_publication(
     outside = tmp_path / "outside-entry.json"
     outside.write_text("outside", encoding="utf-8")
     unsafe_entry = cache.directory / f"{'f' * 64}.json"
-    try:
-        unsafe_entry.symlink_to(outside)
-    except OSError:
-        pytest.skip("host does not permit symlink creation")
+    create_symlink_or_skip(unsafe_entry, outside)
 
     assert cache.put(
         _identity(),

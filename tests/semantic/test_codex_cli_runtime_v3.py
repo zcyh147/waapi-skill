@@ -15,6 +15,7 @@ from typing import Any
 
 import pytest
 
+from tests.support.platform_filesystem import create_symlink_or_skip
 from tests.semantic.support import codex_cli_runtime_v3 as cli_runtime
 from tests.semantic.support.codex_cli_runtime_v3 import (
     CLI_APIS,
@@ -2577,7 +2578,7 @@ def test_waapi_host_path_localizer_rejects_escape_unc_relative_and_symlink(
 
     outside = tmp_path / "outside"
     outside.mkdir()
-    (account_home / "escape").symlink_to(outside, target_is_directory=True)
+    create_symlink_or_skip(account_home / "escape", outside, target_is_directory=True)
     with pytest.raises(CliRuntimeError, match="symlink component"):
         _localize_waapi_host_path(
             r"Y:\escape\Voice.wav",

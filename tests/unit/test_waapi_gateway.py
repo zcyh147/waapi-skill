@@ -13,6 +13,8 @@ from typing import Any, Mapping
 
 import pytest  # pyright: ignore[reportMissingImports]
 
+from tests.support.platform_filesystem import create_symlink_or_skip
+
 import wwise_waapi.dispatcher as dispatcher_module
 from wwise_waapi.builders.query import (  # pyright: ignore[reportMissingImports]
     MAX_ADVANCED_RETURN_EXPRESSION_BYTES,
@@ -3469,7 +3471,7 @@ def test_media_pool_audio_similarity_rejects_symlink_and_missing_file(tmp_path: 
     reference = tmp_path / "reference.wav"
     reference.write_bytes(b"RIFF\x00\x00\x00\x00WAVE")
     link = tmp_path / "reference-link.wav"
-    link.symlink_to(reference)
+    create_symlink_or_skip(link, reference)
 
     for value in (link, tmp_path / "missing.wav"):
         with pytest.raises(waapi_gateway.GatewayInputError):

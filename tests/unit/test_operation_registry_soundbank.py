@@ -8,6 +8,8 @@ from typing import Any, Mapping
 
 import pytest  # pyright: ignore[reportMissingImports]
 
+from tests.support.platform_filesystem import create_symlink_or_skip
+
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     OPERATION_REQUEST_CONTRACT,
     OperationContractError,
@@ -390,14 +392,17 @@ def test_generate_rejects_unsafe_project_relative_sibling_paths(
     assert rejected.value.error_code == "INVALID_PROJECT_CONTEXT"
 
 
-@pytest.mark.skipif(os.name == "nt", reason="Symlink escape semantics require a POSIX host")
 def test_generate_rejects_project_relative_sibling_symlink_escape(
     tmp_path: Path,
 ) -> None:
     io_root, project = _project(tmp_path)
     outside = tmp_path / "outside-cache"
     outside.mkdir()
-    (io_root / "linked-cache").symlink_to(outside, target_is_directory=True)
+    create_symlink_or_skip(
+        io_root / "linked-cache",
+        outside,
+        target_is_directory=True,
+    )
     project["directories"]["cache"] = "../linked-cache/SampleProject"
 
     with pytest.raises(OperationContractError) as rejected:
@@ -409,7 +414,6 @@ def test_generate_rejects_project_relative_sibling_symlink_escape(
     assert rejected.value.error_code == "INVALID_PROJECT_CONTEXT"
 
 
-@pytest.mark.skipif(os.name == "nt", reason="Symlink escape semantics require a POSIX host")
 def test_generate_guard_replay_rejects_new_sibling_symlink_escape(
     tmp_path: Path,
 ) -> None:
@@ -423,7 +427,11 @@ def test_generate_guard_replay_rejects_new_sibling_symlink_escape(
 
     outside = tmp_path / "outside-cache"
     outside.mkdir()
-    (io_root / "late-cache").symlink_to(outside, target_is_directory=True)
+    create_symlink_or_skip(
+        io_root / "late-cache",
+        outside,
+        target_is_directory=True,
+    )
     validation = validate_prepared_roles(prepared, read_call=reader)
 
     assert validation["ok"] is False
@@ -707,7 +715,7 @@ def test_generate_2021_confirmation_rejects_live_project_or_wproj_drift(
         reader.project_file = WWISE_2021_PROJECT.resolve()
     elif drift == "symlink":
         link = project_file.parent / "Linked.wproj"
-        link.symlink_to(project_file)
+        create_symlink_or_skip(link, project_file)
         reader.project_file = link
     else:
         text = project_file.read_text(encoding="utf-8")

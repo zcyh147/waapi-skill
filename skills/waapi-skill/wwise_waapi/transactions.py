@@ -6,20 +6,22 @@ a Wwise operation.  A preview is immutable and explicit confirmation is bound
 to its canonical SHA-256 hash; policy authorization is recorded as a distinct
 durable state and journal event.
 
-Concurrency support intentionally has a clear platform boundary: the locking
-backend uses ``fcntl.flock`` and therefore supports macOS and Linux.  Windows
-callers receive :class:`FileLockUnavailable` rather than silently running
-without a cross-process lock.
+Concurrency support intentionally has a clear platform boundary: macOS and
+Linux use ``fcntl.flock`` while Windows uses a one-byte ``msvcrt.locking``
+region.  Unknown platforms and unavailable backends fail closed rather than
+silently running without a cross-process lock.
 """
 
 from __future__ import annotations
 
+import errno
 import hmac
 import json
 import os
 import re
 import secrets
 import shutil
+import time
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -34,6 +36,11 @@ try:  # pragma: no branch - the absence is exercised by an explicit test hook.
     import fcntl as _fcntl
 except ImportError:  # pragma: no cover - exercised on Windows, not POSIX CI.
     _fcntl = None
+
+try:  # pragma: no branch - the absence is exercised by an explicit test hook.
+    import msvcrt as _msvcrt
+except ImportError:  # pragma: no cover - exercised on POSIX, not Windows CI.
+    _msvcrt = None
 
 
 STATE_DIRECTORY_ENV = "WAAPI_SKILL_STATE_DIR"
@@ -58,6 +65,9 @@ _CONFIRMATION_TOKEN_PATTERN = re.compile(
     rf"[{_CROCKFORD_BASE32_ALPHABET}]{{{_CONFIRMATION_TOKEN_LENGTH}}}$"
 )
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+_LOCK_REGION_BYTES = 1
+_WINDOWS_LOCK_RETRY_SECONDS = 0.05
+_WINDOWS_LOCK_VIOLATION = 33
 
 
 class TransactionError(RuntimeError):
@@ -102,6 +112,117 @@ class StateCorruptionError(TransactionError):
 
 class FileLockUnavailable(TransactionError):
     """No supported cross-process file-lock implementation is available."""
+
+
+class _PosixFileLockBackend:
+    """Exclusive whole-file advisory locking through ``fcntl.flock``."""
+
+    def __init__(self, module: Any) -> None:
+        self._module = module
+
+    def acquire(self, handle: Any) -> None:
+        try:
+            self._module.flock(handle.fileno(), self._module.LOCK_EX)
+        except OSError as exc:
+            raise FileLockUnavailable(
+                "TransactionStore could not acquire its POSIX fcntl.flock lock."
+            ) from exc
+
+    def release(self, handle: Any) -> None:
+        try:
+            self._module.flock(handle.fileno(), self._module.LOCK_UN)
+        except OSError as exc:
+            raise FileLockUnavailable(
+                "TransactionStore could not release its POSIX fcntl.flock lock."
+            ) from exc
+
+
+class _WindowsFileLockBackend:
+    """Exclusive one-byte Windows locking through ``msvcrt.locking``."""
+
+    def __init__(self, module: Any) -> None:
+        self._module = module
+
+    @staticmethod
+    def _seek_lock_region(handle: Any) -> None:
+        try:
+            handle.seek(0, os.SEEK_SET)
+        except OSError as exc:
+            raise FileLockUnavailable(
+                "TransactionStore could not seek to its Windows lock region."
+            ) from exc
+
+    def acquire(self, handle: Any) -> None:
+        while True:
+            self._seek_lock_region(handle)
+            try:
+                self._module.locking(
+                    handle.fileno(),
+                    self._module.LK_NBLCK,
+                    _LOCK_REGION_BYTES,
+                )
+            except OSError as exc:
+                if _is_windows_lock_contention(exc):
+                    time.sleep(_WINDOWS_LOCK_RETRY_SECONDS)
+                    continue
+                raise FileLockUnavailable(
+                    "TransactionStore could not acquire its Windows msvcrt lock."
+                ) from exc
+            return
+
+    def release(self, handle: Any) -> None:
+        self._seek_lock_region(handle)
+        try:
+            self._module.locking(
+                handle.fileno(),
+                self._module.LK_UNLCK,
+                _LOCK_REGION_BYTES,
+            )
+        except OSError as exc:
+            raise FileLockUnavailable(
+                "TransactionStore could not release its Windows msvcrt lock."
+            ) from exc
+
+
+def _is_windows_lock_contention(exc: OSError) -> bool:
+    """Return whether one Windows lock error means another process owns it."""
+
+    return exc.errno in {errno.EACCES, errno.EDEADLK} or (
+        getattr(exc, "winerror", None) == _WINDOWS_LOCK_VIOLATION
+    )
+
+
+def _select_file_lock_backend(platform_name: str) -> Any:
+    """Select one supported lock backend without permitting an unlocked path."""
+
+    if platform_name == "posix":
+        if _fcntl is None or any(
+            not hasattr(_fcntl, attribute)
+            for attribute in ("flock", "LOCK_EX", "LOCK_UN")
+        ):
+            raise FileLockUnavailable(
+                "TransactionStore requires fcntl.flock on macOS/Linux and will not run unlocked."
+            )
+        return _PosixFileLockBackend(_fcntl)
+    if platform_name == "nt":
+        if _msvcrt is None or any(
+            not hasattr(_msvcrt, attribute)
+            for attribute in ("locking", "LK_NBLCK", "LK_UNLCK")
+        ):
+            raise FileLockUnavailable(
+                "TransactionStore requires msvcrt.locking on Windows and will not run unlocked."
+            )
+        return _WindowsFileLockBackend(_msvcrt)
+    raise FileLockUnavailable(
+        f"TransactionStore has no cross-process lock backend for os.name={platform_name!r}; "
+        "it will not run unlocked."
+    )
+
+
+def _lock_platform_name() -> str:
+    """Return the platform discriminator used only by the lock backend seam."""
+
+    return os.name
 
 
 class TransactionState(str, Enum):
@@ -748,27 +869,50 @@ class TransactionStore:
 
     @contextmanager
     def _transaction_lock(self, transaction_id: str) -> Iterator[None]:
-        if os.name == "nt" or _fcntl is None:
-            raise FileLockUnavailable(
-                "TransactionStore cross-process locking requires fcntl.flock on macOS/Linux. "
-                "Windows needs a separate lock backend and is intentionally not run unlocked."
-            )
+        backend = _select_file_lock_backend(_lock_platform_name())
         lock_path = self.locks_dir / f"{transaction_id}.lock"
         if lock_path.is_symlink():
             raise StateCorruptionError(f"Transaction lock cannot be a symlink: {lock_path}")
-        flags = os.O_RDWR | os.O_CREAT
+        flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_BINARY", 0)
         if hasattr(os, "O_NOFOLLOW"):
             flags |= os.O_NOFOLLOW
         fd = os.open(lock_path, flags, 0o600)
-        handle = os.fdopen(fd, "a+b", closefd=True)
         try:
-            _fcntl.flock(handle.fileno(), _fcntl.LOCK_EX)
-            yield
-        finally:
+            # Windows byte-range locks may extend beyond EOF.  Keep a newly
+            # created lock file empty so concurrent first users do not write
+            # byte zero before either one has acquired the lock protecting it.
+            handle = os.fdopen(fd, "r+b", buffering=0, closefd=True)
+        except BaseException:
+            os.close(fd)
+            raise
+
+        acquired = False
+        body_error: BaseException | None = None
+        try:
+            backend.acquire(handle)
+            acquired = True
             try:
-                _fcntl.flock(handle.fileno(), _fcntl.LOCK_UN)
-            finally:
+                yield
+            except BaseException as exc:
+                body_error = exc
+                raise
+        finally:
+            cleanup_error: BaseException | None = None
+            if acquired:
+                try:
+                    backend.release(handle)
+                except BaseException as exc:
+                    cleanup_error = exc
+            try:
                 handle.close()
+            except BaseException as exc:
+                if cleanup_error is None:
+                    cleanup_error = exc
+            # Closing the descriptor is the final OS-level release fallback.
+            # Preserve a transaction-body failure instead of replacing it with
+            # a secondary cleanup exception.
+            if cleanup_error is not None and body_error is None:
+                raise cleanup_error
 
     def _transaction_dir(self, transaction_id: str) -> Path:
         path = self.transactions_dir / transaction_id

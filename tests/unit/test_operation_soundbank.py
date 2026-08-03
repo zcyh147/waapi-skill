@@ -8,6 +8,8 @@ from typing import Any, Mapping
 
 import pytest  # pyright: ignore[reportMissingImports]
 
+from tests.support.platform_filesystem import create_symlink_or_skip
+
 from wwise_waapi.canonical import canonical_sha256  # pyright: ignore[reportMissingImports]
 from wwise_waapi.operation_soundbank import (  # pyright: ignore[reportMissingImports]
     ARTIFACT_TREE_CONTRACT,
@@ -402,7 +404,7 @@ def test_2021_language_inventory_is_hash_bound_and_rejects_dirty_disk_evidence(t
     assert dirty.value.error_code == "PROJECT_DIRTY"
 
     linked = tmp_path / "linked-project.wproj"
-    linked.symlink_to(project_file)
+    create_symlink_or_skip(linked, project_file)
     with pytest.raises(SoundBankContractError) as symlink:
         parse_wwise_2021_language_inventory(
             linked,
@@ -440,7 +442,7 @@ def test_2021_project_file_parser_rejects_dirty_escape_and_symlink(tmp_path: Pat
     assert outside_root != contained_root
 
     link = outside_project.parent / "Linked.wproj"
-    link.symlink_to(outside_project)
+    create_symlink_or_skip(link, outside_project)
     with pytest.raises(SoundBankContractError) as symlink:
         parse_wwise_2021_project_file(
             link,
@@ -575,10 +577,7 @@ def test_artifact_path_and_tree_reject_escape_symlink_and_limits(tmp_path: Path)
     assert limited.value.error_code == "LIMIT_EXCEEDED"
 
     link = output / "escape"
-    try:
-        link.symlink_to(outside, target_is_directory=True)
-    except OSError:
-        pytest.skip("Host does not permit symbolic links")
+    create_symlink_or_skip(link, outside, target_is_directory=True)
     with pytest.raises(SoundBankContractError) as symlinked:
         capture_artifact_tree(output, io_root=io_root)
     assert symlinked.value.error_code == "SYMLINK_NOT_ALLOWED"
@@ -920,10 +919,7 @@ def test_file_proof_rejects_symbolic_link_leaf(tmp_path: Path) -> None:
     target = tmp_path / "target.txt"
     target.write_text('Bank_A\t"Event_A"\n', encoding="utf-8")
     link = tmp_path / "link.txt"
-    try:
-        link.symlink_to(target)
-    except OSError:
-        pytest.skip("Host does not permit symbolic links")
+    create_symlink_or_skip(link, target)
 
     with pytest.raises(SoundBankContractError) as exc:
         parse_soundbank_definition_file(link)

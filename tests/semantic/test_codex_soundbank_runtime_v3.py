@@ -12,6 +12,7 @@ from typing import Any, Mapping, Sequence
 
 import pytest
 
+from tests.support.platform_filesystem import create_symlink_or_skip
 from tests.semantic.support.codex_eval_bundle_v3 import load_eval_bundle_v3
 from tests.semantic.support.codex_compound_heavy_v1 import (
     load_compound_heavy_profile,
@@ -276,7 +277,7 @@ class FakeSoundBankBackend:
             source_row["originalFilePath"] = str(fixture.wav_path)
         elif self.symlink_copied_path:
             alias = copied.with_name("alias-" + copied.name)
-            alias.symlink_to(copied)
+            create_symlink_or_skip(alias, copied)
             source_row["originalFilePath"] = str(alias)
         else:
             source_row["originalFilePath"] = str(copied)
@@ -1846,7 +1847,7 @@ def test_root_reuse_escape_symlink_and_cleanup_residual_fail_closed(tmp_path: Pa
     original = Path(proof.path)
     target = original.with_suffix(".real")
     original.rename(target)
-    original.symlink_to(target)
+    create_symlink_or_skip(original, target)
     with pytest.raises(SoundBankRuntimeError, match="symlink"):
         runtime.snapshot()
 

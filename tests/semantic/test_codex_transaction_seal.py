@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest  # pyright: ignore[reportMissingImports]
 
+from tests.support.platform_filesystem import create_symlink_or_skip
 from tests.semantic.support.codex_transaction_seal import (
     PREVIEW_SEAL_CONTRACT,
     PREVIEW_SEAL_EVIDENCE_CONTRACT,
@@ -343,7 +344,7 @@ def test_symlinked_preview_and_state_root_are_rejected(tmp_path: Path) -> None:
     external = tmp_path / "external-preview.json"
     external.write_bytes(preview.read_bytes())
     preview.unlink()
-    preview.symlink_to(external)
+    create_symlink_or_skip(preview, external)
 
     with pytest.raises(TransactionSealError, match="preview.json cannot be a symlink"):
         verify_preview_seal(
@@ -354,7 +355,7 @@ def test_symlinked_preview_and_state_root_are_rejected(tmp_path: Path) -> None:
         )
 
     root_link = tmp_path / "state-link"
-    root_link.symlink_to(state_root, target_is_directory=True)
+    create_symlink_or_skip(root_link, state_root, target_is_directory=True)
     with pytest.raises(TransactionSealError, match="State-directory symlink"):
         create_preview_seal(root_link, "tx-sealed")
 

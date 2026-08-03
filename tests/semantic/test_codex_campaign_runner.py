@@ -11,6 +11,7 @@ import pytest
 from tests.semantic import run_codex_skill_campaign as campaign_script
 from tests.semantic import run_codex_skill_matrix as matrix
 from tests.semantic.support.codex_campaign import CampaignEvidenceError
+from tests.support.platform_filesystem import create_symlink_or_skip
 from tests.semantic.support.codex_campaign_runner import (
     AUTO_RETRY_CATEGORIES,
     LIVE_PREFLIGHT_CONTRACT,
@@ -761,7 +762,7 @@ def test_expected_skill_symlink_is_replaced_by_regular_attestation(tmp_path: Pat
         / "waapi-skill"
     )
     link.parent.mkdir(parents=True)
-    link.symlink_to(skill_source, target_is_directory=True)
+    create_symlink_or_skip(link, skill_source, target_is_directory=True)
 
     replaced = replace_expected_skill_symlinks(
         attempt,
@@ -786,7 +787,7 @@ def test_any_unexpected_symlink_blocks_skill_link_replacement(tmp_path: Path) ->
     attempt.mkdir()
     target = attempt / "regular.txt"
     target.write_text("evidence\n", encoding="utf-8")
-    (attempt / "unexpected-link").symlink_to(target)
+    create_symlink_or_skip(attempt / "unexpected-link", target)
 
     with pytest.raises(CampaignEvidenceError, match="unexpected symlink"):
         replace_expected_skill_symlinks(

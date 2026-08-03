@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from tests.support.platform_filesystem import create_symlink_or_skip
 from tests.semantic.support.codex_eval_protocol_v3 import (
     build_direct_protocol,
     build_metadata_transaction_protocol,
@@ -617,7 +618,7 @@ def test_object_input_manifest_rejects_symlink(tmp_path: Path) -> None:
     source = tmp_path / "source.wav"
     source.write_bytes(b"wav")
     link = tmp_path / "link.wav"
-    link.symlink_to(source)
+    create_symlink_or_skip(link, source)
     with pytest.raises(ObjectBusinessPlanError, match="regular file"):
         seal_object_input_file_manifest({"fixture": link})
 

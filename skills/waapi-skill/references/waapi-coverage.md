@@ -166,7 +166,7 @@ closed until the packaged contract is reviewed and updated.
 
 ## Verification scope
 
-The focused program gate currently contains 2411 passing tests and exercises
+The focused program gate currently contains 2498 passing tests and exercises
 all 808 packaged route-contract version/API rows with
 in-process fake clients. It validates exact URI dispatch, reflected request and
 result/event schemas, timeout/result ceilings, all three modification-policy

@@ -14,6 +14,7 @@ from typing import Any, Mapping
 
 import pytest
 
+from tests.support.platform_filesystem import create_symlink_or_skip
 from tests.semantic.support.codex_cli_runtime_v3 import (
     CLI_APIS,
     MAX_LOG_BYTES,
@@ -1466,7 +1467,7 @@ def test_cli_blocks_before_launch_when_control_template_has_a_symlink(
     console, source = _make_prerequisites(tmp_path / "prerequisites")
     outside = tmp_path / "outside.wwu"
     outside.write_text("outside", encoding="utf-8")
-    (source.parent / "escaped.wwu").symlink_to(outside)
+    create_symlink_or_skip(source.parent / "escaped.wwu", outside)
     world = _FakeWorld(source_project=source, console_path=console)
 
     outcome = run_heavy_cli_unit(

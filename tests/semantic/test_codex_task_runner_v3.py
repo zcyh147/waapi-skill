@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 
+from tests.support.platform_filesystem import create_symlink_or_skip
 from tests.semantic.support.codex_business_oracle_plan_v3 import (
     write_business_oracle_plan,
 )
@@ -745,6 +746,13 @@ def _run_infrastructure_task(
 ) -> Path:
     skill_source = tmp_path / "skill"
     skill_source.mkdir()
+    skill_probe = tmp_path / "skill-symlink-probe"
+    create_symlink_or_skip(
+        skill_probe,
+        skill_source,
+        target_is_directory=True,
+    )
+    skill_probe.unlink()
     scenario_root = tmp_path / "scenario"
     (scenario_root / "evidence").mkdir(parents=True)
     (scenario_root / "owned").mkdir()

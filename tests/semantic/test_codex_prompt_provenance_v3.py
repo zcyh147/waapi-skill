@@ -9,6 +9,7 @@ from typing import Any, Callable
 
 import pytest
 
+from tests.support.platform_filesystem import create_symlink_or_skip
 from tests.semantic.support.codex_business_oracle_plan_v3 import (
     business_family_for_api,
     write_business_oracle_plan,
@@ -903,7 +904,7 @@ def test_integration_owned_directory_cannot_escape_or_use_a_symlink(
     )
     source_directory = Path(values["weather_source_directory"])
     source_directory.rmdir()
-    source_directory.symlink_to(outside, target_is_directory=True)
+    create_symlink_or_skip(source_directory, outside, target_is_directory=True)
     with pytest.raises(PromptProvenanceError, match="symlink"):
         _write(
             scenario=scenario,
@@ -1059,7 +1060,10 @@ def test_read_rejects_missing_directory_and_symlink_provenance_file(
     symlink_root = _scenario_root(tmp_path, "symlink")
     external = tmp_path / "external.json"
     external.write_text("{}", encoding="utf-8")
-    (symlink_root / "evidence" / PROMPT_PROVENANCE_FILE).symlink_to(external)
+    create_symlink_or_skip(
+        symlink_root / "evidence" / PROMPT_PROVENANCE_FILE,
+        external,
+    )
     with pytest.raises(PromptProvenanceError, match="cannot open|regular file"):
         _read_again(
             symlink_root / "evidence" / PROMPT_PROVENANCE_FILE,
@@ -1072,7 +1076,7 @@ def test_read_rejects_missing_directory_and_symlink_provenance_file(
 def test_rejects_symlink_scenario_root_and_symlink_input_path(tmp_path: Path) -> None:
     real_root = _scenario_root(tmp_path, "real")
     linked_root = tmp_path / "linked"
-    linked_root.symlink_to(real_root, target_is_directory=True)
+    create_symlink_or_skip(linked_root, real_root, target_is_directory=True)
     scenario = _scenario(api="ak.wwise.core.object.get")
     with pytest.raises(PromptProvenanceError, match="root must not be a symlink"):
         _write(
@@ -1085,7 +1089,7 @@ def test_rejects_symlink_scenario_root_and_symlink_input_path(tmp_path: Path) ->
     outside = tmp_path / "outside-io"
     outside.mkdir()
     io_link = root / "owned" / "io"
-    io_link.symlink_to(outside, target_is_directory=True)
+    create_symlink_or_skip(io_link, outside, target_is_directory=True)
     scenario, protocol, values = _audio_convert_case(root, io_root=io_link)
     with pytest.raises(PromptProvenanceError, match="symlink"):
         _write(

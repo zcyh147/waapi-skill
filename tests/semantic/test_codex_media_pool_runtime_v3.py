@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import struct
 import uuid
 from dataclasses import replace
@@ -11,6 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from tests.support.platform_filesystem import create_symlink_or_skip
 from tests.semantic import run_codex_skill_campaign as campaign
 from tests.semantic.support import codex_heavy_project_runner_v3 as heavy_runner
 from tests.semantic.support.codex_audio_media_business_plan_v3 import (
@@ -322,9 +322,21 @@ def _round_trip_isolation(
     dosdevices = wine_prefix / "dosdevices"
     dosdevices.mkdir(parents=True)
     (wine_prefix / "drive_c").mkdir()
-    os.symlink(WINE_Z_DRIVE_TARGET, dosdevices / "z:")
-    os.symlink(WINE_C_DRIVE_TARGET, dosdevices / "c:")
-    os.symlink(str(launch_home), dosdevices / "y:")
+    create_symlink_or_skip(
+        dosdevices / "z:",
+        WINE_Z_DRIVE_TARGET,
+        target_is_directory=True,
+    )
+    create_symlink_or_skip(
+        dosdevices / "c:",
+        WINE_C_DRIVE_TARGET,
+        target_is_directory=True,
+    )
+    create_symlink_or_skip(
+        dosdevices / "y:",
+        launch_home,
+        target_is_directory=True,
+    )
     real_home = real_home or (tmp_path / "real-account-home")
     global_state = real_home / "Library" / "Application Support" / "Audiokinetic" / "Wwise"
     global_state.mkdir(parents=True)
@@ -880,7 +892,7 @@ def test_custom_database_wine_path_boundary_is_exact_and_fail_closed(
     assert localized == source.resolve()
 
     alias = owned / "source-alias"
-    os.symlink(source, alias)
+    create_symlink_or_skip(alias, source, target_is_directory=True)
     with pytest.raises(MediaPoolRuntimeError, match="symlink"):
         host_directory_to_wine_z_path(
             alias,
@@ -891,7 +903,7 @@ def test_custom_database_wine_path_boundary_is_exact_and_fail_closed(
 
     z_drive = isolation.wine_prefix / "dosdevices" / "z:"
     z_drive.unlink()
-    os.symlink("/tmp", z_drive)
+    create_symlink_or_skip(z_drive, "/tmp", target_is_directory=True)
     with pytest.raises(MediaPoolRuntimeError, match="unexpected target"):
         validate_macos_wine_prefix(
             owned_root=owned,
@@ -1110,7 +1122,7 @@ def test_all_five_full_fixture_oracles_compile_typed_business_plan(
         unrelated.mkdir()
         target = tmp_path / "cxbottle-target.conf"
         target.write_text("private Wine state\n", encoding="utf-8")
-        os.symlink(target, unrelated / "cxbottle.conf")
+        create_symlink_or_skip(unrelated / "cxbottle.conf", target)
     validate_media_pool_business_plan(
         sections,
         case,
@@ -1751,7 +1763,7 @@ def test_reference_associations_close_posix_z_and_relative_original_paths(
         if item.asset.referenced_by
     )
     alias = first_path.with_name("reference-alias.wav")
-    os.symlink(first_path, alias)
+    create_symlink_or_skip(alias, first_path)
     tampered = [dict(row) for row in relative_rows]
     tampered[0]["originalFilePath"] = alias.relative_to(originals_root).as_posix()
     assert not verify_reference_associations(staged, {"return": tampered}).ok

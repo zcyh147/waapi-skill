@@ -9,6 +9,7 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 import tests.destructive.support.live_environment as live_env  # pyright: ignore[reportMissingImports]
 import tests.destructive.support.sandbox_fixture as sandbox_fixture  # pyright: ignore[reportMissingImports]
+from tests.support.platform_filesystem import create_symlink_or_skip
 from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
     ENV_WWISE_REAL_LAUNCH_AUDIT_PATH,
     ENV_WWISE_SANDBOX_KEEP_ON_FAILURE,
@@ -358,7 +359,7 @@ def test_case_owned_wine_prefix_rejects_invalid_home_existing_symlink_and_escape
         real_home = case_owned_root / "real-home"
         real_home.mkdir()
         symlink_home = case_owned_root / "symlink-home"
-        symlink_home.symlink_to(real_home, target_is_directory=True)
+        create_symlink_or_skip(symlink_home, real_home, target_is_directory=True)
         symlink_home_env = {**env, "HOME": str(symlink_home)}
         with pytest.raises(SandboxFixtureError, match="HOME must be an existing real directory"):
             launch_sandboxed_wwise(
@@ -382,7 +383,7 @@ def test_case_owned_wine_prefix_rejects_invalid_home_existing_symlink_and_escape
         symlink_target = home / "symlink-target"
         symlink_target.mkdir()
         symlink_prefix = home / "symlink-prefix"
-        symlink_prefix.symlink_to(symlink_target, target_is_directory=True)
+        create_symlink_or_skip(symlink_prefix, symlink_target, target_is_directory=True)
         with pytest.raises(SandboxFixtureError, match="must not already exist .*symlink"):
             launch_sandboxed_wwise(
                 sandbox,
@@ -394,7 +395,11 @@ def test_case_owned_wine_prefix_rejects_invalid_home_existing_symlink_and_escape
         escaped_parent_target = tmp_path / "escaped-prefix-parent"
         escaped_parent_target.mkdir()
         symlink_parent = home / "linked-parent"
-        symlink_parent.symlink_to(escaped_parent_target, target_is_directory=True)
+        create_symlink_or_skip(
+            symlink_parent,
+            escaped_parent_target,
+            target_is_directory=True,
+        )
         with pytest.raises(SandboxFixtureError, match="symlink parent"):
             launch_sandboxed_wwise(
                 sandbox,

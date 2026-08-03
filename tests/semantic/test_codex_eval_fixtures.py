@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest  # pyright: ignore[reportMissingImports]
 
+from tests.support.platform_filesystem import create_symlink_or_skip
 from tests.semantic.support import codex_eval_fixtures as fixture_support
 from tests.semantic.support.codex_eval_fixtures import (
     AudioOracleSnapshot,
@@ -490,7 +491,7 @@ def test_packaged_gateway_binding_rejects_non_regular_runner(
     elif runner_kind == "symlink":
         target = tmp_path / "outside-run.py"
         target.write_text("# outside\n", encoding="utf-8")
-        runner.symlink_to(target)
+        create_symlink_or_skip(runner, target)
 
     with pytest.raises(FixtureContractError, match="runner (does not exist|must be a regular file)"):
         PackagedGatewayBinding(skill_source)

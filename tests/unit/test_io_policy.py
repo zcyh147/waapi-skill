@@ -8,6 +8,7 @@ import pytest  # pyright: ignore[reportMissingImports]
 from wwise_waapi.execution_contracts import ExecutionContractRegistry
 from wwise_waapi.io_policy import IOPolicyError, validate_isolated_io
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
+from tests.support.platform_filesystem import create_symlink_or_skip
 
 
 VERSION = "2025.1"
@@ -179,7 +180,7 @@ def test_existing_symlink_cannot_escape_write_root(tmp_path: Path):
     outside = tmp_path / "outside"
     root.mkdir()
     outside.mkdir()
-    (root / "escape").symlink_to(outside, target_is_directory=True)
+    create_symlink_or_skip(root / "escape", outside, target_is_directory=True)
 
     error = _assert_error(
         "IO_PATH_OUTSIDE_ROOT",
@@ -207,7 +208,7 @@ def test_filesystem_root_is_not_a_write_boundary(tmp_path: Path):
         version=VERSION,
         uri="ak.wwise.debug.generateToneWAV",
         args={"path": str(tmp_path / "tone.wav")},
-        io_root=Path("/"),
+        io_root=Path(tmp_path.anchor),
     )
 
 
@@ -569,7 +570,7 @@ def test_generate_soundbank_relative_symlink_cannot_escape_io_root(tmp_path: Pat
     outside = tmp_path / "outside"
     root.mkdir()
     outside.mkdir()
-    (root / "escape").symlink_to(outside, target_is_directory=True)
+    create_symlink_or_skip(root / "escape", outside, target_is_directory=True)
 
     error = _assert_error(
         "IO_PATH_OUTSIDE_ROOT",

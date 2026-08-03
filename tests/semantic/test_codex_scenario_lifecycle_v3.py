@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from tests.support.platform_filesystem import create_symlink_or_skip
 from tests.destructive.support.sandbox_fixture import (
     ProjectHash,
     SandboxMetadata,
@@ -151,7 +152,11 @@ def _install_home_populating_launch(
         preferences = private_home / "preferences"
         preferences.mkdir()
         (preferences / "settings.ini").write_bytes(b"settings")
-        os.symlink(str(symlink_target), private_home / "BuiltinBottles")
+        create_symlink_or_skip(
+            private_home / "BuiltinBottles",
+            symlink_target,
+            target_is_directory=True,
+        )
         return SimpleNamespace(
             host="127.0.0.1",
             port=49152,
@@ -331,7 +336,11 @@ def test_failed_scenario_archives_and_removes_only_launch_environment_root(
     runtime = controller.start()
     (private_home / "after-ready.log").write_text("codex state", encoding="utf-8")
     outside_link = runtime.io_root / "not-a-launch-environment-link"
-    os.symlink(str(external_target), outside_link)
+    create_symlink_or_skip(
+        outside_link,
+        external_target,
+        target_is_directory=True,
+    )
 
     result = controller.finish("FAIL", reason="oracle mismatch")
 
@@ -390,7 +399,7 @@ def test_changed_ready_symlink_blocks_archive_and_retains_private_home(
     runtime = controller.start()
     link = private_home / "BuiltinBottles"
     link.unlink()
-    os.symlink(str(second_target), link)
+    create_symlink_or_skip(link, second_target, target_is_directory=True)
 
     result = controller.finish("FAIL")
 
@@ -544,7 +553,11 @@ def test_not_started_failure_archives_private_home_without_ready_baseline(
             "{}\n",
             encoding="utf-8",
         )
-        os.symlink(str(external_target), private_home / "BuiltinBottles")
+        create_symlink_or_skip(
+            private_home / "BuiltinBottles",
+            external_target,
+            target_is_directory=True,
+        )
         raise RuntimeError("prelaunch failed")
 
     controller, private_home = _private_home_controller(
@@ -581,7 +594,11 @@ def test_unproven_start_failure_leaves_private_home_untouched(
 
     def failing_launch(sandbox, env):
         private_home = Path(env["HOME"])
-        os.symlink(str(external_target), private_home / "BuiltinBottles")
+        create_symlink_or_skip(
+            private_home / "BuiltinBottles",
+            external_target,
+            target_is_directory=True,
+        )
         sandbox.metadata.process_cleanup_result = None
         raise RuntimeError("readiness failed")
 

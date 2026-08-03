@@ -9,6 +9,7 @@ from typing import Any, Mapping, Sequence
 import pytest
 
 from tests.maintenance import collect_integration_workflows_v2_baseline as collector
+from tests.support.platform_filesystem import create_symlink_or_skip
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -569,7 +570,7 @@ def test_atomic_manifest_write_rejects_symlink(tmp_path: Path) -> None:
     destination = tmp_path / "baseline-2022.1.json"
     target = tmp_path / "target.json"
     target.write_text("{}\n", encoding="utf-8")
-    destination.symlink_to(target)
+    create_symlink_or_skip(destination, target)
     collection = collector.BaselineCollection(
         "2022.1",
         destination,
@@ -599,7 +600,7 @@ def test_repository_destination_keeps_leaf_symlink_for_writer_rejection(
     if not broken:
         outside.write_text("outside\n", encoding="utf-8")
     destination = parent / "baseline.json"
-    destination.symlink_to(outside)
+    create_symlink_or_skip(destination, outside)
 
     lexical = collector._repository_destination(
         repository,

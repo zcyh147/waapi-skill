@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import json
 import math
 import multiprocessing
@@ -10,6 +11,7 @@ from typing import Any
 import pytest  # pyright: ignore[reportMissingImports]
 
 import wwise_waapi.transactions as transaction_module
+from tests.support.platform_filesystem import create_symlink_or_skip
 from wwise_waapi.canonical import canonical_json, canonical_json_bytes, canonical_sha256, sha256_hex
 from wwise_waapi.transactions import (
     ArtifactIntegrityError,
@@ -65,6 +67,33 @@ def _race_draft_authorization(
         results.put(("rejected", mode))
     else:
         results.put(("committed", record.state.value))
+
+
+def _race_create_preview(
+    state_dir: str,
+    transaction_id: str,
+    contender: str,
+    ready: Any,
+    results: Any,
+) -> None:
+    store = TransactionStore(Path(state_dir))
+    if not ready.wait(timeout=5):
+        results.put(
+            ("unexpected", contender, "TimeoutError", "start signal was not received")
+        )
+        return
+    try:
+        record = store.create_preview(transaction_id, {"contender": contender})
+    except PreviewAlreadyExists:
+        results.put(("already_exists", contender))
+    except BaseException as exc:
+        results.put(("unexpected", contender, type(exc).__name__, str(exc)))
+    else:
+        results.put(("created", contender, record.state.value))
+
+
+def _cross_process_context() -> multiprocessing.context.BaseContext:
+    return multiprocessing.get_context("spawn" if os.name == "nt" else "fork")
 
 
 def _preview_path(state_dir: Path, transaction_id: str) -> Path:
@@ -796,26 +825,33 @@ def test_symlinked_store_components_fail_closed(tmp_path) -> None:
     external.mkdir()
     state_with_link = tmp_path / "linked-store"
     state_with_link.mkdir()
-    (state_with_link / "transactions").symlink_to(external, target_is_directory=True)
+    create_symlink_or_skip(
+        state_with_link / "transactions",
+        external,
+        target_is_directory=True,
+    )
     with pytest.raises(StateCorruptionError, match="Store directory cannot be a symlink"):
         TransactionStore(state_with_link)
 
     store = TransactionStore(tmp_path / "normal-store")
-    (store.locks_dir / "tx-lock-link.lock").symlink_to(external / "lock")
+    create_symlink_or_skip(store.locks_dir / "tx-lock-link.lock", external / "lock")
     with pytest.raises(StateCorruptionError, match="lock cannot be a symlink"):
         store.create_preview("tx-lock-link", {"safe": True})
 
-    (store.transactions_dir / "tx-dir-link").symlink_to(external, target_is_directory=True)
+    create_symlink_or_skip(
+        store.transactions_dir / "tx-dir-link",
+        external,
+        target_is_directory=True,
+    )
     with pytest.raises(StateCorruptionError, match="directory cannot be a symlink"):
         store.create_preview("tx-dir-link", {"safe": True})
 
 
-@pytest.mark.skipif(os.name == "nt", reason="fcntl race test is POSIX-only")
-def test_fcntl_lock_serializes_cross_process_state_race(tmp_path) -> None:
+def test_platform_lock_serializes_cross_process_state_race(tmp_path) -> None:
     store = TransactionStore(tmp_path)
     store.create_preview("tx-race", {"race": True})
     store.submit_for_confirmation("tx-race")
-    context = multiprocessing.get_context("fork")
+    context = _cross_process_context()
     ready = context.Event()
     results = context.Queue()
     processes = [
@@ -838,11 +874,10 @@ def test_fcntl_lock_serializes_cross_process_state_race(tmp_path) -> None:
     assert len(store.read_events("tx-race")) == 3
 
 
-@pytest.mark.skipif(os.name == "nt", reason="fcntl race test is POSIX-only")
-def test_fcntl_lock_serializes_competing_draft_authorization_paths(tmp_path) -> None:
+def test_platform_lock_serializes_competing_draft_authorization_paths(tmp_path) -> None:
     store = TransactionStore(tmp_path)
     store.create_preview("tx-authorization-race", {"race": True})
-    context = multiprocessing.get_context("fork")
+    context = _cross_process_context()
     ready = context.Event()
     results = context.Queue()
     processes = [
@@ -880,14 +915,170 @@ def test_fcntl_lock_serializes_competing_draft_authorization_paths(tmp_path) -> 
     }
 
 
-def test_missing_fcntl_fails_closed_with_windows_boundary_message(tmp_path, monkeypatch) -> None:
-    import wwise_waapi.transactions as transactions
-
+def test_platform_lock_serializes_first_concurrent_preview_creation(tmp_path) -> None:
     store = TransactionStore(tmp_path)
-    monkeypatch.setattr(transactions, "_fcntl", None)
+    transaction_id = "tx-first-preview-race"
+    lock_path = store.locks_dir / f"{transaction_id}.lock"
+    assert not lock_path.exists()
 
-    with pytest.raises(FileLockUnavailable, match="macOS/Linux.*Windows"):
+    context = _cross_process_context()
+    ready = context.Event()
+    results = context.Queue()
+    processes = [
+        context.Process(
+            target=_race_create_preview,
+            args=(str(tmp_path), transaction_id, contender, ready, results),
+        )
+        for contender in ("first", "second")
+    ]
+    for process in processes:
+        process.start()
+    ready.set()
+    outcomes = [results.get(timeout=10) for _ in processes]
+    for process in processes:
+        process.join(timeout=10)
+        assert process.exitcode == 0
+
+    assert sorted(outcome[0] for outcome in outcomes) == ["already_exists", "created"]
+    winner = next(outcome[1] for outcome in outcomes if outcome[0] == "created")
+    preview = store.load_preview(transaction_id)
+    assert preview.artifact == {"contender": winner}
+    assert len(store.read_events(transaction_id)) == 1
+
+
+def test_missing_posix_lock_backend_fails_closed(tmp_path, monkeypatch) -> None:
+    store = TransactionStore(tmp_path)
+    monkeypatch.setattr(transaction_module, "_fcntl", None)
+    monkeypatch.setattr(transaction_module, "_lock_platform_name", lambda: "posix")
+
+    with pytest.raises(FileLockUnavailable, match=r"fcntl\.flock.*will not run unlocked"):
         store.create_preview("tx-no-lock", {"unsafe": False})
+
+
+def test_missing_windows_lock_backend_fails_closed(tmp_path, monkeypatch) -> None:
+    store = TransactionStore(tmp_path)
+    monkeypatch.setattr(transaction_module, "_msvcrt", None)
+    monkeypatch.setattr(transaction_module, "_lock_platform_name", lambda: "nt")
+
+    with pytest.raises(FileLockUnavailable, match=r"msvcrt\.locking.*will not run unlocked"):
+        store.create_preview("tx-no-windows-lock", {"unsafe": False})
+
+    assert list(store.locks_dir.iterdir()) == []
+
+
+def test_windows_lock_backend_uses_byte_zero_beyond_eof_and_releases(tmp_path, monkeypatch) -> None:
+    class FakeMsvcrt:
+        LK_NBLCK = 1
+        LK_UNLCK = 2
+
+        def __init__(self) -> None:
+            self.calls: list[tuple[int, int, int, int]] = []
+
+        def locking(self, fd: int, mode: int, byte_count: int) -> None:
+            self.calls.append(
+                (
+                    mode,
+                    byte_count,
+                    os.lseek(fd, 0, os.SEEK_CUR),
+                    os.fstat(fd).st_size,
+                )
+            )
+
+    fake_msvcrt = FakeMsvcrt()
+    monkeypatch.setattr(transaction_module, "_msvcrt", fake_msvcrt)
+    monkeypatch.setattr(transaction_module, "_lock_platform_name", lambda: "nt")
+    store = TransactionStore(tmp_path)
+
+    store.create_preview("tx-windows-lock", {"safe": True})
+
+    assert fake_msvcrt.calls == [
+        (fake_msvcrt.LK_NBLCK, 1, 0, 0),
+        (fake_msvcrt.LK_UNLCK, 1, 0, 0),
+    ]
+    assert (store.locks_dir / "tx-windows-lock.lock").read_bytes() == b""
+
+
+def test_windows_lock_retries_only_recognized_contention(tmp_path, monkeypatch) -> None:
+    class FakeMsvcrt:
+        LK_NBLCK = 1
+        LK_UNLCK = 2
+
+        def __init__(self) -> None:
+            self.acquire_attempts = 0
+
+        def locking(self, _fd: int, mode: int, _byte_count: int) -> None:
+            if mode == self.LK_NBLCK:
+                self.acquire_attempts += 1
+                if self.acquire_attempts == 1:
+                    raise OSError(errno.EACCES, "owned by another process")
+
+    fake_msvcrt = FakeMsvcrt()
+    sleeps: list[float] = []
+    monkeypatch.setattr(transaction_module, "_msvcrt", fake_msvcrt)
+    monkeypatch.setattr(transaction_module, "_lock_platform_name", lambda: "nt")
+    monkeypatch.setattr(transaction_module.time, "sleep", sleeps.append)
+    store = TransactionStore(tmp_path)
+
+    store.create_preview("tx-windows-contention", {"safe": True})
+
+    assert fake_msvcrt.acquire_attempts == 2
+    assert sleeps == [transaction_module._WINDOWS_LOCK_RETRY_SECONDS]
+
+
+def test_windows_lock_contention_classifier_is_narrow() -> None:
+    lock_violation = OSError(errno.EIO, "Windows lock violation")
+    lock_violation.winerror = transaction_module._WINDOWS_LOCK_VIOLATION
+
+    assert transaction_module._is_windows_lock_contention(
+        OSError(errno.EACCES, "access denied")
+    )
+    assert transaction_module._is_windows_lock_contention(
+        OSError(errno.EDEADLK, "deadlock")
+    )
+    assert transaction_module._is_windows_lock_contention(lock_violation)
+    assert not transaction_module._is_windows_lock_contention(
+        OSError(errno.EBADF, "invalid handle")
+    )
+
+
+def test_windows_lock_non_contention_error_fails_closed(tmp_path, monkeypatch) -> None:
+    class FakeMsvcrt:
+        LK_NBLCK = 1
+        LK_UNLCK = 2
+
+        @staticmethod
+        def locking(_fd: int, mode: int, _byte_count: int) -> None:
+            if mode == FakeMsvcrt.LK_NBLCK:
+                raise OSError(errno.EBADF, "invalid lock handle")
+
+    monkeypatch.setattr(transaction_module, "_msvcrt", FakeMsvcrt())
+    monkeypatch.setattr(transaction_module, "_lock_platform_name", lambda: "nt")
+    store = TransactionStore(tmp_path)
+
+    with pytest.raises(FileLockUnavailable, match="could not acquire.*msvcrt"):
+        store.create_preview("tx-windows-bad-handle", {"safe": True})
+
+
+def test_windows_unlock_failure_does_not_mask_body_error(tmp_path, monkeypatch) -> None:
+    class FakeMsvcrt:
+        LK_NBLCK = 1
+        LK_UNLCK = 2
+
+        @staticmethod
+        def locking(_fd: int, mode: int, _byte_count: int) -> None:
+            if mode == FakeMsvcrt.LK_UNLCK:
+                raise OSError(errno.EBADF, "invalid lock handle")
+
+    class BodyError(RuntimeError):
+        pass
+
+    monkeypatch.setattr(transaction_module, "_msvcrt", FakeMsvcrt())
+    monkeypatch.setattr(transaction_module, "_lock_platform_name", lambda: "nt")
+    store = TransactionStore(tmp_path)
+
+    with pytest.raises(BodyError, match="transaction body failed"):
+        with store._transaction_lock("tx-windows-body-error"):
+            raise BodyError("transaction body failed")
 
 
 def test_journal_ahead_state_is_repaired_after_interrupted_materialization(tmp_path) -> None:

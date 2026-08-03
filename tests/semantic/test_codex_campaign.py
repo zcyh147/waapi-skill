@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 import tests.semantic.support.codex_campaign as campaign_module
+from tests.support.platform_filesystem import create_symlink_or_skip
 
 from tests.semantic.support.codex_campaign import (
     ATTEMPT_LEDGER_FILE,
@@ -84,7 +85,7 @@ def test_stable_tree_hash_ignores_times_but_binds_content_mode_path_and_symlink(
     target_a.write_text("same", encoding="utf-8")
     target_b.write_text("same", encoding="utf-8")
     link = root / "link"
-    link.symlink_to("target-a")
+    create_symlink_or_skip(link, "target-a")
 
     baseline = stable_tree_sha256(root)
     os.utime(payload, (payload.stat().st_atime + 10, payload.stat().st_mtime + 10))
@@ -102,10 +103,10 @@ def test_stable_tree_hash_ignores_times_but_binds_content_mode_path_and_symlink(
     assert stable_tree_sha256(root) == baseline
 
     link.unlink()
-    link.symlink_to("target-b")
+    create_symlink_or_skip(link, "target-b")
     assert stable_tree_sha256(root) != baseline
     link.unlink()
-    link.symlink_to("target-a")
+    create_symlink_or_skip(link, "target-a")
     assert stable_tree_sha256(root) == baseline
 
     payload.rename(root / "renamed.txt")
@@ -121,7 +122,7 @@ def test_stable_tree_manifest_records_symlink_without_following_and_supports_exc
     ignored = root / "ignored"
     ignored.mkdir()
     (ignored / "secret").write_text("secret", encoding="utf-8")
-    (root / "link").symlink_to("missing-target")
+    create_symlink_or_skip(root / "link", "missing-target")
 
     rows = stable_tree_manifest(root, exclude_names=("ignored",))
 
@@ -179,7 +180,7 @@ def test_verified_json_uses_one_nofollow_read_per_attested_file(
     real = tmp_path / "real.json"
     atomic_write_json_with_digest(real, {"safe": True})
     link = tmp_path / "link.json"
-    link.symlink_to(real.name)
+    create_symlink_or_skip(link, real.name)
     shutil.copyfile(
         real.with_name(real.name + ".sha256"),
         link.with_name(link.name + ".sha256"),
@@ -385,7 +386,7 @@ def test_attempt_seal_rejects_symlinks_and_unsafe_manifest_paths(tmp_path: Path)
     root = _campaign(tmp_path)
     _attempt_id, attempt = create_attempt(root)
     (attempt / "real.txt").write_text("real", encoding="utf-8")
-    (attempt / "link.txt").symlink_to("real.txt")
+    create_symlink_or_skip(attempt / "link.txt", "real.txt")
     with pytest.raises(CampaignEvidenceError, match="may not contain symlinks"):
         seal_attempt(attempt, [])
 

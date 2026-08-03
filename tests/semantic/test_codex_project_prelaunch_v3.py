@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.support.platform_filesystem import create_symlink_or_skip
 from tests.semantic.support import codex_project_prelaunch_v3 as prelaunch
 from tests.semantic.support.codex_project_prelaunch_v3 import (
     ProjectPrelaunchError,
@@ -361,7 +362,7 @@ def test_added_guids_are_deterministic(tmp_path: Path) -> None:
 
 def test_rejects_symlinked_project(tmp_path: Path) -> None:
     project = tmp_path / "project.wproj"
-    project.symlink_to(SOURCE_PROJECT)
+    create_symlink_or_skip(project, SOURCE_PROJECT)
     io_root = tmp_path / "io"
     io_root.mkdir()
 

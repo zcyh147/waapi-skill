@@ -10,6 +10,7 @@ from typing import Mapping, Sequence
 
 import pytest
 
+from tests.support.platform_filesystem import create_symlink_or_skip
 from .support import codex_harness as codex_harness_module
 from .support.codex_harness import (  # pyright: ignore[reportMissingImports]
     CodexCliHarness,
@@ -50,6 +51,14 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
     ExpectedGatewayStep,
     GATEWAY_REQUIRED_ENV,
 )
+
+
+def _require_auth_symlink_capability(tmp_path: Path, auth: Path) -> None:
+    """Skip POSIX-auth-link tests only when this Windows token lacks privilege."""
+
+    probe = tmp_path / "auth-symlink-probe"
+    create_symlink_or_skip(probe, auth)
+    probe.unlink()
 
 
 def completed_record(
@@ -447,6 +456,7 @@ def test_prompt_audit_and_exec_environments_scrub_ambient_waapi_state(
 ) -> None:
     auth = tmp_path / "auth.json"
     auth.write_text("{}\n", encoding="utf-8")
+    _require_auth_symlink_capability(tmp_path, auth)
     ambient_sensitive = {
         "WWISE_WAAPI_PORT": "65535",
         "WWISE_EVIDENCE_DIR": "/ambient/evidence",
@@ -486,6 +496,7 @@ def test_isolated_environment_preserves_only_complete_runner_owned_broker_overla
 ) -> None:
     auth = tmp_path / "auth.json"
     auth.write_text("{}\n", encoding="utf-8")
+    _require_auth_symlink_capability(tmp_path, auth)
     scripts = tmp_path / "waapi-skill" / "scripts"
     scripts.mkdir(parents=True)
     (scripts / "run.py").write_text("raise SystemExit(0)\n", encoding="utf-8")
@@ -541,7 +552,7 @@ def test_codex_cli_task_reuses_one_disposable_state_and_resumes_exact_thread(
     workspace = tmp_path / "workspace"
     skills = workspace / ".agents" / "skills"
     skills.mkdir(parents=True)
-    (skills / "waapi-skill").symlink_to(skill, target_is_directory=True)
+    create_symlink_or_skip(skills / "waapi-skill", skill, target_is_directory=True)
     commands: list[tuple[str, ...]] = []
     execution_environments: list[dict[str, str]] = []
     prompt_audit_homes: list[str] = []
@@ -655,7 +666,7 @@ def test_codex_cli_task_fails_closed_on_resumed_thread_id_mismatch(
     workspace = tmp_path / "workspace"
     skills = workspace / ".agents" / "skills"
     skills.mkdir(parents=True)
-    (skills / "waapi-skill").symlink_to(skill, target_is_directory=True)
+    create_symlink_or_skip(skills / "waapi-skill", skill, target_is_directory=True)
     thread_ids = iter(("thread-initial", "thread-wrong"))
 
     monkeypatch.setattr(
@@ -747,7 +758,7 @@ def test_harness_verify_requires_exactly_one_installed_workspace_skill(tmp_path:
     workspace = tmp_path / "workspace"
     skills = workspace / ".agents" / "skills"
     skills.mkdir(parents=True)
-    (skills / "waapi-skill").symlink_to(source, target_is_directory=True)
+    create_symlink_or_skip(skills / "waapi-skill", source, target_is_directory=True)
     harness = CodexCliHarness(
         CodexHarnessConfig(
             workspace=workspace,
@@ -758,7 +769,7 @@ def test_harness_verify_requires_exactly_one_installed_workspace_skill(tmp_path:
     )
 
     harness.verify()
-    (skills / "unexpected-skill").symlink_to(source, target_is_directory=True)
+    create_symlink_or_skip(skills / "unexpected-skill", source, target_is_directory=True)
 
     with pytest.raises(CodexHarnessError, match="only waapi-skill"):
         harness.verify()
@@ -1388,7 +1399,7 @@ def test_workspace_snapshot_does_not_follow_skill_symlink_and_reports_source_fil
     (external / "SKILL.md").write_text("external\n", encoding="utf-8")
     install = workspace / ".agents" / "skills"
     install.mkdir(parents=True)
-    (install / "waapi-skill").symlink_to(external, target_is_directory=True)
+    create_symlink_or_skip(install / "waapi-skill", external, target_is_directory=True)
 
     before = snapshot_workspace(workspace)
     (workspace / "helper.py").write_text("print('no')\n", encoding="utf-8")
@@ -1409,11 +1420,11 @@ def test_workspace_snapshot_detects_skill_symlink_retargeting(tmp_path: Path) ->
     first.mkdir()
     second.mkdir()
     install = skills / "waapi-skill"
-    install.symlink_to(first, target_is_directory=True)
+    create_symlink_or_skip(install, first, target_is_directory=True)
     before = snapshot_workspace(workspace)
 
     install.unlink()
-    install.symlink_to(second, target_is_directory=True)
+    create_symlink_or_skip(install, second, target_is_directory=True)
     after = snapshot_workspace(workspace)
     created, modified = workspace_changes(before, after)
 

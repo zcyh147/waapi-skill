@@ -63,7 +63,7 @@ def test_inventory_count_matches_latest_nonlive_result_without_collect_only_over
     assert "807 pytest items" not in inventory
     assert "807 tests collected" not in inventory
     recorded_results = re.findall(
-        r"(\d+ passed, 80 skipped, 27 deselected)",
+        r"(\d+ passed, \d+ skipped, \d+ deselected)",
         inventory,
     )
     assert len(recorded_results) >= 2

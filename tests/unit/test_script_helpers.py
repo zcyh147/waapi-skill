@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pytest  # pyright: ignore[reportMissingImports]
 
+from tests.support.platform_filesystem import create_symlink_or_skip
+
 script_config = importlib.import_module("scripts.config")
 run_script = importlib.import_module("scripts.run")
 setup_script = importlib.import_module("scripts.setup_environment")
@@ -371,7 +373,7 @@ def test_run_bootstrap_rejects_untrusted_setup_target_without_execution(
     if setup_state == "symlink":
         outside = tmp_path / "outside_setup.py"
         outside.write_text("raise SystemExit(0)\n", encoding="utf-8")
-        (scripts_root / "setup_environment.py").symlink_to(outside)
+        create_symlink_or_skip(scripts_root / "setup_environment.py", outside)
     monkeypatch.setattr(run_script, "SKILL_DIR", skill_root)
     monkeypatch.setattr(run_script, "VENV_DIR", tmp_path / ".venv-missing")
     monkeypatch.setattr(
@@ -441,7 +443,7 @@ def test_run_main_rejects_symlinked_packaged_script(
     scripts_root.mkdir(parents=True)
     outside = tmp_path / "outside.py"
     outside.write_text("raise SystemExit(0)\n", encoding="utf-8")
-    (scripts_root / "gateway.py").symlink_to(outside)
+    create_symlink_or_skip(scripts_root / "gateway.py", outside)
     monkeypatch.setattr(run_script, "SKILL_DIR", skill_root)
     monkeypatch.setattr(run_script, "VENV_DIR", tmp_path / ".venv")
     run_script.VENV_DIR.mkdir(parents=True)
@@ -456,7 +458,11 @@ def test_packaged_script_resolver_rejects_symlinked_scripts_directory(tmp_path: 
     outside_scripts = tmp_path / "outside-scripts"
     outside_scripts.mkdir()
     (outside_scripts / "gateway.py").write_text("raise SystemExit(0)\n", encoding="utf-8")
-    (skill_root / "scripts").symlink_to(outside_scripts, target_is_directory=True)
+    create_symlink_or_skip(
+        skill_root / "scripts",
+        outside_scripts,
+        target_is_directory=True,
+    )
 
     with pytest.raises(script_config.PackagedScriptError, match="outside the Skill root"):
         script_config.resolve_packaged_script(skill_root, "gateway.py")
@@ -569,7 +575,7 @@ def test_setup_environment_run_rejects_symlinked_allowlisted_target(
     scripts_root.mkdir(parents=True)
     outside = tmp_path / "outside.py"
     outside.write_text("raise SystemExit(0)\n", encoding="utf-8")
-    (scripts_root / "gateway.py").symlink_to(outside)
+    create_symlink_or_skip(scripts_root / "gateway.py", outside)
     monkeypatch.setattr(setup_script, "VENV_DIR", tmp_path / ".venv")
     env = setup_script.SkillEnvironment(skill_dir=skill_root)
 

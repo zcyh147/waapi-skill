@@ -10,6 +10,8 @@ from typing import Any, Mapping
 
 import pytest  # pyright: ignore[reportMissingImports]
 
+from tests.support.platform_filesystem import create_symlink_or_skip
+
 from wwise_waapi.operation_import import (  # pyright: ignore[reportMissingImports]
     expected_audio_file_source_result_path,
     regular_file_proof,
@@ -1636,19 +1638,23 @@ def test_originals_subfolder_rejects_symlink_root_or_path_components(
     if symlink_kind == "root":
         real_root = tmp_path / "RealOriginals"
         copied = _media(real_root, "Dialog/symlink.wav")
-        originals_root.symlink_to(real_root, target_is_directory=True)
+        create_symlink_or_skip(originals_root, real_root, target_is_directory=True)
         reported_copied = originals_root / "Dialog/symlink.wav"
     elif symlink_kind == "component":
         originals_root.mkdir()
         real_dialog = tmp_path / "RealDialog"
         copied = _media(real_dialog, "symlink.wav")
-        (originals_root / "Dialog").symlink_to(real_dialog, target_is_directory=True)
+        create_symlink_or_skip(
+            originals_root / "Dialog",
+            real_dialog,
+            target_is_directory=True,
+        )
         reported_copied = originals_root / "Dialog/symlink.wav"
     else:
         (originals_root / "Dialog").mkdir(parents=True)
         copied = _media(tmp_path, "real-symlink.wav")
         reported_copied = originals_root / "Dialog/symlink.wav"
-        reported_copied.symlink_to(copied)
+        create_symlink_or_skip(reported_copied, copied)
     path = OLD_ROOT + rf"\Symlink_{symlink_kind}"
     target = _target(source, path, requested_originals_subfolder="Dialog")
     live = _object_row(path, copied, relative_path="Dialog/symlink.wav")

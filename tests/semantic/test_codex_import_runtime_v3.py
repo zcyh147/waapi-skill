@@ -11,6 +11,7 @@ from typing import Any, Mapping, Sequence
 
 import pytest
 
+from tests.support.platform_filesystem import create_symlink_or_skip
 from tests.semantic.support import codex_import_runtime_v3 as import_runtime_v3
 
 from tests.semantic.support.codex_eval_bundle_v3 import (
@@ -1656,7 +1657,7 @@ def test_copied_original_evidence_rejects_escape_and_symlink_components(
     target = real / "target.wav"
     target.write_bytes(b"RIFF-target")
     link = originals / "linked"
-    link.symlink_to(real, target_is_directory=True)
+    create_symlink_or_skip(link, real, target_is_directory=True)
     with pytest.raises(ImportRuntimeError, match="symlink"):
         _copied_original_evidence(link / target.name, project_root=project_root)
 

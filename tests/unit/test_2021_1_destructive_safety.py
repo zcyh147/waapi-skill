@@ -8,6 +8,7 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 import tests.destructive.support.destructive_2021_sandbox as destructive_2021_sandbox  # pyright: ignore[reportMissingImports]
 import tests.destructive.support.live_environment as live_env  # pyright: ignore[reportMissingImports]
+from tests.support.platform_filesystem import create_symlink_or_skip
 from tests.destructive.support.destructive_2021_sandbox import (  # pyright: ignore[reportMissingImports]
     Destructive2021SandboxRuntime,
     DestructiveSandboxUnavailable,
@@ -264,12 +265,7 @@ def test_2021_sandbox_copy_target_rejects_symlink_to_installed_source(
     sandbox_root = tmp_path / "runtime" / "safe-sandbox-root"
     sandbox_project = sandbox_root / "sample-project-copy" / "SampleProject.wproj"
     sandbox_project.parent.mkdir(parents=True)
-    try:
-        sandbox_project.symlink_to(source_project)
-    except OSError as exc:
-        if getattr(exc, "winerror", None) == 1314:
-            pytest.skip("Windows host does not grant symlink privilege for this safety test")
-        raise
+    create_symlink_or_skip(sandbox_project, source_project)
     _configure_2021_paths(monkeypatch, console_path=console, sample_project_path=source_project)
     sandbox = _sandbox_project(source_project=source_project, sandbox_root=sandbox_root, sandbox_project=sandbox_project)
 

@@ -5,6 +5,7 @@ set "SCRIPT_DIR=%~dp0"
 for %%I in ("%SCRIPT_DIR%..") do set "ROOT_DIR=%%~fI"
 set "SKILL_DIR=%ROOT_DIR%\skills\waapi-skill"
 set "DEFAULT_SANDBOX_BASE=%ROOT_DIR%\.waapi-skill-state\runtime\wwise-waapi-sandboxes"
+set "PROGRAM_TEST_MANIFEST=%SCRIPT_DIR%program-test-nodes.txt"
 
 if defined PYTHONPATH (
     set "PYTHONPATH=%SKILL_DIR%;%PYTHONPATH%"
@@ -38,9 +39,9 @@ if "%~1"=="" goto args_done
 
 if "%AFTER_DASHDASH%"=="1" (
     if defined PYTEST_EXTRA_ARGS (
-        set "PYTEST_EXTRA_ARGS=!PYTEST_EXTRA_ARGS! %~1"
+        set "PYTEST_EXTRA_ARGS=!PYTEST_EXTRA_ARGS! "%~1""
     ) else (
-        set "PYTEST_EXTRA_ARGS=%~1"
+        set "PYTEST_EXTRA_ARGS="%~1""
     )
     shift
     goto parse_args
@@ -360,52 +361,11 @@ set "WWISE_WAAPI_PORT="
 set "PYTEST_ADDOPTS="
 call :print_context "none" "program"
 
-set "PROGRAM_EXPECT_VALUE=0"
-for %%A in (%PYTEST_EXTRA_ARGS%) do (
-    call :validate_program_pytest_arg "%%~A"
-    if errorlevel 1 goto fail_program_extra_path
-)
-if "!PROGRAM_EXPECT_VALUE!"=="1" goto fail_program_extra_value
-
-set "PROGRAM_TESTS=tests/unit/test_public_route_coverage_contract.py tests/unit/test_public_route_program_matrix.py tests/unit/test_public_route_negative_contracts.py tests/unit/test_io_policy.py tests/unit/test_transaction_cleanup.py tests/unit/test_transaction_gateway.py::test_generic_manifest_call_runs_full_preview_confirm_execute_verify_chain tests/unit/test_transaction_gateway.py::test_generic_isolated_call_runs_full_chain_with_bound_io_audit"
-set "PROGRAM_TESTS=!PROGRAM_TESTS! tests/unit/test_transaction_gateway.py::test_lifecycle_opener_cleanup_spec_survives_the_full_gateway_chain tests/unit/test_transaction_gateway.py::test_load_bank_cleanup_binding_cannot_be_overridden_by_execution_result tests/unit/test_transaction_gateway.py::test_transport_create_materializes_destroy_request_in_execute_verify_and_agent_result"
-set "PROGRAM_TESTS=!PROGRAM_TESTS! tests/unit/test_transaction_gateway.py::test_transport_verify_guard_failure_keeps_result_bound_destroy_request tests/unit/test_transaction_gateway.py::test_successful_mutation_with_journal_failure_keeps_execution_and_cleanup_facts"
-set "PROGRAM_TESTS=!PROGRAM_TESTS! tests/unit/test_transaction_gateway.py::test_transaction_readback_rejects_an_unreviewed_uri_before_dispatch tests/unit/test_transaction_gateway.py::test_lifecycle_opener_execution_exception_reports_unknown_cleanup"
-set "PROGRAM_TESTS=!PROGRAM_TESTS! tests/unit/test_transaction_gateway.py::test_work_unit_load_is_available_reversal_through_the_full_gateway_chain tests/unit/test_transaction_gateway.py::test_lifecycle_closer_is_not_reported_as_needing_more_cleanup"
-set "PROGRAM_TESTS=!PROGRAM_TESTS! tests/unit/test_operation_registry.py::test_undo_group_builds_one_exact_versioned_immutable_plan tests/unit/test_operation_registry.py::test_undo_group_rejects_independent_members_version_drift_and_large_requests"
-set "PROGRAM_TESTS=!PROGRAM_TESTS! tests/unit/test_operation_registry.py::test_undo_group_version_allowlist_is_exact_and_only_grows_at_reviewed_boundaries"
-set "PROGRAM_TESTS=!PROGRAM_TESTS! tests/unit/test_transaction_gateway.py::test_undo_group_success_uses_one_client_and_verifies_only_result_schemas tests/unit/test_transaction_gateway.py::test_undo_group_success_keeps_one_phase_copy_below_the_final_gateway_ceiling tests/unit/test_transaction_gateway.py::test_undo_group_success_with_journal_failure_is_not_replayed"
-set "PROGRAM_TESTS=!PROGRAM_TESTS! tests/unit/test_transaction_gateway.py::test_undo_group_inner_timeout_reserves_budget_cancels_and_never_retries tests/unit/test_transaction_gateway.py::test_undo_group_cancel_failure_is_terminal_indeterminate"
-set "PROGRAM_TESTS=!PROGRAM_TESTS! tests/unit/test_transaction_gateway.py::test_undo_group_malformed_begin_result_best_effort_cancels_but_stays_indeterminate tests/unit/test_transaction_gateway.py::test_undo_group_malformed_end_result_best_effort_cancels_but_stays_indeterminate"
-set "PROGRAM_TESTS=!PROGRAM_TESTS! tests/unit/test_transaction_gateway.py::test_undo_group_phase_exception_best_effort_cancels_and_remains_indeterminate tests/unit/test_transaction_gateway.py::test_undo_group_accumulated_result_limit_stops_inner_and_attempts_cancel"
-if exist "%ROOT_DIR%\tests\unit\test_public_route_registry_integrity.py" set "PROGRAM_TESTS=!PROGRAM_TESTS! tests/unit/test_public_route_registry_integrity.py"
-
 pushd "%ROOT_DIR%" >nul
-call poetry run python -m pytest !PROGRAM_TESTS! -m "not live and not destructive" --ignore=tests/semantic --ignore=tests/live --ignore=tests/destructive %PYTEST_EXTRA_ARGS%
+call poetry run python "%ROOT_DIR%\ci\run_program_tests.py" "%PROGRAM_TEST_MANIFEST%" !PYTEST_EXTRA_ARGS!
 set "RESULT=!ERRORLEVEL!"
 popd >nul
 exit /b !RESULT!
-
-:validate_program_pytest_arg
-if "!PROGRAM_EXPECT_VALUE!"=="1" (
-    set "PROGRAM_EXPECT_VALUE=0"
-    exit /b 0
-)
-set "PROGRAM_TOKEN=%~1"
-if /I "!PROGRAM_TOKEN!"=="-k" goto program_arg_requires_value
-if /I "!PROGRAM_TOKEN!"=="--maxfail" goto program_arg_requires_value
-if /I "!PROGRAM_TOKEN!"=="--tb" goto program_arg_requires_value
-if /I "!PROGRAM_TOKEN!"=="--color" goto program_arg_requires_value
-if /I "!PROGRAM_TOKEN!"=="--durations" goto program_arg_requires_value
-if /I "!PROGRAM_TOKEN!"=="--capture" goto program_arg_requires_value
-if /I "!PROGRAM_TOKEN!"=="--pyargs" exit /b 1
-if /I "!PROGRAM_TOKEN:~0,9!"=="--pyargs=" exit /b 1
-if "!PROGRAM_TOKEN:~0,1!"=="-" exit /b 0
-exit /b 1
-
-:program_arg_requires_value
-set "PROGRAM_EXPECT_VALUE=1"
-exit /b 0
 
 :run_smoke_for_version
 call :set_version_environment "%~1" "smoke"
@@ -486,14 +446,6 @@ goto script_end
 echo program mode is all-version and requires version 'none' 1>&2
 set "EXIT_CODE=1"
 goto script_end
-
-:fail_program_extra_path
-echo program mode accepts pytest flags and filters, not additional test paths: %PYTEST_EXTRA_ARGS% 1>&2
-exit /b 1
-
-:fail_program_extra_value
-echo program mode received a pytest option without its required value: %PYTEST_EXTRA_ARGS% 1>&2
-exit /b 1
 
 :fail_matrix_requires_all
 echo matrix/focused mode requires version 'all' 1>&2

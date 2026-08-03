@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.support.platform_filesystem import create_symlink_or_skip
 from .support import codex_gateway_broker as broker_module  # pyright: ignore[reportMissingImports]
 from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImports]
     BASH_ENV_NAME,
@@ -3543,7 +3544,7 @@ def test_existing_state_directory_must_exist_and_not_be_symlink(tmp_path: Path) 
     real = tmp_path / "real-state"
     real.mkdir()
     linked = tmp_path / "linked-state"
-    linked.symlink_to(real, target_is_directory=True)
+    create_symlink_or_skip(linked, real, target_is_directory=True)
     with pytest.raises(ValueError, match="symlink"):
         CodexGatewayBroker(
             skill_source=skill,
