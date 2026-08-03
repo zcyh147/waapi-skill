@@ -3,7 +3,6 @@ from __future__ import annotations
 import fnmatch
 import hashlib
 import json
-import os
 from pathlib import Path
 from typing import Any
 
@@ -77,17 +76,16 @@ def test_org_fixture_manifest_hashes_match_committed_files() -> None:
     assert manifest["strategy"] == "path-plus-content excluding fixture metadata/manifest bookkeeping files"
     assert sorted(manifest_files) == actual_paths
 
-    if os.name != "nt":
-        digest = hashlib.sha256()
-        for rel_path in actual_paths:
-            data = _canonical_fixture_bytes(ORG_FIXTURE_ROOT / rel_path)
-            assert manifest_files[rel_path]["bytes"] == len(data)
-            assert manifest_files[rel_path]["sha256"] == hashlib.sha256(data).hexdigest()
-            digest.update(rel_path.encode("utf-8"))
-            digest.update(b"\0")
-            digest.update(manifest_files[rel_path]["sha256"].encode("utf-8"))
-            digest.update(b"\0")
-        assert manifest["digest"] == digest.hexdigest()
+    digest = hashlib.sha256()
+    for rel_path in actual_paths:
+        data = _canonical_fixture_bytes(ORG_FIXTURE_ROOT / rel_path)
+        assert manifest_files[rel_path]["bytes"] == len(data)
+        assert manifest_files[rel_path]["sha256"] == hashlib.sha256(data).hexdigest()
+        digest.update(rel_path.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(manifest_files[rel_path]["sha256"].encode("utf-8"))
+        digest.update(b"\0")
+    assert manifest["digest"] == digest.hexdigest()
     assert manifest["file_count"] == len(actual_paths)
 
 
@@ -114,6 +112,12 @@ def test_org_fixture_wav_assets_are_lfs_tracked_by_gitattributes() -> None:
 
     assert wav_files
     assert "*.wav filter=lfs diff=lfs merge=lfs -text" in attributes
+
+
+def test_all_org_fixture_payloads_disable_checkout_text_translation() -> None:
+    attributes = (REPO_ROOT / ".gitattributes").read_text(encoding="utf-8")
+
+    assert "tests/_org/** -text" in attributes.splitlines()
 
 
 def _read_json(path: Path) -> dict[str, Any]:

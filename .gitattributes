@@ -1,3 +1,7 @@
 *.wav filter=lfs diff=lfs merge=lfs -text
 *.wwu whitespace=cr-at-eol
 *.wproj whitespace=cr-at-eol
+
+# Immutable Wwise fixtures are hash-bound raw payloads. Never translate their
+# line endings during checkout, regardless of the host core.autocrlf setting.
+tests/_org/** -text

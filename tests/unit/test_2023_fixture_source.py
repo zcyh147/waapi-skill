@@ -3,7 +3,6 @@ from __future__ import annotations
 import fnmatch
 import hashlib
 import json
-import os
 from pathlib import Path
 from typing import Any
 
@@ -78,17 +77,16 @@ def _assert_manifest_matches_committed_payload(manifest: dict[str, Any], actual_
     manifest_files = {entry["path"]: entry for entry in manifest["files"]}
     assert sorted(manifest_files) == actual_paths
 
-    if os.name != "nt":
-        digest = hashlib.sha256()
-        for rel_path in actual_paths:
-            data = _canonical_fixture_bytes(ORG_FIXTURE_ROOT / rel_path)
-            assert manifest_files[rel_path]["bytes"] == len(data)
-            assert manifest_files[rel_path]["sha256"] == hashlib.sha256(data).hexdigest()
-            digest.update(rel_path.encode("utf-8"))
-            digest.update(b"\0")
-            digest.update(manifest_files[rel_path]["sha256"].encode("utf-8"))
-            digest.update(b"\0")
-        assert manifest["digest"] == digest.hexdigest()
+    digest = hashlib.sha256()
+    for rel_path in actual_paths:
+        data = _canonical_fixture_bytes(ORG_FIXTURE_ROOT / rel_path)
+        assert manifest_files[rel_path]["bytes"] == len(data)
+        assert manifest_files[rel_path]["sha256"] == hashlib.sha256(data).hexdigest()
+        digest.update(rel_path.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(manifest_files[rel_path]["sha256"].encode("utf-8"))
+        digest.update(b"\0")
+    assert manifest["digest"] == digest.hexdigest()
     assert manifest["file_count"] == len(actual_paths)
 
 
