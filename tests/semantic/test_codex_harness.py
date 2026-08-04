@@ -141,10 +141,37 @@ def test_codex_binary_discovery_uses_host_native_path_lookup(tmp_path: Path) -> 
         windows_alias_calls.append(name)
         return str(linux_binary) if name == "codex" else None
 
-    assert codex_harness_module.discover_codex_binary(
-        platform_name="win32", which=windows_alias_which
-    ) == linux_binary.resolve(strict=True)
+    with pytest.raises(CodexHarnessError, match="host-native .exe"):
+        codex_harness_module.discover_codex_binary(
+            platform_name="win32", which=windows_alias_which
+        )
     assert windows_alias_calls == ["codex.exe", "codex"]
+
+
+def test_codex_binary_discovery_skips_outer_sandbox_proxy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    proxy = executable_file(tmp_path / ".codex" / ".sandbox-bin" / "codex.exe")
+    host = executable_file(tmp_path / "host-bin" / "codex.exe")
+    monkeypatch.setenv("PATH", os.pathsep.join((str(proxy.parent), str(host.parent))))
+
+    assert codex_harness_module.discover_codex_binary(platform_name="win32") == (
+        host.resolve(strict=True)
+    )
+
+    monkeypatch.setenv("PATH", str(proxy.parent))
+    with pytest.raises(
+        CodexHarnessError,
+        match=r"outer-sandbox proxy.*--codex-binary",
+    ):
+        codex_harness_module.discover_codex_binary(platform_name="win32")
+    with pytest.raises(CodexHarnessError, match=r"outer sandbox proxy.*--codex-binary"):
+        codex_harness_module._strict_codex_binary(
+            proxy,
+            source="explicit",
+            platform_name="win32",
+        )
 
 
 def test_codex_binary_discovery_uses_app_fallback_only_on_macos(tmp_path: Path) -> None:
@@ -164,11 +191,19 @@ def test_codex_binary_discovery_uses_app_fallback_only_on_macos(tmp_path: Path) 
 
 
 def test_explicit_codex_binary_has_priority_and_resolves_strictly(tmp_path: Path) -> None:
-    explicit = executable_file(tmp_path / "explicit-codex")
+    explicit = executable_file(tmp_path / "explicit-codex.exe")
 
     assert codex_harness_module.resolve_codex_binary(explicit) == explicit.resolve(strict=True)
     with pytest.raises(CodexHarnessError, match="explicit Codex binary is unavailable"):
-        codex_harness_module.resolve_codex_binary(tmp_path / "missing-codex")
+        codex_harness_module.resolve_codex_binary(tmp_path / "missing-codex.exe")
+
+    non_native = executable_file(tmp_path / "codex.cmd")
+    with pytest.raises(CodexHarnessError, match="host-native .exe"):
+        codex_harness_module._strict_codex_binary(
+            non_native,
+            source="explicit",
+            platform_name="win32",
+        )
 
 
 class InterruptingFakeProcess:

@@ -5602,6 +5602,82 @@ def test_heavy_fingerprint_covers_runner_model_options_and_mutable_inputs(
         campaign.assert_heavy_v3_effective_inputs_frozen(options, effective=effective)
 
 
+def test_codex_version_fingerprint_permission_error_names_stage_and_binary(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    binary = tmp_path / ".codex" / ".sandbox-bin" / "codex.exe"
+    denied = PermissionError(13, "Access denied")
+    denied.winerror = 5  # type: ignore[attr-defined]
+    monkeypatch.setattr(
+        campaign.subprocess,
+        "run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(denied),
+    )
+
+    with pytest.raises(
+        campaign.CampaignConfigError,
+        match=r"Codex version fingerprint probe could not execute",
+    ) as captured:
+        campaign._codex_version_fingerprint(binary)
+
+    message = str(captured.value)
+    assert str(binary) in message
+    assert "PermissionError" in message
+    assert "Access denied" in message
+
+
+def test_heavy_codex_probe_denial_precedes_campaign_root_and_child(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    options = _options(tmp_path)
+    units = (_unit(1),)
+    denied = PermissionError(13, "Access denied")
+    denied.winerror = 5  # type: ignore[attr-defined]
+    child_started = False
+
+    def forbidden_child(*_args: Any, **_kwargs: Any) -> None:
+        nonlocal child_started
+        child_started = True
+        raise AssertionError("campaign child must not start after config failure")
+
+    monkeypatch.setattr(campaign, "load_heavy_v3_campaign_units", lambda _options: units)
+    monkeypatch.setattr(
+        campaign.subprocess,
+        "run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(denied),
+    )
+    monkeypatch.setattr(campaign, "run_child", forbidden_child)
+
+    with pytest.raises(campaign.CampaignConfigError, match=str(options.codex_binary)):
+        campaign.run_heavy_v3_campaign(options)
+
+    assert options.campaign_root.exists() is False
+    assert child_started is False
+
+
+def test_runtime_distribution_fingerprint_permission_error_names_interpreter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    denied = PermissionError(13, "Access denied")
+    denied.winerror = 5  # type: ignore[attr-defined]
+    monkeypatch.setattr(
+        campaign.importlib.metadata,
+        "distributions",
+        lambda: (_ for _ in ()).throw(denied),
+    )
+
+    with pytest.raises(
+        CampaignEvidenceError,
+        match=r"runtime distributions for interpreter",
+    ) as captured:
+        campaign._runtime_distribution_fingerprint()
+
+    assert sys.executable in str(captured.value)
+    assert "PermissionError" in str(captured.value)
+
+
 def test_heavy_fingerprint_rejects_source_project_and_launcher_drift(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

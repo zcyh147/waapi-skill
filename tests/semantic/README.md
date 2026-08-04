@@ -384,6 +384,12 @@ The defaults point to the Codex binary bundled with the ChatGPT app,
 `~/.codex/auth.json`, and
 `tests/fixtures/local/live-environment.json`. Override them only with the
 documented `--codex-binary`, `--auth-json`, and `--live-config` options.
+On Windows, automatic discovery skips Codex's outer
+`%USERPROFILE%\.codex\.sandbox-bin\codex.exe` proxy because it cannot be used
+as the host executable for a nested fresh-Codex campaign. If no later
+host-native `codex.exe` is present on `PATH`, pass its real absolute path with
+`--codex-binary`; `.cmd`, `cmd.exe`, and `shell=True` are not accepted
+substitutes.
 
 ## Live prerequisites and evidence
 

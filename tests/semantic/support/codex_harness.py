@@ -186,7 +186,22 @@ class CodexHarnessError(RuntimeError):
     """Raised when a Codex semantic run cannot satisfy the isolation contract."""
 
 
-def _strict_codex_binary(candidate: Path, *, source: str) -> Path:
+def _is_codex_sandbox_proxy(path: Path) -> bool:
+    """Return whether ``path`` is Codex's outer sandbox command proxy."""
+
+    parts = tuple(part.casefold() for part in Path(path).parts)
+    return any(
+        parts[index : index + 2] == (".codex", ".sandbox-bin")
+        for index in range(max(0, len(parts) - 1))
+    )
+
+
+def _strict_codex_binary(
+    candidate: Path,
+    *,
+    source: str,
+    platform_name: str | None = None,
+) -> Path:
     """Resolve one Codex executable candidate without accepting a missing path."""
 
     try:
@@ -195,7 +210,40 @@ def _strict_codex_binary(candidate: Path, *, source: str) -> Path:
         raise CodexHarnessError(f"{source} Codex binary is unavailable: {candidate}") from exc
     if not resolved.is_file() or not os.access(resolved, os.X_OK):
         raise CodexHarnessError(f"{source} Codex binary is not executable: {resolved}")
+    active_platform = sys.platform if platform_name is None else platform_name
+    if active_platform.startswith("win") and resolved.suffix.casefold() != ".exe":
+        raise CodexHarnessError(
+            f"{source} Codex binary must be a host-native .exe on Windows: {resolved}"
+        )
+    if active_platform.startswith("win") and (
+        _is_codex_sandbox_proxy(candidate) or _is_codex_sandbox_proxy(resolved)
+    ):
+        raise CodexHarnessError(
+            f"{source} Codex binary resolves to the outer sandbox proxy {resolved}; "
+            "pass --codex-binary with the real host-native Codex executable"
+        )
     return resolved
+
+
+def _default_codex_path_candidates(platform_name: str) -> Iterator[Path]:
+    """Yield PATH candidates in order without stopping at a sandbox proxy."""
+
+    executable_names = ("codex.exe",) if platform_name.startswith("win") else ("codex",)
+    seen: set[str] = set()
+    for raw_directory in os.environ.get("PATH", os.defpath).split(os.pathsep):
+        directory = Path(raw_directory or os.curdir).expanduser()
+        for executable_name in executable_names:
+            candidate = directory / executable_name
+            try:
+                resolved = candidate.resolve(strict=True)
+            except OSError:
+                continue
+            identity = os.path.normcase(str(resolved))
+            if identity in seen:
+                continue
+            seen.add(identity)
+            if resolved.is_file() and os.access(resolved, os.X_OK):
+                yield candidate
 
 
 def discover_codex_binary(
@@ -207,14 +255,55 @@ def discover_codex_binary(
     """Discover the host-native Codex CLI, with an App fallback only on macOS."""
 
     platform_name = sys.platform if platform_name is None else platform_name
-    which = shutil.which if which is None else which
-    command_names = ("codex.exe", "codex") if platform_name.startswith("win") else ("codex",)
-    for command_name in command_names:
-        discovered = which(command_name)
-        if discovered:
-            return _strict_codex_binary(Path(discovered), source=f"PATH ({command_name})")
+    rejected_proxies: list[Path] = []
+    if which is None and platform_name.startswith("win"):
+        candidates = (
+            (candidate, f"PATH ({candidate.name})")
+            for candidate in _default_codex_path_candidates(platform_name)
+        )
+    else:
+        command_names = (
+            ("codex.exe", "codex")
+            if platform_name.startswith("win")
+            else ("codex",)
+        )
+        lookup = shutil.which if which is None else which
+        candidates = (
+            (Path(discovered), f"PATH ({command_name})")
+            for command_name in command_names
+            if (discovered := lookup(command_name))
+        )
+    for candidate, source in candidates:
+        try:
+            return _strict_codex_binary(
+                candidate,
+                source=source,
+                platform_name=platform_name,
+            )
+        except CodexHarnessError as exc:
+            try:
+                resolved = candidate.expanduser().resolve(strict=True)
+            except OSError:
+                raise exc
+            if not platform_name.startswith("win") or not (
+                _is_codex_sandbox_proxy(candidate)
+                or _is_codex_sandbox_proxy(resolved)
+            ):
+                raise exc
+            rejected_proxies.append(candidate.expanduser().absolute())
     if platform_name == "darwin":
-        return _strict_codex_binary(macos_app_fallback, source="macOS App fallback")
+        return _strict_codex_binary(
+            macos_app_fallback,
+            source="macOS App fallback",
+            platform_name=platform_name,
+        )
+    if rejected_proxies:
+        rendered = ", ".join(str(path) for path in rejected_proxies)
+        raise CodexHarnessError(
+            "PATH exposes only Codex outer-sandbox proxy candidates "
+            f"({rendered}); pass --codex-binary with the real host-native "
+            "Codex executable"
+        )
     raise CodexHarnessError(
         "Codex CLI was not found on PATH; pass an explicit --codex-binary path"
     )

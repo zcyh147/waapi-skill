@@ -1360,6 +1360,53 @@ def prepare_campaign_root(options: CampaignOptions) -> Path:
     return root
 
 
+def _codex_version_fingerprint(binary: Path) -> str:
+    """Probe one exact Codex executable and retain its path in every failure."""
+
+    candidate = Path(binary)
+    try:
+        completed = subprocess.run(
+            [str(candidate), "--version"],
+            cwd=REPO_ROOT,
+            text=True,
+            encoding="utf-8",
+            errors="strict",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=15,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise CampaignConfigError(
+            "Codex version fingerprint probe could not execute "
+            f"{candidate}: {type(exc).__name__}: {exc}"
+        ) from exc
+    version = completed.stdout.strip()
+    if completed.returncode != 0 or not version:
+        detail = completed.stderr.strip() or f"exit code {completed.returncode}"
+        raise CampaignConfigError(
+            f"Codex version fingerprint probe failed for {candidate}: {detail}"
+        )
+    return version
+
+
+def _runtime_distribution_fingerprint() -> list[tuple[str, str]]:
+    """Return the installed Python distribution inventory with stage diagnostics."""
+
+    try:
+        rows: set[tuple[str, str]] = set()
+        for distribution in importlib.metadata.distributions():
+            name = distribution.metadata.get("Name")
+            if name:
+                rows.add((str(name).casefold(), str(distribution.version)))
+        return sorted(rows)
+    except (OSError, UnicodeError) as exc:
+        raise CampaignEvidenceError(
+            "cannot fingerprint runtime distributions for interpreter "
+            f"{sys.executable}: {type(exc).__name__}: {exc}"
+        ) from exc
+
+
 def build_effective_config(
     options: CampaignOptions,
     *,
@@ -1369,31 +1416,8 @@ def build_effective_config(
     skill_excludes = (".venv", "__pycache__", ".pytest_cache", ".DS_Store", ".coverage")
     harness_excludes = ("__pycache__", ".pytest_cache", ".DS_Store", ".coverage")
     interpreter = Path(sys.executable).resolve(strict=True)
-    codex_version = subprocess.run(
-        [str(options.codex_binary), "--version"],
-        cwd=REPO_ROOT,
-        text=True,
-        encoding="utf-8",
-        errors="strict",
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        timeout=15,
-        check=False,
-    )
-    if codex_version.returncode != 0 or not codex_version.stdout.strip():
-        raise CampaignConfigError(
-            f"cannot fingerprint Codex binary: {codex_version.stderr.strip() or codex_version.returncode}"
-        )
-    distributions = sorted(
-        {
-            (
-                str(distribution.metadata.get("Name") or "").casefold(),
-                str(distribution.version),
-            )
-            for distribution in importlib.metadata.distributions()
-            if distribution.metadata.get("Name")
-        }
-    )
+    codex_version = _codex_version_fingerprint(options.codex_binary)
+    distributions = _runtime_distribution_fingerprint()
     session_rows = [
         {
             "session_id": session.session_id,
@@ -1441,7 +1465,7 @@ def build_effective_config(
         "codex": {
             "path": str(options.codex_binary),
             "sha256": sha256_file(options.codex_binary),
-            "version": codex_version.stdout.strip(),
+            "version": codex_version,
             "model": options.model,
             "reasoning_effort": options.reasoning_effort,
             "service_tier": options.service_tier,
@@ -1484,32 +1508,8 @@ def build_heavy_v3_effective_config(
     interpreter = Path(sys.executable).resolve(strict=True)
     matrix_runner = Path(matrix.__file__).resolve(strict=True)
     campaign_runner = Path(__file__).resolve(strict=True)
-    codex_version = subprocess.run(
-        [str(options.codex_binary), "--version"],
-        cwd=REPO_ROOT,
-        text=True,
-        encoding="utf-8",
-        errors="strict",
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        timeout=15,
-        check=False,
-    )
-    if codex_version.returncode != 0 or not codex_version.stdout.strip():
-        raise CampaignConfigError(
-            "cannot fingerprint Codex binary: "
-            f"{codex_version.stderr.strip() or codex_version.returncode}"
-        )
-    distributions = sorted(
-        {
-            (
-                str(distribution.metadata.get("Name") or "").casefold(),
-                str(distribution.version),
-            )
-            for distribution in importlib.metadata.distributions()
-            if distribution.metadata.get("Name")
-        }
-    )
+    codex_version = _codex_version_fingerprint(options.codex_binary)
+    distributions = _runtime_distribution_fingerprint()
     unit_rows = [
         {
             **heavy_v3_unit_row(unit, sequence=index),
@@ -1589,7 +1589,7 @@ def build_heavy_v3_effective_config(
         "codex": {
             "path": str(options.codex_binary),
             "sha256": sha256_file(options.codex_binary),
-            "version": codex_version.stdout.strip(),
+            "version": codex_version,
             "model": options.model,
             "reasoning_effort": options.reasoning_effort,
             "service_tier": options.service_tier,
@@ -1693,21 +1693,53 @@ def _heavy_v3_live_input_fingerprints(
             raise CampaignEvidenceError(
                 f"live config did not resolve exact launcher and SampleProject for {version}"
             )
-        launcher = Path(contract.console_path).expanduser().resolve(strict=True)
-        project = Path(contract.sample_project_source).expanduser().resolve(strict=True)
+        launcher_input = Path(contract.console_path).expanduser()
+        project_input = Path(contract.sample_project_source).expanduser()
+        try:
+            launcher = launcher_input.resolve(strict=True)
+        except OSError as exc:
+            raise CampaignEvidenceError(
+                f"cannot resolve Wwise {version} launcher {launcher_input}: "
+                f"{type(exc).__name__}: {exc}"
+            ) from exc
+        try:
+            project = project_input.resolve(strict=True)
+        except OSError as exc:
+            raise CampaignEvidenceError(
+                f"cannot resolve Wwise {version} SampleProject {project_input}: "
+                f"{type(exc).__name__}: {exc}"
+            ) from exc
+        try:
+            launcher_fingerprint = _heavy_v3_launcher_fingerprint(launcher)
+        except OSError as exc:
+            raise CampaignEvidenceError(
+                f"cannot fingerprint Wwise {version} launcher {launcher}: "
+                f"{type(exc).__name__}: {exc}"
+            ) from exc
+        try:
+            project_fingerprint = _heavy_v3_project_fingerprint(project)
+        except OSError as exc:
+            raise CampaignEvidenceError(
+                f"cannot fingerprint Wwise {version} SampleProject {project}: "
+                f"{type(exc).__name__}: {exc}"
+            ) from exc
         resolved_versions[version] = {
             "version": version,
-            "launcher": _heavy_v3_launcher_fingerprint(launcher),
-            "sample_project": _heavy_v3_project_fingerprint(project),
+            "launcher": launcher_fingerprint,
+            "sample_project": project_fingerprint,
         }
 
-    migration_source = (
-        _heavy_v3_project_fingerprint(
-            HEAVY_V3_MIGRATION_SOURCE.expanduser().resolve(strict=True)
-        )
-        if migration_selected
-        else None
-    )
+    migration_source = None
+    if migration_selected:
+        migration_input = HEAVY_V3_MIGRATION_SOURCE.expanduser()
+        try:
+            migration_project = migration_input.resolve(strict=True)
+            migration_source = _heavy_v3_project_fingerprint(migration_project)
+        except OSError as exc:
+            raise CampaignEvidenceError(
+                f"cannot fingerprint migration SampleProject {migration_input}: "
+                f"{type(exc).__name__}: {exc}"
+            ) from exc
     return {
         "versions": resolved_versions,
         "migration_source": migration_source,
@@ -1764,7 +1796,13 @@ def _heavy_v3_tree_mtime_sha256(root: Path) -> str:
     for manifest_row in stable_tree_manifest(tree):
         relative = str(manifest_row["path"])
         entry = tree / relative
-        info = entry.stat(follow_symlinks=False)
+        try:
+            info = entry.stat(follow_symlinks=False)
+        except OSError as exc:
+            raise CampaignEvidenceError(
+                f"cannot stat immutable source-tree entry {entry}: "
+                f"{type(exc).__name__}: {exc}"
+            ) from exc
         rows.append(
             {
                 "path": relative,
