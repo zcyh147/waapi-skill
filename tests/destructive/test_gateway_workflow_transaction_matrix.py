@@ -276,12 +276,22 @@ def test_closed_gateway_workflows_across_selected_version(
         imported_id = _required_string(imported_row, "id")
         imported_path = _required_string(imported_row, "path")
         assert imported_path == _untyped_object_path(requested_object_path), imported_row
-        _assert_verification_assertion(audio_import["verify"], "import result shape matches version")
-        _assert_verification_assertion(audio_import["verify"], "import target returned exactly once")
-        _assert_verification_assertion(audio_import["verify"], "imported GUID resolves exactly once")
-        _assert_verification_assertion(audio_import["verify"], "imported path matches returned target")
+        _assert_verification_assertion(
+            audio_import["verification_evidence"], "import result shape matches version"
+        )
+        _assert_verification_assertion(
+            audio_import["verification_evidence"], "import target returned exactly once"
+        )
+        _assert_verification_assertion(
+            audio_import["verification_evidence"], "imported GUID resolves exactly once"
+        )
+        _assert_verification_assertion(
+            audio_import["verification_evidence"], "imported path matches returned target"
+        )
         if runtime.version in {"2023.1", "2024.1", "2025.1"}:
-            _assert_verification_assertion(audio_import["verify"], "audio import log has no errors")
+            _assert_verification_assertion(
+                audio_import["verification_evidence"], "audio import log has no errors"
+            )
 
         included_id = _create_object(
             runtime,
@@ -315,9 +325,12 @@ def test_closed_gateway_workflows_across_selected_version(
                 ],
             },
         )
-        _assert_verification_assertion(inclusions_add["verify"], "SoundBank inclusions match computed post-state")
+        _assert_verification_assertion(
+            inclusions_add["verification_evidence"],
+            "SoundBank inclusions match computed post-state",
+        )
         _assert_soundbank_post_state(
-            inclusions_add["verify"],
+            inclusions_add["verification_evidence"],
             [{"object": included_id.casefold(), "filters": ["media", "structures"]}],
         )
 
@@ -336,7 +349,7 @@ def test_closed_gateway_workflows_across_selected_version(
             },
         )
         _assert_soundbank_post_state(
-            inclusions_union["verify"],
+            inclusions_union["verification_evidence"],
             [{"object": included_id.casefold(), "filters": ["events"]}],
         )
 
@@ -355,7 +368,7 @@ def test_closed_gateway_workflows_across_selected_version(
             },
         )
         _assert_soundbank_post_state(
-            inclusions_preserve["verify"],
+            inclusions_preserve["verification_evidence"],
             [
                 {"object": included_id.casefold(), "filters": ["events"]},
                 {"object": included_second_id.casefold(), "filters": ["media"]},
@@ -377,7 +390,7 @@ def test_closed_gateway_workflows_across_selected_version(
             },
         )
         _assert_soundbank_post_state(
-            inclusions_remove["verify"],
+            inclusions_remove["verification_evidence"],
             [{"object": included_second_id.casefold(), "filters": ["media"]}],
         )
 
@@ -396,7 +409,7 @@ def test_closed_gateway_workflows_across_selected_version(
             },
         )
         _assert_soundbank_post_state(
-            inclusions_replace["verify"],
+            inclusions_replace["verification_evidence"],
             [{"object": included_id.casefold(), "filters": ["events", "structures"]}],
         )
 
@@ -409,7 +422,7 @@ def test_closed_gateway_workflows_across_selected_version(
                 "inclusions": [],
             },
         )
-        _assert_soundbank_post_state(inclusions_clear["verify"], [])
+        _assert_soundbank_post_state(inclusions_clear["verification_evidence"], [])
 
         switch_container_id = _create_object(
             runtime,
@@ -455,14 +468,18 @@ def test_closed_gateway_workflows_across_selected_version(
             operation="switchContainer.addAssignment",
             arguments=assignment_arguments,
         )
-        _assert_verification_assertion(add_assignment["verify"], "assignment pair is present")
+        _assert_verification_assertion(
+            add_assignment["verification_evidence"], "assignment pair is present"
+        )
 
         remove_assignment = _complete_transaction(
             runtime,
             operation="switchContainer.removeAssignment",
             arguments=assignment_arguments,
         )
-        _assert_verification_assertion(remove_assignment["verify"], "assignment pair is absent")
+        _assert_verification_assertion(
+            remove_assignment["verification_evidence"], "assignment pair is absent"
+        )
     finally:
         active_error = sys.exc_info()[1]
         cleanup_errors: list[str] = []
@@ -545,12 +562,75 @@ def _complete_transaction(
     assert verified["automatic_retry"] is False
     assert verified["verification"]["operation"] == operation
     assert verified["verification"]["status"] == TransactionState.VERIFIED.value
-    assert all(item["passed"] is True for item in verified["verification"]["assertions"])
 
     store = TransactionStore(runtime.state_dir)
     assert store.load(transaction_id).state is TransactionState.VERIFIED
     assert store.load_preview(transaction_id).artifact_hash == artifact_hash
-    return {"preview": preview, "execute": executed, "verify": verified}
+    verification_events = [
+        event
+        for event in store.read_events(transaction_id)
+        if event.get("event_type") == "verification_recorded"
+    ]
+    assert len(verification_events) == 1, verification_events
+    verification_details = verification_events[0].get("details")
+    assert isinstance(verification_details, Mapping), verification_events[0]
+    verification_evidence = verification_details.get("verification")
+    assert isinstance(verification_evidence, Mapping), verification_details
+    assert verification_evidence["operation"] == operation
+    assert verification_evidence["status"] == TransactionState.VERIFIED.value
+
+    assertions = verification_evidence.get("assertions")
+    readbacks = verification_evidence.get("readbacks")
+    assert isinstance(assertions, list) and assertions, verification_evidence
+    assert isinstance(readbacks, list), verification_evidence
+    assert all(
+        isinstance(item, Mapping) and item.get("passed") is True
+        for item in assertions
+    ), assertions
+
+    stdout_projection = verified.get("stdout_projection")
+    assert isinstance(stdout_projection, Mapping), verified
+    assert stdout_projection["contract"] == (
+        waapi_gateway.TRANSACTION_VERIFY_SUCCESS_SUMMARY_CONTRACT
+    )
+    assert stdout_projection["full_verification_evidence_persisted"] is True
+    assert stdout_projection["journal_event"] == "verification_recorded"
+    assert stdout_projection["assertion_count"] == len(assertions)
+    assert stdout_projection["passed_assertion_count"] == len(assertions)
+    assert stdout_projection["readback_count"] == len(readbacks)
+    assert stdout_projection["verification_canonical_sha256"] == (
+        waapi_gateway.canonical_sha256(verification_evidence)
+    )
+
+    stdout_verification = verified.get("verification")
+    assert isinstance(stdout_verification, Mapping), verified
+    if stdout_projection["full_verification_evidence_in_stdout"] is True:
+        assert stdout_verification == verification_evidence
+    else:
+        assert stdout_verification["summary_contract"] == (
+            waapi_gateway.TRANSACTION_VERIFICATION_RESULT_SUMMARY_CONTRACT
+        )
+        assert stdout_verification["assertion_count"] == len(assertions)
+        assert stdout_verification["passed_assertion_count"] == len(assertions)
+        assert stdout_verification["failed_assertion_count"] == 0
+        assert stdout_verification["assertions_canonical_sha256"] == (
+            waapi_gateway.canonical_sha256(assertions)
+        )
+        assert stdout_verification["readback_count"] == len(readbacks)
+        assert stdout_verification["readbacks_canonical_sha256"] == (
+            waapi_gateway.canonical_sha256(readbacks)
+        )
+        assert stdout_verification["canonical_sha256"] == (
+            waapi_gateway.canonical_sha256(verification_evidence)
+        )
+        assert stdout_verification["full_evidence_in_stdout"] is False
+
+    return {
+        "preview": preview,
+        "execute": executed,
+        "verify": verified,
+        "verification_evidence": verification_evidence,
+    }
 
 
 def _create_object(
@@ -633,9 +713,7 @@ def _untyped_object_path(object_path: str) -> str:
     return "\\".join(parts)
 
 
-def _assert_verification_assertion(verified: Mapping[str, Any], name: str) -> None:
-    verification = verified.get("verification")
-    assert isinstance(verification, Mapping), verified
+def _assert_verification_assertion(verification: Mapping[str, Any], name: str) -> None:
     assertions = verification.get("assertions")
     assert isinstance(assertions, list), verification
     matches = [item for item in assertions if isinstance(item, Mapping) and item.get("name") == name]
@@ -643,9 +721,9 @@ def _assert_verification_assertion(verified: Mapping[str, Any], name: str) -> No
     assert matches[0].get("passed") is True, matches[0]
 
 
-def _assert_soundbank_post_state(verified: Mapping[str, Any], expected: list[dict[str, Any]]) -> None:
-    verification = verified.get("verification")
-    assert isinstance(verification, Mapping), verified
+def _assert_soundbank_post_state(
+    verification: Mapping[str, Any], expected: list[dict[str, Any]]
+) -> None:
     assertions = verification.get("assertions")
     assert isinstance(assertions, list), verification
     matches = [
