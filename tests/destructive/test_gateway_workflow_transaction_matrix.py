@@ -37,6 +37,11 @@ from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[repor
     prepare_sample_project_sandbox,
     shutdown_sandboxed_wwise,
 )
+from tests.destructive.support.workflow_evidence import (  # pyright: ignore[reportMissingImports]  # noqa: E402
+    validate_audio_import_business_evidence,
+    validate_soundbank_inclusions_business_evidence,
+    validate_switch_assignment_business_evidence,
+)
 from wwise_waapi.headless import HeadlessLifecycle  # pyright: ignore[reportMissingImports]  # noqa: E402
 from wwise_waapi.operation_registry import OPERATION_REQUEST_CONTRACT  # pyright: ignore[reportMissingImports]  # noqa: E402
 from wwise_waapi.transactions import TransactionState, TransactionStore  # pyright: ignore[reportMissingImports]  # noqa: E402
@@ -258,6 +263,7 @@ def test_closed_gateway_workflows_across_selected_version(
         audio_file = _write_fixture_wav(runtime.sandbox.sandbox_path / "GatewayWorkflowAudio", import_name)
         assert path_is_under(audio_file.resolve(strict=True), runtime.sandbox.sandbox_path.resolve(strict=True))
         requested_object_path = f"{object_parent}\\<Sound>{import_name}"
+        import_notes = f"closed gateway audio import {import_name}"
         audio_import = _complete_transaction(
             runtime,
             operation="audio.import",
@@ -267,7 +273,7 @@ def test_closed_gateway_workflows_across_selected_version(
                         "object_path": requested_object_path,
                         "audio_file": str(audio_file),
                         "object_type": "Sound",
-                        "notes": f"closed gateway audio import {import_name}",
+                        "notes": import_notes,
                     }
                 ]
             },
@@ -276,22 +282,15 @@ def test_closed_gateway_workflows_across_selected_version(
         imported_id = _required_string(imported_row, "id")
         imported_path = _required_string(imported_row, "path")
         assert imported_path == _untyped_object_path(requested_object_path), imported_row
-        _assert_verification_assertion(
-            audio_import["verification_evidence"], "import result shape matches version"
+        validate_audio_import_business_evidence(
+            execution=audio_import["execute"],
+            verification=audio_import["verification_evidence"],
+            version=runtime.version,
+            expected_target_path=imported_path,
+            expected_target_id=imported_id,
+            expected_notes=import_notes,
+            source_file=audio_file,
         )
-        _assert_verification_assertion(
-            audio_import["verification_evidence"], "import target returned exactly once"
-        )
-        _assert_verification_assertion(
-            audio_import["verification_evidence"], "imported GUID resolves exactly once"
-        )
-        _assert_verification_assertion(
-            audio_import["verification_evidence"], "imported path matches returned target"
-        )
-        if runtime.version in {"2023.1", "2024.1", "2025.1"}:
-            _assert_verification_assertion(
-                audio_import["verification_evidence"], "audio import log has no errors"
-            )
 
         included_id = _create_object(
             runtime,
@@ -325,13 +324,12 @@ def test_closed_gateway_workflows_across_selected_version(
                 ],
             },
         )
-        _assert_verification_assertion(
+        validate_soundbank_inclusions_business_evidence(
             inclusions_add["verification_evidence"],
-            "SoundBank inclusions match computed post-state",
-        )
-        _assert_soundbank_post_state(
-            inclusions_add["verification_evidence"],
-            [{"object": included_id.casefold(), "filters": ["media", "structures"]}],
+            soundbank_id=soundbank_id,
+            expected=[
+                {"object": included_id.casefold(), "filters": ["media", "structures"]}
+            ],
         )
 
         inclusions_union = _complete_transaction(
@@ -348,9 +346,10 @@ def test_closed_gateway_workflows_across_selected_version(
                 ],
             },
         )
-        _assert_soundbank_post_state(
+        validate_soundbank_inclusions_business_evidence(
             inclusions_union["verification_evidence"],
-            [{"object": included_id.casefold(), "filters": ["events"]}],
+            soundbank_id=soundbank_id,
+            expected=[{"object": included_id.casefold(), "filters": ["events"]}],
         )
 
         inclusions_preserve = _complete_transaction(
@@ -367,9 +366,10 @@ def test_closed_gateway_workflows_across_selected_version(
                 ],
             },
         )
-        _assert_soundbank_post_state(
+        validate_soundbank_inclusions_business_evidence(
             inclusions_preserve["verification_evidence"],
-            [
+            soundbank_id=soundbank_id,
+            expected=[
                 {"object": included_id.casefold(), "filters": ["events"]},
                 {"object": included_second_id.casefold(), "filters": ["media"]},
             ],
@@ -389,9 +389,12 @@ def test_closed_gateway_workflows_across_selected_version(
                 ],
             },
         )
-        _assert_soundbank_post_state(
+        validate_soundbank_inclusions_business_evidence(
             inclusions_remove["verification_evidence"],
-            [{"object": included_second_id.casefold(), "filters": ["media"]}],
+            soundbank_id=soundbank_id,
+            expected=[
+                {"object": included_second_id.casefold(), "filters": ["media"]}
+            ],
         )
 
         inclusions_replace = _complete_transaction(
@@ -408,9 +411,15 @@ def test_closed_gateway_workflows_across_selected_version(
                 ],
             },
         )
-        _assert_soundbank_post_state(
+        validate_soundbank_inclusions_business_evidence(
             inclusions_replace["verification_evidence"],
-            [{"object": included_id.casefold(), "filters": ["events", "structures"]}],
+            soundbank_id=soundbank_id,
+            expected=[
+                {
+                    "object": included_id.casefold(),
+                    "filters": ["events", "structures"],
+                }
+            ],
         )
 
         inclusions_clear = _complete_transaction(
@@ -422,7 +431,11 @@ def test_closed_gateway_workflows_across_selected_version(
                 "inclusions": [],
             },
         )
-        _assert_soundbank_post_state(inclusions_clear["verification_evidence"], [])
+        validate_soundbank_inclusions_business_evidence(
+            inclusions_clear["verification_evidence"],
+            soundbank_id=soundbank_id,
+            expected=[],
+        )
 
         switch_container_id = _create_object(
             runtime,
@@ -468,8 +481,13 @@ def test_closed_gateway_workflows_across_selected_version(
             operation="switchContainer.addAssignment",
             arguments=assignment_arguments,
         )
-        _assert_verification_assertion(
-            add_assignment["verification_evidence"], "assignment pair is present"
+        validate_switch_assignment_business_evidence(
+            add_assignment["verification_evidence"],
+            switch_container_id=switch_container_id,
+            switch_group_id=switch_group_id,
+            child_id=assignment_child_id,
+            state_or_switch_id=switch_id,
+            should_exist=True,
         )
 
         remove_assignment = _complete_transaction(
@@ -477,8 +495,13 @@ def test_closed_gateway_workflows_across_selected_version(
             operation="switchContainer.removeAssignment",
             arguments=assignment_arguments,
         )
-        _assert_verification_assertion(
-            remove_assignment["verification_evidence"], "assignment pair is absent"
+        validate_switch_assignment_business_evidence(
+            remove_assignment["verification_evidence"],
+            switch_container_id=switch_container_id,
+            switch_group_id=switch_group_id,
+            child_id=assignment_child_id,
+            state_or_switch_id=switch_id,
+            should_exist=False,
         )
     finally:
         active_error = sys.exc_info()[1]
@@ -560,8 +583,12 @@ def _complete_transaction(
     assert verified["executed"] is True
     assert verified["verified"] is True
     assert verified["automatic_retry"] is False
-    assert verified["verification"]["operation"] == operation
-    assert verified["verification"]["status"] == TransactionState.VERIFIED.value
+    stdout_verification = verified.get("verification")
+    assert isinstance(stdout_verification, Mapping), verified
+    assert stdout_verification["operation"] == operation
+    assert stdout_verification["status"] == TransactionState.VERIFIED.value
+    assert stdout_verification["ok"] is True
+    assert stdout_verification["business_state_verified"] is True
 
     store = TransactionStore(runtime.state_dir)
     assert store.load(transaction_id).state is TransactionState.VERIFIED
@@ -602,8 +629,6 @@ def _complete_transaction(
         waapi_gateway.canonical_sha256(verification_evidence)
     )
 
-    stdout_verification = verified.get("verification")
-    assert isinstance(stdout_verification, Mapping), verified
     if stdout_projection["full_verification_evidence_in_stdout"] is True:
         assert stdout_verification == verification_evidence
     else:
@@ -711,32 +736,6 @@ def _untyped_object_path(object_path: str) -> str:
             part = part.split(">", 1)[1]
         parts.append(part)
     return "\\".join(parts)
-
-
-def _assert_verification_assertion(verification: Mapping[str, Any], name: str) -> None:
-    assertions = verification.get("assertions")
-    assert isinstance(assertions, list), verification
-    matches = [item for item in assertions if isinstance(item, Mapping) and item.get("name") == name]
-    assert len(matches) == 1, {"expected_assertion": name, "assertions": assertions}
-    assert matches[0].get("passed") is True, matches[0]
-
-
-def _assert_soundbank_post_state(
-    verification: Mapping[str, Any], expected: list[dict[str, Any]]
-) -> None:
-    assertions = verification.get("assertions")
-    assert isinstance(assertions, list), verification
-    matches = [
-        item
-        for item in assertions
-        if isinstance(item, Mapping) and item.get("name") == "SoundBank inclusions match computed post-state"
-    ]
-    assert len(matches) == 1, matches
-    evidence = matches[0].get("evidence")
-    assert isinstance(evidence, Mapping), matches[0]
-    normalized_expected = sorted(expected, key=lambda row: str(row["object"]))
-    assert evidence.get("expected") == normalized_expected
-    assert evidence.get("actual") == normalized_expected
 
 
 def _write_fixture_wav(root: Path, name: str) -> Path:

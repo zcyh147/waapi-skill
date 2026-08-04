@@ -15356,6 +15356,8 @@ def verify_prepared_operation(
                     not old_rows,
                     {"old_row": dict(old_row), "remaining_rows": old_rows},
                 )
+    # Compatibility for already-persisted legacy previews only. Current public
+    # object.create producers emit object-create-graph.
     elif kind == "created-guid-present":
         created_id = _execution_result_id(execution_result)
         if created_id is None:
@@ -16811,6 +16813,8 @@ def verify_prepared_operation(
                                     "actual_target": actual_target,
                                 },
                             )
+    # Compatibility for already-persisted legacy previews only. Current public
+    # audio.import and audio.importTabDelimited producers emit closed-audio-import.
     elif kind == "audio-import-created-objects":
         payload = _execution_payload(execution_result)
         objects_value = payload.get("objects")

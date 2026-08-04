@@ -65,6 +65,9 @@ tests/unit/test_authoring_ui_gateway.py
 tests/unit/test_operation_soundbank.py
 tests/unit/test_operation_registry.py
 tests/unit/test_operation_registry_import_verifier.py
+tests/unit/test_workflow_evidence.py
+tests/unit/test_operation_verification_kind_ownership.py
+tests/unit/test_real_lane_verification_evidence_policy.py
 tests/unit/test_operation_registry_soundbank.py
 tests/unit/test_object_create_replace.py
 tests/unit/test_object_reference_activation.py

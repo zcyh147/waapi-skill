@@ -346,6 +346,9 @@ def test_gateway_transaction_object_lifecycle_across_selected_version(
     initial_notes = f"gateway transaction create proof {object_name}"
     updated_notes = f"gateway transaction setNotes proof {renamed_object_name}"
     expected_volume = -6.0
+    parent_path = (
+        CONTAINERS_PARENT if runtime.version == "2025.1" else ACTOR_MIXER_PARENT
+    )
 
     create = _complete_transaction(
         runtime,
@@ -353,7 +356,7 @@ def test_gateway_transaction_object_lifecycle_across_selected_version(
         arguments={
             "parent": {
                 "kind": "path",
-                "value": CONTAINERS_PARENT if runtime.version == "2025.1" else ACTOR_MIXER_PARENT,
+                "value": parent_path,
             },
             "type": "ActorMixer",
             "name": object_name,
@@ -363,10 +366,18 @@ def test_gateway_transaction_object_lifecycle_across_selected_version(
     created_id = _created_object_id(create["execute"])
 
     try:
-        create_assertions = create["verify"]["verification"]["assertions"]
-        assert all(item["passed"] is True for item in create_assertions), create_assertions
+        created_row = _query_one_object_by_id(
+            runtime,
+            created_id,
+            fields=("id", "name", "path", "notes"),
+        )
+        assert str(created_row["id"]).casefold() == created_id.casefold(), created_row
+        assert created_row["name"] == object_name, created_row
+        created_path = str(created_row["path"])
+        assert created_path == f"{parent_path}\\{object_name}", created_row
+        assert created_row["notes"] == initial_notes, created_row
 
-        set_name = _complete_transaction(
+        _complete_transaction(
             runtime,
             operation="object.setName",
             arguments={
@@ -374,16 +385,17 @@ def test_gateway_transaction_object_lifecycle_across_selected_version(
                 "value": renamed_object_name,
             },
         )
-        name_assertions = set_name["verify"]["verification"]["assertions"]
-        kept_guid = _required_verifier(name_assertions, "renamed object keeps GUID")
-        assert str(kept_guid["evidence"]).casefold() == created_id.casefold(), kept_guid
-        new_name = _required_verifier(name_assertions, "new name matches")
-        assert new_name["evidence"] == renamed_object_name, new_name
-        new_path = _required_verifier(name_assertions, "new path ends with name")
-        assert str(new_path["evidence"]).rstrip("\\").endswith("\\" + renamed_object_name), new_path
-        _required_verifier(name_assertions, "old path no longer resolves to GUID")
+        renamed_row = _query_one_object_by_id(
+            runtime,
+            created_id,
+            fields=("id", "name", "path"),
+        )
+        assert str(renamed_row["id"]).casefold() == created_id.casefold(), renamed_row
+        assert renamed_row["name"] == renamed_object_name, renamed_row
+        assert renamed_row["path"] == f"{parent_path}\\{renamed_object_name}", renamed_row
+        _assert_query_object_absent(runtime, selector=("--path", created_path))
 
-        set_notes = _complete_transaction(
+        _complete_transaction(
             runtime,
             operation="object.setNotes",
             arguments={
@@ -391,11 +403,15 @@ def test_gateway_transaction_object_lifecycle_across_selected_version(
                 "value": updated_notes,
             },
         )
-        notes_assertions = set_notes["verify"]["verification"]["assertions"]
-        notes_match = _required_verifier(notes_assertions, "notes match exactly")
-        assert notes_match["evidence"] == updated_notes, notes_match
+        notes_row = _query_one_object_by_id(
+            runtime,
+            created_id,
+            fields=("id", "notes"),
+        )
+        assert str(notes_row["id"]).casefold() == created_id.casefold(), notes_row
+        assert notes_row["notes"] == updated_notes, notes_row
 
-        set_property = _complete_transaction(
+        _complete_transaction(
             runtime,
             operation="object.setProperty",
             arguments={
@@ -404,59 +420,23 @@ def test_gateway_transaction_object_lifecycle_across_selected_version(
                 "value": expected_volume,
             },
         )
-        property_assertions = set_property["verify"]["verification"]["assertions"]
-        _required_verifier(property_assertions, "property target resolves exactly once")
-        property_match = _required_verifier(
-            property_assertions,
-            "property value matches metadata type",
+        property_row = _query_one_object_by_id(
+            runtime,
+            created_id,
+            fields=("id", "name", "path", "notes", "Volume"),
         )
-        property_evidence = property_match["evidence"]
-        assert isinstance(property_evidence, Mapping), property_match
-        assert float(property_evidence["actual"]) == pytest.approx(expected_volume), property_evidence
-        assert float(property_evidence["expected"]) == pytest.approx(expected_volume), property_evidence
-
-        post_mutation = runtime.gateway(
-            [
-                "query-object",
-                "--object-id",
-                created_id,
-                "--return-field",
-                "id",
-                "--return-field",
-                "name",
-                "--return-field",
-                "path",
-                "--return-field",
-                "notes",
-                "--return-field",
-                "Volume",
-            ],
-            live=True,
-        )
-        assert post_mutation["count"] == 1, post_mutation
-        assert len(post_mutation["objects"]) == 1, post_mutation
-        row = post_mutation["objects"][0]
-        assert str(row["id"]).casefold() == created_id.casefold(), row
-        assert row["name"] == renamed_object_name, row
-        assert str(row["path"]).rstrip("\\").endswith("\\" + renamed_object_name), row
-        assert row["notes"] == updated_notes, row
-        assert float(row["Volume"]) == pytest.approx(expected_volume), row
+        assert str(property_row["id"]).casefold() == created_id.casefold(), property_row
+        assert property_row["name"] == renamed_object_name, property_row
+        assert property_row["path"] == f"{parent_path}\\{renamed_object_name}", property_row
+        assert property_row["notes"] == updated_notes, property_row
+        assert float(property_row["Volume"]) == pytest.approx(expected_volume), property_row
     finally:
-        delete = _complete_transaction(
+        _complete_transaction(
             runtime,
             operation="object.delete",
             arguments={"object": {"kind": "id", "value": created_id}},
         )
-        delete_assertions = delete["verify"]["verification"]["assertions"]
-        deleted = _required_verifier(delete_assertions, "deleted GUID is absent")
-        assert deleted["evidence"] == [], deleted
-
-        final_readback = runtime.gateway(
-            ["query-object", "--object-id", created_id, "--return-field", "id"],
-            live=True,
-        )
-        assert final_readback["count"] == 0
-        assert final_readback["objects"] == []
+        _assert_query_object_absent(runtime, selector=("--object-id", created_id))
 
 
 @pytest.mark.live
@@ -523,16 +503,15 @@ def test_gateway_wait_topic_matches_runner_owned_object_create_and_unsubscribes(
     finally:
         topic_wait.close()
         if created_id is not None:
-            delete = _complete_transaction(
+            _complete_transaction(
                 runtime,
                 operation="object.delete",
                 arguments={"object": {"kind": "id", "value": created_id}},
             )
-            deleted = _required_verifier(
-                delete["verify"]["verification"]["assertions"],
-                "deleted GUID is absent",
+            _assert_query_object_absent(
+                runtime,
+                selector=("--object-id", created_id),
             )
-            assert deleted["evidence"] == [], deleted
 
 
 def _start_packaged_topic_wait(
@@ -763,9 +742,13 @@ def _complete_transaction(
     assert verified["executed"] is True
     assert verified["verified"] is True
     assert verified["automatic_retry"] is False
-    assert verified["verification"]["operation"] == operation
-    assert verified["verification"]["status"] == TransactionState.VERIFIED.value
-    assert all(item["passed"] is True for item in verified["verification"]["assertions"])
+    verification = verified.get("verification")
+    assert isinstance(verification, Mapping), verified
+    assert verification["operation"] == operation
+    assert verification["status"] == TransactionState.VERIFIED.value
+    assert verification["ok"] is True
+    assert verification["business_state_verified"] is True
+    assert all(item["passed"] is True for item in verification["assertions"])
 
     store = TransactionStore(runtime.state_dir)
     assert store.load(transaction_id).state is TransactionState.VERIFIED
@@ -783,15 +766,47 @@ def _created_object_id(executed: Mapping[str, Any]) -> str:
     return object_id
 
 
-def _required_verifier(
-    assertions: Sequence[Mapping[str, Any]],
-    name: str,
+def _query_one_object_by_id(
+    runtime: _GatewaySandboxRuntime,
+    object_id: str,
+    *,
+    fields: Sequence[str],
 ) -> Mapping[str, Any]:
-    matches = [item for item in assertions if item.get("name") == name]
-    assert len(matches) == 1, {"name": name, "assertions": assertions}
-    match = matches[0]
-    assert match.get("passed") is True, match
-    return match
+    command = ["query-object", "--object-id", object_id]
+    for field in fields:
+        command.extend(("--return-field", field))
+    payload = runtime.gateway(command, live=True)
+    objects = payload.get("objects")
+    assert payload.get("count") == 1, payload
+    assert isinstance(objects, list) and len(objects) == 1, payload
+    row = objects[0]
+    assert isinstance(row, Mapping), payload
+    return row
+
+
+def _assert_query_object_absent(
+    runtime: _GatewaySandboxRuntime,
+    *,
+    selector: Sequence[str],
+) -> None:
+    assert len(selector) == 2 and selector[0] in {"--object-id", "--path"}, selector
+    payload = runtime.gateway(
+        [
+            "query-object",
+            *selector,
+            "--return-field",
+            "id",
+            "--return-field",
+            "name",
+            "--return-field",
+            "type",
+            "--return-field",
+            "path",
+        ],
+        live=True,
+    )
+    assert payload.get("count") == 0, payload
+    assert payload.get("objects") == [], payload
 
 
 def _safe_lock_root(env: Mapping[str, str]) -> Path:

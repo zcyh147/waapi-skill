@@ -103,6 +103,17 @@ Unicode, and shell metacharacters where the value can reach a subprocess.
 
 `live`, `destructive`, `smoke`, and `matrix` are strict real modes. They set `WWISE_STRICT_REAL=1`, require an executable `WWISE_CONSOLE`, and require an existing `.wproj` at `WWISE_SAMPLE_PROJECT_PATH`. Missing WwiseConsole or SampleProject prerequisites fail before pytest execution instead of becoming soft skips.
 
+Real live/destructive tests may require a complete `VerificationResult` and
+may assert that every packaged verification assertion passed, but they must
+not select a business check by the human-readable `assertion.name`. Display
+names are diagnostics, not a stable contract: public operations can migrate to
+stronger verifier kinds without preserving legacy wording. Prove business
+effects from the execute payload, structured verification readbacks, or a
+separate closed Gateway query against the sandbox. Unit tests for an individual
+verifier may intentionally lock its assertion names; fixtures for retired
+verifier kinds must say explicitly that they are legacy compatibility tests and
+must not be cited as current public-operation coverage.
+
 Real launches append proof to `.waapi-skill-state/evidence/waapi-test-remediation/real-wwise-launches.jsonl`. Check the audit with:
 
 - `wc -l .waapi-skill-state/evidence/waapi-test-remediation/real-wwise-launches.jsonl`

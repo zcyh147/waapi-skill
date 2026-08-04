@@ -101,6 +101,40 @@ def object_row(
     }
 
 
+def _legacy_created_guid_present_prepared_preview_compatibility_fixture(
+    *,
+    expected: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Build a verifier-only preview shape that current prepare code no longer emits."""
+
+    return {
+        "contract": "waapi-skill.prepared-operation/v1",
+        "operation": "object.create",
+        "verification_plan": {
+            "kind": "created-guid-present",
+            "expected": dict(expected),
+        },
+    }
+
+
+def _legacy_audio_import_created_objects_prepared_preview_compatibility_fixture(
+    *,
+    version: str,
+    targets: list[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Build a verifier-only preview shape that current prepare code no longer emits."""
+
+    return {
+        "contract": "waapi-skill.prepared-operation/v1",
+        "operation": "audio.import",
+        "verification_plan": {
+            "kind": "audio-import-created-objects",
+            "version": version,
+            "targets": [dict(target) for target in targets],
+        },
+    }
+
+
 def _schema_contains_const(value: Any, expected: str) -> bool:
     if isinstance(value, Mapping):
         return value.get("const") == expected or any(
@@ -3590,21 +3624,16 @@ def test_confirmed_role_guard_rejects_field_drift_after_exact_batched_read() -> 
     )["passed"] is False
 
 
-def test_create_delete_property_and_reference_verifiers_have_typed_outcomes() -> None:
+def test_legacy_created_guid_present_prepared_preview_remains_verifiable_for_compatibility() -> None:
     created_id = "{44444444-4444-4444-4444-444444444444}"
-    prepared_create = {
-        "contract": "waapi-skill.prepared-operation/v1",
-        "operation": "object.create",
-        "verification_plan": {
-            "kind": "created-guid-present",
-            "expected": {
-                "name": "Created",
-                "requested_type": "ActorMixer",
-                "parent_id": PARENT_GUID,
-                "notes": "stable",
-            },
-        },
-    }
+    prepared_create = _legacy_created_guid_present_prepared_preview_compatibility_fixture(
+        expected={
+            "name": "Created",
+            "requested_type": "ActorMixer",
+            "parent_id": PARENT_GUID,
+            "notes": "stable",
+        }
+    )
     create_reader = ScriptedReader(
         {
             "ak.wwise.core.object.get": [
@@ -3630,6 +3659,8 @@ def test_create_delete_property_and_reference_verifiers_have_typed_outcomes() ->
     assert created.status == "verified"
     assert next(item for item in created.assertions if item["name"] == "created type is captured")["passed"] is True
 
+
+def test_delete_property_and_reference_verifiers_have_typed_outcomes() -> None:
     prepared_delete = {
         "contract": "waapi-skill.prepared-operation/v1",
         "operation": "object.delete",
@@ -4571,25 +4602,22 @@ def test_tab_import_rejects_value_that_live_property_type_cannot_parse(
 
 
 @pytest.mark.parametrize("version", ["2021.1", "2022.1"])
-def test_old_audio_import_result_uses_runtime_objects_list_without_new_log_contract(version: str) -> None:
+def test_legacy_audio_import_prepared_preview_compatibility_uses_objects_only_result(
+    version: str,
+) -> None:
     created_id = "{44444444-4444-4444-4444-444444444444}"
     target_path = r"\Actor-Mixer Hierarchy\Default Work Unit\Imported"
     created_row = object_row(object_id=created_id, name="Imported", object_type="Sound", path=target_path)
-    prepared = {
-        "contract": "waapi-skill.prepared-operation/v1",
-        "operation": "audio.import",
-        "verification_plan": {
-            "kind": "audio-import-created-objects",
-            "version": version,
-            "targets": [
-                {
-                    "index": 0,
-                    "canonical_target_path": target_path,
-                    "requested_type": "Sound",
-                }
-            ],
-        },
-    }
+    prepared = _legacy_audio_import_created_objects_prepared_preview_compatibility_fixture(
+        version=version,
+        targets=[
+            {
+                "index": 0,
+                "canonical_target_path": target_path,
+                "requested_type": "Sound",
+            }
+        ],
+    )
     result = verify_prepared_operation(
         prepared,
         execution_result={"result": {"objects": [created_row]}},
@@ -4600,16 +4628,11 @@ def test_old_audio_import_result_uses_runtime_objects_list_without_new_log_contr
     assert "audio import log has no errors" not in {item["name"] for item in result.assertions}
 
 
-def test_new_audio_import_error_log_is_a_failed_postcondition() -> None:
-    prepared = {
-        "contract": "waapi-skill.prepared-operation/v1",
-        "operation": "audio.import",
-        "verification_plan": {
-            "kind": "audio-import-created-objects",
-            "version": "2025.1",
-            "targets": [],
-        },
-    }
+def test_legacy_audio_import_prepared_preview_compatibility_rejects_error_log() -> None:
+    prepared = _legacy_audio_import_created_objects_prepared_preview_compatibility_fixture(
+        version="2025.1",
+        targets=[],
+    )
     result = verify_prepared_operation(
         prepared,
         execution_result={
@@ -4636,16 +4659,13 @@ def test_new_audio_import_error_log_is_a_failed_postcondition() -> None:
         {"severity": "Message", "message": "bad index", "index": True},
     ),
 )
-def test_new_audio_import_malformed_log_fails_closed(bad_log: Mapping[str, Any]) -> None:
-    prepared = {
-        "contract": "waapi-skill.prepared-operation/v1",
-        "operation": "audio.import",
-        "verification_plan": {
-            "kind": "audio-import-created-objects",
-            "version": "2025.1",
-            "targets": [],
-        },
-    }
+def test_legacy_audio_import_prepared_preview_compatibility_rejects_malformed_log(
+    bad_log: Mapping[str, Any],
+) -> None:
+    prepared = _legacy_audio_import_created_objects_prepared_preview_compatibility_fixture(
+        version="2025.1",
+        targets=[],
+    )
     result = verify_prepared_operation(
         prepared,
         execution_result={"result": {"log": [dict(bad_log)], "files": [], "objects": []}},
