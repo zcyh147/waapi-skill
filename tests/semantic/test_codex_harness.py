@@ -1959,13 +1959,18 @@ def test_workspace_snapshot_uses_platform_write_then_restore_contract(tmp_path: 
     target.write_text("original\n", encoding="utf-8")
     metadata = target.stat()
     before = snapshot_workspace(tmp_path)
+    before_ctime = target.stat().st_ctime_ns
 
     target.write_text("temporary\n", encoding="utf-8")
     target.write_text("original\n", encoding="utf-8")
     os.utime(target, ns=(metadata.st_atime_ns, metadata.st_mtime_ns))
     after = snapshot_workspace(tmp_path)
 
-    expected_modified = ("existing.txt",) if os.name == "posix" else ()
+    expected_modified = (
+        ("existing.txt",)
+        if target.stat().st_ctime_ns != before_ctime
+        else ()
+    )
     assert workspace_changes(before, after) == ((), expected_modified)
 
 

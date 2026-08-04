@@ -55,6 +55,30 @@ def test_wwise_fixture_tree_digest_binds_path_type_and_content(
     assert changed_type not in {original, changed_content, changed_path}
 
 
+def test_wwise_fixture_tree_digest_ignores_empty_directories(tmp_path: Path) -> None:
+    root = tmp_path / "fixture"
+    _fixture(root)
+    before = fixture_tree.wwise_fixture_tree_sha256(root)
+
+    (root / "Originals" / "Voices" / "English(US)").mkdir(parents=True)
+
+    assert fixture_tree.wwise_fixture_tree_sha256(root) == before
+    assert all(
+        row["type"] == "file"
+        for row in fixture_tree.wwise_fixture_tree_manifest(root)
+    )
+
+
+def test_wwise_fixture_tree_digest_binds_extra_regular_file(tmp_path: Path) -> None:
+    root = tmp_path / "fixture"
+    _fixture(root)
+    before = fixture_tree.wwise_fixture_tree_sha256(root)
+
+    (root / "unexpected.txt").write_bytes(b"unexpected\n")
+
+    assert fixture_tree.wwise_fixture_tree_sha256(root) != before
+
+
 def test_wwise_fixture_tree_rejects_link_or_reparse_entry(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

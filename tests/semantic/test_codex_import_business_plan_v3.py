@@ -820,7 +820,14 @@ def test_archived_original_binding_uses_the_absolute_path_flavor(
         for row in posix_case_drift["rows"]
         if isinstance(row.get("object"), dict)
     )
+    old_drift_path = drift_source["original_file"]["path"]
     drift_relative = str(drift_source["original_file"]["relative_path"])
+    posix_path = str(
+        PurePosixPath("/campaign").joinpath(
+            *PurePosixPath(drift_relative).parts
+        )
+    )
+    drift_source["original_file"]["path"] = posix_path
     drift_source["original_file"]["relative_path"] = drift_relative.swapcase()
     drift_source["original_relative_path"] = str(
         drift_source["original_relative_path"]
@@ -828,8 +835,9 @@ def test_archived_original_binding_uses_the_absolute_path_flavor(
     drift_tree = next(
         item
         for item in posix_case_drift["originals_files"]
-        if item["path"] == drift_source["original_file"]["path"]
+        if item["path"] == old_drift_path
     )
+    drift_tree["path"] = posix_path
     drift_tree["relative_path"] = drift_source["original_file"]["relative_path"]
     with pytest.raises(
         ImportBusinessPlanError,

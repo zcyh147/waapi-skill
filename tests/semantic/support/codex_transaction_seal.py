@@ -9,9 +9,10 @@ The production :class:`wwise_waapi.transactions.TransactionStore` remains the
 authority for preview, state, and hash-chain integrity.  The seal adds runner-
 owned byte and filesystem identity bindings which the production transaction
 protocol deliberately does not persist.  The byte digest is the portable
-immutability boundary.  On POSIX, ``preview.json`` ctime additionally exposes
-write-then-restore activity; on Windows, ``st_ctime`` is creation time, so the
-seal honestly describes the final byte and file-identity state instead.
+immutability boundary.  When the active filesystem exposes ``st_ctime`` as a
+change marker it additionally reveals write-then-restore activity; when it
+exposes creation time, ctime remains identity metadata and the seal honestly
+describes the final byte and file-identity state instead.
 """
 
 from __future__ import annotations
@@ -308,9 +309,9 @@ def verify_preview_seal(
     _require_equal("preview.json SHA-256", seal.preview_json_sha256, snapshot.preview_file.sha256)
     _require_equal("preview.json size", seal.preview_file_size, snapshot.preview_file.size)
     _require_equal("preview.json mode", seal.preview_file_mode, snapshot.preview_file.mode)
-    # POSIX exposes inode change time here, while Windows exposes creation
-    # time.  Both remain useful identity metadata, but only the former proves
-    # that an otherwise identical file was rewritten between observations.
+    # ctime semantics vary by OS, Python version, and filesystem.  It remains
+    # useful identity metadata everywhere, but proves an otherwise-identical
+    # rewrite only when this host actually advances it.
     _require_equal("preview.json ctime", seal.preview_file_ctime_ns, snapshot.preview_file.ctime_ns)
     _require_equal("preview.json device", seal.preview_file_device, snapshot.preview_file.device)
     _require_equal("preview.json inode", seal.preview_file_inode, snapshot.preview_file.inode)

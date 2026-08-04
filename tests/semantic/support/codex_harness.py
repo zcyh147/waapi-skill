@@ -2929,9 +2929,10 @@ def turn_usage(events: Sequence[Mapping[str, Any]]) -> dict[str, int]:
 def snapshot_workspace(root: Path) -> dict[str, str]:
     """Hash final file state and link targets without following Skill symlinks.
 
-    File bytes are the portable change boundary.  POSIX ctime also records an
-    otherwise-restored write; Windows ``st_ctime`` is creation time, so an
-    identical restored final state intentionally remains identical there.
+    File bytes are the portable change boundary.  On filesystems where ctime
+    advances for metadata changes, it also records an otherwise-restored
+    write.  Where ctime is creation time, an identical restored final state
+    intentionally remains identical.
     """
 
     resolved = root.expanduser().resolve(strict=True)

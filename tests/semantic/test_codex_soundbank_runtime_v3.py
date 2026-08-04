@@ -7,7 +7,7 @@ import uuid
 import wave
 import xml.etree.ElementTree as ET
 from collections import Counter
-from pathlib import Path, PureWindowsPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from types import SimpleNamespace
 from typing import Any, Mapping, Sequence
 
@@ -1282,10 +1282,18 @@ def test_copied_original_path_parser_accepts_only_closed_absolute_mappings(
     )
     assert posix == wine_y == wine_z
 
+    if os.name == "nt":
+        native_path = PureWindowsPath(copied)
+        dot_component = f"{native_path.parent}\\.\\{native_path.name}"
+        parent_component = f"{native_path.parent}\\..\\{native_path.name}"
+    else:
+        native_path = PurePosixPath(copied)
+        dot_component = f"{native_path.parent}/./{native_path.name}"
+        parent_component = f"{native_path.parent}/../{native_path.name}"
     unsafe = (
         "~/case/project/Originals/Voices/line.wav",
-        str(copied).replace("/Voices/", "/./Voices/"),
-        str(copied).replace("/Voices/", "/../Voices/"),
+        dot_component,
+        parent_component,
         "Y:\\case\\project\\Originals\\\\line.wav",
         "X:\\case\\project\\Originals\\line.wav",
         r"\\server\share\line.wav",

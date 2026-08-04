@@ -1623,8 +1623,10 @@ def test_copied_original_rejects_untrusted_path_spellings(
     tmp_path: Path,
     unsafe: str,
 ) -> None:
+    project_root = tmp_path / "project"
+    (project_root / "Originals").mkdir(parents=True)
     with pytest.raises(ImportRuntimeError):
-        _copied_original_evidence(unsafe, project_root=tmp_path / "project")
+        _copied_original_evidence(unsafe, project_root=project_root)
 
 
 def test_import_without_requested_originals_subfolder_uses_derived_evidence(

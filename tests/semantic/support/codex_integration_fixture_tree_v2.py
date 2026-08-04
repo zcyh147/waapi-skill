@@ -1,10 +1,12 @@
 """Portable tree identity for committed integration-workflows-v2 fixtures.
 
 The committed Wwise SampleProject sources are copied between native macOS and
-Windows hosts.  Their identity therefore binds only portable relative paths,
-entry kinds, and regular-file contents.  Host executable bits are deliberately
-excluded.  Links, junctions, reparse points, and special files are rejected so
-the digest never depends on host-specific traversal behavior.
+Windows hosts.  Their identity therefore binds only portable regular-file
+paths, entry kinds, and contents.  Host executable bits and empty directories
+are deliberately excluded because neither is a portable Git checkout
+invariant.  Every directory is still traversed, and links, junctions, reparse
+points, and special files are rejected so the digest never depends on
+host-specific traversal behavior.
 """
 
 from __future__ import annotations
@@ -94,7 +96,6 @@ def wwise_fixture_tree_manifest(root: Path) -> tuple[dict[str, Any], ...]:
                     f"reparse points: {path}"
                 )
             if stat.S_ISDIR(metadata.st_mode):
-                rows.append({"path": relative, "type": "directory"})
                 walk(path)
             elif stat.S_ISREG(metadata.st_mode):
                 try:
@@ -121,7 +122,7 @@ def wwise_fixture_tree_manifest(root: Path) -> tuple[dict[str, Any], ...]:
 
 
 def wwise_fixture_tree_sha256(root: Path) -> str:
-    """Hash a Wwise fixture without host permission metadata."""
+    """Hash the portable regular-file identity of a Wwise fixture."""
 
     return hashlib.sha256(
         canonical_json_bytes(wwise_fixture_tree_manifest(root))
