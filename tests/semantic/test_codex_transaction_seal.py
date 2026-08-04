@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import time
 from dataclasses import FrozenInstanceError, replace
 from pathlib import Path
 from typing import Any
@@ -288,32 +287,25 @@ def test_preview_write_then_restore_uses_platform_ctime_contract(tmp_path: Path)
     path = _preview_path(tmp_path)
     original = path.read_bytes()
     metadata = path.stat()
-    old_ctime = metadata.st_ctime_ns
-    time.sleep(0.01)
     path.write_bytes(original)
     os.utime(path, ns=(metadata.st_atime_ns, metadata.st_mtime_ns))
 
     assert path.read_bytes() == original
-    current_ctime = path.stat().st_ctime_ns
-    if current_ctime != old_ctime:
-        # Some Windows/Python/filesystem combinations expose a usable change
-        # marker here too.  Bind the observed behavior, not the platform name.
-        with pytest.raises(TransactionSealError, match="preview.json ctime drift"):
-            verify_preview_seal(
-                tmp_path,
-                "tx-sealed",
-                seal,
-                allowed_states={TransactionState.AWAITING_CONFIRMATION},
-            )
-    else:
-        # On a host exposing creation time, an identical rewrite has the same
-        # final bytes and identity and therefore remains valid.
+    try:
         evidence = verify_preview_seal(
             tmp_path,
             "tx-sealed",
             seal,
             allowed_states={TransactionState.AWAITING_CONFIRMATION},
         )
+    except TransactionSealError as exc:
+        # The verifier's own descriptor snapshot is the authoritative ctime
+        # observation.  Some filesystems publish a write-time ctime change
+        # after an earlier stat, so sampling here first creates a TOCTOU race.
+        assert "preview.json ctime drift" in str(exc)
+    else:
+        # A host that still exposes the original identity metadata may accept
+        # an identical restored final state.
         assert evidence.preview_json_sha256 == seal.preview_json_sha256
 
 
@@ -377,6 +369,20 @@ def test_wrong_transaction_hash_or_guard_bindings_fail_closed(
     drifted = replace(seal, **{field: replacement})
 
     with pytest.raises(TransactionSealError, match=message):
+        verify_preview_seal(
+            tmp_path,
+            "tx-sealed",
+            drifted,
+            allowed_states={TransactionState.AWAITING_CONFIRMATION},
+        )
+
+
+def test_wrong_preview_ctime_binding_fails_closed(tmp_path: Path) -> None:
+    _awaiting_store(tmp_path)
+    seal = create_preview_seal(tmp_path, "tx-sealed")
+    drifted = replace(seal, preview_file_ctime_ns=seal.preview_file_ctime_ns + 1)
+
+    with pytest.raises(TransactionSealError, match="preview.json ctime drift"):
         verify_preview_seal(
             tmp_path,
             "tx-sealed",

@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import math
+import queue
 import shlex
 import sys
 import threading
@@ -7191,11 +7192,66 @@ def test_transport_timeout_discards_late_result_before_next_request() -> None:
     assert not transport._thread.is_alive()
 
 
-def test_timeout_payload_marks_cleanup_complete_when_late_call_releases_in_grace(tmp_path: Path) -> None:
+def test_transport_producer_drops_result_completed_after_monotonic_deadline() -> None:
+    response: queue.Queue[tuple[bool, Any]] = queue.Queue(maxsize=1)
+    request = waapi_gateway._TransportRequest(
+        request_id="expired-request",
+        phase="WAAPI call expired",
+        operation="call",
+        args=("expired", None),
+        kwargs={},
+        response=response,
+        expires_at=time.monotonic() - 1.0,
+        cancelled=threading.Event(),
+    )
+
+    waapi_gateway.GatewayTransport._deliver(request, (True, {"late": True}))
+
+    assert request.cancelled.is_set()
+    with pytest.raises(queue.Empty):
+        response.get_nowait()
+
+
+def test_transport_producer_preserves_completed_close_result_after_deadline() -> None:
+    response: queue.Queue[tuple[bool, Any]] = queue.Queue(maxsize=1)
+    request = waapi_gateway._TransportRequest(
+        request_id="completed-close",
+        phase="transport.close",
+        operation="close",
+        args=(),
+        kwargs={},
+        response=response,
+        expires_at=time.monotonic() - 1.0,
+        cancelled=threading.Event(),
+    )
+
+    waapi_gateway.GatewayTransport._deliver(request, (True, None))
+
+    assert request.cancelled.is_set() is False
+    assert response.get_nowait() == (True, None)
+
+
+def test_timeout_payload_marks_cleanup_complete_when_late_call_releases_in_grace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     object_call_entered = threading.Event()
     release_object_call = threading.Event()
     disconnected = threading.Event()
     configured_timeout = 0.2
+    captured_connections: list[waapi_gateway.GatewayConnection] = []
+    resolve_connection = waapi_gateway.resolve_connection
+
+    def capture_connection(
+        args: Any,
+        *,
+        env: Mapping[str, str],
+    ) -> waapi_gateway.GatewayConnection:
+        connection = resolve_connection(args, env=env)
+        captured_connections.append(connection)
+        return connection
+
+    monkeypatch.setattr(waapi_gateway, "resolve_connection", capture_connection)
 
     class GraceReleaseClient(FakeClient):
         def call(
@@ -7221,9 +7277,9 @@ def test_timeout_payload_marks_cleanup_complete_when_late_call_releases_in_grace
 
     def release_during_cleanup_grace() -> None:
         assert object_call_entered.wait(timeout=1)
+        assert len(captured_connections) == 1
         release_at = (
-            started_at
-            + configured_timeout
+            captured_connections[0].deadline.expires_at
             + waapi_gateway.TRANSPORT_CLEANUP_GRACE_SECONDS / 2
         )
         remaining = release_at - time.monotonic()

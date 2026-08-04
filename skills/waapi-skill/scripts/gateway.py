@@ -825,7 +825,16 @@ class GatewayTransport:
 
     @staticmethod
     def _deliver(request: _TransportRequest, payload: tuple[bool, Any]) -> None:
-        if request.cancelled.is_set():
+        # ``Queue.get(timeout=...)`` is permitted to return an item that was
+        # published after its timeout when the waiting thread was not scheduled
+        # promptly.  Enforce the request's monotonic deadline on the producer
+        # side as well, so an overloaded host cannot turn a late WAAPI result
+        # into an apparent in-budget success.
+        if request.cancelled.is_set() or (
+            request.operation != "close"
+            and time.monotonic() >= request.expires_at
+        ):
+            request.cancelled.set()
             return
         try:
             request.response.put_nowait(payload)
