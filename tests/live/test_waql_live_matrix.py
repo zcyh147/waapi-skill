@@ -27,6 +27,9 @@ from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[repor
     shutdown_sandboxed_wwise,
 )
 from tests.support.active_gate_failures import fail_if_active_runtime_failure  # pyright: ignore[reportMissingImports]
+from tests.support.runtime_evidence_paths import (  # pyright: ignore[reportMissingImports]
+    localize_runtime_evidence_path,
+)
 from wwise_waapi.waql import WAQL_API_URI  # pyright: ignore[reportMissingImports]
 
 
@@ -112,11 +115,11 @@ def _safe_lock_root(env: Mapping[str, str]) -> Path:
 
 
 def _safe_case_evidence_path(case: Mapping[str, Any]) -> Path:
-    target = (REPO_ROOT / str(case["evidence_path"])).resolve(strict=False)
-    evidence_root = WAQL_EVIDENCE_ROOT.resolve(strict=False)
-    if not path_is_under(target, evidence_root):
-        raise AssertionError(f"case evidence path must stay under {WAQL_EVIDENCE_ROOT}: {target}")
-    return target
+    return localize_runtime_evidence_path(
+        WAQL_EVIDENCE_ROOT,
+        str(case["evidence_path"]),
+        expected_filename=f"{case['id']}.json",
+    )
 
 
 def _redact_local_paths(message: str) -> str:
@@ -247,6 +250,8 @@ def _write_case_evidence(
         "result_count": len(result),
         "result_count_policy": case["expected"]["result_count"],
         "assertions": case["assertions"],
+        "evidence_path": evidence_path.relative_to(REPO_ROOT).as_posix(),
+        "provenance_evidence_path": case["evidence_path"],
         "no_mutation": case["no_mutation"],
         "sources": case["sources"],
         "reason": reason,

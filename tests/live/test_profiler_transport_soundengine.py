@@ -615,6 +615,8 @@ def _write_case_evidence(case: Mapping[str, Any], *, status: str, details: Mappi
     body = {
         "case_id": case["id"],
         "status": status,
+        "evidence_path": path.relative_to(REPO_ROOT).as_posix(),
+        "provenance_evidence_path": case["evidence_path"],
         "uris": case["uris"],
         "capture_sequence": case["capture_sequence"],
         "trigger": case["trigger"],

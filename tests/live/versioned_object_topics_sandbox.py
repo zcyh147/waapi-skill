@@ -29,6 +29,9 @@ from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[repor
     prepare_sample_project_sandbox,
     shutdown_sandboxed_wwise,
 )
+from tests.support.runtime_evidence_paths import (  # pyright: ignore[reportMissingImports]
+    localize_runtime_evidence_path,
+)
 from wwise_waapi.subscriptions import SubscriptionEvent, SubscriptionManager, SubscriptionTimeout  # pyright: ignore[reportMissingImports]
 
 
@@ -344,11 +347,7 @@ def _unique_name(version: str, label: str) -> str:
 
 
 def _safe_evidence_path(version: str, path: str) -> Path:
-    expected_root = _version_evidence_root(version)
-    target = (REPO_ROOT / path).resolve(strict=False)
-    if not path_is_under(target, expected_root):
-        raise AssertionError(f"evidence path must stay under {expected_root}: {target}")
-    return target
+    return localize_runtime_evidence_path(_version_evidence_root(version), path)
 
 
 def _write_topic_evidence(version: str, case: Mapping[str, Any], *, payload: Any, expected: Mapping[str, Any]) -> None:
@@ -357,6 +356,8 @@ def _write_topic_evidence(version: str, case: Mapping[str, Any], *, payload: Any
     body = {
         "case_id": case["id"],
         "status": "passed",
+        "evidence_path": path.relative_to(REPO_ROOT).as_posix(),
+        "provenance_evidence_path": case["evidence_path"],
         "uri": case["uri"],
         "publisher": case["publisher"],
         "bounded_wait_seconds": case["bounded_wait_seconds"],
@@ -370,11 +371,14 @@ def _write_topic_evidence(version: str, case: Mapping[str, Any], *, payload: Any
 
 
 def _write_topic_blocker(version: str, case: Mapping[str, Any], exc: BaseException) -> None:
-    path = _safe_evidence_path(version, str(case["evidence_path"]).replace(".json", "-blocker.json"))
+    evidence_path = _safe_evidence_path(version, str(case["evidence_path"]))
+    path = evidence_path.with_name(f"{evidence_path.stem}-blocker{evidence_path.suffix}")
     path.parent.mkdir(parents=True, exist_ok=True)
     body = {
         "case_id": case["id"],
         "status": "blocked",
+        "evidence_path": path.relative_to(REPO_ROOT).as_posix(),
+        "provenance_evidence_path": case["evidence_path"],
         "uri": case["uri"],
         "blocker": _redact_local_paths(str(exc)),
         "bounded_wait_seconds": case["bounded_wait_seconds"],
@@ -390,6 +394,8 @@ def _write_deferred_evidence(version: str, case: Mapping[str, Any]) -> None:
     body = {
         "case_id": case["id"],
         "status": case["status"],
+        "evidence_path": path.relative_to(REPO_ROOT).as_posix(),
+        "provenance_evidence_path": case["evidence_path"],
         "uri": case["uri"],
         "blocker": case["blocker"],
         "counts_as_behavioral": False,

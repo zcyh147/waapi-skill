@@ -15,7 +15,6 @@ from tests.destructive.support.live_environment import (  # pyright: ignore[repo
     ENV_WWISE_LIVE,
     ENV_WWISE_SAMPLE_PROJECT_PATH,
     ENV_WWISE_VERSION,
-    path_is_under,
 )
 from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
     LiveSandboxLock,
@@ -24,6 +23,9 @@ from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[repor
     launch_sandboxed_wwise,
     prepare_sample_project_sandbox,
     shutdown_sandboxed_wwise,
+)
+from tests.support.runtime_evidence_paths import (  # pyright: ignore[reportMissingImports]
+    localize_runtime_evidence_path,
 )
 from wwise_waapi.waql import WAQL_API_URI  # pyright: ignore[reportMissingImports]
 
@@ -62,7 +64,7 @@ def test_2021_1_waql_matrix_cases_are_read_only_and_versioned() -> None:
         _assert_case_is_read_only(case)
         assert case["coverage_status"] == "live-tested"
         assert case["evidence_path"].startswith(
-            ".waapi-skill-state/evidence/wwise-2021-waapi-integration-coverage/live-read-only/"
+            ".sisyphus/evidence/wwise-2021-waapi-integration-coverage/live-read-only/"
         )
         assert case["evidence_path"].endswith(f"/{case['id']}.json")
         assert any("resources/manifest/2021.1/schemas.json" in source for source in case["sources"])
@@ -322,7 +324,8 @@ def _write_case_evidence(
             "rows": rows,
         },
         "assertions": case["assertions"],
-        "evidence_path": case["evidence_path"],
+        "evidence_path": evidence_path.relative_to(REPO_ROOT).as_posix(),
+        "provenance_evidence_path": case["evidence_path"],
         "get_info": _stable_get_info_summary(get_info),
         "no_mutation": case["no_mutation"],
         "read_only_waapi_operations": READ_ONLY_WAAPI_OPERATIONS,
@@ -335,11 +338,11 @@ def _write_case_evidence(
 
 
 def _safe_case_evidence_path(case: Mapping[str, Any]) -> Path:
-    evidence_path = (REPO_ROOT / str(case["evidence_path"])).resolve(strict=False)
-    evidence_root = EVIDENCE_ROOT.resolve(strict=False)
-    if not path_is_under(evidence_path, evidence_root):
-        raise AssertionError(f"case evidence path must stay under {EVIDENCE_ROOT}: {evidence_path}")
-    return evidence_path
+    return localize_runtime_evidence_path(
+        EVIDENCE_ROOT,
+        str(case["evidence_path"]),
+        expected_filename=f"{case['id']}.json",
+    )
 
 
 def _write_run_evidence(matrix: Mapping[str, Any], *, info: Mapping[str, Any], context: Mapping[str, Any]) -> None:

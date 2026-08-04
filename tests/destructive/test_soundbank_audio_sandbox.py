@@ -34,6 +34,9 @@ from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[repor
     shutdown_sandboxed_wwise,
 )
 from tests.support.active_gate_failures import fail_if_active_runtime_failure  # pyright: ignore[reportMissingImports]
+from tests.support.runtime_evidence_paths import (  # pyright: ignore[reportMissingImports]
+    localize_runtime_evidence_path,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -106,6 +109,7 @@ def test_audio_import_generated_wav_readback_cleanup() -> None:
             assert _no_source_generated_outputs(runtime.source_generated_snapshot_before)
             _write_case_evidence(
                 case,
+                evidence_root=EVIDENCE_ROOT,
                 status="passed",
                 details={
                     "imported_name": name,
@@ -118,7 +122,12 @@ def test_audio_import_generated_wav_readback_cleanup() -> None:
         except BaseException as exc:
             if _is_assertion_or_skip(exc):
                 raise
-            _write_case_evidence(case, status="blocked", details=_exception_details(exc))
+            _write_case_evidence(
+                case,
+                evidence_root=EVIDENCE_ROOT,
+                status="blocked",
+                details=_exception_details(exc),
+            )
             runtime.skip_after_blocker = True
             pytest.skip(f"audio import fixture was rejected by Wwise: {type(exc).__name__}: {exc}")
         finally:
@@ -161,6 +170,7 @@ def test_audio_import_tab_delimited_generated_wav_or_records_blocker() -> None:
             assert _no_source_generated_outputs(runtime.source_generated_snapshot_before)
             _write_case_evidence(
                 case,
+                evidence_root=EVIDENCE_ROOT,
                 status="passed",
                 details={
                     "imported_name": name,
@@ -173,7 +183,12 @@ def test_audio_import_tab_delimited_generated_wav_or_records_blocker() -> None:
         except BaseException as exc:
             if _is_assertion_or_skip(exc):
                 raise
-            _write_case_evidence(case, status="blocked", details=_exception_details(exc, blocker=case["blockers"][0]))
+            _write_case_evidence(
+                case,
+                evidence_root=EVIDENCE_ROOT,
+                status="blocked",
+                details=_exception_details(exc, blocker=case["blockers"][0]),
+            )
             runtime.skip_after_blocker = True
             pytest.skip(f"audio tab-delimited import fixture was rejected by Wwise: {type(exc).__name__}: {exc}")
         finally:
@@ -215,13 +230,19 @@ def test_audio_imported_topic_bounded_wait_or_records_blocker() -> None:
             assert _event_mentions_name(event, name), event
             _write_case_evidence(
                 case,
+                evidence_root=EVIDENCE_ROOT,
                 status="passed",
                 details={"imported_name": name, "topic_payload": _json_safe(event), "import_result": _json_safe(result)},
             )
         except (queue.Empty, BaseException) as exc:
             if _is_assertion_or_skip(exc):
                 raise
-            _write_case_evidence(case, status="blocked", details=_exception_details(exc, blocker=case["blockers"][0]))
+            _write_case_evidence(
+                case,
+                evidence_root=EVIDENCE_ROOT,
+                status="blocked",
+                details=_exception_details(exc, blocker=case["blockers"][0]),
+            )
             runtime.skip_after_blocker = True
             pytest.skip(f"audio.imported topic did not provide bounded evidence: {type(exc).__name__}: {exc}")
         finally:
@@ -269,6 +290,7 @@ def test_soundbank_inclusions_replace_read_remove_cleanup() -> None:
             assert _no_source_generated_outputs(runtime.source_generated_snapshot_before)
             _write_case_evidence(
                 case,
+                evidence_root=EVIDENCE_ROOT,
                 status="passed",
                 details={
                     "soundbank_name": soundbank_name,
@@ -279,7 +301,12 @@ def test_soundbank_inclusions_replace_read_remove_cleanup() -> None:
         except BaseException as exc:
             if _is_assertion_or_skip(exc):
                 raise
-            _write_case_evidence(case, status="blocked", details=_exception_details(exc))
+            _write_case_evidence(
+                case,
+                evidence_root=EVIDENCE_ROOT,
+                status="blocked",
+                details=_exception_details(exc),
+            )
             runtime.skip_after_blocker = True
             pytest.skip(f"soundbank inclusion fixture was rejected by Wwise: {type(exc).__name__}: {exc}")
         finally:
@@ -328,6 +355,7 @@ def test_soundbank_generate_write_to_disk_or_records_blocker() -> None:
             if not new_outputs:
                 _write_case_evidence(
                     case,
+                    evidence_root=EVIDENCE_ROOT,
                     status="blocked",
                     details={
                         "blocker": case["blockers"][0],
@@ -342,6 +370,7 @@ def test_soundbank_generate_write_to_disk_or_records_blocker() -> None:
             assert _no_source_generated_outputs(runtime.source_generated_snapshot_before)
             _write_case_evidence(
                 case,
+                evidence_root=EVIDENCE_ROOT,
                 status="passed",
                 details={
                     "soundbank_name": soundbank_name,
@@ -353,7 +382,12 @@ def test_soundbank_generate_write_to_disk_or_records_blocker() -> None:
         except BaseException as exc:
             if _is_assertion_or_skip(exc):
                 raise
-            _write_case_evidence(case, status="blocked", details=_exception_details(exc, blocker=case["blockers"][0]))
+            _write_case_evidence(
+                case,
+                evidence_root=EVIDENCE_ROOT,
+                status="blocked",
+                details=_exception_details(exc, blocker=case["blockers"][0]),
+            )
             runtime.skip_after_blocker = True
             pytest.skip(f"soundbank.generate was blocked by Wwise settings/platform: {type(exc).__name__}: {exc}")
         finally:
@@ -386,6 +420,7 @@ def test_soundbank_process_definition_file_or_records_blocker() -> None:
             if not isinstance(result, Mapping):
                 _write_case_evidence(
                     case,
+                    evidence_root=EVIDENCE_ROOT,
                     status="blocked",
                     details={
                         "blocker": case["blockers"][0],
@@ -400,6 +435,7 @@ def test_soundbank_process_definition_file_or_records_blocker() -> None:
             if not rows:
                 _write_case_evidence(
                     case,
+                    evidence_root=EVIDENCE_ROOT,
                     status="blocked",
                     details={
                         "blocker": case["blockers"][0],
@@ -413,6 +449,7 @@ def test_soundbank_process_definition_file_or_records_blocker() -> None:
             assert _no_source_generated_outputs(runtime.source_generated_snapshot_before)
             _write_case_evidence(
                 case,
+                evidence_root=EVIDENCE_ROOT,
                 status="passed",
                 details={
                     "definition_file": _relative_to_sandbox(definition_file, runtime.require_sandbox_path()),
@@ -423,7 +460,12 @@ def test_soundbank_process_definition_file_or_records_blocker() -> None:
         except BaseException as exc:
             if _is_assertion_or_skip(exc):
                 raise
-            _write_case_evidence(case, status="blocked", details=_exception_details(exc, blocker=case["blockers"][0]))
+            _write_case_evidence(
+                case,
+                evidence_root=EVIDENCE_ROOT,
+                status="blocked",
+                details=_exception_details(exc, blocker=case["blockers"][0]),
+            )
             runtime.skip_after_blocker = True
             pytest.skip(f"soundbank definition fixture was rejected by Wwise: {type(exc).__name__}: {exc}")
         finally:
@@ -455,6 +497,7 @@ def test_soundbank_process_definition_file_version_correct_or_records_blocker() 
             if _process_definition_result_is_unusable(result):
                 _write_case_evidence(
                     case,
+                    evidence_root=TASK6_EVIDENCE_ROOT,
                     status="blocked",
                     details={
                         "blocker": case["blockers"][0],
@@ -474,6 +517,7 @@ def test_soundbank_process_definition_file_version_correct_or_records_blocker() 
             if not rows:
                 _write_case_evidence(
                     case,
+                    evidence_root=TASK6_EVIDENCE_ROOT,
                     status="blocked",
                     details={
                         "blocker": case["blockers"][0],
@@ -499,6 +543,7 @@ def test_soundbank_process_definition_file_version_correct_or_records_blocker() 
             assert source_hash_proof["before"] == source_hash_proof["after"]
             _write_case_evidence(
                 case,
+                evidence_root=TASK6_EVIDENCE_ROOT,
                 status="passed",
                 details={
                     "definition": _definition_evidence(definition_file, runtime.require_sandbox_path(), bank_name),
@@ -518,7 +563,12 @@ def test_soundbank_process_definition_file_version_correct_or_records_blocker() 
                 details["definition"] = _definition_evidence(definition_file, runtime.require_sandbox_path(), bank_name)
                 details["definition_content"] = definition_file.read_text(encoding="utf-8")
             details["source_hash_proof"] = _source_hash_proof(runtime)
-            _write_case_evidence(case, status="blocked", details=details)
+            _write_case_evidence(
+                case,
+                evidence_root=TASK6_EVIDENCE_ROOT,
+                status="blocked",
+                details=details,
+            )
             runtime.skip_after_blocker = True
             pytest.skip(f"soundbank definition fixture was rejected by Wwise: {type(exc).__name__}: {exc}")
         finally:
@@ -908,12 +958,20 @@ def _source_hash_proof(runtime: _SandboxRuntime) -> dict[str, Any]:
     }
 
 
-def _write_case_evidence(case: Mapping[str, Any], *, status: str, details: Mapping[str, Any]) -> None:
-    path = _safe_evidence_path(str(case["evidence_path"]))
+def _write_case_evidence(
+    case: Mapping[str, Any],
+    *,
+    evidence_root: Path,
+    status: str,
+    details: Mapping[str, Any],
+) -> None:
+    path = _safe_evidence_path(evidence_root, str(case["evidence_path"]))
     existing = path.read_text(encoding="utf-8") if path.exists() else f"# {path.stem}\n"
     body = {
         "case_id": case["id"],
         "status": status,
+        "evidence_path": path.relative_to(REPO_ROOT).as_posix(),
+        "provenance_evidence_path": case["evidence_path"],
         "uris": case["uris"],
         "allowlist": case["allowlist"],
         "assertions": case["assertions"],
@@ -925,11 +983,8 @@ def _write_case_evidence(case: Mapping[str, Any], *, status: str, details: Mappi
     path.write_text(existing.rstrip() + "\n\n```json\n" + json.dumps(body, indent=2, sort_keys=True) + "\n```\n", encoding="utf-8")
 
 
-def _safe_evidence_path(path: str) -> Path:
-    target = (REPO_ROOT / path).resolve(strict=False)
-    expected_root = TASK6_EVIDENCE_ROOT.resolve(strict=False) if "wwise-waapi-deferred-reevaluation" in path else EVIDENCE_ROOT.resolve(strict=False)
-    if not path_is_under(target, expected_root):
-        raise AssertionError(f"evidence path must stay under {expected_root}: {target}")
+def _safe_evidence_path(evidence_root: Path, path: str) -> Path:
+    target = localize_runtime_evidence_path(evidence_root, path)
     target.parent.mkdir(parents=True, exist_ok=True)
     return target
 

@@ -28,6 +28,9 @@ from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[repor
     shutdown_sandboxed_wwise,
 )
 from tests.support.active_gate_failures import fail_if_active_runtime_failure  # pyright: ignore[reportMissingImports]
+from tests.support.runtime_evidence_paths import (  # pyright: ignore[reportMissingImports]
+    localize_runtime_evidence_path,
+)
 from wwise_waapi.subscriptions import SubscriptionManager, SubscriptionTimeout  # pyright: ignore[reportMissingImports]
 
 
@@ -233,12 +236,25 @@ def _safe_lock_root(env: Mapping[str, str]) -> Path:
     return root
 
 
-def _safe_evidence_path(path: str, section: str) -> Path:
-    target = (REPO_ROOT / path).resolve(strict=False)
-    expected_root = (EVIDENCE_ROOT / section).resolve(strict=False)
-    if not path_is_under(target, expected_root):
-        raise AssertionError(f"evidence path must stay under {expected_root}: {target}")
-    return target
+def _safe_evidence_path(
+    path: str,
+    section: str,
+    *,
+    expected_filename: str | None = None,
+) -> Path:
+    return localize_runtime_evidence_path(
+        EVIDENCE_ROOT / section,
+        path,
+        expected_filename=expected_filename,
+    )
+
+
+def _safe_generated_evidence_path(filename: str, section: str) -> Path:
+    return _safe_evidence_path(
+        f".waapi-skill-state/evidence/{filename}",
+        section,
+        expected_filename=filename,
+    )
 
 
 def _write_case_evidence(
@@ -254,6 +270,8 @@ def _write_case_evidence(
     payload = {
         "case_id": case["id"],
         "status": status,
+        "evidence_path": path.relative_to(REPO_ROOT).as_posix(),
+        "provenance_evidence_path": case["evidence_path"],
         "uri": case["uri"],
         "args": (rendered or case)["args"],
         "options": (rendered or case)["options"],
@@ -273,6 +291,8 @@ def _write_topic_evidence(case: Mapping[str, Any], *, payload: Mapping[str, Any]
     body = {
         "case_id": case["id"],
         "status": "passed",
+        "evidence_path": path.relative_to(REPO_ROOT).as_posix(),
+        "provenance_evidence_path": case["evidence_path"],
         "uri": case["uri"],
         "publisher": case["publisher"],
         "bounded_wait_seconds": case["bounded_wait_seconds"],
@@ -286,11 +306,17 @@ def _write_topic_evidence(case: Mapping[str, Any], *, payload: Mapping[str, Any]
 
 
 def _write_topic_deferral(case: Mapping[str, Any]) -> None:
-    path = EVIDENCE_ROOT / "topics" / f"{case['id']}.json"
+    provenance_path = case.get("evidence_path")
+    if isinstance(provenance_path, str):
+        path = _safe_evidence_path(provenance_path, "topics")
+    else:
+        path = _safe_generated_evidence_path(f"{case['id']}.json", "topics")
     path.parent.mkdir(parents=True, exist_ok=True)
     body = {
         "case_id": case["id"],
         "status": case["status"],
+        "evidence_path": path.relative_to(REPO_ROOT).as_posix(),
+        "provenance_evidence_path": provenance_path,
         "uri": case["uri"],
         "attempted_publisher": case.get("attempted_publisher"),
         "bounded_wait_seconds": case.get("bounded_wait_seconds"),
@@ -306,11 +332,24 @@ def _write_topic_deferral(case: Mapping[str, Any]) -> None:
 
 
 def _write_topic_blocker(case: Mapping[str, Any], exc: BaseException) -> None:
-    path = EVIDENCE_ROOT / "topics" / f"{case['id']}-blocker.json"
+    provenance_path = case.get("evidence_path")
+    if isinstance(provenance_path, str):
+        evidence_path = _safe_evidence_path(provenance_path, "topics")
+        path = (
+            evidence_path
+            if evidence_path.stem.endswith("-blocker")
+            else evidence_path.with_name(
+                f"{evidence_path.stem}-blocker{evidence_path.suffix}"
+            )
+        )
+    else:
+        path = _safe_generated_evidence_path(f"{case['id']}-blocker.json", "topics")
     path.parent.mkdir(parents=True, exist_ok=True)
     body = {
         "case_id": case["id"],
         "status": "still-deferred-with-evidence",
+        "evidence_path": path.relative_to(REPO_ROOT).as_posix(),
+        "provenance_evidence_path": provenance_path,
         "uri": case["uri"],
         "publisher": case["publisher"],
         "blocker": _redact_local_paths(str(exc)),

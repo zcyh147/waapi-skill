@@ -189,7 +189,11 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                 )
 
                 project_query = _require_gateway_success(
-                    _invoke_gateway(common, ("query-object", "--type", "Project", "--take", "1"), env=env),
+                    _invoke_gateway(
+                        common,
+                        ("query-object", "--type", "Project", "--take", "1", "--detail"),
+                        env=env,
+                    ),
                     command="query-object",
                     version=version,
                 )
@@ -198,7 +202,7 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                 project_all_results = _require_gateway_success(
                     _invoke_gateway(
                         common,
-                        ("query-object", "--type", "Project", "--all-results"),
+                        ("query-object", "--type", "Project", "--all-results", "--detail"),
                         env=env,
                     ),
                     command="query-object --all-results",
@@ -228,6 +232,7 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                         "type",
                         "--return-field",
                         "path",
+                        "--detail",
                     ),
                     env=env,
                 )
@@ -255,6 +260,7 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                             "type",
                             "--return-field",
                             "path",
+                            "--detail",
                         ),
                         env=env,
                     ),
@@ -278,6 +284,7 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                             "id",
                             "--return-field",
                             "path",
+                            "--detail",
                         ),
                         env=env,
                     ),
@@ -295,6 +302,7 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                             "{FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF}",
                             "--return-field",
                             "id",
+                            "--detail",
                         ),
                         env=env,
                     ),
@@ -320,6 +328,7 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                             ),
                             "--take",
                             "1",
+                            "--detail",
                         ),
                         env=env,
                     ),
@@ -343,6 +352,7 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                             '{"field":"name","operator":"=","value":"Default Work Unit"}',
                             "--take",
                             "1",
+                            "--detail",
                         ),
                         env=env,
                     ),
@@ -366,6 +376,7 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                             "children",
                             "--take",
                             "1",
+                            "--detail",
                         ),
                         env=env,
                     ),
@@ -398,6 +409,7 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                                 select,
                                 "--take",
                                 "1",
+                                "--detail",
                             ),
                             env=env,
                         ),
@@ -422,6 +434,7 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                             '{"field":"name","operator":"=","value":"Sound = SFX"}',
                             "--take",
                             "1",
+                            "--detail",
                         ),
                         env=env,
                     ),
@@ -441,7 +454,7 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                 query_by_guid = _require_gateway_success(
                     _invoke_gateway(
                         common,
-                        ("query-object", "--query", query_id, "--take", "1"),
+                        ("query-object", "--query", query_id, "--take", "1", "--detail"),
                         env=env,
                     ),
                     command="query-object --query GUID",
@@ -455,7 +468,7 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                 query_by_path = _require_gateway_success(
                     _invoke_gateway(
                         common,
-                        ("query-object", "--query", query_path, "--take", "1"),
+                        ("query-object", "--query", query_path, "--take", "1", "--detail"),
                         env=env,
                     ),
                     command="query-object --query path",

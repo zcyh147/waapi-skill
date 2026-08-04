@@ -5,6 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from tests.support.runtime_evidence_paths import (
+    RuntimeEvidencePathError,
+    localize_runtime_evidence_path,
+)
+
 
 CAPABILITY_STATUS_VALUES = frozenset({"capability-observed", "capability-blocked", "prerequisite-blocked"})
 PROMOTION_STATUS_VALUES = frozenset({"profiler-backed-tested", "soundengine-backed-tested"})
@@ -122,12 +127,13 @@ def validate_profiler_capability_resource(resource: Mapping[str, Any]) -> None:
 
 
 def safe_profiler_capability_evidence_path(repo_root: Path, evidence_root: Path, path: str) -> Path:
-    """Resolve a resource evidence path and keep it under the Task 3 evidence root."""
+    """Localize resource provenance below the caller-owned Task 3 runtime root."""
 
-    target = (repo_root / path).resolve(strict=False)
-    expected = evidence_root.resolve(strict=False)
-    if target != expected and expected not in target.parents:
-        raise ProfilerCapabilitySchemaError(f"evidence path must stay under {expected}: {target}")
+    del repo_root  # Historical provenance is never resolved relative to the checkout.
+    try:
+        target = localize_runtime_evidence_path(evidence_root, path)
+    except RuntimeEvidencePathError as exc:
+        raise ProfilerCapabilitySchemaError(str(exc)) from exc
     target.parent.mkdir(parents=True, exist_ok=True)
     return target
 

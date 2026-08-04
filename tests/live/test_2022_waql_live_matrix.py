@@ -10,7 +10,6 @@ from typing import Any, Mapping
 import pytest  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.headless import default_waapi_client_factory  # pyright: ignore[reportMissingImports]
-from tests.destructive.support.live_environment import path_is_under  # pyright: ignore[reportMissingImports]
 from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
     LiveSandboxLock,
     cleanup_sandbox,
@@ -18,6 +17,9 @@ from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[repor
     launch_sandboxed_wwise,
     prepare_sample_project_sandbox,
     shutdown_sandboxed_wwise,
+)
+from tests.support.runtime_evidence_paths import (  # pyright: ignore[reportMissingImports]
+    localize_runtime_evidence_path,
 )
 from wwise_waapi.waql import WAQL_API_URI  # pyright: ignore[reportMissingImports]
 
@@ -229,7 +231,8 @@ def _write_case_evidence(case: Mapping[str, Any], rendered: Mapping[str, Any], r
         "result_count": len(rows),
         "result_count_policy": case["expected"]["result_count"],
         "assertions": case["assertions"],
-        "evidence_path": case["evidence_path"],
+        "evidence_path": evidence_path.relative_to(REPO_ROOT).as_posix(),
+        "provenance_evidence_path": case["evidence_path"],
         "no_mutation": case["no_mutation"],
         "sources": case["sources"],
         "wwise_version": EXPECTED_WWISE_VERSION,
@@ -239,8 +242,8 @@ def _write_case_evidence(case: Mapping[str, Any], rendered: Mapping[str, Any], r
 
 
 def _safe_case_evidence_path(case: Mapping[str, Any]) -> Path:
-    evidence_path = (REPO_ROOT / str(case["evidence_path"])).resolve(strict=False)
-    evidence_root = EVIDENCE_ROOT.resolve(strict=False)
-    if not path_is_under(evidence_path, evidence_root):
-        raise AssertionError(f"case evidence path must stay under {EVIDENCE_ROOT}: {evidence_path}")
-    return evidence_path
+    return localize_runtime_evidence_path(
+        EVIDENCE_ROOT,
+        str(case["evidence_path"]),
+        expected_filename=f"{case['id']}.json",
+    )

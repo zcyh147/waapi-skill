@@ -34,6 +34,9 @@ from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[repor
     shutdown_sandboxed_wwise,
 )
 from tests.support.active_gate_failures import fail_if_active_runtime_failure  # pyright: ignore[reportMissingImports]
+from tests.support.runtime_evidence_paths import (  # pyright: ignore[reportMissingImports]
+    localize_runtime_evidence_path,
+)
 from wwise_waapi.subscriptions import SubscriptionManager, SubscriptionTimeout  # pyright: ignore[reportMissingImports]
 
 
@@ -482,6 +485,8 @@ def _write_case_evidence(case: Mapping[str, Any], *, status: str, details: Mappi
     body = {
         "case_id": case["id"],
         "status": status,
+        "evidence_path": path.relative_to(REPO_ROOT).as_posix(),
+        "provenance_evidence_path": case["evidence_path"],
         "uri": case["uri"],
         "precondition": case.get("precondition"),
         "mutation": case.get("mutation"),
@@ -496,10 +501,7 @@ def _write_case_evidence(case: Mapping[str, Any], *, status: str, details: Mappi
 
 
 def _safe_evidence_path(path: str) -> Path:
-    target = (REPO_ROOT / path).resolve(strict=False)
-    expected_root = EVIDENCE_ROOT.resolve(strict=False)
-    if not path_is_under(target, expected_root):
-        raise AssertionError(f"evidence path must stay under {expected_root}: {target}")
+    target = localize_runtime_evidence_path(EVIDENCE_ROOT, path)
     target.parent.mkdir(parents=True, exist_ok=True)
     return target
 
