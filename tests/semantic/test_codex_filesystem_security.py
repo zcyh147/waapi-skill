@@ -192,7 +192,11 @@ def test_bounded_reader_requires_explicit_opt_out_for_ordinary_posix_media(
     path = tmp_path / "source.wav"
     path.write_bytes(b"RIFF-media")
     path.chmod(0o644)
-    monkeypatch.setattr(filesystem, "_platform_name", lambda: "posix")
+    monkeypatch.setattr(
+        filesystem,
+        "private_posix_mode_is_valid",
+        lambda _metadata: False,
+    )
 
     with pytest.raises(filesystem.CodexFileSecurityError, match="exclusive"):
         filesystem.read_bounded_exclusive_regular_file(path, max_bytes=64)
