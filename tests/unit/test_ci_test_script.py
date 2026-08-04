@@ -10,6 +10,7 @@ import pytest
 
 from ci.resolve_live_test_config import LiveTestConfigError, resolve_version_config
 from ci.run_live_test_command import (
+    _validate_smoke_child_command,
     build_live_test_environment,
     main as run_live_test_command,
     resolve_live_python_command,
@@ -247,6 +248,151 @@ def test_live_command_main_runs_exact_argv_without_a_shell(
     assert environment["WWISE_STRICT_REAL"] == "1"
 
 
+def _strong_smoke_output(
+    *,
+    console: Path,
+    sandbox_project: Path,
+    build: str = "2022.1.19.8584",
+) -> str:
+    payload = {
+        "argv": [
+            str(console),
+            "waapi-server",
+            str(sandbox_project),
+            "--wamp-port",
+            "31337",
+            "--http-port",
+            "0",
+        ],
+        "build": build,
+        "cleanup": "cleaned",
+        "contract": "waapi-skill.real-smoke/v1",
+        "display_name": "fake WwiseConsole",
+        "isCommandLine": True,
+        "pid": 4242,
+        "port": 31337,
+        "ready_duration_seconds": 0.25,
+        "sandbox_deleted": True,
+        "sandbox_project": str(sandbox_project),
+        "source_mtime_ns": 123456789,
+        "source_sha256": "0" * 64,
+        "version": "2022.1",
+    }
+    return "smoke ok:" + json.dumps(payload, sort_keys=True) + "\n"
+
+
+@pytest.mark.parametrize(
+    ("proof_kind", "expected_code"),
+    (
+        ("poetry-version", 2),
+        ("valid", 0),
+        ("wrong-build", 2),
+    ),
+)
+def test_live_smoke_requires_get_info_marker_in_addition_to_zero_exit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    proof_kind: str,
+    expected_code: int,
+) -> None:
+    console = tmp_path / "WwiseConsole"
+    console.write_text("console\n", encoding="utf-8")
+    console.chmod(0o755)
+    project = tmp_path / "source" / "SampleProject.wproj"
+    project.parent.mkdir()
+    project.write_text("<Project />\n", encoding="utf-8")
+    sandbox_root = tmp_path / "sandbox"
+    sandbox_project = sandbox_root / "deleted" / "SampleProject.wproj"
+    smoke_script = tmp_path / "ci" / "wwise_smoke.py"
+    smoke_script.parent.mkdir()
+    smoke_script.write_text("# packaged smoke fixture\n", encoding="utf-8")
+    if proof_kind == "poetry-version":
+        child_stdout = "Poetry (version 2.2.1)\n"
+    else:
+        child_stdout = _strong_smoke_output(
+            console=console,
+            sandbox_project=sandbox_project,
+            build=(
+                "2022.1.18.9999"
+                if proof_kind == "wrong-build"
+                else "2022.1.19.8584"
+            ),
+        )
+
+    for name in (
+        "WWISE_TEST_CONFIG",
+        "WWISE_CONSOLE",
+        "WWISE_SAMPLE_PROJECT_PATH",
+        "WWISE_SANDBOX_ROOT",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    def complete_smoke(
+        command: tuple[str, ...],
+        **options: object,
+    ) -> subprocess.CompletedProcess[str]:
+        assert options["stdout"] is subprocess.PIPE
+        assert options["stderr"] is subprocess.PIPE
+        assert options["text"] is True
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=child_stdout,
+            stderr="",
+        )
+
+    code = run_live_test_command(
+        (
+            "--version",
+            "2022.1",
+            "--mode",
+            "smoke",
+            "--repo-root",
+            str(tmp_path),
+            "--default-config",
+            str(tmp_path / "missing-config.json"),
+            "--default-console",
+            str(console),
+            "--default-project",
+            str(project),
+            "--default-sandbox",
+            str(sandbox_root),
+            "--",
+            "poetry",
+            "run",
+            "python",
+            str(smoke_script),
+        ),
+        command_runner=complete_smoke,
+        python_executable=sys.executable,
+    )
+
+    captured = capsys.readouterr()
+    assert code == expected_code, captured.err
+    assert child_stdout in captured.out
+    if expected_code == 0:
+        assert "smoke proof error" not in captured.err
+    else:
+        assert "smoke proof error" in captured.err
+
+
+def test_live_smoke_rejects_any_child_other_than_the_packaged_script(
+    tmp_path: Path,
+) -> None:
+    packaged = tmp_path / "ci" / "wwise_smoke.py"
+    packaged.parent.mkdir()
+    packaged.write_text("# packaged\n", encoding="utf-8")
+    other = tmp_path / "other.py"
+    other.write_text("# other\n", encoding="utf-8")
+
+    with pytest.raises(LiveTestConfigError, match="this checkout"):
+        _validate_smoke_child_command(
+            ("poetry", "run", "python", str(other)),
+            repo_root=tmp_path,
+        )
+
+
 def test_live_command_main_reports_missing_real_prerequisite_as_test_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -319,7 +465,7 @@ def _write_fake_python(bin_dir: Path, fail_on_nonlive: bool = False) -> Path:
         "        handle.write(json.dumps(child_argv) + '\\n')\n"
         "    return subprocess.CompletedProcess(command, 0)\n"
         "argv = sys.argv[1:]\n"
-        "effective_argv = argv[2:] if argv[:2] == ['run', 'python'] else argv\n"
+        "effective_argv = argv[3:] if argv[:3] == ['run', '--', 'python'] else (argv[2:] if argv[:2] == ['run', 'python'] else argv)\n"
         "if effective_argv and Path(effective_argv[0]).name == 'run_live_test_command.py':\n"
         "    sys.path.insert(0, str(Path(effective_argv[0]).resolve().parent))\n"
         "    from run_live_test_command import main\n"
@@ -361,6 +507,8 @@ def _run_ci_test(env: dict[str, str], *args: str) -> subprocess.CompletedProcess
 
 
 def _pytest_argv(argv: list[str]) -> list[str]:
+    if argv[:3] == ["run", "--", "python"]:
+        return argv[3:]
     if argv[:2] == ["run", "python"]:
         return argv[2:]
     if argv and os.path.normcase(argv[0]) == os.path.normcase(sys.executable):

@@ -371,55 +371,7 @@ run_smoke_for_version() {
   print_context "$v" "smoke"
   (
     cd "$ROOT_DIR"
-    python - <<'PY'
-import os
-
-from tests.destructive.support.sandbox_fixture import cleanup_sandbox, prepare_sample_project_sandbox
-from wwise_waapi.headless import HeadlessLifecycle, LifecycleTimeouts, default_waapi_client_factory
-
-env = dict(os.environ)
-timeouts = LifecycleTimeouts(
-    startup=float(os.getenv("WWISE_STARTUP_TIMEOUT", "10")),
-    readiness=float(os.getenv("WWISE_READINESS_TIMEOUT", "60")),
-    probe=float(os.getenv("WWISE_PROBE_TIMEOUT", "5")),
-    shutdown=float(os.getenv("WWISE_SHUTDOWN_TIMEOUT", "10")),
-)
-
-sandbox = prepare_sample_project_sandbox(env, hash_strategy="bounded")
-fixed_port = os.getenv("WWISE_WAAPI_PORT")
-lifecycle = HeadlessLifecycle(
-    console_path=env["WWISE_CONSOLE"],
-    project_path=sandbox.sandbox_project,
-    port=int(fixed_port) if fixed_port else None,
-    timeouts=timeouts,
-    launch_env={**env, **sandbox.env},
-)
-client = None
-failed = True
-try:
-    lifecycle.launch()
-    print(f"smoke project: {sandbox.sandbox_project}", flush=True)
-    print(f"smoke argv: {lifecycle.command!r}", flush=True)
-    print(f"smoke cwd: {str(lifecycle.launch_cwd)!r}", flush=True)
-    print(f"smoke waapi_url: {lifecycle.waapi_url}", flush=True)
-    lifecycle.wait_ready()
-    client = default_waapi_client_factory(lifecycle.waapi_url)
-    info = client.call("ak.wwise.core.getInfo")
-    display_name = info.get("displayName") if isinstance(info, dict) else None
-    version = info.get("version") if isinstance(info, dict) else None
-    print(f"smoke ok: displayName={display_name!r} version={version!r}")
-    failed = False
-except BaseException as exc:
-    print(f"smoke failed: {type(exc).__name__}: {exc}", flush=True)
-    print(f"smoke stdout_tail: {lifecycle.output.tail('stdout', 80)!r}", flush=True)
-    print(f"smoke stderr_tail: {lifecycle.output.tail('stderr', 80)!r}", flush=True)
-    raise
-finally:
-    if client is not None:
-        client.disconnect()
-    lifecycle.shutdown(suppress_errors=True)
-    cleanup_sandbox(sandbox, failed=failed)
-PY
+    python "$ROOT_DIR/ci/wwise_smoke.py"
   )
 }
 

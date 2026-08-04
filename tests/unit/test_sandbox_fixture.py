@@ -296,11 +296,13 @@ def test_launch_uses_sandbox_project_and_records_command(monkeypatch: pytest.Mon
     env["WINEPREFIX"] = str(tmp_path / "caller-prefix-must-be-ignored")
     sandbox = prepare_sample_project_sandbox(env)
     seen_project_paths: list[Path] = []
+    seen_ports: list[int | None] = []
 
     class FakeLifecycle:
         def __init__(self, **kwargs: Any) -> None:
             self.process = FakeProcess()
-            self.port = 31337
+            self.port = kwargs["port"]
+            seen_ports.append(self.port)
             self.project_path = kwargs["project_path"]
             self.launch_env = kwargs["launch_env"]
             self.command = [
@@ -330,10 +332,11 @@ def test_launch_uses_sandbox_project_and_records_command(monkeypatch: pytest.Mon
 
     monkeypatch.setattr(sandbox_fixture, "HeadlessLifecycle", FakeLifecycle)
 
-    lifecycle = launch_sandboxed_wwise(sandbox, env)
+    lifecycle = launch_sandboxed_wwise(sandbox, env, port=31337)
     shutdown_sandboxed_wwise(lifecycle, sandbox)
 
     assert seen_project_paths == [sandbox.sandbox_project]
+    assert seen_ports == [31337]
     assert str(source_project) not in " ".join(sandbox.metadata.command or [])
     assert sandbox.metadata.selected_port == 31337
     assert sandbox.metadata.launch_project_path == str(sandbox.sandbox_project)

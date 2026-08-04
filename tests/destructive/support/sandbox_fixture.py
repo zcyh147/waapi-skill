@@ -328,8 +328,7 @@ def prepare_sample_project_sandbox(
     if source_project.suffix != ".wproj":
         raise SandboxFixtureError(f"SampleProject source must resolve to a .wproj file; got {source_project}")
     source_root = source_project.parent.resolve(strict=True)
-    root = _resolve_sandbox_root(env_map, sandbox_root)
-    _reject_unsafe_root(source_root, root)
+    root = resolve_safe_sandbox_root(env_map, sandbox_root=sandbox_root)
 
     root.mkdir(parents=True, exist_ok=True)
     sandbox_path = (root / f"sample-project-{uuid.uuid4().hex}").resolve(strict=False)
@@ -372,11 +371,35 @@ def prepare_sample_project_sandbox(
     return sandbox
 
 
+def resolve_safe_sandbox_root(
+    env: Mapping[str, str] | None = None,
+    *,
+    sandbox_root: Path | None = None,
+) -> Path:
+    """Resolve and validate a sandbox root without creating any filesystem entry."""
+
+    env_map = env if env is not None else os.environ
+    contract = require_live_environment(env_map)
+    if contract.sample_project_source is None:
+        raise SandboxFixtureError(
+            "WWISE_SAMPLE_PROJECT_PATH must resolve to an immutable .wproj source"
+        )
+    source_project = contract.sample_project_source.expanduser().resolve(strict=True)
+    if source_project.suffix != ".wproj":
+        raise SandboxFixtureError(
+            f"SampleProject source must resolve to a .wproj file; got {source_project}"
+        )
+    root = _resolve_sandbox_root(env_map, sandbox_root)
+    _reject_unsafe_root(source_project.parent.resolve(strict=True), root)
+    return root
+
+
 def launch_sandboxed_wwise(
     sandbox: SandboxProject,
     env: Mapping[str, str] | None = None,
     *,
     timeouts: LifecycleTimeouts | None = None,
+    port: int | None = None,
     wine_prefix_path: Path | None = None,
     case_owned_root: Path | None = None,
 ) -> HeadlessLifecycle:
@@ -404,6 +427,7 @@ def launch_sandboxed_wwise(
     lifecycle = HeadlessLifecycle(
         console_path=contract.console_path,
         project_path=sandbox.sandbox_project,
+        port=port,
         timeouts=timeouts or _timeouts_from_env(env_map),
         launch_env=env_map,
     )
@@ -777,6 +801,7 @@ __all__ = [
     "launch_sandboxed_wwise",
     "prepare_sample_project_sandbox",
     "require_lifecycle_ready_proof",
+    "resolve_safe_sandbox_root",
     "shutdown_sandboxed_wwise",
     "verify_project_identity",
 ]

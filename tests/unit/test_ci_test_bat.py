@@ -70,9 +70,20 @@ def _write_fake_python(bin_dir: Path, fail_on: str | None = None) -> None:
         "        raise AssertionError('live child did not reuse the active Python interpreter')\n"
         "    child_environment = options['env']\n"
         "    append_entry(child_argv, child_environment, options=options)\n"
-        "    return subprocess.CompletedProcess(command, selected_returncode(child_argv[1:]))\n"
+        "    is_smoke = bool(child_argv[1:]) and child_argv[1].endswith('wwise_smoke.py')\n"
+        "    builds = {'2021.1': '2021.1.14.8108', '2022.1': '2022.1.19.8584', '2023.1': '2023.1.19.8928', '2024.1': '2024.1.13.9056', '2025.1': '2025.1.7.9143'}\n"
+        "    version = child_environment.get('WWISE_VERSION')\n"
+        "    sandbox_project = Path(child_environment['WWISE_SANDBOX_ROOT']).resolve() / 'deleted' / 'SampleProject.wproj'\n"
+        "    smoke_command = [child_environment['WWISE_CONSOLE'], 'waapi-server', str(sandbox_project), '--wamp-port', '31337', '--http-port', '0']\n"
+        "    smoke_payload = {'argv': smoke_command, 'build': builds.get(version), 'cleanup': 'cleaned', 'contract': 'waapi-skill.real-smoke/v1', 'display_name': 'fake WwiseConsole', 'isCommandLine': True, 'pid': 4242, 'port': 31337, 'ready_duration_seconds': 0.25, 'sandbox_deleted': True, 'sandbox_project': str(sandbox_project), 'source_mtime_ns': 123456789, 'source_sha256': '0' * 64, 'version': version}\n"
+        "    smoke_stdout = 'smoke ok:' + json.dumps(smoke_payload, sort_keys=True) + '\\n' if is_smoke else None\n"
+        "    smoke_stderr = '' if is_smoke else None\n"
+        "    return subprocess.CompletedProcess(command, selected_returncode(child_argv[1:]), stdout=smoke_stdout, stderr=smoke_stderr)\n"
         "argv = sys.argv[1:]\n"
-        "effective_argv = argv[2:] if argv[:2] == ['run', 'python'] else argv\n"
+        "if argv[:2] == ['run', 'python'] and '--version' in argv:\n"
+        "    print('Poetry (version 2.2.1)')\n"
+        "    sys.exit(0)\n"
+        "effective_argv = argv[3:] if argv[:3] == ['run', '--', 'python'] else (argv[2:] if argv[:2] == ['run', 'python'] else argv)\n"
         "if effective_argv and Path(effective_argv[0]).name == 'run_live_test_command.py':\n"
         "    sys.path.insert(0, str(Path(effective_argv[0]).resolve().parent))\n"
         "    from run_live_test_command import main\n"
@@ -175,6 +186,8 @@ def _payload_argv(call: dict[str, object]) -> list[str]:
 
 def _pytest_argv(call: dict[str, object]) -> list[str]:
     argv = _payload_argv(call)
+    if argv[:3] == ["run", "--", "python"]:
+        return argv[3:]
     if argv[:2] == ["run", "python"]:
         return argv[2:]
     if argv and os.path.normcase(argv[0]) == os.path.normcase(sys.executable):
@@ -184,6 +197,8 @@ def _pytest_argv(call: dict[str, object]) -> list[str]:
 
 def _smoke_argv(call: dict[str, object]) -> list[str]:
     argv = _payload_argv(call)
+    if argv[:3] == ["run", "--", "python"]:
+        return argv[3:]
     if argv[:2] == ["run", "python"]:
         return argv[2:]
     if argv and os.path.normcase(argv[0]) == os.path.normcase(sys.executable):
@@ -378,7 +393,7 @@ def test_ci_test_bat_help_matches_shell_parity_surface() -> None:
     assert "all          Run non-live suite first, then strict real matrix" in result.stdout
     assert "smoke        Run focused WAAPI getInfo smoke via HeadlessLifecycle" in result.stdout
     assert "ci\\test.bat all matrix" in result.stdout
-    assert "poetry run python ..." in result.stdout
+    assert "poetry run -- python ..." in result.stdout
     assert "WWISE_TEST_CONFIG" in result.stdout
 
 
@@ -392,6 +407,10 @@ def test_ci_test_bat_and_shell_share_pathlib_config_resolver() -> None:
     assert shell_source.count("ci/resolve_live_test_config.py") == 1
     assert "ci\\run_live_test_command.py" in batch_source
     assert "resolve_live_test_config" in live_runner_source
+    assert batch_source.count("call poetry run -- python") == 13
+    assert "call poetry run python" not in batch_source
+    assert shell_source.count('python "$ROOT_DIR/ci/wwise_smoke.py"') == 1
+    assert "from wwise_waapi.headless import" not in shell_source
 
 
 def test_ci_test_bat_includes_shared_gateway_nodes_for_every_matrix_version() -> None:
@@ -449,6 +468,7 @@ def test_ci_test_bat_smoke_all_runs_all_five_versions(tmp_path: Path) -> None:
     assert all(call["WWISE_DESTRUCTIVE"] == "0" for call in calls)
     assert all(call["WWISE_STRICT_REAL"] == "1" for call in calls)
     assert all(_smoke_argv(call) and str(_smoke_argv(call)[0]).endswith("ci\\wwise_smoke.py") for call in calls)
+    assert result.stdout.count("smoke ok:") == 5
 
 
 def test_ci_test_bat_reads_versioned_live_environment_config(tmp_path: Path) -> None:
