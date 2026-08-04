@@ -157,7 +157,9 @@ def _base_env(tmp_path: Path, *, fail_on: str | None = None) -> tuple[dict[str, 
 
     console_path = tmp_path / "WwiseConsole.exe"
     console_path.write_text("console\n", encoding="utf-8")
-    project_path = tmp_path / "SampleProject.wproj"
+    source_root = tmp_path / "source"
+    source_root.mkdir()
+    project_path = source_root / "SampleProject.wproj"
     project_path.write_text("<Project />\n", encoding="utf-8")
     sandbox_root = tmp_path / "sandbox"
 
