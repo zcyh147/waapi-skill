@@ -167,6 +167,8 @@ _ISOLATED_PATH_ENV_KEYS = frozenset(
     {
         "HOME",
         "USERPROFILE",
+        "APPDATA",
+        "LOCALAPPDATA",
         "XDG_CACHE_HOME",
         "XDG_CONFIG_HOME",
         "XDG_DATA_HOME",

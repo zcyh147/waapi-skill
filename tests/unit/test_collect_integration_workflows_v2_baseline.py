@@ -410,7 +410,7 @@ def test_collector_builds_closed_manifest_from_fake_gateway(
             collector.canonical_json_bytes(row["state"])
         ).hexdigest()
     assert payload["source_project"]["full_tree_sha256"] == (
-        collector.stable_tree_sha256(source_project.parent)
+        collector.wwise_fixture_tree_sha256(source_project.parent)
     )
     assert any(kind == "assignments" for kind, _value in gateway.queries)
     queried_paths = {

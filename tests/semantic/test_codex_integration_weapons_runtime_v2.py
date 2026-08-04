@@ -10,9 +10,9 @@ from typing import Any, Mapping
 
 import pytest
 
-from tests.semantic.support.codex_campaign import (
-    canonical_json_bytes,
-    stable_tree_sha256,
+from tests.semantic.support.codex_campaign import canonical_json_bytes
+from tests.semantic.support.codex_integration_fixture_tree_v2 import (
+    wwise_fixture_tree_sha256,
 )
 from tests.semantic.support.codex_integration_weapons_runtime_v2 import (
     OBJECT_SET_API,
@@ -283,7 +283,7 @@ class FakeWeaponsWaapi:
             self.version,
             "0" * 64,
             _sha256(source_project),
-            stable_tree_sha256(source_root),
+            wwise_fixture_tree_sha256(source_root),
             tuple(objects),
             tuple(media),
         )

@@ -1373,6 +1373,8 @@ def build_effective_config(
         [str(options.codex_binary), "--version"],
         cwd=REPO_ROOT,
         text=True,
+        encoding="utf-8",
+        errors="strict",
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         timeout=15,
@@ -1486,6 +1488,8 @@ def build_heavy_v3_effective_config(
         [str(options.codex_binary), "--version"],
         cwd=REPO_ROOT,
         text=True,
+        encoding="utf-8",
+        errors="strict",
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         timeout=15,
@@ -12205,10 +12209,18 @@ def run_child(argv: Sequence[str], *, cwd: Path) -> subprocess.CompletedProcess[
         process_group_options["start_new_session"] = True
     elif hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):
         process_group_options["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+    child_environment = dict(os.environ)
+    for name in tuple(child_environment):
+        if name.casefold() == "pythonioencoding":
+            del child_environment[name]
+    child_environment["PYTHONIOENCODING"] = "utf-8:strict"
     return subprocess.run(
         list(argv),
         cwd=cwd,
         text=True,
+        encoding="utf-8",
+        errors="strict",
+        env=child_environment,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         check=False,

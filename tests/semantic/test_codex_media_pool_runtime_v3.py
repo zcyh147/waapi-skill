@@ -23,11 +23,9 @@ from tests.semantic.support.codex_audio_media_business_plan_v3 import (
 from tests.semantic.support.codex_eval_bundle_v3 import load_eval_bundle_v3
 from tests.semantic.support.codex_media_pool_runtime_v3 import (
     CUSTOM_DATABASE_CLEANUP_CONTRACT,
-    CUSTOM_DATABASE_PROOF_CONTRACT,
     MEDIA_POOL_CASE_IDS,
     MEDIA_POOL_CANONICAL_RETURN_FIELDS,
     REFERENCE_MATCH_RESULT_CONTRACT,
-    MACOS_WWISE_WINE_PREFIX_RELATIVE,
     OBJECT_DELETE_URI,
     OBJECT_GET_URI,
     OBJECT_SET_URI,
@@ -40,6 +38,8 @@ from tests.semantic.support.codex_media_pool_runtime_v3 import (
     CustomDatabaseCleanupProof,
     CustomDatabaseIsolation,
     CustomDatabaseRoundTripProof,
+    MacOSWineCustomDatabaseHost,
+    NativeWindowsCustomDatabaseHost,
     MediaPoolRuntimeError,
     apply_media_pool_post_filter,
     bind_media_pool_fields,
@@ -50,6 +50,7 @@ from tests.semantic.support.codex_media_pool_runtime_v3 import (
     build_reference_match_gateway_argv,
     build_reference_read_call,
     custom_database_payload_shape_sha256,
+    custom_database_round_trip_evidence,
     expected_macos_wine_prefix,
     fingerprint_tree,
     get_fields_gateway_argv,
@@ -70,6 +71,7 @@ from tests.semantic.support.codex_media_pool_runtime_v3 import (
     verify_reference_associations,
     verify_reference_match_result,
     verify_semantic_report,
+    _compile_native_windows_owned_directory,
     _parse_native_windows_absolute_path,
     _typed_audio_import_path,
 )
@@ -317,61 +319,73 @@ def _round_trip_isolation(
     real_home: Path | None = None,
 ) -> CustomDatabaseIsolation:
     owned = case.asset_root.parents[1]
-    launch_home = owned / "wwise-home"
-    launch_home.mkdir()
-    wine_prefix = expected_macos_wine_prefix(launch_home)
-    dosdevices = wine_prefix / "dosdevices"
-    dosdevices.mkdir(parents=True)
-    (wine_prefix / "drive_c").mkdir()
-    create_symlink_or_skip(
-        dosdevices / "z:",
-        WINE_Z_DRIVE_TARGET,
-        target_is_directory=True,
-    )
-    create_symlink_or_skip(
-        dosdevices / "c:",
-        WINE_C_DRIVE_TARGET,
-        target_is_directory=True,
-    )
-    create_symlink_or_skip(
-        dosdevices / "y:",
-        launch_home,
-        target_is_directory=True,
-    )
     real_home = real_home or (tmp_path / "real-account-home")
-    global_state = real_home / "Library" / "Application Support" / "Audiokinetic" / "Wwise"
+    if os.name == "nt":
+        profile = owned / "wwise-user-profile"
+        appdata = owned / "wwise-appdata"
+        local_appdata = owned / "wwise-localappdata"
+        for path in (profile, appdata, local_appdata):
+            path.mkdir()
+        host = NativeWindowsCustomDatabaseHost(
+            user_profile=profile,
+            appdata=appdata,
+            local_appdata=local_appdata,
+        )
+        global_state = real_home / "AppData" / "Roaming" / "Audiokinetic" / "Wwise"
+    else:
+        launch_home = owned / "wwise-home"
+        launch_home.mkdir()
+        wine_prefix = expected_macos_wine_prefix(launch_home)
+        dosdevices = wine_prefix / "dosdevices"
+        dosdevices.mkdir(parents=True)
+        (wine_prefix / "drive_c").mkdir()
+        create_symlink_or_skip(
+            dosdevices / "z:",
+            WINE_Z_DRIVE_TARGET,
+            target_is_directory=True,
+        )
+        create_symlink_or_skip(
+            dosdevices / "c:",
+            WINE_C_DRIVE_TARGET,
+            target_is_directory=True,
+        )
+        create_symlink_or_skip(
+            dosdevices / "y:",
+            launch_home,
+            target_is_directory=True,
+        )
+        host = MacOSWineCustomDatabaseHost(
+            launch_home=launch_home,
+            wine_prefix=wine_prefix,
+        )
+        global_state = (
+            real_home
+            / "Library"
+            / "Application Support"
+            / "Audiokinetic"
+            / "Wwise"
+        )
     global_state.mkdir(parents=True)
     (global_state / "Wwise.wsettings").write_text("baseline\n", encoding="utf-8")
     evidence = owned / "evidence" / "custom-db-roundtrip.json"
     evidence.parent.mkdir(parents=True)
-    payload = {
-        "contract": CUSTOM_DATABASE_PROOF_CONTRACT,
-        "wwise_build": SUPPORTED_BUILD,
-        "payload_shape_sha256": custom_database_payload_shape_sha256(),
-        "created_under_user_databases": True,
-        "delete_by_guid_verified": True,
-        "baseline_children_restored": True,
-        "launch_home_isolated": True,
-        "effective_wine_prefix_isolated": True,
-        "wine_prefix_relative_to_launch_home": str(
-            MACOS_WWISE_WINE_PREFIX_RELATIVE
-        ),
-        "wine_z_drive_target": WINE_Z_DRIVE_TARGET,
-        "wine_c_drive_target": WINE_C_DRIVE_TARGET,
-        "global_user_state_unchanged": True,
-    }
+    payload = custom_database_round_trip_evidence(host)
     evidence.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
     proof = CustomDatabaseRoundTripProof(
         wwise_build=SUPPORTED_BUILD,
         evidence_path=evidence,
         evidence_sha256=hashlib.sha256(evidence.read_bytes()).hexdigest(),
         payload_shape_sha256=custom_database_payload_shape_sha256(),
+        host_mode=(
+            "macos_wine"
+            if isinstance(host, MacOSWineCustomDatabaseHost)
+            else "native_windows"
+        ),
     )
     return CustomDatabaseIsolation(
         owned_root=owned,
-        launch_home=launch_home,
-        wine_prefix=wine_prefix,
-        real_account_home=real_home,
+        host=host,
+        real_account_state_root=global_state,
         global_user_state_before=fingerprint_tree(global_state),
         round_trip_proof=proof,
     )
@@ -812,18 +826,26 @@ def test_custom_databases_are_blocked_without_roundtrip_and_use_documented_shape
     assert parent["object"] == USER_DATABASES_PATH
     assert child["type"] == "MediaPoolDatabase"
     assert child["name"] == "SemanticLab Other"
+    if isinstance(isolation.host, MacOSWineCustomDatabaseHost):
+        expected_path = host_directory_to_wine_z_path(
+            case.database("semanticlab_other").source_root,
+            owned_root=isolation.owned_root,
+            launch_home=isolation.host.launch_home,
+            wine_prefix=isolation.host.wine_prefix,
+        )
+        assert expected_path.startswith("Z:\\")
+        assert "/" not in expected_path
+    else:
+        expected_path = str(
+            case.database("semanticlab_other").source_root.resolve(strict=True)
+        )
+        assert PureWindowsPath(expected_path).is_absolute()
+        assert PureWindowsPath(expected_path).drive
     assert path_row == {
         "type": "MediaPoolDatabasePath",
         "name": "",
-        "@Path": host_directory_to_wine_z_path(
-            case.database("semanticlab_other").source_root,
-            owned_root=isolation.owned_root,
-            launch_home=isolation.launch_home,
-            wine_prefix=isolation.wine_prefix,
-        ),
+        "@Path": expected_path,
     }
-    assert path_row["@Path"].startswith("Z:\\")
-    assert "/" not in path_row["@Path"]
 
     database_id = _guid("created-db", "semanticlab_other")
     created = parse_custom_database_create_results(
@@ -874,19 +896,31 @@ def test_custom_database_wine_path_boundary_is_exact_and_fail_closed(
     source = owned / "Custom Media" / "Source Set"
     source.mkdir(parents=True)
 
+    if isinstance(isolation.host, NativeWindowsCustomDatabaseHost):
+        ready = media_pool_preflight(case, isolation=isolation)
+        assert ready.ready
+        wire_path = ready.create_calls[0].args["objects"][0]["children"][0][
+            "@Paths"
+        ][0]["@Path"]
+        assert wire_path == str(
+            case.database("semanticlab_other").source_root.resolve(strict=True)
+        )
+        assert PureWindowsPath(wire_path).is_absolute()
+        return
+
     assert validate_macos_wine_prefix(
         owned_root=owned,
-        launch_home=isolation.launch_home,
-        wine_prefix=isolation.wine_prefix,
-    ) == isolation.wine_prefix
+        launch_home=isolation.host.launch_home,
+        wine_prefix=isolation.host.wine_prefix,
+    ) == isolation.host.wine_prefix
     assert resolve_macos_wine_y_drive_root(
-        isolation.launch_home
-    ) == isolation.launch_home
+        isolation.host.launch_home
+    ) == isolation.host.launch_home
     mapped = host_directory_to_wine_z_path(
         source,
         owned_root=owned,
-        launch_home=isolation.launch_home,
-        wine_prefix=isolation.wine_prefix,
+        launch_home=isolation.host.launch_home,
+        wine_prefix=isolation.host.wine_prefix,
     )
     wire_path = PureWindowsPath(mapped)
     assert wire_path.drive == "Z:"
@@ -896,30 +930,53 @@ def test_custom_database_wine_path_boundary_is_exact_and_fail_closed(
 
     alias = owned / "source-alias"
     create_symlink_or_skip(alias, source, target_is_directory=True)
-    with pytest.raises(MediaPoolRuntimeError, match="symlink"):
+    with pytest.raises(MediaPoolRuntimeError, match="link or reparse"):
         host_directory_to_wine_z_path(
             alias,
             owned_root=owned,
-            launch_home=isolation.launch_home,
-            wine_prefix=isolation.wine_prefix,
+            launch_home=isolation.host.launch_home,
+            wine_prefix=isolation.host.wine_prefix,
         )
 
-    z_drive = isolation.wine_prefix / "dosdevices" / "z:"
+    z_drive = isolation.host.wine_prefix / "dosdevices" / "z:"
     z_drive.unlink()
     create_symlink_or_skip(z_drive, "/tmp", target_is_directory=True)
     with pytest.raises(MediaPoolRuntimeError, match="unexpected target"):
         validate_macos_wine_prefix(
             owned_root=owned,
-            launch_home=isolation.launch_home,
-            wine_prefix=isolation.wine_prefix,
+            launch_home=isolation.host.launch_home,
+            wine_prefix=isolation.host.wine_prefix,
         )
 
     with pytest.raises(MediaPoolRuntimeError, match="exact Wwise 2025 bottle"):
         validate_macos_wine_prefix(
             owned_root=owned,
-            launch_home=isolation.launch_home,
+            launch_home=isolation.host.launch_home,
             wine_prefix=owned / "another-prefix",
         )
+
+
+def test_native_windows_custom_database_path_compiler_is_closed_and_portable() -> None:
+    owned = r"C:\Campaign Root\owned"
+    source = r"c:\Campaign Root\owned\assets\素材 & review"
+
+    assert _compile_native_windows_owned_directory(
+        source,
+        owned_root=owned,
+    ) == str(PureWindowsPath(source))
+
+    for rejected in (
+        r"D:\Campaign Root\owned\assets",
+        r"C:\Campaign Root\outside",
+        r"\\server\share\owned\assets",
+        r"C:relative\assets",
+        r"C:\Campaign Root\owned\..\outside",
+    ):
+        with pytest.raises(MediaPoolRuntimeError):
+            _compile_native_windows_owned_directory(
+                rejected,
+                owned_root=owned,
+            )
 
 
 def test_custom_database_allows_case_owned_home_below_real_account_home(
@@ -935,7 +992,12 @@ def test_custom_database_allows_case_owned_home_below_real_account_home(
     ready = media_pool_preflight(case, isolation=isolation)
 
     assert ready.status == "READY"
-    assert isolation.launch_home.is_relative_to(real_home)
+    isolated_root = (
+        isolation.host.launch_home
+        if isinstance(isolation.host, MacOSWineCustomDatabaseHost)
+        else isolation.host.user_profile
+    )
+    assert isolated_root.is_relative_to(real_home)
 
 
 def test_custom_database_rejects_noncanonical_or_overlapping_global_state(
@@ -950,9 +1012,8 @@ def test_custom_database_rejects_noncanonical_or_overlapping_global_state(
 
     invalid_isolation = CustomDatabaseIsolation(
         owned_root=isolation.owned_root,
-        launch_home=isolation.launch_home,
-        wine_prefix=isolation.wine_prefix,
-        real_account_home=isolation.real_account_home,
+        host=isolation.host,
+        real_account_state_root=isolation.real_account_state_root,
         global_user_state_before=fingerprint_tree(real_home / "other-state"),
         round_trip_proof=isolation.round_trip_proof,
     )

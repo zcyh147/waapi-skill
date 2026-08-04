@@ -49,6 +49,7 @@ from .codex_host_paths import (
     parse_posix_absolute_path,
     parse_windows_drive_path,
 )
+from .codex_filesystem_security import path_is_link_or_reparse
 
 
 VERSION = "2025.1"
@@ -252,14 +253,34 @@ class CustomDatabaseRoundTripProof:
     evidence_path: Path
     evidence_sha256: str
     payload_shape_sha256: str
+    host_mode: Literal["macos_wine", "native_windows"]
+
+
+@dataclass(frozen=True, slots=True)
+class MacOSWineCustomDatabaseHost:
+    """Runner-owned host binding for Wwise Authoring through Wine."""
+
+    launch_home: Path
+    wine_prefix: Path
+
+
+@dataclass(frozen=True, slots=True)
+class NativeWindowsCustomDatabaseHost:
+    """Runner-owned host binding for native Windows Wwise Authoring."""
+
+    user_profile: Path
+    appdata: Path
+    local_appdata: Path
+
+
+CustomDatabaseHost = MacOSWineCustomDatabaseHost | NativeWindowsCustomDatabaseHost
 
 
 @dataclass(frozen=True, slots=True)
 class CustomDatabaseIsolation:
     owned_root: Path
-    launch_home: Path
-    wine_prefix: Path
-    real_account_home: Path
+    host: CustomDatabaseHost
+    real_account_state_root: Path
     global_user_state_before: TreeFingerprint
     round_trip_proof: CustomDatabaseRoundTripProof
 
@@ -894,6 +915,100 @@ def host_directory_to_wine_z_path(
     return str(PureWindowsPath("Z:/", *components))
 
 
+def _compile_native_windows_owned_directory(
+    host_directory: str,
+    *,
+    owned_root: str,
+) -> str:
+    """Compile one already-resolved native Windows directory without host I/O.
+
+    This pure seam lets non-Windows program tests cover Windows lexical rules.
+    The runtime wrapper below supplies only paths that were resolved and checked
+    for links/reparse points on the native Windows filesystem.
+    """
+
+    try:
+        directory = parse_windows_drive_path(host_directory)
+        owned = parse_windows_drive_path(owned_root)
+    except ReflectedHostPathError as exc:
+        raise MediaPoolRuntimeError(
+            "native Windows custom database path is not canonical drive-absolute"
+        ) from exc
+    if directory is None or owned is None:
+        raise MediaPoolRuntimeError(
+            "native Windows custom database path must be drive-absolute"
+        )
+    try:
+        relative = directory.pure.relative_to(owned.pure)
+    except ValueError as exc:
+        raise MediaPoolRuntimeError(
+            "native Windows custom database path is outside case ownership"
+        ) from exc
+    if not relative.parts:
+        raise MediaPoolRuntimeError(
+            "native Windows custom database path cannot equal the case root"
+        )
+    return str(directory.pure)
+
+
+def host_directory_to_native_windows_path(
+    host_directory: Path,
+    *,
+    owned_root: Path,
+) -> str:
+    """Return one proven native Windows drive path below the case-owned root."""
+
+    if os.name != "nt":
+        raise MediaPoolRuntimeError(
+            "native Windows custom database paths require a native Windows host"
+        )
+    owned = _require_real_directory_chain(
+        owned_root,
+        root=owned_root,
+        field="owned_root",
+    )
+    directory = _require_real_directory_chain(
+        host_directory,
+        root=owned,
+        field="custom_database.source_root",
+    )
+    return _compile_native_windows_owned_directory(
+        str(directory),
+        owned_root=str(owned),
+    )
+
+
+def _custom_database_host_mode(
+    host: CustomDatabaseHost,
+) -> Literal["macos_wine", "native_windows"]:
+    if isinstance(host, MacOSWineCustomDatabaseHost):
+        return "macos_wine"
+    if isinstance(host, NativeWindowsCustomDatabaseHost):
+        return "native_windows"
+    raise MediaPoolRuntimeError("custom database host binding is unsupported")
+
+
+def _custom_database_wire_path(
+    host_directory: Path,
+    *,
+    owned_root: Path,
+    host: CustomDatabaseHost,
+) -> str:
+    if isinstance(host, MacOSWineCustomDatabaseHost):
+        return host_directory_to_wine_z_path(
+            host_directory,
+            owned_root=owned_root,
+            launch_home=host.launch_home,
+            wine_prefix=host.wine_prefix,
+        )
+    if isinstance(host, NativeWindowsCustomDatabaseHost):
+        return host_directory_to_native_windows_path(
+            host_directory,
+            owned_root=owned_root,
+        )
+    raise MediaPoolRuntimeError("custom database host binding is unsupported")
+
+
 def media_pool_preflight(
     case: MaterializedMediaPoolCase,
     *,
@@ -921,8 +1036,7 @@ def media_pool_preflight(
         calls = build_custom_database_create_calls(
             case,
             owned_root=isolation.owned_root,
-            launch_home=isolation.launch_home,
-            wine_prefix=isolation.wine_prefix,
+            host=isolation.host,
         )
     except (MediaPoolRuntimeError, OSError, UnicodeError, json.JSONDecodeError) as exc:
         return _blocked_preflight(case, "CUSTOM_DATABASE_ISOLATION_INVALID", str(exc))
@@ -940,25 +1054,19 @@ def build_custom_database_create_calls(
     case: MaterializedMediaPoolCase,
     *,
     owned_root: Path,
-    launch_home: Path,
-    wine_prefix: Path,
+    host: CustomDatabaseHost,
 ) -> tuple[WaapiCall, ...]:
     """Build only Audiokinetic's documented object.set database shape."""
 
-    validate_macos_wine_prefix(
-        owned_root=owned_root,
-        launch_home=launch_home,
-        wine_prefix=wine_prefix,
-    )
+    _validate_custom_database_host(host, owned_root=owned_root)
     result: list[WaapiCall] = []
     for database in case.databases:
         if database.kind != "user_database":
             continue
-        wine_path = host_directory_to_wine_z_path(
+        wire_path = _custom_database_wire_path(
             database.source_root,
             owned_root=owned_root,
-            launch_home=launch_home,
-            wine_prefix=wine_prefix,
+            host=host,
         )
         args = {
             "objects": [
@@ -972,7 +1080,7 @@ def build_custom_database_create_calls(
                                 {
                                     "type": "MediaPoolDatabasePath",
                                     "name": "",
-                                    "@Path": wine_path,
+                                    "@Path": wire_path,
                                 }
                             ],
                         }
@@ -2100,7 +2208,7 @@ def custom_database_payload_shape_sha256() -> str:
                                 {
                                     "type": "MediaPoolDatabasePath",
                                     "name": "",
-                                    "@Path": "{case_owned_wine_z_directory}",
+                                    "@Path": "{case_owned_host_directory}",
                                 }
                             ],
                         }
@@ -2115,27 +2223,111 @@ def custom_database_payload_shape_sha256() -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def custom_database_round_trip_evidence(
+    host: CustomDatabaseHost,
+) -> dict[str, Any]:
+    """Return the exact runner-owned proof payload for one host binding."""
+
+    common: dict[str, Any] = {
+        "contract": CUSTOM_DATABASE_PROOF_CONTRACT,
+        "wwise_build": SUPPORTED_BUILD,
+        "payload_shape_sha256": custom_database_payload_shape_sha256(),
+        "created_under_user_databases": True,
+        "delete_by_guid_verified": True,
+        "baseline_children_restored": True,
+        "global_user_state_unchanged": True,
+    }
+    if isinstance(host, MacOSWineCustomDatabaseHost):
+        common["host_binding"] = {
+            "mode": "macos_wine",
+            "launch_home_isolated": True,
+            "effective_wine_prefix_isolated": True,
+            "wine_prefix_relative_to_launch_home": str(
+                MACOS_WWISE_WINE_PREFIX_RELATIVE
+            ),
+            "wine_z_drive_target": WINE_Z_DRIVE_TARGET,
+            "wine_c_drive_target": WINE_C_DRIVE_TARGET,
+        }
+    elif isinstance(host, NativeWindowsCustomDatabaseHost):
+        common["host_binding"] = {
+            "mode": "native_windows",
+            "user_profile_isolated": True,
+            "appdata_isolated": True,
+            "local_appdata_isolated": True,
+            "database_paths_are_native_drive_absolute": True,
+        }
+    else:  # pragma: no cover - closed union, retained as a runtime boundary
+        raise MediaPoolRuntimeError("custom database host binding is unsupported")
+    return common
+
+
+def _validate_custom_database_host(
+    host: CustomDatabaseHost,
+    *,
+    owned_root: Path,
+) -> None:
+    owned = _require_real_directory_chain(
+        owned_root,
+        root=owned_root,
+        field="owned_root",
+    )
+    if isinstance(host, MacOSWineCustomDatabaseHost):
+        if os.name == "nt":
+            raise MediaPoolRuntimeError(
+                "Wine custom database binding cannot run on native Windows"
+            )
+        launch_home = _require_real_directory_chain(
+            host.launch_home,
+            root=owned,
+            field="launch_home",
+        )
+        wine_prefix = _require_real_directory_chain(
+            host.wine_prefix,
+            root=launch_home,
+            field="wine_prefix",
+        )
+        validate_macos_wine_prefix(
+            owned_root=owned,
+            launch_home=launch_home,
+            wine_prefix=wine_prefix,
+        )
+        return
+    if isinstance(host, NativeWindowsCustomDatabaseHost):
+        if os.name != "nt":
+            raise MediaPoolRuntimeError(
+                "native Windows custom database binding requires native Windows"
+            )
+        profile = _require_real_directory_chain(
+            host.user_profile,
+            root=owned,
+            field="user_profile",
+        )
+        appdata = _require_real_directory_chain(
+            host.appdata,
+            root=owned,
+            field="appdata",
+        )
+        local_appdata = _require_real_directory_chain(
+            host.local_appdata,
+            root=owned,
+            field="local_appdata",
+        )
+        if len({profile, appdata, local_appdata}) != 3:
+            raise MediaPoolRuntimeError(
+                "native Windows user-state roots must be distinct"
+            )
+        return
+    raise MediaPoolRuntimeError("custom database host binding is unsupported")
+
+
 def _validate_custom_database_isolation(
     case: MaterializedMediaPoolCase,
     isolation: CustomDatabaseIsolation,
 ) -> None:
     owned = isolation.owned_root.expanduser().resolve(strict=True)
-    launch_home = isolation.launch_home.expanduser().resolve(strict=True)
-    wine_prefix = isolation.wine_prefix.expanduser().resolve(strict=True)
-    real_home = isolation.real_account_home.expanduser().resolve(strict=True)
     if not _is_relative_to(case.asset_root, owned):
         raise MediaPoolRuntimeError("custom database asset root is outside ownership")
-    if not _is_relative_to(launch_home, owned) or not _is_relative_to(wine_prefix, owned):
-        raise MediaPoolRuntimeError("HOME and WINEPREFIX must both be case-owned")
-    if launch_home == real_home or _is_relative_to(real_home, launch_home):
-        raise MediaPoolRuntimeError(
-            "disposable Wwise HOME contains or equals the real account HOME"
-        )
-    validate_macos_wine_prefix(
-        owned_root=owned,
-        launch_home=launch_home,
-        wine_prefix=wine_prefix,
-    )
+    _validate_custom_database_host(isolation.host, owned_root=owned)
     proof = isolation.round_trip_proof
     if proof.wwise_build != SUPPORTED_BUILD:
         raise MediaPoolRuntimeError(
@@ -2143,36 +2335,23 @@ def _validate_custom_database_isolation(
         )
     if proof.payload_shape_sha256 != custom_database_payload_shape_sha256():
         raise MediaPoolRuntimeError("custom database proof used another payload shape")
+    if proof.host_mode != _custom_database_host_mode(isolation.host):
+        raise MediaPoolRuntimeError("custom database proof used another host mode")
     evidence = proof.evidence_path.expanduser().resolve(strict=True)
     if not _is_relative_to(evidence, owned):
         raise MediaPoolRuntimeError("custom database proof is outside case ownership")
     if hashlib.sha256(evidence.read_bytes()).hexdigest() != proof.evidence_sha256:
         raise MediaPoolRuntimeError("custom database proof digest mismatch")
     payload = json.loads(evidence.read_text(encoding="utf-8"))
-    required = {
-        "contract": CUSTOM_DATABASE_PROOF_CONTRACT,
-        "wwise_build": SUPPORTED_BUILD,
-        "payload_shape_sha256": custom_database_payload_shape_sha256(),
-        "created_under_user_databases": True,
-        "delete_by_guid_verified": True,
-        "baseline_children_restored": True,
-        "launch_home_isolated": True,
-        "effective_wine_prefix_isolated": True,
-        "wine_prefix_relative_to_launch_home": str(
-            MACOS_WWISE_WINE_PREFIX_RELATIVE
-        ),
-        "wine_z_drive_target": WINE_Z_DRIVE_TARGET,
-        "wine_c_drive_target": WINE_C_DRIVE_TARGET,
-        "global_user_state_unchanged": True,
-    }
+    required = custom_database_round_trip_evidence(isolation.host)
     if payload != required:
         raise MediaPoolRuntimeError("custom database round-trip evidence is incomplete")
     global_state_root = isolation.global_user_state_before.root.expanduser().resolve(
         strict=False
     )
-    expected_global_state_root = (
-        real_home / "Library" / "Application Support" / "Audiokinetic" / "Wwise"
-    ).resolve(strict=False)
+    expected_global_state_root = isolation.real_account_state_root.expanduser().resolve(
+        strict=False
+    )
     if global_state_root != expected_global_state_root:
         raise MediaPoolRuntimeError(
             "global user-state baseline is not the exact real-account Wwise state"
@@ -3000,8 +3179,10 @@ def _require_real_owned_file(
             info = current.lstat()
         except OSError as exc:
             raise MediaPoolRuntimeError(f"{field} is unavailable: {current}") from exc
-        if stat.S_ISLNK(info.st_mode):
-            raise MediaPoolRuntimeError(f"{field} contains a symlink: {current}")
+        if path_is_link_or_reparse(current, metadata=info):
+            raise MediaPoolRuntimeError(
+                f"{field} contains a link or reparse point: {current}"
+            )
         is_final = index == len(paths) - 1
         if is_final:
             if not stat.S_ISREG(info.st_mode):
@@ -3376,8 +3557,10 @@ def _require_real_directory_chain(
             raise MediaPoolRuntimeError(
                 f"{field} directory is unavailable: {current}"
             ) from exc
-        if stat.S_ISLNK(info.st_mode):
-            raise MediaPoolRuntimeError(f"{field} contains a symlink: {current}")
+        if path_is_link_or_reparse(current, metadata=info):
+            raise MediaPoolRuntimeError(
+                f"{field} contains a link or reparse point: {current}"
+            )
         if not stat.S_ISDIR(info.st_mode):
             raise MediaPoolRuntimeError(f"{field} is not a directory: {current}")
     resolved_root = root_path.resolve(strict=True)
@@ -3512,8 +3695,11 @@ __all__ = [
     "USER_DATABASES_PATH",
     "BoundMediaPoolRequest",
     "CustomDatabaseCleanupProof",
+    "CustomDatabaseHost",
     "CustomDatabaseIsolation",
     "CustomDatabaseRoundTripProof",
+    "MacOSWineCustomDatabaseHost",
+    "NativeWindowsCustomDatabaseHost",
     "MaterializedMediaPoolCase",
     "MediaAsset",
     "MediaDatabaseFixture",
@@ -3541,11 +3727,13 @@ __all__ = [
     "build_reference_match_gateway_argv",
     "build_reference_read_call",
     "custom_database_payload_shape_sha256",
+    "custom_database_round_trip_evidence",
     "fingerprint_tree",
     "fingerprint_staged_media_assets",
+    "host_directory_to_native_windows_path",
+    "host_directory_to_wine_z_path",
     "expected_macos_wine_prefix",
     "get_fields_gateway_argv",
-    "host_directory_to_wine_z_path",
     "materialize_media_pool_case",
     "media_answer_requires_order",
     "media_near_classification",

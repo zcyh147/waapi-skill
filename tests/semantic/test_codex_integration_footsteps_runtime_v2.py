@@ -15,7 +15,9 @@ from tests.semantic.support.codex_campaign import CampaignEvidenceError
 from tests.semantic.support import codex_heavy_project_runner_v3 as project_runner
 from tests.semantic.support.codex_campaign import (
     canonical_json_bytes,
-    stable_tree_sha256,
+)
+from tests.semantic.support.codex_integration_fixture_tree_v2 import (
+    wwise_fixture_tree_sha256,
 )
 from tests.semantic.support.codex_gateway_broker import (
     CodexGatewayBroker,
@@ -298,7 +300,7 @@ class FakeFootstepsWaapi:
             version=self.version,
             digest="0" * 64,
             project_file_sha256=_sha256(source_project),
-            full_tree_sha256=stable_tree_sha256(source_root),
+            full_tree_sha256=wwise_fixture_tree_sha256(source_root),
             objects=tuple(objects),
             media=tuple(media),
         )

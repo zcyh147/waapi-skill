@@ -184,7 +184,9 @@ def test_atomic_json_digest_round_trip_and_tamper_detection(tmp_path: Path) -> N
     digest = atomic_write_json_with_digest(path, {"value": [1, 2, 3]})
 
     assert load_verified_json(path) == {"value": [1, 2, 3]}
-    assert (path.with_name(path.name + ".sha256")).read_text(encoding="ascii") == digest + "\n"
+    assert (path.with_name(path.name + ".sha256")).read_bytes() == (
+        digest + "\n"
+    ).encode("ascii")
 
     path.write_text('{"value":[1,2,4]}\n', encoding="utf-8")
     with pytest.raises(CampaignEvidenceError, match="SHA-256 mismatch"):
@@ -195,9 +197,8 @@ def test_verified_json_rejects_duplicate_keys_even_with_matching_digest(tmp_path
     path = tmp_path / "duplicate.json"
     data = b'{"same":1,"same":2}\n'
     path.write_bytes(data)
-    path.with_name(path.name + ".sha256").write_text(
-        hashlib.sha256(data).hexdigest() + "\n",
-        encoding="ascii",
+    path.with_name(path.name + ".sha256").write_bytes(
+        (hashlib.sha256(data).hexdigest() + "\n").encode("ascii")
     )
 
     with pytest.raises(CampaignEvidenceError, match="duplicate JSON key"):

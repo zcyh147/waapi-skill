@@ -37,7 +37,10 @@ from tests.semantic.support.codex_campaign import (  # noqa: E402
     CampaignEvidenceError,
     canonical_json_bytes,
     sha256_file,
-    stable_tree_sha256,
+)
+from tests.semantic.support.codex_integration_fixture_tree_v2 import (  # noqa: E402
+    IntegrationFixtureTreeError,
+    wwise_fixture_tree_sha256,
 )
 from tests.semantic.support.codex_integration_footsteps_runtime_v2 import (  # noqa: E402
     FOOTSTEPS_CANONICAL_STATE_FIELDS,
@@ -540,7 +543,12 @@ def collect_integration_workflows_v2_baseline(
         "source project",
     )
     source_root = _real_directory(source_project.parent, "source project root")
-    _reject_tree_symlinks(source_root)
+    try:
+        tree_sha_before = wwise_fixture_tree_sha256(source_root)
+    except IntegrationFixtureTreeError as exc:
+        raise IntegrationBaselineCollectionError(
+            f"committed source tree is unsafe: {exc}"
+        ) from exc
     sandbox_project = _isolated_live_project(
         live_project,
         source_project=source_project,
@@ -557,7 +565,6 @@ def collect_integration_workflows_v2_baseline(
     )
     storage_before = _storage_rows(source_root, layout)
     project_sha_before = sha256_file(source_project)
-    tree_sha_before = stable_tree_sha256(source_root)
     sandbox_authored_before = _require_matching_sandbox_authored_payload(
         source_project=source_project,
         source_root=source_root,
@@ -671,7 +678,12 @@ def collect_integration_workflows_v2_baseline(
     )
     storage_after = _storage_rows(source_root, layout)
     project_sha_after = sha256_file(source_project)
-    tree_sha_after = stable_tree_sha256(source_root)
+    try:
+        tree_sha_after = wwise_fixture_tree_sha256(source_root)
+    except IntegrationFixtureTreeError as exc:
+        raise IntegrationBaselineCollectionError(
+            f"committed source tree became unsafe: {exc}"
+        ) from exc
     if (
         sandbox_authored_after != sandbox_authored_before
         or storage_after != storage_before
@@ -1626,23 +1638,6 @@ def _real_directory(path: Path, label: str) -> Path:
             f"{label} must be one real directory: {candidate}"
         )
     return candidate.resolve(strict=True)
-
-
-def _reject_tree_symlinks(root: Path) -> None:
-    for directory, directory_names, file_names in os.walk(root, followlinks=False):
-        base = Path(directory)
-        for name in (*directory_names, *file_names):
-            candidate = base / name
-            try:
-                metadata = os.lstat(candidate)
-            except OSError as exc:
-                raise IntegrationBaselineCollectionError(
-                    f"cannot inspect committed source entry: {candidate}"
-                ) from exc
-            if stat.S_ISLNK(metadata.st_mode):
-                raise IntegrationBaselineCollectionError(
-                    f"committed source tree contains a symlink: {candidate}"
-                )
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI wrapper

@@ -4,7 +4,6 @@ import importlib.util
 import json
 import math
 import shlex
-import stat
 import sys
 import threading
 import time
@@ -14,6 +13,10 @@ from typing import Any, Mapping
 import pytest  # pyright: ignore[reportMissingImports]
 
 from tests.support.platform_filesystem import create_symlink_or_skip
+from tests.semantic.support.codex_filesystem_security import (
+    path_is_link_or_reparse,
+    private_posix_mode_is_valid,
+)
 
 import wwise_waapi.dispatcher as dispatcher_module
 from wwise_waapi.builders.query import (  # pyright: ignore[reportMissingImports]
@@ -1776,7 +1779,10 @@ def test_transaction_state_directory_falls_back_to_home(
     assert payload["error_code"] == "TransactionNotFound"
     state_dir = home / ".local" / "state" / "waapi-skill"
     assert (state_dir / "transactions").is_dir()
-    assert stat.S_IMODE(state_dir.stat().st_mode) & 0o077 == 0
+    metadata = state_dir.lstat()
+    assert state_dir.is_dir()
+    assert path_is_link_or_reparse(state_dir, metadata=metadata) is False
+    assert private_posix_mode_is_valid(metadata) is True
 
 
 def test_relative_xdg_state_home_fails_closed_without_writing(

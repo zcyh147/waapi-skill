@@ -14,6 +14,7 @@ from tests.semantic.support.codex_campaign import (
     CampaignEvidenceError,
     create_attempt,
     list_campaign_attempts,
+    load_verified_json,
     sha256_file,
     stable_tree_sha256,
 )
@@ -197,18 +198,47 @@ def test_campaign_lock_is_cross_platform_exclusive(tmp_path: Path) -> None:
     root = tmp_path / "campaign"
     root.mkdir()
 
-    with campaign.CampaignLock(root, timeout_seconds=0.1):
-        lock_path = root / campaign.LOCK_FILE
-        lock_bytes = lock_path.read_bytes()
-        assert lock_bytes.startswith(b"pid=")
-        assert lock_bytes.endswith(b"\n")
-        assert b"\r\n" not in lock_bytes
+    with campaign.CampaignLock(root, timeout_seconds=0.1) as holder:
+        assert holder._descriptor is not None
+        assert campaign.os.fstat(holder._descriptor).st_size >= 1
+        owner = load_verified_json(root / campaign.LOCK_OWNER_FILE)
+        assert owner["pid"] == campaign.os.getpid()
+        assert owner["campaign_root"] == str(root.resolve(strict=True))
         with pytest.raises(campaign.CampaignConfigError, match="remained busy"):
             with campaign.CampaignLock(root, timeout_seconds=0.01):
                 pytest.fail("a second campaign writer acquired the same lock")
 
     expected_unlocked_bytes = b"\0" if campaign.os.name == "nt" else b""
     assert (root / campaign.LOCK_FILE).read_bytes() == expected_unlocked_bytes
+
+
+def test_campaign_child_process_owns_utf8_protocol_encoding(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed: dict[str, Any] = {}
+
+    def fake_run(argv: Sequence[str], **options: Any) -> subprocess.CompletedProcess[str]:
+        observed["argv"] = list(argv)
+        observed.update(options)
+        return subprocess.CompletedProcess(list(argv), 0, "ok\n", "")
+
+    monkeypatch.setenv("pythonioencoding", "cp936")
+    monkeypatch.setenv("PYTHONIOENCODING", "cp1252")
+    monkeypatch.setattr(campaign.subprocess, "run", fake_run)
+
+    completed = campaign.run_child(["python", "child.py"], cwd=tmp_path)
+
+    assert completed.returncode == 0
+    assert observed["encoding"] == "utf-8"
+    assert observed["errors"] == "strict"
+    environment = observed["env"]
+    assert isinstance(environment, dict)
+    matching_names = [
+        name for name in environment if name.casefold() == "pythonioencoding"
+    ]
+    assert matching_names == ["PYTHONIOENCODING"]
+    assert environment["PYTHONIOENCODING"] == "utf-8:strict"
 
 
 def test_campaign_lock_fails_closed_without_supported_backend(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import time
 from dataclasses import FrozenInstanceError, replace
@@ -281,18 +282,54 @@ def test_confirm_and_verified_state_progression_preserves_phase_a_preview(tmp_pa
     assert _preview_path(tmp_path).read_bytes() == preview_before
 
 
-def test_preview_write_then_restore_is_detected_by_ctime(tmp_path: Path) -> None:
+def test_preview_write_then_restore_uses_platform_ctime_contract(tmp_path: Path) -> None:
     _awaiting_store(tmp_path)
     seal = create_preview_seal(tmp_path, "tx-sealed")
     path = _preview_path(tmp_path)
     original = path.read_bytes()
-    old_ctime = path.stat().st_ctime_ns
+    metadata = path.stat()
+    old_ctime = metadata.st_ctime_ns
     time.sleep(0.01)
     path.write_bytes(original)
+    os.utime(path, ns=(metadata.st_atime_ns, metadata.st_mtime_ns))
 
     assert path.read_bytes() == original
-    assert path.stat().st_ctime_ns != old_ctime
-    with pytest.raises(TransactionSealError, match="preview.json ctime drift"):
+    if os.name == "posix":
+        assert path.stat().st_ctime_ns != old_ctime
+        with pytest.raises(TransactionSealError, match="preview.json ctime drift"):
+            verify_preview_seal(
+                tmp_path,
+                "tx-sealed",
+                seal,
+                allowed_states={TransactionState.AWAITING_CONFIRMATION},
+            )
+    else:
+        # Windows reports creation time as st_ctime.  An identical rewrite has
+        # the same final bytes and identity and therefore remains valid.
+        assert path.stat().st_ctime_ns == old_ctime
+        evidence = verify_preview_seal(
+            tmp_path,
+            "tx-sealed",
+            seal,
+            allowed_states={TransactionState.AWAITING_CONFIRMATION},
+        )
+        assert evidence.preview_json_sha256 == seal.preview_json_sha256
+
+
+def test_preview_content_drift_is_rejected_after_mtime_restore(tmp_path: Path) -> None:
+    _awaiting_store(tmp_path)
+    seal = create_preview_seal(tmp_path, "tx-sealed")
+    path = _preview_path(tmp_path)
+    original = path.read_bytes()
+    metadata = path.stat()
+    assert original.endswith(b"\n")
+
+    # Preserve valid JSON and the exact file size while changing its bytes.
+    path.write_bytes(original[:-1] + b" ")
+    os.utime(path, ns=(metadata.st_atime_ns, metadata.st_mtime_ns))
+
+    assert path.stat().st_mtime_ns == metadata.st_mtime_ns
+    with pytest.raises(TransactionSealError, match="preview.json SHA-256 drift"):
         verify_preview_seal(
             tmp_path,
             "tx-sealed",

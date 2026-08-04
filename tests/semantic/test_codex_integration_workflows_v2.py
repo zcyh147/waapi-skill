@@ -8,9 +8,9 @@ from typing import Any, Callable
 
 import pytest
 
-from tests.semantic.support.codex_campaign import (
-    canonical_json_bytes,
-    stable_tree_sha256,
+from tests.semantic.support.codex_campaign import canonical_json_bytes
+from tests.semantic.support.codex_integration_fixture_tree_v2 import (
+    wwise_fixture_tree_sha256,
 )
 from tests.semantic.support.codex_integration_workflows_v2 import (
     BASELINE_MANIFEST_CONTRACT,
@@ -120,7 +120,7 @@ def _seal_fake_baselines(repo: Path, profile_path: Path) -> None:
             "source_project": {
                 "relative_path": layout.source_project,
                 "project_file_sha256": _sha256(project),
-                "full_tree_sha256": stable_tree_sha256(project.parent),
+                "full_tree_sha256": wwise_fixture_tree_sha256(project.parent),
             },
             "storage_files": storage_rows,
             "objects": object_rows,

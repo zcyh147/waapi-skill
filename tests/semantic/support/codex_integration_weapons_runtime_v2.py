@@ -24,10 +24,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Protocol
 
-from tests.semantic.support.codex_campaign import (
-    canonical_json_bytes,
-    stable_tree_sha256,
-)
+from tests.semantic.support.codex_campaign import canonical_json_bytes
 from tests.semantic.support.codex_eval_protocol_v3 import (
     OPERATION_REQUEST_CONTRACT,
     V3GatewayProtocol,
@@ -40,6 +37,9 @@ from tests.semantic.support.codex_gateway_broker import (
 )
 from tests.semantic.support.codex_integration_workflows_v2 import (
     BaselineManifest,
+)
+from tests.semantic.support.codex_integration_fixture_tree_v2 import (
+    wwise_fixture_tree_sha256,
 )
 from tests.semantic.support.codex_integration_paths_v2 import (
     IntegrationOriginalPathError,
@@ -2105,7 +2105,7 @@ def _source_project_proof(project: Path, root: Path) -> WeaponsSourceProjectProo
     proof = _regular_file_proof(project, relative_to=root)
     return WeaponsSourceProjectProof(
         proof.sha256,
-        stable_tree_sha256(root),
+        wwise_fixture_tree_sha256(root),
         project.stat().st_mtime_ns,
     )
 

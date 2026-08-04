@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 from dataclasses import replace
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from types import MappingProxyType
 
 import pytest
@@ -150,8 +150,8 @@ def test_archived_tree_rows_reject_windows_case_aliases() -> None:
         _archived_tree_rows(tree, label="Windows test tree")
 
 
-def test_archived_tree_rows_keep_posix_case_distinct(tmp_path: Path) -> None:
-    root = tmp_path / "tree"
+def test_archived_tree_rows_keep_posix_case_distinct() -> None:
+    root = PurePosixPath("/campaign/tree")
     upper = {
         "root": str(root),
         "files": [
@@ -171,10 +171,12 @@ def test_archived_tree_rows_keep_posix_case_distinct(tmp_path: Path) -> None:
     _rehash_tree(upper)
     _rehash_tree(lower)
 
-    assert not _archived_trees_equal(
-        _archived_tree_rows(upper, label="POSIX upper tree"),
-        _archived_tree_rows(lower, label="POSIX lower tree"),
-    )
+    upper_rows = _archived_tree_rows(upper, label="POSIX upper tree")
+    lower_rows = _archived_tree_rows(lower, label="POSIX lower tree")
+
+    assert upper_rows.root.source_flavor == "posix"
+    assert lower_rows.root.source_flavor == "posix"
+    assert not _archived_trees_equal(upper_rows, lower_rows)
 
 
 def test_cli_input_proofs_reject_windows_case_aliases() -> None:

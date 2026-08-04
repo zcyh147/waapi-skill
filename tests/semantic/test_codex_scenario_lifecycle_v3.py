@@ -209,6 +209,37 @@ def test_launch_environment_uses_only_fresh_case_owned_user_state(
     controller.finish("PASS")
 
 
+def test_launch_environment_accepts_native_windows_user_state_roots(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _source, launched_env = _install_fakes(monkeypatch, tmp_path)
+    scenario_root = tmp_path / "scenario"
+    owned = scenario_root / "owned"
+    overrides = {
+        "USERPROFILE": str(owned / "wwise-user-profile"),
+        "APPDATA": str(owned / "wwise-appdata"),
+        "LOCALAPPDATA": str(owned / "wwise-localappdata"),
+    }
+    controller = lifecycle_v3.ScenarioLifecycle(
+        scenario_id="VS25-F-MEDIAPOOL-GET-02",
+        version="2022.1",
+        scenario_root=scenario_root,
+        live_environment={"WWISE_TEST_CONFIG": "unused"},
+        launch_environment_overrides=overrides,
+        lock_root=tmp_path / "lock",
+    )
+
+    runtime = controller.start()
+
+    for key, raw_path in overrides.items():
+        expected = str(Path(raw_path).resolve())
+        assert launched_env[key] == expected
+        assert runtime.runner_environment[key] == expected
+        assert Path(expected).is_dir()
+    controller.finish("PASS")
+
+
 def test_launch_environment_baseline_rejects_windows_junction(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

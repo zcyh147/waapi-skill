@@ -35,6 +35,10 @@ from tests.semantic.support.codex_harness import (
     CodexInfrastructureError,
     CodexInfrastructureFailure,
 )
+from tests.semantic.support.codex_media_pool_runtime_v3 import (
+    WINE_C_DRIVE_TARGET,
+    WINE_Z_DRIVE_TARGET,
+)
 from tests.semantic.support.codex_gateway_broker import (
     MetadataBoundJsonArgument,
     MetadataTokenProjection,
@@ -3143,13 +3147,16 @@ def test_topic_publisher_missing_ack_times_out_fail_closed(
         observer.finish()
 
 
-def test_custom_media_prelaunch_proves_fresh_home_and_effective_wine_prefix(
+def test_custom_media_prelaunch_proves_fresh_runner_owned_user_state(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     real_home = tmp_path / "real-home"
     real_home.mkdir()
     monkeypatch.setenv("HOME", str(real_home))
+    real_appdata = real_home / "AppData" / "Roaming"
+    real_appdata.mkdir(parents=True)
+    monkeypatch.setenv("APPDATA", str(real_appdata))
     calls: list[str] = []
     monkeypatch.setattr(
         runner,
@@ -3189,26 +3196,43 @@ def test_custom_media_prelaunch_proves_fresh_home_and_effective_wine_prefix(
     io_root = tmp_path / "owned" / "io"
     asset_root.mkdir(parents=True)
     io_root.mkdir()
-    launch_home = tmp_path / "owned" / "wwise-user-home"
-    launch_home.mkdir()
+    owned = tmp_path / "owned"
+    if os.name == "nt":
+        native_roots = runner._native_windows_launch_roots(owned)
+        for path in native_roots.values():
+            path.mkdir()
+    else:
+        launch_home = owned / "wwise-user-home"
+        launch_home.mkdir()
 
     hook(sandbox, asset_root, io_root)
 
-    expected_prefix = runner.expected_macos_wine_prefix(launch_home.resolve())
-    assert not expected_prefix.exists()
-    assert holder["launch_home"] == launch_home.resolve()
-    assert holder["owned_wine_prefix_expected"] == expected_prefix
-    assert holder["global_user_state_before"].root.is_relative_to(real_home)
+    if os.name == "nt":
+        assert holder["host_mode"] == "native_windows"
+        assert holder["native_windows_roots"] == native_roots
+        assert holder["global_user_state_before"].root.is_relative_to(
+            real_appdata
+        )
+    else:
+        expected_prefix = runner.expected_macos_wine_prefix(launch_home.resolve())
+        assert not expected_prefix.exists()
+        assert holder["host_mode"] == "macos_wine"
+        assert holder["launch_home"] == launch_home.resolve()
+        assert holder["owned_wine_prefix_expected"] == expected_prefix
+        assert holder["global_user_state_before"].root.is_relative_to(real_home)
     assert calls == ["normalize"]
 
 
-def test_custom_media_prelaunch_rejects_nonempty_private_home(
+def test_custom_media_prelaunch_rejects_nonempty_private_user_state(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     real_home = tmp_path / "real-home"
     real_home.mkdir()
     monkeypatch.setenv("HOME", str(real_home))
+    real_appdata = real_home / "AppData" / "Roaming"
+    real_appdata.mkdir(parents=True)
+    monkeypatch.setenv("APPDATA", str(real_appdata))
     monkeypatch.setattr(
         runner,
         "make_project_prelaunch_hook",
@@ -3230,13 +3254,69 @@ def test_custom_media_prelaunch_rejects_nonempty_private_home(
     owned = tmp_path / "owned"
     assets = owned / "assets"
     io = owned / "io"
-    launch_home = owned / "wwise-user-home"
     assets.mkdir(parents=True)
     io.mkdir()
-    launch_home.mkdir()
-    (launch_home / "unexpected-state").write_text("not fresh", encoding="utf-8")
+    if os.name == "nt":
+        native_roots = runner._native_windows_launch_roots(owned)
+        for path in native_roots.values():
+            path.mkdir()
+        dirty_root = native_roots["APPDATA"]
+    else:
+        dirty_root = owned / "wwise-user-home"
+        dirty_root.mkdir()
+    (dirty_root / "unexpected-state").write_text("not fresh", encoding="utf-8")
     with pytest.raises(runner.HeavyProjectRunnerError, match="not empty"):
         hook(sandbox, assets, io)
+
+
+def test_native_windows_private_user_state_proof_is_case_owned_and_fresh(
+    tmp_path: Path,
+) -> None:
+    owned = tmp_path / "case" / "owned"
+    owned.mkdir(parents=True)
+    roots = runner._native_windows_launch_roots(owned)
+    for path in roots.values():
+        path.mkdir()
+
+    proven = runner._prove_fresh_native_windows_user_state(
+        roots,
+        owned_root=owned,
+    )
+
+    assert proven == roots
+    (roots["APPDATA"] / "unexpected-state").write_text(
+        "dirty",
+        encoding="utf-8",
+    )
+    with pytest.raises(runner.HeavyProjectRunnerError, match="not empty"):
+        runner._prove_fresh_native_windows_user_state(
+            roots,
+            owned_root=owned,
+        )
+
+
+def test_custom_database_host_selection_is_runner_owned(
+    tmp_path: Path,
+) -> None:
+    scenario = _scenario(
+        runner.MEDIA_POOL_GET_URI,
+        scenario_id="VS25-F-MEDIAPOOL-GET-02",
+        fixture={
+            "asset_spec": {"databases": [{"path": "custom"}]},
+            "host_mode": "caller-authored-value-is-ignored",
+        },
+    )
+
+    overrides = runner._launch_environment_overrides(
+        scenario,
+        scenario_root=tmp_path / "case",
+    )
+
+    assert set(overrides) == (
+        {"USERPROFILE", "APPDATA", "LOCALAPPDATA"}
+        if os.name == "nt"
+        else {"HOME"}
+    )
 
 
 def test_media_final_response_accepts_live_filename_or_full_path_basename(
@@ -3331,7 +3411,7 @@ def test_media_observer_accepts_only_closed_compact_reference_match_result(
         adapter.observe_payload(step, {"agent_result": tampered})
 
 
-def test_custom_database_roundtrip_uses_plain_json_real_prefix_and_wine_path(
+def test_custom_database_roundtrip_uses_plain_json_and_runner_owned_host_path(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -3348,36 +3428,52 @@ def test_custom_database_roundtrip_uses_plain_json_real_prefix_and_wine_path(
         scenario,
         asset_root=owned / "assets" / "media-pool-case",
     )
-    launch_home = owned / "wwise-user-home"
-    launch_home.mkdir()
-    wine_prefix = runner.expected_macos_wine_prefix(launch_home)
-    dosdevices = wine_prefix / "dosdevices"
-    dosdevices.mkdir(parents=True)
-    (wine_prefix / "drive_c").mkdir()
-    create_symlink_or_skip(
-        dosdevices / "z:",
-        runner.WINE_Z_DRIVE_TARGET,
-        target_is_directory=True,
-    )
-    create_symlink_or_skip(
-        dosdevices / "c:",
-        runner.WINE_C_DRIVE_TARGET,
-        target_is_directory=True,
-    )
-    create_symlink_or_skip(
-        dosdevices / "y:",
-        launch_home,
-        target_is_directory=True,
-    )
-
     real_home = tmp_path / "real-home"
-    global_state = (
-        real_home
-        / "Library"
-        / "Application Support"
-        / "Audiokinetic"
-        / "Wwise"
-    )
+    if os.name == "nt":
+        native_roots = runner._native_windows_launch_roots(owned)
+        for path in native_roots.values():
+            path.mkdir()
+        runner_environment = {
+            key: str(path) for key, path in native_roots.items()
+        }
+        metadata_prefix = None
+        global_state = (
+            real_home / "AppData" / "Roaming" / "Audiokinetic" / "Wwise"
+        )
+    else:
+        launch_home = owned / "wwise-user-home"
+        launch_home.mkdir()
+        wine_prefix = runner.expected_macos_wine_prefix(launch_home)
+        dosdevices = wine_prefix / "dosdevices"
+        dosdevices.mkdir(parents=True)
+        (wine_prefix / "drive_c").mkdir()
+        create_symlink_or_skip(
+            dosdevices / "z:",
+            WINE_Z_DRIVE_TARGET,
+            target_is_directory=True,
+        )
+        create_symlink_or_skip(
+            dosdevices / "c:",
+            WINE_C_DRIVE_TARGET,
+            target_is_directory=True,
+        )
+        create_symlink_or_skip(
+            dosdevices / "y:",
+            launch_home,
+            target_is_directory=True,
+        )
+        runner_environment = {
+            "HOME": str(launch_home),
+            "WINEPREFIX": str(wine_prefix),
+        }
+        metadata_prefix = str(wine_prefix)
+        global_state = (
+            real_home
+            / "Library"
+            / "Application Support"
+            / "Audiokinetic"
+            / "Wwise"
+        )
     global_state.mkdir(parents=True)
     (global_state / "baseline.json").write_text("{}\n", encoding="utf-8")
     global_before = runner.fingerprint_tree(global_state)
@@ -3448,13 +3544,10 @@ def test_custom_database_roundtrip_uses_plain_json_real_prefix_and_wine_path(
                 "version": {"year": 2025, "major": 1, "minor": 7, "build": 9143}
             }
         ),
-        runner_environment={
-            "HOME": str(launch_home),
-            "WINEPREFIX": str(wine_prefix),
-        },
+        runner_environment=runner_environment,
         owned_root=owned,
         sandbox=SimpleNamespace(
-            metadata=SimpleNamespace(wine_prefix_path=str(wine_prefix))
+            metadata=SimpleNamespace(wine_prefix_path=metadata_prefix)
         ),
     )
 
@@ -3462,19 +3555,28 @@ def test_custom_database_roundtrip_uses_plain_json_real_prefix_and_wine_path(
         case,
         runtime=runtime,
         direct=direct,
-        real_home=real_home,
+        real_account_state_root=global_state,
         global_before=global_before,
     )
 
     assert baseline_ids == ()
     assert current_ids == []
-    assert isolation.wine_prefix == wine_prefix
+    if os.name == "nt":
+        assert isinstance(isolation.host, runner.NativeWindowsCustomDatabaseHost)
+    else:
+        assert isinstance(isolation.host, runner.MacOSWineCustomDatabaseHost)
+        assert isolation.host.wine_prefix == wine_prefix
     assert len(set_requests) == 1
     sent_path = set_requests[0]["objects"][0]["children"][0]["@Paths"][0][
         "@Path"
     ]
-    assert sent_path.startswith("Z:\\")
-    assert str(case.database("semanticlab_editorial").source_root) not in sent_path
+    if os.name == "nt":
+        assert sent_path == str(
+            case.database("semanticlab_editorial").source_root.resolve(strict=True)
+        )
+    else:
+        assert sent_path.startswith("Z:\\")
+        assert str(case.database("semanticlab_editorial").source_root) not in sent_path
     assert type(set_requests[0]) is dict
     assert type(set_requests[0]["objects"]) is list
     assert type(set_requests[0]["objects"][0]["children"][0]) is dict
@@ -3606,6 +3708,9 @@ def test_early_custom_media_start_failure_archives_real_account_proof(
     real_home = tmp_path / "real-home"
     real_home.mkdir()
     monkeypatch.setenv("HOME", str(real_home))
+    real_appdata = real_home / "AppData" / "Roaming"
+    real_appdata.mkdir(parents=True)
+    monkeypatch.setenv("APPDATA", str(real_appdata))
     scenario = _scenario(
         runner.MEDIA_POOL_GET_URI,
         scenario_id="VS25-F-MEDIAPOOL-GET-02",
@@ -3639,9 +3744,17 @@ def test_early_custom_media_start_failure_archives_real_account_proof(
             evidence = self.root / "evidence"
             assets = self.root / "owned" / "assets"
             io_root = self.root / "owned" / "io"
-            launch_home = self.root / "owned" / "wwise-user-home"
             copy = self.root / "owned" / "sandbox-root" / "copy"
-            for path in (evidence, assets, io_root, launch_home, copy):
+            roots = [evidence, assets, io_root, copy]
+            if os.name == "nt":
+                roots.extend(
+                    runner._native_windows_launch_roots(
+                        self.root / "owned"
+                    ).values()
+                )
+            else:
+                roots.append(self.root / "owned" / "wwise-user-home")
+            for path in roots:
                 path.mkdir(parents=True, exist_ok=True)
             sandbox = SimpleNamespace(
                 sandbox_path=copy,

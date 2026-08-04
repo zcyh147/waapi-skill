@@ -17,13 +17,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from tests.semantic.support.codex_campaign import (
-    canonical_json_bytes,
-    stable_tree_sha256,
-)
+from tests.semantic.support.codex_campaign import canonical_json_bytes
 from tests.semantic.support.codex_archive_paths import (
     ArchiveRelativePathError,
     parse_archive_relative_path,
+)
+from tests.semantic.support.codex_integration_fixture_tree_v2 import (
+    IntegrationFixtureTreeError,
+    wwise_fixture_tree_sha256,
 )
 
 
@@ -1070,7 +1071,12 @@ def _load_baseline_manifest(
     project_sha = _sha256(project)
     if source["project_file_sha256"] != project_sha or not _is_sha256(source["full_tree_sha256"]):
         raise IntegrationWorkflowV2Error(f"{layout.version} manifest project hash drifted")
-    actual_tree = stable_tree_sha256(project.parent)
+    try:
+        actual_tree = wwise_fixture_tree_sha256(project.parent)
+    except IntegrationFixtureTreeError as exc:
+        raise IntegrationWorkflowV2Error(
+            f"{layout.version} source project tree is unsafe: {exc}"
+        ) from exc
     if source["full_tree_sha256"] != actual_tree:
         raise IntegrationWorkflowV2Error(f"{layout.version} manifest full tree hash drifted")
 

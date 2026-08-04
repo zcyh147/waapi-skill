@@ -100,18 +100,16 @@ from tests.semantic.support.codex_audio_conversion_runtime_v3 import (
 )
 from tests.semantic.support.codex_media_pool_runtime_v3 import (
     CUSTOM_DATABASE_CLEANUP_CONTRACT,
-    CUSTOM_DATABASE_PROOF_CONTRACT,
     MEDIA_POOL_CLOSED_GROUP_REPORT_CASE_ID,
     MEDIA_POOL_GET_FIELDS_URI,
     MEDIA_POOL_GET_URI,
-    MACOS_WWISE_WINE_PREFIX_RELATIVE,
     SUPPORTED_BUILD,
     USER_DATABASES_PATH,
-    WINE_C_DRIVE_TARGET,
-    WINE_Z_DRIVE_TARGET,
     CustomDatabaseCleanupProof,
     CustomDatabaseIsolation,
     CustomDatabaseRoundTripProof,
+    MacOSWineCustomDatabaseHost,
+    NativeWindowsCustomDatabaseHost,
     MaterializedMediaPoolCase,
     MediaPoolPreflight,
     MediaReportRowExpectation,
@@ -128,6 +126,7 @@ from tests.semantic.support.codex_media_pool_runtime_v3 import (
     build_reference_match_gateway_argv,
     build_reference_read_call,
     custom_database_payload_shape_sha256,
+    custom_database_round_trip_evidence,
     expected_macos_wine_prefix,
     fingerprint_tree,
     materialize_media_pool_case,
@@ -2514,7 +2513,9 @@ def _prepare_media_pool_case(
             case,
             runtime=runtime,
             direct=direct,
-            real_home=prelaunch_evidence.get("real_home"),
+            real_account_state_root=prelaunch_evidence.get(
+                "real_account_state_root"
+            ),
             global_before=prelaunch_evidence.get("global_user_state_before"),
         )
     preflight = media_pool_preflight(case, isolation=isolation)
@@ -2536,12 +2537,21 @@ def _prepare_media_pool_case(
 
     waapi_y_drive_root: Path | None = None
     if os.name != "nt":
-        launch_home = runtime.runner_environment.get("HOME")
-        if not isinstance(launch_home, str) or not launch_home:
+        launch_home_value: Any = runtime.runner_environment.get("HOME")
+        if isinstance(
+            isolation.host if isolation is not None else None,
+            MacOSWineCustomDatabaseHost,
+        ):
+            launch_home_value = isolation.host.launch_home
+        if not isinstance(launch_home_value, (str, Path)) or not str(
+            launch_home_value
+        ):
             raise HeavyProjectRunnerError(
                 "Media Pool Wwise launch did not expose its HOME for Wine Y: binding"
             )
-        waapi_y_drive_root = resolve_macos_wine_y_drive_root(Path(launch_home))
+        waapi_y_drive_root = resolve_macos_wine_y_drive_root(
+            Path(launch_home_value)
+        )
 
     reference_call = build_reference_fixture_call(staged)
     if reference_call is not None:
@@ -2650,26 +2660,35 @@ def _prepare_media_pool_case(
     )
 
 
-def _establish_custom_database_roundtrip(
-    case: MaterializedMediaPoolCase,
-    *,
+def _custom_database_host_from_runtime(
     runtime: ScenarioRuntime,
-    direct: OwnedDirectWaapiCall,
-    real_home: Any,
-    global_before: Any,
-) -> tuple[CustomDatabaseIsolation, tuple[str, ...]]:
-    if not case.requires_custom_database:
-        raise HeavyProjectRunnerError(
-            "custom database round trip used for a Project Originals-only case"
+) -> MacOSWineCustomDatabaseHost | NativeWindowsCustomDatabaseHost:
+    """Derive the host variant only from the runner's current process."""
+
+    if os.name == "nt":
+        roots: dict[str, Path] = {}
+        for key in ("USERPROFILE", "APPDATA", "LOCALAPPDATA"):
+            value = runtime.runner_environment.get(key)
+            if not isinstance(value, str) or not value:
+                raise HeavyProjectRunnerError(
+                    f"native Windows custom database launch has no isolated {key}"
+                )
+            roots[key] = Path(value).resolve(strict=True)
+        if runtime.sandbox.metadata.wine_prefix_path not in {None, ""}:
+            raise HeavyProjectRunnerError(
+                "native Windows custom database launch unexpectedly owns a Wine prefix"
+            )
+        return NativeWindowsCustomDatabaseHost(
+            user_profile=roots["USERPROFILE"],
+            appdata=roots["APPDATA"],
+            local_appdata=roots["LOCALAPPDATA"],
         )
-    build = _exact_wwise_build(runtime.lifecycle.ready_result)
-    if build != SUPPORTED_BUILD:
-        raise HeavyProjectRunnerError(
-            f"custom database payload is proven only for {SUPPORTED_BUILD}; got {build}"
-        )
+
     launch_home_value = runtime.runner_environment.get("HOME")
     if not isinstance(launch_home_value, str) or not launch_home_value:
-        raise HeavyProjectRunnerError("custom database Wwise launch has no isolated HOME")
+        raise HeavyProjectRunnerError(
+            "custom database Wwise launch has no isolated HOME"
+        )
     launch_home = Path(launch_home_value).resolve(strict=True)
     wine_prefix_value = runtime.runner_environment.get("WINEPREFIX")
     if not isinstance(wine_prefix_value, str) or not wine_prefix_value:
@@ -2681,27 +2700,51 @@ def _establish_custom_database_roundtrip(
         launch_home=launch_home,
         wine_prefix=Path(wine_prefix_value),
     )
-    metadata_prefix = runtime.sandbox.metadata.wine_prefix_path
-    if metadata_prefix != str(wine_prefix):
+    if runtime.sandbox.metadata.wine_prefix_path != str(wine_prefix):
         raise HeavyProjectRunnerError(
             "sandbox cleanup metadata is not bound to the effective WINEPREFIX"
         )
-    if not isinstance(real_home, Path):
+    return MacOSWineCustomDatabaseHost(
+        launch_home=launch_home,
+        wine_prefix=wine_prefix,
+    )
+
+
+def _establish_custom_database_roundtrip(
+    case: MaterializedMediaPoolCase,
+    *,
+    runtime: ScenarioRuntime,
+    direct: OwnedDirectWaapiCall,
+    real_account_state_root: Any,
+    global_before: Any,
+) -> tuple[CustomDatabaseIsolation, tuple[str, ...]]:
+    if not case.requires_custom_database:
         raise HeavyProjectRunnerError(
-            "prelaunch real-account HOME evidence is missing"
+            "custom database round trip used for a Project Originals-only case"
         )
-    real_home = real_home.expanduser().resolve(strict=True)
-    if real_home.is_relative_to(runtime.owned_root):
-        raise HeavyProjectRunnerError("real account HOME unexpectedly overlaps case state")
+    build = _exact_wwise_build(runtime.lifecycle.ready_result)
+    if build != SUPPORTED_BUILD:
+        raise HeavyProjectRunnerError(
+            f"custom database payload is proven only for {SUPPORTED_BUILD}; got {build}"
+        )
+    host = _custom_database_host_from_runtime(runtime)
+    if not isinstance(real_account_state_root, Path):
+        raise HeavyProjectRunnerError(
+            "prelaunch real-account Wwise state root evidence is missing"
+        )
+    real_account_state_root = real_account_state_root.expanduser().resolve(
+        strict=False
+    )
+    if real_account_state_root.is_relative_to(runtime.owned_root):
+        raise HeavyProjectRunnerError(
+            "real-account Wwise state unexpectedly overlaps case state"
+        )
     if not hasattr(global_before, "root"):
         raise HeavyProjectRunnerError(
             "prelaunch real-account Wwise state fingerprint is missing"
         )
     global_state_root = global_before.root
-    expected_global_state_root = (
-        real_home / "Library" / "Application Support" / "Audiokinetic" / "Wwise"
-    ).resolve(strict=False)
-    if global_state_root != expected_global_state_root:
+    if global_state_root != real_account_state_root:
         raise HeavyProjectRunnerError(
             "prelaunch Wwise state fingerprint belongs to an unexpected root"
         )
@@ -2710,8 +2753,7 @@ def _establish_custom_database_roundtrip(
     create_calls = build_custom_database_create_calls(
         case,
         owned_root=runtime.owned_root,
-        launch_home=launch_home,
-        wine_prefix=wine_prefix,
+        host=host,
     )
     create_results = tuple(_execute_closed_call(direct, call) for call in create_calls)
     created = parse_custom_database_create_results(case, create_results)
@@ -2732,34 +2774,23 @@ def _establish_custom_database_roundtrip(
         )
 
     evidence_path = runtime.owned_root / "evidence" / "custom-db-roundtrip.json"
-    payload = {
-        "contract": CUSTOM_DATABASE_PROOF_CONTRACT,
-        "wwise_build": build,
-        "payload_shape_sha256": custom_database_payload_shape_sha256(),
-        "created_under_user_databases": True,
-        "delete_by_guid_verified": True,
-        "baseline_children_restored": True,
-        "launch_home_isolated": True,
-        "effective_wine_prefix_isolated": True,
-        "wine_prefix_relative_to_launch_home": str(
-            MACOS_WWISE_WINE_PREFIX_RELATIVE
-        ),
-        "wine_z_drive_target": WINE_Z_DRIVE_TARGET,
-        "wine_c_drive_target": WINE_C_DRIVE_TARGET,
-        "global_user_state_unchanged": True,
-    }
+    payload = custom_database_round_trip_evidence(host)
     _write_json(evidence_path, payload)
     proof = CustomDatabaseRoundTripProof(
         wwise_build=build,
         evidence_path=evidence_path,
         evidence_sha256=_sha256_file(evidence_path),
         payload_shape_sha256=custom_database_payload_shape_sha256(),
+        host_mode=(
+            "macos_wine"
+            if isinstance(host, MacOSWineCustomDatabaseHost)
+            else "native_windows"
+        ),
     )
     isolation = CustomDatabaseIsolation(
         owned_root=runtime.owned_root,
-        launch_home=launch_home,
-        wine_prefix=wine_prefix,
-        real_account_home=real_home,
+        host=host,
+        real_account_state_root=real_account_state_root,
         global_user_state_before=global_before,
         round_trip_proof=proof,
     )
@@ -4617,26 +4648,26 @@ def _prelaunch_hook(
 
     def media_hook(sandbox: Any, asset_root: Path, io_root: Path) -> None:
         if _media_requires_custom_database(scenario):
-            real_home = Path(
-                os.environ.get("HOME", str(Path.home()))
-            ).expanduser().resolve(strict=True)
-            global_state_root = (
-                real_home
-                / "Library"
-                / "Application Support"
-                / "Audiokinetic"
-                / "Wwise"
-            )
-            media_holder["real_home"] = real_home
+            global_state_root = _real_account_wwise_state_root()
+            media_holder["real_account_state_root"] = global_state_root
             media_holder["global_user_state_before"] = fingerprint_tree(
                 global_state_root
             )
-            launch_home, wine_prefix = _prove_fresh_media_launch_home(
-                asset_root.parent / "wwise-user-home",
-                owned_root=asset_root.parent,
-            )
-            media_holder["launch_home"] = launch_home
-            media_holder["owned_wine_prefix_expected"] = wine_prefix
+            if os.name == "nt":
+                native_roots = _prove_fresh_native_windows_user_state(
+                    _native_windows_launch_roots(asset_root.parent),
+                    owned_root=asset_root.parent,
+                )
+                media_holder["host_mode"] = "native_windows"
+                media_holder["native_windows_roots"] = native_roots
+            else:
+                launch_home, wine_prefix = _prove_fresh_media_launch_home(
+                    asset_root.parent / "wwise-user-home",
+                    owned_root=asset_root.parent,
+                )
+                media_holder["host_mode"] = "macos_wine"
+                media_holder["launch_home"] = launch_home
+                media_holder["owned_wine_prefix_expected"] = wine_prefix
         normalizer(sandbox, asset_root, io_root)
         case = materialize_media_pool_case(
             scenario,
@@ -4652,6 +4683,74 @@ def _prelaunch_hook(
         media_holder["staged"] = staged
 
     return media_hook
+
+
+def _real_account_wwise_state_root() -> Path:
+    if os.name == "nt":
+        raw = os.environ.get("APPDATA")
+        if not isinstance(raw, str) or not raw:
+            raise HeavyProjectRunnerError(
+                "native Windows account has no APPDATA for Wwise state proof"
+            )
+        appdata = Path(raw).expanduser().resolve(strict=True)
+        return (appdata / "Audiokinetic" / "Wwise").resolve(strict=False)
+    real_home = Path(
+        os.environ.get("HOME", str(Path.home()))
+    ).expanduser().resolve(strict=True)
+    return (
+        real_home
+        / "Library"
+        / "Application Support"
+        / "Audiokinetic"
+        / "Wwise"
+    ).resolve(strict=False)
+
+
+def _native_windows_launch_roots(owned_root: Path) -> Mapping[str, Path]:
+    """Return the fixed case-owned roots used only on native Windows."""
+
+    owned = Path(owned_root).resolve(strict=False)
+    return MappingProxyType(
+        {
+            "USERPROFILE": owned / "wwise-user-profile",
+            "APPDATA": owned / "wwise-appdata",
+            "LOCALAPPDATA": owned / "wwise-localappdata",
+        }
+    )
+
+
+def _prove_fresh_native_windows_user_state(
+    roots: Mapping[str, Path],
+    *,
+    owned_root: Path,
+) -> Mapping[str, Path]:
+    if set(roots) != {"USERPROFILE", "APPDATA", "LOCALAPPDATA"}:
+        raise HeavyProjectRunnerError(
+            "native Windows custom database user-state roots are incomplete"
+        )
+    owned = Path(owned_root).resolve(strict=True)
+    proven: dict[str, Path] = {}
+    for key in ("USERPROFILE", "APPDATA", "LOCALAPPDATA"):
+        path = Path(roots[key])
+        if path_is_link_or_reparse(path) or not path.is_dir():
+            raise HeavyProjectRunnerError(
+                f"native Windows custom database {key} is not a fresh real directory"
+            )
+        path = path.resolve(strict=True)
+        if not path.is_relative_to(owned) or path == owned:
+            raise HeavyProjectRunnerError(
+                f"native Windows custom database {key} is outside case ownership"
+            )
+        if any(path.iterdir()):
+            raise HeavyProjectRunnerError(
+                f"native Windows custom database {key} is not empty before Wwise startup"
+            )
+        proven[key] = path
+    if len(set(proven.values())) != len(proven):
+        raise HeavyProjectRunnerError(
+            "native Windows custom database user-state roots overlap exactly"
+        )
+    return MappingProxyType(proven)
 
 
 def _prove_fresh_media_launch_home(
@@ -4718,6 +4817,7 @@ def _archive_early_media_isolation_proof(
         / "early-media-isolation.json"
     )
     baseline = media_holder.get("global_user_state_before")
+    host_binding = _early_media_host_binding(media_holder)
     try:
         baseline, observed = _prove_media_global_state_unchanged(media_holder)
     except BaseException as exc:  # noqa: BLE001 - archive the failed proof too
@@ -4729,10 +4829,7 @@ def _archive_early_media_isolation_proof(
                 "real_user_state_unchanged": False,
                 "global_user_state_before": _json_value(baseline),
                 "error": f"{type(exc).__name__}: {exc}",
-                "launch_home": str(media_holder.get("launch_home", "")),
-                "owned_wine_prefix_expected": str(
-                    media_holder.get("owned_wine_prefix_expected", "")
-                ),
+                "host_binding": host_binding,
             },
         )
         raise
@@ -4742,10 +4839,7 @@ def _archive_early_media_isolation_proof(
         "real_user_state_unchanged": True,
         "global_user_state_before": _json_value(baseline),
         "global_user_state_after": _json_value(observed),
-        "launch_home": str(media_holder.get("launch_home", "")),
-        "owned_wine_prefix_expected": str(
-            media_holder.get("owned_wine_prefix_expected", "")
-        ),
+        "host_binding": host_binding,
     }
     _write_json(evidence_path, payload)
     return MappingProxyType(
@@ -4756,6 +4850,36 @@ def _archive_early_media_isolation_proof(
             "real_user_state_unchanged": True,
         }
     )
+
+
+def _early_media_host_binding(media_holder: Mapping[str, Any]) -> Mapping[str, Any]:
+    mode = media_holder.get("host_mode")
+    if mode == "macos_wine":
+        return MappingProxyType(
+            {
+                "mode": mode,
+                "launch_home": str(media_holder.get("launch_home", "")),
+                "owned_wine_prefix_expected": str(
+                    media_holder.get("owned_wine_prefix_expected", "")
+                ),
+            }
+        )
+    if mode == "native_windows":
+        roots = media_holder.get("native_windows_roots")
+        if not isinstance(roots, Mapping):
+            raise HeavyProjectRunnerError(
+                "native Windows early Media Pool isolation roots are missing"
+            )
+        return MappingProxyType(
+            {
+                "mode": mode,
+                "roots": {
+                    key: str(roots.get(key, ""))
+                    for key in ("USERPROFILE", "APPDATA", "LOCALAPPDATA")
+                },
+            }
+        )
+    raise HeavyProjectRunnerError("early Media Pool host mode is missing")
 
 
 def _media_post_shutdown_fallback(
@@ -4788,14 +4912,16 @@ def _launch_environment_overrides(
         scenario
     ):
         return MappingProxyType({})
+    owned = (scenario_root / "owned").resolve(strict=False)
+    if os.name == "nt":
+        return MappingProxyType(
+            {
+                key: str(path)
+                for key, path in _native_windows_launch_roots(owned).items()
+            }
+        )
     return MappingProxyType(
-        {
-            "HOME": str(
-                (scenario_root / "owned" / "wwise-user-home").resolve(
-                    strict=False
-                )
-            )
-        }
+        {"HOME": str((owned / "wwise-user-home").resolve(strict=False))}
     )
 
 
@@ -4810,6 +4936,16 @@ def _owned_wine_prefix(
         if launch_environment_overrides:
             raise HeavyProjectRunnerError(
                 "non-custom scenario unexpectedly has launch environment overrides"
+            )
+        return None
+    if os.name == "nt":
+        if set(launch_environment_overrides) != {
+            "USERPROFILE",
+            "APPDATA",
+            "LOCALAPPDATA",
+        }:
+            raise HeavyProjectRunnerError(
+                "native Windows custom Media Pool isolation roots are incomplete"
             )
         return None
     home_value = launch_environment_overrides.get("HOME")

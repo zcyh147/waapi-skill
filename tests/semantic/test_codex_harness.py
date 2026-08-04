@@ -970,6 +970,8 @@ def test_run_process_keyboard_interrupt_terminates_kills_reaps_and_reraises(
     with pytest.raises(KeyboardInterrupt):
         run_process(["fake-codex"], cwd=tmp_path, env={}, timeout=10.0)
 
+    assert popen_arguments["encoding"] == "utf-8"
+    assert popen_arguments["errors"] == "strict"
     if os.name == "nt":
         assert popen_arguments["creationflags"] == subprocess.CREATE_NEW_PROCESS_GROUP
         assert "start_new_session" not in popen_arguments
@@ -1952,13 +1954,30 @@ def test_output_snapshot_and_skill_tree_hash_detect_created_and_modified_source(
     assert snapshot_tree_hash(after_skill) != before_hash
 
 
-def test_workspace_snapshot_detects_write_then_restore_via_file_times(tmp_path: Path) -> None:
+def test_workspace_snapshot_uses_platform_write_then_restore_contract(tmp_path: Path) -> None:
     target = tmp_path / "existing.txt"
     target.write_text("original\n", encoding="utf-8")
+    metadata = target.stat()
     before = snapshot_workspace(tmp_path)
 
     target.write_text("temporary\n", encoding="utf-8")
     target.write_text("original\n", encoding="utf-8")
+    os.utime(target, ns=(metadata.st_atime_ns, metadata.st_mtime_ns))
     after = snapshot_workspace(tmp_path)
 
+    expected_modified = ("existing.txt",) if os.name == "posix" else ()
+    assert workspace_changes(before, after) == ((), expected_modified)
+
+
+def test_workspace_snapshot_detects_content_change_after_mtime_restore(tmp_path: Path) -> None:
+    target = tmp_path / "existing.txt"
+    target.write_text("original\n", encoding="utf-8")
+    metadata = target.stat()
+    before = snapshot_workspace(tmp_path)
+
+    target.write_text("modified\n", encoding="utf-8")
+    os.utime(target, ns=(metadata.st_atime_ns, metadata.st_mtime_ns))
+    after = snapshot_workspace(tmp_path)
+
+    assert target.stat().st_mtime_ns == metadata.st_mtime_ns
     assert workspace_changes(before, after) == ((), ("existing.txt",))

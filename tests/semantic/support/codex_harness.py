@@ -1143,6 +1143,8 @@ def run_process(
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        encoding="utf-8",
+        errors="strict",
         **process_group_options,
     )
     try:
@@ -2925,7 +2927,12 @@ def turn_usage(events: Sequence[Mapping[str, Any]]) -> dict[str, int]:
 
 
 def snapshot_workspace(root: Path) -> dict[str, str]:
-    """Hash files and link targets without following installed Skill symlinks."""
+    """Hash final file state and link targets without following Skill symlinks.
+
+    File bytes are the portable change boundary.  POSIX ctime also records an
+    otherwise-restored write; Windows ``st_ctime`` is creation time, so an
+    identical restored final state intentionally remains identical there.
+    """
 
     resolved = root.expanduser().resolve(strict=True)
     snapshot: dict[str, str] = {}
