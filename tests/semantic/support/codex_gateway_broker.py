@@ -3255,6 +3255,135 @@ def _broker_platform_name() -> str:
     return os.name
 
 
+def _windows_process_parent_map() -> dict[int, int]:
+    """Snapshot native Windows process ancestry with the standard library."""
+
+    if os.name != "nt":
+        raise GatewayBrokerError(
+            "Windows process ancestry is unavailable on this host"
+        )
+
+    # ``ctypes`` stays local to the Windows-only branch so importing the
+    # semantic harness remains portable on POSIX hosts.
+    import ctypes
+    from ctypes import wintypes
+
+    class ProcessEntry32W(ctypes.Structure):
+        _fields_ = (
+            ("dwSize", wintypes.DWORD),
+            ("cntUsage", wintypes.DWORD),
+            ("th32ProcessID", wintypes.DWORD),
+            ("th32DefaultHeapID", ctypes.c_size_t),
+            ("th32ModuleID", wintypes.DWORD),
+            ("cntThreads", wintypes.DWORD),
+            ("th32ParentProcessID", wintypes.DWORD),
+            ("pcPriClassBase", wintypes.LONG),
+            ("dwFlags", wintypes.DWORD),
+            ("szExeFile", wintypes.WCHAR * 260),
+        )
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    create_snapshot = kernel32.CreateToolhelp32Snapshot
+    process_first = kernel32.Process32FirstW
+    process_next = kernel32.Process32NextW
+    close_handle = kernel32.CloseHandle
+    create_snapshot.argtypes = (wintypes.DWORD, wintypes.DWORD)
+    create_snapshot.restype = wintypes.HANDLE
+    process_first.argtypes = (wintypes.HANDLE, ctypes.POINTER(ProcessEntry32W))
+    process_first.restype = wintypes.BOOL
+    process_next.argtypes = (wintypes.HANDLE, ctypes.POINTER(ProcessEntry32W))
+    process_next.restype = wintypes.BOOL
+    close_handle.argtypes = (wintypes.HANDLE,)
+    close_handle.restype = wintypes.BOOL
+
+    snapshot = create_snapshot(0x00000002, 0)  # TH32CS_SNAPPROCESS
+    if snapshot == ctypes.c_void_p(-1).value:
+        error = ctypes.get_last_error()
+        raise OSError(error, "CreateToolhelp32Snapshot failed")
+    entry = ProcessEntry32W()
+    entry.dwSize = ctypes.sizeof(entry)
+    parents: dict[int, int] = {}
+    try:
+        if not process_first(snapshot, ctypes.byref(entry)):
+            error = ctypes.get_last_error()
+            raise OSError(error, "Process32FirstW failed")
+        while True:
+            parents[int(entry.th32ProcessID)] = int(entry.th32ParentProcessID)
+            entry.dwSize = ctypes.sizeof(entry)
+            if process_next(snapshot, ctypes.byref(entry)):
+                continue
+            error = ctypes.get_last_error()
+            if error == 18:  # ERROR_NO_MORE_FILES
+                break
+            raise OSError(error, "Process32NextW failed")
+    finally:
+        close_handle(snapshot)
+    return parents
+
+
+def _process_is_self_or_descendant(
+    process_id: int,
+    ancestor_process_id: int,
+    parent_process_ids: Mapping[int, int],
+) -> bool:
+    """Return whether one PID reaches the ancestor through a finite parent chain."""
+
+    if process_id <= 0 or ancestor_process_id <= 0:
+        return False
+    current = process_id
+    visited: set[int] = set()
+    while current not in visited:
+        if current == ancestor_process_id:
+            return True
+        visited.add(current)
+        parent = parent_process_ids.get(current)
+        if parent is None or parent <= 0 or parent == current:
+            return False
+        current = parent
+    return False
+
+
+def _subscription_ack_process_binding_is_valid(
+    *,
+    platform_name: str,
+    launched_process_id: int,
+    reported_parent_process_id: int,
+    gateway_process_id: int,
+) -> bool:
+    """Validate the packaged ACK writer against the native launch chain.
+
+    POSIX virtual environments execute the selected interpreter in the launched
+    process, so the gateway's reported parent must remain the exact ``Popen``
+    PID.  Windows virtual-environment ``python.exe`` files are redirectors that
+    create and wait for another interpreter process.  There the reported
+    gateway parent must instead be the launcher itself or one of its live
+    descendants.  The live gateway writer's native immediate parent must also
+    match the ACK.
+    """
+
+    if (
+        launched_process_id <= 0
+        or reported_parent_process_id <= 0
+        or gateway_process_id <= 0
+        or gateway_process_id == launched_process_id
+        or gateway_process_id == reported_parent_process_id
+    ):
+        return False
+    if platform_name == "posix":
+        return reported_parent_process_id == launched_process_id
+    if platform_name != "nt":
+        return False
+
+    parent_process_ids = _windows_process_parent_map()
+    if not _process_is_self_or_descendant(
+        reported_parent_process_id,
+        launched_process_id,
+        parent_process_ids,
+    ):
+        return False
+    return parent_process_ids.get(gateway_process_id) == reported_parent_process_id
+
+
 def _remove_environment_names(
     environment: dict[str, str],
     names: Sequence[str],
@@ -4784,6 +4913,7 @@ class CodexGatewayBroker:
         *,
         runner_process: subprocess.Popen[str],
         started_at_unix_ns: int,
+        platform_name: str,
     ) -> Mapping[str, Any]:
         """Wait for and independently validate a live packaged-child ACK."""
 
@@ -4890,16 +5020,22 @@ class CodexGatewayBroker:
                 expectation.nonce_sha256,
             )
             or type(payload.get("runner_parent_process_id")) is not int
-            or payload.get("runner_parent_process_id") != runner_process.pid
             or type(payload.get("gateway_process_id")) is not int
-            or payload.get("gateway_process_id", 0) <= 0
-            or payload.get("gateway_process_id") == runner_process.pid
             or type(payload.get("subscribed_at_unix_ns")) is not int
             or type(payload.get("subscribed_at_monotonic_ns")) is not int
             or payload.get("subscribed_at_monotonic_ns", 0) <= 0
         ):
             raise GatewayInvocationError(
                 "broker subscription ACK identity, nonce, or packaged process binding is invalid"
+            )
+        if not _subscription_ack_process_binding_is_valid(
+            platform_name=platform_name,
+            launched_process_id=runner_process.pid,
+            reported_parent_process_id=int(payload["runner_parent_process_id"]),
+            gateway_process_id=int(payload["gateway_process_id"]),
+        ):
+            raise GatewayInvocationError(
+                "broker subscription ACK packaged process binding is invalid"
             )
         subscribed_at_unix_ns = int(payload["subscribed_at_unix_ns"])
         if not started_at_unix_ns <= subscribed_at_unix_ns <= validated_at_unix_ns:
@@ -5491,6 +5627,7 @@ class CodexGatewayBroker:
                             ack_credential,
                             runner_process=process,
                             started_at_unix_ns=started_at_unix_ns,
+                            platform_name=self.platform_name,
                         )
                     )
                 except GatewayInvocationError as exc:

@@ -360,7 +360,10 @@ def test_ci_test_bat_program_rejects_extra_paths_and_incomplete_filter_flags(tmp
     missing_filter = _run_ci_test(env, "--mode", "program", "--", "-k")
 
     assert extra_path.returncode == 1
-    assert "accepts pytest flags and filters, not additional test paths" in extra_path.stderr
+    assert (
+        "accepts pytest flags and filter values, not additional test paths"
+        in extra_path.stderr
+    )
     assert missing_filter.returncode == 1
     assert "pytest option without its required value" in missing_filter.stderr
     assert not log_path.exists()

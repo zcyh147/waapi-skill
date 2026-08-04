@@ -390,6 +390,11 @@ with os.fdopen(descriptor, "wb") as stream:
     stream.write(encoded_ack)
     stream.flush()
     os.fsync(stream.fileno())
+if mode == "" and os.name == "nt":
+    # Keep the fake writer and both venv redirector layers alive while the
+    # broker takes its native process snapshot.  The real wait-topic gateway
+    # naturally remains alive after publishing its ACK.
+    time.sleep(1.0)
 if mode == "subscription-ack-duplicate":
     os.open(ack_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
 """
@@ -2684,6 +2689,68 @@ def test_subscription_ack_is_secret_fresh_step_bound_and_broker_validated(
             <= validated["validated_at_unix_ns"]
             <= evidence.records[0].finished_at_unix_ns
         )
+
+
+def test_windows_subscription_ack_accepts_only_the_trusted_redirector_chain(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        broker_module,
+        "_windows_process_parent_map",
+        lambda: {
+            200: 100,
+            300: 200,
+            400: 300,
+            500: 200,
+            600: 100,
+            700: 701,
+            701: 700,
+            901: 900,
+        },
+    )
+
+    assert broker_module._subscription_ack_process_binding_is_valid(
+        platform_name="nt",
+        launched_process_id=100,
+        reported_parent_process_id=100,
+        gateway_process_id=600,
+    )
+    assert broker_module._subscription_ack_process_binding_is_valid(
+        platform_name="nt",
+        launched_process_id=100,
+        reported_parent_process_id=300,
+        gateway_process_id=400,
+    )
+    assert not broker_module._subscription_ack_process_binding_is_valid(
+        platform_name="nt",
+        launched_process_id=100,
+        reported_parent_process_id=900,
+        gateway_process_id=901,
+    )
+    assert not broker_module._subscription_ack_process_binding_is_valid(
+        platform_name="nt",
+        launched_process_id=100,
+        reported_parent_process_id=300,
+        gateway_process_id=500,
+    )
+    assert not broker_module._subscription_ack_process_binding_is_valid(
+        platform_name="nt",
+        launched_process_id=100,
+        reported_parent_process_id=700,
+        gateway_process_id=999,
+    )
+    assert not broker_module._subscription_ack_process_binding_is_valid(
+        platform_name="nt",
+        launched_process_id=100,
+        reported_parent_process_id=300,
+        gateway_process_id=999,
+    )
+    assert not broker_module._subscription_ack_process_binding_is_valid(
+        platform_name="nt",
+        launched_process_id=100,
+        reported_parent_process_id=300,
+        gateway_process_id=300,
+    )
 
 
 @pytest.mark.parametrize(

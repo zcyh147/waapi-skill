@@ -135,8 +135,8 @@ def test_subscription_ack_is_atomically_published_only_after_subscribe(
         "subscribed_at_unix_ns": payload["subscribed_at_unix_ns"],
         "subscribed_at_monotonic_ns": payload["subscribed_at_monotonic_ns"],
     }
-    assert payload["runner_parent_process_id"] > 0
-    assert payload["gateway_process_id"] > 0
+    assert payload["runner_parent_process_id"] == os.getppid()
+    assert payload["gateway_process_id"] == os.getpid()
     assert payload["subscribed_at_unix_ns"] > 0
     assert payload["subscribed_at_monotonic_ns"] > 0
     encoded = target.read_bytes()
