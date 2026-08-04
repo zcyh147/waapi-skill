@@ -380,6 +380,13 @@ OBJECT_CREATE_WRITABLE_PARENT_TYPES = frozenset(
         "MusicSegment",
     }
 )
+OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT: Mapping[
+    str,
+    frozenset[str],
+] = {
+    "StateGroup": frozenset({"State"}),
+    "SwitchGroup": frozenset({"Switch"}),
+}
 OBJECT_CREATE_REFLECTED_PARENT_TYPES_BY_VERSION: Mapping[str, frozenset[str]] = {
     "2025.1": frozenset({"PropertyContainer"}),
 }
@@ -1592,6 +1599,9 @@ class OperationSpec:
     boundary: str | None = None
     supported_versions: tuple[str, ...] = SUPPORTED_WWISE_VERSION_KEYS
     selection_guidance: Mapping[str, Any] = field(default_factory=dict)
+    parent_child_contract: Mapping[str, frozenset[str]] = field(
+        default_factory=dict
+    )
     file_read_policy: str | None = None
     next_step: str | None = None
     preview_owns: tuple[str, ...] = ()
@@ -1639,6 +1649,13 @@ class OperationSpec:
             result["preview_owns"] = list(self.preview_owns)
         if self.selection_guidance:
             result["selection_guidance"] = _json_mapping(self.selection_guidance)
+        if self.parent_child_contract:
+            result["parent_child_contract"] = {
+                parent_type: sorted(child_types)
+                for parent_type, child_types in sorted(
+                    self.parent_child_contract.items()
+                )
+            }
         if self.identity_arguments:
             result["identity_contract"] = {
                 "one_of": [
@@ -2187,12 +2204,14 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "one existing named root that only receives a recursive descendant merge remains an object.create request: identify its existing parent, repeat the root type/name, and use on_name_conflict=merge",
             "when that existing merge root's exact type was not stated or already proven, operation-schema must be followed by one exact-path query-object returning id, name, type, and path before preview; Wwise 2025.1 PropertyContainer readback maps to the ActorMixer request token",
             "ordinary child creation requires one reviewed writable hierarchy parent; list creation requires a non-protected live owner and a canonical list token",
+            "Game Sync hierarchy creation is closed to StateGroup -> State and SwitchGroup -> Switch, whether the live parent is a group or the group appears inside the recursive tree",
             "replace_owned_root is an explicit reviewed authorization boundary, not independently proven ownership; replace requires the collision strictly below that non-protected live root and a complete pre-state snapshot of at most 128 old subtree GUID/path rows",
             "list insertion supports fail, rename, and merge but not replace; raw @ fields, classId, plug-ins, and RTPC rows are not exposed",
             "platform applies to validated properties/references and is verified through the same platform view",
             "auto_add_to_source_control is explicit and defaults to false",
             "the complete returned GUID topology and every requested field are read back after execution",
         ),
+        parent_child_contract=OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT,
         selection_guidance=_selection_guidance(
             use_when=(
                 "The request creates one wholly new recursive root.",
@@ -2613,19 +2632,20 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         },
         identity_arguments=("objects[].object",),
         constraints=(
-            "every target and field pre-state is captured before the one non-retryable batch dispatch",
-            "every existing nested container that receives descendants is a separate objects[] target; children contain only genuinely new direct descendants",
-            "existing objects[] targets do not imply merge; on_name_conflict governs only genuinely new child or list-member names",
+            "seal every target and field pre-state before one non-retryable batch dispatch",
+            "nested containers receiving descendants are separate objects[] targets; children are new direct descendants",
+            "existing objects[] targets do not imply merge; on_name_conflict applies only to new child/list-member names",
             "top-level platform, list_mode, and on_name_conflict may be overridden by one closed target row",
             "a requested name keeps the same GUID and parent; fail/rename collisions are sealed before dispatch",
             "each target row may set properties/references for one effective platform; link state remains the dedicated object.setLinked operation",
             "closed object lists are emitted only from [{name, objects}] descriptors; plug-ins and RTPCs remain dedicated operations",
             "replaceAll seals every current direct list member and every descendant GUID, rechecks the complete snapshot before execution, and verifies exact replacement afterward",
-            "the canonical normalized request is limited to 262144 bytes, including inline Base64 audio",
+            "canonical request limit: 262144 bytes including inline Base64 audio",
             "auto_add_to_source_control is explicit and defaults to false",
-            "a partial result or any per-target readback mismatch fails verification",
+            "partial results or per-target readback mismatches fail verification",
         ),
         supported_versions=("2022.1", "2023.1", "2024.1", "2025.1"),
+        parent_child_contract=OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT,
         selection_guidance=_selection_guidance(
             use_when=(
                 "One atomic request changes fields, references, or lists on existing targets.",
@@ -3937,7 +3957,11 @@ def _prepare_object_create(
         identity_cache=identity_cache,
     )
     if list_name is None:
-        _require_object_create_writable_parent(parent, version=request.version)
+        _require_object_create_writable_parent(
+            parent,
+            version=request.version,
+            child_types=(str(arguments["type"]),),
+        )
     else:
         _require_object_list_owner(parent)
         if requested_conflict == "replace":
@@ -3969,6 +3993,7 @@ def _prepare_object_create(
         )
     except ObjectOperationContractError as exc:
         raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+    _require_specialized_object_tree_relationships(normalized.nodes)
     type_catalog = _read_object_type_catalog(read)
     canonical_types: dict[str, str] = {}
     resolved_references: dict[str, Any] = {}
@@ -4892,7 +4917,9 @@ def _prepare_object_set(
             _require_object_create_writable_parent(
                 target,
                 version=request.version,
+                child_types=tuple(root.type for root in children.roots),
             )
+            _require_specialized_object_tree_relationships(children.nodes)
         if lists:
             _require_object_list_owner(target)
         target_spec: dict[str, Any] = {
@@ -18958,6 +18985,7 @@ def _require_object_create_writable_parent(
     parent: ResolvedObject,
     *,
     version: str,
+    child_types: Sequence[str],
 ) -> None:
     row = parent.row
     path = row.get("path")
@@ -18980,6 +19008,7 @@ def _require_object_create_writable_parent(
         )
     allowed_types = (
         OBJECT_CREATE_WRITABLE_PARENT_TYPES
+        | frozenset(OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT)
         | OBJECT_CREATE_REFLECTED_PARENT_TYPES_BY_VERSION.get(
             version,
             frozenset(),
@@ -18996,6 +19025,88 @@ def _require_object_create_writable_parent(
                 "parent": parent.as_dict(),
             },
         )
+    _require_specialized_object_child_types(
+        parent_type=object_type,
+        child_types=child_types,
+        details={"parent": parent.as_dict(), "version": version},
+    )
+
+
+def _require_specialized_object_tree_relationships(
+    nodes: Sequence[ObjectNodeDescriptor],
+) -> None:
+    for node in nodes:
+        if not node.children:
+            continue
+        _require_specialized_object_child_types(
+            parent_type=node.type,
+            child_types=tuple(child.type for child in node.children),
+            details={"request_path": node.request_path},
+        )
+
+
+def _require_specialized_object_child_types(
+    *,
+    parent_type: Any,
+    child_types: Sequence[str],
+    details: Mapping[str, Any],
+) -> None:
+    parent_token = _object_type_token(parent_type)
+    specialized = next(
+        (
+            (name, allowed)
+            for name, allowed in OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT.items()
+            if _object_type_token(name) == parent_token
+        ),
+        None,
+    )
+    if specialized is not None:
+        canonical_parent, allowed_child_types = specialized
+        allowed_tokens = {
+            _object_type_token(child_type) for child_type in allowed_child_types
+        }
+        invalid_child_types = sorted(
+            {
+                str(child_type)
+                for child_type in child_types
+                if _object_type_token(child_type) not in allowed_tokens
+            },
+            key=str.casefold,
+        )
+        if invalid_child_types:
+            raise OperationContractError(
+                "INVALID_CREATE_CHILD_TYPE_FOR_PARENT",
+                f"{canonical_parent} accepts only its reviewed Game Sync child type.",
+                details={
+                    **dict(details),
+                    "parent_type": canonical_parent,
+                    "invalid_child_types": invalid_child_types,
+                    "allowed_child_types": sorted(allowed_child_types),
+                },
+            )
+
+    for child_type in child_types:
+        allowed_parent_types = sorted(
+            parent_name
+            for parent_name, allowed_children in (
+                OBJECT_CREATE_SPECIALIZED_CHILD_TYPES_BY_PARENT.items()
+            )
+            if _object_type_token(child_type)
+            in {_object_type_token(item) for item in allowed_children}
+        )
+        if allowed_parent_types and parent_token not in {
+            _object_type_token(item) for item in allowed_parent_types
+        }:
+            raise OperationContractError(
+                "INVALID_CREATE_PARENT_TYPE_FOR_CHILD",
+                f"{child_type} can be created only under its reviewed Game Sync group type.",
+                details={
+                    **dict(details),
+                    "actual_parent_type": parent_type,
+                    "child_type": child_type,
+                    "allowed_parent_types": allowed_parent_types,
+                },
+            )
 
 
 def _require_object_list_owner(owner: ResolvedObject) -> None:

@@ -54,6 +54,7 @@ ACTOR_MIXER_PARENT = r"\Actor-Mixer Hierarchy\Default Work Unit"
 CONTAINERS_PARENT = r"\Containers\Default Work Unit"
 SOUNDBANK_PARENT = r"\SoundBanks\Default Work Unit"
 SWITCH_PARENT = r"\Switches\Default Work Unit"
+STATE_GROUP_PARENT = r"\States\Dynamic Dialogue\ObjectiveStatus"
 SWITCH_GROUP_REFERENCE = "SwitchGroupOrStateGroup"
 
 GATEWAY_SPEC = importlib.util.spec_from_file_location("waapi_destructive_workflow_gateway", GATEWAY_PATH)
@@ -255,6 +256,7 @@ def test_closed_gateway_workflows_across_selected_version(
     switch_container_id: str | None = None
     switch_group_id: str | None = None
     switch_id: str | None = None
+    state_id: str | None = None
     assignment_child_id: str | None = None
 
     try:
@@ -455,6 +457,12 @@ def test_closed_gateway_workflows_across_selected_version(
             object_type="Switch",
             name=f"WAAPI_GATEWAY_SWITCH_{runtime.version.replace('.', '_')}_{unique_suffix}",
         )
+        state_id = _create_object(
+            runtime,
+            parent=STATE_GROUP_PARENT,
+            object_type="State",
+            name=f"WAAPI_GATEWAY_STATE_{runtime.version.replace('.', '_')}_{unique_suffix}",
+        )
         _complete_transaction(
             runtime,
             operation="object.setReference",
@@ -516,6 +524,7 @@ def test_closed_gateway_workflows_across_selected_version(
             switch_container_id,
             switch_id,
             switch_group_id,
+            state_id,
         )
         for object_id in cleanup_order:
             if object_id is None:

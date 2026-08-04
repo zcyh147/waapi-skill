@@ -9,6 +9,7 @@ from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImp
     OPERATION_REQUEST_CONTRACT,
     PREPARED_OPERATION_CONTRACT,
     OperationContractError,
+    list_operation_specs,
     parse_operation_request,
     prepare_operation,
     validate_prepared_roles,
@@ -637,6 +638,245 @@ def test_set_accepts_2025_property_container_target_for_new_sound_child() -> Non
     child_plan = prepared["verification_plan"]["nodes"][1]
     assert child_plan["requested_type"] == "Sound"
     assert child_plan["canonical_type"] == "Sound"
+
+
+@pytest.mark.parametrize(
+    "version",
+    ["2022.1", "2023.1", "2024.1", "2025.1"],
+)
+@pytest.mark.parametrize(
+    ("parent_type", "child_type", "hierarchy"),
+    [
+        ("SwitchGroup", "Switch", "Switches"),
+        ("StateGroup", "State", "States"),
+    ],
+)
+def test_set_accepts_closed_game_sync_children_across_supported_versions(
+    version: str,
+    parent_type: str,
+    child_type: str,
+    hierarchy: str,
+) -> None:
+    target_path = rf"\{hierarchy}\Default Work Unit\Reviewed{parent_type}"
+    target = _target_row(object_type=parent_type, path=target_path)
+    request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": version,
+        "operation": "object.set",
+        "arguments": {
+            "objects": [
+                {
+                    "object": {"kind": "id", "value": TARGET_ID},
+                    "children": [
+                        {"type": child_type, "name": f"Reviewed{child_type}"}
+                    ],
+                }
+            ],
+            "on_name_conflict": "fail",
+        },
+    }
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.getTypes": [
+                {
+                    "return": [
+                        {"classId": 1, "name": child_type, "type": "WObject"}
+                    ]
+                }
+            ],
+            "ak.wwise.core.object.get": [
+                {"return": [target]},
+                {"return": []},
+                {"return": [target]},
+                {"return": []},
+            ],
+        }
+    )
+
+    prepared = prepare_operation(
+        parse_operation_request(request),
+        read_call=reader,
+    ).as_dict()
+
+    assert prepared["resolved_roles"]["objects[0].object"]["row"]["type"] == (
+        parent_type
+    )
+    child_dispatch = prepared["dispatch"]["args"]["objects"][0]["children"][0]
+    assert child_dispatch == {
+        "type": child_type,
+        "name": f"Reviewed{child_type}",
+    }
+
+
+@pytest.mark.parametrize(
+    ("parent_type", "child_type", "allowed_child_type"),
+    [
+        ("SwitchGroup", "State", "Switch"),
+        ("StateGroup", "Switch", "State"),
+    ],
+)
+def test_set_rejects_unreviewed_game_sync_children(
+    parent_type: str,
+    child_type: str,
+    allowed_child_type: str,
+) -> None:
+    hierarchy = "Switches" if parent_type == "SwitchGroup" else "States"
+    target = _target_row(
+        object_type=parent_type,
+        path=rf"\{hierarchy}\Default Work Unit\Reviewed{parent_type}",
+    )
+    request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": "2022.1",
+        "operation": "object.set",
+        "arguments": {
+            "objects": [
+                {
+                    "object": {"kind": "id", "value": TARGET_ID},
+                    "children": [{"type": child_type, "name": "WrongValue"}],
+                }
+            ],
+            "on_name_conflict": "fail",
+        },
+    }
+
+    with pytest.raises(OperationContractError) as rejected:
+        prepare_operation(
+            parse_operation_request(request),
+            read_call=ScriptedReader(
+                {
+                    "ak.wwise.core.object.getTypes": [_type_catalog()],
+                    "ak.wwise.core.object.get": [{"return": [target]}],
+                }
+            ),
+        )
+
+    assert rejected.value.error_code == "INVALID_CREATE_CHILD_TYPE_FOR_PARENT"
+    assert rejected.value.details["parent_type"] == parent_type
+    assert rejected.value.details["invalid_child_types"] == [child_type]
+    assert rejected.value.details["allowed_child_types"] == [allowed_child_type]
+
+
+def test_object_set_schema_discloses_closed_game_sync_child_pairs() -> None:
+    spec = {item.name: item.as_dict() for item in list_operation_specs()}["object.set"]
+    assert spec["parent_child_contract"] == {
+        "StateGroup": ["State"],
+        "SwitchGroup": ["Switch"],
+    }
+
+
+@pytest.mark.parametrize(
+    ("child_type", "allowed_parent_type"),
+    [("State", "StateGroup"), ("Switch", "SwitchGroup")],
+)
+def test_set_rejects_game_sync_value_under_general_target(
+    child_type: str,
+    allowed_parent_type: str,
+) -> None:
+    request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": "2022.1",
+        "operation": "object.set",
+        "arguments": {
+            "objects": [
+                {
+                    "object": {"kind": "id", "value": TARGET_ID},
+                    "children": [{"type": child_type, "name": "MisplacedValue"}],
+                }
+            ],
+            "on_name_conflict": "fail",
+        },
+    }
+
+    with pytest.raises(OperationContractError) as rejected:
+        prepare_operation(
+            parse_operation_request(request),
+            read_call=ScriptedReader(
+                {
+                    "ak.wwise.core.object.getTypes": [_type_catalog()],
+                    "ak.wwise.core.object.get": [{"return": [_target_row()]}],
+                }
+            ),
+        )
+
+    assert rejected.value.error_code == "INVALID_CREATE_PARENT_TYPE_FOR_CHILD"
+    assert rejected.value.details["actual_parent_type"] == "ActorMixer"
+    assert rejected.value.details["child_type"] == child_type
+    assert rejected.value.details["allowed_parent_types"] == [allowed_parent_type]
+
+
+@pytest.mark.parametrize(
+    ("group_type", "child_type", "hierarchy"),
+    [
+        ("SwitchGroup", "Switch", "Switches"),
+        ("StateGroup", "State", "States"),
+    ],
+)
+def test_set_accepts_closed_game_sync_pairs_inside_recursive_children(
+    group_type: str,
+    child_type: str,
+    hierarchy: str,
+) -> None:
+    target_path = rf"\{hierarchy}\Default Work Unit"
+    target = _target_row(object_type="WorkUnit", path=target_path)
+    request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": "2022.1",
+        "operation": "object.set",
+        "arguments": {
+            "objects": [
+                {
+                    "object": {"kind": "id", "value": TARGET_ID},
+                    "children": [
+                        {
+                            "type": group_type,
+                            "name": f"Reviewed{group_type}",
+                            "children": [
+                                {
+                                    "type": child_type,
+                                    "name": f"Reviewed{child_type}",
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+            "on_name_conflict": "fail",
+        },
+    }
+    reader = ScriptedReader(
+        {
+            "ak.wwise.core.object.getTypes": [
+                {
+                    "return": [
+                        {"classId": 1, "name": group_type, "type": "WObject"},
+                        {"classId": 2, "name": child_type, "type": "WObject"},
+                    ]
+                }
+            ],
+            "ak.wwise.core.object.get": [
+                {"return": [target]},
+                {"return": []},
+                {"return": [target]},
+                {"return": []},
+            ],
+        }
+    )
+
+    prepared = prepare_operation(
+        parse_operation_request(request),
+        read_call=reader,
+    ).as_dict()
+
+    assert prepared["dispatch"]["args"]["objects"][0]["children"] == [
+        {
+            "type": group_type,
+            "name": f"Reviewed{group_type}",
+            "children": [
+                {"type": child_type, "name": f"Reviewed{child_type}"}
+            ],
+        }
+    ]
 
 
 def test_set_merge_snapshots_every_nested_collision_and_verifies_the_confirmed_result() -> None:

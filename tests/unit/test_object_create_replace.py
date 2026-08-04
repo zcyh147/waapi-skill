@@ -267,6 +267,14 @@ def test_public_create_schema_exposes_merge_query_and_2025_type_alias() -> None:
         "Wwise 2025.1 PropertyContainer readback maps to the ActorMixer request token"
         in constraints
     )
+    assert (
+        "Game Sync hierarchy creation is closed to StateGroup -> State and "
+        "SwitchGroup -> Switch"
+    ) in constraints
+    assert spec["parent_child_contract"] == {
+        "StateGroup": ["State"],
+        "SwitchGroup": ["Switch"],
+    }
 
 
 @pytest.mark.parametrize(
@@ -320,6 +328,247 @@ def test_create_accepts_only_reviewed_writable_parent_categories(
 
     assert prepared["resolved_roles"]["parent"]["row"]["type"] == parent_type
     assert prepared["dispatch"]["args"]["parent"] == PARENT_ID
+
+
+@pytest.mark.parametrize(
+    "version",
+    ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"],
+)
+@pytest.mark.parametrize(
+    ("parent_type", "child_type", "hierarchy"),
+    [
+        ("SwitchGroup", "Switch", "Switches"),
+        ("StateGroup", "State", "States"),
+    ],
+)
+def test_create_accepts_closed_game_sync_parent_child_pairs_across_versions(
+    version: str,
+    parent_type: str,
+    child_type: str,
+    hierarchy: str,
+) -> None:
+    parent_path = rf"\{hierarchy}\Default Work Unit\Reviewed{parent_type}"
+    parent = _row(
+        PARENT_ID,
+        f"Reviewed{parent_type}",
+        parent_type,
+        parent_path,
+        "{default-work-unit}",
+    )
+    arguments = {
+        "parent": {"kind": "id", "value": PARENT_ID},
+        "type": child_type,
+        "name": f"Reviewed{child_type}",
+    }
+    prepared = prepare_operation(
+        parse_operation_request(_request(arguments, version=version)),
+        read_call=ScriptedReader(
+            {
+                "ak.wwise.core.object.get": [
+                    {"return": [parent]},
+                    {"return": []},
+                    {"return": []},
+                ],
+                "ak.wwise.core.object.getTypes": [
+                    {
+                        "return": [
+                            {
+                                "classId": 1,
+                                "name": child_type,
+                                "type": "WObject",
+                            }
+                        ]
+                    }
+                ],
+            }
+        ),
+    ).as_dict()
+
+    assert prepared["resolved_roles"]["parent"]["row"]["type"] == parent_type
+    assert prepared["dispatch"]["args"]["parent"] == PARENT_ID
+    assert prepared["dispatch"]["args"]["type"] == child_type
+    assert prepared["verification_plan"]["nodes"][0]["canonical_type"] == child_type
+
+
+@pytest.mark.parametrize(
+    ("parent_type", "child_type", "allowed_child_type"),
+    [
+        ("SwitchGroup", "State", "Switch"),
+        ("SwitchGroup", "ActorMixer", "Switch"),
+        ("StateGroup", "Switch", "State"),
+        ("StateGroup", "Sound", "State"),
+    ],
+)
+def test_create_rejects_unreviewed_game_sync_parent_child_pairs(
+    parent_type: str,
+    child_type: str,
+    allowed_child_type: str,
+) -> None:
+    hierarchy = "Switches" if parent_type == "SwitchGroup" else "States"
+    parent = _row(
+        PARENT_ID,
+        f"Reviewed{parent_type}",
+        parent_type,
+        rf"\{hierarchy}\Default Work Unit\Reviewed{parent_type}",
+        "{default-work-unit}",
+    )
+    arguments = {
+        "parent": {"kind": "id", "value": PARENT_ID},
+        "type": child_type,
+        "name": f"Rejected{child_type}",
+    }
+
+    with pytest.raises(OperationContractError) as rejected:
+        prepare_operation(
+            parse_operation_request(_request(arguments)),
+            read_call=ScriptedReader(
+                {"ak.wwise.core.object.get": [{"return": [parent]}]}
+            ),
+        )
+
+    assert rejected.value.error_code == "INVALID_CREATE_CHILD_TYPE_FOR_PARENT"
+    assert rejected.value.details["parent_type"] == parent_type
+    assert rejected.value.details["invalid_child_types"] == [child_type]
+    assert rejected.value.details["allowed_child_types"] == [allowed_child_type]
+
+
+def test_create_rejects_invalid_nested_game_sync_child_pair_before_metadata_reads() -> None:
+    arguments = {
+        "parent": {"kind": "id", "value": PARENT_ID},
+        "type": "SwitchGroup",
+        "name": "ReviewedSwitchGroup",
+        "children": [{"type": "State", "name": "WrongGameSyncValue"}],
+    }
+    reader = ScriptedReader(
+        {"ak.wwise.core.object.get": [{"return": [_parent_row()]}]}
+    )
+
+    with pytest.raises(OperationContractError) as rejected:
+        prepare_operation(
+            parse_operation_request(_request(arguments)),
+            read_call=reader,
+        )
+
+    assert rejected.value.error_code == "INVALID_CREATE_CHILD_TYPE_FOR_PARENT"
+    assert rejected.value.details == {
+        "request_path": "$",
+        "parent_type": "SwitchGroup",
+        "invalid_child_types": ["State"],
+        "allowed_child_types": ["Switch"],
+    }
+    assert [call[0] for call in reader.calls] == ["ak.wwise.core.object.get"]
+
+
+@pytest.mark.parametrize(
+    ("child_type", "allowed_parent_type"),
+    [("State", "StateGroup"), ("Switch", "SwitchGroup")],
+)
+def test_create_rejects_game_sync_value_nested_under_general_node(
+    child_type: str,
+    allowed_parent_type: str,
+) -> None:
+    arguments = {
+        "parent": {"kind": "id", "value": PARENT_ID},
+        "type": "ActorMixer",
+        "name": "GeneralNode",
+        "children": [{"type": child_type, "name": f"Misplaced{child_type}"}],
+    }
+
+    with pytest.raises(OperationContractError) as rejected:
+        prepare_operation(
+            parse_operation_request(_request(arguments)),
+            read_call=ScriptedReader(
+                {"ak.wwise.core.object.get": [{"return": [_parent_row()]}]}
+            ),
+        )
+
+    assert rejected.value.error_code == "INVALID_CREATE_PARENT_TYPE_FOR_CHILD"
+    assert rejected.value.details["request_path"] == "$"
+    assert rejected.value.details["actual_parent_type"] == "ActorMixer"
+    assert rejected.value.details["child_type"] == child_type
+    assert rejected.value.details["allowed_parent_types"] == [allowed_parent_type]
+
+
+@pytest.mark.parametrize(
+    ("child_type", "allowed_parent_type"),
+    [("State", "StateGroup"), ("Switch", "SwitchGroup")],
+)
+def test_create_rejects_game_sync_value_under_general_parent(
+    child_type: str,
+    allowed_parent_type: str,
+) -> None:
+    arguments = {
+        "parent": {"kind": "id", "value": PARENT_ID},
+        "type": child_type,
+        "name": f"Misplaced{child_type}",
+    }
+
+    with pytest.raises(OperationContractError) as rejected:
+        prepare_operation(
+            parse_operation_request(_request(arguments)),
+            read_call=ScriptedReader(
+                {"ak.wwise.core.object.get": [{"return": [_parent_row()]}]}
+            ),
+        )
+
+    assert rejected.value.error_code == "INVALID_CREATE_PARENT_TYPE_FOR_CHILD"
+    assert rejected.value.details["actual_parent_type"] == "ActorMixer"
+    assert rejected.value.details["child_type"] == child_type
+    assert rejected.value.details["allowed_parent_types"] == [allowed_parent_type]
+
+
+@pytest.mark.parametrize(
+    ("group_type", "child_type", "hierarchy"),
+    [
+        ("SwitchGroup", "Switch", "Switches"),
+        ("StateGroup", "State", "States"),
+    ],
+)
+def test_create_accepts_closed_game_sync_pairs_inside_recursive_tree(
+    group_type: str,
+    child_type: str,
+    hierarchy: str,
+) -> None:
+    parent_path = rf"\{hierarchy}\Default Work Unit"
+    parent = _row(
+        PARENT_ID,
+        "Default Work Unit",
+        "WorkUnit",
+        parent_path,
+        "{project}",
+    )
+    arguments = {
+        "parent": {"kind": "id", "value": PARENT_ID},
+        "type": group_type,
+        "name": f"Reviewed{group_type}",
+        "children": [{"type": child_type, "name": f"Reviewed{child_type}"}],
+    }
+    prepared = prepare_operation(
+        parse_operation_request(_request(arguments)),
+        read_call=ScriptedReader(
+            {
+                "ak.wwise.core.object.get": [
+                    {"return": [parent]},
+                    {"return": []},
+                    {"return": []},
+                    {"return": []},
+                ],
+                "ak.wwise.core.object.getTypes": [
+                    {
+                        "return": [
+                            {"classId": 1, "name": group_type, "type": "WObject"},
+                            {"classId": 2, "name": child_type, "type": "WObject"},
+                        ]
+                    }
+                ],
+            }
+        ),
+    ).as_dict()
+
+    assert prepared["dispatch"]["args"]["type"] == group_type
+    assert prepared["dispatch"]["args"]["children"] == [
+        {"type": child_type, "name": f"Reviewed{child_type}"}
+    ]
 
 
 def test_create_accepts_2025_property_container_parent_but_dispatches_actor_mixer() -> None:
