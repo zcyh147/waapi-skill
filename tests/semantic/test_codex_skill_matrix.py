@@ -1587,14 +1587,20 @@ def test_transaction_journal_rejects_missing_or_malformed_evidence(tmp_path: Pat
 
 def test_trusted_gateway_environment_removes_only_ambient_waapi_controls(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("WWISE_VERSION", "ambient-version")
+    monkeypatch.setenv("WWISEROOT", "/ambient/legacy-root")
+    monkeypatch.setenv("wwiseconsole", "/ambient/legacy-console")
+    monkeypatch.setenv("WwiseSdk", "/ambient/sdk")
     monkeypatch.setenv("WAAPI_SKILL_STATE_DIR", "/ambient/state")
+    monkeypatch.setenv("waapiurl", "ws://ambient.invalid/waapi")
     monkeypatch.setenv("BASH_ENV", "/ambient/bash-env")
     monkeypatch.setenv("SEMANTIC_MATRIX_KEEP", "preserved")
 
     environment = matrix.trusted_gateway_environment()
 
-    assert "WWISE_VERSION" not in environment
-    assert "WAAPI_SKILL_STATE_DIR" not in environment
+    assert not any(
+        name.upper().startswith(("WWISE", "WAAPI"))
+        for name in environment
+    )
     assert "BASH_ENV" not in environment
     assert environment["SEMANTIC_MATRIX_KEEP"] == "preserved"
     assert environment["PYTHONDONTWRITEBYTECODE"] == "1"

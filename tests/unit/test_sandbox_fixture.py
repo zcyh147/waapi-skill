@@ -23,6 +23,7 @@ from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[repor
     hash_project,
     launch_sandboxed_wwise,
     prepare_sample_project_sandbox,
+    require_lifecycle_ready_proof,
     shutdown_sandboxed_wwise,
 )
 from tests.destructive.support.live_environment import LiveEnvironmentError, require_destructive_environment  # pyright: ignore[reportMissingImports]
@@ -77,6 +78,38 @@ def base_env(console: Path, project: Path, sandbox_root: Path) -> dict[str, str]
 
 class FakeProcess:
     pid = 4242
+
+
+@pytest.mark.parametrize(
+    ("expected_version", "year"),
+    [
+        ("2021.1", 2021),
+        ("2022.1", 2022),
+        ("2023.1", 2023),
+        ("2024.1", 2024),
+        ("2025.1", 2025),
+    ],
+)
+def test_ready_proof_accepts_only_the_requested_supported_version(
+    expected_version: str,
+    year: int,
+) -> None:
+    class ReadyLifecycle:
+        ready_result = {
+            "version": {
+                "displayName": f"fake Wwise {expected_version}",
+                "year": year,
+                "major": 1,
+            }
+        }
+        process = FakeProcess()
+        port = 31337
+        command = ["WwiseConsole", "waapi-server"]
+
+    assert require_lifecycle_ready_proof(
+        ReadyLifecycle(),
+        expected_version=expected_version,
+    ) == ReadyLifecycle.ready_result
 
 
 def test_live_sandbox_lock_serializes_actual_host_processes(tmp_path: Path) -> None:
@@ -319,7 +352,13 @@ def test_launch_uses_sandbox_project_and_records_command(monkeypatch: pytest.Mon
             seen_project_paths.append(self.project_path)
 
         def run_until_ready(self) -> object:
-            self.ready_result = {"version": {"displayName": "fake Wwise 2024.1"}}
+            self.ready_result = {
+                "version": {
+                    "displayName": "fake Wwise 2022.1",
+                    "year": 2022,
+                    "major": 1,
+                }
+            }
             return self.ready_result
 
         def shutdown(self, suppress_errors: bool = True) -> None:
@@ -341,8 +380,12 @@ def test_launch_uses_sandbox_project_and_records_command(monkeypatch: pytest.Mon
     assert sandbox.metadata.selected_port == 31337
     assert sandbox.metadata.launch_project_path == str(sandbox.sandbox_project)
     assert sandbox.metadata.ready_duration_seconds is not None
-    assert sandbox.metadata.get_info_version == {"displayName": "fake Wwise 2024.1"}
-    assert sandbox.metadata.get_info_display_name == "fake Wwise 2024.1"
+    assert sandbox.metadata.get_info_version == {
+        "displayName": "fake Wwise 2022.1",
+        "year": 2022,
+        "major": 1,
+    }
+    assert sandbox.metadata.get_info_display_name == "fake Wwise 2022.1"
     assert sandbox.metadata.identity_verified is True
     assert sandbox.metadata.wine_prefix_path == str(sandbox.wine_prefix_path)
     assert lifecycle.launch_env["WINEPREFIX"] == str(sandbox.wine_prefix_path)
@@ -379,7 +422,13 @@ def test_launch_uses_fresh_case_owned_wine_prefix_without_precreating_it(
             prefix_exists_at_construction.append(wine_prefix.exists() or wine_prefix.is_symlink())
 
         def run_until_ready(self) -> object:
-            self.ready_result = {"version": {"displayName": "fake Wwise 2022.1"}}
+            self.ready_result = {
+                "version": {
+                    "displayName": "fake Wwise 2022.1",
+                    "year": 2022,
+                    "major": 1,
+                }
+            }
             return self.ready_result
 
         def shutdown(self, suppress_errors: bool = True) -> None:
@@ -577,7 +626,13 @@ def test_strict_real_launch_audit_is_written_after_shutdown(monkeypatch: pytest.
             self.cleanup_report: CleanupReport | None = None
 
         def run_until_ready(self) -> object:
-            self.ready_result = {"version": {"displayName": "fake Wwise 2024.1", "year": 2024}}
+            self.ready_result = {
+                "version": {
+                    "displayName": "fake Wwise 2022.1",
+                    "year": 2022,
+                    "major": 1,
+                }
+            }
             return self.ready_result
 
         def shutdown(self, suppress_errors: bool = True) -> None:
@@ -612,8 +667,12 @@ def test_strict_real_launch_audit_is_written_after_shutdown(monkeypatch: pytest.
     assert record["launch_project_path"] == str(sandbox.sandbox_project)
     assert record["sandbox_project_path"] == str(sandbox.sandbox_project)
     assert record["ready_duration_seconds"] >= 0
-    assert record["get_info_version"] == {"displayName": "fake Wwise 2024.1", "year": 2024}
-    assert record["get_info_display_name"] == "fake Wwise 2024.1"
+    assert record["get_info_version"] == {
+        "displayName": "fake Wwise 2022.1",
+        "year": 2022,
+        "major": 1,
+    }
+    assert record["get_info_display_name"] == "fake Wwise 2022.1"
     assert record["cleanup_result"] == "cleaned"
     assert record["cleanup_details"]["wine_prefix"] == str(sandbox.wine_prefix_path)
     assert isinstance(record["recorded_at_unix"], int)
@@ -648,7 +707,13 @@ def test_non_strict_launch_does_not_write_persistent_audit(monkeypatch: pytest.M
             self.cleanup_report: CleanupReport | None = None
 
         def run_until_ready(self) -> object:
-            self.ready_result = {"version": {"displayName": "fake Wwise 2024.1"}}
+            self.ready_result = {
+                "version": {
+                    "displayName": "fake Wwise 2022.1",
+                    "year": 2022,
+                    "major": 1,
+                }
+            }
             return self.ready_result
 
         def shutdown(self, suppress_errors: bool = True) -> None:
@@ -668,7 +733,28 @@ def test_non_strict_launch_does_not_write_persistent_audit(monkeypatch: pytest.M
     cleanup_sandbox(sandbox)
 
 
-def test_launch_shuts_down_when_ready_proof_is_invalid(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("ready_result", "error_pattern"),
+    [
+        ({"version": {}}, "displayName"),
+        (
+            {
+                "version": {
+                    "displayName": "fake Wwise 2021.1",
+                    "year": 2021,
+                    "major": 1,
+                }
+            },
+            "version mismatch",
+        ),
+    ],
+)
+def test_launch_shuts_down_when_ready_proof_is_invalid(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    ready_result: dict[str, object],
+    error_pattern: str,
+) -> None:
     console = make_console(tmp_path)
     source_project = make_sample_project(tmp_path / "source")
     env = base_env(console, source_project, tmp_path / "sandbox-root")
@@ -709,7 +795,7 @@ def test_launch_shuts_down_when_ready_proof_is_invalid(monkeypatch: pytest.Monke
             prefix_exists_at_construction.append(wine_prefix.exists() or wine_prefix.is_symlink())
 
         def run_until_ready(self) -> object:
-            self.ready_result = {"version": {}}
+            self.ready_result = ready_result
             return self.ready_result
 
         def shutdown(self, suppress_errors: bool = True) -> None:
@@ -725,7 +811,7 @@ def test_launch_shuts_down_when_ready_proof_is_invalid(monkeypatch: pytest.Monke
     monkeypatch.setattr(sandbox_fixture.SandboxProject, "write_metadata", tracked_write_metadata)
 
     try:
-        with pytest.raises(SandboxFixtureError, match="displayName"):
+        with pytest.raises(SandboxFixtureError, match=error_pattern):
             launch_sandboxed_wwise(
                 sandbox,
                 env,
@@ -928,7 +1014,13 @@ def test_shutdown_raises_when_cleanup_report_has_residual_processes(monkeypatch:
             self.cleanup_report: CleanupReport | None = None
 
         def run_until_ready(self) -> object:
-            self.ready_result = {"version": {"displayName": "fake Wwise 2024.1"}}
+            self.ready_result = {
+                "version": {
+                    "displayName": "fake Wwise 2022.1",
+                    "year": 2022,
+                    "major": 1,
+                }
+            }
             return self.ready_result
 
         def shutdown(self, suppress_errors: bool = True) -> None:

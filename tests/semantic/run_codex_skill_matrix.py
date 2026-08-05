@@ -81,6 +81,7 @@ from tests.semantic.support.codex_harness import (  # noqa: E402  # pyright: ign
     CodexHarnessConfig,
     CodexInfrastructureError,
     CodexRunResult,
+    is_evaluation_sensitive_environment_key,
     normalized_gateway_command_argv,
     prepare_workspace_skill_install,
     resolve_codex_binary,
@@ -3076,7 +3077,7 @@ def trusted_gateway_environment(overrides: Mapping[str, str] | None = None) -> d
     environment = {
         str(key): str(value)
         for key, value in os.environ.items()
-        if not str(key).startswith(("WWISE_", "WAAPI_")) and str(key) != "BASH_ENV"
+        if not is_evaluation_sensitive_environment_key(str(key))
     }
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
     if overrides:

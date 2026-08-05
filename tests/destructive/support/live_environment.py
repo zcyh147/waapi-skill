@@ -280,8 +280,17 @@ def resolve_wwise_console_path(env: Mapping[str, str] | None = None, version: st
     version_paths = _live_version_paths(env_map, requested_version)
     if version_paths is None:
         return None
-    resolver = WwiseConsolePathResolver(env=dict(env_map), macos_default=version_paths.console_path)
-    return resolver.resolve(env_map.get(ENV_WWISE_CONSOLE))
+    # The live-test contract documents WWISE_CONSOLE as the sole per-run
+    # override.  Legacy WWISECONSOLE/WWISEROOT values are useful to the generic
+    # launcher resolver, but must not override a version-pinned JSON entry here:
+    # an ambient root for another installed Wwise version would otherwise make
+    # the frozen campaign fingerprint and the executable actually launched
+    # disagree.
+    explicit_console = env_map.get(ENV_WWISE_CONSOLE)
+    if explicit_console:
+        resolver = WwiseConsolePathResolver(env={})
+        return resolver.resolve(explicit_console)
+    return version_paths.console_path
 
 
 def require_live_environment(env: Mapping[str, str] | None = None) -> LiveEnvironmentContract:

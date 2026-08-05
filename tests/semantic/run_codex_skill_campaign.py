@@ -219,6 +219,7 @@ from tests.semantic.support.codex_harness import (  # noqa: E402
     completed_command_records,
     count_invalid_jsonl_lines,
     final_agent_message,
+    is_evaluation_sensitive_environment_key,
     parse_jsonl_events,
     turn_usage,
     validate_codex_version_output,
@@ -12278,7 +12279,10 @@ def run_child(argv: Sequence[str], *, cwd: Path) -> subprocess.CompletedProcess[
         process_group_options["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
     child_environment = dict(os.environ)
     for name in tuple(child_environment):
-        if name.casefold() == "pythonioencoding":
+        if (
+            name.casefold() == "pythonioencoding"
+            or is_evaluation_sensitive_environment_key(name)
+        ):
             del child_environment[name]
     child_environment["PYTHONIOENCODING"] = "utf-8:strict"
     return subprocess.run(

@@ -1997,7 +1997,10 @@ def is_evaluation_sensitive_environment_key(key: str) -> bool:
     """Return whether a variable can reveal or control the live WAAPI test."""
 
     normalized = key.upper()
-    return normalized == "BASH_ENV" or normalized.startswith(("WWISE_", "WAAPI_"))
+    return (
+        normalized == "BASH_ENV"
+        or normalized.startswith(("WWISE", "WAAPI"))
+    )
 
 
 def inspect_isolated_environment(

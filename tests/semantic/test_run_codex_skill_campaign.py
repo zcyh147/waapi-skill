@@ -248,6 +248,13 @@ def test_campaign_child_process_owns_utf8_protocol_encoding(
 
     monkeypatch.setenv("pythonioencoding", "cp936")
     monkeypatch.setenv("PYTHONIOENCODING", "cp1252")
+    monkeypatch.setenv("WWISE_VERSION", "ambient-version")
+    monkeypatch.setenv("WWISEROOT", "/ambient/legacy-root")
+    monkeypatch.setenv("wwiseconsole", "/ambient/legacy-console")
+    monkeypatch.setenv("WwiseSdk", "/ambient/sdk")
+    monkeypatch.setenv("WAAPI_URL", "ws://ambient.invalid/waapi")
+    monkeypatch.setenv("waapiurl", "ws://ambient-lower.invalid/waapi")
+    monkeypatch.setenv("BASH_ENV", "/ambient/bash-env")
     monkeypatch.setattr(campaign.subprocess, "run", fake_run)
 
     completed = campaign.run_child(["python", "child.py"], cwd=tmp_path)
@@ -262,6 +269,10 @@ def test_campaign_child_process_owns_utf8_protocol_encoding(
     ]
     assert matching_names == ["PYTHONIOENCODING"]
     assert environment["PYTHONIOENCODING"] == "utf-8:strict"
+    assert not any(
+        campaign.is_evaluation_sensitive_environment_key(name)
+        for name in environment
+    )
 
 
 def test_campaign_lock_fails_closed_without_supported_backend(

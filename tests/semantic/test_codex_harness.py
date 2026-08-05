@@ -882,7 +882,16 @@ def test_isolated_environment_rejects_protected_extra_env(tmp_path: Path, key: s
 
 @pytest.mark.parametrize(
     "key",
-    ["WWISE_WAAPI_PORT", "WWISE_EVIDENCE_DIR", "WAAPI_SKILL_STATE_DIR", "WAAPI_URL"],
+    [
+        "WWISE_WAAPI_PORT",
+        "WWISE_EVIDENCE_DIR",
+        "WWISEROOT",
+        "wwiseconsole",
+        "WwiseSdk",
+        "WAAPI_SKILL_STATE_DIR",
+        "WAAPI_URL",
+        "waapiurl",
+    ],
 )
 def test_isolated_environment_rejects_direct_wwise_and_waapi_extra_env(tmp_path: Path, key: str) -> None:
     auth = tmp_path / "auth.json"
@@ -911,8 +920,12 @@ def test_prompt_audit_and_exec_environments_scrub_ambient_waapi_state(
     ambient_sensitive = {
         "WWISE_WAAPI_PORT": "65535",
         "WWISE_EVIDENCE_DIR": "/ambient/evidence",
+        "WWISEROOT": "/ambient/legacy-root",
+        "wwiseconsole": "/ambient/legacy-console",
+        "WwiseSdk": "/ambient/sdk",
         "WAAPI_SKILL_STATE_DIR": "/ambient/state",
         "WAAPI_URL": "ws://ambient.invalid/waapi",
+        "waapiurl": "ws://ambient-lower.invalid/waapi",
         "WAAPI_CODEX_GATEWAY_BROKER_TOKEN": "ambient-token",
         "WAAPI_CODEX_GATEWAY_REQUIRED": "1",
         "BASH_ENV": "/ambient/bash-env",

@@ -435,7 +435,10 @@ def launch_sandboxed_wwise(
         ready_started = time.perf_counter()
         lifecycle.run_until_ready()
         ready_duration = time.perf_counter() - ready_started
-        ready_info = require_lifecycle_ready_proof(lifecycle)
+        ready_info = require_lifecycle_ready_proof(
+            lifecycle,
+            expected_version=contract.version,
+        )
         sandbox.metadata.selected_port = lifecycle.port
         sandbox.metadata.command = list(lifecycle.command)
         sandbox.metadata.process_pid = getattr(lifecycle.process, "pid", None)
@@ -574,7 +577,11 @@ def _real_launch_audit_path() -> Path:
     return (Path.cwd() / REAL_LAUNCH_AUDIT_PATH).resolve(strict=False)
 
 
-def require_lifecycle_ready_proof(lifecycle: HeadlessLifecycle) -> Mapping[str, Any]:
+def require_lifecycle_ready_proof(
+    lifecycle: HeadlessLifecycle,
+    *,
+    expected_version: str | None = None,
+) -> Mapping[str, Any]:
     """Require real WwiseConsole WAAPI readiness proof from getInfo."""
 
     ready_result = lifecycle.ready_result
@@ -588,6 +595,28 @@ def require_lifecycle_ready_proof(lifecycle: HeadlessLifecycle) -> Mapping[str, 
     display_name = _get_info_display_name(ready_result)
     if not display_name:
         raise SandboxFixtureError(f"WwiseConsole getInfo proof is missing displayName: {ready_result!r}")
+    if expected_version is not None:
+        expected_year_text, separator, expected_major_text = expected_version.partition(".")
+        if (
+            separator != "."
+            or not expected_year_text.isdigit()
+            or not expected_major_text.isdigit()
+        ):
+            raise SandboxFixtureError(
+                f"invalid expected Wwise version identity: {expected_version!r}"
+            )
+        actual_year = version.get("year")
+        actual_major = version.get("major")
+        expected_identity = (int(expected_year_text), int(expected_major_text))
+        if (
+            type(actual_year) is not int
+            or type(actual_major) is not int
+            or (actual_year, actual_major) != expected_identity
+        ):
+            raise SandboxFixtureError(
+                "WwiseConsole getInfo version mismatch: expected "
+                f"{expected_version}, got year={actual_year!r} major={actual_major!r}"
+            )
     if lifecycle.process is None:
         raise SandboxFixtureError("WwiseConsole readiness proof requires a launched process")
     if lifecycle.port is None:

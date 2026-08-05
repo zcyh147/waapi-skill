@@ -93,6 +93,94 @@ def test_live_environment_reads_versioned_local_json_config(tmp_path: Path) -> N
     assert contract.sandbox_root == sandbox_root.resolve(strict=False)
 
 
+@pytest.mark.parametrize(
+    "legacy_environment",
+    [
+        {"WWISECONSOLE": "/ambient/Wwise2021/WwiseConsole.exe"},
+        {"WWISEROOT": "/ambient/Wwise2021"},
+    ],
+)
+def test_versioned_live_config_ignores_legacy_launcher_overrides(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    legacy_environment: dict[str, str],
+) -> None:
+    configured_console = make_console(tmp_path / "configured")
+    configured_project = make_project(tmp_path / "configured")
+    config_path = tmp_path / "live-environment.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "versions": {
+                    "2022.1": {
+                        "wwise_console": str(configured_console),
+                        "sample_project": str(configured_project),
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(live_env.platform, "system", lambda: "Windows")
+
+    contract = require_live_environment(
+        {
+            "WWISE_LIVE": "1",
+            "WWISE_VERSION": "2022.1",
+            "WWISE_TEST_CONFIG": str(config_path),
+            **legacy_environment,
+        }
+    )
+
+    assert contract.console_path == configured_console.resolve(strict=False)
+    assert contract.sample_project_source == configured_project.resolve(strict=False)
+
+
+def test_versioned_live_config_resolves_sequential_versions_without_sticky_launcher(
+    tmp_path: Path,
+) -> None:
+    console_2022 = make_console(tmp_path / "configured-2022")
+    project_2022 = make_project(tmp_path / "configured-2022")
+    console_2025 = make_console(tmp_path / "configured-2025")
+    project_2025 = make_project(tmp_path / "configured-2025")
+    config_path = tmp_path / "live-environment.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "versions": {
+                    "2022.1": {
+                        "wwise_console": str(console_2022),
+                        "sample_project": str(project_2022),
+                    },
+                    "2025.1": {
+                        "wwise_console": str(console_2025),
+                        "sample_project": str(project_2025),
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    expected = (
+        ("2022.1", console_2022, project_2022),
+        ("2025.1", console_2025, project_2025),
+    )
+
+    for version, console, project in expected:
+        contract = require_live_environment(
+            {
+                "WWISE_LIVE": "1",
+                "WWISE_VERSION": version,
+                "WWISE_TEST_CONFIG": str(config_path),
+                "WWISECONSOLE": "/ambient/Wwise2021/WwiseConsole.exe",
+                "WWISEROOT": "/ambient/Wwise2021",
+            }
+        )
+        assert contract.version == version
+        assert contract.console_path == console.resolve(strict=False)
+        assert contract.sample_project_source == project.resolve(strict=False)
+
+
 def test_live_environment_env_overrides_versioned_json_config_for_exact_versions(tmp_path: Path) -> None:
     configured_console = make_console(tmp_path / "configured" / "WwiseConsole.sh")
     configured_project = make_project(tmp_path / "configured" / "SampleProject.wproj")
