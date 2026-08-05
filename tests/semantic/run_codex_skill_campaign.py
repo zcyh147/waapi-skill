@@ -208,16 +208,20 @@ from tests.semantic.support.codex_prompt_asset_reads_v3 import (  # noqa: E402
 from tests.semantic.support.codex_harness import (  # noqa: E402
     CodexGatewayErrorExpectation,
     CodexHarnessConfig,
+    CodexHarnessError,
     audit_session_events,
     build_task_exec_command,
     build_task_resume_command,
     classify_commands,
     classify_codex_infrastructure_failure,
+    codex_process_environment,
+    codex_runtime_files,
     completed_command_records,
     count_invalid_jsonl_lines,
     final_agent_message,
     parse_jsonl_events,
     turn_usage,
+    validate_codex_version_output,
 )
 from tests.semantic.support.codex_gateway_broker import (  # noqa: E402
     CodexGatewayBroker,
@@ -1368,6 +1372,7 @@ def _codex_version_fingerprint(binary: Path) -> str:
         completed = subprocess.run(
             [str(candidate), "--version"],
             cwd=REPO_ROOT,
+            env=codex_process_environment(candidate, os.environ),
             text=True,
             encoding="utf-8",
             errors="strict",
@@ -1376,18 +1381,21 @@ def _codex_version_fingerprint(binary: Path) -> str:
             timeout=15,
             check=False,
         )
-    except (OSError, subprocess.SubprocessError) as exc:
+    except (CodexHarnessError, OSError, subprocess.SubprocessError, UnicodeError) as exc:
         raise CampaignConfigError(
             "Codex version fingerprint probe could not execute "
             f"{candidate}: {type(exc).__name__}: {exc}"
         ) from exc
-    version = completed.stdout.strip()
+    version = completed.stdout
     if completed.returncode != 0 or not version:
         detail = completed.stderr.strip() or f"exit code {completed.returncode}"
         raise CampaignConfigError(
             f"Codex version fingerprint probe failed for {candidate}: {detail}"
         )
-    return version
+    try:
+        return validate_codex_version_output(version, binary=candidate)
+    except CodexHarnessError as exc:
+        raise CampaignConfigError(str(exc)) from exc
 
 
 def _runtime_distribution_fingerprint() -> list[tuple[str, str]]:
@@ -1404,6 +1412,21 @@ def _runtime_distribution_fingerprint() -> list[tuple[str, str]]:
         raise CampaignEvidenceError(
             "cannot fingerprint runtime distributions for interpreter "
             f"{sys.executable}: {type(exc).__name__}: {exc}"
+        ) from exc
+
+
+def _codex_runtime_fingerprints(binary: Path) -> list[dict[str, str]]:
+    """Bind Windows standalone helpers to the same immutable CLI release."""
+
+    try:
+        return [
+            {"path": str(path), "sha256": sha256_file(path)}
+            for path in codex_runtime_files(binary)
+        ]
+    except (CodexHarnessError, OSError, ValueError, TypeError) as exc:
+        raise CampaignEvidenceError(
+            f"cannot fingerprint Codex runtime files for {binary}: "
+            f"{type(exc).__name__}: {exc}"
         ) from exc
 
 
@@ -1465,6 +1488,7 @@ def build_effective_config(
         "codex": {
             "path": str(options.codex_binary),
             "sha256": sha256_file(options.codex_binary),
+            "runtime_files": _codex_runtime_fingerprints(options.codex_binary),
             "version": codex_version,
             "model": options.model,
             "reasoning_effort": options.reasoning_effort,
@@ -1589,6 +1613,7 @@ def build_heavy_v3_effective_config(
         "codex": {
             "path": str(options.codex_binary),
             "sha256": sha256_file(options.codex_binary),
+            "runtime_files": _codex_runtime_fingerprints(options.codex_binary),
             "version": codex_version,
             "model": options.model,
             "reasoning_effort": options.reasoning_effort,
@@ -12129,6 +12154,10 @@ def assert_effective_inputs_frozen(
     for label, path, section in file_bindings:
         if section.get("path") != str(path) or section.get("sha256") != sha256_file(path):
             raise CampaignEvidenceError(f"{label} drifted from the immutable campaign fingerprint")
+    if codex.get("runtime_files", []) != _codex_runtime_fingerprints(options.codex_binary):
+        raise CampaignEvidenceError(
+            "Codex runtime helpers drifted from the immutable campaign fingerprint"
+        )
 
     interpreter = Path(sys.executable).resolve(strict=True)
     if (

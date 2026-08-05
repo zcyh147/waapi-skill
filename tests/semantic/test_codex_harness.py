@@ -112,9 +112,29 @@ def executable_file(path: Path) -> Path:
     return path
 
 
+def windows_standalone_binary(
+    root: Path,
+    *,
+    binary_in_bin: bool = True,
+) -> Path:
+    """Create the closed official-standalone shape expected on Windows."""
+
+    package_marker = root / "codex-package.json"
+    package_marker.parent.mkdir(parents=True, exist_ok=True)
+    package_marker.write_text('{"version":"1.2.3"}\n', encoding="utf-8")
+    binary = executable_file(
+        root / "bin" / "codex.exe" if binary_in_bin else root / "codex.exe"
+    )
+    executable_file(root / "bin" / "codex-code-mode-host.exe")
+    executable_file(root / "codex-path" / "rg.exe")
+    executable_file(root / "codex-resources" / "codex-command-runner.exe")
+    executable_file(root / "codex-resources" / "codex-windows-sandbox-setup.exe")
+    return binary
+
+
 def test_codex_binary_discovery_uses_host_native_path_lookup(tmp_path: Path) -> None:
     linux_binary = executable_file(tmp_path / "codex")
-    windows_binary = executable_file(tmp_path / "codex.exe")
+    windows_binary = windows_standalone_binary(tmp_path / "windows-standalone")
     linux_calls: list[str] = []
     windows_calls: list[str] = []
 
@@ -131,7 +151,9 @@ def test_codex_binary_discovery_uses_host_native_path_lookup(tmp_path: Path) -> 
     ) == linux_binary.resolve(strict=True)
     assert linux_calls == ["codex"]
     assert codex_harness_module.discover_codex_binary(
-        platform_name="win32", which=windows_which
+        platform_name="win32",
+        which=windows_which,
+        probe=lambda _path: "codex-cli 1.2.3",
     ) == windows_binary.resolve(strict=True)
     assert windows_calls == ["codex.exe"]
 
@@ -143,34 +165,323 @@ def test_codex_binary_discovery_uses_host_native_path_lookup(tmp_path: Path) -> 
 
     with pytest.raises(CodexHarnessError, match="host-native .exe"):
         codex_harness_module.discover_codex_binary(
-            platform_name="win32", which=windows_alias_which
+            platform_name="win32",
+            which=windows_alias_which,
+            probe=lambda _path: "codex-cli 1.2.3",
         )
     assert windows_alias_calls == ["codex.exe", "codex"]
 
 
 def test_codex_binary_discovery_skips_outer_sandbox_proxy(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     proxy = executable_file(tmp_path / ".codex" / ".sandbox-bin" / "codex.exe")
-    host = executable_file(tmp_path / "host-bin" / "codex.exe")
-    monkeypatch.setenv("PATH", os.pathsep.join((str(proxy.parent), str(host.parent))))
+    host = windows_standalone_binary(tmp_path / "host-standalone")
+    environment = {
+        "PATH": os.pathsep.join((str(proxy.parent), str(host.parent))),
+    }
 
-    assert codex_harness_module.discover_codex_binary(platform_name="win32") == (
+    assert codex_harness_module.discover_codex_binary(
+        platform_name="win32",
+        environment=environment,
+        probe=lambda _path: "codex-cli 1.2.3",
+    ) == (
         host.resolve(strict=True)
     )
 
-    monkeypatch.setenv("PATH", str(proxy.parent))
+    environment = {"PATH": str(proxy.parent)}
     with pytest.raises(
         CodexHarnessError,
-        match=r"outer-sandbox proxy.*--codex-binary",
+        match=r"outer sandbox proxy.*--codex-binary",
     ):
-        codex_harness_module.discover_codex_binary(platform_name="win32")
+        codex_harness_module.discover_codex_binary(
+            platform_name="win32",
+            environment=environment,
+            probe=lambda _path: "codex-cli 1.2.3",
+        )
     with pytest.raises(CodexHarnessError, match=r"outer sandbox proxy.*--codex-binary"):
         codex_harness_module._strict_codex_binary(
             proxy,
             source="explicit",
             platform_name="win32",
+        )
+
+
+def test_windows_codex_discovery_skips_unlaunchable_windowsapps_candidate(
+    tmp_path: Path,
+) -> None:
+    packaged = executable_file(
+        tmp_path
+        / "Program Files"
+        / "WindowsApps"
+        / "OpenAI.Codex_1.0_arm64__test"
+        / "app"
+        / "resources"
+        / "codex.exe"
+    )
+    host = windows_standalone_binary(tmp_path / "Host CLI & 工具")
+    environment = {
+        "PATH": os.pathsep.join((str(packaged.parent), str(host.parent))),
+    }
+    probed: list[Path] = []
+
+    def probe(candidate: Path) -> str:
+        probed.append(candidate)
+        if candidate == packaged.resolve(strict=True):
+            denied = PermissionError(13, "Access denied")
+            denied.winerror = 5  # type: ignore[attr-defined]
+            raise denied
+        return "codex-cli 1.2.3"
+
+    assert codex_harness_module.discover_codex_binary(
+        platform_name="win32",
+        environment=environment,
+        probe=probe,
+    ) == host.resolve(strict=True)
+    assert probed == [host.resolve(strict=True)]
+
+
+def test_windows_codex_discovery_prefers_official_standalone_current(
+    tmp_path: Path,
+) -> None:
+    current = windows_standalone_binary(
+        tmp_path
+        / "profile"
+        / ".codex"
+        / "packages"
+        / "standalone"
+        / "current"
+    )
+    ambient = executable_file(tmp_path / "ambient" / "codex.exe")
+    environment = {
+        "USERPROFILE": str(tmp_path / "profile"),
+        "PATH": str(ambient.parent),
+    }
+    probed: list[Path] = []
+
+    assert codex_harness_module.discover_codex_binary(
+        platform_name="win32",
+        environment=environment,
+        probe=lambda path: probed.append(path) or "codex-cli 1.2.3",
+    ) == current.resolve(strict=True)
+    assert probed == [current.resolve(strict=True)]
+
+
+def test_windows_codex_discovery_reports_all_unusable_candidates(
+    tmp_path: Path,
+) -> None:
+    packaged = executable_file(
+        tmp_path / "Program Files" / "WindowsApps" / "codex.exe"
+    )
+
+    with pytest.raises(
+        CodexHarnessError,
+        match=r"no usable host-native Codex CLI.*protected Microsoft Store.*standalone",
+    ):
+        codex_harness_module.discover_codex_binary(
+            platform_name="win32",
+            environment={"PATH": str(packaged.parent)},
+            probe=lambda _path: "codex-cli 1.2.3",
+        )
+
+
+def test_windows_codex_discovery_rejects_alias_resolving_into_windowsapps(
+    tmp_path: Path,
+) -> None:
+    packaged = windows_standalone_binary(
+        tmp_path / "Program Files" / "WindowsApps" / "OpenAI.Codex_test"
+    )
+    alias = tmp_path / "ordinary-bin" / "codex.exe"
+    alias.parent.mkdir()
+    create_symlink_or_skip(alias, packaged)
+    probed: list[Path] = []
+
+    with pytest.raises(CodexHarnessError, match="protected Microsoft Store"):
+        codex_harness_module.discover_codex_binary(
+            platform_name="win32",
+            environment={"PATH": str(alias.parent)},
+            probe=lambda path: probed.append(path) or "codex-cli 1.2.3",
+        )
+
+    assert probed == []
+
+
+def test_windows_codex_discovery_rejects_executable_without_standalone_package(
+    tmp_path: Path,
+) -> None:
+    unbound = executable_file(tmp_path / "plain" / "bin" / "codex.exe")
+    probed: list[Path] = []
+
+    with pytest.raises(CodexHarnessError, match=r"package marker is missing"):
+        codex_harness_module.discover_codex_binary(
+            platform_name="win32",
+            environment={"PATH": str(unbound.parent)},
+            probe=lambda path: probed.append(path) or "codex-cli 1.2.3",
+        )
+
+    assert probed == []
+
+
+def test_windows_codex_discovery_continues_after_invalid_version_output(
+    tmp_path: Path,
+) -> None:
+    invalid = windows_standalone_binary(tmp_path / "invalid")
+    valid = windows_standalone_binary(tmp_path / "valid")
+    probed: list[Path] = []
+
+    def probe(path: Path) -> str:
+        probed.append(path)
+        return "not Codex" if path == invalid.resolve(strict=True) else "codex-cli 1.2.3"
+
+    assert codex_harness_module.discover_codex_binary(
+        platform_name="win32",
+        environment={
+            "PATH": os.pathsep.join((str(invalid.parent), str(valid.parent))),
+        },
+        probe=probe,
+    ) == valid.resolve(strict=True)
+    assert probed == [invalid.resolve(strict=True), valid.resolve(strict=True)]
+
+
+def test_windows_codex_runtime_path_keeps_broker_shim_first(
+    tmp_path: Path,
+) -> None:
+    release = tmp_path / "standalone" / "releases" / "1.2.3-arm64"
+    binary = windows_standalone_binary(release)
+    resources = release / "codex-resources"
+    codex_path = release / "codex-path"
+    shim = tmp_path / "broker shims"
+    inherited = tmp_path / "ambient"
+    environment = {
+        "WAAPI_CODEX_GATEWAY_REQUIRED": "1",
+        "Path": f"{shim};{inherited}",
+    }
+
+    result = codex_harness_module.codex_process_environment(
+        binary,
+        environment,
+        platform_name="win32",
+    )
+
+    assert result["Path"].split(";") == [
+        str(shim),
+        str(binary.parent.resolve(strict=True)),
+        str(resources.resolve(strict=True)),
+        str(codex_path.resolve(strict=True)),
+        str(inherited),
+    ]
+
+
+def test_windows_codex_runtime_rejects_root_level_binary(
+    tmp_path: Path,
+) -> None:
+    release = tmp_path / "standalone" / "releases" / "1.2.3-arm64"
+    binary = windows_standalone_binary(release, binary_in_bin=False)
+
+    with pytest.raises(CodexHarnessError, match=r"<release>\\bin\\codex.exe"):
+        codex_harness_module.codex_process_environment(
+            binary,
+            {"Path": str(tmp_path / "ambient")},
+            platform_name="win32",
+        )
+
+
+@pytest.mark.parametrize(
+    "missing_relative",
+    (
+        Path("codex-package.json"),
+        Path("bin") / "codex-code-mode-host.exe",
+        Path("codex-path") / "rg.exe",
+        Path("codex-resources") / "codex-command-runner.exe",
+        Path("codex-resources") / "codex-windows-sandbox-setup.exe",
+    ),
+)
+def test_windows_standalone_runtime_files_are_complete_and_fixed(
+    tmp_path: Path,
+    missing_relative: Path,
+) -> None:
+    release = tmp_path / "standalone" / "releases" / "1.2.3-arm64"
+    binary = windows_standalone_binary(release)
+    expected = [
+        release / "codex-package.json",
+        release / "bin" / "codex-code-mode-host.exe",
+        release / "codex-path" / "rg.exe",
+        release / "codex-resources" / "codex-command-runner.exe",
+        release / "codex-resources" / "codex-windows-sandbox-setup.exe",
+    ]
+
+    assert codex_harness_module.codex_runtime_files(
+        binary,
+        platform_name="win32",
+    ) == tuple(path.resolve(strict=True) for path in expected)
+
+    (release / missing_relative).unlink()
+    with pytest.raises(
+        CodexHarnessError,
+        match="package marker is missing|expected a real regular file",
+    ):
+        codex_harness_module.codex_runtime_files(
+            binary,
+            platform_name="win32",
+        )
+
+
+def test_windows_codex_version_probe_rejects_non_codex_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    binary = windows_standalone_binary(tmp_path / "standalone")
+    monkeypatch.setattr(
+        codex_harness_module.subprocess,
+        "run",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess(
+            [str(binary), "--version"],
+            0,
+            "something else 1.2.3\n",
+            "",
+        ),
+    )
+
+    with pytest.raises(CodexHarnessError, match="version output is invalid"):
+        codex_harness_module._probe_codex_binary(
+            binary,
+            platform_name="win32",
+            environment={"PATH": ""},
+        )
+
+
+@pytest.mark.parametrize(
+    "value",
+    (
+        "codex-cli 0.146.0",
+        "codex 1.2.3\n",
+        "codex-cli 0.146.0-alpha.1+arm64\r\n",
+    ),
+)
+def test_codex_version_output_accepts_one_bounded_semver_line(value: str) -> None:
+    assert codex_harness_module.validate_codex_version_output(
+        value,
+        binary=Path("codex.exe"),
+    ) == value.rstrip("\r\n")
+
+
+@pytest.mark.parametrize(
+    "value",
+    (
+        "",
+        "something 1.2.3",
+        " codex-cli 1.2.3",
+        "codex-cli 1.2.3 ",
+        "codex-cli 1.2.3\nsecond line",
+        "codex-cli 1.2.3\0",
+        "codex-cli 1.2.3+" + "a" * 256,
+    ),
+)
+def test_codex_version_output_rejects_unbounded_or_ambiguous_text(value: str) -> None:
+    with pytest.raises(CodexHarnessError, match="version output is invalid"):
+        codex_harness_module.validate_codex_version_output(
+            value,
+            binary=Path("codex.exe"),
         )
 
 
@@ -832,6 +1143,20 @@ def test_codex_cli_task_reuses_one_disposable_state_and_resumes_exact_thread(
     commands: list[tuple[str, ...]] = []
     execution_environments: list[dict[str, str]] = []
     prompt_audit_homes: list[str] = []
+    runtime_environment_calls: list[dict[str, str]] = []
+
+    def fake_codex_process_environment(
+        binary_arg: Path,
+        environment: Mapping[str, str],
+        *,
+        platform_name: str | None = None,
+    ) -> dict[str, str]:
+        assert binary_arg == binary
+        assert platform_name is None
+        result = dict(environment)
+        result["TEST_CODEX_RUNTIME_BOUND"] = "1"
+        runtime_environment_calls.append(result)
+        return result
 
     def fake_audit_prompt(
         self: CodexCliHarness,
@@ -839,6 +1164,7 @@ def test_codex_cli_task_reuses_one_disposable_state_and_resumes_exact_thread(
         *,
         env: Mapping[str, str],
     ) -> codex_harness_module.CodexPromptAudit:
+        assert env["TEST_CODEX_RUNTIME_BOUND"] == "1"
         prompt_audit_homes.append(env["HOME"])
         return passing_prompt_audit()
 
@@ -849,6 +1175,7 @@ def test_codex_cli_task_reuses_one_disposable_state_and_resumes_exact_thread(
         env: Mapping[str, str],
         timeout: float,
     ) -> codex_harness_module.ProcessResult:
+        assert env["TEST_CODEX_RUNTIME_BOUND"] == "1"
         argv = tuple(str(value) for value in command)
         commands.append(argv)
         execution_environments.append(dict(env))
@@ -880,6 +1207,11 @@ def test_codex_cli_task_reuses_one_disposable_state_and_resumes_exact_thread(
         return codex_harness_module.ProcessResult(0, stdout, "", 0.01)
 
     monkeypatch.setattr(CodexCliHarness, "audit_prompt", fake_audit_prompt)
+    monkeypatch.setattr(
+        codex_harness_module,
+        "codex_process_environment",
+        fake_codex_process_environment,
+    )
     monkeypatch.setattr(codex_harness_module, "run_process", fake_run_process)
     config = CodexHarnessConfig(
         workspace=workspace,
@@ -915,6 +1247,11 @@ def test_codex_cli_task_reuses_one_disposable_state_and_resumes_exact_thread(
     assert execution_environments[0]["CODEX_HOME"] == execution_environments[1]["CODEX_HOME"]
     assert len(set(prompt_audit_homes)) == 2
     assert all(home != execution_environments[0]["HOME"] for home in prompt_audit_homes)
+    assert len(runtime_environment_calls) == 3
+    assert all(
+        environment["TEST_CODEX_RUNTIME_BOUND"] == "1"
+        for environment in runtime_environment_calls
+    )
     assert "--ephemeral" not in commands[0]
     assert "resume" not in commands[0]
     assert "--last" not in commands[1]
@@ -947,6 +1284,11 @@ def test_codex_cli_task_fails_closed_on_resumed_thread_id_mismatch(
         CodexCliHarness,
         "audit_prompt",
         lambda *args, **kwargs: passing_prompt_audit(),
+    )
+    monkeypatch.setattr(
+        codex_harness_module,
+        "codex_process_environment",
+        lambda _binary, environment: dict(environment),
     )
 
     def fake_run_process(*args: object, **kwargs: object) -> codex_harness_module.ProcessResult:

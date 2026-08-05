@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 from dataclasses import replace
 from pathlib import Path
@@ -38,8 +39,27 @@ def _options(
     skill = tmp_path / "skill"
     skill.mkdir(parents=True, exist_ok=True)
     (skill / "SKILL.md").write_text("# frozen candidate\n", encoding="utf-8")
-    codex = tmp_path / "codex"
+    codex = (
+        tmp_path / "codex-release" / "bin" / "codex.exe"
+        if os.name == "nt"
+        else tmp_path / "codex"
+    )
+    codex.parent.mkdir(parents=True, exist_ok=True)
     codex.write_text("synthetic executable; never invoked\n", encoding="utf-8")
+    if os.name == "nt":
+        release = codex.parent.parent
+        (release / "codex-package.json").write_text(
+            '{"version":"1.2.3"}\n',
+            encoding="utf-8",
+        )
+        for helper in (
+            release / "bin" / "codex-code-mode-host.exe",
+            release / "codex-path" / "rg.exe",
+            release / "codex-resources" / "codex-command-runner.exe",
+            release / "codex-resources" / "codex-windows-sandbox-setup.exe",
+        ):
+            helper.parent.mkdir(parents=True, exist_ok=True)
+            helper.write_text("synthetic helper\n", encoding="utf-8")
     auth = tmp_path / "auth.json"
     auth.write_text("{}\n", encoding="utf-8")
     live_config = tmp_path / "live-config.json"
@@ -85,6 +105,9 @@ def _effective_for(options: campaign.CampaignOptions) -> dict[str, Any]:
         "codex": {
             "path": str(options.codex_binary),
             "sha256": sha256_file(options.codex_binary),
+            "runtime_files": campaign._codex_runtime_fingerprints(
+                options.codex_binary
+            ),
             "memory": "disabled",
             "fresh_session_per_phase": True,
         },

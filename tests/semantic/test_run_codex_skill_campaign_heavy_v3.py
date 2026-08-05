@@ -43,6 +43,7 @@ from tests.semantic.support.codex_cli_business_plan_v3 import (
 from tests.semantic.support.codex_campaign import (
     CampaignEvidenceError,
     list_campaign_attempts,
+    sha256_file,
     stable_tree_sha256,
 )
 from tests.semantic.support.codex_campaign_runner import ChildValidation, PhaseVerdict
@@ -355,9 +356,28 @@ def _options(tmp_path: Path) -> campaign.CampaignOptions:
     (scripts / "gateway.py").write_text("# synthetic gateway\n", encoding="utf-8")
     suite = tmp_path / "suite-v3.json"
     suite.write_text("{}\n", encoding="utf-8")
-    codex = tmp_path / "codex"
+    codex = (
+        tmp_path / "codex-release" / "bin" / "codex.exe"
+        if os.name == "nt"
+        else tmp_path / "codex"
+    )
+    codex.parent.mkdir(parents=True, exist_ok=True)
     codex.write_text("synthetic codex binary\n", encoding="utf-8")
     codex.chmod(0o755)
+    if os.name == "nt":
+        release = codex.parent.parent
+        (release / "codex-package.json").write_text(
+            '{"version":"1.2.3"}\n',
+            encoding="utf-8",
+        )
+        for helper in (
+            release / "bin" / "codex-code-mode-host.exe",
+            release / "codex-path" / "rg.exe",
+            release / "codex-resources" / "codex-command-runner.exe",
+            release / "codex-resources" / "codex-windows-sandbox-setup.exe",
+        ):
+            helper.parent.mkdir(parents=True, exist_ok=True)
+            helper.write_text("synthetic helper\n", encoding="utf-8")
     auth = tmp_path / "auth.json"
     auth.write_text("{}\n", encoding="utf-8")
     versions: dict[str, dict[str, str]] = {}
@@ -5573,7 +5593,7 @@ def test_heavy_fingerprint_covers_runner_model_options_and_mutable_inputs(
         campaign.subprocess,
         "run",
         lambda *_args, **_kwargs: subprocess.CompletedProcess(
-            [str(options.codex_binary), "--version"], 0, "codex 1.2.3\n", ""
+            [str(options.codex_binary), "--version"], 0, "codex-cli 1.2.3\n", ""
         ),
     )
     monkeypatch.setattr(campaign.importlib.metadata, "distributions", lambda: ())
@@ -5610,6 +5630,11 @@ def test_codex_version_fingerprint_permission_error_names_stage_and_binary(
     denied = PermissionError(13, "Access denied")
     denied.winerror = 5  # type: ignore[attr-defined]
     monkeypatch.setattr(
+        campaign,
+        "codex_process_environment",
+        lambda _binary, environment: dict(environment),
+    )
+    monkeypatch.setattr(
         campaign.subprocess,
         "run",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(denied),
@@ -5625,6 +5650,45 @@ def test_codex_version_fingerprint_permission_error_names_stage_and_binary(
     assert str(binary) in message
     assert "PermissionError" in message
     assert "Access denied" in message
+
+
+def test_heavy_fingerprint_binds_selected_codex_runtime_helpers(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    options = _options(tmp_path)
+    units = (_unit(1),)
+    helper = tmp_path / "codex-resources" / "codex-command-runner.exe"
+    helper.parent.mkdir()
+    helper.write_text("helper-v1\n", encoding="utf-8")
+    monkeypatch.setattr(
+        campaign.subprocess,
+        "run",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess(
+            [str(options.codex_binary), "--version"],
+            0,
+            "codex-cli 1.2.3\n",
+            "",
+        ),
+    )
+    monkeypatch.setattr(campaign.importlib.metadata, "distributions", lambda: ())
+    monkeypatch.setattr(campaign, "codex_runtime_files", lambda _binary: (helper,))
+
+    effective = campaign.build_heavy_v3_effective_config(
+        options,
+        units=units,
+        required_units={units[0].unit_id: (campaign.HEAVY_V3_PHASE,)},
+    )
+
+    assert effective["codex"]["runtime_files"] == [
+        {"path": str(helper), "sha256": sha256_file(helper)}
+    ]
+    helper.write_text("helper-v2\n", encoding="utf-8")
+    with pytest.raises(CampaignEvidenceError, match="runtime helpers drifted"):
+        campaign.assert_heavy_v3_effective_inputs_frozen(
+            options,
+            effective=effective,
+        )
 
 
 def test_heavy_codex_probe_denial_precedes_campaign_root_and_child(
@@ -5688,7 +5752,7 @@ def test_heavy_fingerprint_rejects_source_project_and_launcher_drift(
         campaign.subprocess,
         "run",
         lambda *_args, **_kwargs: subprocess.CompletedProcess(
-            [str(options.codex_binary), "--version"], 0, "codex 1.2.3\n", ""
+            [str(options.codex_binary), "--version"], 0, "codex-cli 1.2.3\n", ""
         ),
     )
     monkeypatch.setattr(campaign.importlib.metadata, "distributions", lambda: ())
@@ -5738,7 +5802,7 @@ def test_heavy_fingerprint_includes_migration_source_tree(
         campaign.subprocess,
         "run",
         lambda *_args, **_kwargs: subprocess.CompletedProcess(
-            [str(options.codex_binary), "--version"], 0, "codex 1.2.3\n", ""
+            [str(options.codex_binary), "--version"], 0, "codex-cli 1.2.3\n", ""
         ),
     )
     monkeypatch.setattr(campaign.importlib.metadata, "distributions", lambda: ())

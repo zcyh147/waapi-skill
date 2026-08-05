@@ -34,6 +34,14 @@ DEFAULT_TIMEOUT_SECONDS = 180.0
 WINDOWS_HARD_REAP_SECONDS = 5.0
 PROMPT_AUDIT_TIMEOUT_SECONDS = 30.0
 PROMPT_AUDIT_MAX_ATTEMPTS = 2
+CODEX_BINARY_PROBE_TIMEOUT_SECONDS = 15.0
+CODEX_VERSION_PATTERN = re.compile(
+    r"^(?:codex|codex-cli) (?:0|[1-9][0-9]*)\."
+    r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
+    r"(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?"
+    r"(?:\+[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$"
+)
+CODEX_VERSION_OUTPUT_MAX_BYTES = 256
 WORKSPACE_SKILL_EXCLUDED_NAMES = frozenset(
     {".venv", "__pycache__", ".pytest_cache", ".DS_Store", ".coverage"}
 )
@@ -196,6 +204,20 @@ def _is_codex_sandbox_proxy(path: Path) -> bool:
     )
 
 
+def _is_protected_windowsapps_path(path: Path) -> bool:
+    """Recognize Microsoft Store package roots and App Execution Alias roots."""
+
+    native_parts = tuple(part.casefold() for part in Path(path).parts)
+    windows_parts = tuple(part.casefold() for part in PureWindowsPath(str(path)).parts)
+    for parts in (native_parts, windows_parts):
+        for index, part in enumerate(parts):
+            if part != "windowsapps" or index == 0:
+                continue
+            if parts[index - 1] in {"microsoft", "program files", "program files (x86)"}:
+                return True
+    return False
+
+
 def _strict_codex_binary(
     candidate: Path,
     *,
@@ -222,28 +244,108 @@ def _strict_codex_binary(
             f"{source} Codex binary resolves to the outer sandbox proxy {resolved}; "
             "pass --codex-binary with the real host-native Codex executable"
         )
+    if active_platform.startswith("win") and (
+        _is_protected_windowsapps_path(candidate)
+        or _is_protected_windowsapps_path(resolved)
+    ):
+        raise CodexHarnessError(
+            f"{source} Codex binary resolves through a protected Microsoft Store "
+            f"WindowsApps path {resolved}; install the standalone Codex CLI"
+        )
     return resolved
 
 
-def _default_codex_path_candidates(platform_name: str) -> Iterator[Path]:
-    """Yield PATH candidates in order without stopping at a sandbox proxy."""
+def validate_codex_version_output(value: str, *, binary: Path) -> str:
+    """Require the stable machine-readable shape emitted by ``codex --version``."""
+
+    raw = str(value)
+    try:
+        encoded = raw.encode("utf-8", errors="strict")
+    except UnicodeError as exc:
+        raise CodexHarnessError(
+            f"Codex CLI version output is not UTF-8 for {binary}"
+        ) from exc
+    if len(encoded) > CODEX_VERSION_OUTPUT_MAX_BYTES or "\0" in raw:
+        raise CodexHarnessError(
+            f"Codex CLI version output is invalid for {binary}: oversized or contains NUL"
+        )
+    if raw.endswith("\r\n"):
+        version = raw[:-2]
+    elif raw.endswith("\n"):
+        version = raw[:-1]
+    else:
+        version = raw
+    if "\r" in version or "\n" in version or version != version.strip():
+        raise CodexHarnessError(
+            f"Codex CLI version output is invalid for {binary}: expected one clean line"
+        )
+    if not CODEX_VERSION_PATTERN.fullmatch(version):
+        raise CodexHarnessError(
+            f"Codex CLI version output is invalid for {binary}: {version!r}"
+        )
+    return version
+
+
+def _environment_value_case_insensitive(
+    environment: Mapping[str, str],
+    name: str,
+) -> str | None:
+    expected = name.casefold()
+    for key, value in environment.items():
+        if str(key).casefold() == expected:
+            return str(value)
+    return None
+
+
+def _default_codex_path_candidates(
+    platform_name: str,
+    *,
+    environment: Mapping[str, str],
+) -> Iterator[Path]:
+    """Yield lexical PATH candidates so strict resolution can explain failures."""
 
     executable_names = ("codex.exe",) if platform_name.startswith("win") else ("codex",)
-    seen: set[str] = set()
-    for raw_directory in os.environ.get("PATH", os.defpath).split(os.pathsep):
+    raw_path = _environment_value_case_insensitive(environment, "PATH") or os.defpath
+    for raw_directory in raw_path.split(os.pathsep):
         directory = Path(raw_directory or os.curdir).expanduser()
         for executable_name in executable_names:
             candidate = directory / executable_name
-            try:
-                resolved = candidate.resolve(strict=True)
-            except OSError:
-                continue
-            identity = os.path.normcase(str(resolved))
-            if identity in seen:
-                continue
-            seen.add(identity)
-            if resolved.is_file() and os.access(resolved, os.X_OK):
+            if os.path.lexists(candidate):
                 yield candidate
+
+
+def _windows_standalone_codex_candidates(
+    environment: Mapping[str, str],
+) -> Iterator[tuple[Path, str]]:
+    """Yield official user-owned Windows CLI locations before ambient PATH."""
+
+    user_profile = _environment_value_case_insensitive(environment, "USERPROFILE")
+    codex_homes: list[Path] = []
+    configured_codex_home = _environment_value_case_insensitive(environment, "CODEX_HOME")
+    if configured_codex_home:
+        codex_homes.append(Path(configured_codex_home).expanduser())
+    if user_profile:
+        default_codex_home = Path(user_profile).expanduser() / ".codex"
+        if default_codex_home not in codex_homes:
+            codex_homes.append(default_codex_home)
+    for codex_home in codex_homes:
+        current = codex_home / "packages" / "standalone" / "current"
+        candidate = current / "bin" / "codex.exe"
+        if os.path.lexists(candidate):
+            yield candidate, "official standalone current"
+
+    local_appdata = _environment_value_case_insensitive(environment, "LOCALAPPDATA")
+    if local_appdata:
+        visible = (
+            Path(local_appdata).expanduser()
+            / "Programs"
+            / "OpenAI"
+            / "Codex"
+            / "bin"
+            / "codex.exe"
+        )
+        if os.path.lexists(visible):
+            yield visible, "official standalone visible command"
 
 
 def discover_codex_binary(
@@ -251,15 +353,24 @@ def discover_codex_binary(
     platform_name: str | None = None,
     which: Callable[[str], str | None] | None = None,
     macos_app_fallback: Path = MACOS_APP_CODEX_FALLBACK,
+    environment: Mapping[str, str] | None = None,
+    probe: Callable[[Path], str] | None = None,
 ) -> Path:
     """Discover the host-native Codex CLI, with an App fallback only on macOS."""
 
     platform_name = sys.platform if platform_name is None else platform_name
-    rejected_proxies: list[Path] = []
+    active_environment = dict(os.environ if environment is None else environment)
+    rejected_candidates: list[str] = []
     if which is None and platform_name.startswith("win"):
         candidates = (
-            (candidate, f"PATH ({candidate.name})")
-            for candidate in _default_codex_path_candidates(platform_name)
+            *_windows_standalone_codex_candidates(active_environment),
+            *(
+                (candidate, f"PATH ({candidate.name})")
+                for candidate in _default_codex_path_candidates(
+                    platform_name,
+                    environment=active_environment,
+                )
+            ),
         )
     else:
         command_names = (
@@ -273,39 +384,69 @@ def discover_codex_binary(
             for command_name in command_names
             if (discovered := lookup(command_name))
         )
+    seen: set[str] = set()
     for candidate, source in candidates:
         try:
-            return _strict_codex_binary(
+            resolved = _strict_codex_binary(
                 candidate,
                 source=source,
                 platform_name=platform_name,
             )
         except CodexHarnessError as exc:
+            if not platform_name.startswith("win"):
+                raise exc
+            rejected_candidates.append(str(exc))
+            continue
+        identity = os.path.normcase(str(resolved))
+        if identity in seen:
+            continue
+        seen.add(identity)
+        if platform_name.startswith("win"):
             try:
-                resolved = candidate.expanduser().resolve(strict=True)
-            except OSError:
-                raise exc
-            if not platform_name.startswith("win") or not (
-                _is_codex_sandbox_proxy(candidate)
-                or _is_codex_sandbox_proxy(resolved)
-            ):
-                raise exc
-            rejected_proxies.append(candidate.expanduser().absolute())
+                codex_runtime_files(
+                    resolved,
+                    platform_name=platform_name,
+                )
+            except CodexHarnessError as exc:
+                rejected_candidates.append(f"{source} {resolved}: {exc}")
+                continue
+            active_probe = probe or (
+                lambda path: _probe_codex_binary(
+                    path,
+                    platform_name=platform_name,
+                    environment=active_environment,
+                )
+            )
+            try:
+                validate_codex_version_output(
+                    active_probe(resolved),
+                    binary=resolved,
+                )
+            except (CodexHarnessError, OSError, subprocess.SubprocessError) as exc:
+                rejected_candidates.append(f"{source} {resolved}: {type(exc).__name__}: {exc}")
+                continue
+        return resolved
     if platform_name == "darwin":
         return _strict_codex_binary(
             macos_app_fallback,
             source="macOS App fallback",
             platform_name=platform_name,
         )
-    if rejected_proxies:
-        rendered = ", ".join(str(path) for path in rejected_proxies)
+    if rejected_candidates:
+        rendered = "; ".join(rejected_candidates[:8])
         raise CodexHarnessError(
-            "PATH exposes only Codex outer-sandbox proxy candidates "
-            f"({rendered}); pass --codex-binary with the real host-native "
-            "Codex executable"
+            "no usable host-native Codex CLI was found; rejected candidates: "
+            f"{rendered}. Install the official standalone Codex CLI or pass "
+            "--codex-binary with its real executable"
+        )
+    if not platform_name.startswith("win"):
+        raise CodexHarnessError(
+            "Codex CLI was not found on PATH; pass an explicit --codex-binary path"
         )
     raise CodexHarnessError(
-        "Codex CLI was not found on PATH; pass an explicit --codex-binary path"
+        "Codex CLI was not found in the official Windows standalone locations "
+        "or on PATH; install the standalone CLI or pass an explicit "
+        "--codex-binary path"
     )
 
 
@@ -350,6 +491,150 @@ def _sha256_regular_file(path: Path) -> str:
     except OSError as exc:
         raise CodexHarnessError(f"cannot read regular file {path}: {exc}") from exc
     return digest.hexdigest()
+
+
+def _windows_codex_release_root(binary: Path) -> Path:
+    """Return the exact official standalone release root for one Windows CLI."""
+
+    executable = Path(binary).expanduser().resolve(strict=True)
+    if (
+        executable.name.casefold() != "codex.exe"
+        or executable.parent.name.casefold() != "bin"
+    ):
+        raise CodexHarnessError(
+            "Windows semantic campaigns require the standalone executable at "
+            f"<release>\\bin\\codex.exe; received: {executable}"
+        )
+    return executable.parent.parent
+
+
+def _windows_codex_runtime_directories(binary: Path) -> tuple[Path, ...]:
+    """Return directories belonging to the exact selected standalone release."""
+
+    root = _windows_codex_release_root(binary)
+    candidates = (
+        root / "bin",
+        root / "codex-resources",
+        root / "codex-path",
+    )
+    directories: list[Path] = []
+    for candidate in candidates:
+        try:
+            resolved = candidate.resolve(strict=True)
+        except OSError:
+            continue
+        if resolved.is_dir() and not is_link_or_junction(resolved) and resolved not in directories:
+            directories.append(resolved)
+    return tuple(directories)
+
+
+def codex_runtime_files(
+    binary: Path,
+    *,
+    platform_name: str | None = None,
+) -> tuple[Path, ...]:
+    """Return helper files that belong to the selected Windows standalone CLI."""
+
+    active_platform = sys.platform if platform_name is None else platform_name
+    if not active_platform.startswith("win"):
+        return ()
+    root = _windows_codex_release_root(binary)
+    package_marker = root / "codex-package.json"
+    if not package_marker.is_file():
+        raise CodexHarnessError(
+            "Windows semantic campaigns require an official standalone Codex "
+            f"release; package marker is missing: {package_marker}"
+        )
+    candidates = (
+        package_marker,
+        root / "bin" / "codex-code-mode-host.exe",
+        root / "codex-path" / "rg.exe",
+        root / "codex-resources" / "codex-command-runner.exe",
+        root / "codex-resources" / "codex-windows-sandbox-setup.exe",
+    )
+    for candidate in candidates:
+        _sha256_regular_file(candidate)
+    return tuple(candidate.resolve(strict=True) for candidate in candidates)
+
+
+def codex_process_environment(
+    binary: Path,
+    environment: Mapping[str, str],
+    *,
+    platform_name: str | None = None,
+) -> dict[str, str]:
+    """Bind Windows Codex helpers to the same selected standalone release."""
+
+    active_platform = sys.platform if platform_name is None else platform_name
+    result = {str(key): str(value) for key, value in environment.items()}
+    if not active_platform.startswith("win"):
+        return result
+    codex_runtime_files(binary, platform_name=active_platform)
+    runtime_directories = _windows_codex_runtime_directories(binary)
+    if not runtime_directories:
+        return result
+    path_key = next((key for key in result if key.casefold() == "path"), "PATH")
+    existing = result.get(path_key, os.defpath)
+    existing_parts = [part for part in existing.split(";") if part]
+    broker_required = any(
+        key.casefold() == "waapi_codex_gateway_required" and value == "1"
+        for key, value in result.items()
+    )
+    prefix = existing_parts[:1] if broker_required and existing_parts else []
+    suffix = existing_parts[1:] if prefix else existing_parts
+    combined = [*prefix, *(str(path) for path in runtime_directories), *suffix]
+    deduplicated: list[str] = []
+    seen: set[str] = set()
+    for item in combined:
+        identity = os.path.normcase(os.path.abspath(item))
+        if identity not in seen:
+            seen.add(identity)
+            deduplicated.append(item)
+    result[path_key] = ";".join(deduplicated)
+    return result
+
+
+def _probe_codex_binary(
+    binary: Path,
+    *,
+    platform_name: str,
+    environment: Mapping[str, str],
+) -> str:
+    """Require one candidate to be hashable and directly launchable without a shell."""
+
+    candidate = Path(binary)
+    _sha256_regular_file(candidate)
+    for runtime_file in codex_runtime_files(
+        candidate,
+        platform_name=platform_name,
+    ):
+        _sha256_regular_file(runtime_file)
+    try:
+        completed = subprocess.run(
+            [str(candidate), "--version"],
+            cwd=Path.cwd(),
+            env=codex_process_environment(
+                candidate,
+                environment,
+                platform_name=platform_name,
+            ),
+            text=True,
+            encoding="utf-8",
+            errors="strict",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=CODEX_BINARY_PROBE_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError, UnicodeError) as exc:
+        raise CodexHarnessError(
+            f"Codex CLI launch probe failed for {candidate}: {type(exc).__name__}: {exc}"
+        ) from exc
+    version = completed.stdout
+    if completed.returncode != 0 or not version:
+        detail = completed.stderr.strip() or f"exit code {completed.returncode}"
+        raise CodexHarnessError(f"Codex CLI launch probe failed for {candidate}: {detail}")
+    return validate_codex_version_output(version, binary=candidate)
 
 
 def _workspace_skill_manifest(
@@ -855,6 +1140,7 @@ class CodexCliHarness:
         skill_tree_sha256_before = snapshot_tree_hash(before_skill)
 
         with isolated_codex_environment(self.config.auth_json, extra_env=extra_env) as audit_env:
+            audit_env = codex_process_environment(self.config.codex_binary, audit_env)
             prompt_environment = inspect_isolated_environment(audit_env, auth_json=self.config.auth_json)
             if not prompt_environment.passed:
                 raise CodexHarnessError(f"Prompt audit environment is not pristine: {prompt_environment}")
@@ -868,6 +1154,7 @@ class CodexCliHarness:
         if snapshot_tree_hash(snapshot_workspace(self.config.skill_source)) != skill_tree_sha256_before:
             raise CodexHarnessError("codex debug prompt-input modified the target Skill tree")
         with isolated_codex_environment(self.config.auth_json, extra_env=extra_env) as exec_env:
+            exec_env = codex_process_environment(self.config.codex_binary, exec_env)
             execution_environment = inspect_isolated_environment(exec_env, auth_json=self.config.auth_json)
             if not execution_environment.passed:
                 raise CodexHarnessError(f"Execution environment is not pristine: {execution_environment}")
@@ -967,6 +1254,10 @@ class CodexCliTask:
         try:
             execution_env = stack.enter_context(
                 isolated_codex_environment(self.config.auth_json, extra_env=self._extra_env)
+            )
+            execution_env = codex_process_environment(
+                self.config.codex_binary,
+                execution_env,
             )
             execution_environment = inspect_isolated_environment(
                 execution_env,
@@ -1079,6 +1370,10 @@ class CodexCliTask:
         skill_tree_sha256_before = snapshot_tree_hash(before_skill)
 
         with isolated_codex_environment(self.config.auth_json, extra_env=self._extra_env) as audit_env:
+            audit_env = codex_process_environment(
+                self.config.codex_binary,
+                audit_env,
+            )
             prompt_environment = inspect_isolated_environment(
                 audit_env,
                 auth_json=self.config.auth_json,
@@ -3105,6 +3400,8 @@ __all__ = [
     "build_prompt_audit_command",
     "classify_commands",
     "classify_codex_infrastructure_failure",
+    "codex_process_environment",
+    "codex_runtime_files",
     "codex_error_messages",
     "completed_command_records",
     "completed_commands",
@@ -3130,6 +3427,7 @@ __all__ = [
     "subprocess_process_group_options",
     "taskkill_process_tree",
     "turn_usage",
+    "validate_codex_version_output",
     "verify_workspace_skill_install",
     "workspace_changes",
     "workspace_skill_install_path",

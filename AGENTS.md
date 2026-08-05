@@ -356,11 +356,13 @@ binary, interpreter, model, or immutable options change. Resume an unchanged
 campaign with `--resume`; use `--resume --verify-only` to recheck sealed evidence
 without starting Codex or Wwise.
 
-On Windows, the formal runner rejects
-`%USERPROFILE%\.codex\.sandbox-bin\codex.exe`: that path is the outer Codex
-sandbox proxy, not a host executable for nested fresh tasks. Let discovery find
-a later host-native `codex.exe` on `PATH`, or pass its real absolute path with
-`--codex-binary`. Do not substitute a `.cmd`, `cmd.exe`, or `shell=True` launch.
+On Windows, formal campaigns require the standalone Codex CLI. Discovery
+prefers the official user-owned standalone locations, then checks `PATH`, and
+accepts only a hashable real `.exe` that passes a direct `--version` probe. It
+rejects `%USERPROFILE%\.codex\.sandbox-bin` and skips protected Microsoft Store
+`Program Files\WindowsApps` executables that cannot be launched as child
+processes. Install the standalone CLI or pass its exact real path with
+`--codex-binary`; do not substitute a `.cmd`, `cmd.exe`, or `shell=True` launch.
 
 The official profiles are `screening` (40 sessions), `formal_98` (98), and
 `full_cross_version_168` (168). Run the latter two only when the user explicitly

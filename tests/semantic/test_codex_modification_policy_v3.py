@@ -62,7 +62,7 @@ def _base_protocol():
 
 
 def _path_args(tmp_path: Path) -> list[str]:
-    codex = tmp_path / "codex"
+    codex = tmp_path / "codex.exe"
     auth = tmp_path / "auth.json"
     live = tmp_path / "live.json"
     for path in (codex, auth, live):

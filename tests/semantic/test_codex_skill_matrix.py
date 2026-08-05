@@ -326,7 +326,15 @@ def test_parse_args_rejects_unknown_and_duplicate_versions() -> None:
         matrix.parse_args(["--version", "2022.1", "--version", "2022.1"])
 
 
-def test_parse_args_rejects_duplicate_pair_ids_without_using_closed_choices() -> None:
+def test_parse_args_rejects_duplicate_pair_ids_without_using_closed_choices(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        matrix,
+        "resolve_codex_binary",
+        lambda _value: tmp_path / "synthetic-codex",
+    )
     pair_id = "custom-profile:Q1:2022.1:r37"
     parsed = matrix.parse_args(["--pair-id", pair_id])
     assert parsed.pair_ids == (pair_id,)

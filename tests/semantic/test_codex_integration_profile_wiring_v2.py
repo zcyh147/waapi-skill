@@ -29,7 +29,7 @@ PROFILE_PATH = (
 
 def _dependency_args(tmp_path: Path) -> list[str]:
     tmp_path.mkdir(parents=True, exist_ok=True)
-    codex = tmp_path / "codex"
+    codex = tmp_path / "codex.exe"
     auth = tmp_path / "auth.json"
     live = tmp_path / "live-environment.json"
     codex.write_text("not invoked\n", encoding="utf-8")

@@ -380,16 +380,20 @@ child matrix accepts only an atomic `single`, a profile-declared preview-only
 unit, or an ordered preview/confirm pair. It rejects confirm-only, reversed, or
 filter-excluded pairs.
 
-The defaults point to the Codex binary bundled with the ChatGPT app,
-`~/.codex/auth.json`, and
-`tests/fixtures/local/live-environment.json`. Override them only with the
-documented `--codex-binary`, `--auth-json`, and `--live-config` options.
-On Windows, automatic discovery skips Codex's outer
-`%USERPROFILE%\.codex\.sandbox-bin\codex.exe` proxy because it cannot be used
-as the host executable for a nested fresh-Codex campaign. If no later
-host-native `codex.exe` is present on `PATH`, pass its real absolute path with
-`--codex-binary`; `.cmd`, `cmd.exe`, and `shell=True` are not accepted
-substitutes.
+The defaults discover Codex on `PATH`, use `~/.codex/auth.json`, and load
+`tests/fixtures/local/live-environment.json`. macOS alone has a bundled App
+fallback. Override them only with the documented `--codex-binary`,
+`--auth-json`, and `--live-config` options.
+
+Windows fresh-task campaigns require the standalone Codex CLI. Discovery first
+checks the official `packages/standalone/current` and visible user-install
+locations, then `PATH`; each candidate must be a hashable real `.exe` and pass
+a direct, shell-free `--version` probe. It rejects the outer
+`%USERPROFILE%\.codex\.sandbox-bin` proxy and skips protected Microsoft Store
+`Program Files\WindowsApps` executables that cannot be started by a child
+process. Install the official standalone CLI when no candidate exists, or pass
+its exact real path with `--codex-binary`. `.cmd`, `cmd.exe`, and `shell=True`
+are not accepted substitutes.
 
 ## Live prerequisites and evidence
 
