@@ -53,6 +53,7 @@ def test_read_subscription_ack_accepts_exact_gateway_owned_document(
         step=step,
         started_at_unix_ns=started_at_unix_ns,
         runner_parent_process_id=101,
+        platform_name="posix",
     )
 
     assert loaded == payload
@@ -90,6 +91,7 @@ def test_read_subscription_ack_rejects_wrong_identity_or_scalar_type(
             step=step,
             started_at_unix_ns=1,
             runner_parent_process_id=101,
+            platform_name="posix",
         )
 
 
