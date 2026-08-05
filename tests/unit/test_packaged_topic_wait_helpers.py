@@ -27,6 +27,14 @@ def _ack_payload(*, nonce: str, topic: str, step: str) -> dict[str, object]:
     }
 
 
+def _write_canonical_ack(path: Path, payload: dict[str, object]) -> None:
+    path.write_bytes(
+        (json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n").encode(
+            "utf-8"
+        )
+    )
+
+
 def test_read_subscription_ack_accepts_exact_gateway_owned_document(
     tmp_path: Path,
 ) -> None:
@@ -36,10 +44,7 @@ def test_read_subscription_ack_accepts_exact_gateway_owned_document(
     started_at_unix_ns = time.time_ns()
     payload = _ack_payload(nonce=nonce, topic=topic, step=step)
     path = tmp_path / "subscription-ack-test.json"
-    path.write_text(
-        json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n",
-        encoding="utf-8",
-    )
+    _write_canonical_ack(path, payload)
 
     loaded = _read_subscription_ack(
         path,
@@ -75,10 +80,7 @@ def test_read_subscription_ack_rejects_wrong_identity_or_scalar_type(
     payload = _ack_payload(nonce=nonce, topic=topic, step=step)
     payload[field] = value
     path = tmp_path / "subscription-ack-test.json"
-    path.write_text(
-        json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n",
-        encoding="utf-8",
-    )
+    _write_canonical_ack(path, payload)
 
     with pytest.raises(AssertionError):
         _read_subscription_ack(
@@ -107,10 +109,7 @@ def test_read_subscription_ack_accepts_windows_venv_redirector_chain(
     payload["runner_parent_process_id"] = 300
     payload["gateway_process_id"] = 400
     path = tmp_path / "subscription-ack-test.json"
-    path.write_text(
-        json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n",
-        encoding="utf-8",
-    )
+    _write_canonical_ack(path, payload)
 
     loaded = _read_subscription_ack(
         path,

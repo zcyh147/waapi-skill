@@ -6948,12 +6948,21 @@ def test_wait_topic_executes_reviewed_ui_topics_and_unsubscribes(
     assert client.handlers[0].unsubscribe_calls == 1
 
 
-def test_wait_topic_timeout_unsubscribes_on_transport_owner_thread(tmp_path: Path) -> None:
+def test_wait_topic_timeout_unsubscribes_on_transport_owner_thread(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     topic = "ak.wwise.core.object.created"
     client = FakeClient({"ak.wwise.core.getInfo": live_info()})
+    topic_wait_timeout = 0.02
+    monkeypatch.setattr(
+        waapi_gateway,
+        "reserved_topic_wait_timeout",
+        lambda _connection: topic_wait_timeout,
+    )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["--timeout", "0.1", "wait-topic", topic],
+        ["--timeout", "1.0", "wait-topic", topic],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -6962,19 +6971,38 @@ def test_wait_topic_timeout_unsubscribes_on_transport_owner_thread(tmp_path: Pat
     assert payload["call"]["error_code"] == "TIMEOUT"
     details = payload["call"]["details"]
     assert details["cleanup_pending"] is False
-    # The dispatch reserves time for unsubscribe, but an overloaded scheduler
-    # may resume the waiter after the outer 100 ms deadline.  Preserve the
-    # truthful wall-clock flag instead of treating that scheduling variance as
-    # a cleanup failure.
-    assert details["deadline_exhausted"] is (
-        details["elapsed_seconds"] >= details["configured_timeout_seconds"]
-    )
-    assert 0 < details["operation_timeout_seconds"] < 0.1
+    assert details["configured_timeout_seconds"] == 1.0
+    assert details["deadline_exhausted"] is False
+    assert details["operation_timeout_seconds"] == pytest.approx(topic_wait_timeout)
     assert payload["cleanup"] == "unsubscribed"
     assert client.handlers[0].unsubscribe_calls == 1
     assert client.handlers[0].unsubscribe_thread_ident == client.handlers[0].subscribe_thread_ident
     assert client.handlers[0].unsubscribe_thread_ident != threading.get_ident()
     assert client.disconnected is True
+
+
+@pytest.mark.parametrize(
+    ("remaining", "expected"),
+    (
+        (1.0, 0.8),
+        (2.0, 1.75),
+    ),
+)
+def test_reserved_topic_wait_timeout_preserves_cleanup_budget(
+    remaining: float,
+    expected: float,
+) -> None:
+    class FixedDeadline:
+        def require_remaining(self, phase: str) -> float:
+            assert phase == "prepare bounded topic wait"
+            return remaining
+
+    class FixedConnection:
+        deadline = FixedDeadline()
+
+    assert waapi_gateway.reserved_topic_wait_timeout(FixedConnection()) == pytest.approx(
+        expected
+    )
 
 
 def test_disconnect_failure_does_not_mask_returned_wait_topic_timeout(tmp_path: Path) -> None:

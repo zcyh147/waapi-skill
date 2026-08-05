@@ -5714,9 +5714,10 @@ def test_heavy_codex_probe_denial_precedes_campaign_root_and_child(
     )
     monkeypatch.setattr(campaign, "run_child", forbidden_child)
 
-    with pytest.raises(campaign.CampaignConfigError, match=str(options.codex_binary)):
+    with pytest.raises(campaign.CampaignConfigError) as exc_info:
         campaign.run_heavy_v3_campaign(options)
 
+    assert str(options.codex_binary) in str(exc_info.value)
     assert options.campaign_root.exists() is False
     assert child_started is False
 
