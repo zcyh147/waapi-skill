@@ -700,15 +700,82 @@ class InterruptingFakeProcess:
 
 
 def gateway_command(skill: Path, arguments: str) -> str:
-    return f"python {skill / 'scripts' / 'run.py'} gateway.py {arguments}"
+    return recorded_argv_command(
+        "python",
+        str(skill / "scripts" / "run.py"),
+        "gateway.py",
+        *shlex.split(arguments, posix=True),
+    )
 
 
 def recorded_argv_command(*argv: str) -> str:
-    """Render synthetic Codex argv with the parser grammar of this host."""
+    """Render synthetic Codex argv with its platform-neutral JSONL grammar."""
 
-    if os.name == "nt":
-        return subprocess.list2cmdline(argv)
     return shlex.join(argv)
+
+
+def test_recorded_argv_command_round_trips_windows_paths_as_codex_evidence() -> None:
+    runner = r"C:\Program Files\waapi-skill\scripts\run.py"
+    command = recorded_argv_command(
+        "python",
+        runner,
+        "gateway.py",
+        "preview",
+        "--request-json",
+        '{"path":"C:\\\\Audio\\\\rifle.wav"}',
+    )
+
+    argv, has_operators, parse_error, parser_kind = (
+        codex_harness_module._parse_command_argv(
+            command,
+            platform_name="nt",
+        )
+    )
+
+    assert argv == (
+        "python",
+        runner,
+        "gateway.py",
+        "preview",
+        "--request-json",
+        '{"path":"C:\\\\Audio\\\\rifle.wav"}',
+    )
+    assert has_operators is False
+    assert parse_error == ""
+    assert parser_kind == "windows-native"
+
+    raw_native_spelling = f"python {runner} gateway.py preview --request-json '{{}}'"
+    raw_argv, raw_operators, raw_error, raw_parser_kind = (
+        codex_harness_module._parse_command_argv(
+            raw_native_spelling,
+            platform_name="nt",
+        )
+    )
+    raw_record = CodexCommandRecord(
+        command=raw_native_spelling,
+        exit_code=0,
+        status="completed",
+        aggregated_output=json.dumps(
+            {
+                "contract": "waapi-skill.gateway-result/v1",
+                "command": "preview",
+                "ok": True,
+            }
+        ),
+        argv=raw_argv,
+        has_shell_operators=raw_operators,
+        parse_error=raw_error,
+        parser_kind=raw_parser_kind,
+    )
+    raw_facts = classify_commands(
+        (raw_record,),
+        skill_source=Path(r"C:\Program Files\waapi-skill"),
+        expected_gateway_subcommands=("preview",),
+    )
+
+    assert raw_argv != argv
+    assert raw_facts.gateway_commands == ()
+    assert raw_facts.unexpected_commands == (raw_native_spelling,)
 
 
 def test_prompt_audit_rejects_memory_and_unexpected_personal_skills(tmp_path: Path) -> None:
@@ -3222,7 +3289,14 @@ def test_command_classifier_normalizes_only_the_exact_session_version_assignment
     assert cli_alias_facts.unexpected_commands == ()
 
     runner_level = completed_record(
-        f"python {skill / 'scripts' / 'run.py'} --version 2022.1 gateway.py buses",
+        recorded_argv_command(
+            "python",
+            str(skill / "scripts" / "run.py"),
+            "--version",
+            "2022.1",
+            "gateway.py",
+            "buses",
+        ),
         payload,
     )
     runner_level_facts = classify_commands(
@@ -3242,11 +3316,25 @@ def test_command_classifier_normalizes_only_the_exact_session_version_assignment
         completed_record(f"env -i WWISE_VERSION=2022.1 {base}", payload),
         completed_record(f"env OTHER=value {base}", payload),
         completed_record(
-            f"python {skill / 'scripts' / 'run.py'} --version 2023.1 gateway.py buses",
+            recorded_argv_command(
+                "python",
+                str(skill / "scripts" / "run.py"),
+                "--version",
+                "2023.1",
+                "gateway.py",
+                "buses",
+            ),
             payload,
         ),
         completed_record(
-            f"python {skill / 'scripts' / 'run.py'} --version 2022.1 other.py buses",
+            recorded_argv_command(
+                "python",
+                str(skill / "scripts" / "run.py"),
+                "--version",
+                "2022.1",
+                "other.py",
+                "buses",
+            ),
             payload,
         ),
     )
@@ -3266,12 +3354,20 @@ def test_malformed_packaged_runner_is_unexpected_but_not_inline_python(tmp_path:
     (skill / "SKILL.md").write_text("skill\n", encoding="utf-8")
     runner = skill / "scripts" / "run.py"
     malformed = completed_record(
-        f"python {runner} --version 2023.1 gateway.py operation-schema object.copy",
+        recorded_argv_command(
+            "python",
+            str(runner),
+            "--version",
+            "2023.1",
+            "gateway.py",
+            "operation-schema",
+            "object.copy",
+        ),
         "Gateway broker rejected command",
         exit_code=126,
     )
     wrong_target = completed_record(
-        f"python {runner} arbitrary.py status",
+        recorded_argv_command("python", str(runner), "arbitrary.py", "status"),
         "Gateway broker rejected command",
         exit_code=126,
     )
@@ -3548,9 +3644,16 @@ def test_command_classifier_treats_python_exe_as_python_and_only_exact_gateway_a
     skill.mkdir()
     trusted_python = tmp_path / "Python313" / "python.exe"
     runner = skill / "scripts" / "run.py"
-    inline = completed_record(f'"{trusted_python}" -c "print(1)"')
+    inline = completed_record(
+        recorded_argv_command(str(trusted_python), "-c", "print(1)")
+    )
     gateway = completed_record(
-        f'"{trusted_python}" "{runner}" gateway.py status',
+        recorded_argv_command(
+            str(trusted_python),
+            str(runner),
+            "gateway.py",
+            "status",
+        ),
         {
             "contract": "waapi-skill.gateway-result/v1",
             "command": "status",
