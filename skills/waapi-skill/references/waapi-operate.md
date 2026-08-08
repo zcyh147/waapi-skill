@@ -67,15 +67,15 @@ otherwise incomplete query results do not identify a mutation target.
 
 ## Choose by business outcome
 
-Select the operation whose postcondition and verifier match the user's complete authorized outcome. A native API overlap or large batch does not override this rule. `operation.selection_guidance` and, for native URIs, `interface.selection_guidance` are authoritative.
+Select the operation whose postcondition and verifier match the user's complete authorized outcome. A native API overlap or large batch does not override this rule. `operation.selection_guidance` and, for native URIs, `interface.selection_guidance` are authoritative. When media import is primary and its directly described rows include a new target-container hierarchy or a same-row Event/Switch Assignation, select one `audio.import`: encode each new target container once as a typed structure-only row, and never probe `object.create` or a separate assignment first. On Wwise 2023.1 or later, keep `object.set` when import is subordinate to a broader atomic mutation of existing targets.
 
 A named root that already exists and receives any notes, property, reference, or list change locks the whole batch to `object.set`, even when the same request also adds a wholly new subtree below it. After any required selected-subset identity gate, its first transaction-contract command is `operation-schema object.set`.
 
 | User outcome | Select | Do not substitute |
 |---|---|---|
-| Directly described media rows, one or many | `audio.import` | an Agent-generated TSV |
+| Directly described media rows whose primary outcome is import, one or many | `audio.import` | `object.create`, a separate same-row Event/Switch assignment, or an Agent-generated TSV |
 | Existing caller-owned import TSV or explicit Wwise table workflow | `audio.importTabDelimited` | direct import merely because the table is large |
-| Wholly new object hierarchy whose requested root does not already exist | `object.create` | structure-only import |
+| Wholly new structure-only object hierarchy whose requested root does not already exist and has no media or import-manifest intent | `object.create` | `audio.import` |
 | Change fields, references, or lists on existing roots; target multiple existing roots; or append directly to an existing descendant below the named request root that the user explicitly identifies as the direct insertion target—the request root itself does not count | `object.set` | `object.create` |
 | One isolated rename, notes, property, or reference edit | `object.setName`, `object.setNotes`, `object.setProperty`, or `object.setReference` | broad `object.set` |
 | Platform link, plug-in, RTPC curve, or Switch assignment | its dedicated operation | generic object mutation |

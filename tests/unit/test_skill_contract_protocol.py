@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 
@@ -270,6 +271,7 @@ def test_complex_query_guidance_preserves_tokens_pushdown_and_user_bounds() -> N
         "Output Bus -> `OutputBus` (never `@OutputBus`)",
         "Source language -> `audioSource:language`",
         "direct child count -> `childrenCount`",
+        "ASCII-single-quote every standalone argv value beginning with `@`",
         "exactly one returned `AudioFileSource` has `parent.id` exactly equal to that Sound's `id`",
         "Do not report the language as missing when this exact child-source evidence exists",
         "do not associate by row position, similar names, or path prefixes",
@@ -280,7 +282,7 @@ def test_complex_query_guidance_preserves_tokens_pushdown_and_user_bounds() -> N
     ):
         assert phrase in query_flat
     assert "--where-json '{\"field\":\"type\",\"operator\":\"=\",\"value\":\"Sound\"}' --take 24" in query_flat
-    assert "--return-field @Volume --return-field notes --return-field OutputBus" in query_flat
+    assert "--return-field '@Volume' --return-field notes --return-field OutputBus" in query_flat
 
 
 def test_pure_and_query_pushes_every_supported_conjunct_in_canonical_order() -> None:
@@ -302,10 +304,22 @@ def test_pure_and_query_pushes_every_supported_conjunct_in_canonical_order() -> 
         "{\"field\":\"isIncluded\",\"operator\":\"=\",\"value\":true}]' --take 12"
     ) in query_flat
     assert (
-        "--return-field @Volume --return-field notes "
+        "--return-field '@Volume' --return-field notes "
         "--return-field audioSource:language --return-field OutputBus "
         "--return-field isIncluded"
     ) in query_flat
+
+
+def test_query_shell_examples_never_expose_bare_at_prefixed_argv_values() -> None:
+    executable_snippets = "\n".join(
+        re.findall(r"```bash\n(.*?)\n```", QUERY, flags=re.DOTALL)
+    )
+
+    assert executable_snippets
+    assert re.search(
+        r"(?:^|\s)--return-field\s+@[A-Za-z_][A-Za-z0-9_:]*",
+        executable_snippets,
+    ) is None
 
 
 def test_nested_boolean_query_uses_the_closed_structured_contract() -> None:
@@ -548,7 +562,9 @@ def test_all_agent_cat_references_fit_the_single_read_window() -> None:
     }
 
     for name, reference in references.items():
-        assert len(reference.encode("utf-8")) <= 32_768, name
+        lf_bytes = len(reference.encode("utf-8"))
+        assert lf_bytes <= 32_768, name
+        assert lf_bytes + reference.count("\n") <= 32_768, f"{name} CRLF checkout"
 
 
 def test_operate_reference_is_a_bounded_single_read_control_plane() -> None:
@@ -568,6 +584,7 @@ def test_query_reference_has_a_deterministic_end_and_separate_alarm_hops() -> No
     query_flat = " ".join(QUERY.split())
 
     assert len(QUERY.encode("utf-8")) <= 32_768
+    assert len(QUERY.encode("utf-8")) + QUERY.count("\n") <= 32_768
     assert QUERY.count("WAAPI_QUERY_REFERENCE_END") == 1
     assert QUERY.rstrip().endswith(marker)
     assert marker not in QUERY[: QUERY.rfind(marker)]
@@ -583,6 +600,18 @@ def test_query_reference_has_a_deterministic_end_and_separate_alarm_hops() -> No
     assert "then the requested comparison Bus path or id" in query_flat
     assert "count only repeated `--query` flags" in query_flat
     assert "1–2 use 8, 3–4 use 3, and 5–8 use 2" in query_flat
+    for phrase in (
+        "Exact standard bindings",
+        "Success rows are objects in the array",
+        "Complete `no_match` is a bounded miss",
+        "Honor dependencies when authorized, otherwise clarify",
+        "Use fixed reads rather than reflected payloads",
+        "voice pipeline id",
+        "bus pipeline ids",
+        "auto-detected Authoring profile",
+        "bounds the projection",
+    ):
+        assert phrase in query_flat
 
 
 def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
@@ -640,6 +669,34 @@ def test_operate_business_selection_and_execution_domains_remain_explicit() -> N
     ):
         assert phrase in OPERATE
     assert "Batch size alone never establishes file-workflow intent" in compact
+    assert "When media import is primary" in compact
+    assert (
+        "directly described rows include a new target-container hierarchy or "
+        "a same-row Event/Switch Assignation"
+    ) in compact
+    assert "select one `audio.import`" in compact
+    assert "typed structure-only row" in compact
+    assert (
+        "never probe `object.create` or a separate assignment first"
+        in compact
+    )
+    assert (
+        "keep `object.set` when import is subordinate to a broader atomic "
+        "mutation of existing targets"
+    ) in compact
+    assert (
+        "Wholly new structure-only object hierarchy whose requested root does "
+        "not already exist and has no media or import-manifest intent"
+    ) in compact
+    skill_compact = " ".join(SKILL.split())
+    assert "For a structure-only, no-media object tree" in skill_compact
+    assert "When media import is primary" in skill_compact
+    assert "media-row target hierarchy as typed structure-only rows" in skill_compact
+    assert "never probe `object.create` or a separate assignment first" in skill_compact
+    assert (
+        "use `object.set` instead when import is subordinate to a broader "
+        "atomic mutation of existing targets"
+    ) in skill_compact
     assert "request root itself does not count" in compact
     assert "named request root itself does not count" in compact
     assert "locks the whole batch to `object.set`" in compact

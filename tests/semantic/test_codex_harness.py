@@ -2654,6 +2654,53 @@ def test_windows_powershell_recording_preserves_literal_metacharacters(
     assert parse_error == ""
 
 
+def test_windows_powershell_recording_requires_quoted_at_prefixed_argv_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module,
+        "split_native_command_line",
+        portable_windows_outer_split,
+    )
+    quoted = windows_powershell_recording(
+        r"python 'C:\Skill path\run.py' gateway.py query-object --return-field '@Volume' --return-field notes"
+    )
+
+    assert parse_command_argv(
+        quoted,
+        platform_name="nt",
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+    ) == (
+        (
+            "python",
+            r"C:\Skill path\run.py",
+            "gateway.py",
+            "query-object",
+            "--return-field",
+            "@Volume",
+            "--return-field",
+            "notes",
+        ),
+        False,
+        "",
+    )
+
+    bare = windows_powershell_recording(
+        r"python 'C:\Skill path\run.py' gateway.py query-object --return-field @Volume --return-field notes"
+    )
+    argv, has_operators, parse_error = parse_command_argv(
+        bare,
+        platform_name="nt",
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+    )
+
+    assert argv == ()
+    assert has_operators is True
+    assert parse_error == (
+        "PowerShell command contains composition, expansion, or interpolation"
+    )
+
+
 def test_windows_codex_0146_shlex_presentation_recovers_large_audio_import_json() -> None:
     """Decode Codex's POSIX display codec before the literal PowerShell frame."""
 
@@ -3442,19 +3489,26 @@ def test_native_windows_generated_model_command_reconciles_exact_broker_argv(
         encoding="utf-8",
         newline="\n",
     )
-    request = {
-        "contract": "waapi-skill.operation-request/v1",
-        "operation": "object.create",
-        "arguments": {
-            "name": "Rifle's $env:TEMP & pipe|redirect<out> 你好",
-            "parent": {"kind": "path", "value": r"\Actor-Mixer Hierarchy\Default Work Unit"},
-        },
+    predicate = {
+        "field": "name",
+        "operator": "=",
+        "value": "Rifle's $env:TEMP & pipe|redirect<out> 你好",
     }
-    request_json = json.dumps(request, ensure_ascii=False, separators=(",", ":"))
+    predicate_json = json.dumps(predicate, ensure_ascii=False, separators=(",", ":"))
+    root_path = r"\Actor-Mixer Hierarchy\Default Work Unit"
     expected_step = ExpectedGatewayStep(
-        "preview",
-        "preview",
-        ("--request-json", SemanticJsonArgument(request)),
+        "query",
+        "query-object",
+        (
+            "--path",
+            root_path,
+            "--where-json",
+            SemanticJsonArgument(predicate),
+            "--return-field",
+            "id",
+            "--return-field",
+            "@Volume",
+        ),
     )
 
     with CodexGatewayBroker(
@@ -3466,9 +3520,15 @@ def test_native_windows_generated_model_command_reconciles_exact_broker_argv(
             "python",
             str(broker.invocation_runner_path),
             "gateway.py",
-            "preview",
-            "--request-json",
-            request_json,
+            "query-object",
+            "--path",
+            root_path,
+            "--where-json",
+            predicate_json,
+            "--return-field",
+            "id",
+            "--return-field",
+            "@Volume",
         )
         model_command = encode_windows_model_argv(expected)
         completed = run_windows_powershell_model_command(

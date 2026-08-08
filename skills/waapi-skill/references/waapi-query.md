@@ -1,27 +1,25 @@
 # WAAPI query lane
 
-Use this reference for read-only project facts, object and hierarchy inspection,
-metadata discovery, bounded Topic waits, and persistent Topic streams.
+Use this reference for read-only project facts, hierarchy inspection, metadata
+discovery, bounded Topic waits, and persistent streams.
 
-Read this file once with one complete standalone `cat`. The read is complete
-only when the unique terminal sentinel required by `SKILL.md` is the final
-visible line and the tool output has no truncation or omission marker.
-Otherwise stop and report an incomplete host read; do not reread a range or
-invoke the Gateway.
+Read once with a complete standalone `cat`. Complete only when the
+unique terminal sentinel required by `SKILL.md` is the final visible line and
+output has no truncation or omission marker. Otherwise report an incomplete
+read and stop; do not reread a range or invoke the Gateway.
 
 ## Boundaries and routing
 
 - Use only the Skill-local Gateway. Return its structured evidence or a clear
   blocker; never use direct `WaapiClient`, inline Python, or a generated helper.
-- Use the entry file's fixed `status`, `buses`, `selected`, `query-schema`,
+- Use fixed `status`, `buses`, `selected`, `query-schema`,
   `query-object`, `object-types`, `metadata`, `wait-topic`, and `stream-topic`
-  commands directly. Public command shapes include offline
-  `gateway.py query-schema`, simple `gateway.py query-object` flags, structured
-  `gateway.py query-object --request-json`, progressively disclosed
-  `gateway.py query-schema --advanced` and
-  `gateway.py query-object --advanced-request-json`,
-  `gateway.py wait-topic`, and `gateway.py stream-topic`.
-  Observing a Topic is read-only and never authorizes the change that publishes it.
+  directly. Public shapes are offline `gateway.py query-schema`, simple
+  `gateway.py query-object` flags or `--request-json`, progressive
+  `gateway.py query-schema --advanced` plus
+  `gateway.py query-object --advanced-request-json`, and
+  `gateway.py wait-topic`/`gateway.py stream-topic`. Topic observation never
+  authorizes its publishing change.
 - For a broad catalog question start with
   `gateway.py capabilities --all-versions --summary-only`, then narrow with
   `--query`, `--category`, `--item-type`, `--family`, or `--route`.
@@ -33,12 +31,12 @@ invoke the Gateway.
   reflected args/options/result schema is required.
 - The generic shape is
   `gateway.py call <uri> --args-json '<object>' --options-json '<object>'`.
-  It is not an open raw-call surface: only the current version's
-  `preferred_route: manifest_dispatch` rows dispatch, with recursive schema,
-  time, and size validation. An explicit empty-args/options request for
+  It is not an open raw-call surface: only current-version
+  `preferred_route: manifest_dispatch` rows dispatch after recursive schema,
+  time, and size validation. An empty-args/options request for
   `ak.wwise.waapi.getFunctions` or `ak.wwise.waapi.getTopics` is a reviewed
   fast route: run that one `call` directly without `describe` or `capabilities`.
-  Other known bounded reads may use `call` after `describe` proves the route.
+  Other bounded reads need `describe` route proof.
 - Fixed functions return `FIXED_COMMAND_REQUIRED`;
   `ak.wwise.core.object.get` returns `QUERY_OBJECT_REQUIRED`; Topics return
   `WAIT_TOPIC_REQUIRED`; broader reads return `TRANSACTION_REQUIRED` rather than being inferred safe from a `get`-shaped name.
@@ -55,9 +53,9 @@ invoke the Gateway.
 
 `ak.wwise.core.mediaPool.getFields` and `.get` form one closed two-call read.
 Do not run `describe` or `capabilities`: call `getFields` with empty
-args/options, bind only its returned strings, then issue exactly one
+args/options, bind only returned strings, then issue exactly one
 `gateway.py --version 2025.1 call ak.wwise.core.mediaPool.get`. There is no
-`mediaPool.get` subcommand, and the user need not know internal field names.
+`mediaPool.get` subcommand; users need not know internal field names.
 
 1. Exact standard bindings are name/file -> `Filename`, duration ->
    `WAV/Duration`, sample rate -> `WAV/Sample Rate`, bit depth ->
@@ -67,14 +65,13 @@ args/options, bind only its returned strings, then issue exactly one
    `BWFXML/` field whose final component matches case-insensitively and preserve
    its spelling; stop on missing or ambiguous binding.
 2. Args contain only `databases`, `filters`, and `maxResults`. Preserve database
-   and predicate order; expand a range lower bound before its upper bound.
-   Every filter is
+   and predicate order; put a range's lower bound before its upper. Each filter is
    `{"type":"field","field":<bound field>,"operator":<operator>,"value":<value>}`
    with no `weight`. Operators are `equals`, `notEquals`, `contains`,
    `startsWith`, `endsWith`, `matchesRegex`, `lessThan`, `greaterThan`,
    `lessThanOrEqual`, and `greaterThanOrEqual`. “Between/from A to B” is
-   inclusive. Convert kHz to integer Hz, mono/stereo to `1`/`2`, bit depth to
-   integer, and seconds to JSON numbers (`8.0` for whole seconds). Do not add
+   inclusive. Convert kHz to integer Hz, mono/stereo to `1`/`2`, bit depth to an
+   integer, and seconds to JSON numbers (`8.0` when whole). Do not add
    search, paging, sort, description, or similarity args.
 3. Use the user's `maxResults`, else `100`; range is 1–200, with at most 16
    filters and 8 databases. Case-sensitive `Filename` substring matching is the
@@ -146,8 +143,8 @@ This is a Wwise `2025.1`-only follow-up to a successful Media Pool read.
 
 ## Object queries
 
-Object reads: simple flags, closed structured Builder, then bounded native WAQL fallback.
-Use the earliest expressive layer.
+Object reads progress from simple flags to the closed structured Builder, then
+bounded native WAQL fallback; use the earliest expressive layer.
 
 Simple one-source/flat flags: `--path`, `--object-id`, `--type`, `--search`, and
 `--query`; `--query` means an existing Wwise Query Editor object
@@ -186,13 +183,12 @@ sources; `select`, `where`, and `take`; and `compare`, `truthy`, nested
 `all`/`any`, or `not`. Do not add `waql`, `raw`, `expression`, or another escape
 field, or infer absent grammar.
 
-Every broad structured source/select must end with one `take` between `0` and `1000`;
-only one exact object without an expanding select may omit it. The simple
-route keeps its existing `--take N` or explicit user-requested `--all-results` rule.
-Rows above a bound, multiple exact-lookup rows, or a fixed
-`buses` response above 1000 is protocol drift. Successful rows are objects in the
-array; only an explicit empty array is empty. An invalid response shape is a structured error,
-never an empty result.
+Every broad structured source/select ends with one `take` between `0` and `1000`;
+only one exact non-expanding object may omit it. The simple route keeps
+its existing `--take N` or explicit user-requested `--all-results` rule.
+Over-bound or multiple exact-lookup rows are drift; a fixed
+`buses` response above 1000 is protocol drift. Success rows are objects in the array; only an explicit empty array
+is empty. An invalid response shape is a structured error, never an empty result.
 
 Explicit `--return-field` on the simple route and `return` in the structured
 request replace defaults, so include every needed field. An exact path lookup
@@ -249,12 +245,11 @@ invoke:
 python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version <supported-version> query-object --advanced-request-json '<advanced-object-query-v1-json>'
 ```
 
-That document has four fields: `contract`, native `waql`, native `return`, and
-`max_results` (1–1000). It cannot choose URI, args/options, timeout, byte limit,
-or all-results mode. The Gateway fixes read-only
-`ak.wwise.core.object.get`, rejects multi-query framing, appends final
-`take <max_results>`, and rejects excess rows. Native return syntax remains
-version-checked by Wwise and bounded by the Gateway.
+That document has `contract`, native `waql`, native `return`, and `max_results`
+(1–1000). It cannot choose URI, args/options, timeout, byte limit, or all-results
+mode. The Gateway fixes read-only `ak.wwise.core.object.get`, rejects multi-query
+framing, appends final `take <max_results>`, and rejects excess rows. Wwise
+version-checks native return syntax; the Gateway bounds it.
 
 The schema gives exact native-input limits. `waql` and every `return` expression
 use UTF-8 bytes (not character counts) and must be trimmed and single-line.
@@ -278,18 +273,17 @@ a mutation identity.
 
 ### Bounded inventories
 
-Use the simple flags when one source, their fixed selects, and a flat AND cover
-the request. Use the schema-driven structured form when the query needs a
-nested boolean predicate or ordered transform combination that those flags
-cannot express. Use the advanced contract only when the structured schema
-still lacks a required native WAQL construct. Plan one bounded request and
-apply presentation logic only to that complete result.
+Use simple flags for one source, fixed selects, and flat AND; structured form
+for nested predicates or ordered transforms; advanced only for a native
+construct absent from the structured schema. Plan one bounded request and
+apply presentation logic only to its complete result.
 
-- Field tokens are case-sensitive. Mappings include Volume -> `@Volume`, Pitch
-  -> `@Pitch`, notes -> `notes`, Output Bus -> `OutputBus` (never `@OutputBus`),
-  Source language -> `audioSource:language`, parent -> `parent`, inclusion ->
-  `isIncluded`, and direct child count -> `childrenCount`. Never translate,
-  recase, or add/remove `@`.
+- Case-sensitive: Volume -> `@Volume`, Pitch -> `@Pitch`, notes -> `notes`,
+  Output Bus -> `OutputBus` (never `@OutputBus`), Source language ->
+  `audioSource:language`, parent -> `parent`, inclusion -> `isIncluded`, direct
+  child count -> `childrenCount`. Copy tokens exactly; never recase or
+  add/remove `@`. ASCII-single-quote every standalone argv value beginning with
+  `@` on every platform: `--return-field '@Volume'`.
 - Projection order is `id,name,type,path`, then fields needed for report,
   grouping, or sorting in their first-mention order, then additional filter-only
   fields. Determine it by scanning the user's requested output left to right;
@@ -347,13 +341,13 @@ For example, a bounded descendant inventory of Sound candidates remains a
 simple flag query:
 
 ```bash
-python scripts/run.py gateway.py query-object --path '\Actor-Mixer Hierarchy\Default Work Unit\Combat' --select descendants --where-json '{"field":"type","operator":"=","value":"Sound"}' --take 24 --return-field id --return-field name --return-field type --return-field path --return-field @Volume --return-field notes --return-field OutputBus
+python scripts/run.py gateway.py query-object --path '\Actor-Mixer Hierarchy\Default Work Unit\Combat' --select descendants --where-json '{"field":"type","operator":"=","value":"Sound"}' --take 24 --return-field id --return-field name --return-field type --return-field path --return-field '@Volume' --return-field notes --return-field OutputBus
 ```
 
 Pure AND; `isIncluded` is appended last because it is filter-only:
 
 ```bash
-python scripts/run.py gateway.py query-object --path '\Actor-Mixer Hierarchy\Default Work Unit\CombatMix' --select descendants --where-json '[{"field":"type","operator":"=","value":"Sound"},{"field":"@Volume","operator":"<=","value":-6.0},{"field":"notes","operator":":","value":"mix-review"},{"field":"isIncluded","operator":"=","value":true}]' --take 12 --return-field id --return-field name --return-field type --return-field path --return-field @Volume --return-field notes --return-field audioSource:language --return-field OutputBus --return-field isIncluded
+python scripts/run.py gateway.py query-object --path '\Actor-Mixer Hierarchy\Default Work Unit\CombatMix' --select descendants --where-json '[{"field":"type","operator":"=","value":"Sound"},{"field":"@Volume","operator":"<=","value":-6.0},{"field":"notes","operator":":","value":"mix-review"},{"field":"isIncluded","operator":"=","value":true}]' --take 12 --return-field id --return-field name --return-field type --return-field path --return-field '@Volume' --return-field notes --return-field audioSource:language --return-field OutputBus --return-field isIncluded
 ```
 
 Direct parents:
@@ -376,21 +370,19 @@ use the structured request:
 python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version 2022.1 query-object --request-json '{"contract":"waapi-skill.object-query/v1","source":{"kind":"object","objects":[{"kind":"path","value":"\\Actor-Mixer Hierarchy\\Default Work Unit\\CombatMix"}]},"transforms":[{"kind":"select","expressions":[["descendants"]]},{"kind":"where","predicate":{"kind":"all","operands":[{"kind":"compare","path":["type"],"operator":"=","value":"Sound"},{"kind":"compare","path":["@Volume"],"operator":"<=","value":-6.0},{"kind":"any","operands":[{"kind":"compare","path":["notes"],"operator":":","value":"mix-review"},{"kind":"not","operand":{"kind":"truthy","path":["isIncluded"]}}]}]}},{"kind":"take","value":12}],"return":["id","name","type","path","@Volume","notes","audioSource:language","OutputBus","isIncluded"]}'
 ```
 
-The structured Builder is a versioned core subset, not a complete WAQL
-implementation. Python program tests prove its deterministic compiler and the
-advanced route's fixed URI, framing, final cap, and result checks; they do not
-prove that a native construct is accepted by a particular real Wwise version.
-When the structured schema lacks the construct, use the advanced route above
-and let the connected version accept or reject it without a generated-code
-fallback.
+The versioned structured Builder is a core subset. Program tests prove its
+compiler and the advanced route's fixed URI, framing, cap, and result checks,
+not real-Wwise acceptance of a native construct. When the structured schema
+lacks one, use the advanced route and let the connected version decide, with no
+generated-code fallback.
 
 ## Object types, live metadata, and fixed reads
 
-Use `object-types` first for type discovery: it is version-pinned, offline, and
-returns at most 20 rows per version by default. Narrow with `--query`,
-`--object-type`, or `--limit`. `--summary-only` describes the complete catalog
-and cannot combine with those filters. Use live `metadata types` only when the
-running instance must be reflected again. For a machine-readable live summary,
+Use offline, version-pinned `object-types` first; it returns at most 20 rows per
+version by default. Narrow with `--query`, `--object-type`, or `--limit`;
+`--summary-only` describes the complete catalog and cannot combine with them.
+Use live `metadata types` only to reflect the running instance again. For a live
+machine-readable summary,
 `metadata types --summary-only` returns terminal `agent_result`;
 compact-serialize that object exactly and stop. Do not rebuild it from
 `normalized` or repeat the metadata command after success.
@@ -404,22 +396,21 @@ For mutation count only repeated `--query` flags (not objects, rows, files, or
 values): 1–2 use 8, 3–4 use 3, and 5–8 use 2. At a dependency/byte ceiling,
 split without repeating proven phrases.
 
-The Gateway searches at most 256 live details. Complete
-`no_match` is a bounded miss; on `partial`, retry once with broader technical
-phrases, then ask one behavior question. Never guess. Only exact current
-live names may enter closed `properties`/`references`; labels are hints.
-Honor dependencies when authorized, otherwise clarify. Preview revalidates.
+The Gateway searches at most 256 live details. Complete `no_match` is a bounded miss;
+on `partial`, retry once with broader technical phrases, then ask one behavior
+question. Never guess. Only exact current live names enter closed
+`properties`/`references`; labels are hints. Honor dependencies when authorized,
+otherwise clarify. Preview revalidates.
 
 Use fixed reads rather than reflected payloads:
 
-- `profiler-game-objects` accepts non-negative milliseconds or exact
-  `user`/`capture`, supports 2022.1–2025.1, and normalizes 2022
-  `registrationTime` to `register_time`.
-- `profiler-voice-contributions` supports all five versions, takes one uint32
-  voice pipeline id and up to 64 ordered bus pipeline ids (omit them for dry
-  path), and keeps DSF `feature_available`, `reported`, and `value` distinct.
-- `project-default-work-units` keeps availability/reporting/value distinct for
-  2025's `defaultWorkUnits` and `defaultImportWorkUnit`.
+- `profiler-game-objects`: non-negative milliseconds or exact `user`/`capture`;
+  2022.1–2025.1; 2022 `registrationTime` normalizes to `register_time`.
+- `profiler-voice-contributions`: all five versions; one uint32 voice pipeline id
+  and up to 64 ordered bus pipeline ids (omit for dry path); DSF `feature_available`, `reported`,
+  and `value` stay distinct.
+- `project-default-work-units`: distinct availability/reporting/value for
+  2025 `defaultWorkUnits` and `defaultImportWorkUnit`.
 
 Each exposes its stable terminal `agent_result`; do not rebuild it.
 
@@ -440,8 +431,8 @@ hop unless the user asks for the Sound's own volume. For source file/language,
 query `originalFilePath,audioSource:language` on the exact returned
 `activeSource` id. To distinguish routing from Bus mute, query `@Volume` only
 on the exact Bus identities: first the returned `OutputBus` id, then the
-requested comparison Bus path or id. Search is only for genuine discovery or
-disambiguation, never to translate an already exact identity.
+requested comparison Bus path or id. Search only for discovery/disambiguation,
+never exact-identity translation.
 
 ## Topics and Authoring-only reads
 
@@ -496,26 +487,25 @@ precedes final naming. ActorMixer event type is `ActorMixer` in
 trusted publisher evidence for id correlation. `ak.wwise.debug.assertFailed`
 is diagnostic, not recovery proof.
 
-The five `ak.wwise.ui.commands.*` reads require the automatically detected
-Authoring profile. Call live `getCommands` directly without default Console
-`describe`; for offline schema audit only, use
+The five `ak.wwise.ui.commands.*` reads require the auto-detected Authoring profile. Call
+live `getCommands` without Console `describe`; only offline schema audits use
 `describe ak.wwise.ui.commands.getCommands --profile wwise-authoring-ui`.
 Observe execution via bounded `wait-topic ak.wwise.ui.commands.executed`.
 WwiseConsole returns `AUTHORING_HOST_REQUIRED`. Packaged command-id snapshots
-(317/451/475/594/623 across 2021.1–2025.1) are environment evidence, not
-runtime allowlists; mutations use fresh live `getCommands`.
+(317/451/475/594/623 across 2021.1–2025.1) are environment evidence, never
+runtime allowlists; mutations require fresh live `getCommands`.
 
-`debug-wal-tree` is the only `ak.wwise.debug.getWalTree` route (2023.1–2025.1),
-takes 1–256, validates/sorts nodes, and returns bounded `agent_result`.
-`debug-validate-call` (2024.1–2025.1) validates but does not execute one
-reflected request. Both private APIs may be unavailable in non-Debug builds.
+`debug-wal-tree` is the sole `ak.wwise.debug.getWalTree` route (2023.1–2025.1):
+it takes 1–256, validates/sorts nodes, and returns bounded `agent_result`.
+`debug-validate-call` (2024.1–2025.1) validates without executing one reflected
+request. Both may be unavailable in non-Debug builds.
 
 ## Selection and result boundary
 
-For current selection, use live `selected` first. Report rows or explicit empty
-selection. Add repeatable needed accessors; the Gateway retains
-`id,name,type,path`, deduplicates, and bounds the projection. On a headless host
-report the UI boundary; do not invent a fallback.
+For current selection use live `selected` first; report rows or explicit empty
+selection. Add needed repeatable accessors; the Gateway retains
+`id,name,type,path`, deduplicates, and bounds the projection. On a headless host report the
+UI boundary; do not invent a fallback.
 
 Keep return fields explicit as Gateway options. Preserve terminal
 `agent_result` exactly for machine-readable output. Never convert malformed
