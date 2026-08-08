@@ -66,9 +66,11 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
     assert "run exactly one matching `call` command" in skill
     assert "replacing `<supported-version>` with the exact requested or connected Wwise version" in skill
     assert "except for an explicit exact reflection call or a reviewed direct `waapi.call` fast route" in skill
-    assert "read any later named lane reference exactly once with `cat /absolute/path/to/waapi-skill/references/<file>.md`" in skill
-    assert "Never run `wc -l`, `ls`, `rg`, `find`, `stat`, `test`" in skill
-    assert "never split one reference across multiple reads" in skill
+    assert "Read each later named lane reference exactly once in its own shell call" in skill
+    assert "native Windows uses `Get-Content -Raw -Encoding UTF8 '<reference>'`" in skill
+    assert ".agents\\skills\\waapi-skill\\references\\<file>.md" in skill
+    assert "Do not probe with `wc -l`, `ls`, `rg`, `find`, `stat`, or `test`" in skill
+    assert "never split a reference" in skill
     assert (
         "python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version "
         "2022.1 operation-schema object.copy"
@@ -77,12 +79,13 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
     assert "do not run another command after receiving it" in skill
 
 
-def test_cli_bootstrap_uses_only_the_injected_absolute_skill_locator() -> None:
+def test_cli_bootstrap_uses_only_the_literal_injected_skill_locator() -> None:
     skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
 
-    assert "begin with the injected absolute SKILL.md locator" in skill
-    assert "never search the current workspace or infer a repository-relative Skill path" in skill
-    assert "Bootstrap only from the injected absolute `SKILL.md` locator" in skill
+    assert "begin with the injected SKILL.md locator" in skill
+    assert "Get-Content -Raw -Encoding UTF8 '<literal-locator>'" in skill
+    assert "never search the workspace or infer a repository-relative Skill path" in skill
+    assert "Bootstrap only from the injected `SKILL.md` locator" in skill
     assert "Never guess a repository-relative `skills/waapi-skill` path" in skill
     for forbidden_probe in ("`pwd`", "`git status`", "`ls`", "`find`", "`rg`"):
         assert forbidden_probe in skill
@@ -308,7 +311,7 @@ def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
         assert "**656**" in readme
         assert "**152**" in readme
         assert "**6**" in readme
-        assert "2574" in readme
+        assert "2575" in readme
         assert "./skills/waapi-skill/references/waapi-coverage.md" in readme
 
     assert "198 unique routed WAAPI URIs" in english
@@ -317,4 +320,4 @@ def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
     assert "仍要求实时宿主为 Authoring" in " ".join(chinese.split())
     assert "not a claim that all 808 rows have been exercised against a real Wwise process" in english
     assert "不等于已经在真实 Wwise 进程中逐一运行了全部 808 行" in chinese
-    assert "currently contains 2574 passing tests" in coverage_contract
+    assert "currently contains 2575 passing tests" in coverage_contract

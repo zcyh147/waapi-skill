@@ -382,6 +382,79 @@ def _write_coherent_rejected_gateway_trace(
     _write_json(facts_path, facts)
 
 
+def _write_post_complete_rejected_gateway_trace(
+    output_dir: Path,
+    *,
+    session: EvalSession,
+) -> None:
+    broker_path = output_dir / "broker-evidence.json"
+    broker = json.loads(broker_path.read_text(encoding="utf-8"))
+    runner = "/synthetic/waapi-skill/scripts/run.py"
+    extra_argv = [
+        "python",
+        runner,
+        "gateway.py",
+        "capabilities",
+        "--all-versions",
+    ]
+    broker["records"].append(
+        {
+            "sequence": len(broker["records"]) + 1,
+            "step_name": None,
+            "authenticated": True,
+            "accepted": False,
+            "rejection": "broker is terminal COMPLETE",
+            "model_argv": extra_argv,
+            "normalized_model_argv": [],
+            "succeeded": False,
+            "exit_code": 126,
+            "runner_exit_code": None,
+            "allowed_exit_codes": [],
+            "payload": None,
+            "payload_error": "",
+        }
+    )
+    broker.update(
+        {
+            "passed": False,
+            "complete": False,
+            "terminal_state": "FAILED",
+        }
+    )
+    _write_json(broker_path, broker)
+    _write_json(
+        output_dir / "broker-reconciliation.json",
+        {
+            "passed": False,
+            "errors": [
+                "resolved command count 2 does not match accepted broker record count 1",
+                "broker recorded one or more rejected shim requests",
+                "broker evidence did not pass its terminal success contract",
+            ],
+            "observed_command_count": len(broker["records"]),
+            "accepted_record_count": len(session.gateway_steps),
+        },
+    )
+    facts_path = output_dir / "codex-facts.json"
+    facts = json.loads(facts_path.read_text(encoding="utf-8"))
+    command = " ".join(extra_argv)
+    command_facts = facts["command_facts"]
+    command_facts["command_records"].append(
+        {
+            "command": command,
+            "exit_code": 1,
+            "status": "failed",
+            "aggregated_output": "Gateway broker rejected command: broker is terminal COMPLETE\n",
+            "argv": extra_argv,
+            "has_shell_operators": False,
+            "parse_error": "",
+        }
+    )
+    command_facts["gateway_attempt_commands"].append(command)
+    command_facts["unexpected_commands"].append(command)
+    _write_json(facts_path, facts)
+
+
 def _write_structured_infrastructure_failure(
     output_dir: Path,
     *,
@@ -1082,6 +1155,221 @@ def test_coherent_rejected_gateway_trace_is_a_semantic_fail(tmp_path: Path) -> N
             "phases": [{"phase": "single", "status": "FAIL"}],
         },
     )
+
+
+def test_post_complete_rejected_gateway_trace_is_a_semantic_fail(
+    tmp_path: Path,
+) -> None:
+    session = _session("C1")
+    root, skill, suite, live = _write_child(
+        tmp_path,
+        sessions=(session,),
+        phase_kinds=("fail",),
+        offline_only=True,
+        returncode=1,
+    )
+    output_dir = root / "sessions" / _safe_session_name(session.session_id) / "outputs"
+    _write_post_complete_rejected_gateway_trace(output_dir, session=session)
+
+    verdict = classify_phase(output_dir, session=session)
+    result = _validate(
+        root,
+        skill,
+        suite,
+        live,
+        sessions=(session,),
+        offline_only=True,
+        returncode=1,
+    )
+
+    assert verdict.status == "FAIL"
+    assert result.executed_session_ids == (session.session_id,)
+    assert result.pending_session_ids == ()
+    assert result.observations == (
+        {
+            "unit_id": session.pair_id,
+            "status": "FAIL",
+            "phases": [{"phase": "single", "status": "FAIL"}],
+        },
+    )
+
+
+def test_repeated_post_complete_rejections_remain_a_semantic_fail(
+    tmp_path: Path,
+) -> None:
+    session = _session("C1")
+    root, skill, suite, live = _write_child(
+        tmp_path,
+        sessions=(session,),
+        phase_kinds=("fail",),
+        offline_only=True,
+        returncode=1,
+    )
+    output_dir = root / "sessions" / _safe_session_name(session.session_id) / "outputs"
+    _write_post_complete_rejected_gateway_trace(output_dir, session=session)
+
+    broker_path = output_dir / "broker-evidence.json"
+    broker = json.loads(broker_path.read_text(encoding="utf-8"))
+    repeated_record = dict(broker["records"][-1])
+    repeated_record["sequence"] = len(broker["records"]) + 1
+    repeated_record["rejection"] = "broker is terminal FAILED"
+    broker["records"].append(repeated_record)
+    _write_json(broker_path, broker)
+
+    reconciliation_path = output_dir / "broker-reconciliation.json"
+    reconciliation = json.loads(reconciliation_path.read_text(encoding="utf-8"))
+    reconciliation["observed_command_count"] = len(broker["records"])
+    _write_json(reconciliation_path, reconciliation)
+
+    facts_path = output_dir / "codex-facts.json"
+    facts = json.loads(facts_path.read_text(encoding="utf-8"))
+    command_facts = facts["command_facts"]
+    repeated_command = dict(command_facts["command_records"][-1])
+    repeated_command["aggregated_output"] = (
+        "Gateway broker rejected command: broker is terminal FAILED\n"
+    )
+    command_facts["command_records"].append(repeated_command)
+    command_facts["gateway_attempt_commands"].append(repeated_command["command"])
+    command_facts["unexpected_commands"].append(repeated_command["command"])
+    _write_json(facts_path, facts)
+
+    verdict = classify_phase(output_dir, session=session)
+    result = _validate(
+        root,
+        skill,
+        suite,
+        live,
+        sessions=(session,),
+        offline_only=True,
+        returncode=1,
+    )
+
+    assert verdict.status == "FAIL"
+    assert result.executed_session_ids == (session.session_id,)
+
+
+def test_null_step_successful_broker_record_is_blocked(tmp_path: Path) -> None:
+    session = _session("C1")
+    root, _skill, _suite, _live = _write_child(
+        tmp_path,
+        sessions=(session,),
+        phase_kinds=("pass",),
+        offline_only=True,
+        returncode=0,
+    )
+    output_dir = root / "sessions" / _safe_session_name(session.session_id) / "outputs"
+    broker_path = output_dir / "broker-evidence.json"
+    broker = json.loads(broker_path.read_text(encoding="utf-8"))
+    broker["records"][0]["step_name"] = None
+    _write_json(broker_path, broker)
+
+    verdict = classify_phase(output_dir, session=session)
+
+    assert verdict.status == "BLOCKED"
+    assert "broker successful record is contradictory" in verdict.reason
+
+
+def test_null_step_rejection_before_completion_is_blocked(tmp_path: Path) -> None:
+    session = _session("R6")
+    root, _skill, _suite, _live = _write_child(
+        tmp_path,
+        sessions=(session,),
+        phase_kinds=("fail",),
+        offline_only=False,
+        returncode=1,
+    )
+    output_dir = root / "sessions" / _safe_session_name(session.session_id) / "outputs"
+    _write_coherent_rejected_gateway_trace(output_dir, session=session)
+    broker_path = output_dir / "broker-evidence.json"
+    broker = json.loads(broker_path.read_text(encoding="utf-8"))
+    broker["records"][0]["step_name"] = None
+    _write_json(broker_path, broker)
+
+    verdict = classify_phase(output_dir, session=session)
+
+    assert verdict.status == "BLOCKED"
+    assert "broker failed record is contradictory" in verdict.reason
+
+
+def test_post_complete_null_step_with_wrong_terminal_reason_is_blocked(
+    tmp_path: Path,
+) -> None:
+    session = _session("C1")
+    root, _skill, _suite, _live = _write_child(
+        tmp_path,
+        sessions=(session,),
+        phase_kinds=("fail",),
+        offline_only=True,
+        returncode=1,
+    )
+    output_dir = root / "sessions" / _safe_session_name(session.session_id) / "outputs"
+    _write_post_complete_rejected_gateway_trace(output_dir, session=session)
+    broker_path = output_dir / "broker-evidence.json"
+    broker = json.loads(broker_path.read_text(encoding="utf-8"))
+    broker["records"][-1]["rejection"] = "unexpected terminal reason"
+    _write_json(broker_path, broker)
+
+    verdict = classify_phase(output_dir, session=session)
+
+    assert verdict.status == "BLOCKED"
+    assert "broker failed record is contradictory" in verdict.reason
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    (
+        ("model_argv", []),
+        ("normalized_model_argv", ["python", "/forged/run.py"]),
+    ),
+)
+def test_post_complete_null_step_with_invalid_argv_shape_is_blocked(
+    tmp_path: Path,
+    field: str,
+    replacement: list[str],
+) -> None:
+    session = _session("C1")
+    root, _skill, _suite, _live = _write_child(
+        tmp_path,
+        sessions=(session,),
+        phase_kinds=("fail",),
+        offline_only=True,
+        returncode=1,
+    )
+    output_dir = root / "sessions" / _safe_session_name(session.session_id) / "outputs"
+    _write_post_complete_rejected_gateway_trace(output_dir, session=session)
+    broker_path = output_dir / "broker-evidence.json"
+    broker = json.loads(broker_path.read_text(encoding="utf-8"))
+    broker["records"][-1][field] = replacement
+    _write_json(broker_path, broker)
+
+    verdict = classify_phase(output_dir, session=session)
+
+    assert verdict.status == "BLOCKED"
+    assert "broker failed record is contradictory" in verdict.reason
+
+
+def test_post_complete_null_step_without_matching_command_record_is_blocked(
+    tmp_path: Path,
+) -> None:
+    session = _session("C1")
+    root, _skill, _suite, _live = _write_child(
+        tmp_path,
+        sessions=(session,),
+        phase_kinds=("fail",),
+        offline_only=True,
+        returncode=1,
+    )
+    output_dir = root / "sessions" / _safe_session_name(session.session_id) / "outputs"
+    _write_post_complete_rejected_gateway_trace(output_dir, session=session)
+    facts_path = output_dir / "codex-facts.json"
+    facts = json.loads(facts_path.read_text(encoding="utf-8"))
+    facts["command_facts"]["command_records"][-1]["argv"] = ["python", "/forged/run.py"]
+    _write_json(facts_path, facts)
+
+    verdict = classify_phase(output_dir, session=session)
+
+    assert verdict.status == "BLOCKED"
+    assert "not bound to exact Codex command evidence" in verdict.reason
 
 
 @pytest.mark.parametrize("drift", ("malformed", "unauthenticated", "unknown", "contradictory"))

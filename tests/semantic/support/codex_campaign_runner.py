@@ -739,6 +739,7 @@ def _validate_completed_phase_integrity(
         exit_code = record.get("exit_code")
         model_argv = record.get("model_argv")
         normalized_argv = record.get("normalized_model_argv")
+        step_name = record.get("step_name")
         if (
             type(authenticated) is not bool
             or type(accepted) is not bool
@@ -751,22 +752,49 @@ def _validate_completed_phase_integrity(
             or not isinstance(normalized_argv, list)
             or not all(isinstance(value, str) for value in normalized_argv)
             or record.get("sequence") != index
-            or not isinstance(record.get("step_name"), str)
+            or "step_name" not in record
+            or (step_name is not None and not isinstance(step_name, str))
         ):
             raise CampaignEvidenceError("broker record is malformed")
         if authenticated is not True:
             raise CampaignEvidenceError("broker record is unauthenticated")
         if succeeded:
-            if rejected_seen or accepted is not True or exit_code not in allowed or not normalized_argv:
+            if (
+                rejected_seen
+                or accepted is not True
+                or exit_code not in allowed
+                or not normalized_argv
+                or not isinstance(step_name, str)
+            ):
                 raise CampaignEvidenceError("broker successful record is contradictory")
             successful_records.append(record)
         else:
+            successful_prefix = [item["step_name"] for item in successful_records]
+            expected_terminal_reason = (
+                "broker is terminal FAILED"
+                if rejected_seen
+                else "broker is terminal COMPLETE"
+            )
+            valid_post_complete_rejection = (
+                step_name is None
+                and successful_prefix == expected_steps
+                and model_argv != []
+                and normalized_argv == []
+                and record.get("rejection") == expected_terminal_reason
+                and exit_code == 126
+                and "runner_exit_code" in record
+                and record.get("runner_exit_code") is None
+                and "payload" in record
+                and record.get("payload") is None
+                and record.get("payload_error") == ""
+            )
             rejected_seen = True
             if (
                 accepted is not False
                 or allowed != []
                 or not isinstance(record.get("rejection"), str)
                 or not record.get("rejection")
+                or (step_name is None and not valid_post_complete_rejection)
             ):
                 raise CampaignEvidenceError("broker failed record is contradictory")
 
@@ -875,6 +903,46 @@ def _validate_completed_phase_integrity(
         or len(gateway_attempts) != observed_count
     ):
         raise CampaignEvidenceError("gateway attempt evidence does not match reconciliation")
+    null_step_rejections = [record for record in records if record.get("step_name") is None]
+    if null_step_rejections:
+        command_records = command_facts.get("command_records")
+        if not isinstance(command_records, list) or not all(
+            isinstance(item, Mapping) for item in command_records
+        ):
+            raise CampaignEvidenceError("post-completion broker rejection lacks command evidence")
+        command_cursor = 0
+        remaining_gateway_attempts = list(gateway_attempts)
+        for rejected_record in null_step_rejections:
+            match_index = next(
+                (
+                    index
+                    for index in range(command_cursor, len(command_records))
+                    if command_records[index].get("argv")
+                    == rejected_record.get("model_argv")
+                    and type(command_records[index].get("exit_code")) is int
+                    and command_records[index].get("exit_code") != 0
+                    and command_records[index].get("status") == "failed"
+                    and command_records[index].get("parse_error") == ""
+                    and command_records[index].get("has_shell_operators") is False
+                    and command_records[index].get("aggregated_output")
+                    == (
+                        "Gateway broker rejected command: "
+                        f"{rejected_record.get('rejection')}\n"
+                    )
+                ),
+                None,
+            )
+            if match_index is None:
+                raise CampaignEvidenceError(
+                    "post-completion broker rejection is not bound to exact Codex command evidence"
+                )
+            command_cursor = match_index + 1
+            command = command_records[match_index].get("command")
+            if not isinstance(command, str) or command not in remaining_gateway_attempts:
+                raise CampaignEvidenceError(
+                    "post-completion broker rejection is not bound to exact Codex command evidence"
+                )
+            remaining_gateway_attempts.remove(command)
     if require_success:
         _validate_success_command_facts(
             command_facts,

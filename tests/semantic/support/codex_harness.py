@@ -123,6 +123,45 @@ _BROKER_WINDOWS_OVERLAY_NAMES = _BROKER_WINDOWS_MODEL_ENV_NAMES | {"PATH", "PATH
 _SHELL_ASSIGNMENT_RE = re.compile(r"(?P<name>[A-Za-z_][A-Za-z0-9_]*)=(?P<value>.*)", re.DOTALL)
 _PYTHON_EXECUTABLE_RE = re.compile(r"python(?:3(?:\.\d+)?)?(?:\.exe)?")
 _RUNNER_VERSION_SELECTORS = frozenset({"--version", "--wwise-version"})
+_WINDOWS_SYSTEM_POWERSHELL_SUFFIX = (
+    "system32",
+    "windowspowershell",
+    "v1.0",
+    "powershell.exe",
+)
+_WINDOWS_POWERSHELL_PARSER_KIND = "windows-powershell-command"
+_WINDOWS_ENCODED_POWERSHELL_PARSER_KIND = "windows-powershell-encoded"
+_WINDOWS_POWERSHELL_COMMAND_NAMES = frozenset({"powershell", "powershell.exe"})
+_UNSUPPORTED_PWSH_COMMAND_NAMES = frozenset({"pwsh", "pwsh.exe"})
+_POWERSHELL_BARE_FORBIDDEN = frozenset("|&;<>`$(){}[]@#,%*?\"'")
+_ALLOWED_SKILL_READS = frozenset(
+    {
+        "SKILL.md",
+        "references/waapi-setup.md",
+        "references/waapi-query.md",
+        "references/waapi-operate.md",
+        "references/waapi-coverage.md",
+    }
+)
+_WINDOWS_WORKSPACE_SKILL_READS = {
+    r".agents\skills\waapi-skill\SKILL.md": ("SKILL.md",),
+    r".agents\skills\waapi-skill\references\waapi-setup.md": (
+        "references",
+        "waapi-setup.md",
+    ),
+    r".agents\skills\waapi-skill\references\waapi-query.md": (
+        "references",
+        "waapi-query.md",
+    ),
+    r".agents\skills\waapi-skill\references\waapi-operate.md": (
+        "references",
+        "waapi-operate.md",
+    ),
+    r".agents\skills\waapi-skill\references\waapi-coverage.md": (
+        "references",
+        "waapi-coverage.md",
+    ),
+}
 _SKILL_LINE_RE = re.compile(
     r"(?m)^\s*-\s+(?P<name>[A-Za-z0-9_.:-]+)\s*:\s*.*?"
     r"\((?:file|source|locator)\s*:\s*(?P<locator>[^)\n]+)\)\s*$"
@@ -989,6 +1028,7 @@ class CodexCommandRecord:
     argv: tuple[str, ...]
     has_shell_operators: bool
     parse_error: str = ""
+    parser_kind: str = ""
 
     @property
     def succeeded(self) -> bool:
@@ -2533,7 +2573,9 @@ def completed_command_records(events: Sequence[Mapping[str, Any]]) -> tuple[Code
             continue
         if item.get("type") == "command_execution" and isinstance(item.get("command"), str):
             command = str(item["command"])
-            argv, has_operators, parse_error = parse_command_argv(command)
+            argv, has_operators, parse_error, parser_kind = _parse_command_argv(
+                command
+            )
             raw_exit = item.get("exit_code")
             records.append(
                 CodexCommandRecord(
@@ -2544,26 +2586,88 @@ def completed_command_records(events: Sequence[Mapping[str, Any]]) -> tuple[Code
                     argv=argv,
                     has_shell_operators=has_operators,
                     parse_error=parse_error,
+                    parser_kind=parser_kind,
                 )
             )
     return tuple(records)
 
 
-def parse_command_argv(command: str) -> tuple[tuple[str, ...], bool, str]:
+def parse_command_argv(
+    command: str,
+    *,
+    platform_name: str | None = None,
+    windows_directory: str | PureWindowsPath | None = None,
+) -> tuple[tuple[str, ...], bool, str]:
     """Parse a recorded command with the host's native command-line grammar.
 
-    Explicit POSIX shell wrappers retain POSIX parsing on every host.  Bare
+    Explicit POSIX shell wrappers retain POSIX parsing on every host. Bare
     commands use ``CommandLineToArgvW`` on Windows so drive, UNC, and backslash
-    paths are not corrupted by POSIX escape rules.  CMD and PowerShell wrappers
-    are deliberately not unwrapped: they remain unexpected outer commands
-    instead of mixing incompatible shell grammars.
+    paths are not corrupted by POSIX escape rules. Codex's fixed native-Windows
+    ``powershell.exe -Command`` recording wrapper is unwrapped only when it
+    contains one literal argv vector under the restricted grammar below. Other
+    PowerShell and CMD shapes remain unexpected outer commands.
     """
 
-    if os.name == "nt" and command.startswith("powershell.exe "):
+    argv, has_operators, parse_error, _parser_kind = _parse_command_argv(
+        command,
+        platform_name=platform_name,
+        windows_directory=windows_directory,
+    )
+    return argv, has_operators, parse_error
+
+
+def _parse_command_argv(
+    command: str,
+    *,
+    platform_name: str | None = None,
+    windows_directory: str | PureWindowsPath | None = None,
+) -> tuple[tuple[str, ...], bool, str, str]:
+    active_platform = os.name if platform_name is None else platform_name
+    if _is_windows(active_platform) and command.startswith("powershell.exe "):
         try:
-            return decode_windows_powershell_argv(command), False, ""
+            return (
+                decode_windows_powershell_argv(command),
+                False,
+                "",
+                _WINDOWS_ENCODED_POWERSHELL_PARSER_KIND,
+            )
         except PlatformCommandError as exc:
-            return (), True, str(exc)
+            return (), True, str(exc), ""
+
+    if _is_windows(active_platform):
+        has_operators = shell_script_has_operators(command, platform_name="nt")
+        try:
+            outer = split_native_command_line(command, platform_name="nt")
+        except (OSError, ValueError) as exc:
+            return (), True, str(exc), ""
+        if not outer:
+            return (), False, "empty command", ""
+        shell_name = PureWindowsPath(outer[0]).name.casefold()
+        if shell_name in _WINDOWS_POWERSHELL_COMMAND_NAMES:
+            argv, operators, error = _parse_windows_powershell_command_wrapper(
+                outer,
+                windows_directory=windows_directory,
+                platform_name=active_platform,
+            )
+            parser_kind = (
+                _WINDOWS_ENCODED_POWERSHELL_PARSER_KIND
+                if not error and outer[2].startswith("powershell.exe ")
+                else _WINDOWS_POWERSHELL_PARSER_KIND
+                if not error
+                else ""
+            )
+            return (
+                argv,
+                operators,
+                error,
+                parser_kind,
+            )
+        if shell_name in _UNSUPPORTED_PWSH_COMMAND_NAMES:
+            return (), True, "PowerShell Core command wrappers are not supported", ""
+        if shell_name.removesuffix(".exe") in {"bash", "sh", "zsh", "dash", "ksh"}:
+            argv, operators, error = _parse_posix_shell_command_wrapper(outer)
+            return argv, operators, error, "posix-shell"
+        return outer, has_operators, "", "windows-native"
 
     try:
         outer = shlex.split(command, posix=True)
@@ -2571,34 +2675,163 @@ def parse_command_argv(command: str) -> tuple[tuple[str, ...], bool, str]:
         outer = []
     if not outer:
         if not command.strip():
-            return (), False, "empty command"
+            return (), False, "empty command", ""
     script = command
     shell_name = PureWindowsPath(outer[0]).name.casefold() if outer else ""
     shell_stem = shell_name.removesuffix(".exe")
     if shell_stem in {"bash", "sh", "zsh", "dash", "ksh"}:
-        shell_option_index = next(
-            (index for index, value in enumerate(outer[1:], start=1) if value in {"-c", "-lc", "-ic"}),
-            None,
-        )
-        if shell_option_index is None or shell_option_index + 1 >= len(outer):
-            return (), True, "shell command is missing a single -c/-lc script"
-        if shell_option_index + 2 != len(outer):
-            return (), True, "shell command has unexpected arguments after its script"
-        script = outer[shell_option_index + 1]
-        has_operators = shell_script_has_operators(script, platform_name="posix")
-        try:
-            argv = tuple(shlex.split(script, posix=True))
-        except ValueError as exc:
-            return (), True, str(exc)
-        return argv, has_operators, ""
+        argv, operators, error = _parse_posix_shell_command_wrapper(outer)
+        return argv, operators, error, "posix-shell"
 
-    platform_name = "nt" if os.name == "nt" else "posix"
-    has_operators = shell_script_has_operators(script, platform_name=platform_name)
+    has_operators = shell_script_has_operators(script, platform_name="posix")
     try:
-        argv = split_native_command_line(script, platform_name=platform_name)
+        argv = split_native_command_line(script, platform_name="posix")
     except (OSError, ValueError) as exc:
+        return (), True, str(exc), ""
+    return argv, has_operators, "", "posix-native"
+
+
+def _parse_posix_shell_command_wrapper(
+    outer_argv: Sequence[str],
+) -> tuple[tuple[str, ...], bool, str]:
+    if len(outer_argv) != 3 or outer_argv[1] not in {"-c", "-lc", "-ic"}:
+        return (), True, "shell command must be executable plus one -c/-lc/-ic and its script"
+    script = outer_argv[2]
+    has_operators = shell_script_has_operators(script, platform_name="posix")
+    try:
+        argv = tuple(shlex.split(script, posix=True))
+    except ValueError as exc:
         return (), True, str(exc)
     return argv, has_operators, ""
+
+
+def _parse_windows_powershell_command_wrapper(
+    outer_argv: Sequence[str],
+    *,
+    windows_directory: str | PureWindowsPath | None,
+    platform_name: str | None,
+) -> tuple[tuple[str, ...], bool, str]:
+    """Unwrap only Codex's literal native-Windows PowerShell command frame."""
+
+    if len(outer_argv) != 3 or outer_argv[1] != "-Command":
+        return (), True, "unsupported Windows PowerShell command wrapper"
+    executable = PureWindowsPath(outer_argv[0])
+    try:
+        host_windows_directory = (
+            _validated_windows_directory(windows_directory)
+            if windows_directory is not None
+            else _native_windows_directory(platform_name=platform_name)
+        )
+    except (OSError, ValueError) as exc:
+        return (), True, f"cannot identify the native Windows directory: {exc}"
+    expected_executable = host_windows_directory.joinpath(
+        *_WINDOWS_SYSTEM_POWERSHELL_SUFFIX
+    )
+    if executable != expected_executable:
+        return (), True, "Windows PowerShell wrapper executable is not the system host"
+    script = outer_argv[2]
+    if script.startswith("powershell.exe "):
+        try:
+            return decode_windows_powershell_argv(script), False, ""
+        except PlatformCommandError as exc:
+            return (), True, str(exc)
+    try:
+        return _split_literal_powershell_argv(script), False, ""
+    except ValueError as exc:
+        return (), True, str(exc)
+
+
+def _validated_windows_directory(
+    value: str | PureWindowsPath,
+) -> PureWindowsPath:
+    directory = PureWindowsPath(value)
+    if (
+        not directory.is_absolute()
+        or re.fullmatch(r"[A-Za-z]:", directory.drive) is None
+        or directory.root != "\\"
+        or len(directory.parts) < 2
+    ):
+        raise ValueError("Windows directory must be one absolute drive path")
+    return directory
+
+
+def _native_windows_directory(*, platform_name: str | None = None) -> PureWindowsPath:
+    """Read the host Windows directory from the kernel, never from environment."""
+
+    if not _is_windows(platform_name) or os.name != "nt":
+        raise OSError("GetWindowsDirectoryW is unavailable on this host")
+    import ctypes
+    from ctypes import wintypes
+
+    capacity = 32768
+    buffer = ctypes.create_unicode_buffer(capacity)
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    get_windows_directory = kernel32.GetWindowsDirectoryW
+    get_windows_directory.argtypes = [wintypes.LPWSTR, wintypes.UINT]
+    get_windows_directory.restype = wintypes.UINT
+    length = int(get_windows_directory(buffer, capacity))
+    if length == 0:
+        error = ctypes.get_last_error()
+        raise OSError(error, "GetWindowsDirectoryW failed")
+    if length >= capacity:
+        raise OSError("GetWindowsDirectoryW returned an oversized path")
+    return _validated_windows_directory(buffer.value)
+
+
+def _split_literal_powershell_argv(script: str) -> tuple[str, ...]:
+    """Parse one expansion-free PowerShell native-command argv expression.
+
+    Only whitespace-separated bare words and single-quoted literal strings are
+    accepted. Doubled apostrophes inside a literal use PowerShell's exact
+    single-quote escape. Composition, expansion, interpolation, redirection,
+    comments, globbing, arrays, script blocks, and multiline input all fail
+    closed before the command can receive semantic credit.
+    """
+
+    if not script or "\0" in script or "\r" in script or "\n" in script:
+        raise ValueError("PowerShell command must be one non-empty line")
+    arguments: list[str] = []
+    index = 0
+    while index < len(script):
+        while index < len(script) and script[index] in {" ", "\t"}:
+            index += 1
+        if index == len(script):
+            break
+        if script[index] == '"':
+            raise ValueError("PowerShell interpolating strings are not permitted")
+        if script[index] == "'":
+            index += 1
+            literal: list[str] = []
+            while index < len(script):
+                character = script[index]
+                if character != "'":
+                    literal.append(character)
+                    index += 1
+                    continue
+                if index + 1 < len(script) and script[index + 1] == "'":
+                    literal.append("'")
+                    index += 2
+                    continue
+                index += 1
+                break
+            else:
+                raise ValueError("PowerShell single-quoted literal is not closed")
+            if index < len(script) and script[index] not in {" ", "\t"}:
+                raise ValueError("PowerShell argv tokens must not concatenate expressions")
+            arguments.append("".join(literal))
+            continue
+
+        start = index
+        while index < len(script) and script[index] not in {" ", "\t"}:
+            if script[index] in _POWERSHELL_BARE_FORBIDDEN:
+                raise ValueError(
+                    "PowerShell command contains composition, expansion, or interpolation"
+                )
+            index += 1
+        arguments.append(script[start:index])
+    if not arguments:
+        raise ValueError("PowerShell command contains no argv")
+    return tuple(arguments)
 
 
 def split_native_command_line(
@@ -2867,7 +3100,9 @@ def packaged_runner_attempt(record: CodexCommandRecord, *, skill_source: Path) -
 def command_record(command: str | CodexCommandRecord) -> CodexCommandRecord:
     if isinstance(command, CodexCommandRecord):
         return command
-    argv, has_operators, parse_error = parse_command_argv(str(command))
+    argv, has_operators, parse_error, parser_kind = _parse_command_argv(
+        str(command)
+    )
     return CodexCommandRecord(
         command=str(command),
         exit_code=None,
@@ -2876,6 +3111,7 @@ def command_record(command: str | CodexCommandRecord) -> CodexCommandRecord:
         argv=argv,
         has_shell_operators=has_operators,
         parse_error=parse_error,
+        parser_kind=parser_kind,
     )
 
 
@@ -3139,9 +3375,28 @@ def allowed_skill_read(record: CodexCommandRecord, *, skill_source: Path) -> str
             return None
         path_text = record.argv[3]
         minimum_lines = int(match.group(1)) if match is not None else None
+    elif executable == "get-content":
+        if (
+            record.parser_kind != _WINDOWS_POWERSHELL_PARSER_KIND
+            or len(record.argv) != 5
+            or record.argv[1] != "-Raw"
+            or record.argv[2] != "-Encoding"
+            or record.argv[3] != "UTF8"
+        ):
+            return None
+        path_text = record.argv[4]
+        minimum_lines = None
     else:
         return None
-    validated = validated_skill_read(path_text, record.aggregated_output, skill_source=skill_source)
+    validated = validated_skill_read(
+        path_text,
+        record.aggregated_output,
+        skill_source=skill_source,
+        allow_exact_windows_workspace_relative=(
+            executable == "get-content"
+        ),
+        allow_one_terminal_newline=(executable == "get-content"),
+    )
     if validated is None:
         return None
     relative, content = validated
@@ -3195,31 +3450,41 @@ def validated_skill_read(
     aggregated_output: str,
     *,
     skill_source: Path,
+    allow_exact_windows_workspace_relative: bool = False,
+    allow_one_terminal_newline: bool = False,
 ) -> tuple[str, str] | None:
-    """Prove that one approved Skill file was read completely from its absolute locator."""
+    """Prove a complete approved Skill read from one closed locator."""
 
     candidate = Path(path_text).expanduser()
     if not candidate.is_absolute():
-        return None
+        relative_parts = (
+            _WINDOWS_WORKSPACE_SKILL_READS.get(path_text)
+            if allow_exact_windows_workspace_relative
+            else None
+        )
+        source_parts = tuple(part.casefold() for part in Path(skill_source).parts[-3:])
+        if (
+            relative_parts is None
+            or source_parts != (".agents", "skills", "waapi-skill")
+        ):
+            return None
+        candidate = Path(skill_source).joinpath(*relative_parts)
     try:
         resolved = candidate.resolve(strict=True)
         relative = resolved.relative_to(skill_source.expanduser().resolve(strict=True)).as_posix()
     except (OSError, ValueError):
         return None
-    allowed = {
-        "SKILL.md",
-        "references/waapi-setup.md",
-        "references/waapi-query.md",
-        "references/waapi-operate.md",
-        "references/waapi-coverage.md",
-    }
-    if relative not in allowed:
+    if relative not in _ALLOWED_SKILL_READS:
         return None
     try:
-        content = resolved.read_text(encoding="utf-8")
-    except OSError:
+        raw_content = resolved.read_bytes().decode("utf-8", errors="strict")
+    except (OSError, UnicodeDecodeError):
         return None
-    if aggregated_output != content:
+    content = raw_content.replace("\r\n", "\n").replace("\r", "\n")
+    observed = aggregated_output.replace("\r\n", "\n").replace("\r", "\n")
+    if observed != content and not (
+        allow_one_terminal_newline and observed == content + "\n"
+    ):
         return None
     return relative, content
 

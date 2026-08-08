@@ -368,6 +368,10 @@ pin Codex's `windows.sandbox` backend to `unelevated` while retaining
 `workspace-write` and approval policy `never`. Omitting that backend leaves the
 managed-filesystem policy without a sandbox implementation and can decline the
 first non-safe Gateway command before it reaches the authenticated broker.
+Windows PowerShell 5.1 Skill reads must use the exact literal form
+`Get-Content -Raw -Encoding UTF8 <path>`. The semantic harness credits that
+form only through the verified system-PowerShell wrapper; omitting `UTF8` can
+mojibake the Skill before the Agent reaches the Gateway.
 
 The official profiles are `screening` (40 sessions), `formal_98` (98), and
 `full_cross_version_168` (168). Run the latter two only when the user explicitly

@@ -7,13 +7,14 @@ import signal
 import subprocess
 import sys
 import time
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from types import SimpleNamespace
 from typing import Mapping, Sequence
 
 import pytest
 
 from tests.support.platform_filesystem import create_symlink_or_skip
+from wwise_waapi.platform_commands import encode_windows_powershell_argv
 from .support import codex_harness as codex_harness_module
 from .support.codex_harness import (  # pyright: ignore[reportMissingImports]
     CodexCliHarness,
@@ -64,6 +65,54 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
 
 
 _FAKE_KILL_RETURN_CODE = -9
+_WINDOWS_SYSTEM_POWERSHELL = (
+    r"C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe"
+)
+_WINDOWS_DIRECTORY = PureWindowsPath(r"C:\WINDOWS")
+
+
+def windows_powershell_recording(script: str, *, executable: str = _WINDOWS_SYSTEM_POWERSHELL) -> str:
+    escaped_script = script.replace('"', r'\"')
+    return f'"{executable}" -Command "{escaped_script}"'
+
+
+def portable_windows_outer_split(
+    command: str,
+    *,
+    platform_name: str | None = None,
+) -> tuple[str, ...]:
+    assert platform_name == "nt"
+    return tuple(shlex.split(command, posix=True))
+
+
+def completed_windows_record(
+    command: str,
+    output: Mapping[str, object] | str | None = None,
+    *,
+    exit_code: int = 0,
+    status: str = "completed",
+) -> CodexCommandRecord:
+    argv, has_operators, parse_error, parser_kind = codex_harness_module._parse_command_argv(
+        command,
+        platform_name="nt",
+        windows_directory=_WINDOWS_DIRECTORY,
+    )
+    return CodexCommandRecord(
+        command=command,
+        exit_code=exit_code,
+        status=status,
+        aggregated_output=(
+            output
+            if isinstance(output, str)
+            else json.dumps(output, ensure_ascii=False)
+            if output is not None
+            else ""
+        ),
+        argv=argv,
+        has_shell_operators=has_operators,
+        parse_error=parse_error,
+        parser_kind=parser_kind,
+    )
 
 
 def completed_record(
@@ -1684,6 +1733,607 @@ def test_jsonl_parser_extracts_commands_final_message_and_usage() -> None:
     assert audit_session_events(events).passed is True
 
 
+def test_windows_powershell_recording_unwraps_skill_coverage_and_gateway(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module,
+        "split_native_command_line",
+        portable_windows_outer_split,
+    )
+    workspace = tmp_path / "agent-workspace"
+    skill = workspace / ".agents" / "skills" / "waapi-skill"
+    references = skill / "references"
+    runner = skill / "scripts" / "run.py"
+    references.mkdir(parents=True)
+    runner.parent.mkdir()
+    skill_content = "# skill\n"
+    coverage_content = "# coverage\n"
+    (skill / "SKILL.md").write_text(skill_content, encoding="utf-8")
+    (references / "waapi-coverage.md").write_text(
+        coverage_content,
+        encoding="utf-8",
+    )
+    runner.write_text("# runner\n", encoding="utf-8")
+    skill_read = windows_powershell_recording(
+        r"Get-Content -Raw -Encoding UTF8 '.agents\skills\waapi-skill\SKILL.md'"
+    )
+    coverage_read = windows_powershell_recording(
+        r"Get-Content -Raw -Encoding UTF8 '.agents\skills\waapi-skill\references\waapi-coverage.md'"
+    )
+    gateway = windows_powershell_recording(
+        f"python '{runner}' gateway.py capabilities --all-versions --summary-only"
+    )
+    payload = {
+        "contract": "waapi-skill.gateway-result/v1",
+        "command": "capabilities",
+        "ok": True,
+    }
+    records = (
+        completed_windows_record(skill_read, skill_content),
+        completed_windows_record(coverage_read, coverage_content),
+        completed_windows_record(gateway, payload),
+    )
+
+    facts = classify_commands(
+        records,
+        skill_source=skill,
+        expected_gateway_subcommands=("capabilities",),
+    )
+
+    assert records[0].argv == (
+        "Get-Content",
+        "-Raw",
+        "-Encoding",
+        "UTF8",
+        r".agents\skills\waapi-skill\SKILL.md",
+    )
+    assert records[2].argv == (
+        "python",
+        str(runner),
+        "gateway.py",
+        "capabilities",
+        "--all-versions",
+        "--summary-only",
+    )
+    assert facts.skill_read is True
+    assert facts.skill_read_files == (
+        "SKILL.md",
+        "references/waapi-coverage.md",
+    )
+    assert facts.gateway_commands == (gateway,)
+    assert facts.unexpected_commands == ()
+
+
+def test_windows_powershell_recording_preserves_literal_metacharacters(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module,
+        "split_native_command_line",
+        portable_windows_outer_split,
+    )
+    command = windows_powershell_recording(
+        r"python 'C:\Skill path\run.py' gateway.py query-object --name 'A&B;$env:X|*.wav'"
+    )
+
+    argv, has_operators, parse_error = parse_command_argv(
+        command,
+        platform_name="nt",
+        windows_directory=_WINDOWS_DIRECTORY,
+    )
+
+    assert argv == (
+        "python",
+        r"C:\Skill path\run.py",
+        "gateway.py",
+        "query-object",
+        "--name",
+        "A&B;$env:X|*.wav",
+    )
+    assert has_operators is False
+    assert parse_error == ""
+
+
+def test_windows_powershell_recording_preserves_canonical_encoded_continuation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module,
+        "split_native_command_line",
+        portable_windows_outer_split,
+    )
+    expected = (
+        "python",
+        r"C:\Skill path\scripts\run.py",
+        "gateway.py",
+        "transaction-show",
+        "tx1-example",
+    )
+    encoded = encode_windows_powershell_argv(expected)
+
+    assert parse_command_argv(encoded, platform_name="nt") == (expected, False, "")
+    wrapped = windows_powershell_recording(encoded)
+    assert parse_command_argv(
+        wrapped,
+        platform_name="nt",
+        windows_directory=_WINDOWS_DIRECTORY,
+    ) == (expected, False, "")
+    assert codex_harness_module._parse_command_argv(
+        wrapped,
+        platform_name="nt",
+        windows_directory=_WINDOWS_DIRECTORY,
+    )[3] == "windows-powershell-encoded"
+
+
+def test_windows_wrapped_encoded_get_content_cannot_claim_relative_skill_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module,
+        "split_native_command_line",
+        portable_windows_outer_split,
+    )
+    skill = tmp_path / "agent-workspace" / ".agents" / "skills" / "waapi-skill"
+    skill.mkdir(parents=True)
+    content = "# skill\n"
+    (skill / "SKILL.md").write_text(content, encoding="utf-8")
+    encoded = encode_windows_powershell_argv(
+        (
+            "Get-Content",
+            "-Raw",
+            "-Encoding",
+            "UTF8",
+            r".agents\skills\waapi-skill\SKILL.md",
+        )
+    )
+    record = completed_windows_record(
+        windows_powershell_recording(encoded),
+        content,
+    )
+
+    facts = classify_commands((record,), skill_source=skill)
+
+    assert record.parser_kind == "windows-powershell-encoded"
+    assert facts.skill_read is False
+    assert facts.allowed_read_commands == ()
+    assert facts.unexpected_commands == (record.command,)
+
+
+@pytest.mark.parametrize(
+    "script",
+    (
+        "python 'C:\\skill\\run.py' gateway.py capabilities; whoami",
+        "python 'C:\\skill\\run.py' gateway.py capabilities | Out-Null",
+        "python 'C:\\skill\\run.py' gateway.py capabilities > out.txt",
+        "$env:MODE='unsafe'",
+        "python 'C:\\skill\\run.py' gateway.py capabilities $(Get-Date)",
+        "python 'C:\\skill\\run.py' gateway.py capabilities `whoami`",
+        "python 'C:\\skill\\run.py' gateway.py capabilities\nwhoami",
+        'python "C:\\skill\\run.py" gateway.py capabilities',
+    ),
+)
+def test_windows_powershell_recording_rejects_operators_and_expansion(
+    script: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module,
+        "split_native_command_line",
+        portable_windows_outer_split,
+    )
+
+    argv, has_operators, parse_error = parse_command_argv(
+        windows_powershell_recording(script),
+        platform_name="nt",
+        windows_directory=_WINDOWS_DIRECTORY,
+    )
+
+    assert argv == ()
+    assert has_operators is True
+    assert parse_error
+
+
+@pytest.mark.parametrize(
+    "command",
+    (
+        windows_powershell_recording(
+            "Get-Content -Raw -Encoding UTF8 '.agents\\skills\\waapi-skill\\SKILL.md'",
+            executable=r"C:\evil\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+        ),
+        windows_powershell_recording(
+            "Get-Content -Raw -Encoding UTF8 '.agents\\skills\\waapi-skill\\SKILL.md'",
+            executable=r"D:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe",
+        ),
+        windows_powershell_recording(
+            "Get-Content -Raw -Encoding UTF8 '.agents\\skills\\waapi-skill\\SKILL.md'",
+            executable=(
+                r"C:\CustomWindows\System32\WindowsPowerShell\v1.0\powershell.exe"
+            ),
+        ),
+        (
+            f'"{_WINDOWS_SYSTEM_POWERSHELL}" -NoProfile -Command '
+            '"Get-Content -Raw -Encoding UTF8 '
+            '\'.agents\\skills\\waapi-skill\\SKILL.md\'"'
+        ),
+        (
+            r'"C:\Program Files\PowerShell\7\pwsh.exe" -Command '
+            r'"Get-Content -Raw -Encoding UTF8 '
+            r'\'.agents\skills\waapi-skill\SKILL.md\'"'
+        ),
+    ),
+)
+def test_windows_powershell_recording_rejects_wrong_outer_wrapper(
+    command: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module,
+        "split_native_command_line",
+        portable_windows_outer_split,
+    )
+
+    argv, has_operators, parse_error = parse_command_argv(
+        command,
+        platform_name="nt",
+        windows_directory=_WINDOWS_DIRECTORY,
+    )
+
+    assert argv == ()
+    assert has_operators is True
+    assert parse_error
+
+
+def test_posix_shell_wrapper_accepts_only_exact_executable_option_and_script(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module,
+        "split_native_command_line",
+        portable_windows_outer_split,
+    )
+    script = "python '/tmp/Skill path/run.py' gateway.py status"
+    expected = (
+        "python",
+        "/tmp/Skill path/run.py",
+        "gateway.py",
+        "status",
+    )
+    valid_posix = f'/bin/bash -lc "{script}"'
+    valid_windows = f'bash.exe -lc "{script}"'
+
+    assert parse_command_argv(valid_posix) == (expected, False, "")
+    assert parse_command_argv(
+        valid_windows,
+        platform_name="nt",
+        windows_directory=_WINDOWS_DIRECTORY,
+    ) == (expected, False, "")
+
+    invalid_posix = (
+        f'/bin/bash --rcfile /tmp/evil -lc "{script}"',
+        f'/bin/bash --init-file /tmp/evil -c "{script}"',
+        f'/bin/bash -l -c "{script}"',
+        f'/bin/bash -lc "{script}" unexpected',
+    )
+    invalid_windows = (
+        f'bash.exe --rcfile C:\\evil -lc "{script}"',
+        f'bash.exe --init-file C:\\evil -c "{script}"',
+        f'bash.exe -l -c "{script}"',
+        f'bash.exe -lc "{script}" unexpected',
+    )
+    for command in invalid_posix:
+        argv, has_operators, parse_error = parse_command_argv(command)
+        assert argv == ()
+        assert has_operators is True
+        assert parse_error
+    for command in invalid_windows:
+        argv, has_operators, parse_error = parse_command_argv(
+            command,
+            platform_name="nt",
+            windows_directory=_WINDOWS_DIRECTORY,
+        )
+        assert argv == ()
+        assert has_operators is True
+        assert parse_error
+
+
+@pytest.mark.parametrize(
+    ("script", "output"),
+    (
+        (
+            r"Get-Content -Raw -Encoding UTF8 '.agents/skills/waapi-skill/SKILL.md'",
+            "# skill\n",
+        ),
+        (
+            r"Get-Content -Raw -Encoding UTF8 '.agents\skills\waapi-skill\..\waapi-skill\SKILL.md'",
+            "# skill\n",
+        ),
+        (
+            r"Get-Content -Encoding UTF8 '.agents\skills\waapi-skill\SKILL.md'",
+            "# skill\n",
+        ),
+        (
+            r"Get-Content -Raw '.agents\skills\waapi-skill\SKILL.md'",
+            "# skill\n",
+        ),
+        (
+            r"Get-Content -Raw -Encoding Unicode '.agents\skills\waapi-skill\SKILL.md'",
+            "# skill\n",
+        ),
+        (
+            r"Get-Content -Encoding UTF8 -Raw '.agents\skills\waapi-skill\SKILL.md'",
+            "# skill\n",
+        ),
+        (
+            r"Get-Content -Raw -Encoding UTF8 '.agents\skills\waapi-skill\SKILL.md'",
+            "# partial",
+        ),
+    ),
+)
+def test_windows_get_content_rejects_noncanonical_or_partial_skill_reads(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    script: str,
+    output: str,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module,
+        "split_native_command_line",
+        portable_windows_outer_split,
+    )
+    skill = tmp_path / "agent-workspace" / ".agents" / "skills" / "waapi-skill"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("# skill\n", encoding="utf-8")
+    record = completed_windows_record(windows_powershell_recording(script), output)
+
+    facts = classify_commands((record,), skill_source=skill)
+
+    assert facts.skill_read is False
+    assert facts.allowed_read_commands == ()
+    assert facts.unexpected_commands == (record.command,)
+
+
+@pytest.mark.parametrize(
+    ("output", "accepted"),
+    (
+        ("# skill\r\n声音\r\n", True),
+        ("# skill\n声音\n", True),
+        ("# skill\r\n声音\r\n\r\n", True),
+        ("# skill\r\n声音\r\n\r\n\r\n", False),
+        ("# skill\r\n??\r\n\r\n", False),
+    ),
+)
+def test_windows_get_content_utf8_newline_contract(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    output: str,
+    accepted: bool,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module,
+        "split_native_command_line",
+        portable_windows_outer_split,
+    )
+    skill = tmp_path / "agent-workspace" / ".agents" / "skills" / "waapi-skill"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_bytes("# skill\r\n声音\r\n".encode("utf-8"))
+    command = windows_powershell_recording(
+        r"Get-Content -Raw -Encoding UTF8 '.agents\skills\waapi-skill\SKILL.md'"
+    )
+    record = completed_windows_record(command, output)
+
+    facts = classify_commands((record,), skill_source=skill)
+
+    assert facts.skill_read is accepted
+    assert facts.allowed_read_commands == ((command,) if accepted else ())
+    assert facts.unexpected_commands == (() if accepted else (command,))
+
+
+@pytest.mark.parametrize(
+    "parser_kind",
+    ("", "posix-native", "windows-native", "windows-powershell-encoded"),
+)
+def test_relative_get_content_requires_windows_wrapper_parser_provenance(
+    tmp_path: Path,
+    parser_kind: str,
+) -> None:
+    skill = tmp_path / "agent-workspace" / ".agents" / "skills" / "waapi-skill"
+    skill.mkdir(parents=True)
+    content = "# skill\n"
+    (skill / "SKILL.md").write_text(content, encoding="utf-8")
+    command = (
+        r"Get-Content -Raw -Encoding UTF8 "
+        r"'.agents\skills\waapi-skill\SKILL.md'"
+    )
+    record = CodexCommandRecord(
+        command=command,
+        exit_code=0,
+        status="completed",
+        aggregated_output=content,
+        argv=(
+            "Get-Content",
+            "-Raw",
+            "-Encoding",
+            "UTF8",
+            r".agents\skills\waapi-skill\SKILL.md",
+        ),
+        has_shell_operators=False,
+        parser_kind=parser_kind,
+    )
+
+    facts = classify_commands((record,), skill_source=skill)
+
+    assert facts.skill_read is False
+    assert facts.allowed_read_commands == ()
+    assert facts.unexpected_commands == (command,)
+
+
+@pytest.mark.parametrize("relative", (False, True))
+def test_posix_get_content_cannot_claim_absolute_or_relative_skill_read(
+    tmp_path: Path,
+    relative: bool,
+) -> None:
+    skill = tmp_path / "agent-workspace" / ".agents" / "skills" / "waapi-skill"
+    skill.mkdir(parents=True)
+    content = "# skill\n"
+    skill_md = skill / "SKILL.md"
+    skill_md.write_text(content, encoding="utf-8")
+    path_text = (
+        r".agents\skills\waapi-skill\SKILL.md"
+        if relative
+        else str(skill_md)
+    )
+    command = f"Get-Content -Raw -Encoding UTF8 '{path_text}'"
+    record = CodexCommandRecord(
+        command=command,
+        exit_code=0,
+        status="completed",
+        aggregated_output=content,
+        argv=("Get-Content", "-Raw", "-Encoding", "UTF8", path_text),
+        has_shell_operators=False,
+        parser_kind="posix-native",
+    )
+
+    facts = classify_commands((record,), skill_source=skill)
+
+    assert facts.skill_read is False
+    assert facts.allowed_read_commands == ()
+    assert facts.unexpected_commands == (command,)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows command-line parser proof")
+def test_native_windows_system_powershell_get_content_has_parser_provenance(
+    tmp_path: Path,
+) -> None:
+    windows_directory = codex_harness_module._native_windows_directory()
+    executable = str(
+        windows_directory
+        / "System32"
+        / "WindowsPowerShell"
+        / "v1.0"
+        / "powershell.exe"
+    )
+    skill = tmp_path / "agent workspace" / ".agents" / "skills" / "waapi-skill"
+    skill.mkdir(parents=True)
+    content = "# skill\n"
+    (skill / "SKILL.md").write_text(content, encoding="utf-8")
+    command = windows_powershell_recording(
+        r"Get-Content -Raw -Encoding UTF8 '.agents\skills\waapi-skill\SKILL.md'",
+        executable=executable,
+    )
+    events = (
+        {
+            "type": "item.completed",
+            "item": {
+                "type": "command_execution",
+                "command": command,
+                "exit_code": 0,
+                "status": "completed",
+                "aggregated_output": content,
+            },
+        },
+    )
+
+    record = completed_command_records(events)[0]
+    facts = classify_commands((record,), skill_source=skill)
+
+    assert record.parser_kind == "windows-powershell-command"
+    assert record.argv == (
+        "Get-Content",
+        "-Raw",
+        "-Encoding",
+        "UTF8",
+        r".agents\skills\waapi-skill\SKILL.md",
+    )
+    assert facts.skill_read is True
+    assert facts.skill_read_files == ("SKILL.md",)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows command-line parser proof")
+def test_native_windows_system_powershell_unwraps_gateway_path_with_spaces(
+    tmp_path: Path,
+) -> None:
+    windows_directory = codex_harness_module._native_windows_directory()
+    executable = str(
+        windows_directory
+        / "System32"
+        / "WindowsPowerShell"
+        / "v1.0"
+        / "powershell.exe"
+    )
+    runner = tmp_path / "Agent Workspace" / ".agents" / "skills" / "waapi-skill" / "scripts" / "run.py"
+    command = windows_powershell_recording(
+        f"python '{runner}' gateway.py capabilities --summary-only",
+        executable=executable,
+    )
+
+    argv, has_operators, parse_error = parse_command_argv(command)
+
+    assert argv == (
+        "python",
+        str(runner),
+        "gateway.py",
+        "capabilities",
+        "--summary-only",
+    )
+    assert has_operators is False
+    assert parse_error == ""
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows command-line parser proof")
+def test_native_windows_system_powershell_rejects_embedded_double_quote(
+    tmp_path: Path,
+) -> None:
+    windows_directory = codex_harness_module._native_windows_directory()
+    executable = str(
+        windows_directory
+        / "System32"
+        / "WindowsPowerShell"
+        / "v1.0"
+        / "powershell.exe"
+    )
+    runner = tmp_path / "Agent Workspace" / "run.py"
+    command = windows_powershell_recording(
+        f'python "{runner}" gateway.py capabilities',
+        executable=executable,
+    )
+
+    argv, has_operators, parse_error = parse_command_argv(command)
+
+    assert argv == ()
+    assert has_operators is True
+    assert "interpolating strings" in parse_error
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows command-line parser proof")
+def test_native_windows_system_powershell_wraps_encoded_continuation(
+    tmp_path: Path,
+) -> None:
+    windows_directory = codex_harness_module._native_windows_directory()
+    executable = str(
+        windows_directory
+        / "System32"
+        / "WindowsPowerShell"
+        / "v1.0"
+        / "powershell.exe"
+    )
+    expected = (
+        "python",
+        str(tmp_path / "Agent Workspace" / "run.py"),
+        "gateway.py",
+        "transaction-show",
+        "tx1-example",
+    )
+    command = windows_powershell_recording(
+        encode_windows_powershell_argv(expected),
+        executable=executable,
+    )
+
+    assert parse_command_argv(command) == (expected, False, "")
+
+
 def test_pre_action_usage_limit_is_codex_infrastructure_failure() -> None:
     message = (
         "You've hit your usage limit. Visit https://chatgpt.com/codex/settings/usage "
@@ -2116,6 +2766,27 @@ def test_validated_skill_read_accepts_complete_coverage_reference(tmp_path: Path
         content,
         skill_source=skill,
     ) == ("references/waapi-coverage.md", content)
+
+
+def test_validated_skill_read_normalizes_only_line_endings(tmp_path: Path) -> None:
+    skill = tmp_path / "waapi-skill"
+    skill.mkdir()
+    skill_md = skill / "SKILL.md"
+    skill_md.write_bytes(b"first\nsecond\n")
+
+    assert validated_skill_read(
+        str(skill_md),
+        "first\r\nsecond\r\n",
+        skill_source=skill,
+    ) == ("SKILL.md", "first\nsecond\n")
+    assert (
+        validated_skill_read(
+            str(skill_md),
+            "first\r\nsecond\r\n\r\n",
+            skill_source=skill,
+        )
+        is None
+    )
 
 
 def test_command_classifier_accepts_codex_full_range_sed_only_for_exact_skill_read(

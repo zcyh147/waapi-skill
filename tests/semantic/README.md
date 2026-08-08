@@ -401,6 +401,11 @@ selected Windows backend, Codex can reject a Python Gateway command at its
 execution-policy boundary before PATH resolution or broker authentication.
 The fixed backend remains combined with `workspace-write`, approval policy
 `never`, and the existing broker boundary; it is not a permission bypass.
+Windows PowerShell 5.1 does not reliably infer UTF-8 for these Markdown files.
+The Skill therefore requires exact `Get-Content -Raw -Encoding UTF8 <path>`
+reads. Evidence parsing accepts that form only from the verified system
+PowerShell wrapper, normalizes line-ending conventions, and tolerates only the
+single terminal newline that PowerShell adds to the otherwise complete text.
 
 ## Live prerequisites and evidence
 

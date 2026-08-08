@@ -143,9 +143,21 @@ bounded routes, process mode changes have confirmed non-retry transactions,
 once-only terminal transactions with explicit indeterminate lifecycle
 evidence.
 
-## Inspect the exact packaged route lists
+## Inspect aggregate counts and exact packaged route lists
 
-Use the offline catalog instead of copying a static API list into a prompt:
+For aggregate counts across all five supported versions, use exactly this
+unfiltered offline summary:
+
+```bash
+python /absolute/path/to/waapi-skill/scripts/run.py gateway.py capabilities --all-versions --summary-only
+```
+
+That summary already contains each version's `total` and every
+`preferred_routes` count, including `transaction_operation` and
+`unsupported_boundary`. Do not combine `--summary-only` with row filters.
+
+For row-level inventories, omit `--summary-only` and use the offline catalog
+filters instead of copying a static API list into a prompt:
 
 ```bash
 python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version 2022.1 capabilities --limit 0
@@ -166,7 +178,7 @@ closed until the packaged contract is reviewed and updated.
 
 ## Verification scope
 
-The focused program gate currently contains 2574 passing tests and exercises
+The focused program gate currently contains 2575 passing tests and exercises
 all 808 packaged route-contract version/API rows with
 in-process fake clients. It validates exact URI dispatch, reflected request and
 result/event schemas, timeout/result ceilings, all three modification-policy

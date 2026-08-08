@@ -30,7 +30,7 @@ def test_common_reads_use_closed_gateway_before_optional_references() -> None:
     assert "request a zero/short tool-output budget" in SKILL
     assert "continue from the shell exit code alone" in SKILL
     assert "If no complete JSON is visible, stop" in SKILL
-    assert "Read one lane reference only when the fixed command table does not fully answer" in SKILL
+    assert "Read one lane reference only when fixed commands are insufficient" in SKILL
     assert "There is no raw-client fallback" in QUERY
 
 
@@ -106,13 +106,13 @@ def test_media_pool_reference_classification_documents_terminal_result_and_bound
 def test_initial_skill_bootstrap_is_the_only_combined_read_exception() -> None:
     assert "make the first shell action only the injected `SKILL.md` read" in SKILL
     assert "Do not prepend or append `pwd`, `git`, `rg`, `ls`, `find`, `printf`" in SKILL
-    assert "Before any other shell action, read only the injected absolute SKILL.md locator" in SKILL
-    assert "After this entry file has been loaded" in SKILL
-    assert "scoped to the whole visible conversation/task, not to each user turn" in SKILL
-    assert "do not read it again on a confirmation or other transaction-continuation turn" in SKILL
-    assert "same absolute file" in SKILL
+    assert "Before any other shell action, read only that literal locator" in SKILL
+    assert "Read each later named lane reference exactly once" in SKILL
+    assert "spans the visible task, not each turn" in SKILL
+    assert "do not reread it for confirmation or continuation" in SKILL
+    assert "same literal file" in SKILL
     assert "this is the only combined read allowed" in SKILL
-    assert "Never combine a reference read, gateway invocation, or any other commands" in SKILL
+    assert "Never combine a reference read, gateway invocation, or other commands" in SKILL
 
 
 def test_skill_entry_fits_the_fresh_codex_bootstrap_window() -> None:
@@ -830,6 +830,21 @@ def test_soundbank_topic_selection_distinguishes_per_result_from_cycle_notice() 
     assert "`generationDone` is not proof that every Bank succeeded" in query_flat
     assert "use the generating operation's terminal verification" in query_flat
     assert "`interface.selection_guidance`" in query_flat
+
+
+def test_capability_summary_is_unfiltered_and_route_filters_are_row_only() -> None:
+    summary_command = "capabilities --all-versions --summary-only"
+
+    assert f"run exactly `{summary_command}`" in SKILL
+    assert "For five-version totals, first read coverage as directed below" in SKILL
+    assert "it includes every route count" in SKILL
+    assert "Row filters omit `--summary-only`" in SKILL
+    assert "are the exception below" in SKILL
+    assert "read `references/waapi-coverage.md` once after `SKILL.md`" in SKILL
+    assert "before the summary" in SKILL
+    assert summary_command in COVERAGE
+    assert "Do not combine `--summary-only` with row filters" in COVERAGE
+    assert "For row-level inventories, omit `--summary-only`" in COVERAGE
 
 
 def test_five_version_coverage_reference_reports_executable_registry_not_boundaries() -> None:

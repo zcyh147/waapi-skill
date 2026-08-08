@@ -2889,8 +2889,18 @@ def test_extra_command_after_completion_invalidates_terminal_evidence(tmp_path: 
         assert extra.returncode == 126
         assert "terminal COMPLETE" in extra.stderr
         assert len((broker.state_directory / "fake-runner-calls.jsonl").read_text().splitlines()) == 1
-        assert broker.evidence().terminal_state == "FAILED"
-        assert broker.evidence().passed is False
+        evidence = broker.evidence()
+        assert evidence.terminal_state == "FAILED"
+        assert evidence.passed is False
+        assert len(evidence.records) == 2
+        rejected = evidence.records[1]
+        assert rejected.step_name is None
+        assert rejected.authenticated is True
+        assert rejected.accepted is False
+        assert rejected.rejection == "broker is terminal COMPLETE"
+        assert rejected.exit_code == 126
+        assert rejected.runner_exit_code is None
+        assert rejected.allowed_exit_codes == ()
 
 
 def test_broker_rejects_wrong_preview_json_and_bad_dynamic_binding(tmp_path: Path) -> None:

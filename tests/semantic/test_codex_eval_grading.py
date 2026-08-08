@@ -322,6 +322,10 @@ def _make_bundle(
     (skill / "references").mkdir(parents=True)
     (skill / "scripts").mkdir()
     (skill / "SKILL.md").write_text("# skill\n", encoding="utf-8")
+    (skill / "references" / "waapi-coverage.md").write_text(
+        "# coverage\n",
+        encoding="utf-8",
+    )
     (skill / "references" / "waapi-operate.md").write_text("# operate\n", encoding="utf-8")
     (skill / "references" / "waapi-query.md").write_text("# query\n", encoding="utf-8")
     (skill / "scripts" / "run.py").write_text("# packaged runner\n", encoding="utf-8")
@@ -333,6 +337,8 @@ def _make_bundle(
     if reads is None:
         if session.case.id in {"M1", "M2", "M3", "M4", "M5", "M6", "M7", "I1", "S1", "W1", "W2"}:
             reads = ("SKILL.md", "references/waapi-operate.md")
+        elif session.case.id == "C1":
+            reads = ("SKILL.md", "references/waapi-coverage.md")
         elif session.case.id in {"Q2", "Q3", "Q4"}:
             reads = ("SKILL.md", "references/waapi-query.md")
         else:
@@ -703,6 +709,32 @@ def test_fast_path_queries_remain_skill_only(tmp_path: Path, case_id: str) -> No
     assert grade.failed_gate_ids == ("skill_md_read",)
 
 
+def test_c1_requires_exact_coverage_reference_read(tmp_path: Path) -> None:
+    session = _session("C1", "single")
+    result, evidence, reconciliation, paths = _make_bundle(tmp_path / "valid", session)
+    assert _grade(session, result, evidence, reconciliation, paths).passed is True
+
+    result, evidence, reconciliation, paths = _make_bundle(
+        tmp_path / "missing",
+        session,
+        read_files=("SKILL.md",),
+    )
+    grade = _grade(session, result, evidence, reconciliation, paths)
+    assert grade.failed_gate_ids == ("skill_md_read",)
+
+    result, evidence, reconciliation, paths = _make_bundle(
+        tmp_path / "extra",
+        session,
+        read_files=(
+            "SKILL.md",
+            "references/waapi-coverage.md",
+            "references/waapi-query.md",
+        ),
+    )
+    grade = _grade(session, result, evidence, reconciliation, paths)
+    assert grade.failed_gate_ids == ("skill_md_read",)
+
+
 def test_screening_read_policy_partitions_all_40_sessions() -> None:
     sessions = SUITE.expand_profile("screening")
     actual = {
@@ -710,10 +742,11 @@ def test_screening_read_policy_partitions_all_40_sessions() -> None:
         for session in sessions
     }
     skill_only = {
-        *((case_id, "single") for case_id in ("Q1", "Q5", "C1")),
+        *((case_id, "single") for case_id in ("Q1", "Q5")),
         *((case_id, "single") for case_id in ("B1", "B2", "B3", "B4", "B5", "B6", "B7")),
         *((case_id, "single") for case_id in ("R1", "R2", "R3", "R4")),
     }
+    coverage_required = {("C1", "single")}
     query_required = {("Q2", "single"), ("Q4", "single")}
     query_optional = {(case_id, "single") for case_id in ("Q3", "R5", "R6")}
     operate = {
@@ -723,8 +756,12 @@ def test_screening_read_policy_partitions_all_40_sessions() -> None:
     } | {("M2", "single")}
 
     assert len(sessions) == len(actual) == 40
-    assert set(actual) == skill_only | query_required | query_optional | operate
+    assert set(actual) == skill_only | coverage_required | query_required | query_optional | operate
     assert all(actual[key] == (("SKILL.md",),) for key in skill_only)
+    assert all(
+        actual[key] == (("SKILL.md", "references/waapi-coverage.md"),)
+        for key in coverage_required
+    )
     assert all(
         actual[key] == (("SKILL.md", "references/waapi-query.md"),)
         for key in query_required

@@ -66,6 +66,7 @@ OPERATE_REFERENCE = "references/waapi-operate.md"
 QUERY_REFERENCE_CASE_IDS = frozenset({"Q2", "Q4"})
 QUERY_SKILL_OR_REFERENCE_CASE_IDS = frozenset({"Q3", "R5", "R6"})
 QUERY_REFERENCE = "references/waapi-query.md"
+COVERAGE_REFERENCE = "references/waapi-coverage.md"
 
 
 @dataclass(frozen=True, slots=True)
@@ -459,6 +460,8 @@ def _commands_have_safe_read_prefix_and_exact_broker_suffix(
 
 
 def _allowed_read_sequences(session: EvalSession) -> tuple[tuple[str, ...], ...]:
+    if session.case.id == "C1":
+        return (("SKILL.md", COVERAGE_REFERENCE),)
     if session.case.id in OPERATE_CASE_IDS:
         return (("SKILL.md", OPERATE_REFERENCE),)
     if session.case.id in QUERY_SKILL_OR_REFERENCE_CASE_IDS:
