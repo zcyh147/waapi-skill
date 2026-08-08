@@ -121,6 +121,10 @@ def _phase_identity(session: EvalSession, **overrides: Any) -> dict[str, Any]:
     return value
 
 
+def _synthetic_runner(output_dir: Path) -> str:
+    return str(output_dir / ".synthetic-skill" / "scripts" / "run.py")
+
+
 def _write_no_action_evidence(output_dir: Path, *, include_facts: bool) -> None:
     _write_json(
         output_dir / "broker-evidence.json",
@@ -180,7 +184,7 @@ def _write_completed_phase(
             "gates": gate_rows,
         },
     )
-    runner = "/synthetic/waapi-skill/scripts/run.py"
+    runner = _synthetic_runner(output_dir)
     command_records: list[dict[str, Any]] = []
     records: list[dict[str, Any]] = []
     gateway_attempt_commands: list[str] = []
@@ -287,7 +291,7 @@ def _write_coherent_rejected_gateway_trace(
     *,
     session: EvalSession,
 ) -> None:
-    runner = "/synthetic/waapi-skill/scripts/run.py"
+    runner = _synthetic_runner(output_dir)
     expected_step = session.gateway_steps[0]
     wrong_argv = [
         "python",
@@ -390,7 +394,7 @@ def _write_post_complete_rejected_gateway_trace(
 ) -> None:
     broker_path = output_dir / "broker-evidence.json"
     broker = json.loads(broker_path.read_text(encoding="utf-8"))
-    runner = "/synthetic/waapi-skill/scripts/run.py"
+    runner = _synthetic_runner(output_dir)
     extra_argv = [
         "python",
         runner,
