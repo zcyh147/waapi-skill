@@ -363,6 +363,11 @@ rejects `%USERPROFILE%\.codex\.sandbox-bin` and skips protected Microsoft Store
 `Program Files\WindowsApps` executables that cannot be launched as child
 processes. Install the standalone CLI or pass its exact real path with
 `--codex-binary`; do not substitute a `.cmd`, `cmd.exe`, or `shell=True` launch.
+Because campaigns ignore user configuration, native Windows execution must also
+pin Codex's `windows.sandbox` backend to `unelevated` while retaining
+`workspace-write` and approval policy `never`. Omitting that backend leaves the
+managed-filesystem policy without a sandbox implementation and can decline the
+first non-safe Gateway command before it reaches the authenticated broker.
 
 The official profiles are `screening` (40 sessions), `formal_98` (98), and
 `full_cross_version_168` (168). Run the latter two only when the user explicitly

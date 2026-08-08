@@ -31,6 +31,7 @@ DEFAULT_MODEL = "gpt-5.6-sol"
 DEFAULT_REASONING_EFFORT = "medium"
 DEFAULT_SERVICE_TIER = "priority"
 DEFAULT_TIMEOUT_SECONDS = 180.0
+WINDOWS_SEMANTIC_SANDBOX_MODE = "unelevated"
 WINDOWS_HARD_REAP_SECONDS = 5.0
 PROMPT_AUDIT_TIMEOUT_SECONDS = 30.0
 PROMPT_AUDIT_MAX_ATTEMPTS = 2
@@ -2122,6 +2123,10 @@ def _build_exec_prefix(
     ]
     if ephemeral:
         command.append("--ephemeral")
+    if _is_windows():
+        command.extend(
+            ("-c", f'windows.sandbox="{WINDOWS_SEMANTIC_SANDBOX_MODE}"')
+        )
     command.extend(
         [
             "--model",

@@ -395,6 +395,13 @@ process. Install the official standalone CLI when no candidate exists, or pass
 its exact real path with `--codex-binary`. `.cmd`, `cmd.exe`, and `shell=True`
 are not accepted substitutes.
 
+The harness passes `windows.sandbox="unelevated"` explicitly on native Windows.
+This is required because fresh tasks ignore user configuration: without a
+selected Windows backend, Codex can reject a Python Gateway command at its
+execution-policy boundary before PATH resolution or broker authentication.
+The fixed backend remains combined with `workspace-write`, approval policy
+`never`, and the existing broker boundary; it is not a permission bypass.
+
 ## Live prerequisites and evidence
 
 Live phases require the exact version-specific WwiseConsole executable and

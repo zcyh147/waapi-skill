@@ -760,6 +760,71 @@ def test_exec_command_supports_brokered_read_only_model_sandbox_without_writable
     assert "sandbox_workspace_write.network_access=false" in command
 
 
+def test_native_windows_exec_and_task_commands_pin_unelevated_sandbox(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module,
+        "_is_windows",
+        lambda platform_name=None: True,
+    )
+    config = CodexHarnessConfig(
+        workspace=tmp_path,
+        skill_source=tmp_path / "skill",
+        codex_binary=tmp_path / "codex.exe",
+    )
+    output_dir = tmp_path / "outputs"
+
+    commands = (
+        build_exec_command(config, prompt="Inspect it.", writable_dir=output_dir),
+        build_task_exec_command(config, prompt="Preview it.", writable_dir=output_dir),
+        build_task_resume_command(
+            config,
+            thread_id="thread-exact-123",
+            prompt="Confirm it.",
+            writable_dir=output_dir,
+        ),
+    )
+
+    for command in commands:
+        assert command.count('windows.sandbox="unelevated"') == 1
+        assert 'approval_policy="never"' in command
+        assert "--ignore-user-config" in command
+        assert command[command.index("--sandbox") + 1] == "workspace-write"
+
+
+def test_non_windows_exec_and_task_commands_do_not_set_windows_sandbox(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module,
+        "_is_windows",
+        lambda platform_name=None: False,
+    )
+    config = CodexHarnessConfig(
+        workspace=tmp_path,
+        skill_source=tmp_path / "skill",
+        codex_binary=tmp_path / "codex",
+    )
+    output_dir = tmp_path / "outputs"
+
+    commands = (
+        build_exec_command(config, prompt="Inspect it.", writable_dir=output_dir),
+        build_task_exec_command(config, prompt="Preview it.", writable_dir=output_dir),
+        build_task_resume_command(
+            config,
+            thread_id="thread-exact-123",
+            prompt="Confirm it.",
+            writable_dir=output_dir,
+        ),
+    )
+
+    for command in commands:
+        assert not any(value.startswith("windows.sandbox=") for value in command)
+
+
 def test_task_commands_start_non_ephemeral_then_resume_exact_thread_with_isolation_flags(
     tmp_path: Path,
 ) -> None:
