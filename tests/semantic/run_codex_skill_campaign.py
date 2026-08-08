@@ -24,7 +24,7 @@ import stat
 import subprocess
 import sys
 import time
-from dataclasses import asdict, dataclass, fields, is_dataclass
+from dataclasses import asdict, dataclass, fields, is_dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -209,6 +209,7 @@ from tests.semantic.support.codex_harness import (  # noqa: E402
     CodexGatewayErrorExpectation,
     CodexHarnessConfig,
     CodexHarnessError,
+    WindowsPowerShellCoreHost,
     audit_session_events,
     build_task_exec_command,
     build_task_resume_command,
@@ -218,9 +219,12 @@ from tests.semantic.support.codex_harness import (  # noqa: E402
     codex_runtime_files,
     completed_command_records,
     count_invalid_jsonl_lines,
+    discover_windows_powershell_core,
     final_agent_message,
     is_evaluation_sensitive_environment_key,
     parse_jsonl_events,
+    powershell_core_host_fingerprint,
+    probe_windows_powershell_core,
     turn_usage,
     validate_codex_version_output,
 )
@@ -295,6 +299,16 @@ TERRA_LOCKED_V3_PROFILE_IDS = frozenset(
     }
 )
 HEAVY_V3_EFFECTIVE_CONTRACT = "waapi-skill.codex-semantic-campaign-effective/v3"
+WINDOWS_SHELL_BACKEND = "pwsh-ps1-v1"
+_WINDOWS_POWERSHELL_CORE_HOST_KEYS = frozenset(
+    {
+        "edition",
+        "path",
+        "version",
+        "native_argument_passing",
+        "sha256",
+    }
+)
 HEAVY_V3_PHASE = "scenario"
 HEAVY_V3_GROUP_ID = "heavy-v3"
 HEAVY_V3_PROJECT_OUTCOME_CONTRACT = "waapi-skill.codex-heavy-project-run/v3"
@@ -384,6 +398,7 @@ class CampaignOptions:
     offline_only: bool
     lock_timeout_seconds: float
     max_pre_action_retries: int
+    windows_powershell_core_host: WindowsPowerShellCoreHost | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -668,6 +683,7 @@ def run_campaign(options: CampaignOptions) -> int:
         effective = build_effective_config(options, sessions=sessions, required_units=required_units)
     except (CampaignEvidenceError, OSError, subprocess.SubprocessError) as exc:
         raise CampaignConfigError(f"cannot fingerprint campaign inputs: {exc}") from exc
+    sealed_windows_host = _sealed_windows_powershell_core_host(effective)
 
     root = prepare_campaign_root(options)
     with CampaignLock(root, timeout_seconds=options.lock_timeout_seconds):
@@ -736,7 +752,12 @@ def run_campaign(options: CampaignOptions) -> int:
                     group_root = attempt_root / "runs" / group.group_id
                     matrix_root = group_root / "matrix"
                     group_root.mkdir(parents=True, exist_ok=False)
-                    argv_child = build_child_argv(options, group=group, matrix_root=matrix_root)
+                    argv_child = build_child_argv(
+                        options,
+                        group=group,
+                        matrix_root=matrix_root,
+                        windows_powershell_core_host=sealed_windows_host,
+                    )
                     atomic_write_json_with_digest(
                         group_root / "child-request.json",
                         {
@@ -903,6 +924,11 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
         )
     except (CampaignEvidenceError, OSError, subprocess.SubprocessError) as exc:
         raise CampaignConfigError(f"cannot fingerprint heavy campaign inputs: {exc}") from exc
+    sealed_windows_host = _sealed_windows_powershell_core_host(effective)
+    validation_options = replace(
+        options,
+        windows_powershell_core_host=sealed_windows_host,
+    )
 
     root = prepare_campaign_root(options)
     with CampaignLock(root, timeout_seconds=options.lock_timeout_seconds):
@@ -997,6 +1023,7 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
                     options,
                     units=scheduled_units,
                     matrix_root=matrix_root,
+                    windows_powershell_core_host=sealed_windows_host,
                 )
                 request_payload = heavy_v3_child_request(
                     options,
@@ -1051,7 +1078,7 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
                     validation = validate_heavy_v3_child_run(
                         matrix_root,
                         expected_units=scheduled_units,
-                        options=options,
+                        options=validation_options,
                         returncode=completed.returncode,
                     )
                     if options.profile == MODIFICATION_POLICY_V3_PROFILE_ID:
@@ -1140,6 +1167,7 @@ def load_heavy_v3_campaign_units(options: CampaignOptions) -> tuple[Any, ...]:
         suite_path=options.suite_path,
         skill_source=options.skill_source,
         codex_binary=options.codex_binary,
+        windows_powershell_core_host=options.windows_powershell_core_host,
         auth_json=options.auth_json,
         live_config=options.live_config,
         model=options.model,
@@ -1160,6 +1188,7 @@ def build_heavy_v3_child_argv(
     *,
     units: Sequence[Any],
     matrix_root: Path,
+    windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
 ) -> list[str]:
     if not units:
         raise CampaignEvidenceError("heavy child requires at least one scenario")
@@ -1189,6 +1218,15 @@ def build_heavy_v3_child_argv(
         "--timeout",
         str(options.timeout_seconds),
     ]
+    if windows_powershell_core_host is not None:
+        argv.extend(
+            (
+                "--sealed-windows-powershell-core-host-json",
+                _windows_powershell_core_host_cli_json(
+                    windows_powershell_core_host
+                ),
+            )
+        )
     for unit in units:
         argv.extend(("--case-id", str(unit.unit_id)))
     return argv
@@ -1365,7 +1403,11 @@ def prepare_campaign_root(options: CampaignOptions) -> Path:
     return root
 
 
-def _codex_version_fingerprint(binary: Path) -> str:
+def _codex_version_fingerprint(
+    binary: Path,
+    *,
+    windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
+) -> str:
     """Probe one exact Codex executable and retain its path in every failure."""
 
     candidate = Path(binary)
@@ -1373,7 +1415,11 @@ def _codex_version_fingerprint(binary: Path) -> str:
         completed = subprocess.run(
             [str(candidate), "--version"],
             cwd=REPO_ROOT,
-            env=codex_process_environment(candidate, os.environ),
+            env=codex_process_environment(
+                candidate,
+                os.environ,
+                powershell_core_host=windows_powershell_core_host,
+            ),
             text=True,
             encoding="utf-8",
             errors="strict",
@@ -1431,6 +1477,127 @@ def _codex_runtime_fingerprints(binary: Path) -> list[dict[str, str]]:
         ) from exc
 
 
+def _windows_powershell_core_host_seal(
+    *,
+    platform_name: str | None = None,
+    host: WindowsPowerShellCoreHost | None = None,
+) -> dict[str, str] | None:
+    """Seal the exact PowerShell Core host used by native Windows campaigns."""
+
+    active_platform = os.name if platform_name is None else str(platform_name)
+    if active_platform != "nt" and not active_platform.startswith("win"):
+        if host is not None:
+            raise CampaignConfigError(
+                "Windows PowerShell Core host cannot be sealed on a non-Windows host"
+            )
+        return None
+    try:
+        selected = host or discover_windows_powershell_core(
+            platform_name=active_platform
+        )
+        fingerprint = powershell_core_host_fingerprint(selected)
+    except (CodexHarnessError, OSError, TypeError, ValueError) as exc:
+        raise CampaignConfigError(
+            "Windows PowerShell Core host fingerprint probe failed: "
+            f"{type(exc).__name__}: {exc}"
+        ) from exc
+    return {"edition": "Core", **fingerprint}
+
+
+def _codex_shell_effective_config(
+    host: WindowsPowerShellCoreHost | None = None,
+) -> dict[str, Any]:
+    host_fingerprint = _windows_powershell_core_host_seal(host=host)
+    return {
+        "windows_powershell_core_host": host_fingerprint,
+        "windows_shell_backend": (
+            WINDOWS_SHELL_BACKEND if host_fingerprint is not None else None
+        ),
+        "allow_login_shell": False,
+    }
+
+
+def _sealed_windows_powershell_core_host(
+    effective: Mapping[str, Any],
+) -> WindowsPowerShellCoreHost | None:
+    codex = effective.get("codex")
+    if not isinstance(codex, Mapping):
+        raise CampaignEvidenceError("campaign Codex fingerprint is malformed")
+    value = codex.get("windows_powershell_core_host")
+    if value is None:
+        return None
+    if (
+        not isinstance(value, Mapping)
+        or set(value) != _WINDOWS_POWERSHELL_CORE_HOST_KEYS
+        or value.get("edition") != "Core"
+    ):
+        raise CampaignEvidenceError(
+            "Windows PowerShell Core host fingerprint is malformed"
+        )
+    try:
+        return WindowsPowerShellCoreHost(
+            executable=str(value["path"]),
+            version=str(value["version"]),
+            native_argument_passing=str(value["native_argument_passing"]),
+            sha256=str(value["sha256"]),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise CampaignEvidenceError(
+            "Windows PowerShell Core host fingerprint is malformed"
+        ) from exc
+
+
+def _assert_codex_shell_frozen(
+    codex: Mapping[str, Any],
+    *,
+    platform_name: str | None = None,
+) -> None:
+    """Re-probe the sealed shell executable instead of rediscovering ambient PATH."""
+
+    if codex.get("allow_login_shell") is not False:
+        raise CampaignEvidenceError(
+            "campaign Codex login-shell policy drifted from the immutable fingerprint"
+        )
+    expected = codex.get("windows_powershell_core_host")
+    backend = codex.get("windows_shell_backend")
+    active_platform = os.name if platform_name is None else str(platform_name)
+    if active_platform != "nt" and not active_platform.startswith("win"):
+        if expected is not None or backend is not None:
+            raise CampaignEvidenceError(
+                "Windows PowerShell Core host fingerprint does not match this platform"
+            )
+        return
+    if (
+        not isinstance(expected, Mapping)
+        or set(expected) != _WINDOWS_POWERSHELL_CORE_HOST_KEYS
+        or expected.get("edition") != "Core"
+        or backend != WINDOWS_SHELL_BACKEND
+    ):
+        raise CampaignEvidenceError(
+            "Windows PowerShell Core host fingerprint is malformed"
+        )
+    executable = expected.get("path")
+    if not isinstance(executable, str):
+        raise CampaignEvidenceError(
+            "Windows PowerShell Core host fingerprint is malformed"
+        )
+    try:
+        current_host = probe_windows_powershell_core(executable)
+        current = {
+            "edition": "Core",
+            **powershell_core_host_fingerprint(current_host),
+        }
+    except (CodexHarnessError, OSError, TypeError, ValueError) as exc:
+        raise CampaignEvidenceError(
+            "Windows PowerShell Core host drifted from the immutable fingerprint: "
+            f"{type(exc).__name__}: {exc}"
+        ) from exc
+    if dict(expected) != current:
+        raise CampaignEvidenceError(
+            "Windows PowerShell Core host drifted from the immutable fingerprint"
+        )
+
+
 def build_effective_config(
     options: CampaignOptions,
     *,
@@ -1440,7 +1607,10 @@ def build_effective_config(
     skill_excludes = (".venv", "__pycache__", ".pytest_cache", ".DS_Store", ".coverage")
     harness_excludes = ("__pycache__", ".pytest_cache", ".DS_Store", ".coverage")
     interpreter = Path(sys.executable).resolve(strict=True)
-    codex_version = _codex_version_fingerprint(options.codex_binary)
+    codex_version = _codex_version_fingerprint(
+        options.codex_binary,
+        windows_powershell_core_host=options.windows_powershell_core_host,
+    )
     distributions = _runtime_distribution_fingerprint()
     session_rows = [
         {
@@ -1490,6 +1660,7 @@ def build_effective_config(
             "path": str(options.codex_binary),
             "sha256": sha256_file(options.codex_binary),
             "runtime_files": _codex_runtime_fingerprints(options.codex_binary),
+            **_codex_shell_effective_config(options.windows_powershell_core_host),
             "version": codex_version,
             "model": options.model,
             "reasoning_effort": options.reasoning_effort,
@@ -1518,6 +1689,14 @@ def build_effective_config(
     }
 
 
+def _windows_powershell_core_host_cli_json(
+    host: WindowsPowerShellCoreHost,
+) -> str:
+    return canonical_json_bytes(
+        {"edition": "Core", **powershell_core_host_fingerprint(host)}
+    ).decode("utf-8")
+
+
 def build_heavy_v3_effective_config(
     options: CampaignOptions,
     *,
@@ -1533,7 +1712,10 @@ def build_heavy_v3_effective_config(
     interpreter = Path(sys.executable).resolve(strict=True)
     matrix_runner = Path(matrix.__file__).resolve(strict=True)
     campaign_runner = Path(__file__).resolve(strict=True)
-    codex_version = _codex_version_fingerprint(options.codex_binary)
+    codex_version = _codex_version_fingerprint(
+        options.codex_binary,
+        windows_powershell_core_host=options.windows_powershell_core_host,
+    )
     distributions = _runtime_distribution_fingerprint()
     unit_rows = [
         {
@@ -1615,6 +1797,7 @@ def build_heavy_v3_effective_config(
             "path": str(options.codex_binary),
             "sha256": sha256_file(options.codex_binary),
             "runtime_files": _codex_runtime_fingerprints(options.codex_binary),
+            **_codex_shell_effective_config(options.windows_powershell_core_host),
             "version": codex_version,
             "model": options.model,
             "reasoning_effort": options.reasoning_effort,
@@ -3140,6 +3323,7 @@ def _validate_heavy_v3_retryable_failed_facts(
         events_path,
         value,
         label="retryable heavy failed turn",
+        windows_powershell_core_host=options.windows_powershell_core_host,
     )
     events_text = _load_strict_regular_text(events_path)
     stderr = _load_strict_regular_text(turn_root / "stderr.txt")
@@ -3213,6 +3397,7 @@ def _validate_heavy_v3_retryable_failed_facts(
         workspace=task_root / "agent-workspace",
         skill_source=options.skill_source,
         codex_binary=options.codex_binary,
+        windows_powershell_core_host=options.windows_powershell_core_host,
         auth_json=options.auth_json,
         model=options.model,
         reasoning_effort=options.reasoning_effort,
@@ -5013,6 +5198,7 @@ def _validate_heavy_v3_codex_facts(
         turn_root / "events.jsonl",
         value,
         label="passing heavy turn",
+        windows_powershell_core_host=options.windows_powershell_core_host,
     )
     prompt_audit = value.get("prompt_audit")
     isolation_audit = value.get("isolation_audit")
@@ -5049,6 +5235,7 @@ def _validate_heavy_v3_codex_facts(
         workspace=task_root / "agent-workspace",
         skill_source=options.skill_source,
         codex_binary=options.codex_binary,
+        windows_powershell_core_host=options.windows_powershell_core_host,
         auth_json=options.auth_json,
         model=options.model,
         reasoning_effort=options.reasoning_effort,
@@ -5240,6 +5427,7 @@ def _validate_heavy_v3_events_against_facts(
     facts: Mapping[str, Any],
     *,
     label: str,
+    windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
 ) -> tuple[Any, ...]:
     """Rebuild stable Codex facts from archived JSONL instead of trusting child JSON."""
 
@@ -5278,7 +5466,11 @@ def _validate_heavy_v3_events_against_facts(
     )
     expected_session = asdict(session)
     expected_session["passed"] = session.passed
-    expected_records = [asdict(item) for item in completed_command_records(events)]
+    command_records = completed_command_records(
+        events,
+        windows_powershell_core_host=windows_powershell_core_host,
+    )
+    expected_records = [asdict(item) for item in command_records]
     command_facts = facts.get("command_facts")
     expected_thread_id = session.thread_ids[0] if len(session.thread_ids) == 1 else ""
     if (
@@ -5289,7 +5481,7 @@ def _validate_heavy_v3_events_against_facts(
         or command_facts.get("command_records")
         != _json_canonical_value(expected_records)
         or command_facts.get("commands")
-        != [item.command for item in completed_command_records(events)]
+        != [item.command for item in command_records]
         or facts.get("final_response") != final_agent_message(events)
         or facts.get("usage") != turn_usage(events)
         or facts.get("thread_id") != expected_thread_id
@@ -5299,7 +5491,7 @@ def _validate_heavy_v3_events_against_facts(
         raise CampaignEvidenceError(
             f"{label} Codex facts cannot be reconstructed from events.jsonl"
         )
-    return completed_command_records(events)
+    return command_records
 
 
 def _json_canonical_value(value: Any) -> Any:
@@ -12159,6 +12351,7 @@ def assert_effective_inputs_frozen(
         raise CampaignEvidenceError(
             "Codex runtime helpers drifted from the immutable campaign fingerprint"
         )
+    _assert_codex_shell_frozen(codex)
 
     interpreter = Path(sys.executable).resolve(strict=True)
     if (
@@ -12235,6 +12428,7 @@ def build_child_argv(
     *,
     group: ChildGroup,
     matrix_root: Path,
+    windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
 ) -> list[str]:
     argv = [
         sys.executable,
@@ -12262,6 +12456,15 @@ def build_child_argv(
         "--timeout",
         str(options.timeout_seconds),
     ]
+    if windows_powershell_core_host is not None:
+        argv.extend(
+            (
+                "--sealed-windows-powershell-core-host-json",
+                _windows_powershell_core_host_cli_json(
+                    windows_powershell_core_host
+                ),
+            )
+        )
     if group.offline_only:
         argv.append("--offline-only")
     else:
@@ -12728,6 +12931,11 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         suite_path = Path(suite).expanduser().resolve(strict=True)
         skill_source = Path(args.skill_source).expanduser().resolve(strict=True)
         codex_binary = matrix.resolve_codex_binary(args.codex_binary)
+        windows_powershell_core_host = (
+            discover_windows_powershell_core(platform_name="nt")
+            if os.name == "nt"
+            else None
+        )
         auth_json = Path(args.auth_json).expanduser().resolve(strict=True)
         live_config = Path(args.live_config).expanduser().resolve(strict=True)
     except (OSError, matrix.CodexHarnessError) as exc:
@@ -12752,6 +12960,7 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         offline_only=bool(args.offline_only),
         lock_timeout_seconds=float(args.lock_timeout),
         max_pre_action_retries=int(args.max_pre_action_retries),
+        windows_powershell_core_host=windows_powershell_core_host,
     )
 
 

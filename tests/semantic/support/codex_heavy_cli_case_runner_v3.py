@@ -68,6 +68,7 @@ from tests.semantic.support.codex_gateway_broker import (
 from tests.semantic.support.codex_harness import (
     CodexHarnessError,
     CodexInfrastructureError,
+    WindowsPowerShellCoreHost,
     first_gateway_backed_agent_message,
 )
 from tests.semantic.support.codex_scenario_lifecycle_v3 import (
@@ -210,6 +211,7 @@ class HeavyCliRunnerOptions:
     service_tier: str
     timeout_seconds: float
     live_environment: Mapping[str, str]
+    windows_powershell_core_host: WindowsPowerShellCoreHost | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -939,6 +941,7 @@ def run_heavy_cli_unit(
                 task_root=task_root,
                 skill_source=options.skill_source,
                 codex_binary=options.codex_binary,
+                windows_powershell_core_host=options.windows_powershell_core_host,
                 auth_json=options.auth_json,
                 model=options.model,
                 reasoning_effort=options.reasoning_effort,

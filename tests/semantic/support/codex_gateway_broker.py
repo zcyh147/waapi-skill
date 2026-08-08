@@ -88,11 +88,11 @@ _PYTHON_IO_ENCODING_ENV = "PYTHONIOENCODING"
 _PYTHON_NAMES = frozenset({"python", "python3"})
 WINDOWS_SHIM_SCRIPT_NAME = "broker_shim.py"
 WINDOWS_COMMAND_SHIM_NAMES = tuple(
-    f"{name}.cmd" for name in sorted(_PYTHON_NAMES)
+    f"{name}.ps1" for name in sorted(_PYTHON_NAMES)
 )
 _WINDOWS_PATHEXT_NAME = "PATHEXT"
 _WINDOWS_PATH_SEPARATOR = ";"
-_WINDOWS_DEFAULT_PATHEXT = (".COM", ".EXE", ".BAT", ".CMD")
+_WINDOWS_DEFAULT_PATHEXT = (".COM", ".EXE", ".BAT", ".CMD", ".PS1")
 _WINDOWS_PATHEXT_RE = re.compile(r"^\.[A-Za-z0-9]{1,16}$")
 _SUPPORTED_WWISE_VERSIONS = frozenset({"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"})
 _BROKER_READY = "READY"
@@ -3425,7 +3425,7 @@ def _environment_value(
 
 
 def _normalize_windows_pathext(value: str | None) -> str:
-    """Return one closed PATHEXT with the broker's CMD shim preferred."""
+    """Return one closed PATHEXT with the broker's script shim preferred."""
 
     raw = (
         _WINDOWS_PATH_SEPARATOR.join(_WINDOWS_DEFAULT_PATHEXT)
@@ -3440,8 +3440,8 @@ def _normalize_windows_pathext(value: str | None) -> str:
         raise GatewayBrokerError(
             "Windows PATHEXT must be a non-empty semicolon-delimited list of safe extensions"
         )
-    normalized: list[str] = [".CMD"]
-    seen = {".cmd"}
+    normalized: list[str] = [".PS1"]
+    seen = {".ps1"}
     for part in parts:
         folded = part.casefold()
         if folded in seen:
@@ -4092,24 +4092,37 @@ except Exception as exc:
 
 
 def _windows_command_shim_source(interpreter_name: str) -> bytes:
-    """Build one ASCII CMD launcher without embedding any host path."""
+    """Build one BOM-free PowerShell relay with a fixed invocation shape."""
 
     if interpreter_name not in _PYTHON_NAMES:
         raise GatewayBrokerError(
             f"unsupported Windows shim interpreter name: {interpreter_name!r}"
         )
     lines = (
-        "@echo off",
-        "setlocal DisableDelayedExpansion",
-        f"if not defined {SHIM_TRUSTED_PYTHON_ENV} exit /b 125",
+        "$ErrorActionPreference = 'Stop'",
+        "$PSNativeCommandArgumentPassing = 'Standard'",
+        "$PSNativeCommandUseErrorActionPreference = $false",
         (
-            f'"%{SHIM_TRUSTED_PYTHON_ENV}%" '
-            f'"%~dp0{WINDOWS_SHIM_SCRIPT_NAME}" {interpreter_name} %*'
+            "$trustedPython = [Environment]::GetEnvironmentVariable("
+            f"'{SHIM_TRUSTED_PYTHON_ENV}', 'Process')"
         ),
-        "exit /b %ERRORLEVEL%",
+        "if ([String]::IsNullOrWhiteSpace($trustedPython)) { exit 125 }",
+        (
+            "$brokerShim = [System.IO.Path]::Combine("
+            f"$PSScriptRoot, '{WINDOWS_SHIM_SCRIPT_NAME}')"
+        ),
+        "try {",
+        "    $LASTEXITCODE = $null",
+        f"    & $trustedPython $brokerShim '{interpreter_name}' @args",
+        "    if ($null -eq $LASTEXITCODE) { exit 125 }",
+        "    exit $LASTEXITCODE",
+        "} catch {",
+        "    [Console]::Error.WriteLine('Codex gateway broker relay failed.')",
+        "    exit 125",
+        "}",
         "",
     )
-    return "\r\n".join(lines).encode("ascii")
+    return "\n".join(lines).encode("utf-8")
 
 
 class CodexGatewayBroker:
@@ -4804,7 +4817,7 @@ class CodexGatewayBroker:
             source_path = self.shim_directory / WINDOWS_SHIM_SCRIPT_NAME
             source_path.write_text(source, encoding="utf-8")
             for name in sorted(_PYTHON_NAMES):
-                path = self.shim_directory / f"{name}.cmd"
+                path = self.shim_directory / f"{name}.ps1"
                 path.write_bytes(_windows_command_shim_source(name))
             self._bash_env_path = None
             return

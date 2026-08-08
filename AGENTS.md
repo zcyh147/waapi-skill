@@ -368,10 +368,15 @@ pin Codex's `windows.sandbox` backend to `unelevated` while retaining
 `workspace-write` and approval policy `never`. Omitting that backend leaves the
 managed-filesystem policy without a sandbox implementation and can decline the
 first non-safe Gateway command before it reaches the authenticated broker.
-Windows PowerShell 5.1 Skill reads must use the exact literal form
-`Get-Content -Raw -Encoding UTF8 <path>`. The semantic harness credits that
-form only through the verified system-PowerShell wrapper; omitting `UTF8` can
-mojibake the Skill before the Agent reaches the Gateway.
+Formal Windows campaigns also require an attested PowerShell Core `pwsh.exe`
+version 7.3 or newer with `Standard` or `Windows` native argument passing. The
+campaign seals its path, version, mode, and SHA-256, forces a profile-free shell,
+and uses Broker-owned `python.ps1` / `python3.ps1` relays. Never restore the old
+`.cmd` relay: PowerShell intentionally uses legacy argument passing for batch
+files and can remove structural quotes from Gateway JSON before Broker
+authentication. Skill reads use the exact literal form
+`Get-Content -Raw -Encoding UTF8 <path>` and receive credit only through the
+sealed PowerShell Core wrapper.
 
 The official profiles are `screening` (40 sessions), `formal_98` (98), and
 `full_cross_version_168` (168). Run the latter two only when the user explicitly

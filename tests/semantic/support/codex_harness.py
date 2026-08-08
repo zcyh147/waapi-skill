@@ -43,6 +43,14 @@ CODEX_VERSION_PATTERN = re.compile(
     r"(?:\+[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$"
 )
 CODEX_VERSION_OUTPUT_MAX_BYTES = 256
+POWERSHELL_CORE_PROBE_TIMEOUT_SECONDS = 15.0
+POWERSHELL_CORE_VERSION_OUTPUT_MAX_BYTES = 256
+POWERSHELL_CORE_MINIMUM_VERSION = (7, 3, 0)
+POWERSHELL_CORE_VERSION_PATTERN = re.compile(
+    r"^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)"
+    r"(?:\.(?:0|[1-9][0-9]*))?$"
+)
+POWERSHELL_CORE_NATIVE_ARGUMENT_MODES = frozenset({"Standard", "Windows"})
 WORKSPACE_SKILL_EXCLUDED_NAMES = frozenset(
     {".venv", "__pycache__", ".pytest_cache", ".DS_Store", ".coverage"}
 )
@@ -123,16 +131,10 @@ _BROKER_WINDOWS_OVERLAY_NAMES = _BROKER_WINDOWS_MODEL_ENV_NAMES | {"PATH", "PATH
 _SHELL_ASSIGNMENT_RE = re.compile(r"(?P<name>[A-Za-z_][A-Za-z0-9_]*)=(?P<value>.*)", re.DOTALL)
 _PYTHON_EXECUTABLE_RE = re.compile(r"python(?:3(?:\.\d+)?)?(?:\.exe)?")
 _RUNNER_VERSION_SELECTORS = frozenset({"--version", "--wwise-version"})
-_WINDOWS_SYSTEM_POWERSHELL_SUFFIX = (
-    "system32",
-    "windowspowershell",
-    "v1.0",
-    "powershell.exe",
-)
-_WINDOWS_POWERSHELL_PARSER_KIND = "windows-powershell-command"
+_WINDOWS_POWERSHELL_CORE_PARSER_KIND = "windows-pwsh-command"
 _WINDOWS_ENCODED_POWERSHELL_PARSER_KIND = "windows-powershell-encoded"
 _WINDOWS_POWERSHELL_COMMAND_NAMES = frozenset({"powershell", "powershell.exe"})
-_UNSUPPORTED_PWSH_COMMAND_NAMES = frozenset({"pwsh", "pwsh.exe"})
+_WINDOWS_POWERSHELL_CORE_COMMAND_NAMES = frozenset({"pwsh", "pwsh.exe"})
 _POWERSHELL_BARE_FORBIDDEN = frozenset("|&;<>`$(){}[]@#,%*?\"'")
 _ALLOWED_SKILL_READS = frozenset(
     {
@@ -504,6 +506,202 @@ def _is_windows(platform_name: str | None = None) -> bool:
     return (os.name if platform_name is None else platform_name) == "nt"
 
 
+def _is_windows_platform(platform_name: str | None = None) -> bool:
+    active = os.name if platform_name is None else str(platform_name)
+    return active == "nt" or active.startswith("win")
+
+
+@dataclass(frozen=True, slots=True)
+class WindowsPowerShellCoreHost:
+    """One exact, directly probed PowerShell Core native-command host."""
+
+    executable: str
+    version: str
+    native_argument_passing: str
+    sha256: str
+
+    def __post_init__(self) -> None:
+        executable = PureWindowsPath(self.executable)
+        if (
+            not executable.is_absolute()
+            or executable.name.casefold() != "pwsh.exe"
+            or any(part in {".", ".."} for part in executable.parts)
+        ):
+            raise ValueError("PowerShell Core host must be one absolute pwsh.exe path")
+        version = _parse_powershell_core_version(self.version)
+        if version[:3] < POWERSHELL_CORE_MINIMUM_VERSION:
+            raise ValueError("PowerShell Core 7.3 or newer is required")
+        if self.native_argument_passing not in POWERSHELL_CORE_NATIVE_ARGUMENT_MODES:
+            raise ValueError(
+                "PowerShell Core native argument mode must be Standard or Windows"
+            )
+        if re.fullmatch(r"[0-9a-f]{64}", self.sha256) is None:
+            raise ValueError("PowerShell Core host SHA-256 must be lowercase hexadecimal")
+
+    def fingerprint_dict(self) -> dict[str, str]:
+        """Return the stable campaign-sealing projection for this exact host."""
+
+        return {
+            "path": self.executable,
+            "version": self.version,
+            "native_argument_passing": self.native_argument_passing,
+            "sha256": self.sha256,
+        }
+
+
+def _parse_powershell_core_version(value: str) -> tuple[int, ...]:
+    if POWERSHELL_CORE_VERSION_PATTERN.fullmatch(value) is None:
+        raise ValueError("PowerShell Core version must be a canonical numeric version")
+    return tuple(int(part) for part in value.split("."))
+
+
+def validate_powershell_core_probe_output(
+    output: str,
+    *,
+    executable: str,
+    sha256: str,
+) -> WindowsPowerShellCoreHost:
+    """Validate the exact Core/version/native-argument tuple emitted by the probe."""
+
+    if len(output.encode("utf-8")) > POWERSHELL_CORE_VERSION_OUTPUT_MAX_BYTES:
+        raise CodexHarnessError("PowerShell Core probe output is too large")
+    normalized = (
+        output[:-2]
+        if output.endswith("\r\n")
+        else output[:-1]
+        if output.endswith("\n")
+        else output
+    )
+    if not normalized or "\n" in normalized or "\r" in normalized:
+        raise CodexHarnessError("PowerShell Core probe must return exactly one line")
+    parts = normalized.split("|")
+    if len(parts) != 3 or parts[0] != "Core":
+        raise CodexHarnessError("PowerShell Core probe did not report the Core edition")
+    try:
+        return WindowsPowerShellCoreHost(
+            executable=executable,
+            version=parts[1],
+            native_argument_passing=parts[2],
+            sha256=sha256,
+        )
+    except ValueError as exc:
+        raise CodexHarnessError(f"unsupported PowerShell Core host: {exc}") from exc
+
+
+def probe_windows_powershell_core(
+    executable: str | os.PathLike[str],
+    *,
+    runner: Callable[..., subprocess.CompletedProcess[str]] | None = None,
+) -> WindowsPowerShellCoreHost:
+    """Attest one real pwsh.exe with a direct, profile-free, shell-free probe."""
+
+    candidate = Path(executable).expanduser()
+    if (
+        not candidate.is_absolute()
+        or candidate.name.casefold() != "pwsh.exe"
+        or is_link_or_junction(candidate)
+    ):
+        raise CodexHarnessError(
+            "PowerShell Core host must be an absolute, real, non-reparse pwsh.exe"
+        )
+    try:
+        candidate = candidate.resolve(strict=True)
+    except OSError as exc:
+        raise CodexHarnessError(
+            f"PowerShell Core executable does not resolve: {candidate}: {exc}"
+        ) from exc
+    if (
+        candidate.name.casefold() != "pwsh.exe"
+        or is_link_or_junction(candidate)
+        or not candidate.is_file()
+    ):
+        raise CodexHarnessError(
+            "PowerShell Core host must be an absolute, real, non-reparse pwsh.exe"
+        )
+    digest = _sha256_regular_file(candidate)
+    probe_script = (
+        "[Console]::Out.Write(('{0}|{1}|{2}' -f "
+        "$PSVersionTable.PSEdition,$PSVersionTable.PSVersion.ToString(),"
+        "$PSNativeCommandArgumentPassing))"
+    )
+    run = subprocess.run if runner is None else runner
+    probe_argv = [
+        str(candidate),
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        probe_script,
+    ]
+    try:
+        completed = run(
+            probe_argv,
+            cwd=Path.cwd(),
+            env=os.environ.copy(),
+            shell=False,
+            text=True,
+            encoding="utf-8",
+            errors="strict",
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=POWERSHELL_CORE_PROBE_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError, UnicodeError) as exc:
+        raise CodexHarnessError(
+            f"PowerShell Core launch probe failed for {candidate}: "
+            f"{type(exc).__name__}: {exc}"
+        ) from exc
+    if completed.returncode != 0 or completed.stderr:
+        detail = completed.stderr.strip() or f"exit code {completed.returncode}"
+        raise CodexHarnessError(
+            f"PowerShell Core launch probe failed for {candidate}: {detail}"
+        )
+    return validate_powershell_core_probe_output(
+        completed.stdout,
+        executable=str(candidate),
+        sha256=digest,
+    )
+
+
+def powershell_core_host_fingerprint(
+    host: WindowsPowerShellCoreHost,
+) -> dict[str, str]:
+    """Expose the exact JSON-serializable PowerShell host seal."""
+
+    return host.fingerprint_dict()
+
+
+def discover_windows_powershell_core(
+    *,
+    environment: Mapping[str, str] | None = None,
+    platform_name: str | None = None,
+    which: Callable[..., str | None] | None = None,
+    probe: Callable[[str | os.PathLike[str]], WindowsPowerShellCoreHost] | None = None,
+) -> WindowsPowerShellCoreHost:
+    """Select and attest the exact pwsh.exe that native Codex will see on PATH."""
+
+    if not _is_windows_platform(platform_name):
+        raise CodexHarnessError("PowerShell Core discovery is available only on Windows")
+    active_environment = os.environ if environment is None else environment
+    path_value = next(
+        (
+            str(value)
+            for key, value in active_environment.items()
+            if str(key).casefold() == "path"
+        ),
+        None,
+    )
+    locate = shutil.which if which is None else which
+    candidate = locate("pwsh.exe", path=path_value)
+    if not candidate:
+        raise CodexHarnessError(
+            "PowerShell Core 7.3 or newer is required on PATH for native Windows campaigns"
+        )
+    attest = probe_windows_powershell_core if probe is None else probe
+    return attest(candidate)
+
+
 def is_link_or_junction(path: Path) -> bool:
     """Reject links, junctions, and older-Python Windows reparse points."""
 
@@ -602,13 +800,19 @@ def codex_process_environment(
     environment: Mapping[str, str],
     *,
     platform_name: str | None = None,
+    powershell_core_host: WindowsPowerShellCoreHost | None = None,
 ) -> dict[str, str]:
-    """Bind Windows Codex helpers to the same selected standalone release."""
+    """Bind Windows Codex helpers and the attested pwsh host deterministically."""
 
     active_platform = sys.platform if platform_name is None else platform_name
     result = {str(key): str(value) for key, value in environment.items()}
     if not active_platform.startswith("win"):
         return result
+    if powershell_core_host is None and os.name == "nt":
+        powershell_core_host = discover_windows_powershell_core(
+            environment=result,
+            platform_name="nt",
+        )
     codex_runtime_files(binary, platform_name=active_platform)
     runtime_directories = _windows_codex_runtime_directories(binary)
     if not runtime_directories:
@@ -622,7 +826,17 @@ def codex_process_environment(
     )
     prefix = existing_parts[:1] if broker_required and existing_parts else []
     suffix = existing_parts[1:] if prefix else existing_parts
-    combined = [*prefix, *(str(path) for path in runtime_directories), *suffix]
+    powershell_directory = (
+        str(PureWindowsPath(powershell_core_host.executable).parent)
+        if powershell_core_host is not None
+        else ""
+    )
+    combined = [
+        *prefix,
+        *([powershell_directory] if powershell_directory else []),
+        *(str(path) for path in runtime_directories),
+        *suffix,
+    ]
     deduplicated: list[str] = []
     seen: set[str] = set()
     for item in combined:
@@ -1119,6 +1333,7 @@ class CodexHarnessConfig:
     workspace: Path
     skill_source: Path
     codex_binary: Path = field(default_factory=discover_codex_binary)
+    windows_powershell_core_host: WindowsPowerShellCoreHost | None = None
     auth_json: Path = DEFAULT_AUTH_JSON
     model: str = DEFAULT_MODEL
     reasoning_effort: str = DEFAULT_REASONING_EFFORT
@@ -1147,6 +1362,11 @@ class CodexCliHarness:
 
     def __init__(self, config: CodexHarnessConfig) -> None:
         self.config = config
+        self._windows_powershell_core_host: WindowsPowerShellCoreHost | None = None
+
+    @property
+    def windows_powershell_core_host(self) -> WindowsPowerShellCoreHost | None:
+        return self._windows_powershell_core_host
 
     def verify(self) -> None:
         binary = self.config.codex_binary.expanduser()
@@ -1158,6 +1378,27 @@ class CodexCliHarness:
             raise CodexHarnessError(f"Codex binary is missing or not executable: {binary}")
         if not auth.is_file():
             raise CodexHarnessError(f"Codex auth file is missing: {auth}")
+        if _is_windows():
+            discovered_host = discover_windows_powershell_core(
+                environment=os.environ,
+                platform_name="nt",
+            )
+            sealed_host = self.config.windows_powershell_core_host
+            if (
+                sealed_host is not None
+                and powershell_core_host_fingerprint(discovered_host)
+                != powershell_core_host_fingerprint(sealed_host)
+            ):
+                raise CodexHarnessError(
+                    "selected PowerShell Core host differs from the campaign-sealed host"
+                )
+            self._windows_powershell_core_host = sealed_host or discovered_host
+        else:
+            if self.config.windows_powershell_core_host is not None:
+                raise CodexHarnessError(
+                    "PowerShell Core host attestation is valid only for native Windows"
+                )
+            self._windows_powershell_core_host = None
         verify_workspace_skill_install(workspace, skill_source)
         installed_skills = tuple(sorted(path.name for path in skills_dir.iterdir()))
         if installed_skills != ("waapi-skill",):
@@ -1181,7 +1422,11 @@ class CodexCliHarness:
         skill_tree_sha256_before = snapshot_tree_hash(before_skill)
 
         with isolated_codex_environment(self.config.auth_json, extra_env=extra_env) as audit_env:
-            audit_env = codex_process_environment(self.config.codex_binary, audit_env)
+            audit_env = codex_process_environment(
+                self.config.codex_binary,
+                audit_env,
+                powershell_core_host=self._windows_powershell_core_host,
+            )
             prompt_environment = inspect_isolated_environment(audit_env, auth_json=self.config.auth_json)
             if not prompt_environment.passed:
                 raise CodexHarnessError(f"Prompt audit environment is not pristine: {prompt_environment}")
@@ -1195,7 +1440,11 @@ class CodexCliHarness:
         if snapshot_tree_hash(snapshot_workspace(self.config.skill_source)) != skill_tree_sha256_before:
             raise CodexHarnessError("codex debug prompt-input modified the target Skill tree")
         with isolated_codex_environment(self.config.auth_json, extra_env=extra_env) as exec_env:
-            exec_env = codex_process_environment(self.config.codex_binary, exec_env)
+            exec_env = codex_process_environment(
+                self.config.codex_binary,
+                exec_env,
+                powershell_core_host=self._windows_powershell_core_host,
+            )
             execution_environment = inspect_isolated_environment(exec_env, auth_json=self.config.auth_json)
             if not execution_environment.passed:
                 raise CodexHarnessError(f"Execution environment is not pristine: {execution_environment}")
@@ -1213,6 +1462,7 @@ class CodexCliHarness:
             before_workspace=before_workspace,
             before_outputs=before_outputs,
             skill_tree_sha256_before=skill_tree_sha256_before,
+            windows_powershell_core_host=self._windows_powershell_core_host,
         )
 
     def audit_prompt(self, prompt: str, *, env: Mapping[str, str]) -> CodexPromptAudit:
@@ -1268,6 +1518,7 @@ class CodexCliTask:
         self._exit_stack: ExitStack | None = None
         self._execution_env: dict[str, str] | None = None
         self._execution_environment: CodexEnvironmentAudit | None = None
+        self._windows_powershell_core_host: WindowsPowerShellCoreHost | None = None
         self._thread_id = ""
         self._turn_results: list[CodexRunResult] = []
         self._state = "new"
@@ -1291,6 +1542,7 @@ class CodexCliTask:
         if self._state != "new":
             raise CodexHarnessError("CodexCliTask is one-shot and cannot be re-entered")
         self._harness.verify()
+        self._windows_powershell_core_host = self._harness.windows_powershell_core_host
         stack = ExitStack()
         try:
             execution_env = stack.enter_context(
@@ -1299,6 +1551,7 @@ class CodexCliTask:
             execution_env = codex_process_environment(
                 self.config.codex_binary,
                 execution_env,
+                powershell_core_host=self._windows_powershell_core_host,
             )
             execution_environment = inspect_isolated_environment(
                 execution_env,
@@ -1326,6 +1579,7 @@ class CodexCliTask:
         finally:
             self._execution_env = None
             self._exit_stack = None
+            self._windows_powershell_core_host = None
             self._state = "closed"
 
     def run_initial(self, prompt: str, *, output_dir: Path) -> CodexRunResult:
@@ -1414,6 +1668,7 @@ class CodexCliTask:
             audit_env = codex_process_environment(
                 self.config.codex_binary,
                 audit_env,
+                powershell_core_host=self._windows_powershell_core_host,
             )
             prompt_environment = inspect_isolated_environment(
                 audit_env,
@@ -1450,6 +1705,7 @@ class CodexCliTask:
             before_workspace=before_workspace,
             before_outputs=before_outputs,
             skill_tree_sha256_before=skill_tree_sha256_before,
+            windows_powershell_core_host=self._windows_powershell_core_host,
         )
 
 
@@ -1474,6 +1730,7 @@ def _finalize_codex_run(
     before_workspace: Mapping[str, str],
     before_outputs: Mapping[str, str],
     skill_tree_sha256_before: str,
+    windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
 ) -> CodexRunResult:
     """Build one immutable turn result using the shared V2/V3 audit logic."""
 
@@ -1493,7 +1750,10 @@ def _finalize_codex_run(
     modified = tuple(workspace_modified) + tuple(f"outputs/{path}" for path in output_modified)
     deleted = tuple(workspace_deleted) + tuple(f"outputs/{path}" for path in output_deleted)
     events = parse_jsonl_events(completed.stdout)
-    command_records = completed_command_records(events)
+    command_records = completed_command_records(
+        events,
+        windows_powershell_core_host=windows_powershell_core_host,
+    )
     command_facts = classify_commands(
         command_records,
         skill_source=workspace_skill_install_path(config.workspace),
@@ -1995,7 +2255,7 @@ def validate_broker_model_overlay(
 
 
 def _validate_windows_broker_model_overlay(extra_env: Mapping[str, str]) -> None:
-    """Validate native-Windows CMD shims without POSIX mode or X_OK assumptions."""
+    """Validate native-Windows PowerShell shims without POSIX mode assumptions."""
 
     trusted_python = Path(extra_env[_BROKER_WINDOWS_TRUSTED_PYTHON_ENV])
     if (
@@ -2010,8 +2270,11 @@ def _validate_windows_broker_model_overlay(extra_env: Mapping[str, str]) -> None
     extensions = extra_env["PATHEXT"].split(";")
     if not extensions or any(not item or item != item.strip() for item in extensions):
         raise CodexHarnessError("Windows broker PATHEXT must be a closed semicolon list")
-    if ".cmd" not in {item.casefold() for item in extensions}:
-        raise CodexHarnessError("Windows broker PATHEXT must include .CMD")
+    normalized_extensions = tuple(item.casefold() for item in extensions)
+    if normalized_extensions[0] != ".ps1":
+        raise CodexHarnessError("Windows broker PATHEXT must begin with .PS1")
+    if len(normalized_extensions) != len(set(normalized_extensions)):
+        raise CodexHarnessError("Windows broker PATHEXT must not contain duplicates")
 
     path_entries = extra_env["PATH"].split(";")
     if not path_entries or not path_entries[0]:
@@ -2023,10 +2286,16 @@ def _validate_windows_broker_model_overlay(extra_env: Mapping[str, str]) -> None
         or not shim_directory.is_dir()
     ):
         raise CodexHarnessError("Windows broker shim directory must be absolute and real")
-    for filename in ("broker_shim.py", "python.cmd", "python3.cmd"):
+    for filename in ("broker_shim.py", "python.ps1", "python3.ps1"):
         shim = shim_directory / filename
         if is_link_or_junction(shim) or not shim.is_file():
             raise CodexHarnessError(f"Windows broker shim is missing or unsafe: {filename}")
+    for legacy_filename in ("python.cmd", "python3.cmd"):
+        legacy_wrapper = shim_directory / legacy_filename
+        if legacy_wrapper.exists() or is_link_or_junction(legacy_wrapper):
+            raise CodexHarnessError(
+                f"Windows broker shim directory contains forbidden legacy wrapper: {legacy_filename}"
+            )
 
 
 def is_protected_environment_key(key: str) -> bool:
@@ -2165,7 +2434,12 @@ def _build_exec_prefix(
         command.append("--ephemeral")
     if _is_windows():
         command.extend(
-            ("-c", f'windows.sandbox="{WINDOWS_SEMANTIC_SANDBOX_MODE}"')
+            (
+                "-c",
+                "allow_login_shell=false",
+                "-c",
+                f'windows.sandbox="{WINDOWS_SEMANTIC_SANDBOX_MODE}"',
+            )
         )
     command.extend(
         [
@@ -2565,8 +2839,14 @@ def completed_commands(events: Sequence[Mapping[str, Any]]) -> tuple[str, ...]:
     return tuple(record.command for record in completed_command_records(events))
 
 
-def completed_command_records(events: Sequence[Mapping[str, Any]]) -> tuple[CodexCommandRecord, ...]:
+def completed_command_records(
+    events: Sequence[Mapping[str, Any]],
+    *,
+    platform_name: str | None = None,
+    windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
+) -> tuple[CodexCommandRecord, ...]:
     records: list[CodexCommandRecord] = []
+    active_platform = os.name if platform_name is None else platform_name
     for event in events:
         item = event.get("item")
         if event.get("type") != "item.completed" or not isinstance(item, Mapping):
@@ -2574,7 +2854,9 @@ def completed_command_records(events: Sequence[Mapping[str, Any]]) -> tuple[Code
         if item.get("type") == "command_execution" and isinstance(item.get("command"), str):
             command = str(item["command"])
             argv, has_operators, parse_error, parser_kind = _parse_command_argv(
-                command
+                command,
+                platform_name=active_platform,
+                windows_powershell_core_host=windows_powershell_core_host,
             )
             raw_exit = item.get("exit_code")
             records.append(
@@ -2597,21 +2879,25 @@ def parse_command_argv(
     *,
     platform_name: str | None = None,
     windows_directory: str | PureWindowsPath | None = None,
+    windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
 ) -> tuple[tuple[str, ...], bool, str]:
     """Parse a recorded command with the host's native command-line grammar.
 
     Explicit POSIX shell wrappers retain POSIX parsing on every host. Bare
     commands use ``CommandLineToArgvW`` on Windows so drive, UNC, and backslash
     paths are not corrupted by POSIX escape rules. Codex's fixed native-Windows
-    ``powershell.exe -Command`` recording wrapper is unwrapped only when it
-    contains one literal argv vector under the restricted grammar below. Other
-    PowerShell and CMD shapes remain unexpected outer commands.
+    ``pwsh.exe -NoProfile -Command`` recording wrapper is unwrapped only when
+    its exact executable has been attested as PowerShell Core 7.3+ with safe
+    native argument passing and it contains one literal argv vector under the
+    restricted grammar below. Other PowerShell and CMD shapes remain
+    unexpected outer commands.
     """
 
     argv, has_operators, parse_error, _parser_kind = _parse_command_argv(
         command,
         platform_name=platform_name,
         windows_directory=windows_directory,
+        windows_powershell_core_host=windows_powershell_core_host,
     )
     return argv, has_operators, parse_error
 
@@ -2621,19 +2907,9 @@ def _parse_command_argv(
     *,
     platform_name: str | None = None,
     windows_directory: str | PureWindowsPath | None = None,
+    windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
 ) -> tuple[tuple[str, ...], bool, str, str]:
     active_platform = os.name if platform_name is None else platform_name
-    if _is_windows(active_platform) and command.startswith("powershell.exe "):
-        try:
-            return (
-                decode_windows_powershell_argv(command),
-                False,
-                "",
-                _WINDOWS_ENCODED_POWERSHELL_PARSER_KIND,
-            )
-        except PlatformCommandError as exc:
-            return (), True, str(exc), ""
-
     if _is_windows(active_platform):
         has_operators = shell_script_has_operators(command, platform_name="nt")
         try:
@@ -2643,16 +2919,18 @@ def _parse_command_argv(
         if not outer:
             return (), False, "empty command", ""
         shell_name = PureWindowsPath(outer[0]).name.casefold()
-        if shell_name in _WINDOWS_POWERSHELL_COMMAND_NAMES:
-            argv, operators, error = _parse_windows_powershell_command_wrapper(
+        if shell_name in _WINDOWS_POWERSHELL_CORE_COMMAND_NAMES:
+            host = windows_powershell_core_host
+            if host is None:
+                return (), True, "pre-attested PowerShell Core host is required", ""
+            argv, operators, error = _parse_windows_powershell_core_command_wrapper(
                 outer,
-                windows_directory=windows_directory,
-                platform_name=active_platform,
+                powershell_core_host=host,
             )
             parser_kind = (
                 _WINDOWS_ENCODED_POWERSHELL_PARSER_KIND
-                if not error and outer[2].startswith("powershell.exe ")
-                else _WINDOWS_POWERSHELL_PARSER_KIND
+                if not error and outer[3].startswith("powershell.exe ")
+                else _WINDOWS_POWERSHELL_CORE_PARSER_KIND
                 if not error
                 else ""
             )
@@ -2662,8 +2940,8 @@ def _parse_command_argv(
                 error,
                 parser_kind,
             )
-        if shell_name in _UNSUPPORTED_PWSH_COMMAND_NAMES:
-            return (), True, "PowerShell Core command wrappers are not supported", ""
+        if shell_name in _WINDOWS_POWERSHELL_COMMAND_NAMES:
+            return (), True, "Windows PowerShell 5.1 command wrappers are not supported", ""
         if shell_name.removesuffix(".exe") in {"bash", "sh", "zsh", "dash", "ksh"}:
             argv, operators, error = _parse_posix_shell_command_wrapper(outer)
             return argv, operators, error, "posix-shell"
@@ -2705,31 +2983,24 @@ def _parse_posix_shell_command_wrapper(
     return argv, has_operators, ""
 
 
-def _parse_windows_powershell_command_wrapper(
+def _parse_windows_powershell_core_command_wrapper(
     outer_argv: Sequence[str],
     *,
-    windows_directory: str | PureWindowsPath | None,
-    platform_name: str | None,
+    powershell_core_host: WindowsPowerShellCoreHost,
 ) -> tuple[tuple[str, ...], bool, str]:
-    """Unwrap only Codex's literal native-Windows PowerShell command frame."""
+    """Unwrap only Codex's attested, profile-free PowerShell Core frame."""
 
-    if len(outer_argv) != 3 or outer_argv[1] != "-Command":
-        return (), True, "unsupported Windows PowerShell command wrapper"
+    if (
+        len(outer_argv) != 4
+        or outer_argv[1] != "-NoProfile"
+        or outer_argv[2] != "-Command"
+    ):
+        return (), True, "unsupported PowerShell Core command wrapper"
     executable = PureWindowsPath(outer_argv[0])
-    try:
-        host_windows_directory = (
-            _validated_windows_directory(windows_directory)
-            if windows_directory is not None
-            else _native_windows_directory(platform_name=platform_name)
-        )
-    except (OSError, ValueError) as exc:
-        return (), True, f"cannot identify the native Windows directory: {exc}"
-    expected_executable = host_windows_directory.joinpath(
-        *_WINDOWS_SYSTEM_POWERSHELL_SUFFIX
-    )
+    expected_executable = PureWindowsPath(powershell_core_host.executable)
     if executable != expected_executable:
-        return (), True, "Windows PowerShell wrapper executable is not the system host"
-    script = outer_argv[2]
+        return (), True, "PowerShell Core wrapper executable is not the attested host"
+    script = outer_argv[3]
     if script.startswith("powershell.exe "):
         try:
             return decode_windows_powershell_argv(script), False, ""
@@ -2739,43 +3010,6 @@ def _parse_windows_powershell_command_wrapper(
         return _split_literal_powershell_argv(script), False, ""
     except ValueError as exc:
         return (), True, str(exc)
-
-
-def _validated_windows_directory(
-    value: str | PureWindowsPath,
-) -> PureWindowsPath:
-    directory = PureWindowsPath(value)
-    if (
-        not directory.is_absolute()
-        or re.fullmatch(r"[A-Za-z]:", directory.drive) is None
-        or directory.root != "\\"
-        or len(directory.parts) < 2
-    ):
-        raise ValueError("Windows directory must be one absolute drive path")
-    return directory
-
-
-def _native_windows_directory(*, platform_name: str | None = None) -> PureWindowsPath:
-    """Read the host Windows directory from the kernel, never from environment."""
-
-    if not _is_windows(platform_name) or os.name != "nt":
-        raise OSError("GetWindowsDirectoryW is unavailable on this host")
-    import ctypes
-    from ctypes import wintypes
-
-    capacity = 32768
-    buffer = ctypes.create_unicode_buffer(capacity)
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-    get_windows_directory = kernel32.GetWindowsDirectoryW
-    get_windows_directory.argtypes = [wintypes.LPWSTR, wintypes.UINT]
-    get_windows_directory.restype = wintypes.UINT
-    length = int(get_windows_directory(buffer, capacity))
-    if length == 0:
-        error = ctypes.get_last_error()
-        raise OSError(error, "GetWindowsDirectoryW failed")
-    if length >= capacity:
-        raise OSError("GetWindowsDirectoryW returned an oversized path")
-    return _validated_windows_directory(buffer.value)
 
 
 def _split_literal_powershell_argv(script: str) -> tuple[str, ...]:
@@ -3377,7 +3611,7 @@ def allowed_skill_read(record: CodexCommandRecord, *, skill_source: Path) -> str
         minimum_lines = int(match.group(1)) if match is not None else None
     elif executable == "get-content":
         if (
-            record.parser_kind != _WINDOWS_POWERSHELL_PARSER_KIND
+            record.parser_kind != _WINDOWS_POWERSHELL_CORE_PARSER_KIND
             or len(record.argv) != 5
             or record.argv[1] != "-Raw"
             or record.argv[2] != "-Encoding"
@@ -3665,6 +3899,7 @@ __all__ = [
     "CodexRunResult",
     "CodexSessionAudit",
     "ProcessResult",
+    "WindowsPowerShellCoreHost",
     "WORKSPACE_SKILL_EXCLUDED_NAMES",
     "assert_detached_workspace_skill_copy",
     "audit_prompt_input_payload",
@@ -3680,6 +3915,7 @@ __all__ = [
     "completed_commands",
     "count_invalid_jsonl_lines",
     "discover_codex_binary",
+    "discover_windows_powershell_core",
     "final_agent_message",
     "first_gateway_backed_agent_message",
     "gateway_runtime_apis",
@@ -3691,6 +3927,8 @@ __all__ = [
     "normalized_gateway_command_argv",
     "parse_jsonl_events",
     "parse_command_argv",
+    "powershell_core_host_fingerprint",
+    "probe_windows_powershell_core",
     "prepare_workspace_skill_install",
     "prompt_skill_inventory",
     "resolve_codex_binary",
@@ -3701,6 +3939,7 @@ __all__ = [
     "taskkill_process_tree",
     "turn_usage",
     "validate_codex_version_output",
+    "validate_powershell_core_probe_output",
     "verify_workspace_skill_install",
     "workspace_changes",
     "workspace_skill_install_path",

@@ -38,6 +38,7 @@ from tests.semantic.support.codex_harness import (
     CodexInfrastructureError,
     CodexInfrastructureFailure,
     CodexRunResult,
+    WindowsPowerShellCoreHost,
     normalized_gateway_command_argv,
     prepare_workspace_skill_install,
 )
@@ -166,6 +167,7 @@ def run_v3_codex_task(
     runner_environment: Mapping[str, str],
     required_reference: str,
     business_oracle_plan: BusinessOraclePlanEvidence,
+    windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
     turn_reference_schedule: Sequence[Sequence[str]] | None = None,
     trusted_subscription_ack: TrustedSubscriptionAckSpec | None = None,
     trusted_subscription_ack_observer: TrustedSubscriptionAckObserver | None = None,
@@ -294,6 +296,7 @@ def run_v3_codex_task(
         workspace=workspace,
         skill_source=skill_source,
         codex_binary=codex_binary,
+        windows_powershell_core_host=windows_powershell_core_host,
         auth_json=auth_json,
         model=model,
         reasoning_effort=reasoning_effort,

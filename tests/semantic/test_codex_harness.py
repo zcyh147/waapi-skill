@@ -23,6 +23,7 @@ from .support.codex_harness import (  # pyright: ignore[reportMissingImports]
     CodexGatewayErrorExpectation,
     CodexHarnessError,
     CodexHarnessConfig,
+    WindowsPowerShellCoreHost,
     audit_prompt_input_payload,
     audit_session_events,
     build_exec_command,
@@ -33,6 +34,7 @@ from .support.codex_harness import (  # pyright: ignore[reportMissingImports]
     classify_codex_infrastructure_failure,
     completed_command_records,
     count_invalid_jsonl_lines,
+    discover_windows_powershell_core,
     final_agent_message,
     gateway_runtime_apis,
     inspect_isolated_environment,
@@ -40,6 +42,8 @@ from .support.codex_harness import (  # pyright: ignore[reportMissingImports]
     isolated_codex_environment,
     kill_process_group,
     parse_command_argv,
+    powershell_core_host_fingerprint,
+    probe_windows_powershell_core,
     parse_jsonl_events,
     run_process,
     subprocess_process_group_options,
@@ -47,6 +51,7 @@ from .support.codex_harness import (  # pyright: ignore[reportMissingImports]
     snapshot_tree_hash,
     snapshot_workspace,
     turn_usage,
+    validate_powershell_core_probe_output,
     workspace_changes,
     validated_skill_read,
     verify_workspace_skill_install,
@@ -65,15 +70,18 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
 
 
 _FAKE_KILL_RETURN_CODE = -9
-_WINDOWS_SYSTEM_POWERSHELL = (
-    r"C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe"
+_WINDOWS_POWERSHELL_CORE = r"C:\Program Files\PowerShell\7\pwsh.exe"
+_WINDOWS_POWERSHELL_CORE_HOST = WindowsPowerShellCoreHost(
+    executable=_WINDOWS_POWERSHELL_CORE,
+    version="7.6.4",
+    native_argument_passing="Windows",
+    sha256="a" * 64,
 )
-_WINDOWS_DIRECTORY = PureWindowsPath(r"C:\WINDOWS")
 
 
-def windows_powershell_recording(script: str, *, executable: str = _WINDOWS_SYSTEM_POWERSHELL) -> str:
+def windows_powershell_recording(script: str, *, executable: str = _WINDOWS_POWERSHELL_CORE) -> str:
     escaped_script = script.replace('"', r'\"')
-    return f'"{executable}" -Command "{escaped_script}"'
+    return f'"{executable}" -NoProfile -Command "{escaped_script}"'
 
 
 def portable_windows_outer_split(
@@ -95,7 +103,7 @@ def completed_windows_record(
     argv, has_operators, parse_error, parser_kind = codex_harness_module._parse_command_argv(
         command,
         platform_name="nt",
-        windows_directory=_WINDOWS_DIRECTORY,
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
     )
     return CodexCommandRecord(
         command=command,
@@ -392,6 +400,85 @@ def test_windows_codex_discovery_continues_after_invalid_version_output(
     assert probed == [invalid.resolve(strict=True), valid.resolve(strict=True)]
 
 
+@pytest.mark.parametrize("mode", ("Standard", "Windows"))
+def test_powershell_core_probe_contract_accepts_73_or_newer_safe_native_modes(
+    mode: str,
+) -> None:
+    host = validate_powershell_core_probe_output(
+        f"Core|7.6.4|{mode}\r\n",
+        executable=_WINDOWS_POWERSHELL_CORE,
+        sha256="b" * 64,
+    )
+
+    assert host.version == "7.6.4"
+    assert host.native_argument_passing == mode
+    assert powershell_core_host_fingerprint(host) == {
+        "path": _WINDOWS_POWERSHELL_CORE,
+        "version": "7.6.4",
+        "native_argument_passing": mode,
+        "sha256": "b" * 64,
+    }
+    assert json.loads(json.dumps(powershell_core_host_fingerprint(host))) == (
+        powershell_core_host_fingerprint(host)
+    )
+
+
+@pytest.mark.parametrize(
+    "output",
+    (
+        "Desktop|7.6.4|Windows",
+        "Core|7.2.99|Windows",
+        "Core|7.6.4|Legacy",
+        "Core|7.6|Windows",
+        "Core|7.6.4|Windows\nextra",
+        "Core|7.6.4|Windows\n\n",
+    ),
+)
+def test_powershell_core_probe_contract_rejects_unsupported_host(output: str) -> None:
+    with pytest.raises(CodexHarnessError, match="PowerShell Core"):
+        validate_powershell_core_probe_output(
+            output,
+            executable=_WINDOWS_POWERSHELL_CORE,
+            sha256="b" * 64,
+        )
+
+
+def test_windows_powershell_core_discovery_binds_exact_selected_path() -> None:
+    probed: list[str] = []
+
+    host = discover_windows_powershell_core(
+        platform_name="win32",
+        environment={"Path": r"C:\Program Files\PowerShell\7;C:\Windows\System32"},
+        which=lambda name, *, path: (
+            _WINDOWS_POWERSHELL_CORE
+            if name == "pwsh.exe" and "PowerShell" in str(path)
+            else None
+        ),
+        probe=lambda path: probed.append(str(path)) or _WINDOWS_POWERSHELL_CORE_HOST,
+    )
+
+    assert host is _WINDOWS_POWERSHELL_CORE_HOST
+    assert probed == [_WINDOWS_POWERSHELL_CORE]
+
+
+def test_powershell_core_probe_rejects_original_reparse_before_launch(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "real-pwsh.exe"
+    target.write_bytes(b"target")
+    alias = tmp_path / "pwsh.exe"
+    create_symlink_or_skip(alias, target)
+    launched: list[object] = []
+
+    with pytest.raises(CodexHarnessError, match="non-reparse pwsh.exe"):
+        probe_windows_powershell_core(
+            alias,
+            runner=lambda *args, **kwargs: launched.append((args, kwargs)),  # type: ignore[arg-type,return-value]
+        )
+
+    assert launched == []
+
+
 def test_windows_codex_runtime_path_keeps_broker_shim_first(
     tmp_path: Path,
 ) -> None:
@@ -410,15 +497,32 @@ def test_windows_codex_runtime_path_keeps_broker_shim_first(
         binary,
         environment,
         platform_name="win32",
+        powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
     )
 
     assert result["Path"].split(";") == [
         str(shim),
+        r"C:\Program Files\PowerShell\7",
         str(binary.parent.resolve(strict=True)),
         str(resources.resolve(strict=True)),
         str(codex_path.resolve(strict=True)),
         str(inherited),
     ]
+
+
+def test_non_windows_codex_environment_is_unchanged_by_powershell_contract(
+    tmp_path: Path,
+) -> None:
+    environment = {"PATH": "/custom/bin:/usr/bin", "MARKER": "unchanged"}
+
+    result = codex_harness_module.codex_process_environment(
+        tmp_path / "codex",
+        environment,
+        platform_name="darwin",
+        powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+    )
+
+    assert result == environment
 
 
 def test_windows_codex_runtime_rejects_root_level_binary(
@@ -838,6 +942,7 @@ def test_native_windows_exec_and_task_commands_pin_unelevated_sandbox(
 
     for command in commands:
         assert command.count('windows.sandbox="unelevated"') == 1
+        assert command.count("allow_login_shell=false") == 1
         assert 'approval_policy="never"' in command
         assert "--ignore-user-config" in command
         assert command[command.index("--sandbox") + 1] == "workspace-write"
@@ -872,6 +977,7 @@ def test_non_windows_exec_and_task_commands_do_not_set_windows_sandbox(
 
     for command in commands:
         assert not any(value.startswith("windows.sandbox=") for value in command)
+        assert "allow_login_shell=false" not in command
 
 
 def test_task_commands_start_non_ephemeral_then_resume_exact_thread_with_isolation_flags(
@@ -1091,18 +1197,18 @@ def test_native_windows_isolated_environment_uses_detached_auth_copy(tmp_path: P
         assert auth.read_text(encoding="utf-8") == '{"token":"runner-owned"}\n'
 
 
-def test_native_windows_broker_overlay_uses_cmd_shims_without_bash_env(tmp_path: Path) -> None:
+def test_native_windows_broker_overlay_uses_ps1_shims_without_bash_env(tmp_path: Path) -> None:
     auth = tmp_path / "auth.json"
     auth.write_text("{}\n", encoding="utf-8")
     trusted_python = tmp_path / "python.exe"
     trusted_python.write_bytes(b"synthetic interpreter")
     shims = tmp_path / "broker-shims"
     shims.mkdir()
-    for name in ("broker_shim.py", "python.cmd", "python3.cmd"):
+    for name in ("broker_shim.py", "python.ps1", "python3.ps1"):
         (shims / name).write_text("shim\n", encoding="utf-8")
     overlay = {
         "PATH": f"{shims};C:\\Windows\\System32",
-        "PATHEXT": ".CMD;.EXE;.BAT",
+        "PATHEXT": ".PS1;.EXE;.BAT;.CMD",
         "WAAPI_CODEX_GATEWAY_BROKER_ENDPOINT": "127.0.0.1:54321",
         "WAAPI_CODEX_GATEWAY_BROKER_TOKEN": "a" * 32,
         "WAAPI_CODEX_GATEWAY_BROKER_TRANSPORT": "tcp",
@@ -1133,6 +1239,65 @@ def test_native_windows_broker_overlay_uses_cmd_shims_without_bash_env(tmp_path:
                     "WAAPI_CODEX_GATEWAY_SHIM_TRUSTED_PYTHON",
                 }
             )
+        )
+
+
+@pytest.mark.parametrize(
+    ("pathext", "shim_names", "message"),
+    (
+        (
+            ".CMD;.EXE;.BAT",
+            ("broker_shim.py", "python.cmd", "python3.cmd"),
+            r"PATHEXT must begin with \.PS1",
+        ),
+        (
+            ".PS1;.EXE;.CMD",
+            ("broker_shim.py", "python.cmd", "python3.cmd"),
+            "python.ps1",
+        ),
+        (
+            ".PS1;.EXE;.ps1",
+            ("broker_shim.py", "python.ps1", "python3.ps1"),
+            "must not contain duplicates",
+        ),
+        (
+            ".PS1;.EXE;.CMD",
+            (
+                "broker_shim.py",
+                "python.ps1",
+                "python3.ps1",
+                "python.cmd",
+            ),
+            "forbidden legacy wrapper",
+        ),
+    ),
+)
+def test_native_windows_broker_overlay_rejects_cmd_or_ambiguous_pathext(
+    tmp_path: Path,
+    pathext: str,
+    shim_names: tuple[str, ...],
+    message: str,
+) -> None:
+    trusted_python = tmp_path / "python.exe"
+    trusted_python.write_bytes(b"synthetic interpreter")
+    shims = tmp_path / "broker-shims"
+    shims.mkdir()
+    for name in shim_names:
+        (shims / name).write_text("shim\n", encoding="utf-8")
+    overlay = {
+        "PATH": f"{shims};C:\\Windows\\System32",
+        "PATHEXT": pathext,
+        "WAAPI_CODEX_GATEWAY_BROKER_ENDPOINT": "127.0.0.1:54321",
+        "WAAPI_CODEX_GATEWAY_BROKER_TOKEN": "a" * 32,
+        "WAAPI_CODEX_GATEWAY_BROKER_TRANSPORT": "tcp",
+        "WAAPI_CODEX_GATEWAY_REQUIRED": "1",
+        "WAAPI_CODEX_GATEWAY_SHIM_TRUSTED_PYTHON": str(trusted_python.resolve()),
+    }
+
+    with pytest.raises(CodexHarnessError, match=message):
+        codex_harness_module.validate_broker_model_overlay(
+            overlay,
+            platform_name="nt",
         )
 
 
@@ -1277,9 +1442,11 @@ def test_codex_cli_task_reuses_one_disposable_state_and_resumes_exact_thread(
         environment: Mapping[str, str],
         *,
         platform_name: str | None = None,
+        powershell_core_host: WindowsPowerShellCoreHost | None = None,
     ) -> dict[str, str]:
         assert binary_arg == binary
         assert platform_name is None
+        assert powershell_core_host is None
         result = dict(environment)
         result["TEST_CODEX_RUNTIME_BOUND"] = "1"
         runtime_environment_calls.append(result)
@@ -1415,7 +1582,7 @@ def test_codex_cli_task_fails_closed_on_resumed_thread_id_mismatch(
     monkeypatch.setattr(
         codex_harness_module,
         "codex_process_environment",
-        lambda _binary, environment: dict(environment),
+        lambda _binary, environment, **_kwargs: dict(environment),
     )
 
     def fake_run_process(*args: object, **kwargs: object) -> codex_harness_module.ProcessResult:
@@ -1685,6 +1852,89 @@ def test_harness_verify_requires_exactly_one_installed_workspace_skill(tmp_path:
         harness.verify()
 
 
+def test_native_windows_harness_verify_fails_before_exec_without_attested_pwsh(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    binary = tmp_path / "codex.exe"
+    binary.write_bytes(b"synthetic")
+    binary.chmod(0o755)
+    auth = tmp_path / "auth.json"
+    auth.write_text("{}\n", encoding="utf-8")
+    source = tmp_path / "waapi-skill"
+    source.mkdir()
+    (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    workspace = tmp_path / "workspace"
+    prepare_workspace_skill_install(workspace, source, platform_name="nt")
+    harness = CodexCliHarness(
+        CodexHarnessConfig(
+            workspace=workspace,
+            skill_source=source,
+            codex_binary=binary,
+            auth_json=auth,
+        )
+    )
+    monkeypatch.setattr(codex_harness_module, "_is_windows", lambda platform_name=None: True)
+    monkeypatch.setattr(
+        codex_harness_module,
+        "discover_windows_powershell_core",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            CodexHarnessError("PowerShell Core 7.3 or newer is required")
+        ),
+    )
+
+    with pytest.raises(CodexHarnessError, match="PowerShell Core 7.3"):
+        harness.verify()
+
+
+def test_native_windows_harness_binds_and_revalidates_campaign_sealed_pwsh(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    binary = tmp_path / "codex.exe"
+    binary.write_bytes(b"synthetic")
+    binary.chmod(0o755)
+    auth = tmp_path / "auth.json"
+    auth.write_text("{}\n", encoding="utf-8")
+    source = tmp_path / "waapi-skill"
+    source.mkdir()
+    (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    workspace = tmp_path / "workspace"
+    prepare_workspace_skill_install(workspace, source, platform_name="nt")
+    harness = CodexCliHarness(
+        CodexHarnessConfig(
+            workspace=workspace,
+            skill_source=source,
+            codex_binary=binary,
+            windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+            auth_json=auth,
+        )
+    )
+    monkeypatch.setattr(codex_harness_module, "_is_windows", lambda platform_name=None: True)
+    monkeypatch.setattr(
+        codex_harness_module,
+        "discover_windows_powershell_core",
+        lambda **_kwargs: _WINDOWS_POWERSHELL_CORE_HOST,
+    )
+
+    harness.verify()
+    assert harness.windows_powershell_core_host is _WINDOWS_POWERSHELL_CORE_HOST
+
+    other_host = WindowsPowerShellCoreHost(
+        executable=r"C:\Other\PowerShell\7\pwsh.exe",
+        version="7.6.4",
+        native_argument_passing="Windows",
+        sha256="c" * 64,
+    )
+    monkeypatch.setattr(
+        codex_harness_module,
+        "discover_windows_powershell_core",
+        lambda **_kwargs: other_host,
+    )
+    with pytest.raises(CodexHarnessError, match="differs from the campaign-sealed host"):
+        harness.verify()
+
+
 def test_jsonl_parser_extracts_commands_final_message_and_usage() -> None:
     text = "\n".join(
         [
@@ -1821,7 +2071,7 @@ def test_windows_powershell_recording_preserves_literal_metacharacters(
     argv, has_operators, parse_error = parse_command_argv(
         command,
         platform_name="nt",
-        windows_directory=_WINDOWS_DIRECTORY,
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
     )
 
     assert argv == (
@@ -1834,6 +2084,83 @@ def test_windows_powershell_recording_preserves_literal_metacharacters(
     )
     assert has_operators is False
     assert parse_error == ""
+
+
+def test_windows_completed_event_batch_binds_one_pre_attested_pwsh_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module,
+        "split_native_command_line",
+        portable_windows_outer_split,
+    )
+    first = windows_powershell_recording("python 'one.py'")
+    second = windows_powershell_recording(
+        "python 'two.py'",
+        executable=r"C:\Other\PowerShell\7\pwsh.exe",
+    )
+    events = tuple(
+        {
+            "type": "item.completed",
+            "item": {
+                "type": "command_execution",
+                "command": command,
+                "exit_code": 0,
+                "status": "completed",
+                "aggregated_output": "{}",
+            },
+        }
+        for command in (first, second)
+    )
+    records = completed_command_records(
+        events,
+        platform_name="nt",
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+    )
+
+    assert records[0].argv == ("python", "one.py")
+    assert records[0].parser_kind == "windows-pwsh-command"
+    assert records[1].argv == ()
+    assert "not the attested host" in records[1].parse_error
+
+
+def test_windows_attacker_event_cannot_trigger_powershell_host_probe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module,
+        "split_native_command_line",
+        portable_windows_outer_split,
+    )
+    probes: list[object] = []
+    monkeypatch.setattr(
+        codex_harness_module,
+        "probe_windows_powershell_core",
+        lambda *args, **kwargs: probes.append((args, kwargs)),
+    )
+    command = windows_powershell_recording(
+        "python 'attacker.py'",
+        executable=r"C:\Attacker Controlled\pwsh.exe",
+    )
+    events = (
+        {
+            "type": "item.completed",
+            "item": {
+                "type": "command_execution",
+                "command": command,
+                "exit_code": 0,
+                "status": "completed",
+                "aggregated_output": "{}",
+            },
+        },
+    )
+
+    record = completed_command_records(events, platform_name="nt")[0]
+
+    assert probes == []
+    assert record.argv == ()
+    assert record.has_shell_operators is True
+    assert record.parse_error == "pre-attested PowerShell Core host is required"
 
 
 def test_windows_powershell_recording_preserves_canonical_encoded_continuation(
@@ -1853,17 +2180,23 @@ def test_windows_powershell_recording_preserves_canonical_encoded_continuation(
     )
     encoded = encode_windows_powershell_argv(expected)
 
-    assert parse_command_argv(encoded, platform_name="nt") == (expected, False, "")
+    direct_argv, direct_has_operators, direct_error = parse_command_argv(
+        encoded,
+        platform_name="nt",
+    )
+    assert direct_argv == ()
+    assert direct_has_operators is True
+    assert "Windows PowerShell 5.1" in direct_error
     wrapped = windows_powershell_recording(encoded)
     assert parse_command_argv(
         wrapped,
         platform_name="nt",
-        windows_directory=_WINDOWS_DIRECTORY,
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
     ) == (expected, False, "")
     assert codex_harness_module._parse_command_argv(
         wrapped,
         platform_name="nt",
-        windows_directory=_WINDOWS_DIRECTORY,
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
     )[3] == "windows-powershell-encoded"
 
 
@@ -1928,7 +2261,7 @@ def test_windows_powershell_recording_rejects_operators_and_expansion(
     argv, has_operators, parse_error = parse_command_argv(
         windows_powershell_recording(script),
         platform_name="nt",
-        windows_directory=_WINDOWS_DIRECTORY,
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
     )
 
     assert argv == ()
@@ -1954,12 +2287,28 @@ def test_windows_powershell_recording_rejects_operators_and_expansion(
             ),
         ),
         (
-            f'"{_WINDOWS_SYSTEM_POWERSHELL}" -NoProfile -Command '
+            r'"C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" '
+            '-NoProfile -Command '
             '"Get-Content -Raw -Encoding UTF8 '
             '\'.agents\\skills\\waapi-skill\\SKILL.md\'"'
         ),
         (
+            r'"C:\Other\PowerShell\7\pwsh.exe" -NoProfile -Command '
+            r'"Get-Content -Raw -Encoding UTF8 '
+            r'\'.agents\skills\waapi-skill\SKILL.md\'"'
+        ),
+        (
             r'"C:\Program Files\PowerShell\7\pwsh.exe" -Command '
+            r'"Get-Content -Raw -Encoding UTF8 '
+            r'\'.agents\skills\waapi-skill\SKILL.md\'"'
+        ),
+        (
+            r'"C:\Program Files\PowerShell\7\pwsh.exe" -NoLogo -NoProfile -Command '
+            r'"Get-Content -Raw -Encoding UTF8 '
+            r'\'.agents\skills\waapi-skill\SKILL.md\'"'
+        ),
+        (
+            r'"C:\Program Files\PowerShell\7\pwsh.exe" -Login -NoProfile -Command '
             r'"Get-Content -Raw -Encoding UTF8 '
             r'\'.agents\skills\waapi-skill\SKILL.md\'"'
         ),
@@ -1978,7 +2327,7 @@ def test_windows_powershell_recording_rejects_wrong_outer_wrapper(
     argv, has_operators, parse_error = parse_command_argv(
         command,
         platform_name="nt",
-        windows_directory=_WINDOWS_DIRECTORY,
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
     )
 
     assert argv == ()
@@ -2008,7 +2357,7 @@ def test_posix_shell_wrapper_accepts_only_exact_executable_option_and_script(
     assert parse_command_argv(
         valid_windows,
         platform_name="nt",
-        windows_directory=_WINDOWS_DIRECTORY,
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
     ) == (expected, False, "")
 
     invalid_posix = (
@@ -2032,7 +2381,7 @@ def test_posix_shell_wrapper_accepts_only_exact_executable_option_and_script(
         argv, has_operators, parse_error = parse_command_argv(
             command,
             platform_name="nt",
-            windows_directory=_WINDOWS_DIRECTORY,
+            windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
         )
         assert argv == ()
         assert has_operators is True
@@ -2204,24 +2553,50 @@ def test_posix_get_content_cannot_claim_absolute_or_relative_skill_read(
 
 
 @pytest.mark.skipif(os.name != "nt", reason="native Windows command-line parser proof")
-def test_native_windows_system_powershell_get_content_has_parser_provenance(
+def test_native_windows_powershell_core_probe_uses_exact_profile_free_argv(
     tmp_path: Path,
 ) -> None:
-    windows_directory = codex_harness_module._native_windows_directory()
-    executable = str(
-        windows_directory
-        / "System32"
-        / "WindowsPowerShell"
-        / "v1.0"
-        / "powershell.exe"
-    )
+    candidate = tmp_path / "pwsh.exe"
+    candidate.write_bytes(b"synthetic pwsh for injected runner")
+    observed: dict[str, object] = {}
+
+    def fake_runner(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        observed["argv"] = argv
+        observed.update(kwargs)
+        return subprocess.CompletedProcess(
+            argv,
+            0,
+            stdout="Core|7.6.4|Windows",
+            stderr="",
+        )
+
+    host = probe_windows_powershell_core(candidate, runner=fake_runner)
+
+    assert observed["argv"][:5] == [
+        str(candidate.resolve(strict=True)),
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+    ]
+    assert observed["shell"] is False
+    assert host.executable == str(candidate.resolve(strict=True))
+    assert host.version == "7.6.4"
+    assert host.native_argument_passing == "Windows"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows command-line parser proof")
+def test_native_windows_powershell_core_get_content_has_parser_provenance(
+    tmp_path: Path,
+) -> None:
+    host = discover_windows_powershell_core(platform_name="nt")
     skill = tmp_path / "agent workspace" / ".agents" / "skills" / "waapi-skill"
     skill.mkdir(parents=True)
     content = "# skill\n"
     (skill / "SKILL.md").write_text(content, encoding="utf-8")
     command = windows_powershell_recording(
         r"Get-Content -Raw -Encoding UTF8 '.agents\skills\waapi-skill\SKILL.md'",
-        executable=executable,
+        executable=host.executable,
     )
     events = (
         {
@@ -2236,10 +2611,13 @@ def test_native_windows_system_powershell_get_content_has_parser_provenance(
         },
     )
 
-    record = completed_command_records(events)[0]
+    record = completed_command_records(
+        events,
+        windows_powershell_core_host=host,
+    )[0]
     facts = classify_commands((record,), skill_source=skill)
 
-    assert record.parser_kind == "windows-powershell-command"
+    assert record.parser_kind == "windows-pwsh-command"
     assert record.argv == (
         "Get-Content",
         "-Raw",
@@ -2252,24 +2630,20 @@ def test_native_windows_system_powershell_get_content_has_parser_provenance(
 
 
 @pytest.mark.skipif(os.name != "nt", reason="native Windows command-line parser proof")
-def test_native_windows_system_powershell_unwraps_gateway_path_with_spaces(
+def test_native_windows_powershell_core_unwraps_gateway_path_with_spaces(
     tmp_path: Path,
 ) -> None:
-    windows_directory = codex_harness_module._native_windows_directory()
-    executable = str(
-        windows_directory
-        / "System32"
-        / "WindowsPowerShell"
-        / "v1.0"
-        / "powershell.exe"
-    )
+    host = discover_windows_powershell_core(platform_name="nt")
     runner = tmp_path / "Agent Workspace" / ".agents" / "skills" / "waapi-skill" / "scripts" / "run.py"
     command = windows_powershell_recording(
         f"python '{runner}' gateway.py capabilities --summary-only",
-        executable=executable,
+        executable=host.executable,
     )
 
-    argv, has_operators, parse_error = parse_command_argv(command)
+    argv, has_operators, parse_error = parse_command_argv(
+        command,
+        windows_powershell_core_host=host,
+    )
 
     assert argv == (
         "python",
@@ -2283,24 +2657,20 @@ def test_native_windows_system_powershell_unwraps_gateway_path_with_spaces(
 
 
 @pytest.mark.skipif(os.name != "nt", reason="native Windows command-line parser proof")
-def test_native_windows_system_powershell_rejects_embedded_double_quote(
+def test_native_windows_powershell_core_rejects_embedded_double_quote(
     tmp_path: Path,
 ) -> None:
-    windows_directory = codex_harness_module._native_windows_directory()
-    executable = str(
-        windows_directory
-        / "System32"
-        / "WindowsPowerShell"
-        / "v1.0"
-        / "powershell.exe"
-    )
+    host = discover_windows_powershell_core(platform_name="nt")
     runner = tmp_path / "Agent Workspace" / "run.py"
     command = windows_powershell_recording(
         f'python "{runner}" gateway.py capabilities',
-        executable=executable,
+        executable=host.executable,
     )
 
-    argv, has_operators, parse_error = parse_command_argv(command)
+    argv, has_operators, parse_error = parse_command_argv(
+        command,
+        windows_powershell_core_host=host,
+    )
 
     assert argv == ()
     assert has_operators is True
@@ -2308,17 +2678,10 @@ def test_native_windows_system_powershell_rejects_embedded_double_quote(
 
 
 @pytest.mark.skipif(os.name != "nt", reason="native Windows command-line parser proof")
-def test_native_windows_system_powershell_wraps_encoded_continuation(
+def test_native_windows_powershell_core_wraps_encoded_continuation(
     tmp_path: Path,
 ) -> None:
-    windows_directory = codex_harness_module._native_windows_directory()
-    executable = str(
-        windows_directory
-        / "System32"
-        / "WindowsPowerShell"
-        / "v1.0"
-        / "powershell.exe"
-    )
+    host = discover_windows_powershell_core(platform_name="nt")
     expected = (
         "python",
         str(tmp_path / "Agent Workspace" / "run.py"),
@@ -2328,10 +2691,115 @@ def test_native_windows_system_powershell_wraps_encoded_continuation(
     )
     command = windows_powershell_recording(
         encode_windows_powershell_argv(expected),
-        executable=executable,
+        executable=host.executable,
     )
 
-    assert parse_command_argv(command) == (expected, False, "")
+    assert parse_command_argv(
+        command,
+        windows_powershell_core_host=host,
+    ) == (expected, False, "")
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows pwsh argv transport proof")
+def test_native_windows_pwsh_resolves_only_broker_ps1_external_scripts(
+    tmp_path: Path,
+) -> None:
+    host = discover_windows_powershell_core(platform_name="nt")
+    scripts = tmp_path / "waapi-skill" / "scripts"
+    scripts.mkdir(parents=True)
+    (scripts / "run.py").write_text("raise SystemExit(0)\n", encoding="utf-8")
+    with CodexGatewayBroker(
+        skill_source=scripts.parent,
+        expected_steps=(ExpectedGatewayStep("unused", "status"),),
+        transport="tcp",
+    ) as broker:
+        probe_script = (
+            "$commands=@(Get-Command -Name python,python3 -CommandType ExternalScript);"
+            "[Console]::Out.Write(($commands | Select-Object Name,CommandType,Source | "
+            "ConvertTo-Json -Compress))"
+        )
+        completed = subprocess.run(
+            [host.executable, "-NoProfile", "-Command", probe_script],
+            env=broker.model_environment(os.environ),
+            cwd=tmp_path,
+            shell=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="strict",
+            timeout=30,
+            check=False,
+        )
+
+        assert completed.returncode == 0, completed.stderr
+        assert completed.stderr == ""
+        rows = json.loads(completed.stdout)
+        assert [row["Name"].casefold() for row in rows] == ["python.ps1", "python3.ps1"]
+        assert {row["CommandType"] for row in rows} == {"ExternalScript"}
+        assert [PureWindowsPath(row["Source"]) for row in rows] == [
+            PureWindowsPath(broker.shim_directory / "python.ps1"),
+            PureWindowsPath(broker.shim_directory / "python3.ps1"),
+        ]
+        assert not (broker.shim_directory / "python.cmd").exists()
+        assert not (broker.shim_directory / "python3.cmd").exists()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows pwsh argv transport proof")
+def test_native_windows_powershell_core_preserves_2299_byte_hostile_json(
+    tmp_path: Path,
+) -> None:
+    host = discover_windows_powershell_core(platform_name="nt")
+    capture = tmp_path / "capture argv.py"
+    captured = tmp_path / "captured argv.json"
+    capture.write_text(
+        "from pathlib import Path\n"
+        "import sys\n"
+        "Path(sys.argv[1]).write_bytes(sys.argv[2].encode('utf-8'))\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    payload = {
+        "contract": "waapi-skill.operation-request/v1",
+        "operation": "audio.import",
+        "arguments": {
+            "object_path": r"\\Actor-Mixer Hierarchy\\Default Work Unit\\声音 & 'Storm'",
+            "audio_file": r"C:\Media path\%TEMP%\plain&pipe|redirect<out>caret^bang!percent%.wav",
+            "properties": [
+                {"name": "Notes", "value": 'quoted "value" and 中文'},
+                {"name": "IsLoopingEnabled", "value": True},
+            ],
+        },
+        "padding": "",
+    }
+    compact = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    payload["padding"] = "x" * (2299 - len(compact.encode("utf-8")))
+    compact = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    assert len(compact.encode("utf-8")) == 2299
+
+    def ps_literal(value: str) -> str:
+        return "'" + value.replace("'", "''") + "'"
+
+    script = "& " + " ".join(
+        ps_literal(value)
+        for value in (sys.executable, str(capture), str(captured), compact)
+    )
+    completed = subprocess.run(
+        [host.executable, "-NoProfile", "-Command", script],
+        cwd=tmp_path,
+        shell=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="strict",
+        timeout=30,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert captured.read_bytes() == compact.encode("utf-8")
+    assert json.loads(captured.read_text(encoding="utf-8")) == payload
 
 
 def test_pre_action_usage_limit_is_codex_infrastructure_failure() -> None:

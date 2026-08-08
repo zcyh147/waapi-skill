@@ -355,6 +355,7 @@ def test_project_dispatch_passes_closed_runtime_options_without_starting_it(
         service_tier: str
         timeout_seconds: float
         live_environment: Mapping[str, str]
+        windows_powershell_core_host: Any = None
 
     def fake_run(value: _Unit, *, scenario_root: Path, options: FakeOptions):
         observed.update(unit=value, root=scenario_root, options=options)

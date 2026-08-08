@@ -5611,6 +5611,21 @@ def test_heavy_fingerprint_covers_runner_model_options_and_mutable_inputs(
     assert effective["runner"]["matrix_sha256"]
     assert effective["runner"]["campaign_sha256"]
     assert effective["codex"]["model"] == "gpt-5.6-terra"
+    assert effective["codex"]["allow_login_shell"] is False
+    if os.name == "nt":
+        assert effective["codex"]["windows_shell_backend"] == (
+            campaign.WINDOWS_SHELL_BACKEND
+        )
+        assert set(effective["codex"]["windows_powershell_core_host"]) == {
+            "edition",
+            "path",
+            "version",
+            "native_argument_passing",
+            "sha256",
+        }
+    else:
+        assert effective["codex"]["windows_shell_backend"] is None
+        assert effective["codex"]["windows_powershell_core_host"] is None
     assert effective["runtime"]["interpreter_sha256"]
     assert effective["live_config"]["sha256"]
     assert tuple(effective["live_inputs"]["versions"]) == ("2022.1",)
@@ -5632,7 +5647,7 @@ def test_codex_version_fingerprint_permission_error_names_stage_and_binary(
     monkeypatch.setattr(
         campaign,
         "codex_process_environment",
-        lambda _binary, environment: dict(environment),
+        lambda _binary, environment, **_kwargs: dict(environment),
     )
     monkeypatch.setattr(
         campaign.subprocess,
@@ -5832,6 +5847,7 @@ def test_heavy_resume_verify_only_and_resume_schedule_only_pending(
             "tree_sha256": stable_tree_sha256(options.skill_source),
             "excluded_names": [],
         },
+        "codex": {"windows_powershell_core_host": None},
         "synthetic": True,
     }
     monkeypatch.setattr(campaign, "WORKSPACE_ROOT", options.campaign_root.parent)
@@ -5900,6 +5916,7 @@ def test_heavy_resume_retries_in_original_suite_order(
             "tree_sha256": stable_tree_sha256(options.skill_source),
             "excluded_names": [],
         },
+        "codex": {"windows_powershell_core_host": None},
         "synthetic": True,
     }
     monkeypatch.setattr(campaign, "WORKSPACE_ROOT", options.campaign_root.parent)
@@ -5963,6 +5980,7 @@ def test_heavy_campaign_attributes_later_evidence_error_to_that_unit(
             "tree_sha256": stable_tree_sha256(options.skill_source),
             "excluded_names": [],
         },
+        "codex": {"windows_powershell_core_host": None},
         "synthetic": True,
     }
     monkeypatch.setattr(campaign, "WORKSPACE_ROOT", options.campaign_root.parent)

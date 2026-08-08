@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import shlex
+import shutil
 import signal
 import socket
 import subprocess
@@ -586,7 +587,7 @@ elif mode == "bad-command":
     payload["command"] = "buses"
 elif mode == "bad-contract":
     payload["contract"] = "forged/v1"
-elif mode == "expected-error":
+elif mode in {"expected-error", "expected-error-exact-output"}:
     payload["ok"] = os.environ.get("FAKE_GATEWAY_ERROR_OK", "false") == "true"
     payload["error_code"] = os.environ.get(
         "FAKE_GATEWAY_ERROR_CODE",
@@ -597,11 +598,12 @@ elif mode == "expected-error":
         "FAKE_GATEWAY_ERROR_CONTRACT",
         "waapi-skill.gateway-result/v1",
     )
-print("fake setup log before payload")
+if mode not in {"exact-output", "expected-error-exact-output"}:
+    print("fake setup log before payload")
 print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
 if mode == "bad-exit":
     raise SystemExit(7)
-if mode == "expected-error":
+if mode in {"expected-error", "expected-error-exact-output"}:
     raise SystemExit(int(os.environ.get("FAKE_GATEWAY_ERROR_EXIT", "2")))
 if mode in {"terminal-success-exit2", "terminal-indeterminate", "terminal-generic-error"}:
     raise SystemExit(2)
@@ -643,6 +645,32 @@ def run_model_command(
         text=True,
         check=False,
     )
+
+
+def native_pwsh_73_or_skip() -> str:
+    pwsh = shutil.which("pwsh.exe") or shutil.which("pwsh")
+    if pwsh is None:
+        pytest.skip("PowerShell 7 is unavailable")
+    version_probe = subprocess.run(
+        [
+            pwsh,
+            "-NoLogo",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "$PSVersionTable.PSVersion.ToString()",
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=15,
+        check=False,
+    )
+    assert version_probe.returncode == 0, version_probe.stderr
+    version_parts = version_probe.stdout.strip().split(".")
+    if len(version_parts) < 2 or tuple(map(int, version_parts[:2])) < (7, 3):
+        pytest.skip("PowerShell 7.3 or newer is required")
+    return pwsh
 
 
 @pytest.mark.parametrize(
@@ -3270,7 +3298,7 @@ def test_broker_installs_posix_shims_and_exposes_small_harness_overlay(tmp_path:
         assert record.payload["gateway_required_visible"] is False
 
 
-def test_broker_materializes_closed_windows_cmd_shims_and_overlay(
+def test_broker_materializes_closed_windows_powershell_shims_and_overlay(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -3296,11 +3324,30 @@ def test_broker_materializes_closed_windows_cmd_shims_and_overlay(
             assert wrapper.is_file()
             assert wrapper.is_symlink() is False
             raw = wrapper.read_bytes()
-            assert raw.endswith(b"\r\n")
-            assert b"\n" not in raw.replace(b"\r\n", b"")
-            assert b"setlocal DisableDelayedExpansion" in raw
+            assert raw.startswith(b"\xef\xbb\xbf") is False
+            assert raw.endswith(b"\n")
+            assert b"\r" not in raw
             assert SHIM_TRUSTED_PYTHON_ENV.encode("ascii") in raw
             assert WINDOWS_SHIM_SCRIPT_NAME.encode("ascii") in raw
+            assert b"$PSScriptRoot" in raw
+            assert b"@args" in raw
+            assert b"$ErrorActionPreference = 'Stop'" in raw
+            assert b"$PSNativeCommandArgumentPassing = 'Standard'" in raw
+            assert b"$PSNativeCommandUseErrorActionPreference = $false" in raw
+            assert b"$LASTEXITCODE = $null" in raw
+            interpreter_name = Path(name).stem.encode("ascii")
+            assert b"'" + interpreter_name + b"' @args" in raw
+            for forbidden in (
+                b"Invoke-Expression",
+                b"Start-Process",
+                b"EncodedCommand",
+                b"FromBase64String",
+                b"ConvertFrom-Json",
+                b"Set-ExecutionPolicy",
+            ):
+                assert forbidden not in raw
+        assert not (broker.shim_directory / "python.cmd").exists()
+        assert not (broker.shim_directory / "python3.cmd").exists()
 
         overlay = broker.model_environment_overrides(
             r"C:\Windows\System32",
@@ -3309,7 +3356,7 @@ def test_broker_materializes_closed_windows_cmd_shims_and_overlay(
         assert overlay["PATH"] == (
             f"{broker.shim_directory};" r"C:\Windows\System32"
         )
-        assert overlay["PATHEXT"] == ".CMD;.EXE;.BAT;.PY"
+        assert overlay["PATHEXT"] == ".PS1;.EXE;.BAT;.CMD;.PY"
         assert overlay[SHIM_TRUSTED_PYTHON_ENV] == str(broker.trusted_python)
         assert BASH_ENV_NAME not in overlay
         with pytest.raises(GatewayBrokerError, match="has not started"):
@@ -3327,7 +3374,7 @@ def test_broker_materializes_closed_windows_cmd_shims_and_overlay(
         assert "Bash_Env" not in environment
         assert "waapi_codex_gateway_shim_trusted_python" not in environment
         assert environment["PATH"].endswith(r";C:\Trusted\Bin")
-        assert environment["PATHEXT"] == ".CMD;.EXE"
+        assert environment["PATHEXT"] == ".PS1;.EXE;.CMD"
         assert environment[SHIM_TRUSTED_PYTHON_ENV] == str(
             broker.trusted_python
         )
@@ -3378,25 +3425,167 @@ def test_broker_fails_closed_when_no_native_shim_backend_exists(
     assert broker._working_root is None
 
 
-@pytest.mark.skipif(os.name != "nt", reason="native Windows CMD resolution")
-def test_native_windows_cmd_shim_dispatches_bare_python(
+@pytest.mark.parametrize("interpreter_name", ("python", "python3"))
+@pytest.mark.skipif(os.name != "nt", reason="native Windows PowerShell resolution")
+def test_native_windows_powershell_shim_preserves_hostile_json(
     tmp_path: Path,
+    interpreter_name: str,
 ) -> None:
+    pwsh = native_pwsh_73_or_skip()
+
     skill = make_fake_skill(tmp_path)
+    request = {
+        "contract": "waapi-skill.windows-relay-hostile-json/v1",
+        "edge_values": {
+            "empty": "",
+            "trailing_backslash": "C:\\Program Files\\Audio\\tail\\",
+            "escaped_quote": 'say "hello" then write \\"',
+            "control": "line one\nline two\tend\u0001",
+            "unicode": "雪・你好・café",
+            "literal_environment_token": "%TEMP%\\not-expanded\\",
+        },
+        "rows": [
+            {
+                "index": index,
+                "name": f'row {index}: "quoted" and apostrophe \'',
+                "path": rf"C:\Program Files\Audio & Tools\row-{index}\雪.wav",
+                "operators_are_data": "& | ; < > $() ` % ^ ! [ ] { }",
+            }
+            for index in range(24)
+        ],
+    }
+    request_json = json.dumps(
+        request,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    options_json = json.dumps(
+        {"return": ["id", "name", "path"], "note": "你好 & goodbye"},
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    uri = "ak.wwise.core.object.get"
+    arguments = [
+        "call",
+        uri,
+        "--args-json",
+        request_json,
+        "--options-json",
+        options_json,
+    ]
     with CodexGatewayBroker(
         skill_source=skill,
-        expected_steps=(ExpectedGatewayStep("status", "status"),),
+        expected_steps=(
+            ExpectedGatewayStep(
+                "hostile-call",
+                "call",
+                (
+                    uri,
+                    "--args-json",
+                    SemanticJsonArgument(request),
+                    "--options-json",
+                    SemanticJsonArgument(json.loads(options_json)),
+                ),
+            ),
+        ),
+        runner_environment={**os.environ, "FAKE_GATEWAY_MODE": "exact-output"},
         transport="tcp",
     ) as broker:
-        result = run_model_command(broker, ["status"])
+        command_script = interpreter_name + " " + " ".join(
+            "'" + argument.replace("'", "''") + "'"
+            for argument in (
+                str(broker.invocation_runner_path),
+                "gateway.py",
+                *arguments,
+            )
+        )
+        result = subprocess.run(
+            [
+                pwsh,
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                command_script,
+            ],
+            env=broker.model_environment(os.environ),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=30,
+            check=False,
+        )
 
-        assert result.returncode == 0
-        payload = json.loads(result.stdout[result.stdout.index("{") :])
-        assert payload["command"] == "status"
+        assert result.returncode == 0, result.stderr
+        assert result.stderr == ""
+        payload = json.loads(result.stdout)
+        assert payload["command"] == "call"
         assert payload["shim_trusted_python_visible"] is False
         assert payload["bash_env_visible"] is False
         record = broker.evidence().records[0]
-        assert record.normalized_model_argv[0] == "python"
+        assert len(request_json.encode("utf-8")) >= 2299
+        assert request_json.count('"') >= 108
+        assert record.model_argv == (
+            interpreter_name,
+            str(broker.invocation_runner_path),
+            "gateway.py",
+            *arguments,
+        )
+        assert record.normalized_model_argv[0] == interpreter_name
+        assert record.succeeded is True
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows PowerShell resolution")
+def test_native_windows_powershell_shim_propagates_packaged_exit_two(
+    tmp_path: Path,
+) -> None:
+    pwsh = native_pwsh_73_or_skip()
+    skill = make_fake_skill(tmp_path)
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(
+            ExpectedGatewayStep(
+                "expected-error",
+                "status",
+                allowed_exit_codes=(2,),
+                expected_error_code="PACKAGED_PREVIEW_UNAVAILABLE",
+                expected_result_command="status",
+            ),
+        ),
+        runner_environment={
+            **os.environ,
+            "FAKE_GATEWAY_MODE": "expected-error-exact-output",
+        },
+        transport="tcp",
+    ) as broker:
+        command_script = "python '" + str(broker.invocation_runner_path).replace(
+            "'", "''"
+        ) + "' 'gateway.py' 'status'"
+        result = subprocess.run(
+            [
+                pwsh,
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                command_script,
+            ],
+            env=broker.model_environment(os.environ),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=30,
+            check=False,
+        )
+
+        assert result.returncode == 2, result.stderr
+        assert result.stderr == ""
+        payload = json.loads(result.stdout)
+        assert payload["ok"] is False
+        assert payload["error_code"] == "PACKAGED_PREVIEW_UNAVAILABLE"
+        record = broker.evidence().records[0]
+        assert record.runner_exit_code == 2
+        assert record.exit_code == 2
         assert record.succeeded is True
 
 

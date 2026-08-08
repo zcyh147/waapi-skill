@@ -81,6 +81,7 @@ from tests.semantic.support.codex_harness import (  # noqa: E402  # pyright: ign
     CodexHarnessConfig,
     CodexInfrastructureError,
     CodexRunResult,
+    WindowsPowerShellCoreHost,
     is_evaluation_sensitive_environment_key,
     normalized_gateway_command_argv,
     prepare_workspace_skill_install,
@@ -295,6 +296,7 @@ class RunnerOptions:
     pair_ids: tuple[str, ...]
     offline_only: bool
     overwrite: bool
+    windows_powershell_core_host: WindowsPowerShellCoreHost | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -643,6 +645,7 @@ def run_heavy_v3_unit(
             service_tier=options.service_tier,
             timeout_seconds=options.timeout_seconds,
             live_environment=live_environment,
+            windows_powershell_core_host=options.windows_powershell_core_host,
         )
         return runner(unit, scenario_root=scenario_root, options=cli_options)
 
@@ -667,6 +670,7 @@ def run_heavy_v3_unit(
             service_tier=options.service_tier,
             timeout_seconds=options.timeout_seconds,
             live_environment=live_environment,
+            windows_powershell_core_host=options.windows_powershell_core_host,
         )
         return runner(unit, scenario_root=scenario_root, options=project_options)
 
@@ -1933,6 +1937,9 @@ def run_fresh_phase(
                     workspace=workspace,
                     skill_source=options.skill_source,
                     codex_binary=options.codex_binary,
+                    windows_powershell_core_host=(
+                        options.windows_powershell_core_host
+                    ),
                     auth_json=options.auth_json,
                     model=options.model,
                     reasoning_effort=options.reasoning_effort,
@@ -3280,6 +3287,64 @@ def utc_now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
+def _parse_sealed_windows_powershell_core_host(
+    value: str | None,
+    *,
+    platform_name: str | None = None,
+) -> WindowsPowerShellCoreHost | None:
+    if value is None:
+        return None
+    active_platform = os.name if platform_name is None else str(platform_name)
+    if active_platform != "nt" and not active_platform.startswith("win"):
+        raise ValueError(
+            "a sealed Windows PowerShell Core host is valid only on native Windows"
+        )
+    if len(value.encode("utf-8")) > 4096:
+        raise ValueError("sealed Windows PowerShell Core host JSON is too large")
+
+    def reject_duplicate_keys(pairs: Sequence[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, item in pairs:
+            if key in result:
+                raise ValueError(
+                    "sealed Windows PowerShell Core host JSON has duplicate keys"
+                )
+            result[key] = item
+        return result
+
+    try:
+        payload = json.loads(value, object_pairs_hook=reject_duplicate_keys)
+    except (json.JSONDecodeError, UnicodeError, ValueError) as exc:
+        raise ValueError(
+            f"sealed Windows PowerShell Core host JSON is invalid: {exc}"
+        ) from exc
+    expected_keys = {
+        "edition",
+        "path",
+        "version",
+        "native_argument_passing",
+        "sha256",
+    }
+    if (
+        not isinstance(payload, Mapping)
+        or set(payload) != expected_keys
+        or payload.get("edition") != "Core"
+        or not all(isinstance(payload.get(key), str) for key in expected_keys)
+    ):
+        raise ValueError("sealed Windows PowerShell Core host JSON is malformed")
+    try:
+        return WindowsPowerShellCoreHost(
+            executable=str(payload["path"]),
+            version=str(payload["version"]),
+            native_argument_passing=str(payload["native_argument_passing"]),
+            sha256=str(payload["sha256"]),
+        )
+    except ValueError as exc:
+        raise ValueError(
+            f"sealed Windows PowerShell Core host JSON is invalid: {exc}"
+        ) from exc
+
+
 def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -3310,6 +3375,10 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     parser.add_argument("--pair-id", action="append", default=[])
     parser.add_argument("--offline-only", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument(
+        "--sealed-windows-powershell-core-host-json",
+        help=argparse.SUPPRESS,
+    )
     args = parser.parse_args(argv)
     is_executable_v3 = args.profile in EXECUTABLE_V3_PROFILE_IDS
     is_policy_v3 = args.profile == MODIFICATION_POLICY_V3_PROFILE_ID
@@ -3404,7 +3473,10 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     )
     try:
         codex_binary = resolve_codex_binary(args.codex_binary)
-    except CodexHarnessError as exc:
+        windows_powershell_core_host = _parse_sealed_windows_powershell_core_host(
+            args.sealed_windows_powershell_core_host_json
+        )
+    except (CodexHarnessError, ValueError) as exc:
         parser.error(str(exc))
     return RunnerOptions(
         profile=str(args.profile),
@@ -3427,6 +3499,7 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         pair_ids=tuple(str(value) for value in args.pair_id),
         offline_only=bool(args.offline_only),
         overwrite=bool(args.overwrite),
+        windows_powershell_core_host=windows_powershell_core_host,
     )
 
 

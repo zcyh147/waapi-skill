@@ -401,11 +401,17 @@ selected Windows backend, Codex can reject a Python Gateway command at its
 execution-policy boundary before PATH resolution or broker authentication.
 The fixed backend remains combined with `workspace-write`, approval policy
 `never`, and the existing broker boundary; it is not a permission bypass.
-Windows PowerShell 5.1 does not reliably infer UTF-8 for these Markdown files.
-The Skill therefore requires exact `Get-Content -Raw -Encoding UTF8 <path>`
-reads. Evidence parsing accepts that form only from the verified system
-PowerShell wrapper, normalizes line-ending conventions, and tolerates only the
-single terminal newline that PowerShell adds to the otherwise complete text.
+Formal Windows runs require a real, non-reparse PowerShell Core `pwsh.exe`
+version 7.3 or newer whose native argument mode is `Standard` or `Windows`.
+The campaign fingerprints the exact executable, pins `allow_login_shell=false`,
+and revalidates that identity for resume and verify-only. Broker command
+resolution uses generated `python.ps1` / `python3.ps1` relays with `.PS1` first
+in the isolated `PATHEXT`; `.cmd` and `.bat` relays are forbidden because their
+legacy argument path corrupts structured Gateway JSON even under current
+PowerShell Core. The Skill requires exact
+`Get-Content -Raw -Encoding UTF8 <path>` reads. Evidence parsing accepts that
+form only from the sealed PowerShell Core wrapper, normalizes line endings, and
+tolerates only the single terminal newline added to otherwise complete text.
 
 ## Live prerequisites and evidence
 

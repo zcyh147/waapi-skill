@@ -108,6 +108,7 @@ def _effective_for(options: campaign.CampaignOptions) -> dict[str, Any]:
             "runtime_files": campaign._codex_runtime_fingerprints(
                 options.codex_binary
             ),
+            **campaign._codex_shell_effective_config(),
             "memory": "disabled",
             "fresh_session_per_phase": True,
         },
@@ -378,6 +379,129 @@ def test_candidate_frozen_hash_drift_is_detected(tmp_path: Path) -> None:
         campaign.assert_candidate_frozen(options.skill_source, effective=effective)
 
 
+def test_windows_shell_effective_config_seals_exact_profile_free_host(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fingerprint = {
+        "path": r"C:\Program Files\PowerShell\7\pwsh.exe",
+        "version": "7.6.4",
+        "native_argument_passing": "Windows",
+        "sha256": "a" * 64,
+    }
+
+    class SyntheticHost:
+        def fingerprint_dict(self) -> dict[str, str]:
+            return dict(fingerprint)
+
+    monkeypatch.setattr(
+        campaign,
+        "discover_windows_powershell_core",
+        lambda *, platform_name: SyntheticHost(),
+    )
+
+    assert campaign._windows_powershell_core_host_seal(
+        platform_name="win32"
+    ) == {"edition": "Core", **fingerprint}
+    assert campaign._windows_powershell_core_host_seal(
+        platform_name="posix"
+    ) is None
+
+
+def test_ordinary_effective_config_records_shell_policy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    options = _options(tmp_path)
+    monkeypatch.setattr(
+        campaign.subprocess,
+        "run",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess(
+            [str(options.codex_binary), "--version"],
+            0,
+            "codex-cli 1.2.3\n",
+            "",
+        ),
+    )
+    monkeypatch.setattr(campaign.importlib.metadata, "distributions", lambda: ())
+
+    effective = campaign.build_effective_config(
+        options,
+        sessions=(_C1,),
+        required_units={_C1.pair_id: (_C1.phase,)},
+    )
+
+    assert effective["codex"]["allow_login_shell"] is False
+    if os.name == "nt":
+        assert effective["codex"]["windows_shell_backend"] == (
+            campaign.WINDOWS_SHELL_BACKEND
+        )
+        assert set(effective["codex"]["windows_powershell_core_host"]) == {
+            "edition",
+            "path",
+            "version",
+            "native_argument_passing",
+            "sha256",
+        }
+    else:
+        assert effective["codex"]["windows_shell_backend"] is None
+        assert effective["codex"]["windows_powershell_core_host"] is None
+
+
+def test_windows_shell_frozen_reprobes_exact_sealed_executable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fingerprint = {
+        "path": r"C:\Program Files\PowerShell\7\pwsh.exe",
+        "version": "7.6.4",
+        "native_argument_passing": "Windows",
+        "sha256": "b" * 64,
+    }
+    probed: list[str] = []
+
+    class SyntheticHost:
+        def fingerprint_dict(self) -> dict[str, str]:
+            return dict(fingerprint)
+
+    def fake_probe(executable: str) -> SyntheticHost:
+        probed.append(executable)
+        return SyntheticHost()
+
+    monkeypatch.setattr(campaign, "probe_windows_powershell_core", fake_probe)
+    codex = {
+        "windows_powershell_core_host": {"edition": "Core", **fingerprint},
+        "windows_shell_backend": campaign.WINDOWS_SHELL_BACKEND,
+        "allow_login_shell": False,
+    }
+
+    campaign._assert_codex_shell_frozen(codex, platform_name="nt")
+
+    assert probed == [fingerprint["path"]]
+    codex["windows_powershell_core_host"] = {
+        "edition": "Core",
+        **{**fingerprint, "sha256": "c" * 64},
+    }
+    with pytest.raises(CampaignEvidenceError, match="host drifted"):
+        campaign._assert_codex_shell_frozen(codex, platform_name="nt")
+
+
+def test_effective_input_freeze_revalidates_shell_policy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    options = _options(tmp_path)
+    effective = _effective_for(options)
+    observed: list[Mapping[str, Any]] = []
+    monkeypatch.setattr(
+        campaign,
+        "_assert_codex_shell_frozen",
+        lambda codex: observed.append(codex),
+    )
+
+    campaign.assert_effective_inputs_frozen(options, effective=effective)
+
+    assert observed == [effective["codex"]]
+
+
 def test_candidate_drift_during_child_is_sealed_as_blocked(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -456,6 +580,38 @@ def test_build_child_argv_never_requests_overwrite(tmp_path: Path) -> None:
     assert "--overwrite" not in argv
     assert argv.count("--pair-id") == 1
     assert argv[argv.index("--pair-id") + 1] == _C1.pair_id
+
+
+def test_windows_shell_seal_round_trips_into_matrix_child_argv(
+    tmp_path: Path,
+) -> None:
+    options = _options(tmp_path)
+    group = campaign.ChildGroup(
+        group_id="offline",
+        version=None,
+        pair_ids=(_C1.pair_id,),
+        sessions=(_C1,),
+    )
+    host = campaign.WindowsPowerShellCoreHost(
+        executable=r"C:\Program Files\PowerShell\7\pwsh.exe",
+        version="7.6.4",
+        native_argument_passing="Windows",
+        sha256="d" * 64,
+    )
+
+    argv = campaign.build_child_argv(
+        options,
+        group=group,
+        matrix_root=tmp_path / "matrix",
+        windows_powershell_core_host=host,
+    )
+
+    seal_index = argv.index("--sealed-windows-powershell-core-host-json")
+    parsed = matrix._parse_sealed_windows_powershell_core_host(
+        argv[seal_index + 1],
+        platform_name="nt",
+    )
+    assert parsed == host
 
 
 def test_sealed_pass_resumes_verify_only_without_starting_another_child(
