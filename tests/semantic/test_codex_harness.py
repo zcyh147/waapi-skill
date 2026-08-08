@@ -1446,7 +1446,11 @@ def test_codex_cli_task_reuses_one_disposable_state_and_resumes_exact_thread(
     ) -> dict[str, str]:
         assert binary_arg == binary
         assert platform_name is None
-        assert powershell_core_host is None
+        if os.name == "nt":
+            assert powershell_core_host is not None
+            assert powershell_core_host.native_argument_passing in {"Standard", "Windows"}
+        else:
+            assert powershell_core_host is None
         result = dict(environment)
         result["TEST_CODEX_RUNTIME_BOUND"] = "1"
         runtime_environment_calls.append(result)
@@ -2715,7 +2719,8 @@ def test_native_windows_pwsh_resolves_only_broker_ps1_external_scripts(
     ) as broker:
         probe_script = (
             "$commands=@(Get-Command -Name python,python3 -CommandType ExternalScript);"
-            "[Console]::Out.Write(($commands | Select-Object Name,CommandType,Source | "
+            "[Console]::Out.Write(($commands | Select-Object Name,"
+            "@{Name='CommandType';Expression={$_.CommandType.ToString()}},Source | "
             "ConvertTo-Json -Compress))"
         )
         completed = subprocess.run(

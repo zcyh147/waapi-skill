@@ -4106,7 +4106,10 @@ def _windows_command_shim_source(interpreter_name: str) -> bytes:
             "$trustedPython = [Environment]::GetEnvironmentVariable("
             f"'{SHIM_TRUSTED_PYTHON_ENV}', 'Process')"
         ),
-        "if ([String]::IsNullOrWhiteSpace($trustedPython)) { exit 125 }",
+        (
+            "if ([String]::IsNullOrWhiteSpace($trustedPython)) { "
+            "[System.Environment]::Exit(125) }"
+        ),
         (
             "$brokerShim = [System.IO.Path]::Combine("
             f"$PSScriptRoot, '{WINDOWS_SHIM_SCRIPT_NAME}')"
@@ -4114,11 +4117,11 @@ def _windows_command_shim_source(interpreter_name: str) -> bytes:
         "try {",
         "    $LASTEXITCODE = $null",
         f"    & $trustedPython $brokerShim '{interpreter_name}' @args",
-        "    if ($null -eq $LASTEXITCODE) { exit 125 }",
-        "    exit $LASTEXITCODE",
+        "    if ($null -eq $LASTEXITCODE) { [System.Environment]::Exit(125) }",
+        "    [System.Environment]::Exit([int]$LASTEXITCODE)",
         "} catch {",
         "    [Console]::Error.WriteLine('Codex gateway broker relay failed.')",
-        "    exit 125",
+        "    [System.Environment]::Exit(125)",
         "}",
         "",
     )

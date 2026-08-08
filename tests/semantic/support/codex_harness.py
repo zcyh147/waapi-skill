@@ -808,11 +808,6 @@ def codex_process_environment(
     result = {str(key): str(value) for key, value in environment.items()}
     if not active_platform.startswith("win"):
         return result
-    if powershell_core_host is None and os.name == "nt":
-        powershell_core_host = discover_windows_powershell_core(
-            environment=result,
-            platform_name="nt",
-        )
     codex_runtime_files(binary, platform_name=active_platform)
     runtime_directories = _windows_codex_runtime_directories(binary)
     if not runtime_directories:
