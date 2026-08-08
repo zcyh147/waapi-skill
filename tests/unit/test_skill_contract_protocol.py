@@ -625,10 +625,23 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "exact-ID read back every selected" in OPERATE
     assert "These bounded read-only checks precede the transaction contract" in OPERATE
     assert "first transaction-contract branches" in OPERATE
-    assert "Any other metadata-bound operation" in OPERATE
+    assert "explicitly requested unknown dynamic property/reference token" in OPERATE
     assert "one metadata discovery first, then its named `operation-schema`" in OPERATE
-    assert "A named operation with no metadata lookup" in OPERATE
+    assert "A named operation using only closed schema fields and side effects" in OPERATE
     assert "its named `operation-schema` directly" in OPERATE
+    assert "including both import operations" not in OPERATE
+    assert "For direct `audio.import`, fixed fields and same-row Event/Switch Assignation are schema-owned" in OPERATE
+    assert "without an extra dynamic `properties[]`/`references[]` token" in OPERATE
+    assert "begin `operation-schema audio.import`" in OPERATE
+    assert "table workflow with only fixed columns likewise begins `operation-schema audio.importTabDelimited`" in OPERATE
+    assert "unknown dynamic `Property[...]`, `Reference[...]`, or `@...` column remains metadata-first" in OPERATE
+    skill_compact = " ".join(SKILL.split())
+    assert (
+        "metadata precedes schema only for an explicitly requested unknown "
+        "dynamic property/reference token"
+    ) in skill_compact
+    assert "Closed schema fields and side effects are not metadata" in skill_compact
+    assert "without such a token, start with the named schema" in skill_compact
     assert "A known native URI without a named route" in OPERATE
     assert "`describe <uri>`" in OPERATE
     assert "There is deliberately no unconditional schema-to-preview shortcut" in compact
@@ -684,6 +697,8 @@ def test_operate_business_selection_and_execution_domains_remain_explicit() -> N
         "keep `object.set` when import is subordinate to a broader atomic "
         "mutation of existing targets"
     ) in compact
+    assert "independent Switch assignment between existing objects" in compact
+    assert "same-row import side effect" in compact
     assert (
         "Wholly new structure-only object hierarchy whose requested root does "
         "not already exist and has no media or import-manifest intent"
@@ -753,6 +768,10 @@ def test_operate_metadata_and_import_prose_only_rules_are_preserved() -> None:
         "independent enable switches and numeric values as separate queries",
         "`fallback_detail_scan.status` is `partial`",
         "A `complete` scan with no match is terminal",
+        "For direct imports, discover only extra dynamic `properties[]`/`references[]`",
+        "for table imports, only dynamic `Property[...]`, `Reference[...]`, or `@...` columns",
+        "Fixed fields and side effects never trigger discovery",
+        "Event, Dialogue Event, and `switch_assignment` are schema-owned too",
         "`Notes` and `Audio Source Notes` are fixed import columns",
         "not Sound metadata queries",
         "ordinary `audio.importTabDelimited` import",

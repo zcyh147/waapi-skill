@@ -582,6 +582,18 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
     }
     assert prepared.protocol.turn_prefix_counts == (2, 8, 12)
     assert len(prepared.protocol.steps) == 12
+    assert [
+        (step.name, step.subcommand)
+        for step in prepared.protocol.steps[:2]
+    ] == [
+        ("tx01.operation-schema", "operation-schema"),
+        ("tx01.preview", "preview"),
+    ]
+    assert prepared.protocol.steps[0].arguments == ("audio.import",)
+    assert all(
+        step.subcommand != "metadata" for step in prepared.protocol.steps
+    )
+    assert prepared.protocol.commutative_read_only_step_groups == ()
     assert [(row.api, row.count) for row in prepared.expected_dispatches] == [
         (IMPORT_API, 1),
         (REMOVE_ASSIGNMENT_API, 1),

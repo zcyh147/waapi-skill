@@ -36,11 +36,11 @@ After any required selected-subset identity gate, choose exactly one of these fi
 | Request | First transaction-contract sequence |
 |---|---|
 | `object.create` or `object.set` | `operation-schema <name>` first. If the request describes dynamic properties/references by meaning, run one metadata discovery next; do not repeat the schema. |
-| Any other metadata-bound operation with unknown property/reference tokens, including both import operations | one metadata discovery first, then its named `operation-schema` |
-| A named operation with no metadata lookup | its named `operation-schema` directly |
+| Any other operation with an explicitly requested unknown dynamic property/reference token | one metadata discovery first, then its named `operation-schema` |
+| A named operation using only closed schema fields and side effects | its named `operation-schema` directly |
 | A known native URI without a named route | `describe <uri>` and obey only the returned `transaction_operations`, except for the reviewed fast routes below |
 
-Use `operations` only for a broad inventory question, never as preparation for a named change. An implemented dedicated operation owns its URI; `waapi.call` is a hard-rejected bypass unless the catalog explicitly lists it as that URI's transaction operation. The three Undo Group member URIs use only `waapi.undoGroup`.
+For direct `audio.import`, fixed fields and same-row Event/Switch Assignation are schema-owned; without an extra dynamic `properties[]`/`references[]` token, begin `operation-schema audio.import`. An existing table workflow with only fixed columns likewise begins `operation-schema audio.importTabDelimited`; an explicitly requested unknown dynamic `Property[...]`, `Reference[...]`, or `@...` column remains metadata-first. Use `operations` only for a broad inventory question, never as preparation for a named change. An implemented dedicated operation owns its URI; `waapi.call` is a hard-rejected bypass unless the catalog explicitly lists it as that URI's transaction operation. The three Undo Group member URIs use only `waapi.undoGroup`.
 
 After the required discovery/schema sequence, construct only the closed request returned by the schema and preview it. There is deliberately no unconditional schema-to-preview shortcut: missing metadata, version, identity, file, or user input must be resolved by the branch that owns it. Conversely, do not add metadata discovery when an exact property/reference accessor is already visible in a successful live query from this conversation. Apply only the operation schema's mapping: property accessor `@Foo` becomes mutation metadata token `Foo` by removing exactly one leading `@`; reference accessor `OutputBus` remains `OutputBus`. This mapping is evidence-bound to that returned accessor—never strip or invent a token from arbitrary user/model text. Then preview the canonical token.
 
@@ -78,7 +78,7 @@ A named root that already exists and receives any notes, property, reference, or
 | Wholly new structure-only object hierarchy whose requested root does not already exist and has no media or import-manifest intent | `object.create` | `audio.import` |
 | Change fields, references, or lists on existing roots; target multiple existing roots; or append directly to an existing descendant below the named request root that the user explicitly identifies as the direct insertion target—the request root itself does not count | `object.set` | `object.create` |
 | One isolated rename, notes, property, or reference edit | `object.setName`, `object.setNotes`, `object.setProperty`, or `object.setReference` | broad `object.set` |
-| Platform link, plug-in, RTPC curve, or Switch assignment | its dedicated operation | generic object mutation |
+| Platform link, plug-in, RTPC curve, or independent Switch assignment between existing objects | its dedicated operation | generic object mutation or a same-row import side effect |
 | Direct saved SoundBank inclusions | `soundbank.setInclusions` | Definition TSV |
 | Existing caller-owned SoundBank Definition TSV | `soundbank.processDefinitionFiles` | reconstructed direct rows |
 | Generate Bank artifacts | `soundbank.generate` | persistent inclusion editing |
@@ -122,7 +122,7 @@ For `object.create` and `object.set`, complete any required selected-subset iden
 
 The operation preview performs final live typed validation and remains authoritative. Do not add a separate property-info check for a token already proved in the visible conversation, and never inspect metadata-cache files.
 
-For import tables, discover only dynamic property/reference behavior. `Notes` and `Audio Source Notes` are fixed import columns owned by the import schema/parser, not Sound metadata queries. Keep “looping enabled” and “looping infinite” as separate phrases when the user requests infinite looping. A per-object instance limit likewise needs separate “ignore parent playback limit”, “sound instance limit enabled”, and “maximum sound instances” phrases. `volume` and `output bus` are other useful concepts. These are search phrases, never permission to guess the returned internal token.
+For direct imports, discover only extra dynamic `properties[]`/`references[]`; for table imports, only dynamic `Property[...]`, `Reference[...]`, or `@...` columns. Fixed fields and side effects never trigger discovery. `Notes` and `Audio Source Notes` are fixed import columns owned by the schema/parser, not Sound metadata queries; Event, Dialogue Event, and `switch_assignment` are schema-owned too. Keep “looping enabled” and “looping infinite” as separate phrases when the user requests infinite looping. A per-object instance limit likewise needs separate “ignore parent playback limit”, “sound instance limit enabled”, and “maximum sound instances” phrases. `volume` and `output bus` are other useful concepts. These are search phrases, never permission to guess the returned internal token.
 
 ### Compact import and value rules
 

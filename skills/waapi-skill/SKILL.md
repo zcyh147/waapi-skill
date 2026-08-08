@@ -155,10 +155,11 @@ Conditional read for a query not fully covered by the fixed commands, exact-iden
 Use operate for project-changing work: create, move, copy, delete, property/reference edits, imports, soundbanks, switch assignments, and design previews.
 
 For `object.create`/`object.set`, finish any required selected-subset exact-ID
-readback first, then run schema before metadata; its adapter version selects
-scope. For other metadata-bound changes without a live-proven token,
-metadata discovery is the first Gateway command after the operate reference,
-followed by schema. Never infer name, scope, or order.
+readback, then run schema before metadata; its adapter version selects scope.
+Otherwise, metadata precedes schema only for an explicitly requested unknown
+dynamic property/reference token. Closed schema fields and side effects are
+not metadata; without such a token, start with the named schema. Never infer
+tokens, scope, or order.
 
 Apply the canonical policy from the latest gateway `session_context`:
 
