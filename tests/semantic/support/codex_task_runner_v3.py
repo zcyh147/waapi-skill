@@ -63,6 +63,7 @@ TASK_INFRASTRUCTURE_FAILURE_CONTRACT = (
 TASK_COMMAND_LIFECYCLE_FAILURE_CONTRACT = (
     "waapi-skill.codex-semantic-command-lifecycle-failure/v1"
 )
+TASK_GATE_FAILURE_CONTRACT = "waapi-skill.codex-semantic-task-gate-failure/v1"
 PROMPT_MATERIALIZATION_CONTRACT = PROMPT_MATERIALIZATION_RECEIPT_CONTRACT
 PROMPT_MATERIALIZATION_FILE = PROMPT_MATERIALIZATION_RECEIPT_FILE
 _CODEX_INFRASTRUCTURE_CATEGORIES = frozenset(
@@ -498,6 +499,19 @@ def run_v3_codex_task(
                         common_failures = errors or tuple(
                             key for key, value in gates.items() if not value
                         )
+                        _archive_task_gate_failure(
+                            root,
+                            scenario_id=scenario_id,
+                            version=version,
+                            failed_turn_index=turn_index,
+                            expected_turn_count=len(prompt_values),
+                            thread_id=result.thread_id,
+                            grade=grade,
+                            broker_evidence=broker_evidence,
+                            prompt_materialization_path=(
+                                prompt_materialization_path
+                            ),
+                        )
                         raise V3TaskRunnerError(
                             f"{scenario_id} turn {turn_index} failed task gates: "
                             f"common={common_failures}; "
@@ -908,6 +922,73 @@ def _archive_command_lifecycle_failure(
     )
 
 
+def _archive_task_gate_failure(
+    root: Path,
+    *,
+    scenario_id: str,
+    version: str,
+    failed_turn_index: int,
+    expected_turn_count: int,
+    thread_id: str,
+    grade: V3TurnGrade,
+    broker_evidence: GatewayBrokerEvidence,
+    prompt_materialization_path: Path,
+) -> None:
+    """Archive bounded diagnostics without changing the semantic verdict."""
+
+    broker_path = root / "task-gate-broker-evidence.json"
+    _write_json(broker_path, broker_evidence.as_dict(include_output=False))
+    turn_artifacts = tuple(
+        root / "turns" / f"turn-{index:02d}" / filename
+        for index in range(1, failed_turn_index + 1)
+        for filename in (
+            "prompt.txt",
+            "events.jsonl",
+            "stderr.txt",
+            "final.txt",
+            "codex-facts.json",
+            "turn-grade.json",
+        )
+    )
+    artifact_paths = (
+        prompt_materialization_path,
+        *turn_artifacts,
+        broker_path,
+    )
+    missing = tuple(
+        path.relative_to(root).as_posix()
+        for path in artifact_paths
+        if not path.is_file()
+    )
+    if missing:
+        raise V3TaskRunnerError(
+            "task-gate diagnostic archive is incomplete: " + ", ".join(missing)
+        )
+    _write_json(
+        root / "task-gate-failure.json",
+        {
+            "contract": TASK_GATE_FAILURE_CONTRACT,
+            "scenario_id": scenario_id,
+            "version": version,
+            "failed_turn_index": failed_turn_index,
+            "expected_turn_count": expected_turn_count,
+            "thread_id": thread_id,
+            "prompt_sha256": grade.prompt_sha256,
+            "broker_prefix_count": grade.broker_prefix_count,
+            "reconciliation": asdict(grade.reconciliation),
+            "failed_common_gates": [
+                key for key, passed in grade.common_gates.items() if not passed
+            ],
+            "grade_errors": list(grade.errors),
+            "diagnostic_only": True,
+            "artifact_sha256": {
+                path.relative_to(root).as_posix(): _sha256_file(path)
+                for path in artifact_paths
+            },
+        },
+    )
+
+
 def _command_lifecycle_anomalies(stdout: str) -> list[dict[str, Any]]:
     phases: dict[str, dict[str, Mapping[str, Any]]] = {
         "item.started": {},
@@ -1210,6 +1291,7 @@ __all__ = [
     "PROMPT_MATERIALIZATION_CONTRACT",
     "PROMPT_MATERIALIZATION_FILE",
     "TASK_COMMAND_LIFECYCLE_FAILURE_CONTRACT",
+    "TASK_GATE_FAILURE_CONTRACT",
     "TASK_INFRASTRUCTURE_FAILURE_CONTRACT",
     "TASK_RESULT_CONTRACT",
     "V3CommandLifecycleError",

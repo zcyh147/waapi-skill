@@ -446,6 +446,47 @@ class _FakeBrokerEvidence:
                 sequence=index,
                 step_name=name,
                 succeeded=True,
+                model_argv=("python", f"raw-{name}.py", "--value", "原始 值"),
+                normalized_model_argv=(
+                    "python",
+                    f"normalized-{name}.py",
+                    "--value",
+                    "原始 值",
+                ),
+                raw_argv_sha256=hashlib.sha256(
+                    json.dumps(
+                        ["python", f"raw-{name}.py", "--value", "原始 值"],
+                        ensure_ascii=False,
+                        allow_nan=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ).encode("utf-8")
+                ).hexdigest(),
+                argv_sha256=hashlib.sha256(
+                    json.dumps(
+                        [
+                            "python",
+                            f"normalized-{name}.py",
+                            "--value",
+                            "原始 值",
+                        ],
+                        ensure_ascii=False,
+                        allow_nan=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ).encode("utf-8")
+                ).hexdigest(),
+                semantic_argv_sha256=hashlib.sha256(
+                    json.dumps(
+                        ["semantic", name],
+                        ensure_ascii=False,
+                        allow_nan=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ).encode("utf-8")
+                ).hexdigest(),
+                stdout=f"{name}-stdout",
+                stderr=f"{name}-stderr",
                 runner_exit_code=(
                     2
                     if terminal_indeterminate and index == consumed_count
@@ -463,13 +504,21 @@ class _FakeBrokerEvidence:
 
     def as_dict(self, *, include_output: bool = False) -> dict[str, object]:
         records: list[dict[str, object]] = [
-            {"sequence": record.sequence, "step_name": record.step_name}
+            {
+                "sequence": record.sequence,
+                "step_name": record.step_name,
+                "model_argv": list(record.model_argv),
+                "normalized_model_argv": list(record.normalized_model_argv),
+                "raw_argv_sha256": record.raw_argv_sha256,
+                "argv_sha256": record.argv_sha256,
+                "semantic_argv_sha256": record.semantic_argv_sha256,
+            }
             for record in self.records
         ]
         if include_output:
-            for record in records:
-                record.update(
-                    {"stdout": "must-be-filtered", "stderr": "must-be-filtered"}
+            for payload, record in zip(records, self.records, strict=True):
+                payload.update(
+                    {"stdout": record.stdout, "stderr": record.stderr}
                 )
         return {
             "expected_step_names": list(self.expected_step_names),
@@ -549,6 +598,7 @@ def _install_task_fakes(
     failed_result_has_command: bool = False,
     broker_action_on_failure: bool = False,
     broker_close_failure: bool = False,
+    reconciliation_errors: tuple[str, ...] = (),
 ) -> tuple[CodexInfrastructureError, list[object]]:
     instances: list[object] = []
     expected_names = ("first", "second")
@@ -603,10 +653,12 @@ def _install_task_fakes(
         ) -> GatewayBrokerReconciliation:
             assert expected_step_count == self.consumed_count
             return GatewayBrokerReconciliation(
-                passed=True,
-                observed_command_count=expected_step_count,
+                passed=not reconciliation_errors,
+                observed_command_count=(
+                    expected_step_count if not reconciliation_errors else 0
+                ),
                 accepted_record_count=expected_step_count,
-                errors=(),
+                errors=reconciliation_errors,
             )
 
     class FakeTask:
@@ -1138,18 +1190,14 @@ def test_contradictory_infrastructure_failure_is_not_archived_as_retryable(
         assert (task_root / "turns" / "turn-01" / "turn-grade.json").is_file()
 
 
-def test_task_gate_failure_preserves_the_completed_raw_thread_identity(
+def test_task_gate_failure_archives_full_broker_and_turn_diagnostics(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _install_task_fakes(monkeypatch, failure_turn=2)
-    monkeypatch.setattr(
-        task_runner,
-        "_grade_common_turn",
-        lambda *_args, **_kwargs: (
-            ("skill_reads_exact",),
-            {"skill_reads_exact": False},
-        ),
+    _install_task_fakes(
+        monkeypatch,
+        failure_turn=2,
+        reconciliation_errors=("normalized argv differs from broker record",),
     )
 
     with pytest.raises(
@@ -1162,6 +1210,88 @@ def test_task_gate_failure_preserves_the_completed_raw_thread_identity(
         )
 
     assert caught.value.thread_id == "thread-prior"
+    task_root = tmp_path / "scenario" / "evidence" / "codex-task"
+    manifest_path = task_root / "task-gate-failure.json"
+    broker_path = task_root / "task-gate-broker-evidence.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    broker = json.loads(broker_path.read_text(encoding="utf-8"))
+
+    assert manifest["contract"] == task_runner.TASK_GATE_FAILURE_CONTRACT
+    assert manifest["scenario_id"] == "SCENARIO-INFRA-01"
+    assert manifest["version"] == "2022.1"
+    assert manifest["failed_turn_index"] == 1
+    assert manifest["expected_turn_count"] == 2
+    assert manifest["thread_id"] == "thread-prior"
+    assert manifest["diagnostic_only"] is True
+    assert manifest["failed_common_gates"] == []
+    assert manifest["grade_errors"] == []
+    assert manifest["reconciliation"] == {
+        "passed": False,
+        "observed_command_count": 0,
+        "accepted_record_count": 1,
+        "errors": ["normalized argv differs from broker record"],
+    }
+
+    record = broker["records"][0]
+    assert record["model_argv"] == [
+        "python",
+        "raw-first.py",
+        "--value",
+        "原始 值",
+    ]
+    assert record["normalized_model_argv"] == [
+        "python",
+        "normalized-first.py",
+        "--value",
+        "原始 值",
+    ]
+    assert record["raw_argv_sha256"] == hashlib.sha256(
+        json.dumps(
+            record["model_argv"],
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    assert record["argv_sha256"] == hashlib.sha256(
+        json.dumps(
+            record["normalized_model_argv"],
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    assert record["semantic_argv_sha256"] == hashlib.sha256(
+        json.dumps(
+            ["semantic", "first"],
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    assert "stdout" not in record
+    assert "stderr" not in record
+
+    expected_artifacts = {
+        task_runner.PROMPT_MATERIALIZATION_FILE,
+        "turns/turn-01/prompt.txt",
+        "turns/turn-01/events.jsonl",
+        "turns/turn-01/stderr.txt",
+        "turns/turn-01/final.txt",
+        "turns/turn-01/codex-facts.json",
+        "turns/turn-01/turn-grade.json",
+        "task-gate-broker-evidence.json",
+    }
+    assert set(manifest["artifact_sha256"]) == expected_artifacts
+    for relative_path, digest in manifest["artifact_sha256"].items():
+        assert digest == hashlib.sha256(
+            (task_root / relative_path).read_bytes()
+        ).hexdigest()
+    assert not (task_root / "task-result.json").exists()
+    assert not (task_root / "agent-workspace").exists()
 
 
 def test_incomplete_codex_command_lifecycle_is_archived_as_non_retryable_blocked(
