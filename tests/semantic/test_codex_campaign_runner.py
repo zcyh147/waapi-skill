@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from dataclasses import replace
 from pathlib import Path
@@ -1050,15 +1051,24 @@ def test_successful_broker_trace_binds_raw_argv_and_bridges_missing_payload(
     broker_path = output_dir / "broker-evidence.json"
     broker = json.loads(broker_path.read_text(encoding="utf-8"))
     normalized_argv = broker["records"][confirm_index]["normalized_model_argv"]
+    normalized_argv[1] = str(
+        tmp_path / "synthetic" / "waapi-skill" / "scripts" / "run.py"
+    )
     raw_argv = list(normalized_argv)
-    raw_argv[1] = raw_argv[1].replace("/synthetic/", "//synthetic//", 1)
+    path_segment = f"{os.sep}waapi-skill{os.sep}"
+    raw_argv[1] = raw_argv[1].replace(
+        path_segment,
+        f"{os.sep}{os.sep}waapi-skill{os.sep}{os.sep}",
+        1,
+    )
     assert raw_argv != normalized_argv
-    broker["records"][confirm_index]["model_argv"] = raw_argv
+    broker["records"][confirm_index]["model_argv"] = list(normalized_argv)
+    broker["records"][confirm_index]["normalized_model_argv"] = normalized_argv
     execute_index = list(session.gateway_steps).index("execute")
     execute_model_argv = list(
         broker["records"][execute_index]["model_argv"]
     )
-    execute_model_argv[0] = "/private/broker/bin/python"
+    execute_model_argv[0] = str(tmp_path / "broker" / "bin" / "python")
     broker["records"][execute_index]["model_argv"] = execute_model_argv
     _write_json(broker_path, broker)
     confirm_record["argv"] = raw_argv
@@ -1088,7 +1098,7 @@ def test_successful_broker_trace_binds_raw_argv_and_bridges_missing_payload(
 
     facts = json.loads(facts_path.read_text(encoding="utf-8"))
     for forged_argv in (
-        [raw_argv[0], "/forged/run.py", *raw_argv[2:]],
+        [raw_argv[0], str(tmp_path / "forged" / "run.py"), *raw_argv[2:]],
         [*raw_argv[:-1], "forged-step"],
     ):
         facts["command_facts"]["command_records"][confirm_index]["argv"] = (
@@ -1117,6 +1127,14 @@ def test_successful_broker_trace_binds_raw_argv_and_bridges_missing_payload(
         ("normalized_model_argv", []),
         ("normalized_model_argv", valid_normalized_argv[:3]),
         ("normalized_model_argv", ["ruby", *valid_normalized_argv[1:]]),
+        (
+            "normalized_model_argv",
+            [
+                valid_normalized_argv[0],
+                str(tmp_path / "forged" / "run.py"),
+                *valid_normalized_argv[2:],
+            ],
+        ),
         (
             "normalized_model_argv",
             [

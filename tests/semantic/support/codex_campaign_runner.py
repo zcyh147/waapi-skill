@@ -1045,6 +1045,14 @@ def _command_record_matches_broker_raw_argv(
     command_record: Mapping[str, Any],
     broker_record: Mapping[str, Any],
 ) -> bool:
+    """Bind independent raw argv evidence without duplicating reconciliation.
+
+    Broker reconciliation remains authoritative for the raw-to-normalized
+    command semantics.  This join permits only the two transport spellings it
+    can introduce: an absolute POSIX shim versus its bare interpreter name,
+    and redundant separators in the same absolute runner path on Windows.
+    """
+
     observed = command_record.get("argv")
     model_argv = broker_record.get("model_argv")
     normalized_model_argv = broker_record.get("normalized_model_argv")
@@ -1065,7 +1073,19 @@ def _command_record_matches_broker_raw_argv(
         return False
     return (
         observed[0] in {model_argv[0], normalized_model_argv[0]}
-        and observed[1:] == model_argv[1:]
+        and _same_absolute_lexical_path(observed[1], model_argv[1])
+        and _same_absolute_lexical_path(model_argv[1], normalized_model_argv[1])
+        and observed[2:] == model_argv[2:]
+    )
+
+
+def _same_absolute_lexical_path(left: str, right: str) -> bool:
+    left_path = Path(left)
+    right_path = Path(right)
+    return (
+        left_path.is_absolute()
+        and right_path.is_absolute()
+        and left_path == right_path
     )
 
 
