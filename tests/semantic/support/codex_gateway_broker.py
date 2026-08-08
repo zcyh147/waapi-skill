@@ -2530,13 +2530,17 @@ def _normalize_audio_import_request(value: Any) -> dict[str, Any]:
 def _canonicalize_audio_import_media_object_type(
     row: dict[str, Any],
 ) -> None:
-    """Normalize only language-proven generic Sound import aliases.
+    """Normalize only production-proven generic Sound import semantics.
 
     The production import contract treats ``Sound`` as the generic spelling
     behind the reviewed ``Sound SFX`` and ``Sound Voice`` import forms.  Those
     two specialized forms are not interchangeable: the effective import
     language decides which one can be equivalent to ``Sound``.  Structure-only
-    rows and media rows without an explicit effective language stay exact.
+    rows stay exact.  An untyped row with exactly one effective media source
+    may omit ``object_type`` because the production import Builder deliberately
+    leaves the native field absent and Wwise creates the generic Sound object.
+    Typed final path segments are inferred by production rather than defaulted,
+    so they remain exact here.
 
     Other reviewed import-syntax pairs are deliberately excluded.  For
     example, Random/Sequence Container and ActorMixer/PropertyContainer make a
@@ -2544,10 +2548,21 @@ def _canonicalize_audio_import_media_object_type(
     operation requests semantically identical.
     """
 
-    if not any(
-        field in row for field in ("audio_file", "audio_file_base64")
-    ):
+    media_fields = tuple(
+        field
+        for field in ("audio_file", "audio_file_base64")
+        if field in row
+    )
+    if len(media_fields) != 1:
         return
+    if "object_type" not in row:
+        object_path = row.get("object_path")
+        if not isinstance(object_path, str) or not object_path:
+            return
+        leaf = object_path.rsplit("\\", 1)[-1]
+        if "<" in leaf or ">" in leaf:
+            return
+        row["object_type"] = "Sound"
     object_type = row.get("object_type")
     import_language = row.get("import_language")
     if not isinstance(object_type, str) or not isinstance(

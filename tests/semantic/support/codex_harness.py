@@ -2876,16 +2876,16 @@ def parse_command_argv(
     windows_directory: str | PureWindowsPath | None = None,
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
 ) -> tuple[tuple[str, ...], bool, str]:
-    """Parse a recorded command with the host's native command-line grammar.
+    """Parse one Codex command-item presentation into its executed argv.
 
-    Explicit POSIX shell wrappers retain POSIX parsing on every host. Bare
-    commands use ``CommandLineToArgvW`` on Windows so drive, UNC, and backslash
-    paths are not corrupted by POSIX escape rules. Codex's fixed native-Windows
-    ``pwsh.exe -NoProfile -Command`` recording wrapper is unwrapped only when
-    its exact executable has been attested as PowerShell Core 7.3+ with safe
-    native argument passing and it contains one literal argv vector under the
-    restricted grammar below. Other PowerShell and CMD shapes remain
-    unexpected outer commands.
+    Codex CLI 0.146 serializes the underlying command vector for JSONL with
+    Rust ``shlex::try_join`` on every host.  That is a POSIX presentation,
+    not a Windows ``CreateProcess`` command line.  Decode that outer layer
+    first, then unwrap Codex's fixed native-Windows
+    ``pwsh.exe -NoProfile -Command`` frame only when its exact executable has
+    been attested as PowerShell Core 7.3+ with safe native argument passing and
+    it contains one literal argv vector under the restricted grammar below.
+    Other PowerShell and CMD shapes remain unexpected outer commands.
     """
 
     argv, has_operators, parse_error, _parser_kind = _parse_command_argv(
@@ -2908,8 +2908,13 @@ def _parse_command_argv(
     if _is_windows(active_platform):
         has_operators = shell_script_has_operators(command, platform_name="nt")
         try:
-            outer = split_native_command_line(command, platform_name="nt")
-        except (OSError, ValueError) as exc:
+            # ``command_execution.command`` is the client-facing result of
+            # Codex's platform-independent Rust ``shlex::try_join``.  Using
+            # CommandLineToArgvW here preserves the display codec's doubled
+            # backslashes and corrupts Windows paths and JSON strings before
+            # they can be reconciled with the Broker's actual argv.
+            outer = tuple(shlex.split(command, posix=True))
+        except ValueError as exc:
             return (), True, str(exc), ""
         if not outer:
             return (), False, "empty command", ""

@@ -2090,6 +2090,101 @@ def test_windows_powershell_recording_preserves_literal_metacharacters(
     assert parse_error == ""
 
 
+def test_windows_codex_0146_shlex_presentation_recovers_large_audio_import_json() -> None:
+    """Decode Codex's POSIX display codec before the literal PowerShell frame."""
+
+    runner = r"C:\Git_Repos\waapi-skills\skills\waapi-skill\scripts\run.py"
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "imports": [
+                {
+                    "object_path": "<Sound>Rifle_Thunder_Near",
+                    "audio_file": r"C:\Audio fixtures\Rifle\Thunder Near.wav",
+                    "import_language": "SFX",
+                    "properties": [
+                        {"name": "Volume", "value": -2.0},
+                        {"name": "IsLoopingEnabled", "value": True},
+                        {"name": "LoopStart", "value": 0.05},
+                        {"name": "LoopEnd", "value": 1.0},
+                        {
+                            "name": "Notes",
+                            "value": (
+                                "Rifle near-layer reimport transport regression. "
+                                * 48
+                            ),
+                        },
+                    ],
+                }
+            ],
+            "import_operation": "replaceExisting",
+        },
+    }
+    request_json = json.dumps(
+        request,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    assert len(request_json.encode("utf-8")) > 2048
+
+    def powershell_literal(value: str) -> str:
+        return "'" + value.replace("'", "''") + "'"
+
+    script = " ".join(
+        (
+            "python",
+            powershell_literal(runner),
+            "gateway.py",
+            "preview",
+            "--apply",
+            "--request-json",
+            powershell_literal(request_json),
+        )
+    )
+
+    # Codex CLI 0.146 uses Rust shlex::try_join for the client-facing command.
+    # For these two backslash-bearing tokens Rust shlex selects double quotes
+    # and escapes every backslash and double quote.  Keep this as a golden,
+    # independent presentation fixture rather than production encoder logic.
+    def rust_shlex_double_quoted(value: str) -> str:
+        assert not any(character in value for character in "$`!^")
+        return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+    command = " ".join(
+        (
+            rust_shlex_double_quoted(_WINDOWS_POWERSHELL_CORE),
+            "-NoProfile",
+            "-Command",
+            rust_shlex_double_quoted(script),
+        )
+    )
+
+    argv, has_operators, parse_error, parser_kind = (
+        codex_harness_module._parse_command_argv(
+            command,
+            platform_name="nt",
+            windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+        )
+    )
+
+    assert argv == (
+        "python",
+        runner,
+        "gateway.py",
+        "preview",
+        "--apply",
+        "--request-json",
+        request_json,
+    )
+    assert json.loads(argv[-1]) == request
+    assert len(argv[-1].encode("utf-8")) == len(request_json.encode("utf-8"))
+    assert has_operators is False
+    assert parse_error == ""
+    assert parser_kind == "windows-pwsh-command"
+
+
 def test_windows_completed_event_batch_binds_one_pre_attested_pwsh_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

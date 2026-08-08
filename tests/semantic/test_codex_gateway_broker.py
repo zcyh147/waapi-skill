@@ -17,6 +17,10 @@ import pytest
 from tests.support.platform_filesystem import create_symlink_or_skip
 from tests.support.platform_process import run_model_argv
 from .support import codex_gateway_broker as broker_module  # pyright: ignore[reportMissingImports]
+from .support.codex_harness import (  # pyright: ignore[reportMissingImports]
+    WindowsPowerShellCoreHost,
+    parse_command_argv,
+)
 from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImports]
     BASH_ENV_NAME,
     BROKER_TOKEN_ENV,
@@ -4127,6 +4131,129 @@ def test_resolver_and_reconciliation_fail_closed(tmp_path: Path) -> None:
         assert any("differs" in error for error in mismatch.errors)
 
 
+def test_windows_codex_shlex_audio_import_event_reconciles_exact_broker_argv_and_hashes(
+    tmp_path: Path,
+) -> None:
+    """Bind Codex's display command to the Broker without repairing JSON."""
+
+    skill = make_fake_skill(tmp_path)
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "imports": [
+                {
+                    "object_path": "<Sound>Rifle_Thunder_Near",
+                    "audio_file": r"C:\Audio fixtures\Rifle\Thunder Near.wav",
+                    "import_language": "SFX",
+                    "properties": [
+                        {"name": "Volume", "value": -2.0},
+                        {"name": "IsLoopingEnabled", "value": True},
+                        {
+                            "name": "Notes",
+                            "value": "sealed Rifle import evidence " * 72,
+                        },
+                    ],
+                }
+            ],
+            "import_operation": "replaceExisting",
+        },
+    }
+    request_json = json.dumps(request, ensure_ascii=False, separators=(",", ":"))
+    assert len(request_json.encode("utf-8")) > 2048
+    step = ExpectedGatewayStep(
+        "preview",
+        "preview",
+        ("--request-json", SemanticJsonArgument(request)),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(step,),
+        runner_environment={**os.environ, "FAKE_GATEWAY_MODE": "exact-output"},
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(
+            broker,
+            ["preview", "--request-json", request_json],
+        )
+        assert result.returncode == 0, result.stderr
+        evidence = broker.evidence()
+        assert evidence.passed is True
+
+        def powershell_literal(value: str) -> str:
+            return "'" + value.replace("'", "''") + "'"
+
+        script = " ".join(
+            (
+                "python",
+                powershell_literal(str(broker.invocation_runner_path)),
+                "gateway.py",
+                "preview",
+                "--request-json",
+                powershell_literal(request_json),
+            )
+        )
+
+        def rust_shlex_double_quoted(value: str) -> str:
+            assert not any(character in value for character in "$`!^")
+            return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+        pwsh = r"C:\Program Files\PowerShell\7\pwsh.exe"
+        command = " ".join(
+            (
+                rust_shlex_double_quoted(pwsh),
+                "-NoProfile",
+                "-Command",
+                rust_shlex_double_quoted(script),
+            )
+        )
+        observed, has_operators, parse_error = parse_command_argv(
+            command,
+            platform_name="nt",
+            windows_powershell_core_host=WindowsPowerShellCoreHost(
+                executable=pwsh,
+                version="7.6.4",
+                native_argument_passing="Windows",
+                sha256="a" * 64,
+            ),
+        )
+        assert observed[-1] == request_json
+        assert has_operators is False
+        assert parse_error == ""
+
+        exact = reconcile_gateway_commands(
+            (observed,),
+            evidence,
+            skill_source=skill,
+            shim_directory=broker.shim_directory,
+        )
+        assert exact.passed is True
+
+        mutations = (
+            request_json.replace("Rifle_Thunder_Near", "Rifle_Thunder_Far", 1),
+            request_json.replace("Thunder Near.wav", "Thunder Far.wav", 1),
+            request_json.replace('"value":-2.0', '"value":-3.0', 1),
+        )
+        for mutated in mutations:
+            assert mutated != request_json
+            mismatched = (*observed[:-1], mutated)
+            reconciliation = reconcile_gateway_commands(
+                (mismatched,),
+                evidence,
+                skill_source=skill,
+                shim_directory=broker.shim_directory,
+            )
+            assert reconciliation.passed is False
+            assert "command 0: normalized argv differs from broker record" in (
+                reconciliation.errors
+            )
+            assert "command 0: argv hash differs from broker record" in (
+                reconciliation.errors
+            )
+
+
 def test_broker_accepts_empty_explicit_working_root_and_preserves_evidence(tmp_path: Path) -> None:
     skill = make_fake_skill(tmp_path)
     root = tmp_path / "owned"
@@ -6002,6 +6129,119 @@ def test_audio_import_media_sound_aliases_have_one_canonical_hash(
 
     assert expected_hash == actual_hash
     assert json.loads(execution_argv[-1]) == actual
+
+
+@pytest.mark.parametrize(
+    ("import_language", "expected_type"),
+    (
+        (None, "Sound"),
+        ("SFX", "Sound SFX"),
+        ("English(US)", "Sound Voice"),
+    ),
+    ids=(
+        "generic-without-language",
+        "sfx-specialization",
+        "voice-specialization",
+    ),
+)
+def test_audio_import_untyped_media_rows_may_omit_the_implicit_sound_type(
+    tmp_path: Path,
+    import_language: str | None,
+    expected_type: str,
+) -> None:
+    expected, _ = _audio_import_equivalence_requests()
+    for row in expected["arguments"]["imports"]:
+        row["object_type"] = expected_type
+        if import_language is not None:
+            row["import_language"] = import_language
+    actual = json.loads(json.dumps(expected))
+    for row in actual["arguments"]["imports"]:
+        row.pop("object_type")
+    broker, preview_step = _audio_import_equivalence_broker(
+        tmp_path,
+        expected,
+    )
+
+    expected_hash, _ = broker._validate_step(  # noqa: SLF001
+        preview_step,
+        (
+            "preview",
+            "--apply",
+            "--request-json",
+            json.dumps(expected, separators=(",", ":")),
+        ),
+    )
+    actual_hash, execution_argv = broker._validate_step(  # noqa: SLF001
+        preview_step,
+        (
+            "preview",
+            "--apply",
+            "--request-json",
+            json.dumps(actual, separators=(",", ":")),
+        ),
+    )
+
+    assert expected_hash == actual_hash
+    assert json.loads(execution_argv[-1]) == actual
+
+
+@pytest.mark.parametrize(
+    "difference",
+    (
+        "structure-only",
+        "typed-path",
+        "cross-language",
+        "unrelated-type",
+        "second-media-source",
+    ),
+)
+def test_audio_import_implicit_sound_type_equivalence_stays_closed(
+    tmp_path: Path,
+    difference: str,
+) -> None:
+    expected, _ = _audio_import_equivalence_requests()
+    for row in expected["arguments"]["imports"]:
+        row["object_type"] = "Sound SFX"
+        row["import_language"] = "SFX"
+    actual = json.loads(json.dumps(expected))
+    for row in actual["arguments"]["imports"]:
+        row.pop("object_type")
+
+    if difference == "structure-only":
+        for request in (expected, actual):
+            for row in request["arguments"]["imports"]:
+                row.pop("audio_file")
+                row.pop("import_language")
+    elif difference == "typed-path":
+        for request in (expected, actual):
+            for index, row in enumerate(request["arguments"]["imports"]):
+                row["object_path"] = (
+                    rf"\Actor-Mixer Hierarchy\<Sound>Typed_{index}"
+                )
+    elif difference == "cross-language":
+        for row in expected["arguments"]["imports"]:
+            row["object_type"] = "Sound Voice"
+    elif difference == "unrelated-type":
+        for row in expected["arguments"]["imports"]:
+            row["object_type"] = "RandomSequenceContainer"
+    else:
+        for row in actual["arguments"]["imports"]:
+            row["audio_file_base64"] = "UklGRg=="
+
+    broker, preview_step = _audio_import_equivalence_broker(
+        tmp_path,
+        expected,
+    )
+    with pytest.raises(GatewayInvocationError, match="semantically equal"):
+        broker._validate_step(  # noqa: SLF001
+            preview_step,
+            (
+                "preview",
+                "--apply",
+                "--request-json",
+                json.dumps(actual, separators=(",", ":")),
+            ),
+        )
 
 
 @pytest.mark.parametrize(

@@ -11,6 +11,7 @@ from typing import Any, Mapping
 import pytest
 
 from tests.semantic import run_codex_skill_campaign as campaign
+from tests.semantic.support import codex_gateway_broker as broker_module
 from tests.semantic.support.codex_campaign import (
     CampaignEvidenceError,
     canonical_json_bytes,
@@ -28,6 +29,7 @@ from tests.semantic.support.codex_integration_rifle_runtime_v2 import (
     prepare_rifle_integration_runtime,
 )
 from tests.semantic.support.codex_gateway_broker import (
+    MetadataBoundJsonArgument,
     gateway_step_sequence_matches,
 )
 from tests.semantic.support.codex_integration_workflows_v2 import (
@@ -730,6 +732,47 @@ def test_prepares_exact_metadata_bound_use_existing_batch(
     assert prepared.before_snapshot.absent_roles == ("rifle_distant",)
     assert len(prepared.before_snapshot.input_files) == 4
     assert fake.delete_calls == 0
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2025.1"])
+def test_rifle_preview_accepts_only_production_defaulted_sound_row_types(
+    tmp_path: Path,
+    version: str,
+) -> None:
+    prepared, _fake, _runtime = _prepared(tmp_path, version=version)
+    preview_step = next(
+        step for step in prepared.protocol.steps if step.name == "tx01.preview"
+    )
+    bound_request = preview_step.arguments[2]
+    assert isinstance(bound_request, MetadataBoundJsonArgument)
+
+    actual = _plain(prepared.operation_request)
+    for row in actual["arguments"]["imports"][:3]:
+        row.pop("object_type")
+
+    assert broker_module._metadata_bound_json_equal(  # noqa: SLF001
+        actual,
+        bound_request,
+    )
+    assert all(
+        "object_type" not in row
+        for row in actual["arguments"]["imports"][:3]
+    )
+    assert actual["arguments"]["imports"][3]["object_type"] == "Sound SFX"
+
+    wrong_type = copy.deepcopy(actual)
+    wrong_type["arguments"]["imports"][0]["object_type"] = "Sound Voice"
+    assert not broker_module._metadata_bound_json_equal(  # noqa: SLF001
+        wrong_type,
+        bound_request,
+    )
+
+    wrong_target = copy.deepcopy(actual)
+    wrong_target["arguments"]["imports"][1]["object_path"] += "_Other"
+    assert not broker_module._metadata_bound_json_equal(  # noqa: SLF001
+        wrong_target,
+        bound_request,
+    )
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
