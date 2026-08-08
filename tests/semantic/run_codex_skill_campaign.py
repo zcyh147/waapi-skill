@@ -213,7 +213,7 @@ from tests.semantic.support.codex_harness import (  # noqa: E402
     audit_session_events,
     build_task_exec_command,
     build_task_resume_command,
-    classify_commands,
+    classify_task_commands,
     classify_codex_infrastructure_failure,
     codex_process_environment,
     codex_runtime_files,
@@ -228,6 +228,7 @@ from tests.semantic.support.codex_harness import (  # noqa: E402
     probe_windows_powershell_core,
     turn_usage,
     validate_codex_version_output,
+    workspace_skill_install_path,
 )
 from tests.semantic.support.codex_gateway_broker import (  # noqa: E402
     CodexGatewayBroker,
@@ -4689,8 +4690,14 @@ def _validate_heavy_v3_broker_records(
     expected_runner = Path(
         os.path.abspath(os.fspath(options.skill_source / "scripts" / "run.py"))
     )
+    invocation_skill_source = (
+        workspace_skill_install_path(task_root / "agent-workspace")
+        if options.windows_powershell_core_host is not None
+        else None
+    )
     replay = CodexGatewayBroker(
         skill_source=options.skill_source,
+        invocation_skill_source=invocation_skill_source,
         expected_steps=steps,
         expected_wwise_version=version,
         project_modification_policy=(
@@ -4753,6 +4760,7 @@ def _validate_heavy_v3_broker_records(
             resolved = resolve_gateway_invocation(
                 model_argv,
                 skill_source=options.skill_source,
+                invocation_skill_source=invocation_skill_source,
                 shim_directory=task_root / "broker" / "bin",
             )
             semantic_sha, execution_arguments = replay._validate_step(  # noqa: SLF001
@@ -4868,6 +4876,7 @@ def _validate_heavy_v3_broker_records(
             command_resolved = resolve_gateway_invocation(
                 command_argv,
                 skill_source=options.skill_source,
+                invocation_skill_source=invocation_skill_source,
                 shim_directory=task_root / "broker" / "bin",
             )
         except GatewayInvocationError as exc:
@@ -5317,9 +5326,13 @@ def _validate_heavy_v3_codex_facts(
         for step in expected_steps
         if step.allowed_exit_codes == (2,)
     )
-    classified = classify_commands(
+    classified = classify_task_commands(
         command_records,
+        workspace=task_root / "agent-workspace",
         skill_source=options.skill_source,
+        use_windows_workspace_skill_install=(
+            options.windows_powershell_core_host is not None
+        ),
         expected_gateway_subcommands=tuple(
             dict.fromkeys(step.subcommand for step in expected_steps)
         ),

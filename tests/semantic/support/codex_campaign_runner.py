@@ -184,6 +184,7 @@ def replace_expected_skill_symlinks(
     links: list[Path] = []
     copies: list[Path] = []
     agent_workspaces: list[Path] = []
+    active_platform = os.name if platform_name is None else platform_name
 
     def walk(directory: Path) -> None:
         try:
@@ -200,6 +201,11 @@ def replace_expected_skill_symlinks(
                 if not _is_expected_skill_link(path, root=tree):
                     raise CampaignEvidenceError(
                         f"unexpected symlink or junction in child evidence: {path}"
+                    )
+                if active_platform == "nt":
+                    raise CampaignEvidenceError(
+                        "native Windows runner Skill installs must be detached "
+                        "directory copies"
                     )
                 if not stat.S_ISLNK(info.st_mode):
                     raise CampaignEvidenceError(
@@ -218,7 +224,11 @@ def replace_expected_skill_symlinks(
                 if _is_expected_skill_link(path, root=tree):
                     copies.append(path)
                     continue
-                if path.name == "agent-workspace" and "sessions" in path.relative_to(tree).parts:
+                if _has_workspace_skill_install_suffix(path, root=tree):
+                    raise CampaignEvidenceError(
+                        f"runner Skill install uses an unexpected evidence layout: {path}"
+                    )
+                if _is_expected_agent_workspace(path, root=tree):
                     agent_workspaces.append(path)
                 walk(path)
             elif stat.S_ISREG(info.st_mode):
@@ -230,7 +240,6 @@ def replace_expected_skill_symlinks(
                 raise CampaignEvidenceError(f"unsupported child evidence entry: {path}")
 
     walk(tree)
-    active_platform = os.name if platform_name is None else platform_name
     if copies and active_platform != "nt":
         raise CampaignEvidenceError(
             "runner-created Skill directories are allowed only for native Windows campaigns"
@@ -1837,12 +1846,41 @@ def _safe_session_name(session_id: str) -> str:
 
 
 def _is_expected_skill_link(path: Path, *, root: Path) -> bool:
+    if not _has_workspace_skill_install_suffix(path, root=root):
+        return False
+    return _is_expected_agent_workspace(path.parents[2], root=root)
+
+
+def _has_workspace_skill_install_suffix(path: Path, *, root: Path) -> bool:
     try:
         parts = path.relative_to(root).parts
     except ValueError:
         return False
-    suffix = ("agent-workspace", ".agents", "skills", "waapi-skill")
-    return len(parts) >= len(suffix) + 2 and tuple(parts[-4:]) == suffix and "sessions" in parts[:-4]
+    suffix = (".agents", "skills", "waapi-skill")
+    return len(parts) >= len(suffix) and tuple(parts[-3:]) == suffix
+
+
+def _is_expected_agent_workspace(path: Path, *, root: Path) -> bool:
+    try:
+        parts = path.relative_to(root).parts
+    except ValueError:
+        return False
+    if not parts or parts[-1] != "agent-workspace":
+        return False
+    session_layout = (
+        len(parts) == 4
+        and parts[-4] == "matrix"
+        and parts[-3] == "sessions"
+        and bool(parts[-2])
+    )
+    heavy_scenario_layout = (
+        len(parts) == 6
+        and parts[-6] == "matrix"
+        and parts[-5] == "scenarios"
+        and bool(parts[-4])
+        and tuple(parts[-3:]) == ("evidence", "codex-task", "agent-workspace")
+    )
+    return session_layout or heavy_scenario_layout
 
 
 def _reject_all_symlinks(root: Path) -> None:

@@ -16,7 +16,7 @@ import tempfile
 import time
 from contextlib import ExitStack, contextmanager
 from dataclasses import asdict, dataclass, field
-from pathlib import Path, PureWindowsPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Callable, Iterator, Mapping, Sequence
 
 from wwise_waapi.platform_commands import (
@@ -1765,10 +1765,13 @@ def _finalize_codex_run(
         events,
         windows_powershell_core_host=windows_powershell_core_host,
     )
-    command_facts = classify_commands(
+    command_facts = classify_task_commands(
         command_records,
-        skill_source=workspace_skill_install_path(config.workspace),
-        alternate_gateway_skill_sources=(config.skill_source,),
+        workspace=config.workspace,
+        skill_source=config.skill_source,
+        use_windows_workspace_skill_install=(
+            windows_powershell_core_host is not None
+        ),
         expected_gateway_subcommands=config.expected_gateway_subcommands,
         expected_gateway_errors=config.expected_gateway_errors,
         expected_wwise_version=config.expected_wwise_version,
@@ -3441,6 +3444,8 @@ def classify_commands(
     commands: Sequence[str | CodexCommandRecord],
     *,
     skill_source: Path,
+    skill_read_content_source: Path | None = None,
+    alternate_skill_read_sources: Sequence[Path] = (),
     alternate_gateway_skill_sources: Sequence[Path] = (),
     expected_gateway_subcommands: Sequence[str] = (),
     expected_gateway_errors: Sequence[CodexGatewayErrorExpectation] = (),
@@ -3461,9 +3466,15 @@ def classify_commands(
     non_gateway_unexpected: list[str] = []
     skill_read = False
     expected = frozenset(str(value) for value in expected_gateway_subcommands)
+    skill_read_sources = tuple(
+        dict.fromkeys(
+            _absolute_lexical_path(source)
+            for source in (skill_source, *alternate_skill_read_sources)
+        )
+    )
     gateway_skill_sources = tuple(
         dict.fromkeys(
-            Path(source).expanduser().resolve(strict=False)
+            _absolute_lexical_path(source)
             for source in (skill_source, *alternate_gateway_skill_sources)
         )
     )
@@ -3533,7 +3544,23 @@ def classify_commands(
         )
         if is_python and not is_gateway and not is_packaged_runner_attempt:
             inline_python.append(command)
-        allowed_read = allowed_skill_read(record, skill_source=skill_source)
+        allowed_read_candidates = tuple(
+            value
+            for source in skill_read_sources
+            if (
+                value := allowed_skill_read(
+                    record,
+                    skill_source=source,
+                    skill_read_content_source=skill_read_content_source,
+                )
+            )
+        )
+        allowed_read = (
+            allowed_read_candidates[0]
+            if allowed_read_candidates
+            and len(set(allowed_read_candidates)) == 1
+            else None
+        )
         if direct_waapi_command(record):
             direct_client.append(command)
         if write_like_command(record) and not allowed_read:
@@ -3578,6 +3605,51 @@ def classify_commands(
     )
 
 
+def classify_task_commands(
+    commands: Sequence[str | CodexCommandRecord],
+    *,
+    workspace: Path,
+    skill_source: Path,
+    use_windows_workspace_skill_install: bool = False,
+    expected_gateway_subcommands: Sequence[str] = (),
+    expected_gateway_errors: Sequence[CodexGatewayErrorExpectation] = (),
+    expected_wwise_version: str = "",
+) -> CodexCommandFacts:
+    """Classify one task against its fixed install and sealed candidate.
+
+    Native Windows tasks execute the Skill from a detached workspace copy, but
+    campaign archiving may replace that copy with a regular attestation before
+    replaying the command facts.  Keep the immutable workspace install as the
+    read locator while using the sealed candidate as the content authority.
+    POSIX preserves both the canonical and injected-symlink read spellings but
+    accepts only the canonical Gateway runner.  A caller with the sealed native-
+    Windows host instead accepts the detached install read spelling and both
+    the install and canonical Gateway runners.
+    """
+
+    workspace_install = workspace_skill_install_path(workspace)
+    if not use_windows_workspace_skill_install:
+        return classify_commands(
+            commands,
+            skill_source=skill_source,
+            skill_read_content_source=skill_source,
+            alternate_skill_read_sources=(workspace_install,),
+            expected_gateway_subcommands=expected_gateway_subcommands,
+            expected_gateway_errors=expected_gateway_errors,
+            expected_wwise_version=expected_wwise_version,
+        )
+
+    return classify_commands(
+        commands,
+        skill_source=workspace_install,
+        skill_read_content_source=skill_source,
+        alternate_gateway_skill_sources=(skill_source,),
+        expected_gateway_subcommands=expected_gateway_subcommands,
+        expected_gateway_errors=expected_gateway_errors,
+        expected_wwise_version=expected_wwise_version,
+    )
+
+
 def packaged_runner_attempt(record: CodexCommandRecord, *, skill_source: Path) -> bool:
     """Identify an exact packaged runner path even when its argv is malformed.
 
@@ -3592,16 +3664,26 @@ def packaged_runner_attempt(record: CodexCommandRecord, *, skill_source: Path) -
     executable = Path(record.argv[0]).name.lower()
     if _PYTHON_EXECUTABLE_RE.fullmatch(executable) is None:
         return False
-    supplied_runner = Path(record.argv[1]).expanduser()
-    if not supplied_runner.is_absolute():
+    supplied_runner = _supplied_absolute_lexical_path(record.argv[1])
+    if supplied_runner is None:
         return False
-    expected_runner = (
-        skill_source.expanduser().resolve(strict=False) / "scripts" / "run.py"
-    ).resolve(strict=False)
-    try:
-        return supplied_runner.resolve(strict=False) == expected_runner
-    except OSError:
-        return False
+    expected_runner = _absolute_lexical_path(skill_source) / "scripts" / "run.py"
+    return supplied_runner == expected_runner
+
+
+def _absolute_lexical_path(path: Path) -> Path:
+    """Return an absolute locator without dereferencing any path component."""
+
+    return Path(os.path.abspath(os.fspath(Path(path).expanduser())))
+
+
+def _supplied_absolute_lexical_path(path: str | Path) -> Path | None:
+    """Normalize harmless lexical spelling without accepting parent traversal."""
+
+    supplied = Path(path)
+    if not supplied.is_absolute() or ".." in supplied.parts:
+        return None
+    return _absolute_lexical_path(supplied)
 
 
 def command_record(command: str | CodexCommandRecord) -> CodexCommandRecord:
@@ -3709,14 +3791,11 @@ def gateway_invocation(
     if _PYTHON_EXECUTABLE_RE.fullmatch(executable) is None:
         return None
     runner = argv[1]
-    expected_runner = (skill_source.expanduser().resolve(strict=False) / "scripts" / "run.py").resolve(strict=False)
-    candidate = Path(runner).expanduser()
-    if not candidate.is_absolute():
+    expected_runner = _absolute_lexical_path(skill_source) / "scripts" / "run.py"
+    candidate = _supplied_absolute_lexical_path(runner)
+    if candidate is None:
         return None
-    try:
-        if candidate.resolve(strict=False) != expected_runner:
-            return None
-    except OSError:
+    if candidate != expected_runner:
         return None
     if argv[2] != "gateway.py":
         return None
@@ -3861,11 +3940,20 @@ def call_payload_apis(value: Any) -> tuple[str, ...]:
     return tuple(dict.fromkeys(apis))
 
 
-def allowed_skill_read(record: CodexCommandRecord, *, skill_source: Path) -> str | None:
+def allowed_skill_read(
+    record: CodexCommandRecord,
+    *,
+    skill_source: Path,
+    skill_read_content_source: Path | None = None,
+) -> str | None:
     if not record.succeeded or record.parse_error or not record.argv:
         return None
     if record.has_shell_operators:
-        return allowed_skill_bootstrap_read(record, skill_source=skill_source)
+        return allowed_skill_bootstrap_read(
+            record,
+            skill_source=skill_source,
+            skill_read_content_source=skill_read_content_source,
+        )
     executable = Path(record.argv[0]).name.lower()
     complete_skill_read = False
     if executable == "cat":
@@ -3899,6 +3987,7 @@ def allowed_skill_read(record: CodexCommandRecord, *, skill_source: Path) -> str
         path_text,
         record.aggregated_output,
         skill_source=skill_source,
+        skill_read_content_source=skill_read_content_source,
         allow_exact_windows_workspace_relative=(
             executable == "get-content"
         ),
@@ -3914,7 +4003,12 @@ def allowed_skill_read(record: CodexCommandRecord, *, skill_source: Path) -> str
     return relative
 
 
-def allowed_skill_bootstrap_read(record: CodexCommandRecord, *, skill_source: Path) -> str | None:
+def allowed_skill_bootstrap_read(
+    record: CodexCommandRecord,
+    *,
+    skill_source: Path,
+    skill_read_content_source: Path | None = None,
+) -> str | None:
     """Accept only the host's length-check plus complete initial SKILL.md read.
 
     The model cannot follow instructions inside ``SKILL.md`` before loading it.
@@ -3939,7 +4033,12 @@ def allowed_skill_bootstrap_read(record: CodexCommandRecord, *, skill_source: Pa
     if range_match is None or output_match is None or output_match.group(2) != argv[2]:
         return None
     content = output_match.group(3)
-    validated = validated_skill_read(argv[2], content, skill_source=skill_source)
+    validated = validated_skill_read(
+        argv[2],
+        content,
+        skill_source=skill_source,
+        skill_read_content_source=skill_read_content_source,
+    )
     if validated is None:
         return None
     relative, expected_content = validated
@@ -3957,35 +4056,65 @@ def validated_skill_read(
     aggregated_output: str,
     *,
     skill_source: Path,
+    skill_read_content_source: Path | None = None,
     allow_exact_windows_workspace_relative: bool = False,
     allow_one_terminal_newline: bool = False,
 ) -> tuple[str, str] | None:
     """Prove a complete approved Skill read from one closed locator."""
 
-    candidate = Path(path_text).expanduser()
+    candidate = Path(path_text)
+    if ".." in candidate.parts:
+        return None
+    locator = Path(skill_source).expanduser()
+    content_source = (
+        Path(skill_read_content_source).expanduser()
+        if skill_read_content_source is not None
+        else locator
+    )
     if not candidate.is_absolute():
         relative_parts = (
             _WINDOWS_WORKSPACE_SKILL_READS.get(path_text)
             if allow_exact_windows_workspace_relative
             else None
         )
-        source_parts = tuple(part.casefold() for part in Path(skill_source).parts[-3:])
+        source_parts = tuple(part.casefold() for part in locator.parts[-3:])
         if (
             relative_parts is None
             or source_parts != (".agents", "skills", "waapi-skill")
         ):
             return None
-        candidate = Path(skill_source).joinpath(*relative_parts)
-    try:
-        resolved = candidate.resolve(strict=True)
-        relative = resolved.relative_to(skill_source.expanduser().resolve(strict=True)).as_posix()
-    except (OSError, ValueError):
-        return None
+        relative = PurePosixPath(*relative_parts).as_posix()
+    elif skill_read_content_source is not None:
+        # Archive replay may run after the detached Windows install has been
+        # replaced by an attestation file.  Authorize only one exact lexical
+        # allowed path below that fixed locator; do not normalize traversal or
+        # infer another root from the archived command.
+        matching = tuple(
+            relative
+            for relative in _ALLOWED_SKILL_READS
+            if candidate == locator.joinpath(*PurePosixPath(relative).parts)
+        )
+        if len(matching) != 1:
+            return None
+        relative = matching[0]
+    else:
+        try:
+            resolved = candidate.resolve(strict=True)
+            relative = resolved.relative_to(locator.resolve(strict=True)).as_posix()
+        except (OSError, ValueError):
+            return None
     if relative not in _ALLOWED_SKILL_READS:
         return None
     try:
-        raw_content = resolved.read_bytes().decode("utf-8", errors="strict")
-    except (OSError, UnicodeDecodeError):
+        content_root = content_source.resolve(strict=True)
+        resolved_content = content_root.joinpath(
+            *PurePosixPath(relative).parts
+        ).resolve(strict=True)
+        resolved_content.relative_to(content_root)
+        raw_content = resolved_content.read_bytes().decode(
+            "utf-8", errors="strict"
+        )
+    except (OSError, UnicodeDecodeError, ValueError):
         return None
     content = raw_content.replace("\r\n", "\n").replace("\r", "\n")
     observed = aggregated_output.replace("\r\n", "\n").replace("\r", "\n")
@@ -4180,6 +4309,7 @@ __all__ = [
     "build_exec_command",
     "build_prompt_audit_command",
     "classify_commands",
+    "classify_task_commands",
     "classify_codex_infrastructure_failure",
     "codex_process_environment",
     "codex_runtime_files",

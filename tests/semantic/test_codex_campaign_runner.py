@@ -831,11 +831,9 @@ def _validate(
 
 def test_expected_skill_symlink_is_replaced_by_regular_attestation(tmp_path: Path) -> None:
     skill_source, _suite, _live = _inputs(tmp_path)
-    attempt = tmp_path / "attempt"
+    group = tmp_path / "attempt" / "runs" / "offline"
     link = (
-        attempt
-        / "runs"
-        / "offline"
+        group
         / "matrix"
         / "sessions"
         / "screening-C1-2022-1-r1-single"
@@ -848,19 +846,20 @@ def test_expected_skill_symlink_is_replaced_by_regular_attestation(tmp_path: Pat
     create_symlink_or_skip(link, skill_source, target_is_directory=True)
 
     replaced = replace_expected_skill_symlinks(
-        attempt,
+        group,
         skill_source=skill_source,
         candidate_sha256=_HASH,
+        platform_name="posix",
     )
 
-    assert replaced == (link.relative_to(attempt).as_posix(),)
+    assert replaced == (link.relative_to(group).as_posix(),)
     assert link.is_file()
     assert not link.is_symlink()
     assert json.loads(link.read_text(encoding="utf-8")) == {
         "contract": SKILL_LINK_ATTESTATION_CONTRACT,
         "candidate_sha256": _HASH,
         "original_link_target": str(skill_source.resolve()),
-        "path": link.relative_to(attempt).as_posix(),
+        "path": link.relative_to(group).as_posix(),
     }
 
 
@@ -868,11 +867,9 @@ def test_expected_windows_skill_copy_is_hash_checked_detached_and_attested(
     tmp_path: Path,
 ) -> None:
     skill_source, _suite, _live = _inputs(tmp_path)
-    attempt = tmp_path / "attempt"
+    group = tmp_path / "attempt" / "runs" / "online"
     workspace = (
-        attempt
-        / "runs"
-        / "online"
+        group
         / "matrix"
         / "sessions"
         / "screening-Q1-2022-1-r1-single"
@@ -886,20 +883,221 @@ def test_expected_windows_skill_copy_is_hash_checked_detached_and_attested(
     candidate_sha256 = workspace_skill_tree_sha256(skill_source)
 
     replaced = replace_expected_skill_symlinks(
-        attempt,
+        group,
         skill_source=skill_source,
         candidate_sha256=candidate_sha256,
         platform_name="nt",
     )
 
-    assert replaced == (copied.relative_to(attempt).as_posix(),)
+    assert replaced == (copied.relative_to(group).as_posix(),)
     assert copied.is_file() and not copied.is_symlink()
     assert json.loads(copied.read_text(encoding="utf-8")) == {
         "contract": SKILL_COPY_ATTESTATION_CONTRACT,
         "candidate_sha256": candidate_sha256,
         "copied_from": str(skill_source.resolve()),
-        "path": copied.relative_to(attempt).as_posix(),
+        "path": copied.relative_to(group).as_posix(),
     }
+
+
+def test_expected_heavy_windows_skill_copy_is_attested_before_replay(
+    tmp_path: Path,
+) -> None:
+    skill_source, _suite, _live = _inputs(tmp_path)
+    group = tmp_path / "attempt" / "runs" / "heavy-v3"
+    workspace = (
+        group
+        / "matrix"
+        / "scenarios"
+        / "001-INT22-V2-RIFLE-SAFE-REIMPORT"
+        / "evidence"
+        / "codex-task"
+        / "agent-workspace"
+    )
+    copied = prepare_workspace_skill_install(
+        workspace,
+        skill_source,
+        platform_name="nt",
+    )
+    candidate_sha256 = workspace_skill_tree_sha256(skill_source)
+
+    replaced = replace_expected_skill_symlinks(
+        group,
+        skill_source=skill_source,
+        candidate_sha256=candidate_sha256,
+        platform_name="nt",
+    )
+
+    assert replaced == (copied.relative_to(group).as_posix(),)
+    assert copied.is_file() and not copied.is_symlink()
+    assert json.loads(copied.read_text(encoding="utf-8")) == {
+        "contract": SKILL_COPY_ATTESTATION_CONTRACT,
+        "candidate_sha256": candidate_sha256,
+        "copied_from": str(skill_source.resolve()),
+        "path": copied.relative_to(group).as_posix(),
+    }
+
+
+def test_exact_windows_skill_symlink_is_rejected_instead_of_attested(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    skill_source, _suite, _live = _inputs(tmp_path)
+    group = tmp_path / "attempt" / "runs" / "heavy-v3"
+    link = (
+        group
+        / "matrix"
+        / "scenarios"
+        / "001-INT22-V2-RIFLE-SAFE-REIMPORT"
+        / "evidence"
+        / "codex-task"
+        / "agent-workspace"
+        / ".agents"
+        / "skills"
+        / "waapi-skill"
+    )
+    link.parent.mkdir(parents=True)
+    create_symlink_or_skip(link, skill_source, target_is_directory=True)
+    real_resolve = Path.resolve
+
+    def reject_link_resolution(
+        path: Path,
+        *args: object,
+        **kwargs: object,
+    ) -> Path:
+        if path == link:
+            raise AssertionError("native Windows Skill symlink must not be resolved")
+        return real_resolve(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "resolve", reject_link_resolution)
+
+    with pytest.raises(
+        CampaignEvidenceError,
+        match="native Windows.*detached directory copies",
+    ):
+        replace_expected_skill_symlinks(
+            group,
+            skill_source=skill_source,
+            candidate_sha256=workspace_skill_tree_sha256(skill_source),
+            platform_name="nt",
+        )
+
+
+def test_near_heavy_skill_copy_layout_is_rejected(tmp_path: Path) -> None:
+    skill_source, _suite, _live = _inputs(tmp_path)
+    group = tmp_path / "attempt" / "runs" / "heavy-v3"
+    workspace = (
+        group
+        / "matrix"
+        / "scenarios"
+        / "001-INT22-V2-RIFLE-SAFE-REIMPORT"
+        / "evidence"
+        / "not-codex-task"
+        / "agent-workspace"
+    )
+    prepare_workspace_skill_install(
+        workspace,
+        skill_source,
+        platform_name="nt",
+    )
+
+    with pytest.raises(
+        CampaignEvidenceError,
+        match="unexpected evidence layout",
+    ):
+        replace_expected_skill_symlinks(
+            group,
+            skill_source=skill_source,
+            candidate_sha256=workspace_skill_tree_sha256(skill_source),
+            platform_name="nt",
+        )
+
+
+@pytest.mark.parametrize(
+    "workspace_parts",
+    (
+        (
+            "extra-prefix",
+            "matrix",
+            "scenarios",
+            "001-INT22-V2-RIFLE-SAFE-REIMPORT",
+            "evidence",
+            "codex-task",
+            "agent-workspace",
+        ),
+        ("agent-workspace",),
+    ),
+    ids=("extra-prefix", "shallow"),
+)
+def test_skill_copy_outside_exact_group_relative_layout_is_rejected(
+    tmp_path: Path,
+    workspace_parts: tuple[str, ...],
+) -> None:
+    skill_source, _suite, _live = _inputs(tmp_path)
+    group = tmp_path / "attempt" / "runs" / "heavy-v3"
+    prepare_workspace_skill_install(
+        group.joinpath(*workspace_parts),
+        skill_source,
+        platform_name="nt",
+    )
+
+    with pytest.raises(
+        CampaignEvidenceError,
+        match="unexpected evidence layout",
+    ):
+        replace_expected_skill_symlinks(
+            group,
+            skill_source=skill_source,
+            candidate_sha256=workspace_skill_tree_sha256(skill_source),
+            platform_name="nt",
+        )
+
+
+def test_shallow_skill_like_copy_without_agent_workspace_is_rejected(
+    tmp_path: Path,
+) -> None:
+    skill_source, _suite, _live = _inputs(tmp_path)
+    group = tmp_path / "attempt" / "runs" / "heavy-v3"
+    shutil.copytree(
+        skill_source,
+        group / ".agents" / "skills" / "waapi-skill",
+    )
+
+    with pytest.raises(
+        CampaignEvidenceError,
+        match="unexpected evidence layout",
+    ):
+        replace_expected_skill_symlinks(
+            group,
+            skill_source=skill_source,
+            candidate_sha256=workspace_skill_tree_sha256(skill_source),
+            platform_name="nt",
+        )
+
+
+def test_near_heavy_skill_symlink_layout_is_rejected(tmp_path: Path) -> None:
+    skill_source, _suite, _live = _inputs(tmp_path)
+    group = tmp_path / "attempt" / "runs" / "heavy-v3"
+    link = (
+        group
+        / "matrix"
+        / "scenarios"
+        / "001-INT22-V2-RIFLE-SAFE-REIMPORT"
+        / "evidence"
+        / "codex-task-extra"
+        / "agent-workspace"
+        / ".agents"
+        / "skills"
+        / "waapi-skill"
+    )
+    link.parent.mkdir(parents=True)
+    create_symlink_or_skip(link, skill_source, target_is_directory=True)
+
+    with pytest.raises(CampaignEvidenceError, match="unexpected symlink"):
+        replace_expected_skill_symlinks(
+            group,
+            skill_source=skill_source,
+            candidate_sha256=workspace_skill_tree_sha256(skill_source),
+        )
 
 
 def test_windows_skill_copy_attestation_rejects_drift_and_posix_directory_install(

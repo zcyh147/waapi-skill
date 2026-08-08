@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import sys
 from dataclasses import asdict, dataclass, replace
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from types import SimpleNamespace
 from typing import Any, Mapping, Sequence
 
@@ -47,7 +47,11 @@ from tests.semantic.support.codex_campaign import (
     sha256_file,
     stable_tree_sha256,
 )
-from tests.semantic.support.codex_campaign_runner import ChildValidation, PhaseVerdict
+from tests.semantic.support.codex_campaign_runner import (
+    ChildValidation,
+    PhaseVerdict,
+    replace_expected_skill_symlinks,
+)
 from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
     build_direct_protocol,
@@ -67,13 +71,15 @@ from tests.semantic.support.codex_harness import (
     audit_session_events,
     build_task_exec_command,
     build_task_resume_command,
-    classify_commands,
+    classify_task_commands,
     completed_command_records,
     count_invalid_jsonl_lines,
     discover_windows_powershell_core,
     final_agent_message,
     parse_jsonl_events,
+    prepare_workspace_skill_install,
     turn_usage,
+    workspace_skill_install_path,
 )
 from tests.semantic.support.codex_prompt_provenance_v3 import (
     PromptProvenanceEvidence,
@@ -637,6 +643,18 @@ def _mark_codex_infrastructure_block(
                 unit=unit,
             )
         )
+    workspace = task_root / "agent-workspace"
+    skill_install = workspace_skill_install_path(workspace)
+    if not skill_install.exists() and not skill_install.is_symlink():
+        skill_install = prepare_workspace_skill_install(
+            workspace,
+            options.skill_source,
+            platform_name=(
+                "nt"
+                if options.windows_powershell_core_host is not None
+                else "posix"
+            ),
+        )
     expected_prompts = provenance.prompts
     protocol = provenance.protocol
     broker_state = task_root / "broker" / "state"
@@ -648,6 +666,11 @@ def _mark_codex_infrastructure_block(
         task_root=task_root,
         protocol=protocol,
         version=unit.version,
+        invocation_skill_source=(
+            skill_install
+            if options.windows_powershell_core_host is not None
+            else None
+        ),
     )
     if not 1 <= failed_turn_index <= unit.user_turn_count:
         raise AssertionError("synthetic failed turn must be inside the unit topology")
@@ -683,9 +706,21 @@ def _mark_codex_infrastructure_block(
             records=broker_records[previous_prefix:prefix],
             final_response="预览已准备。",
             read_paths=(
-                _synthetic_first_turn_reads(options, unit)
+                _synthetic_first_turn_reads(
+                    options,
+                    unit,
+                    skill_source=_synthetic_runtime_skill_read_source(
+                        options,
+                        skill_install,
+                    ),
+                )
                 if prior_index == 1
                 else ()
+            ),
+            windows_skill_read_source=(
+                skill_install
+                if options.windows_powershell_core_host is not None
+                else None
             ),
             windows_powershell_core_host=options.windows_powershell_core_host,
         )
@@ -1560,13 +1595,26 @@ def _synthetic_gateway_records(
     task_root: Path,
     protocol: V3GatewayProtocol,
     version: str,
+    invocation_skill_source: Path | None = None,
 ) -> list[dict[str, Any]]:
-    runner = Path(os.path.abspath(os.fspath(options.skill_source / "scripts" / "run.py")))
+    runner = Path(
+        os.path.abspath(os.fspath(options.skill_source / "scripts" / "run.py"))
+    )
+    invocation_runner = Path(
+        os.path.abspath(
+            os.fspath(
+                (invocation_skill_source or options.skill_source)
+                / "scripts"
+                / "run.py"
+            )
+        )
+    )
     shim = task_root / "broker" / "bin"
     shim.mkdir(parents=True, exist_ok=True)
     (shim / "python").write_text("synthetic broker shim\n", encoding="utf-8")
     replay = CodexGatewayBroker(
         skill_source=options.skill_source,
+        invocation_skill_source=invocation_skill_source,
         expected_steps=protocol.steps,
         expected_wwise_version=version,
         runner_environment={},
@@ -1587,6 +1635,7 @@ def _synthetic_gateway_records(
         awaiting_snapshot = transaction_store.load_snapshot(transaction_id)
         assert awaiting_snapshot.confirmation_token is not None
     records: list[dict[str, Any]] = []
+    use_candidate_runner = False
     for index, step in enumerate(protocol.steps, start=1):
         arguments = [*step.gateway_global_arguments, step.subcommand]
         for item in step.arguments:
@@ -1623,10 +1672,16 @@ def _synthetic_gateway_records(
                 arguments.append(bound)
             else:
                 raise AssertionError("synthetic protocol argument is unsupported")
-        model_argv = [str(shim / "python"), str(runner), "gateway.py", *arguments]
+        model_argv = [
+            str(shim / "python"),
+            str(runner if use_candidate_runner else invocation_runner),
+            "gateway.py",
+            *arguments,
+        ]
         resolved = resolve_gateway_invocation(
             model_argv,
             skill_source=options.skill_source,
+            invocation_skill_source=invocation_skill_source,
             shim_directory=shim,
         )
         semantic_sha256, execution_arguments = replay._validate_step(  # noqa: SLF001
@@ -1809,6 +1864,7 @@ def _synthetic_gateway_records(
         }
         records.append(record)
         replay._payloads_by_step[step.name] = payload  # noqa: SLF001
+        use_candidate_runner = _selected_next_command(payload) is not None
     return records
 
 
@@ -2102,6 +2158,7 @@ def _synthetic_events(
     records: Sequence[Mapping[str, Any]],
     final_response: str,
     read_paths: Sequence[Path] = (),
+    windows_skill_read_source: Path | None = None,
     platform_name: str | None = None,
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
 ) -> str:
@@ -2111,11 +2168,38 @@ def _synthetic_events(
     ]
     for index, path in enumerate(read_paths, start=1):
         item_id = f"read-{index}"
-        command = _synthetic_command(
-            ("cat", str(path.resolve())),
-            platform_name=platform_name,
-            windows_powershell_core_host=windows_powershell_core_host,
-        )
+        relative_skill_path: Path | None = None
+        if (
+            windows_powershell_core_host is not None
+            and windows_skill_read_source is not None
+        ):
+            try:
+                relative_skill_path = path.relative_to(windows_skill_read_source)
+            except ValueError:
+                pass
+        if relative_skill_path is not None:
+            path_text = str(
+                PureWindowsPath(".agents")
+                / "skills"
+                / "waapi-skill"
+                / PureWindowsPath(*relative_skill_path.parts)
+            )
+            script = (
+                "Get-Content -Raw -Encoding UTF8 '"
+                + path_text.replace("'", "''")
+                + "'"
+            )
+            command = _synthetic_shell_tool_command(
+                script,
+                platform_name="nt",
+                windows_powershell_core_host=windows_powershell_core_host,
+            )
+        else:
+            command = _synthetic_command(
+                ("cat", os.path.abspath(os.fspath(path))),
+                platform_name=platform_name,
+                windows_powershell_core_host=windows_powershell_core_host,
+            )
         events.extend(
             (
                 {
@@ -2302,6 +2386,56 @@ def test_synthetic_command_uses_exact_host_command_grammar() -> None:
     assert tuple(shlex.split(_synthetic_command(argv, platform_name="posix"))) == argv
 
 
+def test_synthetic_windows_reads_use_relative_get_content_only_for_skill(
+    tmp_path: Path,
+) -> None:
+    host = WindowsPowerShellCoreHost(
+        executable=r"C:\Program Files\PowerShell\7\pwsh.exe",
+        version="7.6.4",
+        native_argument_passing="Windows",
+        sha256="a" * 64,
+    )
+    skill_install = tmp_path / "agent-workspace" / ".agents" / "skills" / "waapi-skill"
+    skill_read = skill_install / "SKILL.md"
+    skill_read.parent.mkdir(parents=True)
+    skill_read.write_text("# skill\n", encoding="utf-8")
+    prompt_asset = tmp_path / "scenario" / "owned" / "inputs" / "import.tsv"
+    prompt_asset.parent.mkdir(parents=True)
+    prompt_asset.write_text("Object Path\n<Sound>City_A\n", encoding="utf-8")
+
+    rows = [
+        json.loads(line)
+        for line in _synthetic_events(
+            thread_id="thread-windows-read-shapes",
+            records=(),
+            final_response="done",
+            read_paths=(skill_read, prompt_asset),
+            windows_skill_read_source=skill_install,
+            platform_name="nt",
+            windows_powershell_core_host=host,
+        ).splitlines()
+    ]
+    commands = [
+        row["item"]["command"]
+        for row in rows
+        if row.get("type") == "item.completed"
+        and isinstance(row.get("item"), Mapping)
+        and row["item"].get("type") == "command_execution"
+    ]
+    skill_outer = tuple(shlex.split(commands[0], posix=True))
+    asset_outer = tuple(shlex.split(commands[1], posix=True))
+
+    assert skill_outer[:3] == (host.executable, "-NoProfile", "-Command")
+    assert skill_outer[3] == (
+        r"Get-Content -Raw -Encoding UTF8 '.agents\skills\waapi-skill\SKILL.md'"
+    )
+    assert asset_outer[:3] == (host.executable, "-NoProfile", "-Command")
+    assert decode_windows_powershell_argv(asset_outer[3]) == (
+        "cat",
+        os.path.abspath(os.fspath(prompt_asset)),
+    )
+
+
 def test_synthetic_response_binding_selects_model_command_not_legacy_fallback() -> None:
     payload = {
         "next_command": {
@@ -2402,6 +2536,110 @@ def test_campaign_broker_seal_accepts_expected_exit2_failed_command_status(
         version="2022.1",
         label="expected structured refusal",
     )
+
+
+def test_campaign_broker_replay_gates_task_install_to_windows_and_accepts_candidate(
+    tmp_path: Path,
+) -> None:
+    options = _options(tmp_path)
+    task_root = tmp_path / "task"
+    workspace = task_root / "agent-workspace"
+    installed = workspace_skill_install_path(workspace)
+    installed.parent.mkdir(parents=True)
+    installed.write_text("sealed install attestation\n", encoding="utf-8")
+    unit = _unit(1)
+    protocol = _synthetic_protocol(
+        unit,
+        scenario_root=tmp_path / "scenario",
+        visible_values={},
+    )
+    installed_records = _synthetic_gateway_records(
+        options=options,
+        task_root=task_root,
+        protocol=protocol,
+        version=unit.version,
+        invocation_skill_source=installed,
+    )
+    canonical_records = _synthetic_gateway_records(
+        options=options,
+        task_root=task_root,
+        protocol=protocol,
+        version=unit.version,
+    )
+
+    def archived_commands(records: Sequence[Mapping[str, Any]]) -> list[Any]:
+        events = parse_jsonl_events(
+            _synthetic_events(
+                thread_id="thread-runner-replay",
+                records=records,
+                final_response="done",
+                windows_powershell_core_host=options.windows_powershell_core_host,
+            )
+        )
+        return [
+            campaign._json_canonical_value(asdict(record))
+            for record in completed_command_records(
+                events,
+                windows_powershell_core_host=options.windows_powershell_core_host,
+            )
+        ]
+
+    installed_commands = archived_commands(installed_records)
+    if options.windows_powershell_core_host is not None:
+        campaign._validate_heavy_v3_broker_records(
+            installed_records,
+            task_root=task_root,
+            steps=protocol.steps,
+            command_records=installed_commands,
+            options=options,
+            version=unit.version,
+            label="installed Windows runner replay",
+        )
+    else:
+        with pytest.raises(
+            CampaignEvidenceError,
+            match="broker argv cannot replay protocol step",
+        ):
+            campaign._validate_heavy_v3_broker_records(
+                installed_records,
+                task_root=task_root,
+                steps=protocol.steps,
+                command_records=installed_commands,
+                options=options,
+                version=unit.version,
+                label="installed POSIX runner replay",
+            )
+
+    canonical_commands = archived_commands(canonical_records)
+    campaign._validate_heavy_v3_broker_records(
+        canonical_records,
+        task_root=task_root,
+        steps=protocol.steps,
+        command_records=canonical_commands,
+        options=options,
+        version=unit.version,
+        label="canonical runner replay",
+    )
+
+    third_root = tmp_path / "third-skill"
+    third_records = copy.deepcopy(canonical_records)
+    third_commands = copy.deepcopy(canonical_commands)
+    third_runner = str(third_root / "scripts" / "run.py")
+    third_records[0]["model_argv"][1] = third_runner
+    third_commands[0]["argv"][1] = third_runner
+    with pytest.raises(
+        CampaignEvidenceError,
+        match="broker argv cannot replay protocol step",
+    ):
+        campaign._validate_heavy_v3_broker_records(
+            third_records,
+            task_root=task_root,
+            steps=protocol.steps,
+            command_records=third_commands,
+            options=options,
+            version=unit.version,
+            label="third runner replay",
+        )
 
 
 def test_campaign_broker_seal_binds_confirmation_to_archived_transaction_store(
@@ -2647,10 +2885,24 @@ def _synthetic_required_reference(unit: _Unit) -> str:
 def _synthetic_first_turn_reads(
     options: campaign.CampaignOptions,
     unit: _Unit,
+    *,
+    skill_source: Path | None = None,
 ) -> tuple[Path, Path]:
+    source = skill_source or options.skill_source
     return (
-        options.skill_source / "SKILL.md",
-        options.skill_source / _synthetic_required_reference(unit),
+        source / "SKILL.md",
+        source / _synthetic_required_reference(unit),
+    )
+
+
+def _synthetic_runtime_skill_read_source(
+    options: campaign.CampaignOptions,
+    skill_install: Path,
+) -> Path:
+    return (
+        skill_install
+        if options.windows_powershell_core_host is not None
+        else options.skill_source
     )
 
 
@@ -2674,9 +2926,13 @@ def _synthetic_codex_facts(
         events,
         windows_powershell_core_host=options.windows_powershell_core_host,
     )
-    command_facts = classify_commands(
+    command_facts = classify_task_commands(
         command_records,
+        workspace=task_root / "agent-workspace",
         skill_source=options.skill_source,
+        use_windows_workspace_skill_install=(
+            options.windows_powershell_core_host is not None
+        ),
         expected_gateway_subcommands=tuple(step.subcommand for step in protocol.steps),
         expected_wwise_version=version,
     )
@@ -4246,7 +4502,15 @@ def _write_passing_project_outcome(
     broker_evidence = task_root / "broker" / "evidence"
     broker_state.mkdir(parents=True)
     broker_evidence.mkdir(parents=True)
-    (task_root / "agent-workspace").mkdir(parents=True)
+    workspace = task_root / "agent-workspace"
+    workspace.mkdir(parents=True)
+    skill_install = prepare_workspace_skill_install(
+        workspace,
+        options.skill_source,
+        platform_name=(
+            "nt" if options.windows_powershell_core_host is not None else "posix"
+        ),
+    )
     prompts = _materialized_prompts(unit, visible_values=visible_values)
     prompt_materialization, provenance, business_oracle_plan = _write_prompt_materialization(
         task_root,
@@ -4259,6 +4523,11 @@ def _write_passing_project_outcome(
         task_root=task_root,
         protocol=protocol,
         version=unit.version,
+        invocation_skill_source=(
+            skill_install
+            if options.windows_powershell_core_host is not None
+            else None
+        ),
     )
     if unit.scenario.api == "ak.wwise.core.object.get":
         _populate_synthetic_object_query_payload(
@@ -4314,9 +4583,21 @@ def _write_passing_project_outcome(
             records=turn_records,
             final_response=turn_final,
             read_paths=(
-                _synthetic_first_turn_reads(options, unit)
+                _synthetic_first_turn_reads(
+                    options,
+                    unit,
+                    skill_source=_synthetic_runtime_skill_read_source(
+                        options,
+                        skill_install,
+                    ),
+                )
                 if index == 1
                 else ()
+            ),
+            windows_skill_read_source=(
+                skill_install
+                if options.windows_powershell_core_host is not None
+                else None
             ),
             windows_powershell_core_host=options.windows_powershell_core_host,
         )
@@ -4855,6 +5136,59 @@ def test_heavy_validator_accepts_reviewed_confirmation_prompt(
         returncode=0,
     )
 
+    assert [row["status"] for row in result.observations] == ["PASS"]
+    confirmation = (
+        root
+        / "scenarios"
+        / "001-OBJ22-F-CREATE-01"
+        / "evidence"
+        / "codex-task"
+        / "turns"
+        / "turn-02"
+        / "prompt.txt"
+    ).read_text(encoding="utf-8")
+    assert confirmation == units[0].turns[1].prompt + "\n"
+
+
+def test_heavy_validator_replays_attested_task_install_with_canonical_bytes(
+    tmp_path: Path,
+) -> None:
+    options = _options(tmp_path)
+    units = (_multi_turn_unit(1),)
+    group = tmp_path / "attempt" / "runs" / "heavy-v3"
+    root = group / "matrix"
+    _write_matrix_evidence(
+        root,
+        options=options,
+        units=units,
+        statuses=("PASS",),
+    )
+    installed = workspace_skill_install_path(
+        root
+        / "scenarios"
+        / f"001-{units[0].unit_id}"
+        / "evidence"
+        / "codex-task"
+        / "agent-workspace"
+    )
+
+    replaced = replace_expected_skill_symlinks(
+        group,
+        skill_source=options.skill_source,
+        candidate_sha256=stable_tree_sha256(options.skill_source),
+        platform_name=(
+            "nt" if options.windows_powershell_core_host is not None else "posix"
+        ),
+    )
+
+    assert replaced == (installed.relative_to(group).as_posix(),)
+    assert installed.is_file() and not installed.is_symlink()
+    result = campaign.validate_heavy_v3_child_run(
+        root,
+        expected_units=units,
+        options=options,
+        returncode=0,
+    )
     assert [row["status"] for row in result.observations] == ["PASS"]
     confirmation = (
         root

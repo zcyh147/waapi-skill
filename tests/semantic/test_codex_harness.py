@@ -35,6 +35,7 @@ from .support.codex_harness import (  # pyright: ignore[reportMissingImports]
     build_task_exec_command,
     build_task_resume_command,
     classify_commands,
+    classify_task_commands,
     classify_codex_infrastructure_failure,
     completed_command_records,
     count_invalid_jsonl_lines,
@@ -2412,6 +2413,217 @@ def test_windows_powershell_recording_unwraps_skill_coverage_and_gateway(
     assert facts.unexpected_commands == ()
 
 
+@pytest.mark.parametrize(
+    "relative_skill_read",
+    (True, False),
+    ids=("workspace-relative", "absolute-install-path"),
+)
+def test_task_classifier_replays_removed_windows_install_from_candidate_bytes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    relative_skill_read: bool,
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
+    candidate = tmp_path / "candidate-skill"
+    runner = candidate / "scripts" / "run.py"
+    runner.parent.mkdir(parents=True)
+    skill_content = "# sealed candidate skill\n"
+    (candidate / "SKILL.md").write_text(skill_content, encoding="utf-8")
+    runner.write_text("# packaged runner\n", encoding="utf-8")
+
+    workspace = tmp_path / "agent-workspace"
+    installed = workspace_skill_install_path(workspace)
+    installed.parent.mkdir(parents=True)
+    installed.write_text(
+        '{"contract":"waapi-skill.codex-campaign-skill-copy/v1"}\n',
+        encoding="utf-8",
+    )
+    installed_runner = installed / "scripts" / "run.py"
+    other_runner = tmp_path / "other-skill" / "scripts" / "run.py"
+    payload = {
+        "contract": "waapi-skill.gateway-result/v1",
+        "command": "capabilities",
+        "ok": True,
+    }
+    read_locator = (
+        r".agents\skills\waapi-skill\SKILL.md"
+        if relative_skill_read
+        else str(installed / "SKILL.md")
+    )
+    read = completed_windows_record(
+        windows_powershell_recording(
+            "Get-Content -Raw -Encoding UTF8 '"
+            + read_locator.replace("'", "''")
+            + "'"
+        ),
+        skill_content,
+    )
+    canonical_read = completed_record(
+        f"cat {shlex.quote(str(candidate / 'SKILL.md'))}",
+        skill_content,
+    )
+    workspace_read = completed_record(
+        f"cat {shlex.quote(str(installed / 'SKILL.md'))}",
+        skill_content,
+    )
+    third_read = completed_record(
+        f"cat {shlex.quote(str(tmp_path / 'third-skill' / 'SKILL.md'))}",
+        skill_content,
+    )
+    traversal_read = completed_record(
+        "cat "
+        + shlex.quote(
+            f"{installed}{os.sep}untrusted{os.sep}..{os.sep}SKILL.md"
+        ),
+        skill_content,
+    )
+    tilde_read = completed_record(
+        "cat '~/candidate-skill/SKILL.md'",
+        skill_content,
+    )
+    installed_gateway = completed_windows_record(
+        windows_powershell_recording(
+            f"python '{installed_runner}' gateway.py capabilities"
+        ),
+        payload,
+    )
+    canonical_gateway = completed_windows_record(
+        windows_powershell_recording(
+            f"python '{runner}' gateway.py capabilities"
+        ),
+        payload,
+    )
+    repeated_separator_runner = (
+        f"{installed}{os.sep}{os.sep}scripts{os.sep}.{os.sep}run.py"
+    )
+    repeated_separator_gateway = completed_windows_record(
+        windows_powershell_recording(
+            f"python '{repeated_separator_runner}' gateway.py capabilities"
+        ),
+        payload,
+    )
+    traversal_runner = (
+        f"{installed}{os.sep}untrusted{os.sep}..{os.sep}scripts{os.sep}run.py"
+    )
+    traversal_gateway = completed_windows_record(
+        windows_powershell_recording(
+            f"python '{traversal_runner}' gateway.py capabilities"
+        ),
+        payload,
+    )
+    tilde_gateway = completed_windows_record(
+        windows_powershell_recording(
+            "python '~/agent-workspace/.agents/skills/waapi-skill/scripts/run.py' "
+            "gateway.py capabilities"
+        ),
+        payload,
+    )
+    other_gateway = completed_windows_record(
+        windows_powershell_recording(
+            f"python '{other_runner}' gateway.py capabilities"
+        ),
+        payload,
+    )
+
+    real_resolve = Path.resolve
+
+    def reject_attestation_descendant_resolution(
+        path: Path,
+        *args: object,
+        **kwargs: object,
+    ) -> Path:
+        try:
+            path.relative_to(installed)
+        except ValueError:
+            return real_resolve(path, *args, **kwargs)
+        raise OSError(267, "directory name is invalid", str(path))
+
+    monkeypatch.setattr(Path, "resolve", reject_attestation_descendant_resolution)
+
+    facts = classify_task_commands(
+        (
+            read,
+            installed_gateway,
+            canonical_gateway,
+            repeated_separator_gateway,
+            traversal_gateway,
+            tilde_gateway,
+            other_gateway,
+        ),
+        workspace=workspace,
+        skill_source=candidate,
+        use_windows_workspace_skill_install=True,
+        expected_gateway_subcommands=("capabilities",),
+    )
+
+    assert installed.is_file()
+    assert facts.skill_read is True
+    assert facts.skill_read_files == ("SKILL.md",)
+    assert facts.allowed_read_commands == (read.command,)
+    assert facts.gateway_commands == (
+        installed_gateway.command,
+        canonical_gateway.command,
+        repeated_separator_gateway.command,
+    )
+    assert facts.gateway_attempt_commands == (
+        installed_gateway.command,
+        canonical_gateway.command,
+        repeated_separator_gateway.command,
+    )
+    assert facts.non_gateway_unexpected_commands == (
+        traversal_gateway.command,
+        tilde_gateway.command,
+        other_gateway.command,
+    )
+
+    posix_facts = classify_task_commands(
+        (
+            canonical_read,
+            workspace_read,
+            third_read,
+            traversal_read,
+            tilde_read,
+            installed_gateway,
+            canonical_gateway,
+        ),
+        workspace=workspace,
+        skill_source=candidate,
+    )
+    assert posix_facts.gateway_commands == (canonical_gateway.command,)
+    assert posix_facts.allowed_read_commands == (
+        canonical_read.command,
+        workspace_read.command,
+    )
+    assert posix_facts.skill_read_files == ("SKILL.md", "SKILL.md")
+    assert posix_facts.non_gateway_unexpected_commands == (
+        third_read.command,
+        traversal_read.command,
+        tilde_read.command,
+        installed_gateway.command,
+    )
+
+    drifted_read = CodexCommandRecord(
+        command=read.command,
+        exit_code=read.exit_code,
+        status=read.status,
+        aggregated_output="# detached copy drift\n",
+        argv=read.argv,
+        has_shell_operators=read.has_shell_operators,
+        parse_error=read.parse_error,
+        parser_kind=read.parser_kind,
+    )
+    drifted = classify_task_commands(
+        (drifted_read,),
+        workspace=workspace,
+        skill_source=candidate,
+        use_windows_workspace_skill_install=True,
+    )
+    assert drifted.skill_read is False
+    assert drifted.allowed_read_commands == ()
+    assert drifted.non_gateway_unexpected_commands == (drifted_read.command,)
+
+
 def test_windows_powershell_recording_preserves_literal_metacharacters(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -3843,6 +4055,48 @@ def test_command_classifier_allows_only_exact_initial_skill_bootstrap_read(tmp_p
     assert facts.allowed_read_commands == (command,)
     assert facts.skill_read_files == ("SKILL.md",)
     assert facts.write_like_commands == ()
+    assert facts.unexpected_commands == ()
+
+
+def test_task_classifier_replays_bootstrap_after_install_attestation(
+    tmp_path: Path,
+) -> None:
+    candidate = tmp_path / "candidate-skill"
+    candidate.mkdir()
+    content = "first\nsecond\n"
+    (candidate / "SKILL.md").write_text(content, encoding="utf-8")
+    workspace = tmp_path / "agent-workspace"
+    installed = workspace_skill_install_path(workspace)
+    installed.parent.mkdir(parents=True)
+    installed.write_text("sealed install attestation\n", encoding="utf-8")
+    installed_skill = installed / "SKILL.md"
+    shell_path = shlex.quote(str(installed_skill))
+    command = (
+        f'/bin/bash -lc "wc -l {shell_path} && '
+        f"sed -n '1,240p' {shell_path}\""
+    )
+    output = f"       2 {installed_skill}\n{content}"
+    argv, has_operators, parse_error = parse_command_argv(command)
+    record = CodexCommandRecord(
+        command=command,
+        exit_code=0,
+        status="completed",
+        aggregated_output=output,
+        argv=argv,
+        has_shell_operators=has_operators,
+        parse_error=parse_error,
+    )
+
+    facts = classify_task_commands(
+        (record,),
+        workspace=workspace,
+        skill_source=candidate,
+    )
+
+    assert installed.is_file()
+    assert facts.skill_read is True
+    assert facts.skill_read_files == ("SKILL.md",)
+    assert facts.allowed_read_commands == (command,)
     assert facts.unexpected_commands == ()
 
 

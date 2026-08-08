@@ -13,6 +13,10 @@ from tests.semantic import run_codex_skill_campaign as campaign
 from tests.semantic import run_codex_skill_matrix as matrix
 from tests.semantic import test_run_codex_skill_campaign_heavy_v3 as fixture
 from tests.semantic.support.codex_campaign import CampaignEvidenceError
+from tests.semantic.support.codex_harness import (
+    prepare_workspace_skill_install,
+    workspace_skill_install_path,
+)
 from tests.semantic.support.codex_prompt_provenance_v3 import (
     PromptProvenanceEvidence,
 )
@@ -132,7 +136,15 @@ def _campaign_prompt_asset_read_fixture(
     task_root = scenario_root / "evidence" / "codex-task"
     turn_root = task_root / "turns" / "turn-01"
     turn_root.mkdir(parents=True)
-    (task_root / "agent-workspace").mkdir()
+    workspace = task_root / "agent-workspace"
+    workspace.mkdir()
+    skill_install = prepare_workspace_skill_install(
+        workspace,
+        options.skill_source,
+        platform_name=(
+            "nt" if options.windows_powershell_core_host is not None else "posix"
+        ),
+    )
     asset = scenario_root / "owned" / "inputs" / "import.tsv"
     asset.parent.mkdir(parents=True)
     content = "Object Path\t@Volume\n<Sound>City_A\t-3\n"
@@ -148,6 +160,11 @@ def _campaign_prompt_asset_read_fixture(
         task_root=task_root,
         protocol=protocol,
         version=unit.version,
+        invocation_skill_source=(
+            skill_install
+            if options.windows_powershell_core_host is not None
+            else None
+        ),
     )
     prompt = f"请使用输入表 {asset} 完成这个任务。"
     events_text = fixture._synthetic_events(
@@ -155,8 +172,20 @@ def _campaign_prompt_asset_read_fixture(
         records=broker_records,
         final_response="waapi-skill 已加载，操作完成。",
         read_paths=(
-            *fixture._synthetic_first_turn_reads(options, unit),
+            *fixture._synthetic_first_turn_reads(
+                options,
+                unit,
+                skill_source=fixture._synthetic_runtime_skill_read_source(
+                    options,
+                    skill_install,
+                ),
+            ),
             *((asset,) * asset_read_count),
+        ),
+        windows_skill_read_source=(
+            skill_install
+            if options.windows_powershell_core_host is not None
+            else None
         ),
         windows_powershell_core_host=options.windows_powershell_core_host,
     )
@@ -1055,6 +1084,7 @@ def test_success_rejects_gateway_commands_redistributed_across_turns(
         scenario_root=scenario_root,
         visible_values={},
     )
+    skill_install = workspace_skill_install_path(task_root / "agent-workspace")
     for index, allocated in ((1, records), (2, [])):
         turn_root = task_root / "turns" / f"turn-{index:02d}"
         final = (turn_root / "final.txt").read_text(encoding="utf-8")[:-1]
@@ -1063,9 +1093,21 @@ def test_success_rejects_gateway_commands_redistributed_across_turns(
             records=allocated,
             final_response=final,
             read_paths=(
-                fixture._synthetic_first_turn_reads(options, unit)
+                fixture._synthetic_first_turn_reads(
+                    options,
+                    unit,
+                    skill_source=fixture._synthetic_runtime_skill_read_source(
+                        options,
+                        skill_install,
+                    ),
+                )
                 if index == 1
                 else ()
+            ),
+            windows_skill_read_source=(
+                skill_install
+                if options.windows_powershell_core_host is not None
+                else None
             ),
             windows_powershell_core_host=options.windows_powershell_core_host,
         )
@@ -1927,6 +1969,7 @@ def test_audio_oracle_requires_execute_and_verify_bound_protocol(tmp_path: Path)
 def test_object_get_recomputes_identity_presence_from_final_text(tmp_path: Path) -> None:
     options, unit, root, scenario_root, task_root = _passing_case(tmp_path)
     turn_root = task_root / "turns" / "turn-01"
+    skill_install = workspace_skill_install_path(task_root / "agent-workspace")
     task_result = json.loads((task_root / "task-result.json").read_text(encoding="utf-8"))
     records = task_result["broker"]["records"]
     response = "waapi-skill 已加载。"
@@ -1934,7 +1977,19 @@ def test_object_get_recomputes_identity_presence_from_final_text(tmp_path: Path)
         thread_id="thread-1",
         records=records,
         final_response=response,
-        read_paths=fixture._synthetic_first_turn_reads(options, unit),
+        read_paths=fixture._synthetic_first_turn_reads(
+            options,
+            unit,
+            skill_source=fixture._synthetic_runtime_skill_read_source(
+                options,
+                skill_install,
+            ),
+        ),
+        windows_skill_read_source=(
+            skill_install
+            if options.windows_powershell_core_host is not None
+            else None
+        ),
         windows_powershell_core_host=options.windows_powershell_core_host,
     )
     matrix.write_text(turn_root / "events.jsonl", events)
@@ -1977,6 +2032,7 @@ def test_get02_campaign_rechecks_paired_path_boundaries_from_final_text(
     )
     _validate(options, unit, root)
     turn_root = task_root / "turns" / "turn-01"
+    skill_install = workspace_skill_install_path(task_root / "agent-workspace")
     original = (turn_root / "final.txt").read_text(encoding="utf-8").rstrip("\n")
     outcome = json.loads((scenario_root / "outcome.json").read_text(encoding="utf-8"))
     proof = outcome["checks"]["business_verification"]["verification"]["evidence"]
@@ -1989,7 +2045,19 @@ def test_get02_campaign_rechecks_paired_path_boundaries_from_final_text(
         thread_id="thread-1",
         records=records,
         final_response=response,
-        read_paths=fixture._synthetic_first_turn_reads(options, unit),
+        read_paths=fixture._synthetic_first_turn_reads(
+            options,
+            unit,
+            skill_source=fixture._synthetic_runtime_skill_read_source(
+                options,
+                skill_install,
+            ),
+        ),
+        windows_skill_read_source=(
+            skill_install
+            if options.windows_powershell_core_host is not None
+            else None
+        ),
         windows_powershell_core_host=options.windows_powershell_core_host,
     )
     matrix.write_text(turn_root / "events.jsonl", events)
@@ -2030,6 +2098,7 @@ def test_get02_campaign_recomputes_unexpected_language_from_final_text(
     )
     _validate(options, unit, root)
     turn_root = task_root / "turns" / "turn-01"
+    skill_install = workspace_skill_install_path(task_root / "agent-workspace")
     original = (turn_root / "final.txt").read_text(encoding="utf-8").rstrip("\n")
     outcome = json.loads((scenario_root / "outcome.json").read_text(encoding="utf-8"))
     proof = outcome["checks"]["business_verification"]["verification"]["evidence"]
@@ -2052,7 +2121,19 @@ def test_get02_campaign_recomputes_unexpected_language_from_final_text(
         thread_id="thread-1",
         records=records,
         final_response=response,
-        read_paths=fixture._synthetic_first_turn_reads(options, unit),
+        read_paths=fixture._synthetic_first_turn_reads(
+            options,
+            unit,
+            skill_source=fixture._synthetic_runtime_skill_read_source(
+                options,
+                skill_install,
+            ),
+        ),
+        windows_skill_read_source=(
+            skill_install
+            if options.windows_powershell_core_host is not None
+            else None
+        ),
         windows_powershell_core_host=options.windows_powershell_core_host,
     )
     matrix.write_text(turn_root / "events.jsonl", events)
