@@ -133,8 +133,40 @@ def _closed_next_command(
 
 
 def windows_powershell_recording(script: str, *, executable: str = _WINDOWS_POWERSHELL_CORE) -> str:
-    escaped_script = script.replace('"', r'\"')
-    return f'"{executable}" -NoProfile -Command "{escaped_script}"'
+    return shlex.join((executable, "-NoProfile", "-Command", script))
+
+
+def test_windows_powershell_recording_preserves_json_backslash_escapes() -> None:
+    request = {
+        "parent": {
+            "kind": "path",
+            "value": r"\Actor-Mixer Hierarchy\Default Work Unit",
+        }
+    }
+    request_json = json.dumps(request, ensure_ascii=False, separators=(",", ":"))
+    expected = (
+        "python",
+        r"C:\Agent Workspace\waapi-skill\scripts\run.py",
+        "gateway.py",
+        "preview",
+        "--request-json",
+        request_json,
+    )
+    script = encode_windows_model_argv(expected)
+    command = windows_powershell_recording(script)
+
+    assert tuple(shlex.split(command, posix=True)) == (
+        _WINDOWS_POWERSHELL_CORE,
+        "-NoProfile",
+        "-Command",
+        script,
+    )
+    assert parse_command_argv(
+        command,
+        platform_name="nt",
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+    ) == (expected, False, "")
+    assert json.loads(expected[-1]) == request
 
 
 def portable_windows_outer_split(
