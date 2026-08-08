@@ -154,7 +154,7 @@ python /absolute/path/to/waapi-skill/scripts/run.py gateway.py capabilities --al
 
 That summary already contains each version's `total` and every
 `preferred_routes` count, including `transaction_operation` and
-`unsupported_boundary`. Do not combine `--summary-only` with row filters.
+`unsupported_boundary`; zero-valued route counts remain explicit. Do not combine `--summary-only` with row filters.
 
 For row-level inventories, omit `--summary-only` and use the offline catalog
 filters instead of copying a static API list into a prompt:

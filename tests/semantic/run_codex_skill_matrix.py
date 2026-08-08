@@ -1906,12 +1906,13 @@ def run_fresh_phase(
         write_text(output_dir / "prompt.txt", prompt + "\n")
         stage = "prepare-agent-workspace"
         skill_install = prepare_agent_workspace(workspace, options.skill_source)
+        invocation_skill_source = skill_install if os.name == "nt" else None
         stage = "build-gateway-protocol"
         expected_steps = build_expected_gateway_steps(session, values)
         stage = "broker-initialize"
         broker = CodexGatewayBroker(
             skill_source=options.skill_source,
-            invocation_skill_source=(skill_install if os.name == "nt" else None),
+            invocation_skill_source=invocation_skill_source,
             expected_steps=expected_steps,
             expected_wwise_version=session.version,
             runner_environment=runner_environment,
@@ -1999,6 +2000,7 @@ def run_fresh_phase(
             reconciliation,
             workspace=workspace,
             skill_source=options.skill_source,
+            invocation_skill_source=invocation_skill_source,
             broker_state_directory=state_directory,
             broker_evidence_directory=evidence_directory,
             runner_oracle=resolved_oracle,

@@ -51,6 +51,20 @@ MANIFEST_ROOT = SKILL_ROOT / "resources" / "manifest"
 SEMANTIC_ROOT = SKILL_ROOT / "resources" / "semantic"
 DEFERRED_ROOT = SKILL_ROOT / "resources" / "deferred"
 
+_EXECUTION_ROUTE_TO_PREFERRED_ROUTE = {
+    "excluded": "unsupported_boundary",
+    "fixed_command": "fixed_command",
+    "bounded_call": "manifest_dispatch",
+    "bounded_topic_wait": "bounded_topic_wait",
+    "transaction": "transaction_operation",
+    "managed_transaction": "transaction_operation",
+    "isolated_transaction": "transaction_operation",
+    "compound_transaction_member": "transaction_operation",
+}
+_PREFERRED_ROUTE_KEYS = tuple(
+    sorted(set(_EXECUTION_ROUTE_TO_PREFERRED_ROUTE.values()))
+)
+
 if frozenset(FIXED_COMMANDS_BY_URI) != REVIEWED_FIXED_FUNCTION_URIS:
     raise RuntimeError(
         "The fixed gateway command map and immutable reviewed fixed-function allowlist must match exactly"
@@ -658,16 +672,7 @@ def _authoring_ui_supplement_evidence(
 
 
 def _preferred_route(contract: ExecutionContract) -> str:
-    return {
-        "excluded": "unsupported_boundary",
-        "fixed_command": "fixed_command",
-        "bounded_call": "manifest_dispatch",
-        "bounded_topic_wait": "bounded_topic_wait",
-        "transaction": "transaction_operation",
-        "managed_transaction": "transaction_operation",
-        "isolated_transaction": "transaction_operation",
-        "compound_transaction_member": "transaction_operation",
-    }[contract.route]
+    return _EXECUTION_ROUTE_TO_PREFERRED_ROUTE[contract.route]
 
 
 def _validate_execution_contract_invariant(
@@ -767,13 +772,25 @@ def _schema_summary(status: str, schema: Mapping[str, Any]) -> dict[str, Any]:
 
 def _count_summary(entries: Iterable[CapabilityRecord]) -> dict[str, Any]:
     rows = list(entries)
+    preferred_route_counts = Counter(entry.preferred_route for entry in rows)
+    unknown_preferred_routes = set(preferred_route_counts) - set(
+        _PREFERRED_ROUTE_KEYS
+    )
+    if unknown_preferred_routes:
+        raise CapabilityCatalogError(
+            "Capability summary contains unclassified preferred routes: "
+            f"{sorted(unknown_preferred_routes)!r}"
+        )
     return {
         "total": len(rows),
         "functions": sum(entry.item_type == "function" for entry in rows),
         "topics": sum(entry.item_type == "topic" for entry in rows),
         "schema_status": dict(sorted(Counter(entry.schema_status for entry in rows).items())),
         "interface_status": dict(sorted(Counter(entry.safety.interface_status for entry in rows).items())),
-        "preferred_routes": dict(sorted(Counter(entry.preferred_route for entry in rows).items())),
+        "preferred_routes": {
+            route: preferred_route_counts.get(route, 0)
+            for route in _PREFERRED_ROUTE_KEYS
+        },
         "semantic_families": dict(sorted(Counter(entry.semantic_family or "none" for entry in rows).items())),
         "behavioral_registry_status": dict(
             sorted(Counter(str(entry.evidence.get("registry_status")) for entry in rows).items())

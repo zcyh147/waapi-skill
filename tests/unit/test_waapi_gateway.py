@@ -1981,6 +1981,12 @@ def test_capability_matrix_is_available_offline_without_config_or_client(tmp_pat
         "transaction_operation": 540,
         "unsupported_boundary": 6,
     }
+    assert payload["summary"]["by_version"]["2024.1"]["preferred_routes"][
+        "unsupported_boundary"
+    ] == 0
+    assert payload["summary"]["by_version"]["2025.1"]["preferred_routes"][
+        "unsupported_boundary"
+    ] == 0
     assert payload["match_count"] == 814
     assert payload["returned_count"] == 0
     assert payload["truncated"] is False

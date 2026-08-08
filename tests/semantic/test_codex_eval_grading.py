@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import json
+import shutil
 from dataclasses import FrozenInstanceError, replace
 from pathlib import Path
 
 import pytest
 
-from tests.semantic.support.codex_eval_grading import _allowed_read_sequences, grade_eval_session
+from tests.semantic.support.codex_eval_grading import (
+    _allowed_read_sequences,
+    grade_eval_session,
+)
 from tests.semantic.support.codex_eval_suite import (
     BOUNDARY_CASE_IDS,
     SUPPORTED_VERSIONS,
@@ -43,12 +47,15 @@ def _session(case_id: str, phase: str) -> EvalSession:
 
 def _payloads(session: EvalSession) -> tuple[dict[str, object], ...]:
     if session.case.id == "C1":
+        unsupported_by_version = dict(
+            zip(SUPPORTED_VERSIONS, (2, 2, 2, 0, 0), strict=True)
+        )
         by_version = {
             version: {
                 "total": 100 + index,
                 "preferred_routes": {
                     "transaction_operation": 10 + index,
-                    "unsupported_boundary": 20 + index,
+                    "unsupported_boundary": unsupported_by_version[version],
                 },
             }
             for index, version in enumerate(SUPPORTED_VERSIONS)
@@ -912,6 +919,27 @@ def test_c1_requires_exact_five_version_summary_and_final_metrics(tmp_path: Path
     grade = _grade(session, missing_final, evidence, reconciliation, paths)
     assert "all_versions_reported" in grade.failed_gate_ids
 
+    payload = evidence.records[0].payload
+    summary = payload["summary"]
+    by_version = summary["by_version"]
+    routes_without_zero = dict(by_version["2025.1"]["preferred_routes"])
+    del routes_without_zero["unsupported_boundary"]
+    malformed_by_version = {
+        **by_version,
+        "2025.1": {
+            **by_version["2025.1"],
+            "preferred_routes": routes_without_zero,
+        },
+    }
+    malformed_payload = {
+        **payload,
+        "summary": {**summary, "by_version": malformed_by_version},
+    }
+    malformed_record = replace(evidence.records[0], payload=malformed_payload)
+    malformed_evidence = replace(evidence, records=(malformed_record,))
+    grade = _grade(session, result, malformed_evidence, reconciliation, paths)
+    assert "all_versions_reported" in grade.failed_gate_ids
+
 
 @pytest.mark.parametrize("case_id", ("B1", "B2", "B3", "B4", "B5", "B6", "B7"))
 def test_boundaries_require_schema_only_payload_and_exact_strict_final(
@@ -980,6 +1008,100 @@ def test_matching_session_version_assignment_reconciles_but_wrong_version_fails(
     grade = _grade(session, replace(result, command_facts=wrong_facts), evidence, reconciliation, paths)
     assert "gateway_only_no_ad_hoc_code" in grade.failed_gate_ids
     assert "gateway_result_v1_parsed" in grade.failed_gate_ids
+
+
+def test_c1_grader_binds_detached_invocation_to_canonical_skill(
+    tmp_path: Path,
+) -> None:
+    session = _session("C1", "single")
+    result, evidence, reconciliation, paths = _make_bundle(tmp_path, session)
+    detached_skill = (
+        paths["workspace"] / ".agents" / "skills" / "waapi-skill"
+    )
+    shutil.copytree(paths["skill"], detached_skill)
+    detached_runner = detached_skill / "scripts" / "run.py"
+    payload = evidence.records[0].payload
+    commands = (
+        _command_record(
+            ("cat", str(detached_skill / "SKILL.md")),
+            (detached_skill / "SKILL.md").read_text(encoding="utf-8"),
+        ),
+        _command_record(
+            (
+                "cat",
+                str(detached_skill / "references" / "waapi-coverage.md"),
+            ),
+            (detached_skill / "references" / "waapi-coverage.md").read_text(
+                encoding="utf-8"
+            ),
+        ),
+        _command_record(
+            (
+                "python",
+                str(detached_runner),
+                "gateway.py",
+                "capabilities",
+                "--all-versions",
+                "--summary-only",
+            ),
+            json.dumps(payload),
+        ),
+    )
+    command_facts = classify_commands(
+        commands,
+        skill_source=detached_skill,
+        expected_gateway_subcommands=session.gateway_steps,
+    )
+    detached_result = replace(result, command_facts=command_facts)
+    normalized = (
+        "python",
+        str(detached_runner),
+        "gateway.py",
+        "capabilities",
+        "--all-versions",
+        "--summary-only",
+    )
+    detached_record = replace(
+        evidence.records[0],
+        model_argv=normalized,
+        normalized_model_argv=normalized,
+        gateway_arguments=(
+            "capabilities",
+            "--all-versions",
+            "--summary-only",
+        ),
+    )
+    detached_evidence = replace(evidence, records=(detached_record,))
+
+    grade = grade_eval_session(
+        session,
+        detached_result,
+        detached_evidence,
+        reconciliation,
+        workspace=paths["workspace"],
+        skill_source=paths["skill"],
+        invocation_skill_source=detached_skill,
+        broker_state_directory=paths["state"],
+        broker_evidence_directory=paths["evidence"],
+        runner_oracle=_oracle(session),
+    )
+    assert grade.passed is True
+
+    third_skill = tmp_path / "untrusted" / "waapi-skill"
+    unbound_grade = grade_eval_session(
+        session,
+        detached_result,
+        detached_evidence,
+        reconciliation,
+        workspace=paths["workspace"],
+        skill_source=paths["skill"],
+        invocation_skill_source=third_skill,
+        broker_state_directory=paths["state"],
+        broker_evidence_directory=paths["evidence"],
+        runner_oracle=_oracle(session),
+    )
+    assert "gateway_only_no_ad_hoc_code" in unbound_grade.failed_gate_ids
+    assert "gateway_result_v1_parsed" in unbound_grade.failed_gate_ids
 
 
 @pytest.mark.parametrize("case_id", ("R1", "R2", "R3", "R4", "R5", "R6"))

@@ -304,9 +304,27 @@ def test_catalog_summary_reconciles_all_five_version_totals() -> None:
         "unsupported_boundary": 6,
     }
     assert "semantic_builder" not in summary["totals"]["preferred_routes"]
+    unsupported_by_version = {
+        "2021.1": 2,
+        "2022.1": 2,
+        "2023.1": 2,
+        "2024.1": 0,
+        "2025.1": 0,
+    }
+    preferred_route_keys = set(summary["totals"]["preferred_routes"])
     for version, (functions, topics) in EXPECTED_COUNTS.items():
-        assert summary["by_version"][version]["functions"] == functions
-        assert summary["by_version"][version]["topics"] == topics
+        version_summary = summary["by_version"][version]
+        assert version_summary["functions"] == functions
+        assert version_summary["topics"] == topics
+        assert set(version_summary["preferred_routes"]) == preferred_route_keys
+        assert (
+            version_summary["preferred_routes"]["unsupported_boundary"]
+            == unsupported_by_version[version]
+        )
+        assert (
+            sum(version_summary["preferred_routes"].values())
+            == version_summary["total"]
+        )
 
 
 def test_all_semantic_read_records_resolve_to_public_gateway_routes() -> None:

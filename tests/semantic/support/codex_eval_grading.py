@@ -134,6 +134,7 @@ def grade_eval_session(
     *,
     workspace: Path,
     skill_source: Path,
+    invocation_skill_source: Path | None = None,
     broker_state_directory: Path,
     broker_evidence_directory: Path,
     runner_oracle: Mapping[str, Any],
@@ -171,6 +172,11 @@ def grade_eval_session(
         result,
         broker_evidence,
         skill_source=skill_path,
+        invocation_skill_source=(
+            _absolute(invocation_skill_source)
+            if invocation_skill_source is not None
+            else None
+        ),
         expected_wwise_version=session.version,
     )
     broker_integrity = _broker_integrity(
@@ -425,6 +431,7 @@ def _commands_have_safe_read_prefix_and_exact_broker_suffix(
     broker_evidence: GatewayBrokerEvidence,
     *,
     skill_source: Path,
+    invocation_skill_source: Path | None,
     expected_wwise_version: str,
 ) -> bool:
     """Prove command provenance without conflating it with lane-read policy.
@@ -450,6 +457,7 @@ def _commands_have_safe_read_prefix_and_exact_broker_suffix(
         normalized = _normalized_gateway_record(
             record,
             skill_source=skill_source,
+            invocation_skill_source=invocation_skill_source,
             expected_wwise_version=expected_wwise_version,
         )
         if normalized is None:
@@ -479,6 +487,7 @@ def _normalized_gateway_record(
     record: CodexCommandRecord,
     *,
     skill_source: Path,
+    invocation_skill_source: Path | None = None,
     expected_wwise_version: str,
 ) -> tuple[str, ...] | None:
     argv = normalized_gateway_command_argv(
@@ -490,13 +499,18 @@ def _normalized_gateway_record(
     interpreter = Path(argv[0]).name
     if interpreter not in {"python", "python3"}:
         return None
-    expected_runner = _absolute_lexical(skill_source / "scripts" / "run.py")
+    allowed_runners = {
+        _absolute_lexical(source / "scripts" / "run.py")
+        for source in (skill_source, invocation_skill_source)
+        if source is not None
+    }
     supplied_runner = Path(argv[1]).expanduser()
-    if not supplied_runner.is_absolute() or _absolute_lexical(supplied_runner) != expected_runner:
+    normalized_runner = _absolute_lexical(supplied_runner)
+    if not supplied_runner.is_absolute() or normalized_runner not in allowed_runners:
         return None
     if argv[2] != "gateway.py":
         return None
-    return (interpreter, str(expected_runner), "gateway.py", *argv[3:])
+    return (interpreter, str(normalized_runner), "gateway.py", *argv[3:])
 
 
 def _broker_integrity(
