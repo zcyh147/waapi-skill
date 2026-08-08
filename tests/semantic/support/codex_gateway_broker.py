@@ -4115,7 +4115,6 @@ def _windows_command_shim_source(interpreter_name: str) -> bytes:
             f"$PSScriptRoot, '{WINDOWS_SHIM_SCRIPT_NAME}')"
         ),
         "try {",
-        "    $LASTEXITCODE = $null",
         f"    & $trustedPython $brokerShim '{interpreter_name}' @args",
         "    if ($null -eq $LASTEXITCODE) { [System.Environment]::Exit(125) }",
         "    [System.Environment]::Exit([int]$LASTEXITCODE)",

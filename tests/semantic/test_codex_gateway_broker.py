@@ -3334,7 +3334,7 @@ def test_broker_materializes_closed_windows_powershell_shims_and_overlay(
             assert b"$ErrorActionPreference = 'Stop'" in raw
             assert b"$PSNativeCommandArgumentPassing = 'Standard'" in raw
             assert b"$PSNativeCommandUseErrorActionPreference = $false" in raw
-            assert b"$LASTEXITCODE = $null" in raw
+            assert b"$LASTEXITCODE = $null" not in raw
             assert raw.count(b"[System.Environment]::Exit(") == 4
             assert b" exit " not in raw
             interpreter_name = Path(name).stem.encode("ascii")
