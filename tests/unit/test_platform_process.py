@@ -20,6 +20,13 @@ def _windows_launcher_files(tmp_path: Path) -> tuple[Path, Path, Path]:
     return interpreter, command_directory, shim
 
 
+def _powershell_executable(tmp_path: Path) -> Path:
+    executable = tmp_path / "PowerShell" / "7" / "pwsh.exe"
+    executable.parent.mkdir(parents=True)
+    executable.write_bytes(b"pwsh")
+    return executable
+
+
 def test_posix_model_command_executes_original_argv() -> None:
     command = ("python", "/tmp/skill/scripts/run.py", "gateway.py", "status")
 
@@ -171,4 +178,127 @@ def test_run_model_argv_owns_shell_and_environment_options(
             windows_interpreter=interpreter,
             windows_command_directory=command_directory,
             shell=True,
+        )
+
+
+def test_windows_powershell_model_command_uses_exact_closed_transport(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    executable = _powershell_executable(tmp_path)
+    working_directory = tmp_path / "Agent Workspace"
+    working_directory.mkdir()
+    observed: dict[str, object] = {}
+
+    def fake_run(argv, **kwargs):  # type: ignore[no-untyped-def]
+        observed["argv"] = tuple(argv)
+        observed.update(kwargs)
+        return subprocess.CompletedProcess(argv, 0, "{\"ok\":true}", "")
+
+    monkeypatch.setattr(platform_process.subprocess, "run", fake_run)
+    environment = {"PATH": r"C:\closed broker", "BROKER_TOKEN": "secret"}
+    model_command = "python 'C:\\Skill path\\run.py' 'gateway.py' 'status'"
+
+    completed = platform_process.run_windows_powershell_model_command(
+        model_command,
+        powershell_executable=executable,
+        environment=environment,
+        cwd=working_directory,
+    )
+
+    assert completed.returncode == 0
+    assert observed["argv"] == (
+        str(executable),
+        "-NoProfile",
+        "-Command",
+        model_command,
+    )
+    assert observed["cwd"] == working_directory
+    assert observed["env"] == environment
+    assert observed["shell"] is False
+    assert observed["stdout"] is subprocess.PIPE
+    assert observed["stderr"] is subprocess.PIPE
+    assert observed["text"] is True
+    assert observed["encoding"] == "utf-8"
+    assert observed["errors"] == "strict"
+    assert observed["timeout"] == 30
+    assert observed["check"] is False
+
+
+@pytest.mark.parametrize(
+    "model_command",
+    ("", "python\0status", b"python status", "python 'runner.py';whoami"),
+)
+def test_windows_powershell_model_command_rejects_invalid_script(
+    tmp_path: Path,
+    model_command: object,
+) -> None:
+    executable = _powershell_executable(tmp_path)
+
+    with pytest.raises(platform_process.PlatformProcessError, match="model command"):
+        platform_process.run_windows_powershell_model_command(  # type: ignore[arg-type]
+            model_command,
+            powershell_executable=executable,
+            environment={},
+            cwd=tmp_path,
+        )
+
+
+def test_windows_powershell_model_command_rejects_relative_executable(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(platform_process.PlatformProcessError, match="absolute"):
+        platform_process.run_windows_powershell_model_command(
+            "python 'runner.py'",
+            powershell_executable=Path("pwsh.exe"),
+            environment={},
+            cwd=tmp_path,
+        )
+
+
+@pytest.mark.parametrize("invalid_name", ("powershell.exe", "pwsh.cmd"))
+def test_windows_powershell_model_command_rejects_non_pwsh_executable(
+    tmp_path: Path,
+    invalid_name: str,
+) -> None:
+    executable = tmp_path / invalid_name
+    executable.write_bytes(b"not pwsh")
+
+    with pytest.raises(platform_process.PlatformProcessError, match="exact pwsh.exe"):
+        platform_process.run_windows_powershell_model_command(
+            "python 'runner.py'",
+            powershell_executable=executable,
+            environment={},
+            cwd=tmp_path,
+        )
+
+
+@pytest.mark.parametrize("reparse_target", ("executable", "cwd"))
+def test_windows_powershell_model_command_rejects_reparse_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    reparse_target: str,
+) -> None:
+    executable = _powershell_executable(tmp_path)
+    working_directory = tmp_path / "Agent Workspace"
+    working_directory.mkdir()
+    original_lstat = Path.lstat
+
+    def fake_lstat(path: Path):
+        metadata = original_lstat(path)
+        target = executable if reparse_target == "executable" else working_directory
+        if path == target:
+            return SimpleNamespace(
+                st_mode=metadata.st_mode,
+                st_file_attributes=0x400,
+            )
+        return metadata
+
+    monkeypatch.setattr(Path, "lstat", fake_lstat)
+    with pytest.raises(platform_process.PlatformProcessError, match="reparse"):
+        platform_process.run_windows_powershell_model_command(
+            "python 'runner.py'",
+            powershell_executable=executable,
+            environment={},
+            cwd=working_directory,
         )

@@ -10,7 +10,6 @@ from typing import Mapping
 import pytest
 
 from tests.semantic.support.codex_gateway_broker import (
-    BoundedIntegerArgument,
     GatewayDerivedReferenceActivationAllowance,
     MetadataBoundJsonArgument,
     MetadataTokenProjection,
@@ -430,7 +429,7 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
     ]
     assert [step.arguments[-2:] for step in metadata_steps] == [
         ("--limit", "2"),
-        ("--limit", BoundedIntegerArgument(1, 8)),
+        ("--limit", "8"),
     ]
     assert protocol.commutative_read_only_step_groups == (
         ("tx02.operation-schema", "tx02.metadata"),

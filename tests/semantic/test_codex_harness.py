@@ -14,7 +14,11 @@ from typing import Mapping, Sequence
 import pytest
 
 from tests.support.platform_filesystem import create_symlink_or_skip
-from wwise_waapi.platform_commands import encode_windows_powershell_argv
+from tests.support.platform_process import run_windows_powershell_model_command
+from wwise_waapi.platform_commands import (
+    encode_windows_model_argv,
+    encode_windows_powershell_argv,
+)
 from .support import codex_harness as codex_harness_module
 from .support.codex_harness import (  # pyright: ignore[reportMissingImports]
     CodexCliHarness,
@@ -36,6 +40,7 @@ from .support.codex_harness import (  # pyright: ignore[reportMissingImports]
     count_invalid_jsonl_lines,
     discover_windows_powershell_core,
     final_agent_message,
+    gateway_continuation_binding_errors,
     gateway_runtime_apis,
     inspect_isolated_environment,
     is_link_or_junction,
@@ -65,6 +70,7 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
     CodexGatewayBroker,
     ExpectedGatewayStep,
     GATEWAY_REQUIRED_ENV,
+    SemanticJsonArgument,
     SHIM_TRUSTED_PYTHON_ENV,
 )
 
@@ -77,6 +83,53 @@ _WINDOWS_POWERSHELL_CORE_HOST = WindowsPowerShellCoreHost(
     native_argument_passing="Windows",
     sha256="a" * 64,
 )
+
+
+def _closed_next_command(
+    full_argv: Sequence[str],
+    *,
+    platform_name: str,
+    select_model_command: bool = True,
+) -> dict[str, object]:
+    gateway_argv = list(full_argv[3:])
+    next_command: dict[str, object] = {
+        "contract": "waapi-skill.gateway-next-command/v2",
+        "command": gateway_argv[0],
+        "gateway_argv": gateway_argv,
+        "full_argv": list(full_argv),
+        "copy_exactly": True,
+        "shell_family": (
+            "windows-powershell-encoded" if platform_name == "nt" else "posix-sh"
+        ),
+    }
+    model_command: str | None = None
+    if platform_name == "nt":
+        shell_command = encode_windows_powershell_argv(full_argv)
+        if select_model_command:
+            model_command = encode_windows_model_argv(full_argv)
+            next_command["shell_command"] = shell_command
+            next_command["model_shell_family"] = "windows-pwsh-literal-v1"
+    else:
+        shell_command = shlex.join(full_argv)
+    next_command["copy_instruction"] = {
+        "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+        "source_field": (
+            "model_command" if model_command is not None else "shell_command"
+        ),
+        "action": "execute_verbatim_as_one_shell_tool_call",
+        "forbidden_transformations": [
+            "reconstruct",
+            "shorten",
+            "normalize",
+            "substitute_path_segments",
+            "select_another_field",
+        ],
+    }
+    if model_command is not None:
+        next_command["model_command"] = model_command
+    else:
+        next_command["shell_command"] = shell_command
+    return next_command
 
 
 def windows_powershell_recording(script: str, *, executable: str = _WINDOWS_POWERSHELL_CORE) -> str:
@@ -146,6 +199,206 @@ def completed_record(
         has_shell_operators=has_operators,
         parse_error=parse_error,
     )
+
+
+def test_response_derived_posix_continuation_binds_exact_inner_script() -> None:
+    full_argv = (
+        "python",
+        "/tmp/Skill Path/scripts/run.py",
+        "gateway.py",
+        "confirm",
+        "tx-1",
+    )
+    next_command = _closed_next_command(full_argv, platform_name="posix")
+    payload = {"next_command": next_command}
+    selected = str(next_command["shell_command"])
+    prior = completed_record("python initial.py", payload)
+    current_command = shlex.join(("/bin/bash", "-lc", selected))
+    current = CodexCommandRecord(
+        command=current_command,
+        exit_code=0,
+        status="completed",
+        aggregated_output="{}",
+        argv=tuple(shlex.split(selected)),
+        has_shell_operators=False,
+        parser_kind="posix-shell",
+    )
+
+    errors = gateway_continuation_binding_errors(
+        (prior, current),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="posix",
+    )
+
+    assert errors == ()
+
+
+def test_response_derived_windows_model_command_binds_exact_inner_script() -> None:
+    full_argv = (
+        "python",
+        r"C:\Agent Workspace\.agents\skills\waapi-skill\scripts\run.py",
+        "gateway.py",
+        "confirm",
+        "tx-1",
+    )
+    next_command = _closed_next_command(full_argv, platform_name="nt")
+    payload = {"next_command": next_command}
+    selected = str(next_command["model_command"])
+    prior = completed_windows_record(
+        windows_powershell_recording("python initial.py"),
+        payload,
+    )
+    current = completed_windows_record(
+        shlex.join(
+            (
+                _WINDOWS_POWERSHELL_CORE_HOST.executable,
+                "-NoProfile",
+                "-Command",
+                selected,
+            )
+        ),
+        {},
+    )
+
+    errors = gateway_continuation_binding_errors(
+        (prior, current),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="nt",
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+    )
+
+    assert errors == ()
+
+
+def test_response_derived_windows_fallback_binds_exact_encoded_script() -> None:
+    full_argv = (
+        "python",
+        r"C:\Agent Workspace\.agents\skills\waapi-skill\scripts\run.py",
+        "gateway.py",
+        "confirm",
+        "x" * 1100,
+    )
+    next_command = _closed_next_command(
+        full_argv,
+        platform_name="nt",
+        select_model_command=False,
+    )
+    payload = {"next_command": next_command}
+    selected = str(next_command["shell_command"])
+    prior = completed_windows_record(
+        windows_powershell_recording("python initial.py"),
+        payload,
+    )
+    current = completed_windows_record(
+        shlex.join(
+            (
+                _WINDOWS_POWERSHELL_CORE_HOST.executable,
+                "-NoProfile",
+                "-Command",
+                selected,
+            )
+        ),
+        {},
+    )
+
+    errors = gateway_continuation_binding_errors(
+        (prior, current),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="nt",
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+    )
+
+    assert errors == ()
+
+
+@pytest.mark.parametrize(
+    "tamper",
+    (
+        "legacy_field",
+        "equivalent_requote",
+        "missing_copy_instruction",
+        "missing_selected_field",
+        "invalid_source_field",
+        "prior_output_mismatch",
+        "wrong_outer_wrapper",
+    ),
+)
+def test_response_derived_windows_continuation_fails_closed(
+    tamper: str,
+) -> None:
+    confirmation_token = "ct1-0123456789abcdefghjkmnpq"
+    full_argv = (
+        "python",
+        r"C:\Agent Workspace\.agents\skills\waapi-skill\scripts\run.py",
+        "gateway.py",
+        "confirm",
+        "tx-1",
+        "--confirmation-token",
+        confirmation_token,
+    )
+    next_command = _closed_next_command(full_argv, platform_name="nt")
+    payload = {"next_command": next_command}
+    observed = str(next_command["model_command"])
+    prior_payload: Mapping[str, object] = payload
+    if tamper == "legacy_field":
+        observed = str(next_command["shell_command"])
+    elif tamper == "equivalent_requote":
+        observed = (
+            "python 'C:\\Agent Workspace\\.agents\\skills\\waapi-skill\\scripts\\run.py' "
+            "gateway.py confirm tx-1 --confirmation-token "
+            f"{confirmation_token}"
+        )
+    elif tamper == "missing_copy_instruction":
+        del next_command["copy_instruction"]
+    elif tamper == "missing_selected_field":
+        del next_command["model_command"]
+    elif tamper == "invalid_source_field":
+        instruction = next_command["copy_instruction"]
+        assert isinstance(instruction, dict)
+        instruction["source_field"] = "shell_command"
+    elif tamper == "prior_output_mismatch":
+        prior_payload = {"next_command": {**next_command, "command": "execute"}}
+    prior = completed_windows_record(
+        windows_powershell_recording("python initial.py"),
+        prior_payload,
+    )
+    current = completed_windows_record(
+        (
+            observed
+            if tamper == "wrong_outer_wrapper"
+            else shlex.join(
+                (
+                    _WINDOWS_POWERSHELL_CORE_HOST.executable,
+                    "-NoProfile",
+                    "-Command",
+                    observed,
+                )
+            )
+        ),
+        {},
+    )
+
+    errors = gateway_continuation_binding_errors(
+        (prior, current),
+        (SimpleNamespace(payload=payload), SimpleNamespace(payload={})),
+        platform_name="nt",
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+    )
+
+    assert len(errors) == 1
+    assert errors[0].startswith("command 2: ")
+    assert "tx-1" not in errors[0]
+    assert confirmation_token not in errors[0]
+
+
+def test_model_authored_command_without_prior_continuation_is_unchanged() -> None:
+    record = completed_record("python initial.py", {})
+
+    assert gateway_continuation_binding_errors(
+        (record,),
+        (SimpleNamespace(payload={}),),
+        platform_name="posix",
+    ) == ()
 
 
 def passing_prompt_audit() -> codex_harness_module.CodexPromptAudit:
@@ -2366,6 +2619,67 @@ def test_windows_powershell_recording_preserves_canonical_encoded_continuation(
     )[3] == "windows-powershell-encoded"
 
 
+def test_windows_powershell_recording_recovers_generated_model_command_exactly(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module,
+        "split_native_command_line",
+        portable_windows_outer_split,
+    )
+    expected = (
+        "python",
+        r"C:\Skill path\scripts\run.py",
+        "gateway.py",
+        "transaction-show",
+        "tx1-quote'and-$env:TEMP&pipe|你好",
+    )
+    model_command = encode_windows_model_argv(expected)
+    recorded_command = windows_powershell_recording(model_command)
+
+    argv, has_operators, parse_error, parser_kind = (
+        codex_harness_module._parse_command_argv(
+            recorded_command,
+            platform_name="nt",
+            windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+        )
+    )
+
+    assert argv == expected
+    assert has_operators is False
+    assert parse_error == ""
+    assert parser_kind == "windows-pwsh-command"
+
+
+@pytest.mark.parametrize("quote", tuple(chr(value) for value in range(0x2018, 0x2020)))
+@pytest.mark.parametrize("position", ("bare", "literal"))
+def test_windows_powershell_recording_rejects_every_smart_quote(
+    quote: str,
+    position: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module,
+        "split_native_command_line",
+        portable_windows_outer_split,
+    )
+    script = (
+        f"python run{quote}.py"
+        if position == "bare"
+        else f"python 'run{quote}.py'"
+    )
+
+    argv, has_operators, parse_error = parse_command_argv(
+        windows_powershell_recording(script),
+        platform_name="nt",
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+    )
+
+    assert argv == ()
+    assert has_operators is True
+    assert parse_error == "PowerShell smart quotes are not permitted"
+
+
 def test_windows_wrapped_encoded_get_content_cannot_claim_relative_skill_read(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -2864,6 +3178,89 @@ def test_native_windows_powershell_core_wraps_encoded_continuation(
         command,
         windows_powershell_core_host=host,
     ) == (expected, False, "")
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows pwsh/Broker argv proof")
+def test_native_windows_generated_model_command_reconciles_exact_broker_argv(
+    tmp_path: Path,
+) -> None:
+    host = discover_windows_powershell_core(platform_name="nt")
+    skill = tmp_path / "WAAPI Skill"
+    scripts = skill / "scripts"
+    scripts.mkdir(parents=True)
+    (scripts / "run.py").write_text(
+        "import json, sys\n"
+        "print(json.dumps({\n"
+        "    'contract': 'waapi-skill.gateway-result/v1',\n"
+        "    'command': sys.argv[2],\n"
+        "    'ok': True,\n"
+        "}, ensure_ascii=False, separators=(',', ':')))\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "operation": "object.create",
+        "arguments": {
+            "name": "Rifle's $env:TEMP & pipe|redirect<out> 你好",
+            "parent": {"kind": "path", "value": r"\Actor-Mixer Hierarchy\Default Work Unit"},
+        },
+    }
+    request_json = json.dumps(request, ensure_ascii=False, separators=(",", ":"))
+    expected_step = ExpectedGatewayStep(
+        "preview",
+        "preview",
+        ("--request-json", SemanticJsonArgument(request)),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(expected_step,),
+        transport="tcp",
+    ) as broker:
+        expected = (
+            "python",
+            str(broker.invocation_runner_path),
+            "gateway.py",
+            "preview",
+            "--request-json",
+            request_json,
+        )
+        model_command = encode_windows_model_argv(expected)
+        completed = run_windows_powershell_model_command(
+            model_command,
+            powershell_executable=Path(host.executable),
+            cwd=tmp_path,
+            environment=broker.model_environment(os.environ),
+        )
+
+        assert completed.returncode == 0, completed.stderr
+        recorded_command = windows_powershell_recording(
+            model_command,
+            executable=host.executable,
+        )
+        record = completed_command_records(
+            (
+                {
+                    "type": "item.completed",
+                    "item": {
+                        "type": "command_execution",
+                        "command": recorded_command,
+                        "exit_code": completed.returncode,
+                        "status": "completed",
+                        "aggregated_output": completed.stdout,
+                    },
+                },
+            ),
+            platform_name="nt",
+            windows_powershell_core_host=host,
+        )[0]
+
+        assert record.argv == expected
+        assert record.has_shell_operators is False
+        assert record.parse_error == ""
+        assert record.parser_kind == "windows-pwsh-command"
+        assert broker.reconcile((record.argv,)).passed is True
 
 
 @pytest.mark.skipif(os.name != "nt", reason="native Windows pwsh argv transport proof")

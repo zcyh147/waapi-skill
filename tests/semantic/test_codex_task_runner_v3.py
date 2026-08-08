@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shlex
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -94,6 +95,83 @@ def test_common_grade_accepts_first_and_resumed_turn_shapes() -> None:
         )
         assert errors == ()
         assert all(gates.values())
+
+
+def test_task_reconciliation_rejects_equivalent_requoted_continuation() -> None:
+    full_argv = (
+        "python",
+        "/tmp/Skill Path/scripts/run.py",
+        "gateway.py",
+        "confirm",
+        "tx-1",
+    )
+    selected = shlex.join(full_argv)
+    next_command = {
+        "contract": "waapi-skill.gateway-next-command/v2",
+        "command": "confirm",
+        "gateway_argv": list(full_argv[3:]),
+        "full_argv": list(full_argv),
+        "copy_exactly": True,
+        "shell_family": "posix-sh",
+        "copy_instruction": {
+            "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+            "source_field": "shell_command",
+            "action": "execute_verbatim_as_one_shell_tool_call",
+            "forbidden_transformations": [
+                "reconstruct",
+                "shorten",
+                "normalize",
+                "substitute_path_segments",
+                "select_another_field",
+            ],
+        },
+        "shell_command": selected,
+    }
+    prior_payload = {"next_command": next_command}
+    prior = CodexCommandRecord(
+        command="/bin/bash -lc 'python initial.py'",
+        exit_code=0,
+        status="completed",
+        aggregated_output=json.dumps(prior_payload),
+        argv=("python", "initial.py"),
+        has_shell_operators=False,
+        parser_kind="posix-shell",
+    )
+    equivalent = (
+        "python '/tmp/Skill Path/scripts/run.py' 'gateway.py' 'confirm' 'tx-1'"
+    )
+    assert tuple(shlex.split(equivalent)) == full_argv
+    assert equivalent != selected
+    current = CodexCommandRecord(
+        command=shlex.join(("/bin/bash", "-lc", equivalent)),
+        exit_code=0,
+        status="completed",
+        aggregated_output="{}",
+        argv=full_argv,
+        has_shell_operators=False,
+        parser_kind="posix-shell",
+    )
+    evidence = SimpleNamespace(
+        accepted_records=(
+            SimpleNamespace(payload=prior_payload),
+            SimpleNamespace(payload={}),
+        )
+    )
+    raw = GatewayBrokerReconciliation(True, 2, 2, ())
+
+    reconciliation = task_runner._bind_gateway_prefix_reconciliation(
+        raw,
+        command_records=(prior, current),
+        broker_evidence=evidence,
+        platform_name="posix",
+    )
+
+    assert reconciliation.passed is False
+    assert reconciliation.observed_command_count == 2
+    assert reconciliation.accepted_record_count == 2
+    assert reconciliation.errors == (
+        "command 2: Gateway continuation was not copied from its selected source field",
+    )
 
 
 def test_reference_schedule_preserves_default_and_allows_alarm_lane_transition() -> None:
@@ -501,6 +579,10 @@ class _FakeBrokerEvidence:
             "INDETERMINATE" if terminal_indeterminate else "RUNNING"
         )
         self.terminal_indeterminate = terminal_indeterminate
+
+    @property
+    def accepted_records(self) -> tuple[SimpleNamespace, ...]:
+        return self.records
 
     def as_dict(self, *, include_output: bool = False) -> dict[str, object]:
         records: list[dict[str, object]] = [

@@ -32,6 +32,7 @@ from tests.semantic.support.codex_gateway_broker import (
 from tests.semantic.support.codex_filesystem_security import write_utf8_text_bytes
 from tests.semantic.support.codex_harness import (
     CodexCliTask,
+    CodexCommandRecord,
     CodexGatewayErrorExpectation,
     CodexHarnessConfig,
     CodexHarnessError,
@@ -39,6 +40,7 @@ from tests.semantic.support.codex_harness import (
     CodexInfrastructureFailure,
     CodexRunResult,
     WindowsPowerShellCoreHost,
+    gateway_continuation_binding_errors,
     normalized_gateway_command_argv,
     prepare_workspace_skill_install,
 )
@@ -280,6 +282,7 @@ def run_v3_codex_task(
     results: list[CodexRunResult] = []
     grades: list[V3TurnGrade] = []
     cumulative_gateway_argvs: list[tuple[str, ...]] = []
+    cumulative_gateway_records: list[CodexCommandRecord] = []
     previous_prefix = 0
     broker_evidence: GatewayBrokerEvidence | None = None
     infrastructure_error: CodexInfrastructureError | None = None
@@ -389,7 +392,14 @@ def run_v3_codex_task(
                         alternate_skill_sources=(skill_source,),
                         expected_wwise_version=version,
                     )
+                    turn_gateway_records = _gateway_candidate_records(
+                        result,
+                        skill_source=skill_install,
+                        alternate_skill_sources=(skill_source,),
+                        expected_wwise_version=version,
+                    )
                     cumulative_gateway_argvs.extend(turn_gateway)
+                    cumulative_gateway_records.extend(turn_gateway_records)
                     broker_evidence = broker.evidence()
                     terminal_indeterminate = bool(
                         getattr(broker_evidence, "terminal_indeterminate", False)
@@ -434,18 +444,13 @@ def run_v3_codex_task(
                             cumulative_gateway_argvs,
                             expected_step_count=effective_prefix,
                         )
-                        reconciliation = GatewayBrokerReconciliation(
-                            passed=raw_reconciliation.passed
-                            and not prefix_errors,
-                            observed_command_count=(
-                                raw_reconciliation.observed_command_count
-                            ),
-                            accepted_record_count=(
-                                raw_reconciliation.accepted_record_count
-                            ),
-                            errors=(
-                                *raw_reconciliation.errors,
-                                *prefix_errors,
+                        reconciliation = _bind_gateway_prefix_reconciliation(
+                            raw_reconciliation,
+                            command_records=cumulative_gateway_records,
+                            broker_evidence=broker_evidence,
+                            prefix_errors=prefix_errors,
+                            windows_powershell_core_host=(
+                                windows_powershell_core_host
                             ),
                         )
                     terminal_execute_exit2_count = _terminal_execute_exit2_count(
@@ -830,6 +835,67 @@ def _gateway_candidate_argvs(
         ):
             candidates.append(argv)
     return tuple(candidates)
+
+
+def _gateway_candidate_records(
+    result: CodexRunResult,
+    *,
+    skill_source: Path,
+    alternate_skill_sources: Sequence[Path] = (),
+    expected_wwise_version: str,
+) -> tuple[CodexCommandRecord, ...]:
+    """Keep raw Codex records for response-derived continuation binding."""
+
+    expected_runners = {
+        os.path.abspath(os.fspath(source / "scripts" / "run.py"))
+        for source in (skill_source, *alternate_skill_sources)
+    }
+    candidates: list[CodexCommandRecord] = []
+    for record in result.command_facts.command_records:
+        argv = normalized_gateway_command_argv(
+            record.argv,
+            expected_wwise_version=expected_wwise_version,
+        )
+        if (
+            len(argv) >= 4
+            and os.path.abspath(os.path.expanduser(argv[1])) in expected_runners
+            and argv[2] == "gateway.py"
+        ):
+            candidates.append(record)
+    return tuple(candidates)
+
+
+def _bind_gateway_prefix_reconciliation(
+    raw_reconciliation: GatewayBrokerReconciliation,
+    *,
+    command_records: Sequence[CodexCommandRecord],
+    broker_evidence: GatewayBrokerEvidence,
+    prefix_errors: Sequence[str] = (),
+    windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
+    platform_name: str | None = None,
+) -> GatewayBrokerReconciliation:
+    """Add exact response-derived command binding to argv reconciliation."""
+
+    continuation_errors = gateway_continuation_binding_errors(
+        command_records,
+        broker_evidence.accepted_records,
+        platform_name=platform_name,
+        windows_powershell_core_host=windows_powershell_core_host,
+    )
+    return GatewayBrokerReconciliation(
+        passed=(
+            raw_reconciliation.passed
+            and not prefix_errors
+            and not continuation_errors
+        ),
+        observed_command_count=raw_reconciliation.observed_command_count,
+        accepted_record_count=raw_reconciliation.accepted_record_count,
+        errors=(
+            *raw_reconciliation.errors,
+            *prefix_errors,
+            *continuation_errors,
+        ),
+    )
 
 
 def _prepare_agent_workspace(

@@ -6,6 +6,11 @@ tests deliberately use a bare ``python`` identity so the broker shim owns that
 name.  On Windows, launch that shim with its absolute trusted interpreter and
 pass the bare identity as data.  This preserves the broker-visible argv without
 putting model arguments through ``cmd.exe`` or another shell.
+
+The one native PowerShell transport proof starts an already-attested absolute
+``pwsh.exe`` directly through the closed helper below.  It accepts only the
+canonical bounded model-command grammar and does not expose a general shell
+execution seam.
 """
 
 from __future__ import annotations
@@ -17,9 +22,17 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from wwise_waapi.platform_commands import (
+    PlatformCommandError,
+    decode_windows_model_argv,
+)
+
 
 class PlatformProcessError(RuntimeError):
     """A model-facing command cannot be launched without changing its argv."""
+
+
+_WINDOWS_POWERSHELL_MODEL_TIMEOUT_SECONDS = 30
 
 
 def model_command_launcher_argv(
@@ -99,6 +112,59 @@ def run_model_argv(
     )
 
 
+def run_windows_powershell_model_command(
+    model_command: str,
+    *,
+    powershell_executable: Path,
+    environment: Mapping[str, str],
+    cwd: Path,
+) -> subprocess.CompletedProcess[str]:
+    """Run one generated model command through an exact attested pwsh path.
+
+    This is the narrow native-Windows test seam for proving Codex's outer
+    ``pwsh.exe -NoProfile -Command`` transport.  The caller supplies the
+    already-attested executable and complete child environment; this helper
+    rechecks the executable and working directory without resolving through
+    ``PATH`` or a reparse point and owns every subprocess transport option.
+    """
+
+    try:
+        decode_windows_model_argv(model_command)
+    except PlatformCommandError as exc:
+        raise PlatformProcessError(
+            f"PowerShell model command is not canonical: {exc}"
+        ) from exc
+    executable = Path(powershell_executable)
+    if executable.name.casefold() != "pwsh.exe":
+        raise PlatformProcessError(
+            "PowerShell model command requires an exact pwsh.exe executable"
+        )
+    _require_plain_path(
+        executable,
+        expect_directory=False,
+        label="PowerShell executable",
+    )
+    working_directory = Path(cwd)
+    _require_plain_path(
+        working_directory,
+        expect_directory=True,
+        label="PowerShell working directory",
+    )
+    return subprocess.run(
+        (str(executable), "-NoProfile", "-Command", model_command),
+        cwd=working_directory,
+        env=dict(environment),
+        shell=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="strict",
+        timeout=_WINDOWS_POWERSHELL_MODEL_TIMEOUT_SECONDS,
+        check=False,
+    )
+
+
 def _model_argv(value: Sequence[str]) -> tuple[str, ...]:
     if isinstance(value, (str, bytes)):
         raise PlatformProcessError("model argv must be a sequence of strings")
@@ -175,4 +241,5 @@ __all__ = [
     "PlatformProcessError",
     "model_command_launcher_argv",
     "run_model_argv",
+    "run_windows_powershell_model_command",
 ]

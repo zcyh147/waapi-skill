@@ -27,8 +27,12 @@ from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImp
     parse_operation_request,
 )
 from wwise_waapi.platform_commands import (  # pyright: ignore[reportMissingImports]
+    PlatformCommandError,
+    WINDOWS_MODEL_COMMAND_FAMILY,
     WINDOWS_POWERSHELL_ENCODED_FAMILY,
+    decode_windows_model_argv,
     decode_windows_powershell_argv,
+    encode_windows_model_argv,
     encode_windows_powershell_argv,
 )
 from wwise_waapi.transactions import TransactionState, TransactionStore
@@ -78,7 +82,7 @@ def expected_transaction_next_command(
         *normalized,
     ]
     expected: dict[str, Any] = {
-        "contract": "waapi-skill.gateway-next-command/v1",
+        "contract": "waapi-skill.gateway-next-command/v2",
         "command": command,
         "gateway_argv": normalized,
         "full_argv": full_argv,
@@ -91,21 +95,35 @@ def expected_transaction_next_command(
     if os.name == "nt":
         expected["shell_family"] = WINDOWS_POWERSHELL_ENCODED_FAMILY
         shell_command = encode_windows_powershell_argv(full_argv)
+        try:
+            model_command = encode_windows_model_argv(full_argv)
+        except PlatformCommandError:
+            model_command = None
     else:
         expected["shell_family"] = "posix-sh"
         shell_command = shlex.join(full_argv)
+        model_command = None
+    if model_command is not None:
+        expected["shell_command"] = shell_command
+        expected["model_shell_family"] = WINDOWS_MODEL_COMMAND_FAMILY
     expected["copy_instruction"] = {
-        "contract": "waapi-skill.gateway-command-copy-instruction/v1",
-        "source_field": "shell_command",
+        "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+        "source_field": (
+            "model_command" if model_command is not None else "shell_command"
+        ),
         "action": "execute_verbatim_as_one_shell_tool_call",
         "forbidden_transformations": [
             "reconstruct",
             "shorten",
             "normalize",
             "substitute_path_segments",
+            "select_another_field",
         ],
     }
-    expected["shell_command"] = shell_command
+    if model_command is not None:
+        expected["model_command"] = model_command
+    else:
+        expected["shell_command"] = shell_command
     return expected
 
 
@@ -2091,10 +2109,18 @@ def test_transaction_next_command_quotes_posix_shell_arguments_without_reconstru
     )
     assert shlex.split(payload["shell_command"]) == payload["full_argv"]
     assert payload["copy_instruction"]["source_field"] == "shell_command"
+    assert payload["copy_instruction"]["contract"] == (
+        "waapi-skill.gateway-command-copy-instruction/v2"
+    )
+    assert "select_another_field" in payload["copy_instruction"][
+        "forbidden_transformations"
+    ]
+    assert "model_command" not in payload
+    assert "model_shell_family" not in payload
     assert tuple(payload)[-2:] == ("copy_instruction", "shell_command")
 
 
-def test_transaction_next_command_keeps_one_copy_source_on_windows(
+def test_transaction_next_command_adds_one_short_copy_source_on_windows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(waapi_gateway, "os", type("WindowsOS", (), {"name": "nt"})())
@@ -2110,21 +2136,129 @@ def test_transaction_next_command_keeps_one_copy_source_on_windows(
     )
 
     assert payload["shell_family"] == WINDOWS_POWERSHELL_ENCODED_FAMILY
+    assert payload["shell_command"] == encode_windows_powershell_argv(
+        payload["full_argv"]
+    )
     assert decode_windows_powershell_argv(payload["shell_command"]) == tuple(
         payload["full_argv"]
     )
+    assert payload["model_shell_family"] == WINDOWS_MODEL_COMMAND_FAMILY
+    assert payload["model_command"] == (
+        "python 'C:\\WAAPI Skill\\scripts\\run.py' 'gateway.py' "
+        "'execute' 'tx1-windows'"
+    )
+    assert decode_windows_model_argv(payload["model_command"]) == tuple(
+        payload["full_argv"]
+    )
     assert payload["copy_instruction"] == {
-        "contract": "waapi-skill.gateway-command-copy-instruction/v1",
-        "source_field": "shell_command",
+        "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+        "source_field": "model_command",
         "action": "execute_verbatim_as_one_shell_tool_call",
         "forbidden_transformations": [
             "reconstruct",
             "shorten",
             "normalize",
             "substitute_path_segments",
+            "select_another_field",
         ],
     }
+    assert tuple(payload)[-4:] == (
+        "shell_command",
+        "model_shell_family",
+        "copy_instruction",
+        "model_command",
+    )
+
+    serialized = json.dumps(payload, ensure_ascii=False)
+    assert r"C:\\WAAPI Skill\\scripts\\run.py" in serialized
+    decoded_payload = json.loads(serialized)
+    assert decode_windows_model_argv(decoded_payload["model_command"]) == tuple(
+        decoded_payload["full_argv"]
+    )
+
+
+@pytest.mark.parametrize(
+    "runner_path",
+    (
+        PureWindowsPath("C:/Unsafe\u2018Skill/scripts/run.py"),
+        PureWindowsPath("C:/" + "x" * 1100 + "/run.py"),
+    ),
+)
+def test_transaction_next_command_falls_back_to_legacy_source_when_short_form_is_unsafe(
+    runner_path: PureWindowsPath,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(waapi_gateway, "os", type("WindowsOS", (), {"name": "nt"})())
+    monkeypatch.setattr(waapi_gateway, "GATEWAY_RUNNER_PATH", runner_path)
+
+    payload = waapi_gateway.transaction_next_command(
+        "execute",
+        ["execute", "tx1-windows"],
+    )
+
+    assert payload["contract"] == "waapi-skill.gateway-next-command/v2"
+    assert decode_windows_powershell_argv(payload["shell_command"]) == tuple(
+        payload["full_argv"]
+    )
+    assert payload["copy_instruction"]["source_field"] == "shell_command"
+    assert "select_another_field" in payload["copy_instruction"][
+        "forbidden_transformations"
+    ]
+    assert "model_command" not in payload
+    assert "model_shell_family" not in payload
     assert tuple(payload)[-2:] == ("copy_instruction", "shell_command")
+
+
+@pytest.mark.parametrize(
+    "command,gateway_argv",
+    (
+        (
+            "transaction-show",
+            ["transaction-show", "tx1-phase", "--summary-only"],
+        ),
+        (
+            "confirm",
+            [
+                "confirm",
+                "tx1-phase",
+                "--confirmation-token",
+                f"ct1-{'0' * 24}",
+            ],
+        ),
+        ("execute", ["execute", "tx1-phase"]),
+        ("verify", ["verify", "tx1-phase"]),
+    ),
+)
+def test_transaction_next_command_uses_the_v2_windows_shape_for_every_phase(
+    command: str,
+    gateway_argv: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(waapi_gateway, "os", type("WindowsOS", (), {"name": "nt"})())
+    monkeypatch.setattr(
+        waapi_gateway,
+        "GATEWAY_RUNNER_PATH",
+        PureWindowsPath(r"C:\WAAPI Skill\scripts\run.py"),
+    )
+
+    payload = waapi_gateway.transaction_next_command(command, gateway_argv)
+
+    assert payload["contract"] == "waapi-skill.gateway-next-command/v2"
+    assert payload["command"] == command
+    assert payload["gateway_argv"] == gateway_argv
+    assert decode_windows_powershell_argv(payload["shell_command"]) == tuple(
+        payload["full_argv"]
+    )
+    assert decode_windows_model_argv(payload["model_command"]) == tuple(
+        payload["full_argv"]
+    )
+    assert payload["copy_instruction"]["source_field"] == "model_command"
+    assert tuple(payload)[-4:] == (
+        "shell_command",
+        "model_shell_family",
+        "copy_instruction",
+        "model_command",
+    )
 
 
 def test_transaction_show_summary_compacts_large_graph_without_losing_exact_request() -> None:

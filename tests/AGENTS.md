@@ -91,9 +91,10 @@ unknown string by replacing slashes:
   separators and validate them with the owning parser instead of `pathlib`.
 - Model-facing subprocess tests on Windows must use
   `tests/support/platform_process.py`. Do not restore bare-PATH launch through
-  `cmd.exe`, `COMSPEC`, `shell=True`, or a hand-built command line; the helper
-  starts the attested Python and broker shim directly while keeping model argv
-  as data.
+  `cmd.exe`, `COMSPEC`, `shell=True`, or a hand-built command line. The ordinary
+  helper starts the attested Python and broker shim directly while keeping model
+  argv as data; the narrower PowerShell transport proof accepts only an already
+  attested absolute `pwsh.exe` and the canonical bounded model-command grammar.
 
 Add focused POSIX, Windows-drive, and UNC cases whenever a shared path boundary
 changes. At minimum cover case semantics, traversal, mixed separators, spaces,

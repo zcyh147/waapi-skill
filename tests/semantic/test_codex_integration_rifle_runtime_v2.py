@@ -726,6 +726,7 @@ def test_prepares_exact_metadata_bound_use_existing_batch(
     )
     assert METADATA_QUERIES == ("volume", "output bus")
     assert METADATA_TOKENS == ("Volume", "OutputBus")
+    assert prepared.protocol.steps[0].arguments[-2:] == ("--limit", "8")
     assert prepared.expected_dispatches[0].api == IMPORT_API
     assert prepared.expected_dispatches[0].count == 1
     assert len(prepared.before_snapshot.objects) == 10

@@ -53,7 +53,10 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
 )
 from wwise_waapi.transactions import confirmation_token_for
 from wwise_waapi.platform_commands import (
+    PlatformCommandError,
+    WINDOWS_MODEL_COMMAND_FAMILY,
     WINDOWS_POWERSHELL_ENCODED_FAMILY,
+    encode_windows_model_argv,
     encode_windows_powershell_argv,
 )
 
@@ -257,6 +260,8 @@ def fake_confirmation_token(transaction_id: str) -> str:
 def expected_fake_confirmation_next_command(
     runner_path: Path,
     transaction_id: str,
+    *,
+    platform_name: str | None = None,
 ) -> dict[str, object]:
     token = fake_confirmation_token(transaction_id)
     gateway_argv = (
@@ -272,32 +277,86 @@ def expected_fake_confirmation_next_command(
         *gateway_argv,
     )
     result: dict[str, object] = {
-        "contract": "waapi-skill.gateway-next-command/v1",
+        "contract": "waapi-skill.gateway-next-command/v2",
         "command": "confirm",
         "gateway_argv": list(gateway_argv),
         "full_argv": list(full_argv),
         "copy_exactly": True,
         "requires_explicit_user_confirmation": True,
     }
-    if os.name == "nt":
+    model_command: str | None = None
+    active_platform = os.name if platform_name is None else platform_name
+    if active_platform == "nt":
         result["shell_family"] = WINDOWS_POWERSHELL_ENCODED_FAMILY
         shell_command = encode_windows_powershell_argv(full_argv)
+        try:
+            model_command = encode_windows_model_argv(full_argv)
+        except PlatformCommandError:
+            model_command = None
     else:
         result["shell_family"] = "posix-sh"
         shell_command = shlex.join(full_argv)
+    if model_command is not None:
+        result["shell_command"] = shell_command
+        result["model_shell_family"] = WINDOWS_MODEL_COMMAND_FAMILY
     result["copy_instruction"] = {
-        "contract": "waapi-skill.gateway-command-copy-instruction/v1",
-        "source_field": "shell_command",
+        "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+        "source_field": (
+            "model_command" if model_command is not None else "shell_command"
+        ),
         "action": "execute_verbatim_as_one_shell_tool_call",
         "forbidden_transformations": [
             "reconstruct",
             "shorten",
             "normalize",
             "substitute_path_segments",
+            "select_another_field",
         ],
     }
-    result["shell_command"] = shell_command
+    if model_command is not None:
+        result["model_command"] = model_command
+    else:
+        result["shell_command"] = shell_command
     return result
+
+
+def test_response_bound_windows_continuation_selects_the_named_model_source(
+    tmp_path: Path,
+) -> None:
+    next_command = expected_fake_confirmation_next_command(
+        tmp_path / "Skill with spaces" / "scripts" / "run.py",
+        "tx-response-binding",
+        platform_name="nt",
+    )
+
+    source_field = next_command["copy_instruction"]["source_field"]
+    assert source_field == "model_command"
+    assert next_command[source_field] == next_command["model_command"]
+    assert next_command[source_field] != next_command["shell_command"]
+    assert tuple(next_command)[-4:] == (
+        "shell_command",
+        "model_shell_family",
+        "copy_instruction",
+        "model_command",
+    )
+
+
+def test_response_bound_windows_continuation_keeps_the_named_legacy_fallback(
+    tmp_path: Path,
+) -> None:
+    runner = tmp_path.joinpath(*(("long-segment",) * 100), "run.py")
+    next_command = expected_fake_confirmation_next_command(
+        runner,
+        "tx-response-binding",
+        platform_name="nt",
+    )
+
+    source_field = next_command["copy_instruction"]["source_field"]
+    assert source_field == "shell_command"
+    assert next_command[source_field] == next_command["shell_command"]
+    assert "model_command" not in next_command
+    assert "model_shell_family" not in next_command
+    assert tuple(next_command)[-2:] == ("copy_instruction", "shell_command")
 
 
 FAKE_RUNNER = r'''from __future__ import annotations
@@ -331,6 +390,31 @@ def windows_gateway_command(argv):
     )
     encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
     return "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand " + encoded
+
+def windows_model_command(argv):
+    if isinstance(argv, (str, bytes)) or not argv or argv[0] != "python":
+        raise ValueError("Windows model command requires the fixed python executable")
+    smart_quotes = {chr(value) for value in range(0x2018, 0x2020)}
+    for argument in argv:
+        if type(argument) is not str:
+            raise ValueError("Windows model argv items must be strings")
+        if any(
+            ord(character) < 32 or 0x7F <= ord(character) <= 0x9F
+            for character in argument
+        ):
+            raise ValueError("Windows model argv contains a control character")
+        if any(character in smart_quotes for character in argument):
+            raise ValueError("Windows model argv contains a smart quote")
+        argument.encode("utf-8", errors="strict")
+    command = "python"
+    if len(argv) > 1:
+        command += " " + " ".join(
+            "'" + argument.replace("'", "''") + "'"
+            for argument in argv[1:]
+        )
+    if len(command.encode("utf-8", errors="strict")) > 1024:
+        raise ValueError("Windows model command exceeds its byte bound")
+    return command
 
 state = Path(os.environ["WAAPI_SKILL_STATE_DIR"])
 state.mkdir(parents=True, exist_ok=True)
@@ -506,31 +590,44 @@ elif command == "transaction-show":
         "gateway.py",
         *gateway_argv,
     ]
-    payload["next_command"] = {
-        "contract": "waapi-skill.gateway-next-command/v1",
+    next_command = {
+        "contract": "waapi-skill.gateway-next-command/v2",
         "command": "confirm",
         "gateway_argv": gateway_argv,
         "full_argv": full_argv,
         "copy_exactly": True,
         "requires_explicit_user_confirmation": True,
         "shell_family": "windows-powershell-encoded" if os.name == "nt" else "posix-sh",
-        "copy_instruction": {
-            "contract": "waapi-skill.gateway-command-copy-instruction/v1",
-            "source_field": "shell_command",
-            "action": "execute_verbatim_as_one_shell_tool_call",
-            "forbidden_transformations": [
-                "reconstruct",
-                "shorten",
-                "normalize",
-                "substitute_path_segments",
-            ],
-        },
-        "shell_command": (
-            windows_gateway_command(full_argv)
-            if os.name == "nt"
-            else shlex.join(full_argv)
-        ),
     }
+    model_command = None
+    if os.name == "nt":
+        shell_command = windows_gateway_command(full_argv)
+        try:
+            model_command = windows_model_command(full_argv)
+        except ValueError:
+            model_command = None
+    else:
+        shell_command = shlex.join(full_argv)
+    if model_command is not None:
+        next_command["shell_command"] = shell_command
+        next_command["model_shell_family"] = "windows-pwsh-literal-v1"
+    next_command["copy_instruction"] = {
+        "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+        "source_field": "model_command" if model_command is not None else "shell_command",
+        "action": "execute_verbatim_as_one_shell_tool_call",
+        "forbidden_transformations": [
+            "reconstruct",
+            "shorten",
+            "normalize",
+            "substitute_path_segments",
+            "select_another_field",
+        ],
+    }
+    if model_command is not None:
+        next_command["model_command"] = model_command
+    else:
+        next_command["shell_command"] = shell_command
+    payload["next_command"] = next_command
     if mode == "confirmation-token-only":
         payload["confirmation"] = {"token": confirmation_token}
     elif mode == "confirmation-wrong-journal-head":

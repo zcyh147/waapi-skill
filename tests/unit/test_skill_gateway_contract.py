@@ -240,8 +240,11 @@ def test_existing_transaction_continuation_precedes_named_operation_schema() -> 
     assert "an artifact hash is not a lookup key" in operate
     assert "transaction-show <transaction-id> --summary-only" in operate
     assert "Do not call `operations`, `operation-schema`, or `preview` first" in operate
-    assert "`next_command.shell_command` as the sole executable representation" in operate
-    assert "Copy the entire string verbatim as one shell tool call" in operate
+    assert "execute only the field named by `next_command.copy_instruction.source_field`" in operate
+    assert "copy that entire string verbatim as one shell tool call" in operate
+    assert "normally selects the short `model_command`" in operate
+    assert "encoded `shell_command` remains an audit/fallback representation" in operate
+    assert "never infer fallback from the visible field" in operate
     assert operate.index("## Choose the phase and first Gateway command") < operate.index(
         "## Continue only from Gateway-owned commands"
     )
@@ -311,7 +314,7 @@ def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
         assert "**656**" in readme
         assert "**152**" in readme
         assert "**6**" in readme
-        assert "2575" in readme
+        assert "2635" in readme
         assert "./skills/waapi-skill/references/waapi-coverage.md" in readme
 
     assert "198 unique routed WAAPI URIs" in english
@@ -320,4 +323,4 @@ def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
     assert "仍要求实时宿主为 Authoring" in " ".join(chinese.split())
     assert "not a claim that all 808 rows have been exercised against a real Wwise process" in english
     assert "不等于已经在真实 Wwise 进程中逐一运行了全部 808 行" in chinese
-    assert "currently contains 2575 passing tests" in coverage_contract
+    assert "currently contains 2635 passing tests" in coverage_contract

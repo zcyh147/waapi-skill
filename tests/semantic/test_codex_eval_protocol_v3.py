@@ -15,6 +15,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_schema_query_transaction_protocol,
     build_transaction_protocol,
     call_step,
+    metadata_candidate_limit,
     query_object_step,
     wait_topic_step,
 )
@@ -223,6 +224,38 @@ def test_metadata_transaction_protocol_is_generic_and_binds_every_preview() -> N
         assert argument.expected_required_token_projection == (
             MetadataTokenProjection("Volume", "property", "Real32"),
         )
+
+
+@pytest.mark.parametrize(
+    ("query_count", "expected_limit"),
+    ((1, 8), (2, 8), (3, 3), (4, 3), (5, 2), (8, 2)),
+)
+def test_metadata_transaction_protocol_uses_the_skill_query_count_budget(
+    query_count: int,
+    expected_limit: int,
+) -> None:
+    queries = tuple(f"setting {index}" for index in range(query_count))
+
+    protocol = build_metadata_transaction_protocol(
+        (_request(),),
+        object_type="Sound",
+        metadata_queries=queries,
+        required_tokens=("Volume",),
+    )
+
+    assert metadata_candidate_limit(queries) == expected_limit
+    assert protocol.steps[0].arguments[-2:] == (
+        "--limit",
+        str(expected_limit),
+    )
+
+
+@pytest.mark.parametrize("queries", ((), tuple("q" for _ in range(9)), "volume"))
+def test_metadata_candidate_budget_rejects_non_protocol_query_counts(
+    queries: object,
+) -> None:
+    with pytest.raises(V3ProtocolError, match="metadata candidate budget"):
+        metadata_candidate_limit(queries)  # type: ignore[arg-type]
 
 
 def test_schema_first_metadata_protocol_exposes_version_before_exact_scope() -> None:

@@ -221,6 +221,7 @@ from tests.semantic.support.codex_harness import (  # noqa: E402
     count_invalid_jsonl_lines,
     discover_windows_powershell_core,
     final_agent_message,
+    gateway_continuation_binding_errors,
     is_evaluation_sensitive_environment_key,
     parse_jsonl_events,
     powershell_core_host_fingerprint,
@@ -4673,6 +4674,18 @@ def _validate_heavy_v3_broker_records(
     # CodexGatewayBroker intentionally rejects an empty full protocol.
     if not steps:
         return
+    continuation_errors = gateway_continuation_binding_errors(
+        command_records,
+        records,
+        platform_name=(
+            "nt" if options.windows_powershell_core_host is not None else "posix"
+        ),
+        windows_powershell_core_host=options.windows_powershell_core_host,
+    )
+    if continuation_errors:
+        raise CampaignEvidenceError(
+            f"{label} response-derived Gateway continuation binding is invalid"
+        )
     expected_runner = Path(
         os.path.abspath(os.fspath(options.skill_source / "scripts" / "run.py"))
     )

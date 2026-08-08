@@ -31,7 +31,10 @@ from tests.semantic.support.codex_eval_fixtures import (
 )
 from wwise_waapi.transactions import confirmation_token_for
 from wwise_waapi.platform_commands import (
+    PlatformCommandError,
+    WINDOWS_MODEL_COMMAND_FAMILY,
     WINDOWS_POWERSHELL_ENCODED_FAMILY,
+    encode_windows_model_argv,
     encode_windows_powershell_argv,
 )
 
@@ -59,6 +62,7 @@ def _fake_trusted_next_command(
     gateway_argv: tuple[str, ...],
     *,
     requires_explicit_user_confirmation: bool = False,
+    platform_name: str | None = None,
 ) -> dict[str, Any]:
     full_argv = (
         "python",
@@ -67,7 +71,7 @@ def _fake_trusted_next_command(
         *gateway_argv,
     )
     result: dict[str, Any] = {
-        "contract": "waapi-skill.gateway-next-command/v1",
+        "contract": "waapi-skill.gateway-next-command/v2",
         "command": command,
         "gateway_argv": list(gateway_argv),
         "full_argv": list(full_argv),
@@ -75,24 +79,39 @@ def _fake_trusted_next_command(
     }
     if requires_explicit_user_confirmation:
         result["requires_explicit_user_confirmation"] = True
-    if os.name == "nt":
+    model_command: str | None = None
+    active_platform = os.name if platform_name is None else platform_name
+    if active_platform == "nt":
         result["shell_family"] = WINDOWS_POWERSHELL_ENCODED_FAMILY
         shell_command = encode_windows_powershell_argv(full_argv)
+        try:
+            model_command = encode_windows_model_argv(full_argv)
+        except PlatformCommandError:
+            model_command = None
     else:
         result["shell_family"] = "posix-sh"
         shell_command = shlex.join(full_argv)
+    if model_command is not None:
+        result["shell_command"] = shell_command
+        result["model_shell_family"] = WINDOWS_MODEL_COMMAND_FAMILY
     result["copy_instruction"] = {
-        "contract": "waapi-skill.gateway-command-copy-instruction/v1",
-        "source_field": "shell_command",
+        "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+        "source_field": (
+            "model_command" if model_command is not None else "shell_command"
+        ),
         "action": "execute_verbatim_as_one_shell_tool_call",
         "forbidden_transformations": [
             "reconstruct",
             "shorten",
             "normalize",
             "substitute_path_segments",
+            "select_another_field",
         ],
     }
-    result["shell_command"] = shell_command
+    if model_command is not None:
+        result["model_command"] = model_command
+    else:
+        result["shell_command"] = shell_command
     return result
 
 
@@ -441,6 +460,31 @@ def test_fake_trusted_wwise_show_returns_exact_token_continuation() -> None:
             transaction["confirmation_token"],
         ),
         requires_explicit_user_confirmation=True,
+    )
+
+
+def test_fake_trusted_windows_response_selects_model_command_not_fallback() -> None:
+    next_command = _fake_trusted_next_command(
+        "confirm",
+        (
+            "confirm",
+            "tx-response-binding",
+            "--confirmation-token",
+            f"ct1-{'0' * 24}",
+        ),
+        requires_explicit_user_confirmation=True,
+        platform_name="nt",
+    )
+
+    source_field = next_command["copy_instruction"]["source_field"]
+    assert source_field == "model_command"
+    assert next_command[source_field] == next_command["model_command"]
+    assert next_command[source_field] != next_command["shell_command"]
+    assert tuple(next_command)[-4:] == (
+        "shell_command",
+        "model_shell_family",
+        "copy_instruction",
+        "model_command",
     )
 
 

@@ -94,8 +94,11 @@ from tests.semantic.support.codex_object_heavy_v3 import (
     build_object_heavy_v3_recipe,
 )
 from wwise_waapi.platform_commands import (
+    PlatformCommandError,
+    WINDOWS_MODEL_COMMAND_FAMILY,
     WINDOWS_POWERSHELL_ENCODED_FAMILY,
     decode_windows_powershell_argv,
+    encode_windows_model_argv,
     encode_windows_powershell_argv,
 )
 from tests.semantic.support.codex_object_runtime_v3 import ObjectRuntimeSnapshot
@@ -1663,11 +1666,53 @@ def _synthetic_gateway_records(
                 confirmation_token,
             ]
             full_argv = [
-                os.path.abspath(sys.executable),
+                "python",
                 str(runner.resolve(strict=True)),
                 "gateway.py",
                 *gateway_argv,
             ]
+            next_command: dict[str, Any] = {
+                "contract": "waapi-skill.gateway-next-command/v2",
+                "command": "confirm",
+                "gateway_argv": gateway_argv,
+                "full_argv": full_argv,
+                "copy_exactly": True,
+                "requires_explicit_user_confirmation": True,
+            }
+            model_command: str | None = None
+            if os.name == "nt":
+                next_command["shell_family"] = WINDOWS_POWERSHELL_ENCODED_FAMILY
+                shell_command = encode_windows_powershell_argv(full_argv)
+                try:
+                    model_command = encode_windows_model_argv(full_argv)
+                except PlatformCommandError:
+                    model_command = None
+            else:
+                next_command["shell_family"] = "posix-sh"
+                shell_command = shlex.join(full_argv)
+            if model_command is not None:
+                next_command["shell_command"] = shell_command
+                next_command["model_shell_family"] = WINDOWS_MODEL_COMMAND_FAMILY
+            next_command["copy_instruction"] = {
+                "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+                "source_field": (
+                    "model_command"
+                    if model_command is not None
+                    else "shell_command"
+                ),
+                "action": "execute_verbatim_as_one_shell_tool_call",
+                "forbidden_transformations": [
+                    "reconstruct",
+                    "shorten",
+                    "normalize",
+                    "substitute_path_segments",
+                    "select_another_field",
+                ],
+            }
+            if model_command is not None:
+                next_command["model_command"] = model_command
+            else:
+                next_command["shell_command"] = shell_command
             payload.update(
                 {
                     "transaction_id": transaction_id,
@@ -1685,37 +1730,7 @@ def _synthetic_gateway_records(
                             "last_event_hash": last_event_hash,
                         },
                     },
-                    "next_command": {
-                        "contract": "waapi-skill.gateway-next-command/v1",
-                        "command": "confirm",
-                        "gateway_argv": gateway_argv,
-                        "full_argv": full_argv,
-                        "copy_exactly": True,
-                        "requires_explicit_user_confirmation": True,
-                        "shell_family": (
-                            WINDOWS_POWERSHELL_ENCODED_FAMILY
-                            if os.name == "nt"
-                            else "posix-sh"
-                        ),
-                        "copy_instruction": {
-                            "contract": (
-                                "waapi-skill.gateway-command-copy-instruction/v1"
-                            ),
-                            "source_field": "shell_command",
-                            "action": "execute_verbatim_as_one_shell_tool_call",
-                            "forbidden_transformations": [
-                                "reconstruct",
-                                "shorten",
-                                "normalize",
-                                "substitute_path_segments",
-                            ],
-                        },
-                        "shell_command": (
-                            encode_windows_powershell_argv(full_argv)
-                            if os.name == "nt"
-                            else shlex.join(full_argv)
-                        ),
-                    },
+                    "next_command": next_command,
                 }
             )
         elif step.subcommand == "confirm":
@@ -2120,13 +2135,21 @@ def _synthetic_events(
                 },
             )
         )
+    selected_continuation: str | None = None
     for index, record in enumerate(records, start=1):
         item_id = f"gateway-{index}"
-        command = _synthetic_command(
-            tuple(str(value) for value in record["model_argv"]),
-            platform_name=platform_name,
-            windows_powershell_core_host=windows_powershell_core_host,
-        )
+        if selected_continuation is None:
+            command = _synthetic_command(
+                tuple(str(value) for value in record["model_argv"]),
+                platform_name=platform_name,
+                windows_powershell_core_host=windows_powershell_core_host,
+            )
+        else:
+            command = _synthetic_shell_tool_command(
+                selected_continuation,
+                platform_name=platform_name,
+                windows_powershell_core_host=windows_powershell_core_host,
+            )
         events.extend(
             (
                 {
@@ -2150,6 +2173,7 @@ def _synthetic_events(
                 },
             )
         )
+        selected_continuation = _selected_next_command(record["payload"])
     events.extend(
         (
             {
@@ -2167,6 +2191,58 @@ def _synthetic_events(
         json.dumps(item, ensure_ascii=False, sort_keys=True) + "\n"
         for item in events
     )
+
+
+def _selected_next_command(payload: Mapping[str, Any]) -> str | None:
+    """Select only the response field named by its closed copy instruction."""
+
+    next_command = payload.get("next_command")
+    if next_command is None:
+        return None
+    if not isinstance(next_command, Mapping):
+        raise AssertionError("synthetic next_command must be an object")
+    copy_instruction = next_command.get("copy_instruction")
+    if not isinstance(copy_instruction, Mapping):
+        raise AssertionError("synthetic next_command lacks its copy instruction")
+    source_field = copy_instruction.get("source_field")
+    if source_field not in {"model_command", "shell_command"}:
+        raise AssertionError("synthetic next_command source field is unsupported")
+    if "model_command" in next_command and source_field != "model_command":
+        raise AssertionError(
+            "synthetic Windows continuation must not select shell_command when "
+            "model_command exists"
+        )
+    command = next_command.get(source_field)
+    if not isinstance(command, str) or not command:
+        raise AssertionError("synthetic next_command selected source is unavailable")
+    return command
+
+
+def _synthetic_shell_tool_command(
+    command: str,
+    *,
+    platform_name: str | None = None,
+    windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
+) -> str:
+    """Render a Gateway-selected command as one synthetic Codex shell call."""
+
+    effective_platform = os.name if platform_name is None else platform_name
+    if effective_platform == "nt":
+        if windows_powershell_core_host is None:
+            raise AssertionError(
+                "synthetic Windows commands require one attested PowerShell Core host"
+            )
+        return shlex.join(
+            (
+                windows_powershell_core_host.executable,
+                "-NoProfile",
+                "-Command",
+                command,
+            )
+        )
+    if effective_platform == "posix":
+        return command
+    raise AssertionError(f"unsupported synthetic command platform: {effective_platform}")
 
 
 def _synthetic_command(
@@ -2224,6 +2300,32 @@ def test_synthetic_command_uses_exact_host_command_grammar() -> None:
     assert outer[:3] == (host.executable, "-NoProfile", "-Command")
     assert decode_windows_powershell_argv(outer[3]) == argv
     assert tuple(shlex.split(_synthetic_command(argv, platform_name="posix"))) == argv
+
+
+def test_synthetic_response_binding_selects_model_command_not_legacy_fallback() -> None:
+    payload = {
+        "next_command": {
+            "contract": "waapi-skill.gateway-next-command/v2",
+            "shell_command": "powershell.exe -EncodedCommand legacy",
+            "copy_instruction": {
+                "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+                "source_field": "model_command",
+            },
+            "model_command": "python 'run.py' 'gateway.py' 'confirm' 'tx1'",
+        }
+    }
+
+    assert _selected_next_command(payload) == payload["next_command"][
+        "model_command"
+    ]
+
+    tampered = copy.deepcopy(payload)
+    tampered["next_command"]["copy_instruction"]["source_field"] = "shell_command"
+    with pytest.raises(
+        AssertionError,
+        match="must not select shell_command",
+    ):
+        _selected_next_command(tampered)
 
 
 def _soundbank_refusal_broker_fixture(
@@ -2374,6 +2476,80 @@ def test_campaign_broker_seal_binds_confirmation_to_archived_transaction_store(
             options=options,
             version="2022.1",
             label="tampered durable confirmation",
+        )
+
+
+def test_campaign_archive_rejects_equivalent_requoted_continuation(
+    tmp_path: Path,
+) -> None:
+    options = _options(tmp_path)
+    task_root = tmp_path / "task"
+    task_root.mkdir()
+    protocol = build_transaction_protocol((_synthetic_audio_transaction_request(),))
+    records = _synthetic_gateway_records(
+        options=options,
+        task_root=task_root,
+        protocol=protocol,
+        version="2022.1",
+    )
+    command_records = list(
+        completed_command_records(
+            parse_jsonl_events(
+                _synthetic_events(
+                    thread_id="thread-continuation-binding",
+                    records=records,
+                    final_response="已完成确认事务。",
+                    windows_powershell_core_host=(
+                        options.windows_powershell_core_host
+                    ),
+                )
+            ),
+            windows_powershell_core_host=options.windows_powershell_core_host,
+        )
+    )
+    prior_index = next(
+        index
+        for index, record in enumerate(records[:-1])
+        if _selected_next_command(record["payload"]) is not None
+    )
+    selected = _selected_next_command(records[prior_index]["payload"])
+    assert selected is not None
+    if options.windows_powershell_core_host is not None:
+        equivalent = selected.replace("'gateway.py'", "gateway.py", 1)
+        tampered_command = _synthetic_shell_tool_command(
+            equivalent,
+            platform_name="nt",
+            windows_powershell_core_host=options.windows_powershell_core_host,
+        )
+    else:
+        equivalent = selected.replace(" gateway.py ", " 'gateway.py' ", 1)
+        tampered_command = _synthetic_shell_tool_command(
+            equivalent,
+            platform_name="posix",
+        )
+    assert equivalent != selected
+    continuation_index = prior_index + 1
+    assert tuple(shlex.split(equivalent)) == command_records[continuation_index].argv
+    command_records[continuation_index] = replace(
+        command_records[continuation_index],
+        command=tampered_command,
+    )
+
+    with pytest.raises(
+        CampaignEvidenceError,
+        match="response-derived Gateway continuation binding is invalid",
+    ):
+        campaign._validate_heavy_v3_broker_records(
+            records,
+            task_root=task_root,
+            steps=protocol.steps,
+            command_records=[
+                campaign._json_canonical_value(asdict(record))
+                for record in command_records
+            ],
+            options=options,
+            version="2022.1",
+            label="requoted continuation",
         )
 
 

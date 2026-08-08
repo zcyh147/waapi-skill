@@ -30,6 +30,21 @@ class V3ProtocolError(ValueError):
     """A materialized scenario cannot form an exact broker allow-list."""
 
 
+def metadata_candidate_limit(queries: Sequence[str]) -> int:
+    """Return the deterministic per-query candidate budget from the Skill."""
+
+    if isinstance(queries, (str, bytes)):
+        raise V3ProtocolError(
+            "metadata candidate budget requires a query sequence"
+        )
+    count = len(tuple(queries))
+    if not 1 <= count <= 8:
+        raise V3ProtocolError(
+            "metadata candidate budget requires 1..8 query phrases"
+        )
+    return 8 if count <= 2 else 3 if count <= 4 else 2
+
+
 def operation_request_equivalence(operation: str) -> str:
     """Return the one reviewed JSON equivalence for an operation request."""
 
@@ -478,7 +493,9 @@ def build_metadata_transaction_protocol(
                 MetadataQueryArgument(query),
             )
         )
-    metadata_arguments.extend(("--limit", "8"))
+    metadata_arguments.extend(
+        ("--limit", str(metadata_candidate_limit(queries)))
+    )
     metadata_step = ExpectedGatewayStep(
         name=metadata_step_name,
         subcommand="metadata",
@@ -873,6 +890,7 @@ __all__ = [
     "build_schema_query_transaction_protocol",
     "build_transaction_protocol",
     "call_step",
+    "metadata_candidate_limit",
     "operation_request_equivalence",
     "query_object_step",
     "wait_topic_step",

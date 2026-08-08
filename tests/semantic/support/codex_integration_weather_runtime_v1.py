@@ -22,9 +22,9 @@ from typing import Any, Callable, Mapping, Sequence
 from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
     build_transaction_protocol,
+    metadata_candidate_limit,
 )
 from tests.semantic.support.codex_gateway_broker import (
-    BoundedIntegerArgument,
     ExpectedGatewayStep,
     GatewayDerivedReferenceActivationAllowance,
     MetadataBoundJsonArgument,
@@ -82,13 +82,6 @@ RTPC_POINTS = (
     MappingProxyType({"x": 50.0, "y": -12.0, "shape": "Linear"}),
     MappingProxyType({"x": 100.0, "y": 0.0, "shape": "Linear"}),
 )
-
-
-def _metadata_candidate_limit(queries: Sequence[str]) -> int:
-    """Keep compound discovery useful without overflowing its public result."""
-
-    count = len(tuple(queries))
-    return 2 if count >= 5 else 3 if count >= 3 else 8
 
 
 class IntegrationWeatherRuntimeError(RuntimeError):
@@ -1242,15 +1235,11 @@ def _build_metadata_workflow_protocol(
             ]
             for query in queries:
                 arguments.extend(("--query", MetadataQueryArgument(query)))
-            candidate_limit = _metadata_candidate_limit(queries)
+            candidate_limit = metadata_candidate_limit(queries)
             arguments.extend(
                 (
                     "--limit",
-                    (
-                        BoundedIntegerArgument(1, candidate_limit)
-                        if prefix == "tx02"
-                        else str(candidate_limit)
-                    ),
+                    str(candidate_limit),
                 )
             )
             metadata_step = ExpectedGatewayStep(
@@ -1439,7 +1428,7 @@ def _discover(
         read_call=direct,
         queries=queries,
         object_type=object_type,
-        limit=_metadata_candidate_limit(queries),
+        limit=metadata_candidate_limit(queries),
     ).as_dict()
     resolved = result.get("scope", {}).get("resolved", {})
     if not isinstance(resolved, Mapping) or resolved.get("name") != object_type:

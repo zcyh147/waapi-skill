@@ -91,7 +91,10 @@ from wwise_waapi.host_paths import (  # noqa: E402  # pyright: ignore[reportMiss
     localize_waapi_host_path,
 )
 from wwise_waapi.platform_commands import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    PlatformCommandError,
+    WINDOWS_MODEL_COMMAND_FAMILY,
     WINDOWS_POWERSHELL_ENCODED_FAMILY,
+    encode_windows_model_argv,
     encode_windows_powershell_argv,
 )
 from wwise_waapi.builders.query import (  # noqa: E402  # pyright: ignore[reportMissingImports]
@@ -301,9 +304,9 @@ TRANSACTION_SHOW_SUMMARY_FIXED_BUDGET_BYTES = 6 * 1024
 # be reduced further without losing required evidence.
 TRANSACTION_SHOW_SUMMARY_TARGET_BYTES = 4 * 1024
 TRANSACTION_SHOW_SUMMARY_CONTRACT = "waapi-skill.transaction-show-summary/v1"
-TRANSACTION_NEXT_COMMAND_CONTRACT = "waapi-skill.gateway-next-command/v1"
+TRANSACTION_NEXT_COMMAND_CONTRACT = "waapi-skill.gateway-next-command/v2"
 TRANSACTION_COMMAND_COPY_INSTRUCTION_CONTRACT = (
-    "waapi-skill.gateway-command-copy-instruction/v1"
+    "waapi-skill.gateway-command-copy-instruction/v2"
 )
 TRANSACTION_CONFIRMATION_BINDING_CONTRACT = (
     "waapi-skill.confirmation-binding/v1"
@@ -9083,24 +9086,38 @@ def transaction_next_command(
         payload["requires_explicit_user_confirmation"] = True
     if requires_later_user_message:
         payload["requires_later_user_message"] = True
+    model_command: str | None = None
     if os.name == "nt":
         payload["shell_family"] = WINDOWS_POWERSHELL_ENCODED_FAMILY
         shell_command = encode_windows_powershell_argv(full_argv)
+        try:
+            model_command = encode_windows_model_argv(full_argv)
+        except PlatformCommandError:
+            model_command = None
     else:
         payload["shell_family"] = "posix-sh"
         shell_command = shlex.join(full_argv)
+    if model_command is not None:
+        payload["shell_command"] = shell_command
+        payload["model_shell_family"] = WINDOWS_MODEL_COMMAND_FAMILY
     payload["copy_instruction"] = {
         "contract": TRANSACTION_COMMAND_COPY_INSTRUCTION_CONTRACT,
-        "source_field": "shell_command",
+        "source_field": (
+            "model_command" if model_command is not None else "shell_command"
+        ),
         "action": "execute_verbatim_as_one_shell_tool_call",
         "forbidden_transformations": [
             "reconstruct",
             "shorten",
             "normalize",
             "substitute_path_segments",
+            "select_another_field",
         ],
     }
-    payload["shell_command"] = shell_command
+    if model_command is not None:
+        payload["model_command"] = model_command
+    else:
+        payload["shell_command"] = shell_command
     return payload
 
 
@@ -9162,7 +9179,7 @@ def transaction_agent_result(
         result["cleanup"] = dict(cleanup)
     if next_command is not None:
         # A preview mirrors the exact top-level continuation here so the final
-        # machine-readable field also ends on the canonical shell command.
+        # machine-readable field also ends on the selected continuation.
         result["next_command"] = next_command
     return result
 

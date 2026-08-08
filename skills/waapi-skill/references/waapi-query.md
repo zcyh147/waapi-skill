@@ -395,14 +395,14 @@ running instance must be reflected again. For a machine-readable live summary,
 compact-serialize that object exactly and stop. Do not rebuild it from
 `normalized` or repeat the metadata command after success.
 
-Use `metadata discover` only when meaning is known but no exact live name is
-visible. Translate intent to short English phrases in repeated
+`metadata discover` resolves a known meaning to a live name. Translate intent
+to short English phrases in repeated
 `--query`; never ask for internal names. Choose one scope: `--object-type` for a
-known new/imported type, `--class-id` for a proven class id, or `--object` for an
-existing GUID/path or plug-in. Per-phrase `--limit` defaults to 5 and
-maxes at 8; for mutation use 8 candidates for 1–2 phrases, 3 for 3–4, and 2 for
-5–8. Keep related phrases together; at a dependency/byte ceiling, split without
-repeating proven phrases.
+known new/imported type, `--class-id` for a proven class id, or `--object` for a
+GUID/path or plug-in. `--limit` is per phrase (default 5, max 8).
+For mutation count only repeated `--query` flags (not objects, rows, files, or
+values): 1–2 use 8, 3–4 use 3, and 5–8 use 2. At a dependency/byte ceiling,
+split without repeating proven phrases.
 
 The Gateway searches at most 256 live details. Complete
 `no_match` is a bounded miss; on `partial`, retry once with broader technical

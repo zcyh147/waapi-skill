@@ -21,6 +21,9 @@ from typing import Any, Callable, Iterator, Mapping, Sequence
 
 from wwise_waapi.platform_commands import (
     PlatformCommandError,
+    WINDOWS_MODEL_COMMAND_FAMILY,
+    WINDOWS_POWERSHELL_ENCODED_FAMILY,
+    decode_windows_model_argv,
     decode_windows_powershell_argv,
 )
 
@@ -133,9 +136,22 @@ _PYTHON_EXECUTABLE_RE = re.compile(r"python(?:3(?:\.\d+)?)?(?:\.exe)?")
 _RUNNER_VERSION_SELECTORS = frozenset({"--version", "--wwise-version"})
 _WINDOWS_POWERSHELL_CORE_PARSER_KIND = "windows-pwsh-command"
 _WINDOWS_ENCODED_POWERSHELL_PARSER_KIND = "windows-powershell-encoded"
+_TRANSACTION_NEXT_COMMAND_CONTRACT = "waapi-skill.gateway-next-command/v2"
+_TRANSACTION_COPY_INSTRUCTION_CONTRACT = (
+    "waapi-skill.gateway-command-copy-instruction/v2"
+)
+_TRANSACTION_COPY_ACTION = "execute_verbatim_as_one_shell_tool_call"
+_TRANSACTION_FORBIDDEN_TRANSFORMATIONS = (
+    "reconstruct",
+    "shorten",
+    "normalize",
+    "substitute_path_segments",
+    "select_another_field",
+)
 _WINDOWS_POWERSHELL_COMMAND_NAMES = frozenset({"powershell", "powershell.exe"})
 _WINDOWS_POWERSHELL_CORE_COMMAND_NAMES = frozenset({"pwsh", "pwsh.exe"})
 _POWERSHELL_BARE_FORBIDDEN = frozenset("|&;<>`$(){}[]@#,%*?\"'")
+_POWERSHELL_SMART_QUOTES = frozenset(chr(value) for value in range(0x2018, 0x2020))
 _ALLOWED_SKILL_READS = frozenset(
     {
         "SKILL.md",
@@ -2869,6 +2885,261 @@ def completed_command_records(
     return tuple(records)
 
 
+def gateway_continuation_binding_errors(
+    command_records: Sequence[CodexCommandRecord | Mapping[str, Any]],
+    broker_records: Sequence[Any],
+    *,
+    platform_name: str | None = None,
+    windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
+) -> tuple[str, ...]:
+    """Bind every response-derived continuation to its exact selected bytes.
+
+    Ordinary first commands and later model-authored commands remain governed
+    by argv/Broker reconciliation.  A command immediately following a trusted
+    Gateway payload with ``next_command`` is different: the Gateway selected
+    one response field as an immutable shell-tool continuation.  Re-parsing to
+    equivalent argv is insufficient because it would give a reconstructed,
+    re-quoted, or legacy fallback field the same semantic credit.
+
+    The caller supplies only Gateway command records, in Broker order.  The
+    prior Codex output must reproduce the prior Broker payload exactly before
+    its copy instruction is trusted.  Diagnostics intentionally omit the raw
+    command, transaction token, and payload.
+    """
+
+    active_platform = os.name if platform_name is None else platform_name
+    errors: list[str] = []
+    for index in range(1, len(broker_records)):
+        prior_broker = broker_records[index - 1]
+        prior_payload = _record_field(prior_broker, "payload")
+        if not isinstance(prior_payload, Mapping) or "next_command" not in prior_payload:
+            continue
+        command_number = index + 1
+        if index >= len(command_records) or index - 1 >= len(command_records):
+            errors.append(
+                f"command {command_number}: Gateway continuation raw evidence is missing"
+            )
+            continue
+        prior_command = command_records[index - 1]
+        current_command = command_records[index]
+        if not _command_output_matches_payload(prior_command, prior_payload):
+            errors.append(
+                f"command {command_number}: prior Gateway output does not match Broker evidence"
+            )
+            continue
+        selected = _selected_gateway_continuation(
+            prior_payload.get("next_command"),
+            platform_name=active_platform,
+        )
+        if selected is None:
+            errors.append(
+                f"command {command_number}: prior Gateway copy instruction is incomplete or invalid"
+            )
+            continue
+        source_field, expected_command = selected
+        observed_command, observed_kind = _raw_shell_tool_command(
+            current_command,
+            platform_name=active_platform,
+            windows_powershell_core_host=windows_powershell_core_host,
+        )
+        expected_kind = (
+            _WINDOWS_POWERSHELL_CORE_PARSER_KIND
+            if source_field == "model_command" and _is_windows(active_platform)
+            else _WINDOWS_ENCODED_POWERSHELL_PARSER_KIND
+            if source_field == "shell_command" and _is_windows(active_platform)
+            else ""
+        )
+        try:
+            copied_exactly = (
+                observed_command is not None
+                and observed_command.encode("utf-8", errors="strict")
+                == expected_command.encode("utf-8", errors="strict")
+            )
+        except UnicodeEncodeError:
+            copied_exactly = False
+        if (
+            observed_command is None
+            or not copied_exactly
+            or (expected_kind and observed_kind != expected_kind)
+        ):
+            errors.append(
+                f"command {command_number}: Gateway continuation was not copied "
+                "from its selected source field"
+            )
+    return tuple(errors)
+
+
+def _record_field(record: Any, name: str, default: Any = None) -> Any:
+    if isinstance(record, Mapping):
+        return record.get(name, default)
+    return getattr(record, name, default)
+
+
+def _command_output_matches_payload(
+    record: CodexCommandRecord | Mapping[str, Any],
+    payload: Mapping[str, Any],
+) -> bool:
+    raw_output = _record_field(record, "aggregated_output", "")
+    if not isinstance(raw_output, str):
+        return False
+    try:
+        observed = json.loads(raw_output.strip())
+    except (json.JSONDecodeError, UnicodeError):
+        return False
+    return observed == payload
+
+
+def _selected_gateway_continuation(
+    value: Any,
+    *,
+    platform_name: str,
+) -> tuple[str, str] | None:
+    """Return the one field selected by a complete closed v2 instruction."""
+
+    if not isinstance(value, Mapping):
+        return None
+    common_keys = {
+        "contract",
+        "command",
+        "gateway_argv",
+        "full_argv",
+        "copy_exactly",
+        "shell_family",
+        "copy_instruction",
+    }
+    optional_keys = {
+        "requires_explicit_user_confirmation",
+        "requires_later_user_message",
+    }
+    instruction = value.get("copy_instruction")
+    if (
+        value.get("contract") != _TRANSACTION_NEXT_COMMAND_CONTRACT
+        or value.get("copy_exactly") is not True
+        or not isinstance(value.get("command"), str)
+        or not value.get("command")
+        or not isinstance(instruction, Mapping)
+        or set(instruction)
+        != {"contract", "source_field", "action", "forbidden_transformations"}
+        or instruction.get("contract")
+        != _TRANSACTION_COPY_INSTRUCTION_CONTRACT
+        or instruction.get("action") != _TRANSACTION_COPY_ACTION
+        or instruction.get("forbidden_transformations")
+        != list(_TRANSACTION_FORBIDDEN_TRANSFORMATIONS)
+        or any(value.get(key) is not True for key in optional_keys & set(value))
+    ):
+        return None
+    gateway_argv = value.get("gateway_argv")
+    full_argv = value.get("full_argv")
+    if (
+        not isinstance(gateway_argv, list)
+        or not gateway_argv
+        or any(not isinstance(item, str) for item in gateway_argv)
+        or gateway_argv[0] != value.get("command")
+        or not isinstance(full_argv, list)
+        or len(full_argv) != len(gateway_argv) + 3
+        or full_argv[0] != "python"
+        or not isinstance(full_argv[1], str)
+        or not full_argv[1]
+        or full_argv[2] != "gateway.py"
+        or full_argv != ["python", full_argv[1], "gateway.py", *gateway_argv]
+    ):
+        return None
+    source_field = instruction.get("source_field")
+    if source_field == "model_command":
+        required_keys = common_keys | optional_keys.intersection(value) | {
+            "shell_command",
+            "model_shell_family",
+            "model_command",
+        }
+        if (
+            not _is_windows(platform_name)
+            or set(value) != required_keys
+            or value.get("shell_family") != WINDOWS_POWERSHELL_ENCODED_FAMILY
+            or value.get("model_shell_family") != WINDOWS_MODEL_COMMAND_FAMILY
+            or not isinstance(value.get("shell_command"), str)
+            or not value.get("shell_command")
+        ):
+            return None
+        try:
+            if (
+                decode_windows_model_argv(str(value["model_command"]))
+                != tuple(full_argv)
+                or decode_windows_powershell_argv(str(value["shell_command"]))
+                != tuple(full_argv)
+            ):
+                return None
+        except PlatformCommandError:
+            return None
+    elif source_field == "shell_command":
+        required_keys = common_keys | optional_keys.intersection(value) | {
+            "shell_command"
+        }
+        expected_family = (
+            WINDOWS_POWERSHELL_ENCODED_FAMILY
+            if _is_windows(platform_name)
+            else "posix-sh"
+        )
+        if (
+            set(value) != required_keys
+            or value.get("shell_family") != expected_family
+        ):
+            return None
+        try:
+            if _is_windows(platform_name):
+                representation_argv = decode_windows_powershell_argv(
+                    str(value["shell_command"])
+                )
+                if representation_argv != tuple(full_argv):
+                    return None
+            elif value.get("shell_command") != shlex.join(full_argv):
+                return None
+        except PlatformCommandError:
+            return None
+    else:
+        return None
+    selected = value.get(source_field)
+    if not isinstance(selected, str) or not selected:
+        return None
+    return str(source_field), selected
+
+
+def _raw_shell_tool_command(
+    record: CodexCommandRecord | Mapping[str, Any],
+    *,
+    platform_name: str,
+    windows_powershell_core_host: WindowsPowerShellCoreHost | None,
+) -> tuple[str | None, str]:
+    command = _record_field(record, "command", "")
+    parser_kind = _record_field(record, "parser_kind", "")
+    if not isinstance(command, str) or not isinstance(parser_kind, str):
+        return None, ""
+    if _is_windows(platform_name):
+        if windows_powershell_core_host is None:
+            return None, parser_kind
+        try:
+            outer = tuple(shlex.split(command, posix=True))
+        except ValueError:
+            return None, parser_kind
+        if (
+            len(outer) != 4
+            or PureWindowsPath(outer[0])
+            != PureWindowsPath(windows_powershell_core_host.executable)
+            or outer[1:3] != ("-NoProfile", "-Command")
+        ):
+            return None, parser_kind
+        return outer[3], parser_kind
+    if parser_kind == "posix-native":
+        return command, parser_kind
+    if parser_kind == "posix-shell":
+        try:
+            outer = tuple(shlex.split(command, posix=True))
+        except ValueError:
+            return None, parser_kind
+        if len(outer) == 3 and outer[1] in {"-c", "-lc", "-ic"}:
+            return outer[2], parser_kind
+    return None, parser_kind
+
+
 def parse_command_argv(
     command: str,
     *,
@@ -3024,6 +3295,8 @@ def _split_literal_powershell_argv(script: str) -> tuple[str, ...]:
 
     if not script or "\0" in script or "\r" in script or "\n" in script:
         raise ValueError("PowerShell command must be one non-empty line")
+    if any(character in _POWERSHELL_SMART_QUOTES for character in script):
+        raise ValueError("PowerShell smart quotes are not permitted")
     arguments: list[str] = []
     index = 0
     while index < len(script):
@@ -3918,6 +4191,7 @@ __all__ = [
     "discover_windows_powershell_core",
     "final_agent_message",
     "first_gateway_backed_agent_message",
+    "gateway_continuation_binding_errors",
     "gateway_runtime_apis",
     "inspect_isolated_environment",
     "is_link_or_junction",

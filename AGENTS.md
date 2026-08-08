@@ -229,6 +229,10 @@ user's approval.
   envelope from `wwise_waapi/platform_commands.py`. Do not replace it with
   `subprocess.list2cmdline`, `cmd.exe` quoting, or model-reconstructed argv;
   `list2cmdline` is a CreateProcess/MSVCRT serializer, not a CMD shell escape.
+  A v2 continuation may additionally expose a short Gateway-generated
+  `model_command`; execute only the field named by the complete
+  `copy_instruction.source_field`. The encoded `shell_command` remains the
+  canonical audit/fallback envelope and is not selected implicitly.
 - Update README coverage numbers and `tests/TEST_INVENTORY.md` only from an actual
   completed run; never estimate a passing count.
 - Fresh Codex campaign and matrix runners are the only agent-semantic test lane.

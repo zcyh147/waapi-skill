@@ -581,6 +581,8 @@ def test_query_reference_has_a_deterministic_end_and_separate_alarm_hops() -> No
     assert "query `@Volume` only on the exact Bus identities" in query_flat
     assert "first the returned `OutputBus` id" in query_flat
     assert "then the requested comparison Bus path or id" in query_flat
+    assert "count only repeated `--query` flags" in query_flat
+    assert "1–2 use 8, 3–4 use 3, and 5–8 use 2" in query_flat
 
 
 def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
@@ -678,6 +680,13 @@ def test_operate_metadata_and_import_prose_only_rules_are_preserved() -> None:
     compact = " ".join(OPERATE.split())
     for phrase in (
         "one repeated `--query '<ordinary phrase>'` per requested setting",
+        "Count only those repeated `--query` flags in this invocation",
+        "not objects, rows, files, values, or other settings",
+        "one or two flags require `--limit 8`",
+        "three or four require `--limit 3`",
+        "five through eight require `--limit 2`",
+        "A rejected or nonzero Gateway invocation is also a hard stop",
+        "Do not advance to the next schema, preview, or transaction phase",
         "several existing targets of one proven type",
         "`--object` for one existing object",
         "`--object-type Sound`",
@@ -774,11 +783,12 @@ def test_operate_policy_and_gateway_owned_continuation_are_closed() -> None:
     assert "Gateway owns the external transaction store" in OPERATE
     assert "A rejected or incomplete preview is a hard same-turn boundary" in OPERATE
     assert "On `LOCAL_WAAPI_HOST_REQUIRED`, report and stop" in OPERATE
-    assert "`next_command.shell_command` as the sole executable representation" in compact
-    assert "`copy_instruction` names the action" in compact
-    assert "Copy the entire string verbatim as one shell tool call" in compact
+    assert "execute only the field named by `next_command.copy_instruction.source_field`" in compact
+    assert "copy that entire string verbatim as one shell tool call" in compact
+    assert "normally selects the short `model_command`" in compact
+    assert "encoded `shell_command` remains an audit/fallback representation" in compact
     assert "Do not render diagnostic `full_argv`" in compact
-    assert "Never reconstruct or substitute it" in compact
+    assert "never infer fallback from the visible field" in compact
     assert "run `confirm --help`" in compact
     assert "a status/check request stops after `transaction-show`" in compact
     assert "a verify-only request never executes" in compact
