@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import functools
 import json
 import hashlib
 import math
@@ -62,12 +63,14 @@ from tests.semantic.support.codex_gateway_broker import (
 )
 from tests.semantic.support.codex_harness import (
     CodexHarnessConfig,
+    WindowsPowerShellCoreHost,
     audit_session_events,
     build_task_exec_command,
     build_task_resume_command,
     classify_commands,
     completed_command_records,
     count_invalid_jsonl_lines,
+    discover_windows_powershell_core,
     final_agent_message,
     parse_jsonl_events,
     turn_usage,
@@ -336,6 +339,16 @@ def _visible_preview_only_request_unit(
     )
 
 
+@functools.cache
+def _synthetic_windows_powershell_core_host(
+) -> WindowsPowerShellCoreHost | None:
+    """Attest the one native Windows shell shared by synthetic campaign evidence."""
+
+    if os.name != "nt":
+        return None
+    return discover_windows_powershell_core(platform_name="nt")
+
+
 def _options(tmp_path: Path) -> campaign.CampaignOptions:
     skill = tmp_path / "skill"
     skill.mkdir(exist_ok=True)
@@ -421,6 +434,7 @@ def _options(tmp_path: Path) -> campaign.CampaignOptions:
         offline_only=False,
         lock_timeout_seconds=1.0,
         max_pre_action_retries=0,
+        windows_powershell_core_host=_synthetic_windows_powershell_core_host(),
     )
 
 
@@ -446,6 +460,7 @@ def _matrix_options(
         pair_ids=(),
         offline_only=False,
         overwrite=False,
+        windows_powershell_core_host=options.windows_powershell_core_host,
     )
 
 
@@ -669,6 +684,7 @@ def _mark_codex_infrastructure_block(
                 if prior_index == 1
                 else ()
             ),
+            windows_powershell_core_host=options.windows_powershell_core_host,
         )
         matrix.write_text(prior_turn_root / "events.jsonl", prior_events)
         matrix.write_text(prior_turn_root / "stderr.txt", "")
@@ -2072,6 +2088,7 @@ def _synthetic_events(
     final_response: str,
     read_paths: Sequence[Path] = (),
     platform_name: str | None = None,
+    windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
 ) -> str:
     events: list[dict[str, Any]] = [
         {"type": "thread.started", "thread_id": thread_id},
@@ -2080,7 +2097,9 @@ def _synthetic_events(
     for index, path in enumerate(read_paths, start=1):
         item_id = f"read-{index}"
         command = _synthetic_command(
-            ("cat", str(path.resolve())), platform_name=platform_name
+            ("cat", str(path.resolve())),
+            platform_name=platform_name,
+            windows_powershell_core_host=windows_powershell_core_host,
         )
         events.extend(
             (
@@ -2106,6 +2125,7 @@ def _synthetic_events(
         command = _synthetic_command(
             tuple(str(value) for value in record["model_argv"]),
             platform_name=platform_name,
+            windows_powershell_core_host=windows_powershell_core_host,
         )
         events.extend(
             (
@@ -2153,12 +2173,25 @@ def _synthetic_command(
     argv: Sequence[str],
     *,
     platform_name: str | None = None,
+    windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
 ) -> str:
     """Encode synthetic Codex evidence with the grammar used by that host."""
 
     effective_platform = os.name if platform_name is None else platform_name
     if effective_platform == "nt":
-        return encode_windows_powershell_argv(argv)
+        if windows_powershell_core_host is None:
+            raise AssertionError(
+                "synthetic Windows commands require one attested PowerShell Core host"
+            )
+        encoded_continuation = encode_windows_powershell_argv(argv)
+        return subprocess.list2cmdline(
+            (
+                windows_powershell_core_host.executable,
+                "-NoProfile",
+                "-Command",
+                encoded_continuation,
+            )
+        )
     if effective_platform == "posix":
         return shlex.join(argv)
     raise AssertionError(f"unsupported synthetic command platform: {effective_platform}")
@@ -2172,9 +2205,24 @@ def test_synthetic_command_uses_exact_host_command_grammar() -> None:
         '{"name":"雷雨 & wind"}',
     )
 
-    assert decode_windows_powershell_argv(
-        _synthetic_command(argv, platform_name="nt")
-    ) == argv
+    host = WindowsPowerShellCoreHost(
+        executable=r"C:\Program Files\PowerShell\7\pwsh.exe",
+        version="7.6.4",
+        native_argument_passing="Windows",
+        sha256="a" * 64,
+    )
+    outer = tuple(
+        shlex.split(
+            _synthetic_command(
+                argv,
+                platform_name="nt",
+                windows_powershell_core_host=host,
+            ),
+            posix=True,
+        )
+    )
+    assert outer[:3] == (host.executable, "-NoProfile", "-Command")
+    assert decode_windows_powershell_argv(outer[3]) == argv
     assert tuple(shlex.split(_synthetic_command(argv, platform_name="posix"))) == argv
 
 
@@ -2213,9 +2261,19 @@ def _soundbank_refusal_broker_fixture(
             thread_id="thread-refusal",
             records=records,
             final_response="该输入按封装边界被拒绝。",
+            windows_powershell_core_host=options.windows_powershell_core_host,
         )
     )
-    return options, task_root, protocol, records, completed_command_records(events)
+    return (
+        options,
+        task_root,
+        protocol,
+        records,
+        completed_command_records(
+            events,
+            windows_powershell_core_host=options.windows_powershell_core_host,
+        ),
+    )
 
 
 def test_campaign_broker_seal_accepts_expected_exit2_failed_command_status(
@@ -2263,8 +2321,10 @@ def test_campaign_broker_seal_binds_confirmation_to_archived_transaction_store(
                 thread_id="thread-confirmation-store",
                 records=records,
                 final_response="已完成确认事务。",
+                windows_powershell_core_host=options.windows_powershell_core_host,
             )
-        )
+        ),
+        windows_powershell_core_host=options.windows_powershell_core_host,
     )
     serialized_commands = [
         campaign._json_canonical_value(asdict(record))
@@ -2434,7 +2494,10 @@ def _synthetic_codex_facts(
     events = parse_jsonl_events(events_text)
     invalid = count_invalid_jsonl_lines(events_text)
     session = audit_session_events(events, invalid_json_line_count=invalid)
-    command_records = completed_command_records(events)
+    command_records = completed_command_records(
+        events,
+        windows_powershell_core_host=options.windows_powershell_core_host,
+    )
     command_facts = classify_commands(
         command_records,
         skill_source=options.skill_source,
@@ -2445,6 +2508,7 @@ def _synthetic_codex_facts(
         workspace=task_root / "agent-workspace",
         skill_source=options.skill_source,
         codex_binary=options.codex_binary,
+        windows_powershell_core_host=options.windows_powershell_core_host,
         auth_json=options.auth_json,
         model=options.model,
         reasoning_effort=options.reasoning_effort,
@@ -4078,6 +4142,7 @@ def _write_passing_project_outcome(
                 if index == 1
                 else ()
             ),
+            windows_powershell_core_host=options.windows_powershell_core_host,
         )
         matrix.write_text(turn_root / "prompt.txt", prompt + "\n")
         matrix.write_text(turn_root / "events.jsonl", events_text)
@@ -5590,11 +5655,9 @@ def test_heavy_fingerprint_covers_runner_model_options_and_mutable_inputs(
     options = _options(tmp_path)
     units = (_unit(1),)
     monkeypatch.setattr(
-        campaign.subprocess,
-        "run",
-        lambda *_args, **_kwargs: subprocess.CompletedProcess(
-            [str(options.codex_binary), "--version"], 0, "codex-cli 1.2.3\n", ""
-        ),
+        campaign,
+        "_codex_version_fingerprint",
+        lambda _binary, *, windows_powershell_core_host=None: "codex-cli 1.2.3",
     )
     monkeypatch.setattr(campaign.importlib.metadata, "distributions", lambda: ())
 
@@ -5677,14 +5740,9 @@ def test_heavy_fingerprint_binds_selected_codex_runtime_helpers(
     helper.parent.mkdir()
     helper.write_text("helper-v1\n", encoding="utf-8")
     monkeypatch.setattr(
-        campaign.subprocess,
-        "run",
-        lambda *_args, **_kwargs: subprocess.CompletedProcess(
-            [str(options.codex_binary), "--version"],
-            0,
-            "codex-cli 1.2.3\n",
-            "",
-        ),
+        campaign,
+        "_codex_version_fingerprint",
+        lambda _binary, *, windows_powershell_core_host=None: "codex-cli 1.2.3",
     )
     monkeypatch.setattr(campaign.importlib.metadata, "distributions", lambda: ())
     monkeypatch.setattr(campaign, "codex_runtime_files", lambda _binary: (helper,))
@@ -5765,11 +5823,9 @@ def test_heavy_fingerprint_rejects_source_project_and_launcher_drift(
     options = _options(tmp_path)
     units = (_unit(1),)
     monkeypatch.setattr(
-        campaign.subprocess,
-        "run",
-        lambda *_args, **_kwargs: subprocess.CompletedProcess(
-            [str(options.codex_binary), "--version"], 0, "codex-cli 1.2.3\n", ""
-        ),
+        campaign,
+        "_codex_version_fingerprint",
+        lambda _binary, *, windows_powershell_core_host=None: "codex-cli 1.2.3",
     )
     monkeypatch.setattr(campaign.importlib.metadata, "distributions", lambda: ())
     effective = campaign.build_heavy_v3_effective_config(
@@ -5815,11 +5871,9 @@ def test_heavy_fingerprint_includes_migration_source_tree(
         ),
     )
     monkeypatch.setattr(
-        campaign.subprocess,
-        "run",
-        lambda *_args, **_kwargs: subprocess.CompletedProcess(
-            [str(options.codex_binary), "--version"], 0, "codex-cli 1.2.3\n", ""
-        ),
+        campaign,
+        "_codex_version_fingerprint",
+        lambda _binary, *, windows_powershell_core_host=None: "codex-cli 1.2.3",
     )
     monkeypatch.setattr(campaign.importlib.metadata, "distributions", lambda: ())
 

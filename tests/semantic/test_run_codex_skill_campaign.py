@@ -413,14 +413,9 @@ def test_ordinary_effective_config_records_shell_policy(
 ) -> None:
     options = _options(tmp_path)
     monkeypatch.setattr(
-        campaign.subprocess,
-        "run",
-        lambda *_args, **_kwargs: subprocess.CompletedProcess(
-            [str(options.codex_binary), "--version"],
-            0,
-            "codex-cli 1.2.3\n",
-            "",
-        ),
+        campaign,
+        "_codex_version_fingerprint",
+        lambda _binary, *, windows_powershell_core_host=None: "codex-cli 1.2.3",
     )
     monkeypatch.setattr(campaign.importlib.metadata, "distributions", lambda: ())
 

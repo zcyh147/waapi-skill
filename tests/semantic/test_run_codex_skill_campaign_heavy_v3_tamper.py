@@ -158,10 +158,14 @@ def _campaign_prompt_asset_read_fixture(
             *fixture._synthetic_first_turn_reads(options, unit),
             *((asset,) * asset_read_count),
         ),
+        windows_powershell_core_host=options.windows_powershell_core_host,
     )
     if asset_output is not None:
         event_rows = [json.loads(line) for line in events_text.splitlines()]
-        asset_command = fixture._synthetic_command(("cat", str(asset.resolve())))
+        asset_command = fixture._synthetic_command(
+            ("cat", str(asset.resolve())),
+            windows_powershell_core_host=options.windows_powershell_core_host,
+        )
         for row in event_rows:
             item = row.get("item")
             if (
@@ -1063,6 +1067,7 @@ def test_success_rejects_gateway_commands_redistributed_across_turns(
                 if index == 1
                 else ()
             ),
+            windows_powershell_core_host=options.windows_powershell_core_host,
         )
         matrix.write_text(turn_root / "events.jsonl", events)
         facts = fixture._synthetic_codex_facts(
@@ -1930,6 +1935,7 @@ def test_object_get_recomputes_identity_presence_from_final_text(tmp_path: Path)
         records=records,
         final_response=response,
         read_paths=fixture._synthetic_first_turn_reads(options, unit),
+        windows_powershell_core_host=options.windows_powershell_core_host,
     )
     matrix.write_text(turn_root / "events.jsonl", events)
     matrix.write_text(turn_root / "final.txt", response + "\n")
@@ -1984,6 +1990,7 @@ def test_get02_campaign_rechecks_paired_path_boundaries_from_final_text(
         records=records,
         final_response=response,
         read_paths=fixture._synthetic_first_turn_reads(options, unit),
+        windows_powershell_core_host=options.windows_powershell_core_host,
     )
     matrix.write_text(turn_root / "events.jsonl", events)
     matrix.write_text(turn_root / "final.txt", response + "\n")
@@ -2046,6 +2053,7 @@ def test_get02_campaign_recomputes_unexpected_language_from_final_text(
         records=records,
         final_response=response,
         read_paths=fixture._synthetic_first_turn_reads(options, unit),
+        windows_powershell_core_host=options.windows_powershell_core_host,
     )
     matrix.write_text(turn_root / "events.jsonl", events)
     matrix.write_text(turn_root / "final.txt", response + "\n")
