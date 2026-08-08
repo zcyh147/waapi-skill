@@ -1030,7 +1030,9 @@ def test_offline_child_classifies_trusted_phase_evidence(
     )
 
 
-def test_successful_broker_trace_bridges_one_missing_cli_payload(tmp_path: Path) -> None:
+def test_successful_broker_trace_binds_raw_argv_and_bridges_missing_payload(
+    tmp_path: Path,
+) -> None:
     session = _session("M4", "confirm")
     root, skill, suite, live = _write_child(
         tmp_path,
@@ -1045,7 +1047,26 @@ def test_successful_broker_trace_bridges_one_missing_cli_payload(tmp_path: Path)
     command_facts = facts["command_facts"]
     confirm_index = list(session.gateway_steps).index("confirm")
     confirm_record = command_facts["command_records"][confirm_index]
+    broker_path = output_dir / "broker-evidence.json"
+    broker = json.loads(broker_path.read_text(encoding="utf-8"))
+    normalized_argv = broker["records"][confirm_index]["normalized_model_argv"]
+    raw_argv = list(normalized_argv)
+    raw_argv[1] = raw_argv[1].replace("/synthetic/", "//synthetic//", 1)
+    assert raw_argv != normalized_argv
+    broker["records"][confirm_index]["model_argv"] = raw_argv
+    execute_index = list(session.gateway_steps).index("execute")
+    execute_model_argv = list(
+        broker["records"][execute_index]["model_argv"]
+    )
+    execute_model_argv[0] = "/private/broker/bin/python"
+    broker["records"][execute_index]["model_argv"] = execute_model_argv
+    _write_json(broker_path, broker)
+    confirm_record["argv"] = raw_argv
+    confirm_record["command"] = " ".join(raw_argv)
     confirm_record["aggregated_output"] = ""
+    command_facts["gateway_attempt_commands"][confirm_index] = confirm_record[
+        "command"
+    ]
     command_facts["gateway_subcommands"].remove("confirm")
     command_facts["unexpected_commands"] = [confirm_record["command"]]
     _write_json(facts_path, facts)
@@ -1064,6 +1085,59 @@ def test_successful_broker_trace_bridges_one_missing_cli_payload(tmp_path: Path)
     assert verdict.status == "PASS"
     assert result.executed_session_ids == (session.session_id,)
     assert result.observations[0]["status"] == "PASS"
+
+    facts = json.loads(facts_path.read_text(encoding="utf-8"))
+    for forged_argv in (
+        [raw_argv[0], "/forged/run.py", *raw_argv[2:]],
+        [*raw_argv[:-1], "forged-step"],
+    ):
+        facts["command_facts"]["command_records"][confirm_index]["argv"] = (
+            forged_argv
+        )
+        _write_json(facts_path, facts)
+
+        forged_verdict = classify_phase(output_dir, session=session)
+        assert forged_verdict.status == "BLOCKED"
+        assert "trusted broker command is not uniquely present" in forged_verdict.reason
+
+    facts["command_facts"]["command_records"][confirm_index]["argv"] = raw_argv
+    _write_json(facts_path, facts)
+    valid_broker = json.loads(broker_path.read_text(encoding="utf-8"))
+    valid_normalized_argv = valid_broker["records"][confirm_index][
+        "normalized_model_argv"
+    ]
+    malformed_argvs = (
+        ("model_argv", []),
+        ("model_argv", raw_argv[:3]),
+        ("model_argv", ["ruby", *raw_argv[1:]]),
+        ("model_argv", ["evil/python", *raw_argv[1:]]),
+        ("model_argv", ["python3", *raw_argv[1:]]),
+        ("model_argv", [raw_argv[0], "", *raw_argv[2:]]),
+        ("model_argv", [raw_argv[0], 7, *raw_argv[2:]]),
+        ("normalized_model_argv", []),
+        ("normalized_model_argv", valid_normalized_argv[:3]),
+        ("normalized_model_argv", ["ruby", *valid_normalized_argv[1:]]),
+        (
+            "normalized_model_argv",
+            [
+                valid_normalized_argv[0],
+                valid_normalized_argv[1],
+                "other.py",
+                *valid_normalized_argv[3:],
+            ],
+        ),
+        (
+            "normalized_model_argv",
+            [valid_normalized_argv[0], "", *valid_normalized_argv[2:]],
+        ),
+    )
+    for field, malformed_argv in malformed_argvs:
+        malformed_broker = json.loads(json.dumps(valid_broker))
+        malformed_broker["records"][confirm_index][field] = malformed_argv
+        _write_json(broker_path, malformed_broker)
+
+        malformed_verdict = classify_phase(output_dir, session=session)
+        assert malformed_verdict.status == "BLOCKED"
 
 
 @pytest.mark.parametrize(

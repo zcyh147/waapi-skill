@@ -985,11 +985,13 @@ def _validate_success_command_facts(
     unmatched_command_indexes = set(range(len(command_records)))
     broker_command_records: list[Mapping[str, Any]] = []
     for broker_record in broker_records:
-        normalized = broker_record.get("normalized_model_argv")
         matches = [
             index
             for index in unmatched_command_indexes
-            if command_records[index].get("argv") == normalized
+            if _command_record_matches_broker_raw_argv(
+                command_records[index],
+                broker_record,
+            )
         ]
         if len(matches) != 1:
             raise CampaignEvidenceError("trusted broker command is not uniquely present in Codex facts")
@@ -1037,6 +1039,34 @@ def _validate_success_command_facts(
         raise CampaignEvidenceError("gateway subcommands do not match trusted visible broker output")
     if len(visible_steps) + len(unexpected_indexes) != len(expected_steps):
         raise CampaignEvidenceError("trusted broker output bridge is incomplete")
+
+
+def _command_record_matches_broker_raw_argv(
+    command_record: Mapping[str, Any],
+    broker_record: Mapping[str, Any],
+) -> bool:
+    observed = command_record.get("argv")
+    model_argv = broker_record.get("model_argv")
+    normalized_model_argv = broker_record.get("normalized_model_argv")
+    if not all(
+        isinstance(argv, list)
+        and len(argv) >= 4
+        and all(isinstance(value, str) and bool(value) for value in argv)
+        for argv in (observed, model_argv, normalized_model_argv)
+    ):
+        return False
+    raw_interpreter = Path(model_argv[0])
+    if (
+        raw_interpreter.name not in {"python", "python3"}
+        or (raw_interpreter.parent != Path(".") and not raw_interpreter.is_absolute())
+        or normalized_model_argv[0] != raw_interpreter.name
+        or normalized_model_argv[2] != "gateway.py"
+    ):
+        return False
+    return (
+        observed[0] in {model_argv[0], normalized_model_argv[0]}
+        and observed[1:] == model_argv[1:]
+    )
 
 
 def _validate_no_agent_action(output_dir: Path, *, require_facts: bool) -> None:
