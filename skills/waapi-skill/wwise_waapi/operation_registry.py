@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping, NoReturn, Sequence
 from xml.etree import ElementTree as ET
 
-from .canonical import canonical_json_bytes
+from .canonical import canonical_json_bytes, canonical_sha256
 from .builders.identity import ObjectIdentity, ResolvedObject, plan_object_resolution
 from .builders.metadata import (
     GET_PROPERTY_AND_REFERENCE_NAMES_URI,
@@ -3413,6 +3413,68 @@ def describe_operation(name: str) -> OperationSpec:
             f"Unknown closed operation {name!r}.",
             details={"operation": name, "supported": sorted(OPERATION_SPECS)},
         ) from exc
+
+
+def operation_request_machine_contract(name: str, version: str) -> dict[str, Any]:
+    """Return the versioned machine contract that governs request validity.
+
+    Human summaries and routing guidance are deliberately excluded: editing
+    prose must not invalidate an otherwise unchanged Operation Draft.  Fields
+    that affect accepted request values, identities, file policy, or Preview
+    ownership remain bound into the contract.
+    """
+
+    spec = describe_operation(name)
+    if version not in SUPPORTED_WWISE_VERSION_KEYS:
+        raise OperationContractError(
+            "UNSUPPORTED_VERSION",
+            f"Unsupported Wwise version {version!r}.",
+            details={"supported_versions": list(SUPPORTED_WWISE_VERSION_KEYS)},
+        )
+    if version not in spec.supported_versions:
+        raise OperationContractError(
+            "UNAVAILABLE_IN_VERSION",
+            f"{name} is not reflected for Wwise {version}.",
+            details={
+                "operation": name,
+                "version": version,
+                "supported_versions": list(spec.supported_versions),
+            },
+        )
+    if not spec.implemented:
+        raise OperationContractError(
+            "OPERATION_BOUNDARY",
+            f"{name} does not yet have a closed executable verifier.",
+            details={"operation": name, "boundary": spec.boundary},
+        )
+    return {
+        "additional_properties": False,
+        "argument_contract": _operation_argument_contract(
+            spec.name,
+            spec.argument_contract,
+            version=version,
+        ),
+        "constraints": list(spec.constraints),
+        "contract": "waapi-skill.operation-request-schema/v1",
+        "file_read_policy": spec.file_read_policy,
+        "identity_arguments": list(spec.identity_arguments),
+        "operation": spec.name,
+        "optional_arguments": list(spec.optional_arguments),
+        "parent_child_contract": {
+            parent_type: sorted(child_types)
+            for parent_type, child_types in sorted(spec.parent_child_contract.items())
+        },
+        "preview_owns": list(spec.preview_owns),
+        "request_contract": OPERATION_REQUEST_CONTRACT,
+        "required_arguments": list(spec.required_arguments),
+        "version": version,
+    }
+
+
+def operation_request_schema_digest(name: str, version: str) -> str:
+    """Bind one Draft to the exact Registry-owned request machine contract."""
+
+    return canonical_sha256(operation_request_machine_contract(name, version))
 
 
 def parse_operation_request(payload: Mapping[str, Any], *, expected_version: str | None = None) -> OperationRequest:
@@ -19564,6 +19626,8 @@ __all__ = [
     "VerificationResult",
     "describe_operation",
     "list_operation_specs",
+    "operation_request_machine_contract",
+    "operation_request_schema_digest",
     "parse_operation_request",
     "prepare_operation",
     "validate_prepared_roles",

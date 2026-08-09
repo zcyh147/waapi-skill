@@ -19,6 +19,8 @@ from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImp
     _materialize_audio_import_dynamic_rows,
     describe_operation,
     list_operation_specs,
+    operation_request_machine_contract,
+    operation_request_schema_digest,
     parse_operation_request,
     prepare_operation,
     validate_prepared_roles,
@@ -59,6 +61,31 @@ EXPECTED_ACTOR_MIXER_METADATA_TYPES = {
     "2024.1": "ActorMixer",
     "2025.1": "PropertyContainer",
 }
+
+
+def test_operation_request_schema_digest_owns_only_versioned_machine_contract() -> None:
+    contract_2022 = operation_request_machine_contract("object.set", "2022.1")
+    contract_2025 = operation_request_machine_contract("object.set", "2025.1")
+
+    assert contract_2022["contract"] == "waapi-skill.operation-request-schema/v1"
+    assert contract_2022["operation"] == "object.set"
+    assert contract_2022["version"] == "2022.1"
+    assert contract_2022["request_contract"] == OPERATION_REQUEST_CONTRACT
+    assert "summary" not in contract_2022
+    assert "selection_guidance" not in contract_2022
+    assert "next_step" not in contract_2022
+    assert operation_request_schema_digest("object.set", "2022.1") == (
+        "2b6d3903c5b3e11618c3eaf0a3d5a26aa0045db26750320f3a8ce8c7da004cee"
+    )
+    assert operation_request_schema_digest("object.set", "2025.1") != (
+        operation_request_schema_digest("object.set", "2022.1")
+    )
+    assert contract_2025["argument_contract"] != {}
+
+    with pytest.raises(OperationContractError, match="Unknown closed operation"):
+        operation_request_schema_digest("missing.operation", "2022.1")
+    with pytest.raises(OperationContractError, match="Unsupported Wwise version"):
+        operation_request_schema_digest("object.set", "2099.1")
 
 
 class ScriptedReader:

@@ -166,8 +166,15 @@ from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[re
     build_undo_group_execution_plan,
     describe_operation,
     list_operation_specs,
+    operation_request_schema_digest,
     validate_prepared_roles,
     verify_prepared_operation,
+)
+from wwise_waapi.operation_drafts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    OPERATION_DRAFT_CONTRACT,
+    OperationDraftRecord,
+    OperationDraftState,
+    OperationDraftStore,
 )
 from wwise_waapi.platform_paths import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     WWISE_WIRE_PATH_INPUT_AUDIT_CONTRACT,
@@ -249,6 +256,9 @@ OFFLINE_COMMANDS = frozenset(
         "object-types",
         "config-show",
         "config-set",
+        "draft-start",
+        "draft-inspect",
+        "draft-cancel",
         "transaction-show",
         "confirm",
         "reject",
@@ -979,7 +989,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--state-dir",
         help=(
-            f"Transaction state directory; defaults to ${STATE_DIRECTORY_ENV}, "
+            f"Gateway runtime state directory; defaults to ${STATE_DIRECTORY_ENV}, "
             "then $XDG_STATE_HOME/waapi-skill or $HOME/.local/state/waapi-skill"
         ),
     )
@@ -1389,6 +1399,30 @@ def build_parser() -> argparse.ArgumentParser:
     config_set.add_argument("--waapi-port")
     config_set.add_argument("--clear-waapi-port", action="store_true")
     config_set.add_argument("--project-modification-policy")
+
+    draft_start = subparsers.add_parser(
+        "draft-start",
+        help=(
+            "Start one task-capability-bound Operation Draft without connecting "
+            "to Wwise or creating a transaction Preview"
+        ),
+    )
+    draft_start.add_argument("operation")
+
+    draft_inspect = subparsers.add_parser(
+        "draft-inspect",
+        help="Inspect one authorized Operation Draft without connecting to Wwise",
+    )
+    draft_inspect.add_argument("draft_id")
+    draft_inspect.add_argument("--task-authority", required=True)
+
+    draft_cancel = subparsers.add_parser(
+        "draft-cancel",
+        help="Cancel one authorized editable Operation Draft without connecting to Wwise",
+    )
+    draft_cancel.add_argument("draft_id")
+    draft_cancel.add_argument("--task-authority", required=True)
+    draft_cancel.add_argument("--expected-revision", required=True, type=int)
 
     transaction_show = subparsers.add_parser(
         "transaction-show",
@@ -2813,6 +2847,44 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
 
 def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]) -> dict[str, Any]:
     """Run catalog commands without requiring a WAAPI port or live Wwise."""
+
+    if args.command == "draft-start":
+        request_version = resolve_operation_schema_version(args, env=env)
+        if request_version is None:
+            raise GatewayInputError(
+                "draft-start requires an explicit or configured Wwise version."
+            )
+        schema_digest = operation_request_schema_digest(
+            args.operation,
+            request_version,
+        )
+        store = OperationDraftStore(
+            resolve_transaction_state_directory(args, env=env)
+        )
+        started = store.start(
+            operation=args.operation,
+            version=request_version,
+            schema_digest=schema_digest,
+        )
+        payload = operation_draft_payload(args.command, started.record)
+        payload["task_authority"] = started.task_authority
+        return payload
+    if args.command in {"draft-inspect", "draft-cancel"}:
+        store = OperationDraftStore(
+            resolve_transaction_state_directory(args, env=env)
+        )
+        if args.command == "draft-inspect":
+            record = store.inspect(
+                args.draft_id,
+                task_authority=args.task_authority,
+            )
+        else:
+            record = store.cancel(
+                args.draft_id,
+                task_authority=args.task_authority,
+                expected_revision=args.expected_revision,
+            )
+        return operation_draft_payload(args.command, record)
 
     if args.command == "config-show":
         return config_result_payload("config-show", load_gateway_config(env))
@@ -9187,6 +9259,43 @@ def transaction_state_payload(command: str, record: Any, *, offline: bool) -> di
             ["execute", record.transaction_id],
         )
     return payload
+
+
+def operation_draft_payload(
+    command: str,
+    record: OperationDraftRecord,
+) -> dict[str, Any]:
+    """Project bounded lifecycle facts without inventing adapter-owned fields."""
+
+    allowed_actions = (
+        ["inspect", "cancel"]
+        if record.state is OperationDraftState.EDITABLE
+        else []
+    )
+    return {
+        "contract": GATEWAY_RESULT_CONTRACT,
+        "ok": True,
+        "status": record.state.value,
+        "command": command,
+        "offline": True,
+        "draft": {
+            "contract": OPERATION_DRAFT_CONTRACT,
+            "draft_id": record.draft_id,
+            "lifecycle_state": record.state.value,
+            "revision": record.revision,
+            "binding": {
+                "operation": record.operation,
+                "version": record.version,
+                "schema_digest": record.schema_digest,
+            },
+            "created_at": record.created_at,
+            "updated_at": record.updated_at,
+            "current_facts": [],
+            "missing_fields": [],
+            "missing_fields_status": "no_operation_adapter",
+            "allowed_actions": allowed_actions,
+        },
+    }
 
 
 def transaction_agent_result(
