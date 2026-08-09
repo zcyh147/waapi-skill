@@ -95,7 +95,12 @@ def _write_fake_python(bin_dir: Path, fail_on: str | None = None) -> None:
         "    is_smoke = bool(child_argv[1:]) and child_argv[1].endswith('wwise_smoke.py')\n"
         "    builds = {'2021.1': '2021.1.14.8108', '2022.1': '2022.1.19.8584', '2023.1': '2023.1.19.8928', '2024.1': '2024.1.13.9056', '2025.1': '2025.1.7.9143'}\n"
         "    version = child_environment.get('WWISE_VERSION')\n"
-        "    sandbox_project = Path(child_environment['WWISE_SANDBOX_ROOT']).resolve() / 'deleted' / 'SampleProject.wproj'\n"
+        "    if not is_smoke:\n"
+        "        return subprocess.CompletedProcess(command, selected_returncode(child_argv[1:]))\n"
+        "    sandbox_root = child_environment.get('WWISE_SANDBOX_ROOT')\n"
+        "    if sandbox_root is None:\n"
+        "        raise AssertionError('smoke child did not receive WWISE_SANDBOX_ROOT')\n"
+        "    sandbox_project = Path(sandbox_root).resolve() / 'deleted' / 'SampleProject.wproj'\n"
         "    smoke_command = [child_environment['WWISE_CONSOLE'], 'waapi-server', str(sandbox_project), '--wamp-port', '31337', '--http-port', '0']\n"
         "    smoke_payload = {'argv': smoke_command, 'build': builds.get(version), 'cleanup': 'cleaned', 'contract': 'waapi-skill.real-smoke/v1', 'display_name': 'fake WwiseConsole', 'isCommandLine': True, 'pid': 4242, 'port': 31337, 'ready_duration_seconds': 0.25, 'sandbox_deleted': True, 'sandbox_project': str(sandbox_project), 'source_mtime_ns': 123456789, 'source_sha256': '0' * 64, 'version': version}\n"
         "    smoke_stdout = 'smoke ok:' + json.dumps(smoke_payload, sort_keys=True) + '\\n' if is_smoke else None\n"
@@ -286,10 +291,10 @@ def test_python_driver_owns_all_platform_defaults_and_pytest_nodes() -> None:
         posix = default_live_paths(version, "live", windows=False)
 
         assert str(windows.console).startswith(r"C:\Audiokinetic\Wwise")
-        assert str(windows.project).endswith(
-            str(Path("tests") / "_org" / version / "SampleProject.wproj")
+        assert windows.project == (
+            REPO_ROOT / "tests" / "_org" / version / "SampleProject.wproj"
         )
-        assert str(posix.console).startswith("/Applications/Audiokinetic/Wwise")
+        assert posix.console.as_posix().startswith("/Applications/Audiokinetic/Wwise")
         for node in (*LIVE_TEST_NODES[version], *DESTRUCTIVE_TEST_NODES[version]):
             assert (REPO_ROOT / node.split("::", 1)[0]).is_file()
 
