@@ -80,7 +80,10 @@ from .operation_import import (
     verify_regular_file_proof as verify_import_file_proof,
 )
 from .operation_object import (
+    DEFAULT_MAX_CHILDREN_PER_NODE,
+    DEFAULT_MAX_DEPTH,
     DEFAULT_MAX_FIELDS_PER_NODE,
+    DEFAULT_MAX_IMPORT_FILES,
     DEFAULT_MAX_NODES,
     DEFAULT_MAX_REQUEST_BYTES,
     ObjectImportDescriptor,
@@ -96,6 +99,7 @@ from .operation_object import (
     materialize_waapi_rtpc,
     normalize_object_forest,
     normalize_object_import,
+    normalize_object_node,
     normalize_object_list_name,
     normalize_object_lists,
     normalize_property_descriptors,
@@ -1766,6 +1770,9 @@ class VerificationResult:
 
 
 ReadCall = Callable[[str, Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any]]
+
+MAX_OBJECT_SET_COMPOSER_CHECK_READS = 512
+MAX_OBJECT_SET_COMPOSER_CHECK_MESSAGE_CHARS = 1024
 
 # Positive contract for dedicated operations whose adapters bind paths on the
 # gateway machine. Generic ``waapi.call`` locality is derived separately from
@@ -3646,7 +3653,7 @@ def operation_request_schema_digest(name: str, version: str) -> str:
 
 
 def object_set_composer_fragment_contract(version: str) -> dict[str, Any]:
-    """Project only the Registry-owned fragments used by Composer issue #7.
+    """Project only the Registry-owned fragments reviewed for the Composer.
 
     This intentionally does not expose a generic schema-pointer API.  A later
     Adapter must add another reviewed projection rather than selecting an
@@ -3655,10 +3662,12 @@ def object_set_composer_fragment_contract(version: str) -> dict[str, Any]:
 
     machine = operation_request_machine_contract("object.set", version)
     try:
-        row = machine["argument_contract"]["properties"]["objects"]["items"]
+        argument_properties = machine["argument_contract"]["properties"]
+        row = argument_properties["objects"]["items"]
         properties = row["properties"]
         selector = properties["object"]
         scalar_property = properties["properties"]["items"]
+        node_properties = properties["children"]["items"]["properties"]
     except (KeyError, TypeError) as exc:  # pragma: no cover - registry invariant
         raise RuntimeError(
             "object.set Registry schema no longer exposes the reviewed Composer fragments"
@@ -3669,9 +3678,49 @@ def object_set_composer_fragment_contract(version: str) -> dict[str, Any]:
         "version": version,
         "target_selector": _json_mapping(selector),
         "scalar_property": _json_mapping(scalar_property),
+        "request_options": {
+            name: _json_mapping(argument_properties[name])
+            for name in (
+                "platform",
+                "list_mode",
+                "on_name_conflict",
+                "auto_add_to_source_control",
+            )
+        },
+        "target_fields": {
+            name: _json_mapping(properties[name])
+            for name in (
+                "name",
+                "notes",
+                "platform",
+                "list_mode",
+                "on_name_conflict",
+            )
+        },
+        "node_fields": {
+            name: _json_mapping(node_properties[name])
+            for name in ("type", "name", "notes", "platform", "language")
+        },
+        "list_name": _json_mapping(properties["lists"]["items"]["properties"]["name"]),
+        "import_supported": version in OBJECT_SET_IMPORT_VERSIONS,
+        "import_file": _json_mapping(
+            properties["import"]["properties"]["files"]["items"]
+        ),
+        "import_options": {
+            "auto_add_to_source_control": _json_mapping(
+                properties["import"]["properties"]["auto_add_to_source_control"]
+            )
+        },
         "limits": {
-            "targets": 1,
+            "targets": 32,
             "properties_per_target": DEFAULT_MAX_FIELDS_PER_NODE,
+            "children_per_parent": DEFAULT_MAX_CHILDREN_PER_NODE,
+            "lists_per_target": properties["lists"].get(
+                "maxItems", DEFAULT_MAX_CHILDREN_PER_NODE
+            ),
+            "total_nodes": DEFAULT_MAX_NODES,
+            "depth": DEFAULT_MAX_DEPTH,
+            "files_per_import": DEFAULT_MAX_IMPORT_FILES,
             "canonical_request_bytes": machine["argument_contract"].get(
                 "maximumCanonicalRequestBytes"
             ),
@@ -3721,11 +3770,180 @@ def validate_object_set_composer_fragment(
         if len(descriptors) != 1:  # pragma: no cover - normalizer invariant
             raise RuntimeError("one scalar property fragment did not normalize once")
         return descriptors[0].as_dict()
+    if fragment == "request_option":
+        if not isinstance(payload, Mapping) or set(payload) != {"name", "value"}:
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                "object.set Composer request option must contain name and value.",
+            )
+        name = payload.get("name")
+        contract = object_set_composer_fragment_contract(version)
+        option_contracts = contract["request_options"]
+        if not isinstance(name, str) or name not in option_contracts:
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                "object.set Composer request option is not reviewed.",
+                details={"name": name, "allowed": sorted(option_contracts)},
+            )
+        return {
+            "name": name,
+            "value": _normalize_composer_scalar(
+                payload.get("value"),
+                schema=option_contracts[name],
+                field=f"object.set.{name}",
+            ),
+        }
+    if fragment in {"target_field", "node_field"}:
+        if not isinstance(payload, Mapping) or set(payload) != {"name", "value"}:
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                f"object.set Composer {fragment} must contain name and value.",
+            )
+        name = payload.get("name")
+        contract = object_set_composer_fragment_contract(version)
+        field_contracts = contract[
+            "target_fields" if fragment == "target_field" else "node_fields"
+        ]
+        if not isinstance(name, str) or name not in field_contracts:
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                f"object.set Composer {fragment} is not reviewed.",
+                details={"name": name, "allowed": sorted(field_contracts)},
+            )
+        return {
+            "name": name,
+            "value": _normalize_composer_scalar(
+                payload.get("value"),
+                schema=field_contracts[name],
+                field=f"object.set.{fragment}.{name}",
+            ),
+        }
+    if fragment == "node":
+        try:
+            return normalize_object_node(
+                payload,
+                base_path="$.arguments.objects[0].children[0]",
+                allow_platform=True,
+                allow_language=True,
+                allow_import=version in OBJECT_SET_IMPORT_VERSIONS,
+            ).as_dict()
+        except ObjectOperationContractError as exc:
+            raise OperationContractError(
+                exc.error_code,
+                str(exc),
+                details=exc.details,
+            ) from exc
+    if fragment == "list_name":
+        try:
+            return {
+                "name": normalize_object_list_name(
+                    payload,
+                    request_path="$.arguments.objects[0].lists[0].name",
+                )
+            }
+        except ObjectOperationContractError as exc:
+            raise OperationContractError(
+                exc.error_code,
+                str(exc),
+                details=exc.details,
+            ) from exc
+    if fragment == "import_file":
+        if version not in OBJECT_SET_IMPORT_VERSIONS:
+            raise OperationContractError(
+                "VERSION_BEHAVIOR_BOUNDARY",
+                "object.set import is available only in Wwise 2023.1-2025.1.",
+                details={"version": version},
+            )
+        try:
+            descriptor = normalize_object_import(
+                {"files": [payload]},
+                request_path="$.arguments.objects[0].import",
+            )
+        except ObjectOperationContractError as exc:
+            raise OperationContractError(
+                exc.error_code,
+                str(exc),
+                details=exc.details,
+            ) from exc
+        return descriptor.files[0].as_dict()
+    if fragment == "import_option":
+        if version not in OBJECT_SET_IMPORT_VERSIONS:
+            raise OperationContractError(
+                "VERSION_BEHAVIOR_BOUNDARY",
+                "object.set import is available only in Wwise 2023.1-2025.1.",
+                details={"version": version},
+            )
+        if not isinstance(payload, Mapping) or set(payload) != {"name", "value"}:
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                "object.set Composer import option must contain name and value.",
+            )
+        name = payload.get("name")
+        contracts = object_set_composer_fragment_contract(version)["import_options"]
+        if not isinstance(name, str) or name not in contracts:
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                "object.set Composer import option is not reviewed.",
+                details={"name": name, "allowed": sorted(contracts)},
+            )
+        return {
+            "name": name,
+            "value": _normalize_composer_scalar(
+                payload.get("value"),
+                schema=contracts[name],
+                field=f"object.set.import.{name}",
+            ),
+        }
     raise OperationContractError(
         "OPERATION_DRAFT_ADAPTER_UNAVAILABLE",
-        "Only the exact object.set target selector and scalar property fragments are reviewed.",
+        "The requested object.set fragment is outside the reviewed Composer Adapter.",
         details={"operation": "object.set", "version": version, "fragment": fragment},
     )
+
+
+def _normalize_composer_scalar(
+    value: Any,
+    *,
+    schema: Mapping[str, Any],
+    field: str,
+) -> Any:
+    """Apply the small scalar subset projected from one Registry field."""
+
+    expected_type = schema.get("type")
+    if expected_type == "boolean":
+        if type(value) is not bool:
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                f"{field} must be a JSON boolean.",
+            )
+    elif expected_type == "string":
+        if not isinstance(value, str):
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                f"{field} must be a string.",
+            )
+        minimum = schema.get("minLength")
+        maximum = schema.get("maxLength")
+        if isinstance(minimum, int) and len(value) < minimum:
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                f"{field} is shorter than the Registry minimum.",
+            )
+        if isinstance(maximum, int) and len(value) > maximum:
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                f"{field} exceeds the Registry maximum.",
+            )
+    else:  # pragma: no cover - guarded by the reviewed Registry projection
+        raise RuntimeError(f"Unsupported Composer scalar schema for {field}")
+    allowed = schema.get("enum")
+    if isinstance(allowed, list) and value not in allowed:
+        raise OperationContractError(
+            "INVALID_ARGUMENT",
+            f"{field} is outside the Registry enum.",
+            details={"actual": value, "allowed": list(allowed)},
+        )
+    return value
 
 
 def parse_operation_request(payload: Mapping[str, Any], *, expected_version: str | None = None) -> OperationRequest:
@@ -8215,6 +8433,88 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
         cleanup=cleanup,
         warnings=tuple(warnings),
     )
+
+
+def prepare_object_set_composer_check(
+    request: OperationRequest,
+    *,
+    read_call: ReadCall,
+) -> ReadCall:
+    """Check every object.set row and return the same bounded read snapshot.
+
+    The Composer uses this only before its authoritative Preview build.  Each
+    row is prepared through the Registry's normal operation path so the check
+    does not maintain a second identity or metadata validator.  Successful
+    reads are cached and then replayed into the full Preview build, which still
+    reparses and prepares the complete canonical request.
+    """
+
+    if request.operation != "object.set":
+        raise OperationContractError(
+            "INVALID_REQUEST",
+            "The multi-row Composer check is available only for object.set.",
+        )
+    raw_objects = _mapping_sequence(request.arguments.get("objects"), field="objects")
+    cache: dict[bytes, Mapping[str, Any]] = {}
+
+    def cached_read(
+        uri: str,
+        args: Mapping[str, Any],
+        options: Mapping[str, Any],
+    ) -> Mapping[str, Any]:
+        key = canonical_json_bytes(
+            {"uri": uri, "args": dict(args), "options": dict(options)}
+        )
+        existing = cache.get(key)
+        if existing is not None:
+            return dict(existing)
+        if len(cache) >= MAX_OBJECT_SET_COMPOSER_CHECK_READS:
+            raise OperationContractError(
+                "OPERATION_DRAFT_CHECK_LIMIT_EXCEEDED",
+                "Operation Draft live check exceeded its fixed read ceiling.",
+                details={"limit": MAX_OBJECT_SET_COMPOSER_CHECK_READS},
+            )
+        result = read_call(uri, args, options)
+        if not isinstance(result, Mapping):
+            raise OperationContractError(
+                "INVALID_READBACK",
+                f"Readback for {uri} must be a JSON object.",
+                details={"uri": uri, "actual_type": type(result).__name__},
+            )
+        normalized = dict(result)
+        cache[key] = normalized
+        return dict(normalized)
+
+    common_arguments = {
+        key: value
+        for key, value in request.arguments.items()
+        if key != "objects"
+    }
+    issues: list[dict[str, Any]] = []
+    for row_index, row in enumerate(raw_objects):
+        row_request = OperationRequest(
+            contract=request.contract,
+            version=request.version,
+            operation=request.operation,
+            arguments={**common_arguments, "objects": [dict(row)]},
+        )
+        try:
+            prepare_operation(row_request, read_call=cached_read)
+        except OperationContractError as exc:
+            issues.append(
+                {
+                    "row_index": row_index,
+                    "error_code": exc.error_code,
+                    "message": str(exc)[:MAX_OBJECT_SET_COMPOSER_CHECK_MESSAGE_CHARS],
+                }
+            )
+    if issues:
+        raise OperationContractError(
+            "OPERATION_DRAFT_CHECK_FAILED",
+            "Operation Draft live check found invalid object.set rows.",
+            details={"issues": issues},
+        )
+    return cached_read
 
 
 def _prepare_ui_command_operation(
@@ -19888,6 +20188,7 @@ __all__ = [
     "operation_request_schema_digest",
     "object_set_composer_fragment_contract",
     "parse_operation_request",
+    "prepare_object_set_composer_check",
     "prepare_operation",
     "validate_operation_input_mode_lanes",
     "validate_object_set_composer_fragment",

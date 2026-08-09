@@ -8,8 +8,14 @@ from collections import deque
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+import pytest
+
 from wwise_waapi.operation_drafts import (  # pyright: ignore[reportMissingImports]
     OperationDraftStore,
+)
+from wwise_waapi.operation_composer import (  # pyright: ignore[reportMissingImports]
+    OperationComposerError,
+    operation_composer_digest,
 )
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     LEGACY_JSON_INPUT_MODE,
@@ -245,10 +251,11 @@ def test_object_set_typed_actions_build_one_target_scalar_fact_offline(
         "handle": handle,
         "selector": {"kind": "id", "value": TARGET_ID},
         "properties": [],
+        "children": [],
+        "lists": [],
+        "import": None,
     }
-    assert target["draft"]["missing_fields"] == [
-        f"targets[{handle}].properties"
-    ]
+    assert target["draft"]["missing_fields"] == [f"targets[{handle}].change"]
 
     property_code, property_result = execute(
         tmp_path,
@@ -274,6 +281,9 @@ def test_object_set_typed_actions_build_one_target_scalar_fact_offline(
             "handle": handle,
             "selector": {"kind": "id", "value": TARGET_ID},
             "properties": [{"name": "Volume", "value": -6.0}],
+            "children": [],
+            "lists": [],
+            "import": None,
         }
     ]
     assert property_result["draft"]["missing_fields"] == []
@@ -351,9 +361,7 @@ def test_property_correction_and_removal_are_ordered_typed_edits(
     )
     assert removed_property["draft"]["revision"] == 5
     assert removed_property["draft"]["current_facts"][0]["properties"] == []
-    assert removed_property["draft"]["missing_fields"] == [
-        f"targets[{handle}].properties"
-    ]
+    assert removed_property["draft"]["missing_fields"] == [f"targets[{handle}].change"]
 
     _code, removed_target = execute(
         tmp_path,
@@ -368,7 +376,7 @@ def test_property_correction_and_removal_are_ordered_typed_edits(
     )
     assert removed_target["draft"]["revision"] == 6
     assert removed_target["draft"]["current_facts"] == []
-    assert removed_target["draft"]["allowed_actions"][0] == "add_target"
+    assert "add_target" in removed_target["draft"]["allowed_actions"]
 
 
 def test_invalid_action_is_byte_atomic_and_rejects_complete_request_injection(
@@ -673,3 +681,634 @@ def test_live_check_is_bounded_durable_and_any_edit_invalidates_it(
     assert edited["draft"]["check"] is None
     assert "preview-from-draft" not in edited["draft"]["allowed_actions"]
     assert "check" in edited["draft"]["allowed_actions"]
+
+
+def test_live_check_reports_all_invalid_target_rows_without_writing(
+    tmp_path: Path,
+) -> None:
+    _code, started = execute(tmp_path, "draft-start", "object.set")
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    revision = 1
+    target_ids = (
+        "{10000000-0000-0000-0000-000000000001}",
+        "{10000000-0000-0000-0000-000000000002}",
+    )
+    for target_id in target_ids:
+        code, targeted = execute(
+            tmp_path,
+            "draft-apply",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(revision),
+            "--action-json",
+            action("add_target", selector={"kind": "id", "value": target_id}),
+        )
+        assert code == 0
+        revision = targeted["draft"]["revision"]
+        handle = targeted["draft"]["current_facts"][-1]["handle"]
+        code, changed = execute(
+            tmp_path,
+            "draft-apply",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(revision),
+            "--action-json",
+            action(
+                "set_property",
+                target_handle=handle,
+                name="Volume",
+                value=99.0,
+            ),
+        )
+        assert code == 0
+        revision = changed["draft"]["revision"]
+
+    record_path = (
+        tmp_path
+        / "state"
+        / "operation-drafts-v1"
+        / "records"
+        / f"{draft_id}.json"
+    )
+    before = record_path.read_bytes()
+    rows = [
+        {
+            "id": target_id,
+            "name": f"Target {index}",
+            "type": "Sound",
+            "path": rf"\Actor-Mixer Hierarchy\Default Work Unit\Target {index}",
+            "parent": {"id": PARENT_ID},
+            "notes": "before",
+        }
+        for index, target_id in enumerate(target_ids, start=1)
+    ]
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [live_info()],
+            "ak.wwise.core.getProjectInfo": [project_row()],
+            "ak.wwise.core.object.getTypes": [
+                {"return": [{"classId": 1, "name": "Sound", "type": "Sound"}]}
+            ],
+            "ak.wwise.core.object.getPropertyInfo": [
+                {
+                    "name": "Volume",
+                    "type": "Real32",
+                    "restriction": {"type": "range", "min": -96.3, "max": 12.0},
+                },
+                {
+                    "name": "Volume",
+                    "type": "Real32",
+                    "restriction": {"type": "range", "min": -96.3, "max": 12.0},
+                },
+            ],
+            "ak.wwise.core.object.get": [
+                {"return": [rows[0]]},
+                {"return": [rows[1]]},
+            ],
+        }
+    )
+
+    exit_code, rejected = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-check",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(revision),
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert exit_code == 2
+    assert rejected["error_code"] == "OPERATION_DRAFT_CHECK_FAILED"
+    assert [issue["row_index"] for issue in rejected["details"]["issues"]] == [0, 1]
+    assert {
+        issue["error_code"] for issue in rejected["details"]["issues"]
+    } == {"PROPERTY_VALUE_OUT_OF_RANGE"}
+    assert record_path.read_bytes() == before
+    assert not (tmp_path / "state" / "transactions").exists()
+    identity_calls = [
+        call
+        for call in client.calls
+        if call[0] == "ak.wwise.core.object.get"
+    ]
+    assert len(identity_calls) == 2
+    assert client.disconnected is True
+
+
+def test_weather_shape_keeps_multiple_targets_and_request_options_in_business_order(
+    tmp_path: Path,
+) -> None:
+    selectors = [
+        {
+            "kind": "direct-child",
+            "parent": {"kind": "path", "value": rf"\Events\Weather\Play_{name}"},
+            "type": "Action",
+        }
+        for name in ("Rain", "Wind")
+    ]
+    expected_properties = (
+        (("FadeTime", 0.25), ("Delay", 0.0)),
+        (("FadeTime", 0.4), ("Delay", 0.1)),
+    )
+    _code, started = execute(tmp_path, "draft-start", "object.set")
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    revision = 1
+
+    code, configured = execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        str(revision),
+        "--action-json",
+        action("set_request_option", name="on_name_conflict", value="fail"),
+    )
+    assert code == 0
+    revision = configured["draft"]["revision"]
+
+    handles: list[str] = []
+    for selector, properties in zip(selectors, expected_properties, strict=True):
+        code, targeted = execute(
+            tmp_path,
+            "draft-apply",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(revision),
+            "--action-json",
+            action("add_target", selector=selector),
+        )
+        assert code == 0
+        revision = targeted["draft"]["revision"]
+        handles.append(targeted["draft"]["current_facts"][-1]["handle"])
+        for name, value in properties:
+            code, updated = execute(
+                tmp_path,
+                "draft-apply",
+                draft_id,
+                "--task-authority",
+                authority,
+                "--expected-revision",
+                str(revision),
+                "--action-json",
+                action(
+                    "set_property",
+                    target_handle=handles[-1],
+                    name=name,
+                    value=value,
+                ),
+            )
+            assert code == 0
+            revision = updated["draft"]["revision"]
+
+    materialized = OperationDraftStore(tmp_path / "state").materialize_request(
+        draft_id,
+        task_authority=authority,
+        expected_revision=revision,
+        schema_digest=started["draft"]["binding"]["schema_digest"],
+        composer_digest=operation_composer_digest("object.set", "2022.1"),
+    )
+
+    assert materialized.request == {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.set",
+        "arguments": {
+            "objects": [
+                {
+                    "object": selectors[index],
+                    "properties": [
+                        {"name": name, "value": value}
+                        for name, value in expected_properties[index]
+                    ],
+                }
+                for index in range(2)
+            ],
+            "on_name_conflict": "fail",
+        },
+    }
+    assert [row["handle"] for row in updated["draft"]["current_facts"]] == handles
+
+
+def test_target_and_recursive_child_facts_materialize_without_raw_tree_patches(
+    tmp_path: Path,
+) -> None:
+    _code, started = execute(tmp_path, "draft-start", "object.set")
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    revision = 1
+
+    def apply(action_name: str, **fields: Any) -> dict[str, Any]:
+        nonlocal revision
+        code, payload = execute(
+            tmp_path,
+            "draft-apply",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(revision),
+            "--action-json",
+            action(action_name, **fields),
+        )
+        assert code == 0
+        revision = payload["draft"]["revision"]
+        return payload
+
+    targeted = apply(
+        "add_target",
+        selector={"kind": "id", "value": TARGET_ID},
+    )
+    target_handle = targeted["draft"]["current_facts"][0]["handle"]
+    apply("set_target_field", target_handle=target_handle, name="notes", value="batch")
+    apply("set_target_field", target_handle=target_handle, name="platform", value="Windows")
+    child = apply(
+        "add_child",
+        parent_handle=target_handle,
+        type="Sound",
+        name="Rain_Layer",
+    )
+    child_handle = child["draft"]["current_facts"][0]["children"][0]["handle"]
+    apply("set_node_field", node_handle=child_handle, name="notes", value="loop")
+    apply("set_node_field", node_handle=child_handle, name="language", value="SFX")
+    final = apply(
+        "set_node_property",
+        node_handle=child_handle,
+        name="Volume",
+        value=-4.0,
+    )
+
+    materialized = OperationDraftStore(tmp_path / "state").materialize_request(
+        draft_id,
+        task_authority=authority,
+        expected_revision=revision,
+        schema_digest=started["draft"]["binding"]["schema_digest"],
+        composer_digest=operation_composer_digest("object.set", "2022.1"),
+    )
+    assert materialized.request["arguments"] == {
+        "objects": [
+            {
+                "object": {"kind": "id", "value": TARGET_ID},
+                "notes": "batch",
+                "platform": "Windows",
+                "children": [
+                    {
+                        "type": "Sound",
+                        "name": "Rain_Layer",
+                        "notes": "loop",
+                        "language": "SFX",
+                        "properties": [{"name": "Volume", "value": -4.0}],
+                    }
+                ],
+            }
+        ]
+    }
+    assert final["draft"]["missing_fields"] == []
+
+
+def test_closed_object_list_members_use_handles_and_keep_insertion_order(
+    tmp_path: Path,
+) -> None:
+    _code, started = execute(tmp_path, "draft-start", "object.set")
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    revision = 1
+
+    def apply(action_name: str, **fields: Any) -> dict[str, Any]:
+        nonlocal revision
+        code, payload = execute(
+            tmp_path,
+            "draft-apply",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(revision),
+            "--action-json",
+            action(action_name, **fields),
+        )
+        assert code == 0
+        revision = payload["draft"]["revision"]
+        return payload
+
+    targeted = apply("add_target", selector={"kind": "id", "value": TARGET_ID})
+    target_handle = targeted["draft"]["current_facts"][0]["handle"]
+    listed = apply("add_list", target_handle=target_handle, name="CustomList")
+    list_handle = listed["draft"]["current_facts"][0]["lists"][0]["handle"]
+    first = apply("add_list_member", list_handle=list_handle, type="Sound", name="Rain")
+    first_handle = first["draft"]["current_facts"][0]["lists"][0]["objects"][0]["handle"]
+    second = apply("add_list_member", list_handle=list_handle, type="Sound", name="Wind")
+    second_handle = second["draft"]["current_facts"][0]["lists"][0]["objects"][1]["handle"]
+    apply("set_node_field", node_handle=first_handle, name="notes", value="first")
+    final = apply("set_node_field", node_handle=second_handle, name="platform", value="Windows")
+
+    materialized = OperationDraftStore(tmp_path / "state").materialize_request(
+        draft_id,
+        task_authority=authority,
+        expected_revision=revision,
+        schema_digest=started["draft"]["binding"]["schema_digest"],
+        composer_digest=operation_composer_digest("object.set", "2022.1"),
+    )
+    assert materialized.request["arguments"]["objects"][0]["lists"] == [
+        {
+            "name": "CustomList",
+            "objects": [
+                {"type": "Sound", "name": "Rain", "notes": "first"},
+                {"type": "Sound", "name": "Wind", "platform": "Windows"},
+            ],
+        }
+    ]
+    assert [
+        item["handle"]
+        for item in final["draft"]["current_facts"][0]["lists"][0]["objects"]
+    ] == [first_handle, second_handle]
+
+
+def test_embedded_import_files_are_versioned_correctable_and_handle_addressed(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "Rain Source.wav"
+    source.write_bytes(b"RIFF\x04\x00\x00\x00WAVEpayload")
+    _code, started = execute(
+        tmp_path,
+        "--version",
+        "2023.1",
+        "draft-start",
+        "object.set",
+    )
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    revision = 1
+
+    def apply(action_name: str, **fields: Any) -> dict[str, Any]:
+        nonlocal revision
+        code, payload = execute(
+            tmp_path,
+            "draft-apply",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(revision),
+            "--action-json",
+            action(action_name, **fields),
+        )
+        assert code == 0
+        revision = payload["draft"]["revision"]
+        return payload
+
+    targeted = apply("add_target", selector={"kind": "id", "value": TARGET_ID})
+    target_handle = targeted["draft"]["current_facts"][0]["handle"]
+    imported = apply(
+        "add_import_file",
+        owner_handle=target_handle,
+        audio_file=str(source),
+        language="SFX",
+        object_type="AudioFileSource",
+    )
+    file_fact = imported["draft"]["current_facts"][0]["import"]["files"][0]
+    file_handle = file_fact["handle"]
+    assert TARGET_HANDLE_RE.fullmatch(file_handle)
+    apply(
+        "set_import_file_field",
+        file_handle=file_handle,
+        name="originals_subfolder",
+        value="Weather/Rain",
+    )
+    final = apply(
+        "set_import_option",
+        owner_handle=target_handle,
+        name="auto_add_to_source_control",
+        value=False,
+    )
+
+    materialized = OperationDraftStore(tmp_path / "state").materialize_request(
+        draft_id,
+        task_authority=authority,
+        expected_revision=revision,
+        schema_digest=started["draft"]["binding"]["schema_digest"],
+        composer_digest=operation_composer_digest("object.set", "2023.1"),
+    )
+    assert materialized.request["arguments"]["objects"][0]["import"] == {
+        "files": [
+            {
+                "audio_file": str(source),
+                "originals_subfolder": "Weather/Rain",
+                "language": "SFX",
+                "object_type": "AudioFileSource",
+            }
+        ],
+        "auto_add_to_source_control": False,
+    }
+    assert final["draft"]["missing_fields"] == []
+
+
+def test_embedded_import_is_rejected_before_revision_on_wwise_2022(
+    tmp_path: Path,
+) -> None:
+    _code, started = execute(tmp_path, "draft-start", "object.set")
+    assert "add_import_file" not in started["draft"]["allowed_actions"]
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    _code, targeted = execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--action-json",
+        action("add_target", selector={"kind": "id", "value": TARGET_ID}),
+    )
+    assert "add_import_file" not in targeted["draft"]["allowed_actions"]
+    target_handle = targeted["draft"]["current_facts"][0]["handle"]
+    record_path = (
+        tmp_path / "state" / "operation-drafts-v1" / "records" / f"{draft_id}.json"
+    )
+    before = record_path.read_bytes()
+
+    code, rejected = execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "2",
+        "--action-json",
+        action(
+            "add_import_file",
+            owner_handle=target_handle,
+            audio_file=str(tmp_path / "not-opened.wav"),
+        ),
+    )
+
+    assert code == 2
+    assert rejected["error_code"] == "OPERATION_DRAFT_ACTION_INVALID"
+    assert record_path.read_bytes() == before
+
+
+def test_invalid_options_duplicates_and_target_ceiling_are_byte_atomic(
+    tmp_path: Path,
+) -> None:
+    _code, started = execute(tmp_path, "draft-start", "object.set")
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    record_path = (
+        tmp_path / "state" / "operation-drafts-v1" / "records" / f"{draft_id}.json"
+    )
+    before = record_path.read_bytes()
+
+    code, rejected = execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--action-json",
+        action("set_request_option", name="list_mode", value="raw-native-mode"),
+    )
+    assert code == 2
+    assert rejected["error_code"] == "OPERATION_DRAFT_ACTION_INVALID"
+    assert record_path.read_bytes() == before
+
+    revision = 1
+    first_selector: dict[str, Any] | None = None
+    for index in range(32):
+        selector = {"kind": "id", "value": index + 1}
+        code, payload = execute(
+            tmp_path,
+            "draft-apply",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(revision),
+            "--action-json",
+            action("add_target", selector=selector),
+        )
+        assert code == 0
+        revision = payload["draft"]["revision"]
+        first_selector = first_selector or selector
+
+    before_limit = record_path.read_bytes()
+    code, limited = execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        str(revision),
+        "--action-json",
+        action("add_target", selector={"kind": "id", "value": 33}),
+    )
+    assert code == 2
+    assert limited["details"]["limit"] == 32
+    assert record_path.read_bytes() == before_limit
+
+    code, duplicate = execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        str(revision),
+        "--action-json",
+        action("add_target", selector=first_selector),
+    )
+    assert code == 2
+    assert record_path.read_bytes() == before_limit
+
+
+def test_empty_append_list_remains_incomplete_but_replace_all_can_clear_it(
+    tmp_path: Path,
+) -> None:
+    _code, started = execute(tmp_path, "draft-start", "object.set")
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    _code, targeted = execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--action-json",
+        action("add_target", selector={"kind": "id", "value": TARGET_ID}),
+    )
+    target_handle = targeted["draft"]["current_facts"][0]["handle"]
+    _code, listed = execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "2",
+        "--action-json",
+        action("add_list", target_handle=target_handle, name="CustomList"),
+    )
+    assert listed["draft"]["missing_fields"] == [
+        f"targets[{target_handle}].lists["
+        f"{listed['draft']['current_facts'][0]['lists'][0]['handle']}].objects"
+    ]
+    store = OperationDraftStore(tmp_path / "state")
+    with pytest.raises(OperationComposerError) as incomplete:
+        store.materialize_request(
+            draft_id,
+            task_authority=authority,
+            expected_revision=3,
+            schema_digest=started["draft"]["binding"]["schema_digest"],
+            composer_digest=operation_composer_digest("object.set", "2022.1"),
+        )
+    assert incomplete.value.error_code == "NO_OP"
+
+    code, replaced = execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "3",
+        "--action-json",
+        action("set_request_option", name="list_mode", value="replaceAll"),
+    )
+    assert code == 0
+    assert replaced["draft"]["missing_fields"] == []
+    materialized = store.materialize_request(
+        draft_id,
+        task_authority=authority,
+        expected_revision=4,
+        schema_digest=started["draft"]["binding"]["schema_digest"],
+        composer_digest=operation_composer_digest("object.set", "2022.1"),
+    )
+    assert materialized.request["arguments"] == {
+        "objects": [
+            {
+                "object": {"kind": "id", "value": TARGET_ID},
+                "lists": [{"name": "CustomList", "objects": []}],
+            }
+        ],
+        "list_mode": "replaceAll",
+    }

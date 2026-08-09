@@ -84,7 +84,12 @@ class FakeClient:
         self.disconnected = True
 
 
-def gateway_env(tmp_path: Path, *, policy: str = "ask_before_changes") -> dict[str, str]:
+def gateway_env(
+    tmp_path: Path,
+    *,
+    policy: str = "ask_before_changes",
+    version: str = "2022.1",
+) -> dict[str, str]:
     config_path = tmp_path / "config" / "config.json"
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(
@@ -102,11 +107,12 @@ def gateway_env(tmp_path: Path, *, policy: str = "ask_before_changes") -> dict[s
         "WAAPI_SKILL_CONFIG_PATH": str(config_path),
         "WWISE_WAAPI_HOST": "127.0.0.1",
         "WWISE_WAAPI_PORT": "31337",
-        "WWISE_VERSION": "2022.1",
+        "WWISE_VERSION": version,
     }
 
 
-def live_info() -> dict[str, Any]:
+def live_info(version: str = "2022.1") -> dict[str, Any]:
+    year, major = (int(part) for part in version.split("."))
     return {
         "displayName": "Wwise",
         "isCommandLine": True,
@@ -117,13 +123,132 @@ def live_info() -> dict[str, Any]:
         "platform": "macosx",
         "configuration": "release",
         "version": {
-            "year": 2022,
-            "major": 1,
+            "year": year,
+            "major": major,
             "minor": 0,
             "build": 1,
-            "displayName": "v2022.1.0",
+            "displayName": f"v{version}.0",
         },
     }
+
+
+WEATHER_ACTIONS = (
+    ("Rain_Bed", 0.25, 0.0),
+    ("Wind_Bed", 0.4, 0.1),
+    ("Thunder_Near", 0.05, 0.0),
+    ("Thunder_Mid", 0.12, 0.08),
+    ("Thunder_Far", 0.25, 0.16),
+)
+
+
+def weather_request(version: str) -> dict[str, Any]:
+    return {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": version,
+        "operation": "object.set",
+        "arguments": {
+            "objects": [
+                {
+                    "object": {
+                        "kind": "direct-child",
+                        "parent": {
+                            "kind": "path",
+                            "value": rf"\Events\Default Work Unit\Integration Weather\Play_{name}",
+                        },
+                        "type": "Action",
+                    },
+                    "properties": [
+                        {"name": "FadeTime", "value": fade_time},
+                        {"name": "Delay", "value": delay},
+                    ],
+                }
+                for name, fade_time, delay in WEATHER_ACTIONS
+            ],
+            "on_name_conflict": "fail",
+        },
+    }
+
+
+class WeatherClient:
+    def __init__(self, version: str) -> None:
+        self.version = version
+        self.calls: list[
+            tuple[str, Mapping[str, Any] | None, Mapping[str, Any] | None]
+        ] = []
+        self.disconnected = False
+        self._events: dict[str, dict[str, Any]] = {}
+        self._actions: dict[str, dict[str, Any]] = {}
+        for index, (name, _fade_time, _delay) in enumerate(
+            WEATHER_ACTIONS,
+            start=1,
+        ):
+            event_path = rf"\Events\Default Work Unit\Integration Weather\Play_{name}"
+            event_id = f"{{20000000-0000-0000-0000-{index:012d}}}"
+            action_id = f"{{30000000-0000-0000-0000-{index:012d}}}"
+            self._events[event_path] = {
+                "id": event_id,
+                "name": f"Play_{name}",
+                "type": "Event",
+                "path": event_path,
+                "parent": {"id": PARENT_GUID},
+                "notes": "",
+            }
+            self._actions[event_path] = {
+                "id": action_id,
+                "name": "Action",
+                "type": "Action",
+                "path": f"{event_path}\\Action",
+                "parent": {"id": event_id},
+                "notes": "",
+                "FadeTime": 0.0,
+                "Delay": 0.0,
+            }
+
+    def call(
+        self,
+        uri: str,
+        args: Mapping[str, Any] | None = None,
+        options: Mapping[str, Any] | None = None,
+    ) -> Any:
+        self.calls.append((uri, args, options))
+        call_args = dict(args or {})
+        if uri == "ak.wwise.core.getInfo":
+            return live_info(self.version)
+        if uri == "ak.wwise.core.getProjectInfo":
+            return project_row()
+        if uri == "ak.wwise.core.object.getTypes":
+            return {"return": [{"classId": 9, "name": "Action", "type": "Action"}]}
+        if uri == "ak.wwise.core.object.getPropertyInfo":
+            return {
+                "name": call_args["property"],
+                "type": "Real32",
+                "restriction": {"type": "range", "min": 0.0, "max": 10.0},
+            }
+        if uri != "ak.wwise.core.object.get":
+            raise AssertionError(f"Unexpected WAAPI call: {uri} {args!r} {options!r}")
+        source = call_args.get("from")
+        transform = call_args.get("transform")
+        if isinstance(source, Mapping) and "path" in source:
+            path = source["path"][0]
+            return {"return": [dict(self._events[path])]}
+        if "waql" in call_args:
+            waql = str(call_args["waql"])
+            for event_path, action in self._actions.items():
+                if f'from object "{event_path}"' in waql:
+                    return {"return": [dict(action)]}
+            raise AssertionError(f"Unknown Weather WAQL: {waql}")
+        if isinstance(source, Mapping) and "id" in source:
+            object_id = source["id"][0]
+            action = next(
+                row for row in self._actions.values() if row["id"] == object_id
+            )
+            if transform:
+                return {"return": []}
+            return {"return": [dict(action)]}
+        raise AssertionError(f"Unexpected object.get shape: {args!r} {options!r}")
+
+    def disconnect(self) -> None:
+        self.disconnected = True
 
 
 def project_row() -> dict[str, Any]:
@@ -1034,4 +1159,143 @@ def test_composer_seal_and_legacy_preview_produce_identical_artifacts(
     }
     assert composer_client.calls == legacy_client.calls
     assert composer_client.calls == expected_preview_calls()
+    assert list(composer_payload)[-1] == list(legacy_payload)[-1] == "agent_result"
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2025.1"))
+def test_weather_batch_composer_matches_legacy_preview_exactly(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    version: str,
+) -> None:
+    original_builder = waapi_gateway.build_transaction_preview_artifact
+    fixed_now = datetime(2026, 8, 10, 12, 0, tzinfo=timezone.utc)
+
+    def deterministic_builder(*args: Any, **kwargs: Any) -> Any:
+        kwargs["now"] = fixed_now
+        return original_builder(*args, **kwargs)
+
+    monkeypatch.setattr(
+        waapi_gateway,
+        "build_transaction_preview_artifact",
+        deterministic_builder,
+    )
+    expected_request = weather_request(version)
+    composer_root = tmp_path / "composer"
+    _code, started = offline_execute(
+        composer_root,
+        "--version",
+        version,
+        "draft-start",
+        "object.set",
+    )
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    revision = 1
+    request_option = apply_action(
+        composer_root,
+        draft_id,
+        authority,
+        revision,
+        {"action": "set_request_option", "name": "on_name_conflict", "value": "fail"},
+    )
+    revision = request_option["draft"]["revision"]
+    for expected_row in expected_request["arguments"]["objects"]:
+        targeted = apply_action(
+            composer_root,
+            draft_id,
+            authority,
+            revision,
+            {"action": "add_target", "selector": expected_row["object"]},
+        )
+        revision = targeted["draft"]["revision"]
+        target_handle = targeted["draft"]["current_facts"][-1]["handle"]
+        for property_row in expected_row["properties"]:
+            changed = apply_action(
+                composer_root,
+                draft_id,
+                authority,
+                revision,
+                {
+                    "action": "set_property",
+                    "target_handle": target_handle,
+                    "name": property_row["name"],
+                    "value": property_row["value"],
+                },
+            )
+            revision = changed["draft"]["revision"]
+
+    check_client = WeatherClient(version)
+    check_code, checked = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(composer_root / "state"),
+            "draft-check",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(revision),
+        ],
+        env=gateway_env(composer_root, version=version),
+        client_factory=lambda _url: check_client,
+    )
+    assert check_code == 0, checked
+    checked_revision = checked["draft"]["revision"]
+    composer_client = WeatherClient(version)
+    composer_code, composer_payload = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(composer_root / "state"),
+            "preview-from-draft",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(checked_revision),
+            "--apply",
+            "--ttl",
+            "300",
+        ],
+        env=gateway_env(composer_root, version=version),
+        client_factory=lambda _url: composer_client,
+    )
+    assert composer_code == 0, composer_payload
+    composer_artifact = TransactionStore(composer_root / "state").load_preview(
+        composer_payload["transaction_id"]
+    ).artifact
+
+    legacy_root = tmp_path / "legacy"
+    legacy_client = WeatherClient(version)
+    legacy_code, legacy_payload = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(legacy_root / "state"),
+            "legacy-preview",
+            "--request-json",
+            json.dumps(expected_request),
+            "--apply",
+            "--ttl",
+            "300",
+        ],
+        env=gateway_env(legacy_root, version=version),
+        client_factory=lambda _url: legacy_client,
+    )
+    assert legacy_code == 0, legacy_payload
+    legacy_artifact = TransactionStore(legacy_root / "state").load_preview(
+        legacy_payload["transaction_id"]
+    ).artifact
+
+    assert composer_artifact == legacy_artifact
+    assert composer_artifact["request"] == expected_request
+    assert composer_payload["artifact_hash"] == legacy_payload["artifact_hash"]
+    assert composer_payload["preview_summary"] == legacy_payload["preview_summary"]
+    assert composer_payload["authorization"] == legacy_payload["authorization"]
+    assert composer_payload["cleanup"] == legacy_payload["cleanup"]
+    assert composer_artifact["prepared_operation"]["dispatch"]["uri"] == (
+        "ak.wwise.core.object.set"
+    )
+    assert composer_client.calls == legacy_client.calls
+    assert check_client.disconnected is composer_client.disconnected is True
+    assert legacy_client.disconnected is True
     assert list(composer_payload)[-1] == list(legacy_payload)[-1] == "agent_result"

@@ -171,6 +171,7 @@ from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[re
     operation_input_mode,
     operation_request_schema_digest,
     parse_operation_request,
+    prepare_object_set_composer_check,
     validate_prepared_roles,
     verify_prepared_operation,
 )
@@ -5964,6 +5965,15 @@ def dispatch_operation_draft_check(
         project=project,
         state_dir=state_dir,
     )
+    canonical_request = parse_operation_request(
+        request_payload,
+        expected_version=detected_version,
+    )
+    if canonical_request.operation == OBJECT_SET_COMPOSER_OPERATION:
+        read_call = prepare_object_set_composer_check(
+            canonical_request,
+            read_call=read_call,
+        )
     checked_artifact = build_transaction_preview_artifact(
         request_payload,
         live_version=detected_version,

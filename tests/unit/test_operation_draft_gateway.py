@@ -99,9 +99,16 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
         "updated_at": started["draft"]["updated_at"],
         "expires_at": started["draft"]["expires_at"],
         "current_facts": [],
+        "request_options": {},
         "missing_fields": ["target"],
         "missing_fields_status": "incomplete",
-        "allowed_actions": ["add_target", "inspect", "cancel"],
+        "allowed_actions": [
+            "set_request_option",
+            "clear_request_option",
+            "add_target",
+            "inspect",
+            "cancel",
+        ],
         "check": None,
         "seal": None,
     }

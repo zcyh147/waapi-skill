@@ -26,7 +26,6 @@ from typing import Any, Callable, Iterator, Mapping
 from .canonical import canonical_json_bytes, canonical_sha256
 from .filesystem_security import path_is_link_or_reparse
 from .operation_composer import (
-    OPERATION_COMPOSITION_CONTRACT,
     OperationComposerError,
     apply_composer_action,
     composition_projection,
@@ -553,8 +552,10 @@ class OperationDraftStore:
 
         if not isinstance(draft_id, str) or not _DRAFT_ID_PATTERN.fullmatch(draft_id):
             raise _not_available()
-        current = _utc_datetime(now)
         with self._existing_draft_lock(draft_id):
+            # A waiting caller must not sample a time before a concurrent
+            # revision that becomes visible after it acquires this lock.
+            current = _utc_datetime(now)
             loaded = self._inspect_unlocked(
                 draft_id,
                 task_authority=task_authority,
@@ -651,8 +652,8 @@ class OperationDraftStore:
 
         if not isinstance(draft_id, str) or not _DRAFT_ID_PATTERN.fullmatch(draft_id):
             raise _not_available()
-        current = _utc_datetime(now)
         with self._existing_draft_lock(draft_id):
+            current = _utc_datetime(now)
             loaded = self._inspect_unlocked(
                 draft_id,
                 task_authority=task_authority,
@@ -724,8 +725,8 @@ class OperationDraftStore:
             )
         if not isinstance(draft_id, str) or not _DRAFT_ID_PATTERN.fullmatch(draft_id):
             raise _not_available()
-        current = _utc_datetime(now)
         with self._existing_draft_lock(draft_id):
+            current = _utc_datetime(now)
             loaded = self._inspect_unlocked(
                 draft_id,
                 task_authority=task_authority,
@@ -849,8 +850,8 @@ class OperationDraftStore:
             raise ValueError("policy is invalid")
         if not isinstance(draft_id, str) or not _DRAFT_ID_PATTERN.fullmatch(draft_id):
             raise _not_available()
-        current = _utc_datetime(now)
         with self._existing_draft_lock(draft_id):
+            current = _utc_datetime(now)
             loaded = self._inspect_unlocked(
                 draft_id,
                 task_authority=task_authority,
@@ -994,8 +995,8 @@ class OperationDraftStore:
             raise ValueError("transaction_state is not a sealable Preview state")
         if not isinstance(draft_id, str) or not _DRAFT_ID_PATTERN.fullmatch(draft_id):
             raise _not_available()
-        current = _utc_datetime(now)
         with self._existing_draft_lock(draft_id):
+            current = _utc_datetime(now)
             loaded = self._inspect_unlocked(
                 draft_id,
                 task_authority=task_authority,
@@ -1096,8 +1097,8 @@ class OperationDraftStore:
     ) -> OperationDraftRecord:
         if not isinstance(draft_id, str) or not _DRAFT_ID_PATTERN.fullmatch(draft_id):
             raise _not_available()
-        current = _utc_datetime(now)
         with self._existing_draft_lock(draft_id):
+            current = _utc_datetime(now)
             return self._inspect_unlocked(
                 draft_id,
                 task_authority=task_authority,
@@ -1130,8 +1131,8 @@ class OperationDraftStore:
     ) -> OperationDraftRecord:
         if not isinstance(draft_id, str) or not _DRAFT_ID_PATTERN.fullmatch(draft_id):
             raise _not_available()
-        current = _utc_datetime(now)
         with self._existing_draft_lock(draft_id):
+            current = _utc_datetime(now)
             loaded = self._inspect_unlocked(
                 draft_id,
                 task_authority=task_authority,
@@ -1854,48 +1855,21 @@ def _replay_seal_reservation(
     return _seal_reservation_from_record(record, replayed=True)
 
 
-def _validate_durable_composition(value: Any) -> Mapping[str, Any]:
-    if not isinstance(value, Mapping) or set(value) != {"contract", "targets"}:
+def _validate_durable_composition(
+    value: Any,
+    *,
+    operation: str,
+    version: str,
+) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
         raise ValueError("draft composition fields are invalid")
-    if value.get("contract") != OPERATION_COMPOSITION_CONTRACT:
-        raise ValueError("draft composition contract is invalid")
-    targets = value.get("targets")
-    if not isinstance(targets, list) or len(targets) > 1:
-        raise ValueError("draft composition targets are invalid")
-    for target in targets:
-        if not isinstance(target, Mapping) or set(target) != {
-            "handle",
-            "selector",
-            "properties",
-        }:
-            raise ValueError("draft composition target fields are invalid")
-        handle = target.get("handle")
-        if (
-            not isinstance(handle, str)
-            or re.fullmatch(r"odh1-[0-9a-f]{24}", handle) is None
-        ):
-            raise ValueError("draft composition target handle is invalid")
-        if not isinstance(target.get("selector"), Mapping):
-            raise ValueError("draft composition selector is invalid")
-        properties = target.get("properties")
-        if (
-            not isinstance(properties, list)
-            or len(properties) > MAX_OPERATION_DRAFT_FIELDS_PER_ROW
-        ):
-            raise ValueError("draft composition properties are invalid")
-        for descriptor in properties:
-            if (
-                not isinstance(descriptor, Mapping)
-                or set(descriptor) != {"name", "value"}
-                or not isinstance(descriptor.get("name"), str)
-            ):
-                raise ValueError("draft composition property is invalid")
     try:
         normalized = json.loads(canonical_json_bytes(dict(value)).decode("utf-8"))
     except (RecursionError, TypeError, UnicodeError, ValueError) as exc:
         raise ValueError("draft composition is not strict JSON") from exc
     if not isinstance(normalized, Mapping):  # pragma: no cover - mapping invariant
         raise ValueError("draft composition is invalid")
+    composition_projection(operation, version, normalized)
     return normalized
 
 
@@ -2261,7 +2235,11 @@ def _record_from_mapping(
             or not _SHA256_PATTERN.fullmatch(composer_digest)
         ):
             raise ValueError("composer digest is invalid")
-        composition = _validate_durable_composition(payload["composition"])
+        composition = _validate_durable_composition(
+            payload["composition"],
+            operation=payload["operation"],
+            version=payload["version"],
+        )
         check = _validate_durable_check(
             payload["check"],
             revision=revision,
