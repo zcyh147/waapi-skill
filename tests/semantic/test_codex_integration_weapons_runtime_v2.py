@@ -522,6 +522,33 @@ def _prepared(tmp_path: Path, *, version: str = "2022.1") -> tuple[Any, FakeWeap
     return prepared, fake, runtime
 
 
+def test_weapons_composer_protocol_compiles_as_one_complete_workflow_transaction(
+    tmp_path: Path,
+) -> None:
+    from tests.semantic.support import codex_heavy_project_runner_v3 as project_runner
+
+    unit = _unit("2022.1")
+    prepared, _fake, _runtime = _prepared(tmp_path)
+
+    sections = project_runner._compile_integration_workflow_plan(
+        unit=unit,
+        protocol=prepared.protocol,
+        visible_values=prepared.visible_values,
+        oracle_requirements=prepared.oracle_requirements,
+        baseline_manifest_digest="a" * 64,
+    )
+
+    transaction_steps = [
+        row
+        for row in sections.static_expectation["workflow_steps"]
+        if row["transaction_id"] == "tx01"
+    ]
+    assert transaction_steps[0]["kind"] == "operation_schema"
+    assert transaction_steps[1]["kind"] == "operation_compose"
+    assert transaction_steps[-6]["kind"] == "operation_compose_check"
+    assert transaction_steps[-5]["kind"] == "preview"
+
+
 def _typed_action_broker(
     prepared: Any,
     *,

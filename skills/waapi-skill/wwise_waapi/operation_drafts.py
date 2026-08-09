@@ -413,6 +413,7 @@ class _ManagedDirectoryIdentity:
     path: Path
     metadata: os.stat_result
     require_private: bool
+    state_root: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -438,7 +439,7 @@ class OperationDraftStore:
         self.store_dir = state_dir / "operation-drafts-v1"
         self.records_dir = self.store_dir / "records"
         self.locks_dir = self.store_dir / "locks"
-        _ensure_private_state_directory(self.state_dir, label="State directory")
+        _ensure_safe_state_directory(self.state_dir, label="State directory")
         for directory in (self.store_dir, self.records_dir, self.locks_dir):
             _ensure_private_managed_directory(directory, label="Draft Store directory")
         self._directory_identities = _capture_managed_directory_identities(
@@ -2831,16 +2832,25 @@ def _capture_managed_directory_identities(
         current /= component
         if current in seen:
             continue
-        require_private = current == state_dir
+        state_root = current == state_dir
+        require_private = False
         identities.append(
             _ManagedDirectoryIdentity(
                 path=current,
-                metadata=_require_plain_directory(
-                    current,
-                    label="Operation Draft state directory",
-                    require_private=require_private,
+                metadata=(
+                    _require_safe_state_root_directory(
+                        current,
+                        label="Operation Draft state directory",
+                    )
+                    if state_root
+                    else _require_plain_directory(
+                        current,
+                        label="Operation Draft state directory",
+                        require_private=False,
+                    )
                 ),
                 require_private=require_private,
+                state_root=state_root,
             )
         )
         seen.add(current)
@@ -2856,6 +2866,7 @@ def _capture_managed_directory_identities(
                     require_private=True,
                 ),
                 require_private=True,
+                state_root=False,
             )
         )
         seen.add(directory)
@@ -2867,10 +2878,17 @@ def _attest_managed_directory_identities(
 ) -> None:
     for identity in identities:
         try:
-            current = _require_plain_directory(
-                identity.path,
-                label="Operation Draft managed directory",
-                require_private=identity.require_private,
+            current = (
+                _require_safe_state_root_directory(
+                    identity.path,
+                    label="Operation Draft state directory",
+                )
+                if identity.state_root
+                else _require_plain_directory(
+                    identity.path,
+                    label="Operation Draft managed directory",
+                    require_private=identity.require_private,
+                )
             )
         except OperationDraftStorageCorruption as exc:
             raise _OperationDraftDirectoryIdentityChanged(
@@ -2882,7 +2900,7 @@ def _attest_managed_directory_identities(
             )
 
 
-def _ensure_private_state_directory(path: Path, *, label: str) -> None:
+def _ensure_safe_state_directory(path: Path, *, label: str) -> None:
     if not path.is_absolute():
         raise OperationDraftStorageCorruption(f"{label} must be absolute.")
     current = Path(path.anchor)
@@ -2902,7 +2920,22 @@ def _ensure_private_state_directory(path: Path, *, label: str) -> None:
         _require_plain_directory(current, label=label, require_private=False)
         if created and os.name == "posix":
             os.chmod(current, 0o700)
-    _require_plain_directory(path, label=label, require_private=True)
+    _require_safe_state_root_directory(path, label=label)
+
+
+def _require_safe_state_root_directory(path: Path, *, label: str) -> os.stat_result:
+    metadata = _require_plain_directory(path, label=label, require_private=False)
+    if os.name == "posix":
+        if stat.S_IMODE(metadata.st_mode) & 0o022:
+            raise OperationDraftStorageCorruption(
+                f"{label} must not be writable by group or other users."
+            )
+        getuid = getattr(os, "geteuid", None)
+        if getuid is not None and metadata.st_uid != getuid():
+            raise OperationDraftStorageCorruption(
+                f"{label} must be owned by the current user."
+            )
+    return metadata
 
 
 def _ensure_private_managed_directory(path: Path, *, label: str) -> None:

@@ -93,6 +93,66 @@ def _race_start(
         results.put(("started", started.record.revision))
 
 
+@pytest.mark.skipif(os.name != "posix", reason="POSIX mode contract")
+def test_shared_state_root_may_be_readable_but_draft_store_remains_private(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "shared-state"
+    state_dir.mkdir(mode=0o755)
+    state_dir.chmod(0o755)
+
+    store = OperationDraftStore(state_dir)
+    started = store.start(
+        operation="object.set",
+        version="2022.1",
+        schema_digest="f" * 64,
+    )
+
+    assert started.record.revision == 1
+    assert stat.S_IMODE(state_dir.stat().st_mode) == 0o755
+    assert stat.S_IMODE(store.store_dir.stat().st_mode) == 0o700
+    assert stat.S_IMODE(store.records_dir.stat().st_mode) == 0o700
+    assert stat.S_IMODE(store.locks_dir.stat().st_mode) == 0o700
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX mode contract")
+def test_shared_state_root_rejects_group_or_other_write_access(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "writable-state"
+    state_dir.mkdir(mode=0o777)
+    state_dir.chmod(0o777)
+
+    with pytest.raises(OperationDraftStorageCorruption, match="writable"):
+        OperationDraftStore(state_dir)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX mode contract")
+def test_shared_state_root_permission_drift_is_rejected_before_record_access(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "shared-state"
+    state_dir.mkdir(mode=0o755)
+    state_dir.chmod(0o755)
+    store = OperationDraftStore(state_dir)
+    started = store.start(
+        operation="object.set",
+        version="2022.1",
+        schema_digest="f" * 64,
+    )
+    record_path = store.records_dir / f"{started.draft_id}.json"
+    before = record_path.read_bytes()
+
+    state_dir.chmod(0o777)
+
+    with pytest.raises(OperationDraftStorageCorruption, match="re-attested"):
+        store.inspect(
+            started.draft_id,
+            task_authority=started.task_authority,
+        )
+    assert record_path.read_bytes() == before
+
+
 def test_cross_process_revision_cas_commits_once_and_rejects_the_loser_as_stale(
     tmp_path: Path,
 ) -> None:

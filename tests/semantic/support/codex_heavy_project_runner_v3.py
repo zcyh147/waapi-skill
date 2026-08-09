@@ -3934,7 +3934,11 @@ def _compile_integration_workflow_plan(
     }
     kind_by_subcommand = {
         "operation-schema": "operation_schema",
+        "draft-start": "operation_compose",
+        "draft-apply": "operation_compose",
+        "draft-check": "operation_compose_check",
         "preview": "preview",
+        "preview-from-draft": "preview",
         "transaction-show": "transaction_show",
         "confirm": "confirm",
         "execute": "execute",
