@@ -1,0 +1,26 @@
+{
+  "contract": "waapi-skill.codex-integration-profile/v1",
+  "profile_id": "integration",
+  "component_profiles": [
+    "../integration-workflows-v1/profile.json",
+    "../integration-workflows-v2/profile.json"
+  ],
+  "versions": [
+    "2022.1",
+    "2025.1"
+  ],
+  "workflow_order": [
+    "weather",
+    "alarm",
+    "harbor",
+    "rifle",
+    "footsteps",
+    "weapons"
+  ],
+  "totals": {
+    "logical_workflow_count": 6,
+    "task_count": 12,
+    "transaction_count": 20,
+    "user_turn_count": 36
+  }
+}
