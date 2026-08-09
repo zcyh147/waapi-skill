@@ -831,11 +831,35 @@ class DraftActionResponseBinding:
 
 
 @dataclass(frozen=True, slots=True)
+class DraftActionQueryIdentityBinding:
+    """Allow one typed reference target to reuse an exact queried Bus identity."""
+
+    pointer: str
+    step: str
+
+    def __post_init__(self) -> None:
+        if self.pointer != "/target":
+            raise ValueError(
+                "DraftActionQueryIdentityBinding.pointer must be /target"
+            )
+        if (
+            not isinstance(self.step, str)
+            or not self.step
+            or self.step != self.step.strip()
+            or len(self.step) > 160
+        ):
+            raise ValueError(
+                "DraftActionQueryIdentityBinding.step must be one bounded step name"
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class DraftActionJsonArgument:
     """One fixed business action with only Gateway response handles left dynamic."""
 
     expected: Mapping[str, Any]
     response_bindings: tuple[DraftActionResponseBinding, ...] = ()
+    query_identity_bindings: tuple[DraftActionQueryIdentityBinding, ...] = ()
 
     def __post_init__(self) -> None:
         try:
@@ -888,6 +912,40 @@ class DraftActionJsonArgument:
             raise ValueError(
                 "DraftActionJsonArgument must bind exactly the handle required by its action"
             )
+        if (
+            not isinstance(self.query_identity_bindings, tuple)
+            or any(
+                not isinstance(binding, DraftActionQueryIdentityBinding)
+                for binding in self.query_identity_bindings
+            )
+            or len(
+                {binding.pointer for binding in self.query_identity_bindings}
+            )
+            != len(self.query_identity_bindings)
+        ):
+            raise ValueError(
+                "DraftActionJsonArgument query identity bindings must be unique"
+            )
+        if self.query_identity_bindings:
+            try:
+                target = _json_pointer(normalized, "/target")
+            except GatewayInvocationError as exc:
+                raise ValueError(
+                    "DraftActionJsonArgument query-bound target is absent"
+                ) from exc
+            if (
+                normalized.get("action") != "set_reference"
+                or len(self.query_identity_bindings) != 1
+                or not isinstance(target, Mapping)
+                or set(target) != {"kind", "value"}
+                or target.get("kind") != "path"
+                or not isinstance(target.get("value"), str)
+                or not target["value"].startswith("\\")
+            ):
+                raise ValueError(
+                    "DraftActionJsonArgument query identity is valid only for "
+                    "one exact path reference target"
+                )
 
 
 ExpectedArgument = (
@@ -1380,6 +1438,17 @@ def validate_operation_draft_protocol_steps(
                 ):
                     raise ValueError(
                         "typed Draft action handles must come from one prior draft-apply response"
+                    )
+            for binding in arguments[6].query_identity_bindings:
+                source_index = indexes.get(binding.step)
+                if (
+                    source_index is None
+                    or source_index >= start_index
+                    or steps[source_index].subcommand != "query-object"
+                ):
+                    raise ValueError(
+                        "typed Draft action query identities must come from one "
+                        "pre-Draft query-object response"
                     )
         elif any(isinstance(value, DraftActionJsonArgument) for value in arguments):
             raise ValueError("typed Draft actions are valid only on draft-apply")
@@ -4126,8 +4195,56 @@ def _sealed_query_identity_object_operation_equal(
 ) -> tuple[bool, Mapping[str, str]]:
     """Compare one request after sealing two aliases to one prior query row."""
 
+    identity = _exact_query_bus_identity(
+        source_payload=source_payload,
+        source_step=source_step,
+        expected_step_name=expected.source_step,
+    )
+    object_id = identity["id"]
+    object_path = identity["path"]
+
+    try:
+        normalized = json.loads(_canonical_json_bytes(actual))
+    except (json.JSONDecodeError, GatewayInvocationError):
+        return False, identity
+    path_identity = {"kind": "path", "value": object_path}
+    id_identity = {"kind": "id", "value": object_id}
+    allowed = {
+        _canonical_json_bytes(path_identity),
+        _canonical_json_bytes(id_identity),
+    }
+    for pointer in expected.target_pointers:
+        try:
+            expected_target = _json_pointer(expected.expected, pointer)
+            actual_target = _json_pointer(actual, pointer)
+            normalized_target = _json_pointer(normalized, pointer)
+        except GatewayInvocationError:
+            return False, identity
+        if (
+            _canonical_json_bytes(expected_target)
+            != _canonical_json_bytes(path_identity)
+            or _canonical_json_bytes(actual_target) not in allowed
+            or not isinstance(normalized_target, dict)
+        ):
+            return False, identity
+        normalized_target.clear()
+        normalized_target.update(path_identity)
+    return (
+        _object_operation_json_equal(normalized, expected.expected),
+        identity,
+    )
+
+
+def _exact_query_bus_identity(
+    *,
+    source_payload: Mapping[str, Any],
+    source_step: ExpectedGatewayStep,
+    expected_step_name: str,
+) -> Mapping[str, str]:
+    """Return one exact-ID Bus query row after validating command and payload."""
+
     if (
-        source_step.name != expected.source_step
+        source_step.name != expected_step_name
         or source_step.subcommand != "query-object"
         or len(source_step.arguments) != 10
         or source_step.arguments[0] != "--object-id"
@@ -4177,36 +4294,7 @@ def _sealed_query_identity_object_operation_equal(
             "sealed query identity source row is not the exact requested Bus"
         )
 
-    try:
-        normalized = json.loads(_canonical_json_bytes(actual))
-    except (json.JSONDecodeError, GatewayInvocationError):
-        return False, MappingProxyType({"id": object_id, "path": object_path})
-    path_identity = {"kind": "path", "value": object_path}
-    id_identity = {"kind": "id", "value": object_id}
-    allowed = {
-        _canonical_json_bytes(path_identity),
-        _canonical_json_bytes(id_identity),
-    }
-    for pointer in expected.target_pointers:
-        try:
-            expected_target = _json_pointer(expected.expected, pointer)
-            actual_target = _json_pointer(actual, pointer)
-            normalized_target = _json_pointer(normalized, pointer)
-        except GatewayInvocationError:
-            return False, MappingProxyType({"id": object_id, "path": object_path})
-        if (
-            _canonical_json_bytes(expected_target)
-            != _canonical_json_bytes(path_identity)
-            or _canonical_json_bytes(actual_target) not in allowed
-            or not isinstance(normalized_target, dict)
-        ):
-            return False, MappingProxyType({"id": object_id, "path": object_path})
-        normalized_target.clear()
-        normalized_target.update(path_identity)
-    return (
-        _object_operation_json_equal(normalized, expected.expected),
-        MappingProxyType({"id": object_id, "path": object_path}),
-    )
+    return MappingProxyType({"id": object_id, "path": object_path})
 
 
 def _decode_json_argument(
@@ -5950,7 +6038,71 @@ class CodexGatewayBroker:
                                 "value": bound,
                             }
                         )
-                    if actual_json != bound_expected:
+                    normalized_actual = json.loads(
+                        _canonical_json_bytes(actual_json).decode("utf-8")
+                    )
+                    identity_evidence: list[dict[str, Any]] = []
+                    for binding in expected.query_identity_bindings:
+                        source = self._payloads_by_step.get(binding.step)
+                        if source is None:
+                            raise GatewayInvocationError(
+                                f"step {step.name!r} query identity source "
+                                f"{binding.step!r} is unavailable"
+                            )
+                        source_steps = tuple(
+                            candidate
+                            for candidate in self.expected_steps
+                            if candidate.name == binding.step
+                        )
+                        if len(source_steps) != 1:
+                            raise GatewayInvocationError(
+                                f"step {step.name!r} query identity source is not unique"
+                            )
+                        identity = _exact_query_bus_identity(
+                            source_payload=source,
+                            source_step=source_steps[0],
+                            expected_step_name=binding.step,
+                        )
+                        expected_target = _json_pointer(
+                            bound_expected,
+                            binding.pointer,
+                        )
+                        actual_target = _json_pointer(
+                            actual_json,
+                            binding.pointer,
+                        )
+                        normalized_target = _json_pointer(
+                            normalized_actual,
+                            binding.pointer,
+                        )
+                        path_identity = {
+                            "kind": "path",
+                            "value": identity["path"],
+                        }
+                        id_identity = {
+                            "kind": "id",
+                            "value": identity["id"],
+                        }
+                        if (
+                            expected_target != path_identity
+                            or actual_target not in (path_identity, id_identity)
+                            or not isinstance(normalized_target, dict)
+                        ):
+                            raise GatewayInvocationError(
+                                f"step {step.name!r} typed Draft action query-bound "
+                                "identity does not match the exact Bus row"
+                            )
+                        normalized_target.clear()
+                        normalized_target.update(path_identity)
+                        identity_evidence.append(
+                            {
+                                "pointer": binding.pointer,
+                                "step": binding.step,
+                                "id": identity["id"],
+                                "path": identity["path"],
+                            }
+                        )
+                    if normalized_actual != bound_expected:
                         raise GatewayInvocationError(
                             f"step {step.name!r} typed Draft action is not exactly equal "
                             "to its business facts and Gateway response bindings"
@@ -5960,6 +6112,7 @@ class CodexGatewayBroker:
                             dict(expected.expected),
                             "draft-action-json/v1",
                             binding_evidence,
+                            identity_evidence,
                         )
                     )
                 elif isinstance(expected, ResponseBinding):
@@ -6550,6 +6703,7 @@ __all__ = [
     "WINDOWS_SHIM_SCRIPT_NAME",
     "CodexGatewayBroker",
     "DraftActionJsonArgument",
+    "DraftActionQueryIdentityBinding",
     "DraftActionResponseBinding",
     "ExpectedGatewayStep",
     "GatewayBrokerError",

@@ -413,6 +413,14 @@ def test_object_set_typed_actions_build_one_target_scalar_fact_offline(
     handle = target_fact["handle"]
     assert TARGET_HANDLE_RE.fullmatch(handle)
     assert target["draft"]["revision"] == 2
+    assert target["draft"]["next_action_binding"] == {
+        "contract": "waapi-skill.operation-draft-next-action/v1",
+        "draft_id": draft_id,
+        "expected_revision": 2,
+        "one_action_only": True,
+        "then_read_next_response": True,
+        "precompute_or_increment_revision": False,
+    }
     assert target_fact == {
         "handle": handle,
         "selector": {"kind": "id", "value": TARGET_ID},

@@ -88,6 +88,14 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
         "draft_id": draft_id,
         "lifecycle_state": "editable",
         "revision": 1,
+        "next_action_binding": {
+            "contract": "waapi-skill.operation-draft-next-action/v1",
+            "draft_id": draft_id,
+            "expected_revision": 1,
+            "one_action_only": True,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        },
         "binding": {
             "operation": "object.set",
             "version": "2022.1",

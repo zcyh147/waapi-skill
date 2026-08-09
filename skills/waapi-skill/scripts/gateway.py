@@ -3009,6 +3009,11 @@ def operation_composer_input_contract(
                 "task_authority",
                 "revision",
             ],
+            "revision_discipline": {
+                "mode": "one_action_then_read_next_response",
+                "expected_revision_source": "/draft/revision",
+                "precompute_or_increment_revision": False,
+            },
         },
         "check": {
             "subcommand": "draft-check",
@@ -10329,27 +10334,37 @@ def operation_draft_payload(
                 else []
             ),
         }
+    draft = {
+        "contract": OPERATION_DRAFT_CONTRACT,
+        "draft_id": record.draft_id,
+        "lifecycle_state": record.state.value,
+        "revision": record.revision,
+        "binding": {
+            "operation": record.operation,
+            "version": record.version,
+            "schema_digest": record.schema_digest,
+        },
+        "created_at": record.created_at,
+        "updated_at": record.updated_at,
+        "expires_at": record.expires_at,
+        **projection,
+    }
+    if record.state is OperationDraftState.EDITABLE:
+        draft["next_action_binding"] = {
+            "contract": "waapi-skill.operation-draft-next-action/v1",
+            "draft_id": record.draft_id,
+            "expected_revision": record.revision,
+            "one_action_only": True,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
     return {
         "contract": GATEWAY_RESULT_CONTRACT,
         "ok": True,
         "status": record.state.value,
         "command": command,
         "offline": offline,
-        "draft": {
-            "contract": OPERATION_DRAFT_CONTRACT,
-            "draft_id": record.draft_id,
-            "lifecycle_state": record.state.value,
-            "revision": record.revision,
-            "binding": {
-                "operation": record.operation,
-                "version": record.version,
-                "schema_digest": record.schema_digest,
-            },
-            "created_at": record.created_at,
-            "updated_at": record.updated_at,
-            "expires_at": record.expires_at,
-            **projection,
-        },
+        "draft": draft,
     }
 
 

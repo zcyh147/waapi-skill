@@ -408,12 +408,22 @@ def prepare_weapons_integration_runtime(
     )
     try:
         before, visible_values, request = session.prepare()
+        audit_step = _audit_query_step(visible_values["weapons_audit_root_path"])
+        output_bus_steps = _output_bus_readback_steps(before)
+        output_bus_states = _distinct_output_bus_states(before)
+        reference_identity_sources = {
+            state.path: step.name
+            for state, step in zip(
+                output_bus_states,
+                output_bus_steps,
+                strict=True,
+            )
+        }
         transaction_steps = build_object_set_composer_transaction_steps(
             request,
             label="tx01",
+            reference_identity_sources=reference_identity_sources,
         )
-        audit_step = _audit_query_step(visible_values["weapons_audit_root_path"])
-        output_bus_steps = _output_bus_readback_steps(before)
         identity_steps = tuple(
             _identity_readback_step(role, before.objects_by_role()[role])
             for role in _SELECTED_ROLES

@@ -32,6 +32,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
 from tests.semantic.support.codex_gateway_broker import (
     BoundedIntegerArgument,
     DraftActionJsonArgument,
+    DraftActionQueryIdentityBinding,
     DraftActionResponseBinding,
     ExpectedGatewayStep,
     GatewayDerivedReferenceActivationAllowance,
@@ -615,21 +616,28 @@ def _serialize_step(step: ExpectedGatewayStep) -> dict[str, Any]:
             )
         elif isinstance(item, DraftActionJsonArgument):
             cloned = _json_clone(item.expected)
-            arguments.append(
-                {
-                    "kind": "draft_action_json",
-                    "value": cloned,
-                    "sha256": _sha256_json(cloned),
-                    "response_bindings": [
-                        {
-                            "pointer": binding.pointer,
-                            "step": binding.step,
-                            "response_pointer": binding.response_pointer,
-                        }
-                        for binding in item.response_bindings
-                    ],
-                }
-            )
+            row = {
+                "kind": "draft_action_json",
+                "value": cloned,
+                "sha256": _sha256_json(cloned),
+                "response_bindings": [
+                    {
+                        "pointer": binding.pointer,
+                        "step": binding.step,
+                        "response_pointer": binding.response_pointer,
+                    }
+                    for binding in item.response_bindings
+                ],
+            }
+            if item.query_identity_bindings:
+                row["query_identity_bindings"] = [
+                    {
+                        "pointer": binding.pointer,
+                        "step": binding.step,
+                    }
+                    for binding in item.query_identity_bindings
+                ]
+            arguments.append(row)
         elif isinstance(item, ResponseBinding):
             arguments.append(
                 {
@@ -896,13 +904,20 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
                 raise PromptProvenanceError(
                     "metadata-bound JSON protocol argument is invalid"
                 ) from exc
-        elif kind == "draft_action_json" and set(row) == {
-            "kind",
-            "value",
-            "sha256",
-            "response_bindings",
+        elif kind == "draft_action_json" and frozenset(row) in {
+            frozenset({"kind", "value", "sha256", "response_bindings"}),
+            frozenset(
+                {
+                    "kind",
+                    "value",
+                    "sha256",
+                    "response_bindings",
+                    "query_identity_bindings",
+                }
+            ),
         }:
             raw_bindings = row.get("response_bindings")
+            raw_identity_bindings = row.get("query_identity_bindings", [])
             if (
                 row.get("sha256") != _sha256_json(row.get("value"))
                 or not isinstance(raw_bindings, list)
@@ -914,6 +929,14 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
                         for field in ("pointer", "step", "response_pointer")
                     )
                     for binding in raw_bindings
+                )
+                or not isinstance(raw_identity_bindings, list)
+                or any(
+                    not isinstance(binding, Mapping)
+                    or set(binding) != {"pointer", "step"}
+                    or not isinstance(binding.get("pointer"), str)
+                    or not isinstance(binding.get("step"), str)
+                    for binding in raw_identity_bindings
                 )
             ):
                 raise PromptProvenanceError(
@@ -930,6 +953,13 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
                                 response_pointer=str(binding["response_pointer"]),
                             )
                             for binding in raw_bindings
+                        ),
+                        query_identity_bindings=tuple(
+                            DraftActionQueryIdentityBinding(
+                                pointer=str(binding["pointer"]),
+                                step=str(binding["step"]),
+                            )
+                            for binding in raw_identity_bindings
                         ),
                     )
                 )

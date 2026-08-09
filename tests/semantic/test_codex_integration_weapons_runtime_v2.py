@@ -27,6 +27,7 @@ from tests.semantic.support.codex_integration_workflows_v2 import (
 from tests.semantic.support.codex_gateway_broker import (
     CodexGatewayBroker,
     DraftActionJsonArgument,
+    DraftActionQueryIdentityBinding,
     GatewayInvocationError,
     ResponseBinding,
     SealedQueryIdentityBoundJsonArgument,
@@ -34,6 +35,7 @@ from tests.semantic.support.codex_gateway_broker import (
     gateway_step_sequence_matches,
 )
 from tests.semantic.support.codex_prompt_provenance_v3 import (
+    PromptProvenanceError,
     deserialize_protocol,
     serialize_protocol,
 )
@@ -606,6 +608,25 @@ def _typed_action_broker(
     for binding in argument.response_bindings:
         target_index = int(binding.response_pointer.split("/")[3])
         supplied_action[binding.pointer.removeprefix("/")] = handles[target_index]
+    for binding in argument.query_identity_bindings:
+        source_step = next(
+            candidate
+            for candidate in prepared.protocol.steps
+            if candidate.name == binding.step
+        )
+        broker._payloads_by_step[binding.step] = {  # noqa: SLF001
+            "ok": True,
+            "command": "query-object",
+            "count": 1,
+            "objects": [
+                {
+                    "id": source_step.arguments[1],
+                    "name": "Weapons_Bus",
+                    "type": "Bus",
+                    "path": supplied_action["target"]["value"],
+                }
+            ],
+        }
     return broker, step, supplied_action
 
 
@@ -680,6 +701,22 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
     )
     serialized = serialize_protocol(prepared.protocol)
     assert deserialize_protocol(serialized) == prepared.protocol
+    tampered = copy.deepcopy(serialized)
+    identity_bound_argument = next(
+        argument
+        for step in tampered["steps"]
+        for argument in step["arguments"]
+        if argument.get("kind") == "draft_action_json"
+        and argument.get("query_identity_bindings")
+    )
+    identity_bound_argument["query_identity_bindings"][0]["step"] = (
+        "missing.output.bus.query"
+    )
+    with pytest.raises(
+        PromptProvenanceError,
+        match="pre-Draft query-object response",
+    ):
+        deserialize_protocol(tampered)
     composer_steps = prepared.protocol.steps[7:19]
     assert composer_steps[0].subcommand == "draft-start"
     assert [step.subcommand for step in composer_steps[-2:]] == [
@@ -693,6 +730,22 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
     assert all(
         isinstance(step.arguments[-1], DraftActionJsonArgument)
         for step in action_steps
+    )
+    reference_actions = [
+        step.arguments[-1]
+        for step in action_steps
+        if step.arguments[-1].expected["action"] == "set_reference"
+    ]
+    assert len(reference_actions) == 2
+    assert all(
+        argument.query_identity_bindings
+        == (
+            DraftActionQueryIdentityBinding(
+                pointer="/target",
+                step="relationship.output_bus.02",
+            ),
+        )
+        for argument in reference_actions
     )
     assert not any(
         isinstance(argument, SealedQueryIdentityBoundJsonArgument)
@@ -834,6 +887,21 @@ def test_composer_repeats_the_exact_reviewed_output_bus_path(
             "value": prepared.visible_values["weapons_bus_path"],
         },
     ]
+    for occurrence in range(2):
+        broker, step, action = _typed_action_broker(
+            prepared,
+            action="set_reference",
+            occurrence=occurrence,
+        )
+        broker._validate_step(step, _typed_action_argv(step, action))  # noqa: SLF001
+        binding = step.arguments[-1].query_identity_bindings[0]
+        source_step = next(
+            candidate
+            for candidate in prepared.protocol.steps
+            if candidate.name == binding.step
+        )
+        action["target"] = {"kind": "id", "value": source_step.arguments[1]}
+        broker._validate_step(step, _typed_action_argv(step, action))  # noqa: SLF001
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])

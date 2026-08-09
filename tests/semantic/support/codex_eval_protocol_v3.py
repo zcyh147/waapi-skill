@@ -15,6 +15,7 @@ from typing import Any, Mapping, Sequence
 
 from tests.semantic.support.codex_gateway_broker import (
     DraftActionJsonArgument,
+    DraftActionQueryIdentityBinding,
     DraftActionResponseBinding,
     ExpectedGatewayStep,
     MetadataBoundJsonArgument,
@@ -40,6 +41,7 @@ def build_object_set_composer_transaction_steps(
     request: Mapping[str, Any],
     *,
     label: str,
+    reference_identity_sources: Mapping[str, str] | None = None,
 ) -> tuple[ExpectedGatewayStep, ...]:
     """Translate one reviewed flat object.set request into one typed Draft flow."""
 
@@ -53,8 +55,21 @@ def build_object_set_composer_transaction_steps(
     if not isinstance(objects, list) or not objects:
         raise V3ProtocolError("object.set Composer request requires objects")
 
+    identity_sources = dict(reference_identity_sources or {})
+    if any(
+        not isinstance(path, str)
+        or not path.startswith("\\")
+        or not isinstance(step, str)
+        or not step
+        for path, step in identity_sources.items()
+    ):
+        raise V3ProtocolError("Composer reference identity sources are invalid")
     action_specs: list[
-        tuple[Mapping[str, Any], DraftActionResponseBinding | None]
+        tuple[
+            Mapping[str, Any],
+            DraftActionResponseBinding | None,
+            tuple[DraftActionQueryIdentityBinding, ...],
+        ]
     ] = []
     for option_name in (
         "platform",
@@ -79,6 +94,7 @@ def build_object_set_composer_transaction_steps(
                         "value": arguments[option_name],
                     },
                     None,
+                    (),
                 )
             )
     allowed_request_fields = {
@@ -107,6 +123,7 @@ def build_object_set_composer_transaction_steps(
                     "selector": dict(raw_target["object"]),
                 },
                 None,
+                (),
             )
         )
         handle_binding = DraftActionResponseBinding(
@@ -136,6 +153,7 @@ def build_object_set_composer_transaction_steps(
                             "value": raw_target[field_name],
                         },
                         handle_binding,
+                        (),
                     )
                 )
         properties = raw_target.get("properties", [])
@@ -168,11 +186,26 @@ def build_object_set_composer_transaction_steps(
                         "value": row["value"],
                     },
                     handle_binding,
+                    (),
                 )
             )
         for row in references:
             if not isinstance(row, Mapping) or set(row) != {"name", "target"}:
                 raise V3ProtocolError("object.set Composer reference is invalid")
+            target = row["target"]
+            identity_bindings: tuple[DraftActionQueryIdentityBinding, ...] = ()
+            if (
+                isinstance(target, Mapping)
+                and target.get("kind") == "path"
+                and isinstance(target.get("value"), str)
+                and target["value"] in identity_sources
+            ):
+                identity_bindings = (
+                    DraftActionQueryIdentityBinding(
+                        pointer="/target",
+                        step=identity_sources[target["value"]],
+                    ),
+                )
             action_specs.append(
                 (
                     {
@@ -182,6 +215,7 @@ def build_object_set_composer_transaction_steps(
                         "target": row["target"],
                     },
                     reference_binding,
+                    identity_bindings,
                 )
             )
         action_index = len(action_specs)
@@ -199,7 +233,10 @@ def build_object_set_composer_transaction_steps(
         ),
     ]
     latest_revision_step = f"{label}.draft-start"
-    for index, (action, handle_binding) in enumerate(action_specs, start=1):
+    for index, (action, handle_binding, identity_bindings) in enumerate(
+        action_specs,
+        start=1,
+    ):
         action_name = f"{label}.action.{index:03d}"
         steps.append(
             ExpectedGatewayStep(
@@ -217,6 +254,7 @@ def build_object_set_composer_transaction_steps(
                         response_bindings=(
                             (handle_binding,) if handle_binding is not None else ()
                         ),
+                        query_identity_bindings=identity_bindings,
                     ),
                 ),
             )
