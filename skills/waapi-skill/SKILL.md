@@ -1,13 +1,13 @@
 ---
 name: waapi-skill
-description: Use this skill for Wwise and WAAPI work through its local Python runtime, versioned manifests, semantic builders, bounded subscriptions, and safe dispatcher. Always use it for the Wwise project/version, selection, object lookup, hierarchy browsing, properties, imports, soundbanks, switch assignments, topic waits, WAAPI setup/connection, or project changes, even without explicit “WAAPI”. For every Skill-backed task, begin with the injected SKILL.md locator; never search the workspace or infer a repository-relative Skill path. Before any other shell action, read only that literal locator in one command; native Windows uses exact `Get-Content -Raw -Encoding UTF8 '<literal-locator>'`. The first command must not also run pwd, git, rg, ls, find, inspect a user file, or invoke the gateway.
+description: Use this Skill for any Wwise/WAAPI version, project, query, object/property, import, SoundBank, switch, topic, setup, or change—even without “WAAPI”. Use only its Python runtime, versioned resources/builders, bounded subscriptions, and safe dispatcher. Read only the injected SKILL.md locator first; never search for or infer it. Choose by command host, not Wwise/Codex version or path spelling. POSIX uses `cat '<literal-locator>'` or exact `sed -n '1,$p' '<literal-locator>'`; native Windows uses exact `Get-Content -Raw -Encoding UTF8 '<literal-locator>'` in PowerShell Core. Never cross-use/wrap these forms or combine the read with unrelated action.
 ---
 
 # Wwise WAAPI Skill
 
 Automate Wwise only through the packaged, version-aware gateway. Do not replace it with temporary scripts, inline Python, direct `WaapiClient` calls, or repository archaeology.
 
-In a fresh task, make the first shell action only the injected `SKILL.md` read. Do not prepend or append `pwd`, `git`, `rg`, `ls`, `find`, `printf`, a user-file read, or a gateway command. Finish that read before the next command.
+In a fresh task, make that host-native injected `SKILL.md` read the sole first shell action. Never combine it with `pwd`, `git`, `rg`, `ls`, `find`, `printf`, a user-file read, or a gateway command; finish before the next command.
 
 Supported Wwise versions are `2021.1`, `2022.1`, `2023.1`, `2024.1`, and `2025.1`.
 
@@ -27,7 +27,7 @@ Use the first gateway command already required by the user's task. If the first 
 4. Use connection settings in this order: explicit gateway flags, `WWISE_WAAPI_HOST` / `WWISE_WAAPI_PORT` / `WWISE_VERSION`, then the external saved config reported by `config-show`. Put the runtime version selector after `gateway.py` and before its subcommand. The exact full shape is `python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version 2022.1 operation-schema object.copy`; `--wwise-version` is accepted in that gateway-global position as a compatibility alias and is also the saved-config field after `config-set`. Do not inspect or hand-edit config files. Do not scan unrelated ports or processes.
 5. Treat gateway JSON as authoritative. Every gateway command must leave its complete JSON visible to the conversation before the next command: never suppress or redirect its output, request a zero/short tool-output budget, or continue from the shell exit code alone. If no complete JSON is visible, stop and report that missing result instead of assuming success. On a structured error or boundary, report it; do not improvise another WAAPI client or write a helper.
 6. Read one lane reference only when fixed commands are insufficient; five-version totals, coverage, and program-matrix requests are the exception below.
-7. Read each later named lane reference exactly once in its own shell call: POSIX uses `cat <absolute-reference>`; native Windows uses `Get-Content -Raw -Encoding UTF8 '<reference>'` with the absolute path or exact injected `.agents\skills\waapi-skill\references\<file>.md`. Never derive or normalize that relative locator. “Exactly once” spans the visible task, not each turn; if the file is already visible, do not reread it for confirmation or continuation. Do not probe with `wc -l`, `ls`, `rg`, `find`, `stat`, or `test`, and never split a reference. Complete `waapi-query.md` and `waapi-operate.md` reads end with the exact `WAAPI_QUERY_REFERENCE_END` and `WAAPI_OPERATE_REFERENCE_END` sentinels. Proceed only when the matching sentinel is the final visible line with no truncation or omission marker; otherwise stop and report an incomplete read without a partial reread or gateway call. Do not use `sed`, `head`, `tail`, `rg`, or a second reader to check. Make each gateway invocation its own later shell call. A host may bootstrap the initial complete `SKILL.md` with exactly `wc -l <SKILL.md> && sed -n '1,<enough-lines>p' <SKILL.md>` against that same literal file; this is the only combined read allowed. Never combine a reference read, gateway invocation, or other commands with `&&`, `;`, a pipe, command substitution, or a multi-command shell string because those actions are not independently auditable.
+7. Read each later named lane reference exactly once in its own shell call. POSIX uses `cat <absolute-reference>`; native Windows uses `Get-Content -Raw -Encoding UTF8 '<reference>'` with an absolute path or exact injected `.agents\skills\waapi-skill\references\<file>.md`. Do not derive or normalize it. “Exactly once” spans the visible task, not each turn; never reread an already-visible file. Do not probe with `wc -l`, `ls`, `rg`, `find`, `stat`, or `test`, and never split a reference. Complete `waapi-query.md` and `waapi-operate.md` reads end with the exact `WAAPI_QUERY_REFERENCE_END` and `WAAPI_OPERATE_REFERENCE_END` sentinels. Proceed only when the matching sentinel is the final visible line with no truncation or omission marker; otherwise report an incomplete read and stop without a partial reread or gateway call. Do not use `sed`, `head`, `tail`, `rg`, or a second reader to check. Give each gateway invocation its own later shell call. Only POSIX may bootstrap the initial complete `SKILL.md` with exactly `wc -l <SKILL.md> && sed -n '1,<enough-lines>p' <SKILL.md>` against that same literal file; this is the only combined read allowed. Never combine any other command with `&&`, `;`, a pipe, command substitution, or a multi-command shell string; those forms are not independently auditable.
 
 ## Fixed gateway commands
 
@@ -156,10 +156,10 @@ Use operate for project-changing work: create, move, copy, delete, property/refe
 
 For `object.create`/`object.set`, finish any required selected-subset exact-ID
 readback, then run schema before metadata; its adapter version selects scope.
-Otherwise, metadata precedes schema only for an explicitly requested unknown
-dynamic property/reference token. Closed schema fields and side effects are
-not metadata; without such a token, start with the named schema. Never infer
-tokens, scope, or order.
+Otherwise, only an explicit unknown dynamic property/reference token needs
+metadata; the operate reference says whether it precedes or commutes with
+schema. Closed fields and side effects are not metadata; without that token,
+start with the named schema. Never infer a token or scope.
 
 Apply the canonical policy from the latest gateway `session_context`:
 

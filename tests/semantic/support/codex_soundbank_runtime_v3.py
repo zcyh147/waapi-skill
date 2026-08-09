@@ -58,7 +58,12 @@ from .codex_version_layout_v3 import (
     CodexVersionLayoutV3,
     get_codex_version_layout_v3,
 )
-from wwise_waapi.operation_soundbank import parse_soundbank_definition_file
+from wwise_waapi.filesystem_security import path_is_link_or_reparse
+from wwise_waapi.operation_soundbank import (
+    MAX_LANGUAGES,
+    MAX_PLATFORMS,
+    parse_soundbank_definition_file,
+)
 
 try:  # ``pwd`` is not available on Windows, where Wine drive mapping is unnecessary.
     import pwd
@@ -88,6 +93,7 @@ COMPOUND_CROSS_VERSION_SOUNDBANK_APIS = frozenset(
     }
 )
 EXPECTED_SCENARIO_COUNT = 25
+PROJECT_INFO_OBSERVER_MAX_PLATFORM_ROWS = 32
 PROCESS_REFUSAL_ID = "O22-SB-PROCESS-DEF-05"
 PROCESS_REFUSAL_ERROR_CODE = "AMBIGUOUS_IDENTITY"
 PROCESS_REFUSAL_ABSENT_IDENTITIES = (
@@ -1535,9 +1541,12 @@ class PreparedSoundBankRuntime:
         self,
         blueprint: SoundBankBlueprint,
         backend: SoundBankRuntimeBackend,
+        *,
+        project_info_observer: Callable[[Mapping[str, Any]], None] | None = None,
     ) -> None:
         self.blueprint = blueprint
         self.backend = backend
+        self._project_info_observer = project_info_observer
         self.materialized: MaterializedSoundBankCase | None = None
         self.hidden_before: SoundBankSnapshot | None = None
         self._created_ids: list[str] = []
@@ -1549,6 +1558,7 @@ class PreparedSoundBankRuntime:
         project_info = _normalize_fixture_project_info(
             self.backend,
             blueprint=self.blueprint,
+            observer=self._project_info_observer,
         )
         if self.blueprint.scenario_id == PROCESS_REFUSAL_ID:
             for _key, object_type, name in PROCESS_REFUSAL_ABSENT_IDENTITIES:
@@ -3482,34 +3492,38 @@ def _validate_project_info(
     directories = _mapping(info.get("directories"), "project_info.directories")
     normalized_directories = dict(directories)
     for field in ("root", "cache", "soundBankOutputRoot"):
-        path = _localize_wwise_host_path(
+        path = _resolve_owned_host_directory(
             _text(directories.get(field), f"directories.{field}"),
             f"directories.{field}",
-        ).resolve(
-            strict=False
+            io_root=blueprint.io_root,
         )
-        _require_under(path, blueprint.io_root, f"directories.{field}")
         normalized_directories[field] = str(path)
-    platforms = _mapping_rows(info.get("platforms"), "project_info.platforms")
-    if not platforms:
-        raise SoundBankRuntimeError("project_info has no platforms")
+    platforms = _bounded_mapping_rows(
+        info.get("platforms"),
+        "project_info.platforms",
+        max_rows=MAX_PLATFORMS,
+        empty_message="project_info has no platforms",
+    )
+    languages = _bounded_mapping_rows(
+        info.get("languages"),
+        "project_info.languages",
+        max_rows=MAX_LANGUAGES,
+        empty_message="project_info has no languages",
+    )
     normalized_platforms: list[dict[str, Any]] = []
     for row in platforms:
         _guid(row.get("id"), "platform.id")
         _text(row.get("name"), "platform.name")
         normalized_row = dict(row)
         for field in ("soundBankPath", "copiedMediaPath"):
-            path = _localize_wwise_host_path(
+            path = _resolve_owned_host_directory(
                 _text(row.get(field), f"platform.{field}"),
                 f"platform.{field}",
-            ).resolve(strict=False)
-            _require_under(path, blueprint.io_root, f"platform.{field}")
+                io_root=blueprint.io_root,
+            )
             path.mkdir(parents=True, exist_ok=True)
             normalized_row[field] = str(path)
         normalized_platforms.append(normalized_row)
-    languages = _mapping_rows(info.get("languages"), "project_info.languages")
-    if not languages:
-        raise SoundBankRuntimeError("project_info has no languages")
     for row in languages:
         _guid(row.get("id"), "language.id")
         _text(row.get("name"), "language.name")
@@ -3526,6 +3540,7 @@ def _normalize_fixture_project_info(
     backend: SoundBankRuntimeBackend,
     *,
     blueprint: SoundBankBlueprint,
+    observer: Callable[[Mapping[str, Any]], None] | None = None,
 ) -> Mapping[str, Any]:
     """Normalize a patch-upgraded private fixture without touching user projects.
 
@@ -3536,21 +3551,32 @@ def _normalize_fixture_project_info(
     then read and validated again; there is no retry or best-effort fallback.
     """
 
+    initial_raw = backend.get_project_info()
+    if observer is not None:
+        observer(_project_info_observer_projection(initial_raw))
     initial = _validate_project_info(
-        backend.get_project_info(),
+        initial_raw,
         blueprint=blueprint,
         require_clean=False,
     )
     if initial.get("isDirty") is False:
         return initial
     backend.save_project()
+    saved_raw = backend.get_project_info()
+    if observer is not None:
+        observer(_project_info_observer_projection(saved_raw))
     return _validate_project_info(
-        backend.get_project_info(),
+        saved_raw,
         blueprint=blueprint,
     )
 
 
-def _localize_wwise_host_path(value: str, field: str) -> Path:
+def _localize_wwise_host_path(
+    value: str,
+    field: str,
+    *,
+    allow_trailing_separator: bool = False,
+) -> Path:
     """Map Wwise/Wine virtual-drive paths before touching the host filesystem.
 
     Wine Wwise commonly reports host paths as ``Y:\\...`` (the account home)
@@ -3560,7 +3586,10 @@ def _localize_wwise_host_path(value: str, field: str) -> Path:
     """
 
     try:
-        windows_path = parse_windows_drive_path(value)
+        windows_path = parse_windows_drive_path(
+            value,
+            allow_trailing_separator=allow_trailing_separator,
+        )
     except ReflectedHostPathError as exc:
         raise SoundBankRuntimeError(f"{field} has an unsafe host path") from exc
     if windows_path is not None:
@@ -3587,7 +3616,12 @@ def _localize_wwise_host_path(value: str, field: str) -> Path:
             )
     else:
         try:
-            path = Path(parse_posix_absolute_path(value))
+            path = Path(
+                parse_posix_absolute_path(
+                    value,
+                    allow_trailing_separator=allow_trailing_separator,
+                )
+            )
         except ReflectedHostPathError as exc:
             raise SoundBankRuntimeError(
                 f"{field} must be an absolute host path"
@@ -3595,6 +3629,122 @@ def _localize_wwise_host_path(value: str, field: str) -> Path:
     if not path.is_absolute():
         raise SoundBankRuntimeError(f"{field} must be an absolute host path")
     return path
+
+
+def _project_info_observer_projection(
+    value: Mapping[str, Any],
+) -> Mapping[str, Any]:
+    """Detach only the bounded raw path fields needed by evidence observers.
+
+    The projection intentionally does not clone the full getProjectInfo result.
+    Its containers are new, its leaves are immutable strings/integers/``None``,
+    and platform access is bounded by index without iterating the source list.
+    Languages are outside the host-path evidence contract.
+    """
+
+    directories = value.get("directories")
+    raw_platforms = value.get("platforms")
+    if isinstance(raw_platforms, list):
+        platform_count: int | None = len(raw_platforms)
+        recorded_count = min(
+            platform_count,
+            PROJECT_INFO_OBSERVER_MAX_PLATFORM_ROWS,
+        )
+        platforms: list[dict[str, str | None]] = []
+        for index in range(recorded_count):
+            raw = raw_platforms[index]
+            platforms.append(
+                {
+                    "name": _observer_string(
+                        raw.get("name") if isinstance(raw, Mapping) else None
+                    ),
+                    "soundBankPath": _observer_string(
+                        raw.get("soundBankPath")
+                        if isinstance(raw, Mapping)
+                        else None
+                    ),
+                    "copiedMediaPath": _observer_string(
+                        raw.get("copiedMediaPath")
+                        if isinstance(raw, Mapping)
+                        else None
+                    ),
+                }
+            )
+        omitted_platform_rows = platform_count - recorded_count
+    else:
+        platform_count = None
+        omitted_platform_rows = 0
+        platforms = []
+    return {
+        "path": _observer_string(value.get("path")),
+        "directories": {
+            field: _observer_string(
+                directories.get(field) if isinstance(directories, Mapping) else None
+            )
+            for field in ("root", "cache", "soundBankOutputRoot")
+        },
+        "platforms": platforms,
+        "platform_count": platform_count,
+        "omitted_platform_rows": omitted_platform_rows,
+    }
+
+
+def _observer_string(value: Any) -> str | None:
+    return value if isinstance(value, str) else None
+
+
+def _resolve_owned_host_directory(
+    value: str,
+    field: str,
+    *,
+    io_root: Path,
+) -> Path:
+    """Localize one Wwise directory without erasing redirect evidence.
+
+    Wwise directory fields conventionally carry one trailing native separator.
+    Accept that exact lexical form, then prove containment and reject every
+    existing symbolic-link, junction, or other Windows reparse component
+    before ``resolve`` can follow it.  Traversal, repeated separators, UNC
+    paths, and file-valued trailing separators remain rejected by the parser.
+    """
+
+    candidate = _localize_wwise_host_path(
+        value,
+        field,
+        allow_trailing_separator=True,
+    )
+    root = io_root.expanduser().resolve(strict=True)
+    try:
+        relative = candidate.relative_to(root)
+    except ValueError as exc:
+        raise SoundBankRuntimeError(
+            f"{field} escapes the scenario-owned I/O root"
+        ) from exc
+    if not relative.parts:
+        raise SoundBankRuntimeError(
+            f"{field} must be below the scenario-owned I/O root"
+        )
+
+    current = root
+    for component in relative.parts:
+        current /= component
+        try:
+            metadata = current.lstat()
+        except FileNotFoundError:
+            break
+        except OSError as exc:
+            raise SoundBankRuntimeError(
+                f"{field} path metadata is unavailable: {current}"
+            ) from exc
+        if path_is_link_or_reparse(current, metadata=metadata):
+            raise SoundBankRuntimeError(
+                f"{field} contains a symbolic link or Windows reparse point: "
+                f"{current}"
+            )
+
+    resolved = candidate.resolve(strict=False)
+    _require_under(resolved, root, field)
+    return resolved
 
 
 def _read_media_source_state(
@@ -4354,6 +4504,33 @@ def _mapping_rows(value: Any, field: str) -> tuple[Mapping[str, Any], ...]:
     if not isinstance(value, list) or not all(isinstance(row, Mapping) for row in value):
         raise SoundBankRuntimeError(f"{field} must be an object array")
     return tuple(value)
+
+
+def _bounded_mapping_rows(
+    value: Any,
+    field: str,
+    *,
+    max_rows: int,
+    empty_message: str,
+) -> tuple[Mapping[str, Any], ...]:
+    """Reject an oversized raw JSON array before iterating or copying it."""
+
+    if not isinstance(value, list):
+        raise SoundBankRuntimeError(f"{field} must be an object array")
+    count = len(value)
+    if count == 0:
+        raise SoundBankRuntimeError(empty_message)
+    if count > max_rows:
+        raise SoundBankRuntimeError(
+            f"{field} exceeds the {max_rows}-row limit"
+        )
+    rows: list[Mapping[str, Any]] = []
+    for index in range(count):
+        row = value[index]
+        if not isinstance(row, Mapping):
+            raise SoundBankRuntimeError(f"{field} must be an object array")
+        rows.append(row)
+    return tuple(rows)
 
 
 def _string_rows(value: Any, field: str) -> tuple[str, ...]:

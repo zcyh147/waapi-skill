@@ -41,6 +41,55 @@ def test_windows_drive_parser_is_independent_of_the_host_flavour(
 
 
 @pytest.mark.parametrize(
+    ("value", "expected"),
+    (
+        (
+            "Y:/Documents/case/GeneratedSoundBanks/",
+            PureWindowsPath(r"Y:\Documents\case\GeneratedSoundBanks"),
+        ),
+        (
+            "Y:\\Documents\\case\\GeneratedSoundBanks\\",
+            PureWindowsPath(r"Y:\Documents\case\GeneratedSoundBanks"),
+        ),
+        (
+            "y:/Harbor Mixed\\港口/Generated Banks\\",
+            PureWindowsPath("y:/Harbor Mixed/港口/Generated Banks"),
+        ),
+        ("Y:\\", PureWindowsPath("Y:/")),
+    ),
+)
+def test_windows_drive_parser_accepts_one_trailing_directory_separator_only_when_enabled(
+    value: str,
+    expected: PureWindowsPath,
+) -> None:
+    with pytest.raises(ReflectedHostPathError):
+        parse_windows_drive_path(value)
+
+    parsed = parse_windows_drive_path(value, allow_trailing_separator=True)
+
+    assert parsed is not None
+    assert parsed.pure == expected
+    assert parsed.drive == expected.drive[0].upper()
+    assert parsed.relative_parts == expected.parts[1:]
+
+
+@pytest.mark.parametrize(
+    "value",
+    (
+        "Y:/case/../outside/",
+        "Y:/case//output/",
+        "Y:/case/output//",
+        "\\\\server\\share\\output\\",
+    ),
+)
+def test_windows_directory_parser_still_rejects_traversal_repeats_and_unc(
+    value: str,
+) -> None:
+    with pytest.raises(ReflectedHostPathError):
+        parse_windows_drive_path(value, allow_trailing_separator=True)
+
+
+@pytest.mark.parametrize(
     "value",
     (
         r"\\server\share\file.wav",
@@ -65,6 +114,44 @@ def test_posix_parser_is_independent_of_the_host_flavour() -> None:
     assert parse_posix_absolute_path(
         "/data/~archive/Voice.wav"
     ) == PurePosixPath("/data/~archive/Voice.wav")
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    (
+        ("/Users/test/GeneratedSoundBanks/", "/Users/test/GeneratedSoundBanks"),
+        ("/Users/测试/Harbor Builds/", "/Users/测试/Harbor Builds"),
+        ("/", "/"),
+    ),
+)
+def test_posix_parser_accepts_one_trailing_directory_separator_only_when_enabled(
+    value: str,
+    expected: str,
+) -> None:
+    with pytest.raises(ReflectedHostPathError):
+        parse_posix_absolute_path(value)
+
+    assert parse_posix_absolute_path(
+        value,
+        allow_trailing_separator=True,
+    ) == PurePosixPath(expected)
+
+
+@pytest.mark.parametrize(
+    "value",
+    (
+        "/case/../outside/",
+        "/case//output/",
+        "/case/output//",
+        "//",
+        "//server/share/output/",
+    ),
+)
+def test_posix_directory_parser_still_rejects_traversal_repeats_and_unc(
+    value: str,
+) -> None:
+    with pytest.raises(ReflectedHostPathError):
+        parse_posix_absolute_path(value, allow_trailing_separator=True)
 
 
 @pytest.mark.parametrize(

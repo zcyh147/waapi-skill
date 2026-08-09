@@ -28,12 +28,18 @@ class WindowsDrivePath:
     relative_parts: tuple[str, ...]
 
 
-def parse_windows_drive_path(value: str) -> WindowsDrivePath | None:
+def parse_windows_drive_path(
+    value: str,
+    *,
+    allow_trailing_separator: bool = False,
+) -> WindowsDrivePath | None:
     """Parse a local drive path independently of the current host flavour.
 
     ``None`` means that ``value`` has no Windows drive.  UNC paths, drive-
-    relative spellings, empty components, repeated separators, dot traversal,
-    and trailing separators fail closed instead of being normalized silently.
+    relative spellings, empty components, repeated separators, and dot
+    traversal fail closed instead of being normalized silently.  A caller
+    handling a directory-valued field may explicitly accept exactly one
+    trailing separator; file-valued fields remain strict by default.
     """
 
     candidate = PureWindowsPath(value)
@@ -52,15 +58,29 @@ def parse_windows_drive_path(value: str) -> WindowsDrivePath | None:
     if (
         not suffix
         or suffix[0] not in {"\\", "/"}
-        or len(suffix) == 1
-        or suffix[1] in {"\\", "/"}
-        or suffix[-1] in {"\\", "/"}
-        or re.search(r"[\\/](?:\.{1,2})(?:[\\/]|$)", suffix)
-        or re.search(r"[\\/]{2}", suffix)
+        or (len(suffix) > 1 and suffix[1] in {"\\", "/"})
+    ):
+        raise ReflectedHostPathError("Windows path has an unsafe component")
+    relative = suffix[1:]
+    if allow_trailing_separator and relative.endswith(("\\", "/")):
+        relative = relative[:-1]
+        # A drive root is valid for a directory field, but a repeated root
+        # separator must not collapse to that valid spelling.
+        if not relative and len(suffix) > 1:
+            raise ReflectedHostPathError("Windows path has an unsafe component")
+    elif relative.endswith(("\\", "/")):
+        raise ReflectedHostPathError("Windows path has an unsafe component")
+    if (
+        re.search(r"(?:^|[\\/])(?:\.{1,2})(?:[\\/]|$)", relative)
+        or re.search(r"[\\/]{2}", relative)
+        or relative.endswith(("\\", "/"))
     ):
         raise ReflectedHostPathError("Windows path has an unsafe component")
     parts = tuple(candidate.parts[1:])
-    if not parts or any(part in {"", ".", ".."} for part in parts):
+    if (
+        (not parts and not allow_trailing_separator)
+        or any(part in {"", ".", ".."} for part in parts)
+    ):
         raise ReflectedHostPathError("Windows path has an unsafe component")
     return WindowsDrivePath(
         pure=candidate,
@@ -69,18 +89,33 @@ def parse_windows_drive_path(value: str) -> WindowsDrivePath | None:
     )
 
 
-def parse_posix_absolute_path(value: str) -> PurePosixPath:
-    """Parse one canonical POSIX absolute path without host I/O."""
+def parse_posix_absolute_path(
+    value: str,
+    *,
+    allow_trailing_separator: bool = False,
+) -> PurePosixPath:
+    """Parse one canonical POSIX absolute path without host I/O.
+
+    Directory-valued callers may explicitly accept exactly one trailing
+    separator.  Repeated separators and traversal remain invalid.
+    """
 
     if "\\" in value:
         raise ReflectedHostPathError("POSIX path contains a Windows separator")
+    if "//" in value:
+        raise ReflectedHostPathError("POSIX path has an unsafe component")
+    parsed_value = value
+    if allow_trailing_separator and parsed_value.endswith("/"):
+        if parsed_value != "/":
+            parsed_value = parsed_value[:-1]
+    elif parsed_value.endswith("/"):
+        raise ReflectedHostPathError("POSIX path has an unsafe component")
     if (
-        value.endswith("/")
-        or "//" in value
-        or re.search(r"/(?:\.{1,2})(?:/|$)", value)
+        (parsed_value.endswith("/") and parsed_value != "/")
+        or re.search(r"/(?:\.{1,2})(?:/|$)", parsed_value)
     ):
         raise ReflectedHostPathError("POSIX path has an unsafe component")
-    candidate = PurePosixPath(value)
+    candidate = PurePosixPath(parsed_value)
     if not candidate.is_absolute():
         raise ReflectedHostPathError("POSIX path must be absolute")
     if any(part in {"", ".", ".."} for part in candidate.parts):

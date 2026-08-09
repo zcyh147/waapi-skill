@@ -105,20 +105,49 @@ def test_media_pool_reference_classification_documents_terminal_result_and_bound
 
 
 def test_initial_skill_bootstrap_is_the_only_combined_read_exception() -> None:
-    assert "make the first shell action only the injected `SKILL.md` read" in SKILL
-    assert "Do not prepend or append `pwd`, `git`, `rg`, `ls`, `find`, `printf`" in SKILL
-    assert "Before any other shell action, read only that literal locator" in SKILL
+    frontmatter = SKILL.split("---", 2)[1]
+
+    assert (
+        "make that host-native injected `SKILL.md` read the sole first shell action"
+        in SKILL
+    )
+    assert "Never combine it with `pwd`, `git`, `rg`, `ls`, `find`, `printf`" in SKILL
+    assert "Choose by command host, not Wwise/Codex version or path spelling" in frontmatter
+    assert "POSIX uses `cat '<literal-locator>'` or exact `sed -n '1,$p'" in frontmatter
+    assert (
+        "native Windows uses exact "
+        "`Get-Content -Raw -Encoding UTF8 '<literal-locator>'`" in frontmatter
+    )
+    assert "Never cross-use/wrap these forms" in frontmatter
+    assert "combine the read with unrelated action" in frontmatter
     assert "Read each later named lane reference exactly once" in SKILL
     assert "spans the visible task, not each turn" in SKILL
-    assert "do not reread it for confirmation or continuation" in SKILL
+    assert "never reread an already-visible file" in SKILL
     assert "same literal file" in SKILL
+    assert "Only POSIX may bootstrap the initial complete `SKILL.md`" in SKILL
     assert "this is the only combined read allowed" in SKILL
-    assert "Never combine a reference read, gateway invocation, or other commands" in SKILL
+    assert "Never combine any other command" in SKILL
+
+
+def test_skill_frontmatter_uses_the_closed_plain_scalar_shape() -> None:
+    frontmatter = SKILL.split("---", 2)[1].strip().splitlines()
+
+    assert len(frontmatter) == 2
+    assert frontmatter[0] == "name: waapi-skill"
+    assert frontmatter[1].startswith("description: ")
+    description = frontmatter[1].removeprefix("description: ")
+    assert description
+    # This Skill deliberately uses one unquoted plain YAML scalar.  A colon
+    # followed by whitespace would start a nested mapping and make the Skill
+    # unloadable, so keep that syntax outside the value.
+    assert ": " not in description
+    assert "\t" not in description
 
 
 def test_skill_entry_fits_the_fresh_codex_bootstrap_window() -> None:
     assert len(SKILL.splitlines()) <= 230
     assert len(SKILL.encode("utf-8")) <= 35_000
+    assert len(SKILL.replace("\n", "\r\n").encode("utf-8")) <= 35_000
 
 
 def test_exact_identity_query_is_complete_in_entry_file() -> None:
@@ -173,6 +202,21 @@ def test_query_relationship_hops_reuse_returned_guids_without_weakening_guards()
     assert "query each distinct GUID exactly once" in section_flat
     assert "advanced-WAQL candidate" in section_flat
     assert "simple exact-id readback" in section_flat
+
+
+def test_operate_reuses_completed_exact_read_guids_for_later_selectors() -> None:
+    section = OPERATE.split("Public mutation identities are closed", 1)[1].split(
+        "## Choose by business outcome", 1
+    )[0]
+    section_flat = " ".join(section.split())
+
+    assert "exact relationship/path read" in section_flat
+    assert "returns canonical `id`/`name`/`type`/`path`" in section_flat
+    assert "reuse its GUID as an `id` selector" in section_flat
+    assert "later object/target" in section_flat
+    assert "never switch to path/name" in section_flat
+    assert "retype its Wwise path" in section_flat
+    assert "Gateway revalidates it" in section_flat
 
 
 def test_relationship_display_name_never_substitutes_for_absolute_bus_path() -> None:
@@ -630,18 +674,24 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "A named operation using only closed schema fields and side effects" in OPERATE
     assert "its named `operation-schema` directly" in OPERATE
     assert "including both import operations" not in OPERATE
-    assert "For direct `audio.import`, fixed fields and same-row Event/Switch Assignation are schema-owned" in OPERATE
-    assert "without an extra dynamic `properties[]`/`references[]` token" in OPERATE
-    assert "begin `operation-schema audio.import`" in OPERATE
-    assert "table workflow with only fixed columns likewise begins `operation-schema audio.importTabDelimited`" in OPERATE
-    assert "unknown dynamic `Property[...]`, `Reference[...]`, or `@...` column remains metadata-first" in OPERATE
+    assert "its schema owns fixed fields and same-row Event/Switch Assignation" in OPERATE
+    assert "Without dynamic `properties[]`/`references[]`" in OPERATE
+    assert "start `operation-schema audio.import`" in OPERATE
+    assert "For dynamic tokens on media Sound rows, `Sound` fixes scope" in OPERATE
+    assert "metadata/schema are independent and may swap" in OPERATE
+    assert "both precede preview and neither repeats" in OPERATE
+    assert "Fixed-column table import also starts `operation-schema audio.importTabDelimited`" in OPERATE
+    assert "unknown dynamic `Property[...]`/`Reference[...]`/`@...` columns stay metadata-first" in OPERATE
     skill_compact = " ".join(SKILL.split())
     assert (
-        "metadata precedes schema only for an explicitly requested unknown "
-        "dynamic property/reference token"
+        "only an explicit unknown dynamic property/reference token needs metadata"
     ) in skill_compact
-    assert "Closed schema fields and side effects are not metadata" in skill_compact
-    assert "without such a token, start with the named schema" in skill_compact
+    assert (
+        "operate reference says whether it precedes or commutes with schema"
+        in skill_compact
+    )
+    assert "Closed fields and side effects are not metadata" in skill_compact
+    assert "without that token, start with the named schema" in skill_compact
     assert "A known native URI without a named route" in OPERATE
     assert "`describe <uri>`" in OPERATE
     assert "There is deliberately no unconditional schema-to-preview shortcut" in compact
@@ -650,9 +700,12 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "copy `request_envelope` exactly" in compact
     assert "Unknown fields fail" in OPERATE
     assert "serialize every JSON string exactly once" in OPERATE
-    assert "Public operation requests contain only the closed selector objects above, never raw WAQL text" in OPERATE
+    assert "Operation requests use only closed selectors, never raw WAQL" in OPERATE
     assert "`exact-type-name`" in OPERATE
-    assert "never leave JSON escape backslashes" in OPERATE
+    assert r"Raw JSON spells each Wwise separator `\\`" in OPERATE
+    assert r"decoding yields `\`" in OPERATE
+    assert r"A raw `\` is invalid or escape-changing" in OPERATE
+    assert "never paste a decoded/displayed Wwise path" in OPERATE
     assert (
         "Each later intended-change preview still uses `preview --apply`"
         in OPERATE

@@ -8,6 +8,7 @@ state to that lifecycle's quarantine path.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from collections.abc import Callable, Mapping
@@ -16,6 +17,7 @@ from pathlib import Path, PurePosixPath
 from types import MappingProxyType
 from typing import Any
 
+from tests.semantic.support.codex_campaign import atomic_write_json_with_digest
 from tests.semantic.support.codex_eval_bundle_v3 import (
     ExpectedDispatch,
     OnlineScenario,
@@ -41,6 +43,7 @@ from tests.semantic.support.codex_soundbank_runtime_v3 import (
     ExpectedArtifact,
     InclusionRow,
     MaterializedSoundBankCase,
+    PROJECT_INFO_OBSERVER_MAX_PLATFORM_ROWS,
     PreparedSoundBankRuntime,
     SoundBankBlueprint,
     SoundBankRuntimeBackend,
@@ -57,6 +60,12 @@ HARBOR_DEBUG_EVENT = "Play_Harbor_Debug"
 HARBOR_BUS_NAME = "Harbor Bus"
 HARBOR_PLATFORMS = ("Windows", "Mac")
 HARBOR_FILTERS = ("events", "structures", "media")
+HARBOR_PROJECT_INFO_PATH_EVIDENCE_CONTRACT = (
+    "waapi-skill.harbor-project-info-host-paths/v1"
+)
+HARBOR_PROJECT_INFO_PATH_EVIDENCE_FILE = "harbor-project-info-host-paths.json"
+HARBOR_PROJECT_INFO_RAW_PATH_MAX_BYTES = 4096
+HARBOR_PROJECT_INFO_MAX_PLATFORM_ROWS = PROJECT_INFO_OBSERVER_MAX_PLATFORM_ROWS
 SET_INCLUSIONS_API = "ak.wwise.core.soundbank.setInclusions"
 GENERATE_API = "ak.wwise.core.soundbank.generate"
 REQUIRED_REFERENCE = "references/waapi-operate.md"
@@ -125,6 +134,7 @@ class PreparedHarborIntegrationRuntime:
     expected_dispatches: tuple[IntegrationPrimaryDispatch, ...]
     oracle_requirements: tuple[HarborOracleRequirement, ...]
     prompt_sources: Mapping[str, Any]
+    host_path_evidence_path: Path
     required_reference: str = REQUIRED_REFERENCE
 
 
@@ -177,7 +187,16 @@ def _prepare_harbor_integration_runtime(
     )
     blueprint = _harbor_prestate_blueprint(blueprint, workflow)
     backend = backend_factory(blueprint)
-    soundbank_runtime = PreparedSoundBankRuntime(blueprint, backend)
+    path_evidence = _HarborProjectInfoPathEvidenceRecorder(
+        runtime.evidence_root / HARBOR_PROJECT_INFO_PATH_EVIDENCE_FILE,
+        scenario_id=scenario.id,
+        version=version,
+    )
+    soundbank_runtime = PreparedSoundBankRuntime(
+        blueprint,
+        backend,
+        project_info_observer=path_evidence.observe,
+    )
     materialized = soundbank_runtime.prepare()
     before = soundbank_runtime.hidden_before
     if before is None:
@@ -252,7 +271,166 @@ def _prepare_harbor_integration_runtime(
         expected_dispatches=expected_dispatches,
         oracle_requirements=oracle_requirements,
         prompt_sources=_freeze_mapping(prompt_sources),
+        host_path_evidence_path=path_evidence.path,
     )
+
+
+class _HarborProjectInfoPathEvidenceRecorder:
+    """Archive exact pre-normalization path spellings from getProjectInfo."""
+
+    def __init__(self, path: Path, *, scenario_id: str, version: str) -> None:
+        self.path = Path(path)
+        if not self.path.is_absolute():
+            raise HarborIntegrationRuntimeError(
+                "Harbor project-info path evidence requires an absolute path"
+            )
+        digest_path = self.path.with_name(self.path.name + ".sha256")
+        if (
+            self.path.exists()
+            or self.path.is_symlink()
+            or digest_path.exists()
+            or digest_path.is_symlink()
+        ):
+            raise HarborIntegrationRuntimeError(
+                f"Harbor project-info path evidence cannot be reused: {self.path}"
+            )
+        self._scenario_id = scenario_id
+        self._version = version
+        self._observations: list[Mapping[str, Any]] = []
+
+    def observe(self, project_info: Mapping[str, Any]) -> None:
+        if not isinstance(project_info, Mapping):
+            raise HarborIntegrationRuntimeError(
+                "Harbor getProjectInfo path evidence requires an object"
+            )
+        if len(self._observations) >= 2:
+            raise HarborIntegrationRuntimeError(
+                "Harbor getProjectInfo path evidence exceeded two observations"
+            )
+        paths, platform_row_count, omitted_platform_rows = (
+            _raw_project_info_host_paths(project_info)
+        )
+        observation = {
+            "index": len(self._observations) + 1,
+            "platform_row_count": platform_row_count,
+            "omitted_platform_rows": omitted_platform_rows,
+            "paths": paths,
+        }
+        self._observations.append(observation)
+        atomic_write_json_with_digest(
+            self.path,
+            {
+                "contract": HARBOR_PROJECT_INFO_PATH_EVIDENCE_CONTRACT,
+                "scenario_id": self._scenario_id,
+                "version": self._version,
+                "source": "ak.wwise.core.getProjectInfo",
+                "model_visible": False,
+                "normalization_applied": False,
+                "observation_count": len(self._observations),
+                "observations": list(self._observations),
+            },
+        )
+
+
+def _raw_project_info_host_paths(
+    project_info: Mapping[str, Any],
+) -> tuple[list[Mapping[str, Any]], int | None, int]:
+    rows: list[Mapping[str, Any]] = [
+        _raw_host_path_evidence("project_info.path", project_info.get("path"))
+    ]
+    directories = project_info.get("directories")
+    for field in ("root", "cache", "soundBankOutputRoot"):
+        rows.append(
+            _raw_host_path_evidence(
+                f"project_info.directories.{field}",
+                directories.get(field) if isinstance(directories, Mapping) else None,
+            )
+        )
+    platforms = project_info.get("platforms")
+    platform_row_count = project_info.get("platform_count")
+    omitted_platform_rows = project_info.get("omitted_platform_rows")
+    if (
+        not isinstance(platforms, list)
+        or (
+            platform_row_count is not None
+            and (
+                isinstance(platform_row_count, bool)
+                or not isinstance(platform_row_count, int)
+                or platform_row_count < 0
+            )
+        )
+        or isinstance(omitted_platform_rows, bool)
+        or not isinstance(omitted_platform_rows, int)
+        or omitted_platform_rows < 0
+    ):
+        raise HarborIntegrationRuntimeError(
+            "Harbor project-info observer projection is malformed"
+        )
+    expected_recorded = (
+        0
+        if platform_row_count is None
+        else min(platform_row_count, HARBOR_PROJECT_INFO_MAX_PLATFORM_ROWS)
+    )
+    expected_omitted = (
+        0 if platform_row_count is None else platform_row_count - expected_recorded
+    )
+    if (
+        len(platforms) != expected_recorded
+        or omitted_platform_rows != expected_omitted
+    ):
+        raise HarborIntegrationRuntimeError(
+            "Harbor project-info observer projection count is inconsistent"
+        )
+    if platform_row_count is not None:
+        for index in range(len(platforms)):
+            platform = platforms[index]
+            for field in ("soundBankPath", "copiedMediaPath"):
+                rows.append(
+                    _raw_host_path_evidence(
+                        f"project_info.platforms[{index}].{field}",
+                        platform.get(field) if isinstance(platform, Mapping) else None,
+                    )
+                )
+    return rows, platform_row_count, omitted_platform_rows
+
+
+def _raw_host_path_evidence(
+    field: str,
+    value: Any,
+) -> Mapping[str, Any]:
+    if isinstance(value, str):
+        encoded = value.encode("utf-8")
+        byte_count: int | None = len(encoded)
+        raw_omitted = byte_count > HARBOR_PROJECT_INFO_RAW_PATH_MAX_BYTES
+        raw_value: str | None = None if raw_omitted else value
+        trailing_separator: bool | None = value.endswith(("/", "\\"))
+        if value.startswith(("\\\\", "//")):
+            lexical_flavor = "unc"
+        elif len(value) >= 3 and value[0].isalpha() and value[1] == ":":
+            lexical_flavor = "windows-drive"
+        elif value.startswith("/"):
+            lexical_flavor = "posix"
+        else:
+            lexical_flavor = "unknown"
+        raw_sha256: str | None = hashlib.sha256(encoded).hexdigest()
+    else:
+        raw_value = None
+        raw_omitted = False
+        trailing_separator = None
+        lexical_flavor = "non-string"
+        byte_count = None
+        raw_sha256 = None
+    return {
+        "field": field,
+        "raw_value": raw_value,
+        "raw_type": type(value).__name__,
+        "utf8_bytes": byte_count,
+        "raw_utf8_limit": HARBOR_PROJECT_INFO_RAW_PATH_MAX_BYTES,
+        "raw_omitted": raw_omitted,
+        "raw_sha256": raw_sha256,
+        "lexical_flavor": lexical_flavor,
+        "trailing_separator": trailing_separator,
+    }
 
 
 class _HarborIntegrationAdapter:
@@ -1173,6 +1351,10 @@ __all__ = [
     "HARBOR_DEBUG_EVENT",
     "HARBOR_FILTERS",
     "HARBOR_PLATFORMS",
+    "HARBOR_PROJECT_INFO_PATH_EVIDENCE_CONTRACT",
+    "HARBOR_PROJECT_INFO_PATH_EVIDENCE_FILE",
+    "HARBOR_PROJECT_INFO_MAX_PLATFORM_ROWS",
+    "HARBOR_PROJECT_INFO_RAW_PATH_MAX_BYTES",
     "HARBOR_RELEASE_BANK",
     "HARBOR_WORKFLOW_ID",
     "HarborIntegrationRuntimeError",

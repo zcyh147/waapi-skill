@@ -1332,6 +1332,7 @@ def _build_metadata_workflow_protocol(
         tuple(steps),
         prefixes,
         commutative_read_only_step_groups=(
+            ("tx01.metadata", "tx01.operation-schema"),
             ("tx02.operation-schema", "tx02.metadata"),
         ),
     )

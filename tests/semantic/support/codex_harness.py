@@ -134,6 +134,7 @@ _BROKER_WINDOWS_OVERLAY_NAMES = _BROKER_WINDOWS_MODEL_ENV_NAMES | {"PATH", "PATH
 _SHELL_ASSIGNMENT_RE = re.compile(r"(?P<name>[A-Za-z_][A-Za-z0-9_]*)=(?P<value>.*)", re.DOTALL)
 _PYTHON_EXECUTABLE_RE = re.compile(r"python(?:3(?:\.\d+)?)?(?:\.exe)?")
 _RUNNER_VERSION_SELECTORS = frozenset({"--version", "--wwise-version"})
+_POSIX_COMMAND_PARSER_KINDS = frozenset({"posix-native", "posix-shell"})
 _WINDOWS_POWERSHELL_CORE_PARSER_KIND = "windows-pwsh-command"
 _WINDOWS_ENCODED_POWERSHELL_PARSER_KIND = "windows-powershell-encoded"
 _TRANSACTION_NEXT_COMMAND_CONTRACT = "waapi-skill.gateway-next-command/v2"
@@ -3957,19 +3958,24 @@ def allowed_skill_read(
     executable = Path(record.argv[0]).name.lower()
     complete_skill_read = False
     if executable == "cat":
-        if len(record.argv) != 2:
+        if (
+            record.parser_kind not in _POSIX_COMMAND_PARSER_KINDS
+            or len(record.argv) != 2
+        ):
             return None
         path_text = record.argv[1]
         minimum_lines = None
     elif executable == "sed":
-        if len(record.argv) != 4 or record.argv[1] != "-n":
+        if (
+            record.parser_kind not in _POSIX_COMMAND_PARSER_KINDS
+            or len(record.argv) != 4
+            or record.argv[1] != "-n"
+            or record.argv[2] != "1,$p"
+        ):
             return None
-        match = re.fullmatch(r"1,(\d+)p", record.argv[2])
-        complete_skill_read = record.argv[2] == "1,$p"
-        if match is None and not complete_skill_read:
-            return None
+        complete_skill_read = True
         path_text = record.argv[3]
-        minimum_lines = int(match.group(1)) if match is not None else None
+        minimum_lines = None
     elif executable == "get-content":
         if (
             record.parser_kind != _WINDOWS_POWERSHELL_CORE_PARSER_KIND
@@ -4017,6 +4023,8 @@ def allowed_skill_bootstrap_read(
     reference reads, gateway calls, arbitrary commands, or partial content.
     """
 
+    if record.parser_kind not in _POSIX_COMMAND_PARSER_KINDS:
+        return None
     argv = record.argv
     if (
         len(argv) != 8

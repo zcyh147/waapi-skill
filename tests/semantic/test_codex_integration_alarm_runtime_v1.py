@@ -27,7 +27,10 @@ from tests.semantic.support.codex_integration_alarm_runtime_v1 import (
 from tests.semantic.support.codex_integration_workflows_v1 import (
     load_integration_workflows_profile,
 )
-from tests.semantic.support.codex_gateway_broker import ResponseBinding
+from tests.semantic.support.codex_gateway_broker import (
+    ResponseBinding,
+    SemanticJsonArgument,
+)
 
 
 DATA_ROOT = (
@@ -524,6 +527,13 @@ def test_operation_request_is_bound_to_live_sound_and_target_bus_ids(
         "kind": "id",
         "value": rows["target_bus"].object_id,
     }
+    preview_step = next(
+        step for step in prepared.protocol.steps if step.name == "tx01.preview"
+    )
+    preview_request = preview_step.arguments[2]
+    assert isinstance(preview_request, SemanticJsonArgument)
+    assert preview_request.equivalence == "wire_exact"
+    assert preview_request.expected == request
     with pytest.raises(TypeError):
         request["arguments"]["reference"] = "Attenuation"  # type: ignore[index]
 

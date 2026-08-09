@@ -580,6 +580,217 @@ def test_dirty_fixture_normalization_never_saves_a_different_live_project(
     assert ("save", None) not in backend.calls
 
 
+def test_project_info_observer_receives_detached_strict_json_before_validation(
+    tmp_path: Path,
+) -> None:
+    scenario = _compound_scenario("O22-SB-GENERATE-01", "2025.1")
+    runtime, backend = _unprepared_runtime(
+        tmp_path,
+        scenario,
+        version="2025.1",
+    )
+    raw_before = json.loads(json.dumps(backend.project_info))
+    observed: list[dict[str, Any]] = []
+
+    def mutate_observation(value: Mapping[str, Any]) -> None:
+        assert isinstance(value, dict)
+        observed.append(value)
+        value["path"] = "//observer/must/not/change/validation.wproj"
+        directories = value["directories"]
+        assert isinstance(directories, dict)
+        directories["root"] = "//observer/must/not/change/validation/"
+
+    normalized = soundbank_runtime._normalize_fixture_project_info(
+        backend,
+        blueprint=runtime.blueprint,
+        observer=mutate_observation,
+    )
+
+    assert len(observed) == 1
+    assert backend.project_info == raw_before
+    assert normalized["path"] == str(runtime.blueprint.sandbox_project)
+    assert normalized["directories"]["root"] == raw_before["directories"]["root"]
+
+
+def _bounded_project_info_inventories(
+    backend: FakeSoundBankBackend,
+    *,
+    platform_count: int,
+    language_count: int,
+) -> dict[str, Any]:
+    project_info = json.loads(json.dumps(backend.project_info))
+    platform_template = project_info["platforms"][0]
+    project_info["platforms"] = [
+        {
+            **platform_template,
+            "id": _guid(f"bounded-platform:{index}"),
+            "name": f"Bounded Platform {index}",
+            "baseName": f"Bounded Platform {index}",
+        }
+        for index in range(platform_count)
+    ]
+    project_info["languages"] = [
+        {
+            "id": _guid(f"bounded-language:{index}"),
+            "name": f"Bounded Language {index}",
+        }
+        for index in range(language_count)
+    ]
+    return project_info
+
+
+class _PlatformRowsWithoutIteration(list[Mapping[str, Any]]):
+    def __init__(
+        self,
+        rows: Sequence[Mapping[str, Any]],
+        *,
+        reported_length: int,
+    ) -> None:
+        super().__init__(rows)
+        self.reported_length = reported_length
+        self.iteration_attempts = 0
+        self.requested_indexes: list[int] = []
+
+    def __len__(self) -> int:
+        return self.reported_length
+
+    def __iter__(self) -> Any:
+        self.iteration_attempts += 1
+        raise AssertionError("oversized raw platform rows must not be iterated")
+
+    def __getitem__(self, index: Any) -> Any:
+        if not isinstance(index, int):
+            raise AssertionError("observer projection must use bounded integer indexes")
+        self.requested_indexes.append(index)
+        return super().__getitem__(index)
+
+
+@pytest.mark.parametrize("reported_length", (17, 100_000))
+def test_project_info_overflow_uses_bounded_projection_then_rejects_before_iteration(
+    tmp_path: Path,
+    reported_length: int,
+) -> None:
+    scenario = _compound_scenario("O22-SB-GENERATE-01", "2025.1")
+    runtime, backend = _unprepared_runtime(
+        tmp_path,
+        scenario,
+        version="2025.1",
+    )
+    template = json.loads(json.dumps(backend.project_info["platforms"][0]))
+    recorded_count = min(
+        reported_length,
+        soundbank_runtime.PROJECT_INFO_OBSERVER_MAX_PLATFORM_ROWS,
+    )
+    raw_platforms = _PlatformRowsWithoutIteration(
+        [
+            {
+                **template,
+                "id": _guid(f"overflow-platform:{index}"),
+                "name": f"Overflow Platform {index}",
+            }
+            for index in range(recorded_count)
+        ],
+        reported_length=reported_length,
+    )
+    backend.project_info["platforms"] = raw_platforms
+    observed: list[Mapping[str, Any]] = []
+
+    with pytest.raises(SoundBankRuntimeError, match="16-row limit"):
+        soundbank_runtime._normalize_fixture_project_info(
+            backend,
+            blueprint=runtime.blueprint,
+            observer=observed.append,
+        )
+
+    assert raw_platforms.iteration_attempts == 0
+    assert raw_platforms.requested_indexes == list(range(recorded_count))
+    assert len(observed) == 1
+    assert observed[0]["platform_count"] == reported_length
+    assert observed[0]["omitted_platform_rows"] == (
+        reported_length - recorded_count
+    )
+    projected_rows = observed[0]["platforms"]
+    assert isinstance(projected_rows, list)
+    assert len(projected_rows) == recorded_count
+    assert projected_rows[0] is not raw_platforms[0]
+
+
+def test_project_info_accepts_production_platform_and_language_ceiling(
+    tmp_path: Path,
+) -> None:
+    scenario = _compound_scenario("O22-SB-GENERATE-01", "2025.1")
+    runtime, backend = _unprepared_runtime(
+        tmp_path,
+        scenario,
+        version="2025.1",
+    )
+    project_info = _bounded_project_info_inventories(
+        backend,
+        platform_count=soundbank_runtime.MAX_PLATFORMS,
+        language_count=soundbank_runtime.MAX_LANGUAGES,
+    )
+
+    normalized = soundbank_runtime._validate_project_info(
+        project_info,
+        blueprint=runtime.blueprint,
+    )
+
+    assert len(normalized["platforms"]) == soundbank_runtime.MAX_PLATFORMS
+    assert len(normalized["languages"]) == soundbank_runtime.MAX_LANGUAGES
+
+
+@pytest.mark.parametrize(
+    ("inventory", "count", "message"),
+    (
+        ("platforms", 0, "no platforms"),
+        (
+            "platforms",
+            soundbank_runtime.MAX_PLATFORMS + 1,
+            f"{soundbank_runtime.MAX_PLATFORMS}-row limit",
+        ),
+        ("languages", 0, "no languages"),
+        (
+            "languages",
+            soundbank_runtime.MAX_LANGUAGES + 1,
+            f"{soundbank_runtime.MAX_LANGUAGES}-row limit",
+        ),
+    ),
+)
+def test_project_info_rejects_unbounded_inventory_before_any_platform_mkdir(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    inventory: str,
+    count: int,
+    message: str,
+) -> None:
+    scenario = _compound_scenario("O22-SB-GENERATE-01", "2025.1")
+    runtime, backend = _unprepared_runtime(
+        tmp_path,
+        scenario,
+        version="2025.1",
+    )
+    project_info = _bounded_project_info_inventories(
+        backend,
+        platform_count=(count if inventory == "platforms" else 2),
+        language_count=(count if inventory == "languages" else 4),
+    )
+    mkdir_calls: list[Path] = []
+
+    def reject_mkdir(path: Path, *_args: Any, **_kwargs: Any) -> None:
+        mkdir_calls.append(path)
+        raise AssertionError("platform mkdir must not run for an invalid inventory")
+
+    monkeypatch.setattr(Path, "mkdir", reject_mkdir)
+
+    with pytest.raises(SoundBankRuntimeError, match=message):
+        soundbank_runtime._validate_project_info(
+            project_info,
+            blueprint=runtime.blueprint,
+        )
+
+    assert mkdir_calls == []
+
+
 def test_dirty_private_fixture_is_saved_once_and_rechecked_clean(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -788,10 +999,10 @@ def test_topic_runtime_localizes_long_wine_project_info_paths(
     wine_project_info["path"] = raw_project_path
     directories = wine_project_info["directories"]
     for field, value in tuple(directories.items()):
-        directories[field] = wine_path(Path(value))
+        directories[field] = wine_path(Path(value)) + "\\"
     for platform in wine_project_info["platforms"]:
         for field in ("soundBankPath", "copiedMediaPath"):
-            platform[field] = wine_path(Path(platform[field]))
+            platform[field] = wine_path(Path(platform[field])) + "\\"
     monkeypatch.setattr(
         soundbank_runtime,
         "pwd",
@@ -821,6 +1032,87 @@ def test_topic_runtime_localizes_long_wine_project_info_paths(
 
     assert materialized.topic_plan is not None
     assert materialized.topic_plan.publishers
+
+
+def test_project_info_file_path_does_not_inherit_directory_trailing_separator_allowance(
+    tmp_path: Path,
+) -> None:
+    scenario = next(row for row in _scenarios() if row.id == "O22-SB-GENERATE-01")
+    runtime, backend = _unprepared_runtime(tmp_path, scenario)
+    backend.project_info["path"] = str(runtime.blueprint.sandbox_project) + os.sep
+
+    with pytest.raises(SoundBankRuntimeError, match="project_info.path"):
+        runtime.prepare()
+
+
+def test_project_info_directory_rejects_link_or_reparse_before_resolution(
+    tmp_path: Path,
+) -> None:
+    scenario = next(row for row in _scenarios() if row.id == "O22-SB-GENERATE-01")
+    runtime, backend = _unprepared_runtime(tmp_path, scenario)
+    real_cache = runtime.blueprint.io_root / "real-cache"
+    real_cache.mkdir()
+    cache_alias = runtime.blueprint.io_root / "cache-alias"
+    create_symlink_or_skip(cache_alias, real_cache, target_is_directory=True)
+    backend.project_info["directories"]["cache"] = str(cache_alias) + os.sep
+
+    with pytest.raises(
+        SoundBankRuntimeError,
+        match="symbolic link or Windows reparse point",
+    ):
+        runtime.prepare()
+
+
+def test_project_info_directory_rejects_windows_reparse_metadata_before_resolution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scenario = next(row for row in _scenarios() if row.id == "O22-SB-GENERATE-01")
+    runtime, backend = _unprepared_runtime(tmp_path, scenario)
+    cache = Path(backend.project_info["directories"]["cache"])
+    monkeypatch.setattr(
+        soundbank_runtime,
+        "path_is_link_or_reparse",
+        lambda path, *, metadata: path == cache,
+    )
+
+    with pytest.raises(
+        SoundBankRuntimeError,
+        match="symbolic link or Windows reparse point",
+    ):
+        runtime.prepare()
+
+
+@pytest.mark.parametrize(
+    "unsafe_value",
+    (
+        "../outside/",
+        "//server/share/output/",
+    ),
+)
+def test_project_info_directory_trailing_separator_does_not_weaken_fail_closed_paths(
+    tmp_path: Path,
+    unsafe_value: str,
+) -> None:
+    scenario = next(row for row in _scenarios() if row.id == "O22-SB-GENERATE-01")
+    runtime, backend = _unprepared_runtime(tmp_path, scenario)
+    backend.project_info["directories"]["cache"] = unsafe_value
+
+    with pytest.raises(SoundBankRuntimeError):
+        runtime.prepare()
+
+
+def test_project_info_directory_rejects_absolute_escape_with_trailing_separator(
+    tmp_path: Path,
+) -> None:
+    scenario = next(row for row in _scenarios() if row.id == "O22-SB-GENERATE-01")
+    runtime, backend = _unprepared_runtime(tmp_path / "case", scenario)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    backend.project_info["directories"]["cache"] = str(outside) + os.sep
+
+    with pytest.raises(SoundBankRuntimeError, match="escapes"):
+        runtime.prepare()
 
 
 def _topic_payload(row: TopicExpectedEvent) -> dict[str, Any]:

@@ -13,6 +13,7 @@ from tests.semantic.support.codex_gateway_broker import (
     GatewayDerivedReferenceActivationAllowance,
     MetadataBoundJsonArgument,
     MetadataTokenProjection,
+    gateway_step_sequence_matches,
 )
 from tests.semantic.support.codex_integration_weather_runtime_v1 import (
     ACTION_METADATA_QUERIES,
@@ -432,6 +433,7 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         ("--limit", "8"),
     ]
     assert protocol.commutative_read_only_step_groups == (
+        ("tx01.metadata", "tx01.operation-schema"),
         ("tx02.operation-schema", "tx02.metadata"),
     )
     assert [
@@ -450,6 +452,43 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         "tx02.execute",
         "tx03.execute",
     ]
+    groups = protocol.commutative_read_only_step_groups
+    for canonical in (
+        ("tx01.metadata", "tx01.operation-schema", "tx01.preview"),
+        ("tx02.operation-schema", "tx02.metadata", "tx02.preview"),
+    ):
+        first, second, preview_name = canonical
+        assert gateway_step_sequence_matches(canonical, canonical, groups)
+        assert gateway_step_sequence_matches(
+            canonical,
+            (second, first, preview_name),
+            groups,
+        )
+        assert not gateway_step_sequence_matches(
+            canonical,
+            (first, first, preview_name),
+            groups,
+        )
+        assert not gateway_step_sequence_matches(
+            canonical,
+            (second, second, preview_name),
+            groups,
+        )
+        assert not gateway_step_sequence_matches(
+            canonical,
+            (first, preview_name),
+            groups,
+        )
+        assert not gateway_step_sequence_matches(
+            canonical,
+            (second, preview_name),
+            groups,
+        )
+        assert not gateway_step_sequence_matches(
+            canonical,
+            (first, preview_name, second),
+            groups,
+        )
     preview = next(
         step for step in protocol.steps if step.name == "tx01.preview"
     )

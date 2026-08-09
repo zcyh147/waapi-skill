@@ -40,16 +40,16 @@ After any required selected-subset identity gate, choose exactly one of these fi
 | A named operation using only closed schema fields and side effects | its named `operation-schema` directly |
 | A known native URI without a named route | `describe <uri>` and obey only the returned `transaction_operations`, except for the reviewed fast routes below |
 
-For direct `audio.import`, fixed fields and same-row Event/Switch Assignation are schema-owned; without an extra dynamic `properties[]`/`references[]` token, begin `operation-schema audio.import`. An existing table workflow with only fixed columns likewise begins `operation-schema audio.importTabDelimited`; an explicitly requested unknown dynamic `Property[...]`, `Reference[...]`, or `@...` column remains metadata-first. Use `operations` only for a broad inventory question, never as preparation for a named change. An implemented dedicated operation owns its URI; `waapi.call` is a hard-rejected bypass unless the catalog explicitly lists it as that URI's transaction operation. The three Undo Group member URIs use only `waapi.undoGroup`.
+For direct `audio.import`, its schema owns fixed fields and same-row Event/Switch Assignation. Without dynamic `properties[]`/`references[]`, start `operation-schema audio.import`. For dynamic tokens on media Sound rows, `Sound` fixes scope; metadata/schema are independent and may swap, but both precede preview and neither repeats. Fixed-column table import also starts `operation-schema audio.importTabDelimited`; unknown dynamic `Property[...]`/`Reference[...]`/`@...` columns stay metadata-first. Use `operations` only for broad inventory. Dedicated operations own their URIs; `waapi.call` is rejected unless the catalog lists it for that URI. The three Undo Group URIs use only `waapi.undoGroup`.
 
 After the required discovery/schema sequence, construct only the closed request returned by the schema and preview it. There is deliberately no unconditional schema-to-preview shortcut: missing metadata, version, identity, file, or user input must be resolved by the branch that owns it. Conversely, do not add metadata discovery when an exact property/reference accessor is already visible in a successful live query from this conversation. Apply only the operation schema's mapping: property accessor `@Foo` becomes mutation metadata token `Foo` by removing exactly one leading `@`; reference accessor `OutputBus` remains `OutputBus`. This mapping is evidence-bound to that returned accessor—never strip or invent a token from arbitrary user/model text. Then preview the canonical token.
 
 Public mutation identities are closed to `id`, `path`, `exact-type-name`,
-`direct-child`, and `scoped-name`. When the user's supplied identity and scope
-already fit one selector returned by the operation schema, put that selector
-directly in the preview and let the Gateway perform live resolution. Do not add
-`query-object` merely to translate the same exact identity into an id or path,
-and never place caller- or model-authored raw WAQL in an operation request.
+`direct-child`, and `scoped-name`. Use a schema-fitting selector directly in
+preview; do not query only to translate it or use raw WAQL. After exact
+relationship/path read returns canonical `id`/`name`/`type`/`path`, reuse its
+GUID as an `id` selector for later object/target; never switch to path/name or
+retype its Wwise path. Gateway revalidates it.
 
 For an exact SoundBank name that is intended to be globally unique by type, use
 `{"kind":"exact-type-name","type":"SoundBank","name":"<exact name>"}`. For an
@@ -183,7 +183,7 @@ For an unambiguous actual change use one standalone:
 python /absolute/path/to/waapi-skill/scripts/run.py gateway.py preview --apply --request-json '<closed-request-json>'
 ```
 
-Single-quote the whole compact request at the shell layer and serialize every JSON string exactly once. After JSON decoding, each Wwise path separator is one `\`; never leave JSON escape backslashes inside the decoded value. Public operation requests contain only the closed selector objects above, never raw WAQL text. Invalid JSON stops before preview and is not repaired or retried in the same turn.
+Single-quote the compact shell request and serialize every JSON string exactly once. Raw JSON spells each Wwise separator `\\`; decoding yields `\`. A raw `\` is invalid or escape-changing; never paste a decoded/displayed Wwise path. Operation requests use only closed selectors, never raw WAQL. Invalid JSON stops before preview; do not repair or retry that turn.
 
 Under `ask_before_changes`, a user asking to see the preview before confirming an intended change still uses `preview --apply`: that flag creates the durable confirmation-bound preview and does not execute the change. Omit `--apply` only for a hypothetical, design-only, or explicitly non-executable preview.
 In ordinary use omit `--state-dir`: the Gateway owns the external transaction store. Pass it only when a trusted caller explicitly supplied an absolute override, then reuse that path unchanged.

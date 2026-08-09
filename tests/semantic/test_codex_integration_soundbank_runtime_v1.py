@@ -1,20 +1,29 @@
 from __future__ import annotations
 
+import hashlib
+import os
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Callable
 
 import pytest
 
+from tests.semantic.support import codex_soundbank_runtime_v3 as soundbank_runtime
+from tests.semantic.support.codex_campaign import load_verified_json
 from tests.semantic.support.codex_integration_soundbank_runtime_v1 import (
     GENERATE_API,
     HARBOR_BUS_NAME,
     HARBOR_CONTROL_BANK,
     HARBOR_FILTERS,
     HARBOR_PLATFORMS,
+    HARBOR_PROJECT_INFO_MAX_PLATFORM_ROWS,
+    HARBOR_PROJECT_INFO_PATH_EVIDENCE_CONTRACT,
+    HARBOR_PROJECT_INFO_PATH_EVIDENCE_FILE,
+    HARBOR_PROJECT_INFO_RAW_PATH_MAX_BYTES,
     HARBOR_RELEASE_BANK,
     SET_INCLUSIONS_API,
     HarborIntegrationRuntimeError,
+    _HarborProjectInfoPathEvidenceRecorder,
     _prepare_harbor_integration_runtime,
     _validated_generation_request,
     prepare_harbor_integration_runtime,
@@ -25,6 +34,7 @@ from tests.semantic.support.codex_integration_workflows_v1 import (
     load_integration_workflows_profile,
 )
 from tests.semantic.support.codex_scenario_lifecycle_v3 import ScenarioRuntime
+from tests.semantic.support.codex_soundbank_runtime_v3 import SoundBankRuntimeError
 from tests.semantic.test_codex_soundbank_runtime_v3 import FakeSoundBankBackend
 
 
@@ -92,6 +102,7 @@ def _prepare(
     tmp_path: Path,
     *,
     version: str = "2022.1",
+    project_info_mutator: Callable[[dict[str, Any]], None] | None = None,
 ) -> tuple[Any, FakeSoundBankBackend, IntegrationWorkflowCase]:
     unit = _unit(version)
     runtime = _runtime(
@@ -103,6 +114,8 @@ def _prepare(
 
     def backend_factory(blueprint: Any) -> FakeSoundBankBackend:
         backend = FakeSoundBankBackend(blueprint)
+        if project_info_mutator is not None:
+            project_info_mutator(backend.project_info)
         holder["backend"] = backend
         return backend
 
@@ -118,6 +131,15 @@ def _prepare(
 
 def _step(prepared: Any, name: str) -> Any:
     return next(row for row in prepared.protocol.steps if row.name == name)
+
+
+def _append_native_directory_separators(project_info: dict[str, Any]) -> None:
+    directories = project_info["directories"]
+    for field in ("root", "cache", "soundBankOutputRoot"):
+        directories[field] += os.sep
+    for platform in project_info["platforms"]:
+        for field in ("soundBankPath", "copiedMediaPath"):
+            platform[field] += os.sep
 
 
 def _apply_tx01(
@@ -275,6 +297,205 @@ def test_harbor_runtime_materializes_closed_dual_platform_workflow_and_cleans(
         row.get("name") in {HARBOR_RELEASE_BANK, HARBOR_CONTROL_BANK}
         for row in backend.rows.values()
     )
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2025.1"))
+def test_harbor_runtime_accepts_native_directory_trailing_separators_and_seals_raw_evidence(
+    tmp_path: Path,
+    version: str,
+) -> None:
+    prepared, _backend, _workflow = _prepare(
+        tmp_path,
+        version=version,
+        project_info_mutator=_append_native_directory_separators,
+    )
+
+    evidence = load_verified_json(prepared.host_path_evidence_path)
+
+    assert evidence["contract"] == HARBOR_PROJECT_INFO_PATH_EVIDENCE_CONTRACT
+    assert evidence["scenario_id"] == _unit(version).scenario.id
+    assert evidence["version"] == version
+    assert evidence["model_visible"] is False
+    assert evidence["normalization_applied"] is False
+    assert evidence["observation_count"] == 1
+    observation = evidence["observations"][0]
+    assert observation["platform_row_count"] == 2
+    assert observation["omitted_platform_rows"] == 0
+    paths = observation["paths"]
+    assert len(paths) == 8
+    project_path = paths[0]
+    assert project_path["field"] == "project_info.path"
+    assert project_path["trailing_separator"] is False
+    assert project_path["raw_omitted"] is False
+    assert project_path["raw_utf8_limit"] == HARBOR_PROJECT_INFO_RAW_PATH_MAX_BYTES
+    assert project_path["raw_sha256"] == hashlib.sha256(
+        project_path["raw_value"].encode("utf-8")
+    ).hexdigest()
+    directory_paths = paths[1:]
+    assert all(row["trailing_separator"] is True for row in directory_paths)
+    assert all(row["raw_omitted"] is False for row in directory_paths)
+    assert all(row["raw_value"].endswith(os.sep) for row in directory_paths)
+    assert all(
+        row["raw_sha256"]
+        == hashlib.sha256(row["raw_value"].encode("utf-8")).hexdigest()
+        for row in directory_paths
+    )
+    projection = prepared.prompt_sources["soundbank_generate_project_info"]
+    assert not projection["directories"]["cache"].endswith(os.sep)
+    assert all(
+        not row[field].endswith(os.sep)
+        for row in projection["platforms"]
+        for field in ("soundBankPath", "copiedMediaPath")
+    )
+
+
+def test_harbor_unsafe_project_info_path_is_archived_before_fail_closed(
+    tmp_path: Path,
+) -> None:
+    unit = _unit("2022.1")
+    runtime = _runtime(
+        tmp_path,
+        scenario_id=unit.scenario.id,
+        version=unit.version,
+    )
+
+    def backend_factory(blueprint: Any) -> FakeSoundBankBackend:
+        backend = FakeSoundBankBackend(blueprint)
+        backend.project_info["directories"]["root"] = (
+            "\\\\server\\share\\Harbor\\"
+        )
+        return backend
+
+    with pytest.raises(SoundBankRuntimeError, match="directories.root"):
+        _prepare_harbor_integration_runtime(
+            unit.workflow,
+            unit.scenario,
+            version=unit.version,
+            runtime=runtime,
+            backend_factory=backend_factory,
+        )
+
+    evidence_path = runtime.evidence_root / HARBOR_PROJECT_INFO_PATH_EVIDENCE_FILE
+    evidence = load_verified_json(evidence_path)
+    root_row = next(
+        row
+        for row in evidence["observations"][0]["paths"]
+        if row["field"] == "project_info.directories.root"
+    )
+    assert root_row == {
+        "field": "project_info.directories.root",
+        "raw_value": "\\\\server\\share\\Harbor\\",
+        "raw_type": "str",
+        "utf8_bytes": len("\\\\server\\share\\Harbor\\".encode("utf-8")),
+        "raw_utf8_limit": HARBOR_PROJECT_INFO_RAW_PATH_MAX_BYTES,
+        "raw_omitted": False,
+        "raw_sha256": hashlib.sha256(
+            "\\\\server\\share\\Harbor\\".encode("utf-8")
+        ).hexdigest(),
+        "lexical_flavor": "unc",
+        "trailing_separator": True,
+    }
+
+
+def test_harbor_overlimit_raw_path_evidence_is_hashed_but_omitted(
+    tmp_path: Path,
+) -> None:
+    unit = _unit("2022.1")
+    runtime = _runtime(
+        tmp_path,
+        scenario_id=unit.scenario.id,
+        version=unit.version,
+    )
+    overlimit = (
+        "\\\\server\\share\\"
+        + "路" * (HARBOR_PROJECT_INFO_RAW_PATH_MAX_BYTES // 2)
+        + "\\"
+    )
+    encoded = overlimit.encode("utf-8")
+    assert len(encoded) > HARBOR_PROJECT_INFO_RAW_PATH_MAX_BYTES
+
+    def backend_factory(blueprint: Any) -> FakeSoundBankBackend:
+        backend = FakeSoundBankBackend(blueprint)
+        backend.project_info["directories"]["root"] = overlimit
+        return backend
+
+    with pytest.raises(SoundBankRuntimeError, match="directories.root"):
+        _prepare_harbor_integration_runtime(
+            unit.workflow,
+            unit.scenario,
+            version=unit.version,
+            runtime=runtime,
+            backend_factory=backend_factory,
+        )
+
+    evidence_path = runtime.evidence_root / HARBOR_PROJECT_INFO_PATH_EVIDENCE_FILE
+    evidence = load_verified_json(evidence_path)
+    root_row = next(
+        row
+        for row in evidence["observations"][0]["paths"]
+        if row["field"] == "project_info.directories.root"
+    )
+    assert root_row["raw_value"] is None
+    assert root_row["raw_omitted"] is True
+    assert root_row["raw_utf8_limit"] == HARBOR_PROJECT_INFO_RAW_PATH_MAX_BYTES
+    assert root_row["utf8_bytes"] == len(encoded)
+    assert root_row["raw_sha256"] == hashlib.sha256(encoded).hexdigest()
+    assert root_row["lexical_flavor"] == "unc"
+    assert root_row["trailing_separator"] is True
+    assert evidence_path.stat().st_size < HARBOR_PROJECT_INFO_RAW_PATH_MAX_BYTES
+
+
+def test_harbor_path_evidence_caps_platform_rows_and_observation_count(
+    tmp_path: Path,
+) -> None:
+    evidence_path = tmp_path / HARBOR_PROJECT_INFO_PATH_EVIDENCE_FILE
+    recorder = _HarborProjectInfoPathEvidenceRecorder(
+        evidence_path,
+        scenario_id="INT22-HARBOR-SOUNDBANK-RELEASE",
+        version="2022.1",
+    )
+    platform_row_count = HARBOR_PROJECT_INFO_MAX_PLATFORM_ROWS + 3
+    project_info = {
+        "path": "/owned/Harbor.wproj",
+        "directories": {
+            "root": "/owned/",
+            "cache": "/owned/cache/",
+            "soundBankOutputRoot": "/owned/soundbanks/",
+        },
+        "platforms": [
+            {
+                "name": f"Platform {index}",
+                "soundBankPath": f"/owned/soundbanks/Platform {index}/",
+                "copiedMediaPath": f"/owned/soundbanks/Platform {index}/Media/",
+            }
+            for index in range(platform_row_count)
+        ],
+    }
+
+    projection = soundbank_runtime._project_info_observer_projection(project_info)
+    recorder.observe(projection)
+    recorder.observe(projection)
+    with pytest.raises(
+        HarborIntegrationRuntimeError,
+        match="exceeded two observations",
+    ):
+        recorder.observe(projection)
+
+    evidence = load_verified_json(evidence_path)
+    assert evidence["observation_count"] == 2
+    for observation in evidence["observations"]:
+        assert observation["platform_row_count"] == platform_row_count
+        assert observation["omitted_platform_rows"] == 3
+        assert len(observation["paths"]) == (
+            4 + 2 * HARBOR_PROJECT_INFO_MAX_PLATFORM_ROWS
+        )
+        assert observation["paths"][-1]["field"] == (
+            "project_info.platforms[31].copiedMediaPath"
+        )
+        assert not any(
+            "platforms[32]" in row["field"]
+            for row in observation["paths"]
+        )
 
 
 def test_harbor_generation_preflight_rejects_output_directory_as_io_root(

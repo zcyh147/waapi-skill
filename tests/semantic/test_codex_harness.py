@@ -216,7 +216,9 @@ def completed_record(
     exit_code: int = 0,
     status: str = "completed",
 ) -> CodexCommandRecord:
-    argv, has_operators, parse_error = parse_command_argv(command)
+    argv, has_operators, parse_error, parser_kind = (
+        codex_harness_module._parse_command_argv(command)
+    )
     return CodexCommandRecord(
         command=command,
         exit_code=exit_code,
@@ -231,6 +233,7 @@ def completed_record(
         argv=argv,
         has_shell_operators=has_operators,
         parse_error=parse_error,
+        parser_kind=parser_kind,
     )
 
 
@@ -3323,6 +3326,39 @@ def test_posix_get_content_cannot_claim_absolute_or_relative_skill_read(
     assert facts.unexpected_commands == (command,)
 
 
+@pytest.mark.parametrize(
+    "script",
+    (
+        r"cat '.agents\skills\waapi-skill\SKILL.md'",
+        r"sed -n '1,$p' '.agents\skills\waapi-skill\SKILL.md'",
+    ),
+    ids=("cat", "sed"),
+)
+def test_windows_powershell_rejects_posix_skill_readers(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    script: str,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module,
+        "split_native_command_line",
+        portable_windows_outer_split,
+    )
+    skill = tmp_path / "agent-workspace" / ".agents" / "skills" / "waapi-skill"
+    skill.mkdir(parents=True)
+    content = "# skill\n"
+    (skill / "SKILL.md").write_text(content, encoding="utf-8")
+    command = windows_powershell_recording(script)
+    record = completed_windows_record(command, content)
+
+    facts = classify_commands((record,), skill_source=skill)
+
+    assert record.parser_kind == "windows-pwsh-command"
+    assert facts.skill_read is False
+    assert facts.allowed_read_commands == ()
+    assert facts.unexpected_commands == (command,)
+
+
 @pytest.mark.skipif(os.name != "nt", reason="native Windows command-line parser proof")
 def test_native_windows_powershell_core_probe_uses_exact_profile_free_argv(
     tmp_path: Path,
@@ -3800,7 +3836,7 @@ def test_command_classifier_distinguishes_gateway_from_inline_code_and_discovery
     (skill / "SKILL.md").write_text("skill\n", encoding="utf-8")
     commands = (
         completed_record(
-            recorded_argv_command("sed", "-n", "1,200p", str(skill / "SKILL.md")),
+            recorded_argv_command("sed", "-n", "1,$p", str(skill / "SKILL.md")),
             "skill\n",
         ),
         completed_record(
@@ -4098,7 +4134,9 @@ def test_command_classifier_allows_only_exact_initial_skill_bootstrap_read(tmp_p
     shell_path = shlex.quote(str(skill_md))
     command = f'/bin/bash -lc "wc -l {shell_path} && sed -n \'1,240p\' {shell_path}"'
     output = f"       2 {skill_md}\n{content}"
-    argv, has_operators, parse_error = parse_command_argv(command)
+    argv, has_operators, parse_error, parser_kind = (
+        codex_harness_module._parse_command_argv(command)
+    )
     record = CodexCommandRecord(
         command=command,
         exit_code=0,
@@ -4107,6 +4145,7 @@ def test_command_classifier_allows_only_exact_initial_skill_bootstrap_read(tmp_p
         argv=argv,
         has_shell_operators=has_operators,
         parse_error=parse_error,
+        parser_kind=parser_kind,
     )
 
     facts = classify_commands((record,), skill_source=skill)
@@ -4116,6 +4155,100 @@ def test_command_classifier_allows_only_exact_initial_skill_bootstrap_read(tmp_p
     assert facts.skill_read_files == ("SKILL.md",)
     assert facts.write_like_commands == ()
     assert facts.unexpected_commands == ()
+
+
+@pytest.mark.parametrize(
+    "parser_kind",
+    (
+        "windows-pwsh-command",
+        "windows-native",
+        "windows-powershell-encoded",
+        "",
+    ),
+)
+def test_command_classifier_rejects_posix_bootstrap_read_outside_posix_parser(
+    tmp_path: Path,
+    parser_kind: str,
+) -> None:
+    skill = tmp_path / "waapi-skill"
+    skill.mkdir()
+    skill_md = skill / "SKILL.md"
+    content = "first\nsecond\n"
+    skill_md.write_text(content, encoding="utf-8")
+    command = f"wc -l {skill_md} && sed -n '1,240p' {skill_md}"
+    record = CodexCommandRecord(
+        command=command,
+        exit_code=0,
+        status="completed",
+        aggregated_output=f"       2 {skill_md}\n{content}",
+        argv=(
+            "wc",
+            "-l",
+            str(skill_md),
+            "&&",
+            "sed",
+            "-n",
+            "1,240p",
+            str(skill_md),
+        ),
+        has_shell_operators=True,
+        parser_kind=parser_kind,
+    )
+
+    facts = classify_commands((record,), skill_source=skill)
+
+    assert facts.skill_read is False
+    assert facts.allowed_read_commands == ()
+    assert facts.skill_read_files == ()
+    assert facts.unexpected_commands == (command,)
+
+
+@pytest.mark.parametrize(
+    "parser_kind",
+    (
+        "windows-pwsh-command",
+        "windows-native",
+        "windows-powershell-encoded",
+        "",
+    ),
+)
+@pytest.mark.parametrize(
+    "argv",
+    (
+        ("cat", "{skill}"),
+        ("sed", "-n", "1,$p", "{skill}"),
+    ),
+)
+def test_command_classifier_rejects_posix_skill_reader_outside_posix_parser(
+    tmp_path: Path,
+    parser_kind: str,
+    argv: tuple[str, ...],
+) -> None:
+    skill = tmp_path / "waapi-skill"
+    skill.mkdir()
+    skill_md = skill / "SKILL.md"
+    content = "first\nsecond\n"
+    skill_md.write_text(content, encoding="utf-8")
+    rendered_argv = tuple(
+        str(skill_md) if value == "{skill}" else value for value in argv
+    )
+    command = recorded_argv_command(*rendered_argv)
+    record = CodexCommandRecord(
+        command=command,
+        exit_code=0,
+        status="completed",
+        aggregated_output=content,
+        argv=rendered_argv,
+        has_shell_operators=False,
+        parser_kind=parser_kind,
+    )
+
+    facts = classify_commands((record,), skill_source=skill)
+
+    assert facts.skill_read is False
+    assert facts.allowed_read_commands == ()
+    assert facts.skill_read_files == ()
+    assert facts.unexpected_commands == (command,)
 
 
 def test_task_classifier_replays_bootstrap_after_install_attestation(
@@ -4136,7 +4269,9 @@ def test_task_classifier_replays_bootstrap_after_install_attestation(
         f"sed -n '1,240p' {shell_path}\""
     )
     output = f"       2 {installed_skill}\n{content}"
-    argv, has_operators, parse_error = parse_command_argv(command)
+    argv, has_operators, parse_error, parser_kind = (
+        codex_harness_module._parse_command_argv(command)
+    )
     record = CodexCommandRecord(
         command=command,
         exit_code=0,
@@ -4145,6 +4280,7 @@ def test_task_classifier_replays_bootstrap_after_install_attestation(
         argv=argv,
         has_shell_operators=has_operators,
         parse_error=parse_error,
+        parser_kind=parser_kind,
     )
 
     facts = classify_task_commands(
@@ -4249,7 +4385,9 @@ def test_command_classifier_rejects_other_skill_reads_with_shell_operators(tmp_p
     )
 
     for command, output in commands_and_outputs:
-        argv, has_operators, parse_error = parse_command_argv(command)
+        argv, has_operators, parse_error, parser_kind = (
+            codex_harness_module._parse_command_argv(command)
+        )
         assert has_operators is True
         record = CodexCommandRecord(
             command=command,
@@ -4259,6 +4397,7 @@ def test_command_classifier_rejects_other_skill_reads_with_shell_operators(tmp_p
             argv=argv,
             has_shell_operators=has_operators,
             parse_error=parse_error,
+            parser_kind=parser_kind,
         )
 
         facts = classify_commands((record,), skill_source=skill)

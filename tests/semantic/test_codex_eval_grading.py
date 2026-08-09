@@ -312,6 +312,7 @@ def _command_record(argv: tuple[str, ...], output: str) -> CodexCommandRecord:
         aggregated_output=output,
         argv=argv,
         has_shell_operators=False,
+        parser_kind="posix-native",
     )
 
 

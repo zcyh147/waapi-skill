@@ -81,10 +81,15 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
 
 def test_cli_bootstrap_uses_only_the_literal_injected_skill_locator() -> None:
     skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    frontmatter = skill.split("---", 2)[1]
 
-    assert "begin with the injected SKILL.md locator" in skill
-    assert "Get-Content -Raw -Encoding UTF8 '<literal-locator>'" in skill
-    assert "never search the workspace or infer a repository-relative Skill path" in skill
+    assert "Read only the injected SKILL.md locator first" in frontmatter
+    assert "never search for or infer it" in frontmatter
+    assert "Choose by command host, not Wwise/Codex version or path spelling" in frontmatter
+    assert "POSIX uses `cat '<literal-locator>'` or exact `sed -n '1,$p'" in frontmatter
+    assert "Get-Content -Raw -Encoding UTF8 '<literal-locator>'" in frontmatter
+    assert "Never cross-use/wrap these forms" in frontmatter
+    assert "combine the read with unrelated action" in frontmatter
     assert "Bootstrap only from the injected `SKILL.md` locator" in skill
     assert "Never guess a repository-relative `skills/waapi-skill` path" in skill
     for forbidden_probe in ("`pwd`", "`git status`", "`ls`", "`find`", "`rg`"):
@@ -314,7 +319,7 @@ def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
         assert "**656**" in readme
         assert "**152**" in readme
         assert "**6**" in readme
-        assert "2636" in readme
+        assert "2638" in readme
         assert "./skills/waapi-skill/references/waapi-coverage.md" in readme
 
     assert "198 unique routed WAAPI URIs" in english
@@ -323,4 +328,4 @@ def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
     assert "仍要求实时宿主为 Authoring" in " ".join(chinese.split())
     assert "not a claim that all 808 rows have been exercised against a real Wwise process" in english
     assert "不等于已经在真实 Wwise 进程中逐一运行了全部 808 行" in chinese
-    assert "currently contains 2636 passing tests" in coverage_contract
+    assert "currently contains 2638 passing tests" in coverage_contract
