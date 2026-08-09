@@ -158,6 +158,30 @@ campaign root. Stop the pass early only for a systemic harness, source-sandbox,
 evidence, or cleanup fault that could invalidate later cases. The profile
 totals are a design contract.
 
+The frozen public `integration` candidate
+`7f54506783a131695bafb97b89103488cb73d96c` has host-specific cumulative
+evidence, not one single-root pass. On macOS, `imac-int-7f54506-r1` passed 7
+units and failed 5, `imac-int-7f54506-r2-retry5` passed 4 and failed 1, and
+`imac-int-7f54506-r3-rifle` passed its one fresh Rifle unit and its identical
+`--resume --verify-only` audit. All 12 unique public-profile units therefore
+have macOS passing evidence across those three roots, but no root passed 12/12.
+
+On native Windows, `iwin-int-7f54506-r1` passed 9 units and failed 3. Fresh
+root `iwin-int-7f54506-r2-retry3` then passed Weather and failed both Weapons
+units, leaving 10 of 12 unique public-profile units with native-Windows passing
+evidence. Both remaining Weapons units failed in both roots when the
+authenticated Broker rejected malformed preview JSON before the rejected
+command reached the runner or Wwise; no mutation occurred. This is not complete
+native-Windows `integration` acceptance and must not be reported as Windows
+12/12. All four roots containing semantic FAILs were frozen without
+verify-only replay. Independently,
+`test_native_windows_powershell_shim_preserves_hostile_json` passed both native
+Windows parameterizations (2 passed, exit 0), proving exact hostile-JSON
+preservation through pwsh -> PS1 -> Broker without granting any semantic PASS
+credit. On both hosts every source-project full hash and mtime remained
+unchanged, passing sandboxes were removed, failed sandboxes were sealed and
+quarantined, and no scoped residual process remained.
+
 The legacy internal `integration_workflows_cross_version_6` component is
 defined by `tests/semantic/data/integration-workflows-v1/profile.json`. It
 supplies Weather, Alarm, and Harbor once per version: six tasks, 20 user turns,

@@ -5,8 +5,21 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+ROOT_AGENTS = REPO_ROOT / "AGENTS.md"
+TESTS_AGENTS = REPO_ROOT / "tests" / "AGENTS.md"
 SEMANTIC_README = REPO_ROOT / "tests" / "semantic" / "README.md"
 TEST_INVENTORY = REPO_ROOT / "tests" / "TEST_INVENTORY.md"
+
+PUBLIC_INTEGRATION_CANDIDATE = "7f54506783a131695bafb97b89103488cb73d96c"
+PUBLIC_INTEGRATION_MAC_ROOTS = (
+    "imac-int-7f54506-r1",
+    "imac-int-7f54506-r2-retry5",
+    "imac-int-7f54506-r3-rifle",
+)
+PUBLIC_INTEGRATION_WINDOWS_ROOTS = (
+    "iwin-int-7f54506-r1",
+    "iwin-int-7f54506-r2-retry3",
+)
 
 CODEX_PROFILE_COMMANDS = (
     "skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py "
@@ -107,3 +120,58 @@ def test_docs_do_not_overclaim_formal_or_full_completion() -> None:
         "full_cross_version_168 completed successfully",
     ):
         assert stale_claim not in readme
+
+
+def test_public_integration_candidate_evidence_is_exact_and_host_scoped() -> None:
+    documents = tuple(
+        path.read_text(encoding="utf-8")
+        for path in (ROOT_AGENTS, TESTS_AGENTS, SEMANTIC_README, TEST_INVENTORY)
+    )
+
+    for document in documents:
+        assert PUBLIC_INTEGRATION_CANDIDATE in document
+        for root in (*PUBLIC_INTEGRATION_MAC_ROOTS, *PUBLIC_INTEGRATION_WINDOWS_ROOTS):
+            assert root in document
+        for phrase in (
+            "passed 7\nunits and failed 5",
+            "passed 4 and failed 1",
+            "passed its one fresh Rifle unit and its identical",
+            "All 12 unique public-profile units therefore\nhave macOS passing evidence",
+            "but no root passed 12/12",
+            "passed 9 units and failed 3",
+            "passed Weather and failed both Weapons\nunits",
+            "10 of 12 unique public-profile units with native-Windows passing\nevidence",
+            "authenticated Broker rejected malformed preview JSON",
+            "not complete\nnative-Windows `integration` acceptance",
+            "must not be reported as Windows\n12/12",
+            "All four roots containing semantic FAILs were frozen without\nverify-only replay",
+            "test_native_windows_powershell_shim_preserves_hostile_json",
+            "2 passed, exit 0",
+            "without granting any semantic PASS\ncredit",
+            "full hash and mtime remained\nunchanged",
+            "no scoped residual process remained",
+        ):
+            assert phrase in document
+
+    inventory = documents[-1]
+    assert "`ci\\test.bat --mode program -- -q -ra`" in inventory
+    assert "2609 passed, 34 skipped in 167.50s; exit 0" in inventory
+    assert "The batch launcher delegated repository development tests to Poetry" in inventory
+    assert "started neither Codex nor Wwise" in inventory
+
+
+def test_public_integration_candidate_docs_forbid_false_windows_completion() -> None:
+    documents = tuple(
+        path.read_text(encoding="utf-8")
+        for path in (ROOT_AGENTS, TESTS_AGENTS, SEMANTIC_README, TEST_INVENTORY)
+    )
+
+    for document in documents:
+        for false_claim in (
+            f"candidate `{PUBLIC_INTEGRATION_CANDIDATE}` passed Windows 12/12",
+            "`iwin-int-7f54506-r1` passed all 12",
+            "`iwin-int-7f54506-r2-retry3` passed both Weapons",
+            "complete native-Windows `integration` acceptance for candidate",
+            "single-root 12/12 at `imac-int-7f54506-r1`",
+        ):
+            assert false_claim not in document
