@@ -572,7 +572,43 @@ elif command == "draft-apply":
             {
                 "handle": "odh1-333333333333333333333333",
                 "selector": draft_action["selector"],
+                "properties": [],
+                "references": [],
+                "children": [],
+                "lists": [],
+                "import": None,
             }
+        ]
+        draft_marker["missing_fields"] = [
+            "targets[odh1-333333333333333333333333].change"
+        ]
+        draft_marker["missing_fields_status"] = "incomplete"
+        draft_marker["allowed_actions"] = [
+            "set_request_option", "clear_request_option", "add_target",
+            "set_property", "set_reference", "remove_reference",
+            "set_target_field", "clear_target_field", "add_child",
+            "set_node_field", "clear_node_field", "set_node_property",
+            "remove_node_property", "remove_node", "add_list", "remove_list",
+            "add_list_member", "remove_target", "inspect", "cancel",
+        ]
+    elif draft_action["action"] == "set_target_field":
+        target_handle = draft_action["target_handle"]
+        target = next(
+            row
+            for row in draft_marker["current_facts"]
+            if row["handle"] == target_handle
+        )
+        target[draft_action["name"]] = draft_action["value"]
+        draft_marker["missing_fields"] = []
+        draft_marker["missing_fields_status"] = "complete"
+        draft_marker["allowed_actions"] = [
+            "set_request_option", "clear_request_option", "add_target",
+            "set_property", "set_reference", "remove_reference",
+            "set_target_field", "clear_target_field", "add_child",
+            "set_node_field", "clear_node_field", "set_node_property",
+            "remove_node_property", "remove_node", "add_list", "remove_list",
+            "add_list_member", "remove_property", "remove_target", "check",
+            "inspect", "cancel",
         ]
     draft_marker["revision"] += 1
     marker_path.write_text(json.dumps(draft_marker), encoding="utf-8")
@@ -581,7 +617,11 @@ elif command == "draft-apply":
         "revision": draft_marker["revision"],
         "lifecycle_state": "editable",
         "binding": {"operation": "object.set", "version": "2022.1"},
+        "request_options": {},
         "current_facts": draft_marker["current_facts"],
+        "missing_fields": draft_marker["missing_fields"],
+        "missing_fields_status": draft_marker["missing_fields_status"],
+        "allowed_actions": draft_marker["allowed_actions"],
     }
 elif command == "draft-inspect":
     draft_marker = json.loads(
@@ -654,6 +694,38 @@ elif command == "preview-from-draft":
         "transaction_id": transaction_id,
         "artifact_hash": artifact_hash,
     })
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.set",
+        "arguments": {
+            "objects": [
+                {
+                    "object": row["selector"],
+                    **{
+                        key: value
+                        for key, value in row.items()
+                        if key
+                        in {
+                            "name", "notes", "platform", "list_mode",
+                            "on_name_conflict",
+                        }
+                    },
+                    **{
+                        key: row[key]
+                        for key in ("properties", "references")
+                        if row.get(key)
+                    },
+                }
+                for row in draft_marker["current_facts"]
+            ]
+        },
+    }
+    payload["agent_result"] = {
+        "request": request,
+        "transaction_id": transaction_id,
+        "artifact_hash": artifact_hash,
+    }
 elif command == "preview":
     (state / "preview-marker.json").write_text(
         json.dumps(
@@ -823,7 +895,14 @@ elif mode in {"expected-error", "expected-error-exact-output"}:
     )
 if mode not in {"exact-output", "expected-error-exact-output"}:
     print("fake setup log before payload")
-print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
+print(
+    json.dumps(
+        payload,
+        ensure_ascii=False,
+        indent=2,
+        sort_keys=command != "preview-from-draft",
+    )
+)
 if mode == "bad-exit":
     raise SystemExit(7)
 if mode in {"expected-error", "expected-error-exact-output"}:
@@ -1193,10 +1272,26 @@ def test_broker_executes_typed_draft_actions_with_gateway_response_bindings(
                 check_result,
                 preview_result,
             )
-        ] == [0, 0, 0, 0, 0]
+        ] == [0, 0, 0, 0, 0], preview_result.stderr
         assert broker.evidence().complete is True
         assert broker.evidence().consumed_step_names == tuple(step.name for step in steps)
         assert not (broker.state_directory / "mutation-executed").exists()
+
+        preview_payload = json.loads(
+            preview_result.stdout[preview_result.stdout.index("{") :]
+        )
+        drifted_preview = json.loads(json.dumps(preview_payload))
+        drifted_preview["agent_result"]["request"]["arguments"]["objects"][0][
+            "notes"
+        ] = "different"
+        with pytest.raises(
+            GatewayInvocationError,
+            match="does not replay from the reviewed typed actions",
+        ):
+            broker._validate_operation_draft_payload(  # noqa: SLF001
+                steps[-1],
+                drifted_preview,
+            )
 
 
 def test_broker_rejects_stale_draft_revision_before_runner_dispatch(
@@ -1485,12 +1580,30 @@ def test_typed_draft_protocol_rejects_prefilled_handles_and_json_bypass(
             ("--request-json", SemanticJsonArgument({"operation": "object.set"})),
         ),
     )
-    with pytest.raises(ValueError, match="cannot also expose"):
+    with pytest.raises(ValueError, match="same operation"):
         CodexGatewayBroker(
             skill_source=skill,
             expected_steps=steps,
             transport="tcp",
         )
+
+    mixed_steps = (
+        ExpectedGatewayStep("draft.start", "draft-start", ("object.set",)),
+        ExpectedGatewayStep(
+            "legacy.import",
+            "preview",
+            (
+                "--request-json",
+                SemanticJsonArgument({"operation": "audio.import"}),
+            ),
+        ),
+    )
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=mixed_steps,
+        transport="tcp",
+    ):
+        pass
 
     terminal_steps = (
         ExpectedGatewayStep("draft.start", "draft-start", ("object.set",)),
@@ -5436,11 +5549,26 @@ def test_weather_limit_two_metadata_step_crosses_broker_validation(
     )
 
     def request(operation: str, sentinel: int) -> dict[str, object]:
+        arguments: dict[str, object] = {"sentinel": sentinel}
+        if operation == "object.set":
+            arguments = {
+                "objects": [
+                    {
+                        "object": {
+                            "kind": "path",
+                            "value": r"\Events\Default Work Unit\Weather\Action",
+                        },
+                        "properties": [
+                            {"name": "FadeTime", "value": 0.25}
+                        ],
+                    }
+                ]
+            }
         return {
             "contract": "waapi-skill.operation-request/v1",
             "version": "2022.1",
             "operation": operation,
-            "arguments": {"sentinel": sentinel},
+            "arguments": arguments,
         }
 
     volume_projection = (

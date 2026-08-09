@@ -26,7 +26,9 @@ from tests.semantic.support.codex_integration_workflows_v2 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     CodexGatewayBroker,
+    DraftActionJsonArgument,
     GatewayInvocationError,
+    ResponseBinding,
     SealedQueryIdentityBoundJsonArgument,
     SemanticJsonArgument,
     gateway_step_sequence_matches,
@@ -520,19 +522,32 @@ def _prepared(tmp_path: Path, *, version: str = "2022.1") -> tuple[Any, FakeWeap
     return prepared, fake, runtime
 
 
-def _preview_broker(
+def _typed_action_broker(
     prepared: Any,
-    fake: FakeWeaponsWaapi,
-) -> tuple[CodexGatewayBroker, Any]:
-    preview = next(
-        step for step in prepared.protocol.steps if step.name == "tx01.preview"
-    )
-    source = next(
+    *,
+    action: str,
+    occurrence: int = 0,
+) -> tuple[CodexGatewayBroker, Any, dict[str, Any]]:
+    matches = [
         step
         for step in prepared.protocol.steps
-        if step.name == "relationship.output_bus.02"
+        if step.subcommand == "draft-apply"
+        and isinstance(step.arguments[-1], DraftActionJsonArgument)
+        and step.arguments[-1].expected.get("action") == action
+    ]
+    step = matches[occurrence]
+    argument = step.arguments[-1]
+    assert isinstance(argument, DraftActionJsonArgument)
+    handles = [f"odh1-{index:024x}" for index in range(1, 4)]
+    current_facts = [
+        {"handle": handle, "selector": {"kind": "id", "value": _guid(str(index))}}
+        for index, handle in enumerate(handles, start=1)
+    ]
+    start = next(
+        candidate
+        for candidate in prepared.protocol.steps
+        if candidate.subcommand == "draft-start"
     )
-    assert source.arguments[1].casefold() == fake.roles["weapons_bus"].casefold()
     broker = CodexGatewayBroker(
         skill_source=(
             Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
@@ -542,10 +557,43 @@ def _preview_broker(
             prepared.protocol.commutative_read_only_step_groups
         ),
     )
-    broker._payloads_by_step[source.name] = fake.object_id_payload(  # noqa: SLF001
-        str(source.arguments[1])
+    broker._payloads_by_step[start.name] = {  # noqa: SLF001
+        "task_authority": "da1-" + "1" * 40,
+        "draft": {
+            "draft_id": "od1-" + "2" * 32,
+            "revision": 1,
+            "current_facts": [],
+        },
+    }
+    for expected in step.arguments:
+        if not isinstance(expected, ResponseBinding) or expected.step == start.name:
+            continue
+        broker._payloads_by_step[expected.step] = {  # noqa: SLF001
+            "draft": {"revision": 99, "current_facts": current_facts}
+        }
+    for binding in argument.response_bindings:
+        broker._payloads_by_step[binding.step] = {  # noqa: SLF001
+            "draft": {"revision": 99, "current_facts": current_facts}
+        }
+    supplied_action = copy.deepcopy(dict(argument.expected))
+    for binding in argument.response_bindings:
+        target_index = int(binding.response_pointer.split("/")[3])
+        supplied_action[binding.pointer.removeprefix("/")] = handles[target_index]
+    return broker, step, supplied_action
+
+
+def _typed_action_argv(step: Any, action: Mapping[str, Any]) -> tuple[str, ...]:
+    revision = "99"
+    return (
+        step.subcommand,
+        "od1-" + "2" * 32,
+        "--task-authority",
+        "da1-" + "1" * 40,
+        "--expected-revision",
+        revision,
+        "--action-json",
+        json.dumps(action, separators=(",", ":")),
     )
-    return broker, preview
 
 
 def _observe(
@@ -586,7 +634,7 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
         if version == "2022.1"
         else r"\Busses\Default Work Unit\WAAPI_V2_Weapons"
     )
-    assert tuple(step.name for step in prepared.protocol.steps) == (
+    assert tuple(step.name for step in prepared.protocol.steps[:8]) == (
         "audit.scope",
         "relationship.output_bus.01",
         "relationship.output_bus.02",
@@ -594,13 +642,9 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
         "identity.audit_tail",
         "identity.audit_mechanical",
         "tx01.operation-schema",
-        "tx01.preview",
-        "tx01.transaction-show",
-        "tx01.confirm",
-        "tx01.execute",
-        "tx01.verify",
+        "tx01.draft-start",
     )
-    assert prepared.protocol.turn_prefix_counts == (3, 8, 12)
+    assert prepared.protocol.turn_prefix_counts == (3, 20, 24)
     assert prepared.protocol.commutative_read_only_step_groups == (
         (
             "relationship.output_bus.01",
@@ -609,15 +653,25 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
     )
     serialized = serialize_protocol(prepared.protocol)
     assert deserialize_protocol(serialized) == prepared.protocol
-    preview_argument = serialized["steps"][7]["arguments"][2]
-    assert preview_argument["kind"] == (
-        "sealed_query_identity_object_operation_json"
-    )
-    assert preview_argument["source_step"] == "relationship.output_bus.02"
-    assert preview_argument["target_pointers"] == [
-        "/arguments/objects/0/references/0/target",
-        "/arguments/objects/2/references/0/target",
+    composer_steps = prepared.protocol.steps[7:20]
+    assert composer_steps[0].subcommand == "draft-start"
+    assert [step.subcommand for step in composer_steps[-2:]] == [
+        "draft-check",
+        "preview-from-draft",
     ]
+    action_steps = [
+        step for step in composer_steps if step.subcommand == "draft-apply"
+    ]
+    assert len(action_steps) == 10
+    assert all(
+        isinstance(step.arguments[-1], DraftActionJsonArgument)
+        for step in action_steps
+    )
+    assert not any(
+        isinstance(argument, SealedQueryIdentityBoundJsonArgument)
+        for step in composer_steps
+        for argument in step.arguments
+    )
     audit = prepared.protocol.steps[0]
     assert audit.subcommand == "query-object"
     assert audit.arguments[:4] == (
@@ -709,142 +763,80 @@ def test_weapons_fast_path_keeps_canonical_volume_and_rejects_query_accessor(
     tmp_path: Path,
     version: str,
 ) -> None:
-    prepared, fake, _runtime = _prepared(tmp_path, version=version)
-    broker, preview = _preview_broker(prepared, fake)
-    argument = preview.arguments[2]
-
-    assert isinstance(argument, SealedQueryIdentityBoundJsonArgument)
-    assert argument.equivalence == "object_operation_v1"
-    expected = _plain(argument.expected)
-    tail_properties = expected["arguments"]["objects"][1]["properties"]
-    assert tail_properties == [{"name": "Volume", "value": -3.0}]
-
-    accessor_request = copy.deepcopy(expected)
-    accessor_request["arguments"]["objects"][1]["properties"][0]["name"] = (
-        "@Volume"
+    prepared, _fake, _runtime = _prepared(tmp_path, version=version)
+    broker, step, action = _typed_action_broker(
+        prepared,
+        action="set_property",
     )
-    with pytest.raises(GatewayInvocationError, match="semantically equal"):
+
+    assert action["name"] == "Volume"
+    assert action["value"] == -3.0
+    broker._validate_step(step, _typed_action_argv(step, action))  # noqa: SLF001
+
+    action["name"] = "@Volume"
+    with pytest.raises(GatewayInvocationError, match="typed Draft action"):
         broker._validate_step(  # noqa: SLF001
-            preview,
-            (
-                "preview",
-                "--apply",
-                "--request-json",
-                json.dumps(accessor_request, separators=(",", ":")),
-            ),
+            step,
+            _typed_action_argv(step, action),
         )
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-@pytest.mark.parametrize("identity_form", ["path", "id", "mixed"])
-def test_preview_accepts_only_the_two_identities_from_the_sealed_weapons_bus_row(
+def test_composer_repeats_the_exact_reviewed_output_bus_path(
     tmp_path: Path,
     version: str,
-    identity_form: str,
 ) -> None:
-    prepared, fake, _runtime = _prepared(tmp_path, version=version)
-    broker, preview = _preview_broker(prepared, fake)
-    argument = preview.arguments[2]
-    assert isinstance(argument, SealedQueryIdentityBoundJsonArgument)
-    request = _plain(argument.expected)
-    canonical_hash, _ = broker._validate_step(  # noqa: SLF001
-        preview,
-        (
-            "preview",
-            "--apply",
-            "--request-json",
-            json.dumps(request, separators=(",", ":")),
-        ),
-    )
+    prepared, _fake, _runtime = _prepared(tmp_path, version=version)
+    references = [
+        step.arguments[-1].expected
+        for step in prepared.protocol.steps
+        if step.subcommand == "draft-apply"
+        and isinstance(step.arguments[-1], DraftActionJsonArgument)
+        and step.arguments[-1].expected.get("action") == "set_reference"
+    ]
 
-    if identity_form in {"id", "mixed"}:
-        request["arguments"]["objects"][0]["references"][0]["target"] = {
-            "kind": "id",
-            "value": fake.roles["weapons_bus"],
-        }
-    if identity_form == "id":
-        request["arguments"]["objects"][2]["references"][0]["target"] = {
-            "kind": "id",
-            "value": fake.roles["weapons_bus"],
-        }
-
-    semantic_hash, execution_argv = broker._validate_step(  # noqa: SLF001
-        preview,
-        (
-            "preview",
-            "--apply",
-            "--request-json",
-            json.dumps(request, separators=(",", ":")),
-        ),
-    )
-
-    assert semantic_hash == canonical_hash
-    assert json.loads(execution_argv[-1]) == request
+    assert len(references) == 2
+    assert [row["name"] for row in references] == ["OutputBus", "OutputBus"]
+    assert [row["target"] for row in references] == [
+        {
+            "kind": "path",
+            "value": prepared.visible_values["weapons_bus_path"],
+        },
+        {
+            "kind": "path",
+            "value": prepared.visible_values["weapons_bus_path"],
+        },
+    ]
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-@pytest.mark.parametrize("object_index", [0, 2])
+@pytest.mark.parametrize("reference_index", [0, 1])
 @pytest.mark.parametrize("wrong_identity", ["guid", "path"])
-def test_preview_rejects_wrong_output_bus_guid_or_path(
+def test_composer_rejects_wrong_output_bus_guid_or_path(
     tmp_path: Path,
     version: str,
-    object_index: int,
+    reference_index: int,
     wrong_identity: str,
 ) -> None:
-    prepared, fake, _runtime = _prepared(tmp_path, version=version)
-    broker, preview = _preview_broker(prepared, fake)
-    argument = preview.arguments[2]
-    assert isinstance(argument, SealedQueryIdentityBoundJsonArgument)
-    request = _plain(argument.expected)
-    target = request["arguments"]["objects"][object_index]["references"][0][
-        "target"
-    ]
+    prepared, _fake, _runtime = _prepared(tmp_path, version=version)
+    broker, step, action = _typed_action_broker(
+        prepared,
+        action="set_reference",
+        occurrence=reference_index,
+    )
+    target = action["target"]
     if wrong_identity == "guid":
-        target.update({"kind": "id", "value": _guid("wrong-output-bus")})
+        action["target"] = {
+            "kind": "id",
+            "value": _guid("wrong-output-bus"),
+        }
     else:
         target["value"] += "_Wrong"
 
-    with pytest.raises(GatewayInvocationError, match="sealed query-identity"):
+    with pytest.raises(GatewayInvocationError, match="typed Draft action"):
         broker._validate_step(  # noqa: SLF001
-            preview,
-            (
-                "preview",
-                "--apply",
-                "--request-json",
-                json.dumps(request, separators=(",", ":")),
-            ),
-        )
-
-
-@pytest.mark.parametrize("source_drift", ["id", "path"])
-def test_preview_rejects_a_drifted_sealed_output_bus_source_row(
-    tmp_path: Path,
-    source_drift: str,
-) -> None:
-    prepared, fake, _runtime = _prepared(tmp_path)
-    broker, preview = _preview_broker(prepared, fake)
-    source_payload = copy.deepcopy(
-        broker._payloads_by_step["relationship.output_bus.02"]  # noqa: SLF001
-    )
-    if source_drift == "id":
-        source_payload["objects"][0]["id"] = _guid("wrong-output-bus")
-    else:
-        source_payload["objects"][0]["path"] += "_Wrong"
-    broker._payloads_by_step["relationship.output_bus.02"] = (  # noqa: SLF001
-        source_payload
-    )
-    argument = preview.arguments[2]
-    assert isinstance(argument, SealedQueryIdentityBoundJsonArgument)
-
-    with pytest.raises(GatewayInvocationError, match="sealed query.identity"):
-        broker._validate_step(  # noqa: SLF001
-            preview,
-            (
-                "preview",
-                "--apply",
-                "--request-json",
-                json.dumps(_plain(argument.expected), separators=(",", ":")),
-            ),
+            step,
+            _typed_action_argv(step, action),
         )
 
 

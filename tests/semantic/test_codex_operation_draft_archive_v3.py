@@ -265,24 +265,24 @@ def _sealed_archive(
         ),
     )
     show_step = ExpectedGatewayStep(
-        "tx.show",
+        "draft.show",
         "transaction-show",
         (ResponseBinding("draft.preview", "/transaction_id"), "--summary-only"),
     )
     confirm_step = ExpectedGatewayStep(
-        "tx.confirm",
+        "draft.confirm",
         "confirm",
-        (ResponseBinding("tx.show", "/transaction_id"),),
+        (ResponseBinding("draft.show", "/transaction_id"),),
     )
     execute_step = ExpectedGatewayStep(
-        "tx.execute",
+        "draft.execute",
         "execute",
-        (ResponseBinding("tx.confirm", "/transaction_id"),),
+        (ResponseBinding("draft.confirm", "/transaction_id"),),
     )
     verify_step = ExpectedGatewayStep(
-        "tx.verify",
+        "draft.verify",
         "verify",
-        (ResponseBinding("tx.execute", "/transaction_id"),),
+        (ResponseBinding("draft.execute", "/transaction_id"),),
     )
     steps = (
         start_step,
@@ -447,6 +447,65 @@ def test_composer_archive_reconstructs_actions_request_preview_and_cleanup(
     )
     assert evidence["preview_binding"]["transaction_final_state"] == "verified"
     assert evidence["cleanup_outcome"]["status"] == "not_required"
+
+
+def test_composer_archive_ignores_other_legacy_transaction_payloads(
+    tmp_path: Path,
+) -> None:
+    state_dir, steps, records = _sealed_archive(tmp_path)
+    legacy_request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {"imports": []},
+    }
+    legacy_preview = ExpectedGatewayStep(
+        "legacy.preview",
+        "preview",
+        (
+            "--request-json",
+            SemanticJsonArgument(legacy_request),
+        ),
+    )
+    legacy_show = ExpectedGatewayStep(
+        "legacy.show",
+        "transaction-show",
+        ("tx-unrelated", "--summary-only"),
+    )
+    mixed_steps = (legacy_preview, legacy_show, *steps)
+    mixed_records = [
+        _record(
+            legacy_preview,
+            ["--request-json", json.dumps(legacy_request)],
+            {
+                "contract": GATEWAY_CONTRACT,
+                "ok": True,
+                "command": "preview",
+                "transaction_id": "tx-unrelated",
+            },
+        ),
+        _record(
+            legacy_show,
+            ["tx-unrelated", "--summary-only"],
+            {
+                "contract": GATEWAY_CONTRACT,
+                "ok": True,
+                "command": "transaction-show",
+                "transaction_id": "tx-unrelated",
+            },
+        ),
+        *records,
+    ]
+
+    evidence = validate_operation_draft_archive(
+        state_directory=state_dir,
+        steps=mixed_steps,
+        broker_records=mixed_records,
+    )
+
+    assert evidence is not None
+    assert evidence["preview_binding"]["transaction_final_state"] == "verified"
+    assert evidence["canonical_request"]["operation"] == "object.set"
 
 
 @pytest.mark.parametrize(

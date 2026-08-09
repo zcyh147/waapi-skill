@@ -19,7 +19,7 @@ import os
 import re
 import stat
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Protocol
@@ -28,11 +28,10 @@ from tests.semantic.support.codex_campaign import canonical_json_bytes
 from tests.semantic.support.codex_eval_protocol_v3 import (
     OPERATION_REQUEST_CONTRACT,
     V3GatewayProtocol,
-    build_transaction_protocol,
+    build_object_set_composer_transaction_steps,
 )
 from tests.semantic.support.codex_gateway_broker import (
     ExpectedGatewayStep,
-    SealedQueryIdentityBoundJsonArgument,
     SemanticJsonArgument,
     gateway_step_sequence_matches,
 )
@@ -161,11 +160,6 @@ _AUDIT_RETURN_FIELDS = (
 )
 _IDENTITY_RETURN_FIELDS = ("id", "name", "type", "path")
 _OUTPUT_BUS_STEP_PREFIX = "relationship.output_bus."
-_WEAPONS_BUS_SOURCE_STEP = "relationship.output_bus.02"
-_WEAPONS_BUS_TARGET_POINTERS = (
-    "/arguments/objects/0/references/0/target",
-    "/arguments/objects/2/references/0/target",
-)
 _EXPECTED_AUDIT_VIOLATIONS: Mapping[str, tuple[str, ...]] = MappingProxyType(
     {
         "audit_close": ("name_prefix", "output_bus_path", "volume", "notes"),
@@ -414,23 +408,9 @@ def prepare_weapons_integration_runtime(
     )
     try:
         before, visible_values, request = session.prepare()
-        transaction = build_transaction_protocol((request,))
-        preview = transaction.steps[1]
-        transaction_steps = (
-            transaction.steps[0],
-            replace(
-                preview,
-                arguments=(
-                    "--apply",
-                    "--request-json",
-                    SealedQueryIdentityBoundJsonArgument(
-                        expected=request,
-                        source_step=_WEAPONS_BUS_SOURCE_STEP,
-                        target_pointers=_WEAPONS_BUS_TARGET_POINTERS,
-                    ),
-                ),
-            ),
-            *transaction.steps[2:],
+        transaction_steps = build_object_set_composer_transaction_steps(
+            request,
+            label="tx01",
         )
         audit_step = _audit_query_step(visible_values["weapons_audit_root_path"])
         output_bus_steps = _output_bus_readback_steps(before)
@@ -444,8 +424,13 @@ def prepare_weapons_integration_runtime(
             (audit_step, *output_bus_steps, *identity_steps, *transaction_steps),
             (
                 read_prefix,
-                transaction.turn_prefix_counts[0] + transaction_prefix,
-                len(transaction.steps) + transaction_prefix,
+                transaction_prefix
+                + next(
+                    index
+                    for index, step in enumerate(transaction_steps, start=1)
+                    if step.name == "tx01.preview"
+                ),
+                len(transaction_steps) + transaction_prefix,
             ),
             commutative_read_only_step_groups=(
                 tuple(step.name for step in output_bus_steps),
@@ -624,15 +609,25 @@ class _WeaponsSession:
         output_bus_steps = _output_bus_readback_steps(self.before)
         output_bus_names = tuple(step.name for step in output_bus_steps)
         names = tuple(step.name for step in protocol.steps)
+        transaction_names = names[6:]
         if (
-            names
+            names[:6]
             != (
                 "audit.scope",
                 *output_bus_names,
                 "identity.audit_close",
                 "identity.audit_tail",
                 "identity.audit_mechanical",
-                "tx01.operation-schema",
+            )
+            or transaction_names[:2]
+            != ("tx01.operation-schema", "tx01.draft-start")
+            or tuple(
+                step.subcommand for step in protocol.steps[6:20]
+            ).count("draft-apply")
+            != 10
+            or transaction_names[-6:]
+            != (
+                "tx01.check",
                 "tx01.preview",
                 "tx01.transaction-show",
                 "tx01.confirm",
@@ -641,7 +636,7 @@ class _WeaponsSession:
             )
             or tuple(protocol.steps[1 : 1 + len(output_bus_steps)])
             != output_bus_steps
-            or protocol.turn_prefix_counts != (3, 8, 12)
+            or protocol.turn_prefix_counts != (3, 20, 24)
             or protocol.commutative_read_only_step_groups
             != (output_bus_names,)
         ):

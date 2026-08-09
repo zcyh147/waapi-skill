@@ -10,6 +10,7 @@ from typing import Mapping
 import pytest
 
 from tests.semantic.support.codex_gateway_broker import (
+    DraftActionJsonArgument,
     GatewayDerivedReferenceActivationAllowance,
     MetadataBoundJsonArgument,
     MetadataTokenProjection,
@@ -455,7 +456,6 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
     groups = protocol.commutative_read_only_step_groups
     for canonical in (
         ("tx01.metadata", "tx01.operation-schema", "tx01.preview"),
-        ("tx02.operation-schema", "tx02.metadata", "tx02.preview"),
     ):
         first, second, preview_name = canonical
         assert gateway_step_sequence_matches(canonical, canonical, groups)
@@ -500,11 +500,31 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
     action_preview = next(
         step for step in protocol.steps if step.name == "tx02.preview"
     )
-    assert isinstance(action_preview.arguments[2], MetadataBoundJsonArgument)
-    expected_action_objects = action_preview.arguments[2].expected["arguments"][
-        "objects"
+    assert action_preview.subcommand == "preview-from-draft"
+    assert "--request-json" not in action_preview.arguments
+    action_steps = [
+        step
+        for step in protocol.steps
+        if step.name.startswith("tx02.action.")
     ]
-    assert [row["object"] for row in expected_action_objects] == [
+    assert len(action_steps) == 16
+    assert all(step.subcommand == "draft-apply" for step in action_steps)
+    assert all(
+        isinstance(step.arguments[-1], DraftActionJsonArgument)
+        for step in action_steps
+    )
+    assert action_steps[0].arguments[-1].expected == {
+        "contract": "waapi-skill.operation-draft-action/v1",
+        "action": "set_request_option",
+        "name": "on_name_conflict",
+        "value": "fail",
+    }
+    add_targets = [
+        step.arguments[-1].expected
+        for step in action_steps
+        if step.arguments[-1].expected["action"] == "add_target"
+    ]
+    assert [row["selector"] for row in add_targets] == [
         {
             "kind": "direct-child",
             "parent": {
@@ -515,6 +535,10 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         }
         for target in targets
     ]
+    assert not any(
+        step.subcommand == "preview" and step.name.startswith("tx02.")
+        for step in protocol.steps
+    )
     rtpc_schema_index = next(
         index
         for index, step in enumerate(protocol.steps)
@@ -534,17 +558,15 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
     ) == ("Volume",)
     assert rtpc_preview.arguments[2].equivalence == "object_set_rtpc_v1"
     serialized = serialize_protocol(protocol)
-    serialized_action_preview = next(
+    serialized_action_steps = [
         step
         for step in serialized["steps"]
-        if step["name"] == "tx02.preview"
+        if step["name"].startswith("tx02.action.")
+    ]
+    assert all(
+        step["arguments"][-1]["kind"] == "draft_action_json"
+        for step in serialized_action_steps
     )
-    assert [
-        row["object"]
-        for row in serialized_action_preview["arguments"][2]["value"][
-            "arguments"
-        ]["objects"]
-    ] == [row["object"] for row in expected_action_objects]
     assert deserialize_protocol(serialized) == protocol
     plan_steps = _workflow_plan_steps(
         protocol,

@@ -444,10 +444,15 @@ def _validate_operation_draft_archive(
         )
         if preview_payload.get("cleanup") != expected_preview_cleanup:
             _fail("Composer Preview cleanup does not replay from its immutable spec")
+        preview_step = next(
+            step for step in steps if step.subcommand == "preview-from-draft"
+        )
+        draft_label = preview_step.name.split(".", 1)[0]
         transaction_payloads = [
             payload
             for step, payload in zip(steps, payloads)
-            if step.subcommand
+            if step.name.startswith(f"{draft_label}.")
+            and step.subcommand
             in {"transaction-show", "confirm", "reject", "execute", "verify"}
         ]
         if any(payload.get("transaction_id") != transaction_id for payload in transaction_payloads):

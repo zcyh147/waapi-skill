@@ -38,6 +38,13 @@ from tests.semantic.support.codex_filesystem_security import (
     path_is_link_or_reparse,
     read_bounded_exclusive_regular_file,
 )
+from wwise_waapi.operation_composer import (
+    OperationComposerError,
+    apply_composer_action,
+    composition_projection,
+    materialize_operation_request,
+    new_composition,
+)
 
 
 GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
@@ -1210,6 +1217,20 @@ _DRAFT_AUTHORITY_RE = re.compile(r"^da1-[0-9a-f]{40}$")
 _DRAFT_HANDLE_RE = re.compile(r"^odh1-[0-9a-f]{24}$")
 
 
+def _draft_projection_handles(value: Any) -> set[str]:
+    handles: set[str] = set()
+    if isinstance(value, Mapping):
+        handle = value.get("handle")
+        if isinstance(handle, str):
+            handles.add(handle)
+        for nested in value.values():
+            handles.update(_draft_projection_handles(nested))
+    elif isinstance(value, list):
+        for nested in value:
+            handles.update(_draft_projection_handles(nested))
+    return handles
+
+
 def validate_operation_draft_protocol_steps(
     expected_steps: Sequence[ExpectedGatewayStep],
 ) -> None:
@@ -1219,10 +1240,6 @@ def validate_operation_draft_protocol_steps(
     draft_steps = tuple(step for step in steps if step.subcommand in _DRAFT_SUBCOMMANDS)
     if not draft_steps:
         return
-    if any(step.subcommand in {"preview", "legacy-preview"} for step in steps):
-        raise ValueError(
-            "a typed Draft protocol cannot also expose a complete JSON Preview ingress"
-        )
     starts = tuple(step for step in draft_steps if step.subcommand == "draft-start")
     if len(starts) != 1:
         raise ValueError("a typed Draft protocol requires exactly one draft-start step")
@@ -1234,6 +1251,27 @@ def validate_operation_draft_protocol_steps(
         or start.arguments[0] != start.arguments[0].strip()
     ):
         raise ValueError("draft-start must bind one exact operation name")
+    draft_operation = start.arguments[0]
+    for step in steps:
+        if step.subcommand not in {"preview", "legacy-preview"}:
+            continue
+        request_arguments = tuple(
+            argument.expected
+            for argument in step.arguments
+            if isinstance(
+                argument,
+                (
+                    SemanticJsonArgument,
+                    MetadataBoundJsonArgument,
+                    SealedQueryIdentityBoundJsonArgument,
+                ),
+            )
+        )
+        if any(request.get("operation") == draft_operation for request in request_arguments):
+            raise ValueError(
+                "a typed Draft protocol cannot expose a complete JSON ingress "
+                "for the same operation"
+            )
     indexes = {step.name: index for index, step in enumerate(steps)}
     start_index = indexes[start.name]
     terminal_draft_indexes = tuple(
@@ -6213,6 +6251,21 @@ class CodexGatewayBroker:
                 raise GatewayInvocationError(
                     "preview-from-draft must return one reviewable transaction state"
                 )
+            agent_result = payload.get("agent_result")
+            if not isinstance(agent_result, Mapping):
+                raise GatewayInvocationError(
+                    "preview-from-draft must return one exact agent_result"
+                )
+            expected_request = self._replay_expected_operation_draft_request(step)
+            if agent_result.get("request") != expected_request:
+                raise GatewayInvocationError(
+                    "preview-from-draft canonical request does not replay from "
+                    "the reviewed typed actions"
+                )
+            if list(payload)[-1] != "agent_result":
+                raise GatewayInvocationError(
+                    "preview-from-draft must keep agent_result final"
+                )
             return
 
         draft = payload.get("draft")
@@ -6299,6 +6352,108 @@ class CodexGatewayBroker:
             raise GatewayInvocationError(
                 "Draft response lifecycle state does not follow the reviewed transition"
             )
+
+    def _replay_expected_operation_draft_request(
+        self,
+        preview_step: ExpectedGatewayStep,
+    ) -> Mapping[str, Any]:
+        start = next(
+            step for step in self.expected_steps if step.subcommand == "draft-start"
+        )
+        operation = str(start.arguments[0])
+        start_payload = self._payloads_by_step.get(start.name)
+        start_draft = (
+            start_payload.get("draft")
+            if isinstance(start_payload, Mapping)
+            else None
+        )
+        version = (
+            start_draft.get("binding", {}).get("version")
+            if isinstance(start_draft, Mapping)
+            and isinstance(start_draft.get("binding"), Mapping)
+            else None
+        )
+        if not isinstance(version, str) or version not in _SUPPORTED_WWISE_VERSIONS:
+            raise GatewayInvocationError(
+                "Draft canonical replay is missing its version binding"
+            )
+        composition = new_composition(operation, version)
+        preview_index = self.expected_steps.index(preview_step)
+        for action_step in self.expected_steps[:preview_index]:
+            if action_step.subcommand != "draft-apply":
+                continue
+            argument = action_step.arguments[-1]
+            if not isinstance(argument, DraftActionJsonArgument):
+                raise GatewayInvocationError(
+                    "Draft canonical replay found an untyped action"
+                )
+            action = json.loads(
+                _canonical_json_bytes(dict(argument.expected)).decode("utf-8")
+            )
+            for binding in argument.response_bindings:
+                source = self._payloads_by_step.get(binding.step)
+                if source is None:
+                    raise GatewayInvocationError(
+                        "Draft canonical replay is missing a handle source"
+                    )
+                bound = _json_pointer(source, binding.response_pointer)
+                if not isinstance(bound, str) or _DRAFT_HANDLE_RE.fullmatch(bound) is None:
+                    raise GatewayInvocationError(
+                        "Draft canonical replay received an invalid handle"
+                    )
+                action[binding.pointer.removeprefix("/")] = bound
+
+            response = self._payloads_by_step.get(action_step.name)
+            response_draft = (
+                response.get("draft") if isinstance(response, Mapping) else None
+            )
+            if not isinstance(response_draft, Mapping):
+                raise GatewayInvocationError(
+                    "Draft canonical replay is missing an action response"
+                )
+            before_handles = _draft_projection_handles(
+                composition_projection(operation, version, composition)[
+                    "current_facts"
+                ]
+            )
+            after_handles = _draft_projection_handles(
+                response_draft.get("current_facts")
+            )
+            remaining_handles = sorted(after_handles - before_handles)
+
+            def handle_factory() -> str:
+                if not remaining_handles:
+                    raise OperationComposerError(
+                        "Draft action response is missing its generated handle."
+                    )
+                return remaining_handles.pop(0)
+
+            try:
+                composition, _action_name = apply_composer_action(
+                    operation,
+                    version,
+                    composition,
+                    action,
+                    handle_factory=handle_factory,
+                )
+            except OperationComposerError as exc:
+                raise GatewayInvocationError(
+                    f"Draft canonical replay rejected one reviewed action: {exc}"
+                ) from exc
+            projection = composition_projection(operation, version, composition)
+            if remaining_handles or any(
+                response_draft.get(key) != value
+                for key, value in projection.items()
+            ):
+                raise GatewayInvocationError(
+                    "Draft action response does not match deterministic composition"
+                )
+        try:
+            return materialize_operation_request(operation, version, composition)
+        except OperationComposerError as exc:
+            raise GatewayInvocationError(
+                f"Draft canonical request cannot be materialized: {exc}"
+            ) from exc
 
     def _reject(
         self,

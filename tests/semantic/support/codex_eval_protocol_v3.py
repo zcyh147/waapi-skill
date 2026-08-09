@@ -9,10 +9,13 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from dataclasses import dataclass, replace
 from typing import Any, Mapping, Sequence
 
 from tests.semantic.support.codex_gateway_broker import (
+    DraftActionJsonArgument,
+    DraftActionResponseBinding,
     ExpectedGatewayStep,
     MetadataBoundJsonArgument,
     MetadataQueryArgument,
@@ -25,10 +28,250 @@ from tests.semantic.support.codex_gateway_broker import (
 
 
 OPERATION_REQUEST_CONTRACT = "waapi-skill.operation-request/v1"
+OPERATION_DRAFT_ACTION_CONTRACT = "waapi-skill.operation-draft-action/v1"
 
 
 class V3ProtocolError(ValueError):
     """A materialized scenario cannot form an exact broker allow-list."""
+
+
+def build_object_set_composer_transaction_steps(
+    request: Mapping[str, Any],
+    *,
+    label: str,
+) -> tuple[ExpectedGatewayStep, ...]:
+    """Translate one reviewed flat object.set request into one typed Draft flow."""
+
+    normalized = _validate_operation_request(request)
+    if normalized["operation"] != "object.set":
+        raise V3ProtocolError("Composer transaction builder requires object.set")
+    if not isinstance(label, str) or not re.fullmatch(r"tx[0-9]{2}", label):
+        raise V3ProtocolError("Composer transaction label must be txNN")
+    arguments = normalized["arguments"]
+    objects = arguments.get("objects")
+    if not isinstance(objects, list) or not objects:
+        raise V3ProtocolError("object.set Composer request requires objects")
+
+    action_specs: list[
+        tuple[Mapping[str, Any], DraftActionResponseBinding | None]
+    ] = []
+    for option_name in (
+        "platform",
+        "list_mode",
+        "on_name_conflict",
+        "auto_add_to_source_control",
+    ):
+        if option_name in arguments:
+            action_specs.append(
+                (
+                    {
+                        "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+                        "action": "set_request_option",
+                        "name": option_name,
+                        "value": arguments[option_name],
+                    },
+                    None,
+                )
+            )
+    allowed_request_fields = {
+        "objects",
+        "platform",
+        "list_mode",
+        "on_name_conflict",
+        "auto_add_to_source_control",
+    }
+    if set(arguments) - allowed_request_fields:
+        raise V3ProtocolError("object.set Composer request fields are not supported")
+
+    action_index = len(action_specs)
+    for target_index, raw_target in enumerate(objects):
+        if not isinstance(raw_target, Mapping) or not isinstance(
+            raw_target.get("object"), Mapping
+        ):
+            raise V3ProtocolError("object.set Composer target is invalid")
+        action_index += 1
+        target_step_name = f"{label}.action.{action_index:03d}"
+        action_specs.append(
+            (
+                {
+                    "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+                    "action": "add_target",
+                    "selector": dict(raw_target["object"]),
+                },
+                None,
+            )
+        )
+        handle_binding = DraftActionResponseBinding(
+            pointer="/target_handle",
+            step=target_step_name,
+            response_pointer=f"/draft/current_facts/{target_index}/handle",
+        )
+        reference_binding = DraftActionResponseBinding(
+            pointer="/owner_handle",
+            step=target_step_name,
+            response_pointer=f"/draft/current_facts/{target_index}/handle",
+        )
+        for field_name in (
+            "name",
+            "notes",
+            "platform",
+            "list_mode",
+            "on_name_conflict",
+        ):
+            if field_name in raw_target:
+                action_specs.append(
+                    (
+                        {
+                            "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+                            "action": "set_target_field",
+                            "name": field_name,
+                            "value": raw_target[field_name],
+                        },
+                        handle_binding,
+                    )
+                )
+        properties = raw_target.get("properties", [])
+        references = raw_target.get("references", [])
+        unsupported = set(raw_target) - {
+            "object",
+            "name",
+            "notes",
+            "platform",
+            "list_mode",
+            "on_name_conflict",
+            "properties",
+            "references",
+        }
+        if (
+            unsupported
+            or not isinstance(properties, list)
+            or not isinstance(references, list)
+        ):
+            raise V3ProtocolError("object.set Composer target fields are not supported")
+        for row in properties:
+            if not isinstance(row, Mapping) or set(row) != {"name", "value"}:
+                raise V3ProtocolError("object.set Composer property is invalid")
+            action_specs.append(
+                (
+                    {
+                        "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+                        "action": "set_property",
+                        "name": row["name"],
+                        "value": row["value"],
+                    },
+                    handle_binding,
+                )
+            )
+        for row in references:
+            if not isinstance(row, Mapping) or set(row) != {"name", "target"}:
+                raise V3ProtocolError("object.set Composer reference is invalid")
+            action_specs.append(
+                (
+                    {
+                        "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+                        "action": "set_reference",
+                        "name": row["name"],
+                        "target": row["target"],
+                    },
+                    reference_binding,
+                )
+            )
+        action_index = len(action_specs)
+
+    steps: list[ExpectedGatewayStep] = [
+        ExpectedGatewayStep(
+            name=f"{label}.operation-schema",
+            subcommand="operation-schema",
+            arguments=("object.set",),
+        ),
+        ExpectedGatewayStep(
+            name=f"{label}.draft-start",
+            subcommand="draft-start",
+            arguments=("object.set",),
+        ),
+    ]
+    latest_revision_step = f"{label}.draft-start"
+    for index, (action, handle_binding) in enumerate(action_specs, start=1):
+        action_name = f"{label}.action.{index:03d}"
+        steps.append(
+            ExpectedGatewayStep(
+                name=action_name,
+                subcommand="draft-apply",
+                arguments=(
+                    ResponseBinding(f"{label}.draft-start", "/draft/draft_id"),
+                    "--task-authority",
+                    ResponseBinding(f"{label}.draft-start", "/task_authority"),
+                    "--expected-revision",
+                    ResponseBinding(latest_revision_step, "/draft/revision"),
+                    "--action-json",
+                    DraftActionJsonArgument(
+                        expected=action,
+                        response_bindings=(
+                            (handle_binding,) if handle_binding is not None else ()
+                        ),
+                    ),
+                ),
+            )
+        )
+        latest_revision_step = action_name
+    check_name = f"{label}.check"
+    preview_name = f"{label}.preview"
+    show_name = f"{label}.transaction-show"
+    confirm_name = f"{label}.confirm"
+    execute_name = f"{label}.execute"
+    steps.extend(
+        (
+            ExpectedGatewayStep(
+                name=check_name,
+                subcommand="draft-check",
+                arguments=(
+                    ResponseBinding(f"{label}.draft-start", "/draft/draft_id"),
+                    "--task-authority",
+                    ResponseBinding(f"{label}.draft-start", "/task_authority"),
+                    "--expected-revision",
+                    ResponseBinding(latest_revision_step, "/draft/revision"),
+                ),
+            ),
+            ExpectedGatewayStep(
+                name=preview_name,
+                subcommand="preview-from-draft",
+                arguments=(
+                    ResponseBinding(f"{label}.draft-start", "/draft/draft_id"),
+                    "--task-authority",
+                    ResponseBinding(f"{label}.draft-start", "/task_authority"),
+                    "--expected-revision",
+                    ResponseBinding(check_name, "/draft/revision"),
+                    "--apply",
+                ),
+            ),
+            ExpectedGatewayStep(
+                name=show_name,
+                subcommand="transaction-show",
+                arguments=(ResponseBinding(preview_name, "/transaction_id"), "--summary-only"),
+            ),
+            ExpectedGatewayStep(
+                name=confirm_name,
+                subcommand="confirm",
+                arguments=(
+                    ResponseBinding(show_name, "/transaction_id"),
+                    "--confirmation-token",
+                    ResponseBinding(show_name, "/confirmation/token"),
+                ),
+            ),
+            ExpectedGatewayStep(
+                name=execute_name,
+                subcommand="execute",
+                arguments=(ResponseBinding(confirm_name, "/transaction_id"),),
+                allowed_exit_codes=(0, 2),
+            ),
+            ExpectedGatewayStep(
+                name=f"{label}.verify",
+                subcommand="verify",
+                arguments=(ResponseBinding(execute_name, "/transaction_id"),),
+            ),
+        )
+    )
+    return tuple(steps)
 
 
 def metadata_candidate_limit(queries: Sequence[str]) -> int:
@@ -887,6 +1130,7 @@ __all__ = [
     "V3GatewayProtocol",
     "V3ProtocolError",
     "build_direct_protocol",
+    "build_object_set_composer_transaction_steps",
     "build_modification_policy_protocol",
     "build_metadata_transaction_protocol",
     "build_schema_query_transaction_protocol",

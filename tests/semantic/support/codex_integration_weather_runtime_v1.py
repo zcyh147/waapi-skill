@@ -21,6 +21,7 @@ from typing import Any, Callable, Mapping, Sequence
 
 from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
+    build_object_set_composer_transaction_steps,
     build_transaction_protocol,
     metadata_candidate_limit,
 )
@@ -1208,13 +1209,30 @@ def _build_metadata_workflow_protocol(
             reused_projection,
             "object_set_rtpc_v1",
         )
-    base = build_transaction_protocol(requests)
+    legacy_base = build_transaction_protocol(requests)
+    composer_tx02 = build_object_set_composer_transaction_steps(
+        requests[1],
+        label="tx02",
+    )
+    base_steps: list[ExpectedGatewayStep] = []
+    inserted_tx02 = False
+    for step in legacy_base.steps:
+        prefix = step.name.split(".", 1)[0]
+        if prefix != "tx02":
+            base_steps.append(step)
+        elif not inserted_tx02:
+            base_steps.extend(composer_tx02)
+            inserted_tx02 = True
+    if not inserted_tx02:
+        raise IntegrationWeatherRuntimeError(
+            "weather object.set transaction is missing from the base protocol"
+        )
     metadata_by_tx = {
         f"tx{index:02d}": row
         for index, row in enumerate(metadata, start=1)
     }
     steps: list[ExpectedGatewayStep] = []
-    for step in base.steps:
+    for step in base_steps:
         prefix = step.name.split(".", 1)[0]
         if step.subcommand == "operation-schema":
             metadata_row = metadata_by_tx[prefix]
@@ -1317,16 +1335,17 @@ def _build_metadata_workflow_protocol(
                 )
         steps.append(step)
     prefixes = tuple(
-        base_prefix
-        + sum(
-            candidate.subcommand == "operation-schema"
-            and metadata_by_tx[
-                candidate.name.split(".", 1)[0]
-            ]
-            is not None
-            for candidate in base.steps[:base_prefix]
+        next(
+            index
+            for index, step in enumerate(steps, start=1)
+            if step.name == checkpoint
         )
-        for base_prefix in base.turn_prefix_counts
+        for checkpoint in (
+            "tx01.preview",
+            "tx02.preview",
+            "tx03.preview",
+            "tx03.verify",
+        )
     )
     return V3GatewayProtocol(
         tuple(steps),
@@ -1376,6 +1395,10 @@ def _workflow_plan_steps(
     result: list[Mapping[str, Any]] = []
     kind_by_subcommand = {
         "operation-schema": "operation_schema",
+        "draft-start": "operation_compose",
+        "draft-apply": "operation_compose",
+        "draft-check": "operation_compose_check",
+        "preview-from-draft": "preview",
         "preview": "preview",
         "transaction-show": "transaction_show",
         "confirm": "confirm",
