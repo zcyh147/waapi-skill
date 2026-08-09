@@ -2660,6 +2660,59 @@ def test_windows_powershell_recording_preserves_literal_metacharacters(
     assert parse_error == ""
 
 
+@pytest.mark.parametrize(
+    "subcommand",
+    (
+        "legacy-operation-schema",
+        "legacy-preview",
+        "draft-start",
+        "draft-inspect",
+        "draft-apply",
+        "draft-check",
+        "draft-cancel",
+        "preview-from-draft",
+    ),
+)
+def test_command_classifier_recognizes_versioned_operation_input_routes(
+    tmp_path: Path,
+    subcommand: str,
+) -> None:
+    skill = tmp_path / "skill"
+    runner = skill / "scripts" / "run.py"
+    runner.parent.mkdir(parents=True)
+    runner.write_text("# packaged runner\n", encoding="utf-8")
+    payload = json.dumps(
+        {
+            "contract": "waapi-skill.gateway-result/v1",
+            "ok": True,
+            "command": subcommand,
+        }
+    )
+    record = CodexCommandRecord(
+        command=shlex.join(
+            ("python", str(runner), "gateway.py", subcommand)
+        ),
+        exit_code=0,
+        status="completed",
+        aggregated_output=payload,
+        argv=("python", str(runner), "gateway.py", subcommand),
+        has_shell_operators=False,
+        parse_error="",
+        parser_kind="posix-native",
+    )
+
+    facts = classify_commands(
+        (record,),
+        skill_source=skill,
+        expected_gateway_subcommands=(subcommand,),
+    )
+
+    assert facts.gateway_commands == (record.command,)
+    assert facts.gateway_attempt_commands == (record.command,)
+    assert facts.gateway_subcommands == (subcommand,)
+    assert facts.unexpected_commands == ()
+
+
 def test_windows_powershell_recording_requires_quoted_at_prefixed_argv_value(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

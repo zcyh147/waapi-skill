@@ -222,10 +222,7 @@ from wwise_waapi.transaction_runtime import (  # noqa: E402  # pyright: ignore[r
     validate_transaction_guards,
 )
 from wwise_waapi.transaction_cleanup import (  # noqa: E402  # pyright: ignore[reportMissingImports]
-    CLEANUP_PROJECTION_CONTRACT,
-    CLEANUP_SPEC_CONTRACT,
-    TransactionCleanupError,
-    project_transaction_cleanup,
+    transaction_cleanup_payload as _transaction_cleanup_payload,
 )
 from wwise_waapi.transactions import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     CONFIRMATION_TOKEN_MATERIAL_CONTRACT,
@@ -10237,56 +10234,11 @@ def transaction_cleanup_payload(
 ) -> dict[str, Any]:
     """Preserve the immutable cleanup spec and add an honest phase status."""
 
-    raw_spec = prepared.get("cleanup")
-    spec = dict(raw_spec) if isinstance(raw_spec, Mapping) else {"kind": "none"}
-    if spec.get("contract") == CLEANUP_SPEC_CONTRACT:
-        try:
-            projection = project_transaction_cleanup(
-                spec,
-                phase=phase,
-                execution_result=execution_result,
-            )
-        except TransactionCleanupError as exc:
-            projection = {
-                "contract": CLEANUP_PROJECTION_CONTRACT,
-                "phase": phase,
-                "status": "unknown",
-                "automatic_cleanup": False,
-                "automatic_retry": False,
-                "error": exc.as_dict(),
-            }
-        return {
-            "spec": spec,
-            "status": projection["status"],
-            "projection": projection,
-        }
-
-    kind = spec.get("kind")
-    if phase == "indeterminate":
-        status = "unknown"
-    elif kind in {None, "none", "none-after-delete"}:
-        status = "not_required"
-    elif kind == "same_connection_cancel_on_inner_failure":
-        status = (
-            "armed_during_execution"
-            if phase == "preview"
-            else "handled_same_connection"
-            if phase == "execution_cancelled"
-            else "not_required"
-        )
-    elif phase == "preview":
-        status = "not_started"
-    else:
-        status = "pending"
-    projection = {
-        "contract": CLEANUP_PROJECTION_CONTRACT,
-        "phase": phase,
-        "status": status,
-        "kind": kind,
-        "automatic_cleanup": bool(spec.get("automatic_cleanup") is True),
-        "automatic_retry": False,
-    }
-    return {"spec": spec, "status": status, "projection": projection}
+    return _transaction_cleanup_payload(
+        prepared,
+        phase=phase,
+        execution_result=execution_result,
+    )
 
 
 def transaction_show_summary(

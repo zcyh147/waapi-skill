@@ -455,6 +455,66 @@ def _strict_json_copy(value: Any, *, path: str) -> Any:
     )
 
 
+def transaction_cleanup_payload(
+    prepared: Mapping[str, Any],
+    *,
+    phase: str,
+    execution_result: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Project one immutable cleanup spec into its deterministic phase result."""
+
+    raw_spec = prepared.get("cleanup")
+    spec = dict(raw_spec) if isinstance(raw_spec, Mapping) else {"kind": "none"}
+    if spec.get("contract") == CLEANUP_SPEC_CONTRACT:
+        try:
+            projection = project_transaction_cleanup(
+                spec,
+                phase=phase,
+                execution_result=execution_result,
+            )
+        except TransactionCleanupError as exc:
+            projection = {
+                "contract": CLEANUP_PROJECTION_CONTRACT,
+                "phase": phase,
+                "status": "unknown",
+                "automatic_cleanup": False,
+                "automatic_retry": False,
+                "error": exc.as_dict(),
+            }
+        return {
+            "spec": spec,
+            "status": projection["status"],
+            "projection": projection,
+        }
+
+    kind = spec.get("kind")
+    if phase == "indeterminate":
+        status = "unknown"
+    elif kind in {None, "none", "none-after-delete"}:
+        status = "not_required"
+    elif kind == "same_connection_cancel_on_inner_failure":
+        status = (
+            "armed_during_execution"
+            if phase == "preview"
+            else "handled_same_connection"
+            if phase == "execution_cancelled"
+            else "not_required"
+        )
+    elif phase == "preview":
+        status = "not_started"
+    else:
+        status = "pending"
+    projection = {
+        "contract": CLEANUP_PROJECTION_CONTRACT,
+        "phase": phase,
+        "status": status,
+        "kind": kind,
+        "automatic_cleanup": bool(spec.get("automatic_cleanup") is True),
+        "automatic_retry": False,
+    }
+    return {"spec": spec, "status": status, "projection": projection}
+
+
 __all__ = [
     "CLEANUP_PHASES",
     "CLEANUP_PROJECTION_CONTRACT",
@@ -462,4 +522,5 @@ __all__ = [
     "TransactionCleanupError",
     "build_transaction_cleanup_spec",
     "project_transaction_cleanup",
+    "transaction_cleanup_payload",
 ]

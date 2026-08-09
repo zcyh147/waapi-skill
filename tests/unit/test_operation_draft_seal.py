@@ -16,6 +16,12 @@ from wwise_waapi.operation_drafts import (  # pyright: ignore[reportMissingImpor
     OperationDraftSealReplayMismatch,
     OperationDraftState,
     OperationDraftStore,
+    operation_draft_authority_digest,
+    parse_operation_draft_archive_bytes,
+)
+from wwise_waapi.canonical import (  # pyright: ignore[reportMissingImports]
+    canonical_json_bytes,
+    canonical_sha256,
 )
 from wwise_waapi.transactions import (  # pyright: ignore[reportMissingImports]
     TransactionStore,
@@ -691,6 +697,50 @@ def test_preview_from_checked_draft_seals_one_canonical_transaction(
         "transaction_id": transaction_id,
         "artifact_hash": previewed["artifact_hash"],
     }
+
+
+def test_archive_parser_binds_authority_and_canonical_request_to_composition(
+    tmp_path: Path,
+) -> None:
+    draft_id, authority = checked_draft(tmp_path)
+    code, previewed, _client = seal_checked_draft(
+        tmp_path,
+        draft_id,
+        authority,
+    )
+    assert code == 0, previewed
+    record_path = draft_record_path(tmp_path, draft_id)
+
+    parsed = parse_operation_draft_archive_bytes(
+        record_path.read_bytes(),
+        expected_draft_id=draft_id,
+    )
+
+    assert parsed.state is OperationDraftState.SEALED
+    assert parsed.authority_digest == operation_draft_authority_digest(authority)
+    assert parsed.seal is not None
+    assert parsed.seal["request"] == EXPECTED_REQUEST
+
+    tampered = json.loads(record_path.read_text(encoding="utf-8"))
+    tampered_request = tampered["seal"]["request"]
+    tampered_request["arguments"]["objects"][0]["properties"][0]["value"] = -2
+    tampered_digest = canonical_sha256(tampered_request)
+    tampered["seal"]["request_digest"] = tampered_digest
+    tampered["check"]["request_digest"] = tampered_digest
+    digest_material = dict(tampered)
+    del digest_material["record_digest"]
+    tampered["record_digest"] = canonical_sha256(
+        {
+            "contract": "waapi-skill.operation-draft-record-digest/v1",
+            "record": digest_material,
+        }
+    )
+
+    with pytest.raises(ValueError, match="canonical request.*composition"):
+        parse_operation_draft_archive_bytes(
+            canonical_json_bytes(tampered),
+            expected_draft_id=draft_id,
+        )
 
 
 def test_sealed_draft_replays_the_same_preview_without_another_transition(

@@ -56,6 +56,11 @@ from tests.semantic.support.codex_prompt_asset_reads_v3 import (
     remove_validated_command_occurrences,
     validated_prompt_asset_cat_commands,
 )
+from tests.semantic.support.codex_operation_draft_archive_v3 import (
+    ComposerArchiveError,
+    classify_composer_failure_stage,
+    validate_operation_draft_archive,
+)
 
 
 TASK_RESULT_CONTRACT = "waapi-skill.codex-semantic-task-result/v5"
@@ -516,6 +521,12 @@ def run_v3_codex_task(
                             prompt_materialization_path=(
                                 prompt_materialization_path
                             ),
+                            gateway_failure_stage=(
+                                _composer_failure_stage(
+                                    protocol,
+                                    broker_evidence,
+                                )
+                            ),
                         )
                         raise V3TaskRunnerError(
                             f"{scenario_id} turn {turn_index} failed task gates: "
@@ -552,24 +563,52 @@ def run_v3_codex_task(
         ),
     )
     task_result = {
-            "contract": TASK_RESULT_CONTRACT,
-            "scenario_id": scenario_id,
-            "version": version,
-            "thread_id": run.thread_id,
-            "turn_count": len(run.turns),
-            "passed": run.passed,
-            "prompt_materialization_sha256": _sha256_file(
-                prompt_materialization_path
-            ),
-            "broker": run.broker_evidence.as_dict(include_output=False),
-            "turn_grades": [
-                {
-                    **asdict(item),
-                    "passed": item.passed,
-                }
-                for item in run.turn_grades
-            ],
-        }
+        "contract": TASK_RESULT_CONTRACT,
+        "scenario_id": scenario_id,
+        "version": version,
+        "thread_id": run.thread_id,
+        "turn_count": len(run.turns),
+        "passed": run.passed,
+        "prompt_materialization_sha256": _sha256_file(
+            prompt_materialization_path
+        ),
+        "broker": run.broker_evidence.as_dict(include_output=False),
+        "turn_grades": [
+            {
+                **asdict(item),
+                "passed": item.passed,
+            }
+            for item in run.turn_grades
+        ],
+    }
+    if any(
+        step.subcommand.startswith("draft-")
+        or step.subcommand == "preview-from-draft"
+        for step in protocol.steps
+    ):
+        broker_payload = run.broker_evidence.as_dict(include_output=False)
+        broker_records = broker_payload["records"]
+        steps_by_name = {step.name: step for step in protocol.steps}
+        try:
+            composer_evidence = validate_operation_draft_archive(
+                state_directory=root / "broker" / "state",
+                steps=tuple(
+                    steps_by_name[str(record["step_name"])]
+                    for record in broker_records
+                ),
+                broker_records=broker_records,
+            )
+        except (ComposerArchiveError, KeyError) as exc:
+            raise V3TaskRunnerError(
+                f"Composer task evidence cannot be sealed: {exc}",
+                thread_id=run.thread_id,
+            ) from exc
+        if composer_evidence is None:
+            raise V3TaskRunnerError(
+                "Composer protocol completed without Composer evidence",
+                thread_id=run.thread_id,
+            )
+        task_result["composer_evidence"] = composer_evidence
     if protocol.allowed_turn_prefix_counts:
         task_result["protocol_terminal_passed"] = run.broker_protocol_passed
         task_result["accepted_terminal_prefixes"] = list(
@@ -999,6 +1038,7 @@ def _archive_task_gate_failure(
     grade: V3TurnGrade,
     broker_evidence: GatewayBrokerEvidence,
     prompt_materialization_path: Path,
+    gateway_failure_stage: str | None = None,
 ) -> None:
     """Archive bounded diagnostics without changing the semantic verdict."""
 
@@ -1030,29 +1070,55 @@ def _archive_task_gate_failure(
         raise V3TaskRunnerError(
             "task-gate diagnostic archive is incomplete: " + ", ".join(missing)
         )
-    _write_json(
-        root / "task-gate-failure.json",
-        {
-            "contract": TASK_GATE_FAILURE_CONTRACT,
-            "scenario_id": scenario_id,
-            "version": version,
-            "failed_turn_index": failed_turn_index,
-            "expected_turn_count": expected_turn_count,
-            "thread_id": thread_id,
-            "prompt_sha256": grade.prompt_sha256,
-            "broker_prefix_count": grade.broker_prefix_count,
-            "reconciliation": asdict(grade.reconciliation),
-            "failed_common_gates": [
-                key for key, passed in grade.common_gates.items() if not passed
-            ],
-            "grade_errors": list(grade.errors),
-            "diagnostic_only": True,
-            "artifact_sha256": {
-                path.relative_to(root).as_posix(): _sha256_file(path)
-                for path in artifact_paths
-            },
+    payload = {
+        "contract": TASK_GATE_FAILURE_CONTRACT,
+        "scenario_id": scenario_id,
+        "version": version,
+        "failed_turn_index": failed_turn_index,
+        "expected_turn_count": expected_turn_count,
+        "thread_id": thread_id,
+        "prompt_sha256": grade.prompt_sha256,
+        "broker_prefix_count": grade.broker_prefix_count,
+        "reconciliation": asdict(grade.reconciliation),
+        "failed_common_gates": [
+            key for key, passed in grade.common_gates.items() if not passed
+        ],
+        "grade_errors": list(grade.errors),
+        "diagnostic_only": True,
+        "artifact_sha256": {
+            path.relative_to(root).as_posix(): _sha256_file(path)
+            for path in artifact_paths
         },
+    }
+    if gateway_failure_stage is not None:
+        payload["gateway_failure_stage"] = gateway_failure_stage
+    _write_json(root / "task-gate-failure.json", payload)
+
+
+def _composer_failure_stage(
+    protocol: V3GatewayProtocol,
+    broker_evidence: GatewayBrokerEvidence,
+) -> str | None:
+    if not any(
+        step.subcommand.startswith("draft-")
+        or step.subcommand == "preview-from-draft"
+        for step in protocol.steps
+    ):
+        return None
+    steps_by_name = {step.name: step for step in protocol.steps}
+    if broker_evidence.records:
+        final_name = broker_evidence.records[-1].step_name
+        if final_name in steps_by_name and not broker_evidence.records[-1].succeeded:
+            return classify_composer_failure_stage(
+                steps_by_name[final_name].subcommand
+            )
+    next_index = len(broker_evidence.consumed_step_names)
+    subcommand = (
+        protocol.steps[next_index].subcommand
+        if next_index < len(protocol.steps)
+        else protocol.steps[-1].subcommand
     )
+    return classify_composer_failure_stage(subcommand)
 
 
 def _command_lifecycle_anomalies(stdout: str) -> list[dict[str, Any]]:

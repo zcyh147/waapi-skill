@@ -153,6 +153,10 @@ from tests.semantic.support.codex_object_business_plan_v3 import (  # noqa: E402
     validate_archived_object_business_plan,
     validate_object_archived_verification,
 )
+from tests.semantic.support.codex_operation_draft_archive_v3 import (  # noqa: E402
+    ComposerArchiveError,
+    validate_operation_draft_archive,
+)
 from tests.semantic.support.codex_soundbank_business_plan_v3 import (  # noqa: E402
     SoundBankBusinessPlanError,
     SoundBankBusinessPlanSections,
@@ -4550,7 +4554,10 @@ def _validate_heavy_v3_task_result(
     expected_turn_count = getattr(expected_unit, "user_turn_count", None)
     if (
         not isinstance(value, Mapping)
-        or set(value) != required_keys
+        or set(value) not in (
+            required_keys,
+            required_keys | {"composer_evidence"},
+        )
         or value.get("contract") != HEAVY_V3_TASK_RESULT_CONTRACT
         or value.get("scenario_id")
         != _heavy_v3_base_scenario_id(expected_unit)
@@ -4581,6 +4588,16 @@ def _validate_heavy_v3_task_result(
         expected_unit=expected_unit,
         expected_sha256=str(value["prompt_materialization_sha256"]),
     )
+    protocol = prompt_evidence.provenance.protocol
+    is_composer_protocol = any(
+        step.subcommand.startswith("draft-")
+        or step.subcommand == "preview-from-draft"
+        for step in protocol.steps
+    )
+    if is_composer_protocol:
+        required_keys.add("composer_evidence")
+    if set(value) != required_keys:
+        raise CampaignEvidenceError("passing heavy task-result contract is invalid")
     turn_grades = value.get("turn_grades")
     if not isinstance(turn_grades, list) or len(turn_grades) != expected_turn_count:
         raise CampaignEvidenceError("passing heavy task has invalid turn grades")
@@ -4593,7 +4610,6 @@ def _validate_heavy_v3_task_result(
         )
     gateway_records: list[Mapping[str, Any]] = []
     previous_prefix = 0
-    protocol = prompt_evidence.provenance.protocol
     expected_skill_reads = _heavy_v3_expected_skill_reads(expected_unit)
     for index, grade in enumerate(turn_grades, start=1):
         turn_root = turns_root / f"turn-{index:02d}"
@@ -4647,6 +4663,31 @@ def _validate_heavy_v3_task_result(
             None,
         ),
     )
+    if is_composer_protocol:
+        broker_value = value.get("broker")
+        if not isinstance(broker_value, Mapping):
+            raise CampaignEvidenceError("passing Composer task lacks Broker evidence")
+        broker_records = broker_value.get("records")
+        consumed_names = broker_value.get("consumed_step_names")
+        if not isinstance(broker_records, list) or not isinstance(consumed_names, list):
+            raise CampaignEvidenceError("passing Composer Broker evidence is malformed")
+        try:
+            replayed_composer = validate_operation_draft_archive(
+                state_directory=task_root / "broker" / "state",
+                steps=_steps_in_consumed_order(
+                    protocol.steps[: len(consumed_names)],
+                    consumed_names,
+                ),
+                broker_records=broker_records,
+            )
+        except ComposerArchiveError as exc:
+            raise CampaignEvidenceError(
+                f"passing Composer archive cannot be replayed: {exc}"
+            ) from exc
+        if replayed_composer is None or value.get("composer_evidence") != replayed_composer:
+            raise CampaignEvidenceError(
+                "passing Composer task-result evidence differs from offline replay"
+            )
     return prompt_evidence
 
 
@@ -4910,6 +4951,16 @@ def _validate_heavy_v3_broker_records(
                 expected_project_modification_policy
             ),
         )
+        if (
+            step.subcommand.startswith("draft-")
+            or step.subcommand == "preview-from-draft"
+        ):
+            try:
+                replay._validate_operation_draft_payload(step, payload)  # noqa: SLF001
+            except Exception as exc:
+                raise CampaignEvidenceError(
+                    f"{label} Draft response cannot replay protocol step {step.name}: {exc}"
+                ) from exc
         if step.subcommand == "transaction-show":
             try:
                 validate_transaction_show_confirmation_against_store(
@@ -5032,6 +5083,10 @@ def _validate_heavy_v3_broker_records(
         if observed_payload != payload:
             raise CampaignEvidenceError(
                 f"{label} Codex command output differs from broker payload"
+            )
+        if "agent_result" in observed_payload and list(observed_payload)[-1] != "agent_result":
+            raise CampaignEvidenceError(
+                f"{label} Codex command output does not keep agent_result final"
             )
         replay._payloads_by_step[step.name] = payload  # noqa: SLF001
 

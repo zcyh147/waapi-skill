@@ -1719,6 +1719,14 @@ def _task_authority_digest(task_authority: str) -> str:
     )
 
 
+def operation_draft_authority_digest(task_authority: str) -> str:
+    """Return the durable domain-separated digest for one issued capability."""
+
+    if not _valid_task_authority(task_authority):
+        raise ValueError("task_authority is not a valid issued Draft capability")
+    return _task_authority_digest(task_authority)
+
+
 def _valid_task_authority(task_authority: Any) -> bool:
     return isinstance(task_authority, str) and bool(
         _TASK_AUTHORITY_PATTERN.fullmatch(task_authority)
@@ -2121,6 +2129,77 @@ def _parse_canonical_record_bytes(
     return record
 
 
+def parse_operation_draft_archive_bytes(
+    data: bytes,
+    *,
+    expected_draft_id: str,
+) -> OperationDraftRecord:
+    """Strictly parse one bounded canonical record without opening a live Store."""
+
+    if not isinstance(data, bytes):
+        raise TypeError("Operation Draft archive data must be bytes")
+    if len(data) > MAX_OPERATION_DRAFT_RECORD_BYTES:
+        raise ValueError("Operation Draft archive record exceeds its fixed byte ceiling")
+    if not isinstance(expected_draft_id, str) or not _DRAFT_ID_PATTERN.fullmatch(
+        expected_draft_id
+    ):
+        raise ValueError("expected_draft_id is invalid")
+    try:
+        return _parse_canonical_record_bytes(
+            data,
+            expected_draft_id=expected_draft_id,
+        )
+    except (json.JSONDecodeError, RecursionError, UnicodeError) as exc:
+        raise ValueError("Operation Draft archive record is invalid") from exc
+
+
+def load_operation_draft_archive_record(
+    state_dir: Path,
+    draft_id: str,
+) -> OperationDraftRecord:
+    """Read one frozen Draft record without creating, locking, or repairing state."""
+
+    if not isinstance(state_dir, Path) or not state_dir.is_absolute():
+        raise ValueError("state_dir must be one absolute pathlib.Path")
+    if not isinstance(draft_id, str) or not _DRAFT_ID_PATTERN.fullmatch(draft_id):
+        raise ValueError("draft_id is invalid")
+    store_dir = state_dir / "operation-drafts-v1"
+    records_dir = store_dir / "records"
+    locks_dir = store_dir / "locks"
+    identities = _capture_managed_directory_identities(
+        state_dir=state_dir,
+        managed_directories=(store_dir, records_dir, locks_dir),
+    )
+    _attest_managed_directory_identities(identities)
+    try:
+        entries: list[Path] = []
+        with os.scandir(records_dir) as iterator:
+            for entry in iterator:
+                entries.append(Path(entry.path))
+                if len(entries) > MAX_MANAGED_OPERATION_DRAFT_ENTRIES:
+                    raise OperationDraftStorageCorruption(
+                        "Operation Draft archive contains too many managed entries."
+                    )
+    except OSError as exc:
+        raise OperationDraftStorageCorruption(
+            "Operation Draft archive records cannot be enumerated."
+        ) from exc
+    expected_path = records_dir / f"{draft_id}.json"
+    if entries != [expected_path]:
+        raise OperationDraftStorageCorruption(
+            "Operation Draft archive must contain exactly its bound record."
+        )
+    snapshot = _read_bounded_record_snapshot(
+        expected_path,
+        attest_directories=lambda: _attest_managed_directory_identities(identities),
+    )
+    _attest_managed_directory_identities(identities)
+    return parse_operation_draft_archive_bytes(
+        snapshot.data,
+        expected_draft_id=draft_id,
+    )
+
+
 def _record_from_mapping(
     payload: Any,
     *,
@@ -2260,6 +2339,21 @@ def _record_from_mapping(
             check=check,
             updated_at=payload["updated_at"],
         )
+        if seal is not None:
+            try:
+                composed_request = materialize_operation_request(
+                    payload["operation"],
+                    payload["version"],
+                    composition,
+                )
+            except OperationComposerError as exc:
+                raise ValueError(
+                    "draft composition cannot materialize its canonical request"
+                ) from exc
+            if seal.get("request") != composed_request:
+                raise ValueError(
+                    "draft canonical request does not match its durable composition"
+                )
     else:
         composer_digest = None
         composition = None

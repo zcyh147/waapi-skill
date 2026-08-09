@@ -71,6 +71,8 @@ _LOCK_REGION_BYTES = 1
 _WINDOWS_LOCK_RETRY_SECONDS = 0.05
 _WINDOWS_LOCK_VIOLATION = 33
 _DURABLE_READ_CHUNK_BYTES = 1024 * 1024
+MAX_TRANSACTION_ARCHIVE_FILE_BYTES = 8 * 1024 * 1024
+MAX_TRANSACTION_ARCHIVE_EVENTS = 4096
 
 
 class TransactionError(RuntimeError):
@@ -340,6 +342,177 @@ class TransactionSnapshot:
     record: TransactionRecord
     events: tuple[Mapping[str, Any], ...]
     confirmation_token: str | None
+
+
+def load_transaction_archive_snapshot(
+    state_dir: Path,
+    transaction_id: str,
+) -> TransactionSnapshot:
+    """Read one frozen transaction exactly, without creating or repairing state."""
+
+    transaction_id = validate_transaction_id(transaction_id)
+    root = resolve_state_directory(state_dir)
+    transactions_dir = root / "transactions"
+    transaction_dir = transactions_dir / transaction_id
+    for path, label in (
+        (root, "State directory"),
+        (transactions_dir, "Transaction store directory"),
+        (transaction_dir, "Transaction archive directory"),
+    ):
+        _require_plain_directory(path, label=label)
+    try:
+        names = {entry.name for entry in transaction_dir.iterdir()}
+    except OSError as exc:
+        raise StateCorruptionError(
+            f"Transaction archive directory could not be read: {transaction_dir}: {exc}"
+        ) from exc
+    expected_names = {"preview.json", "state.json", "events.jsonl"}
+    if names != expected_names:
+        raise StateCorruptionError(
+            f"Transaction archive files are invalid for {transaction_id!r}"
+        )
+
+    preview_path = transaction_dir / "preview.json"
+    preview_payload, _preview_bytes = _read_canonical_archive_object(
+        preview_path,
+        label="Immutable transaction preview",
+    )
+    if set(preview_payload) != {
+        "artifact",
+        "artifact_hash",
+        "created_at",
+        "schema_version",
+        "transaction_id",
+    }:
+        raise StateCorruptionError("Immutable transaction preview fields are invalid")
+    if preview_payload.get("schema_version") != TRANSACTION_SCHEMA_VERSION:
+        raise StateCorruptionError("Unsupported transaction preview schema")
+    if preview_payload.get("transaction_id") != transaction_id:
+        raise ArtifactIntegrityError("Transaction preview id does not match its directory")
+    artifact_hash = preview_payload.get("artifact_hash")
+    if not isinstance(artifact_hash, str) or not _SHA256_PATTERN.fullmatch(artifact_hash):
+        raise StateCorruptionError("Transaction preview artifact hash is invalid")
+    if not hmac.compare_digest(
+        artifact_hash,
+        canonical_sha256(preview_payload.get("artifact")),
+    ):
+        raise ArtifactIntegrityError("Transaction preview artifact hash does not match")
+    created_at = preview_payload.get("created_at")
+    if not isinstance(created_at, str) or not created_at:
+        raise StateCorruptionError("Transaction preview created_at is invalid")
+    preview = PreviewArtifact(
+        transaction_id=transaction_id,
+        artifact=preview_payload["artifact"],
+        artifact_hash=artifact_hash,
+        created_at=created_at,
+    )
+
+    state_payload, _state_bytes = _read_canonical_archive_object(
+        transaction_dir / "state.json",
+        label="Materialized transaction state",
+    )
+    if set(state_payload) != {
+        "artifact_hash",
+        "created_at",
+        "event_sequence",
+        "last_event_hash",
+        "schema_version",
+        "state",
+        "transaction_id",
+        "updated_at",
+    }:
+        raise StateCorruptionError("Materialized transaction state fields are invalid")
+    record = _record_from_payload(state_payload, transaction_id)
+    if not hmac.compare_digest(record.artifact_hash, preview.artifact_hash):
+        raise ArtifactIntegrityError("Transaction state artifact hash does not match preview")
+
+    events_path = transaction_dir / "events.jsonl"
+    events_bytes = _read_plain_regular_bytes_bounded(
+        events_path,
+        label="Transaction archive event journal",
+        maximum_bytes=MAX_TRANSACTION_ARCHIVE_FILE_BYTES,
+    )
+    raw_lines = events_bytes.splitlines(keepends=True)
+    if not raw_lines or len(raw_lines) > MAX_TRANSACTION_ARCHIVE_EVENTS:
+        raise StateCorruptionError("Transaction archive event count is invalid")
+    events: list[Mapping[str, Any]] = []
+    previous_hash = ""
+    previous_state: str | None = None
+    expected_event_fields = {
+        "artifact_hash",
+        "details",
+        "event_hash",
+        "event_type",
+        "from_state",
+        "previous_event_hash",
+        "sequence",
+        "timestamp",
+        "to_state",
+        "transaction_id",
+    }
+    for sequence, raw_line in enumerate(raw_lines, start=1):
+        if not raw_line.endswith(b"\n") or raw_line in {b"\n", b"\r\n"}:
+            raise StateCorruptionError(
+                f"Transaction archive event framing is invalid at {events_path}:{sequence}"
+            )
+        event_bytes = raw_line[:-1]
+        try:
+            event = json.loads(event_bytes.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError, RecursionError) as exc:
+            raise StateCorruptionError(
+                f"Transaction archive event JSON is invalid at {events_path}:{sequence}"
+            ) from exc
+        if not isinstance(event, dict) or set(event) != expected_event_fields:
+            raise StateCorruptionError(
+                f"Transaction archive event fields are invalid at {events_path}:{sequence}"
+            )
+        if event_bytes != canonical_json_bytes(event):
+            raise StateCorruptionError(
+                f"Transaction archive event is not canonical at {events_path}:{sequence}"
+            )
+        _validate_event(
+            event,
+            transaction_id=transaction_id,
+            artifact_hash=artifact_hash,
+            expected_sequence=sequence,
+            expected_previous_hash=previous_hash,
+            expected_from_state=previous_state,
+            path=events_path,
+        )
+        to_state = _coerce_state(event["to_state"], field="event.to_state")
+        if sequence == 1:
+            if event["event_type"] != "preview_created" or to_state is not TransactionState.DRAFT:
+                raise StateCorruptionError("Transaction archive creation event is invalid")
+        else:
+            from_state = _coerce_state(previous_state, field="event.from_state")
+            if to_state not in ALLOWED_TRANSITIONS[from_state]:
+                raise StateCorruptionError("Transaction archive contains an illegal transition")
+        events.append(event)
+        previous_hash = event["event_hash"]
+        previous_state = event["to_state"]
+
+    final_event = events[-1]
+    first_event = events[0]
+    if (
+        record.created_at != preview.created_at
+        or first_event["timestamp"] != preview.created_at
+        or record.updated_at != final_event["timestamp"]
+        or record.event_sequence != len(events)
+        or record.last_event_hash != final_event["event_hash"]
+        or record.state.value != final_event["to_state"]
+    ):
+        raise StateCorruptionError("Materialized transaction state does not match its journal")
+    confirmation_token = (
+        _confirmation_token_for_record(record, preview)
+        if record.state is TransactionState.AWAITING_CONFIRMATION
+        else None
+    )
+    return TransactionSnapshot(
+        preview=preview,
+        record=record,
+        events=tuple(events),
+        confirmation_token=confirmation_token,
+    )
 
 
 def resolve_state_directory(state_dir: Path | None = None) -> Path:
@@ -1311,6 +1484,74 @@ def _read_plain_regular_bytes(path: Path, *, label: str) -> bytes:
         raise StateCorruptionError(f"{label} could not be read: {path}: {exc}") from exc
     finally:
         os.close(descriptor)
+
+
+def _read_plain_regular_bytes_bounded(
+    path: Path,
+    *,
+    label: str,
+    maximum_bytes: int,
+) -> bytes:
+    """Read one durable file through a descriptor with a hard byte ceiling."""
+
+    if isinstance(maximum_bytes, bool) or not isinstance(maximum_bytes, int) or maximum_bytes < 1:
+        raise ValueError("maximum_bytes must be a positive integer")
+    _require_plain_regular_file(path, label=label)
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise StateCorruptionError(
+            f"{label} could not be opened safely: {path}: {exc}"
+        ) from exc
+    try:
+        _require_opened_plain_regular_file(path, descriptor=descriptor, label=label)
+        before = os.fstat(descriptor)
+        if before.st_size > maximum_bytes:
+            raise StateCorruptionError(f"{label} exceeds its fixed byte ceiling: {path}")
+        chunks: list[bytes] = []
+        remaining = maximum_bytes + 1
+        while remaining:
+            chunk = os.read(descriptor, min(_DURABLE_READ_CHUNK_BYTES, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        data = b"".join(chunks)
+        if len(data) > maximum_bytes:
+            raise StateCorruptionError(f"{label} exceeds its fixed byte ceiling: {path}")
+        after = os.fstat(descriptor)
+        if not _same_regular_file_snapshot(before, after):
+            raise StateCorruptionError(f"{label} changed while it was read: {path}")
+        _require_opened_plain_regular_file(path, descriptor=descriptor, label=label)
+        return data
+    except OSError as exc:
+        raise StateCorruptionError(f"{label} could not be read: {path}: {exc}") from exc
+    finally:
+        os.close(descriptor)
+
+
+def _read_canonical_archive_object(
+    path: Path,
+    *,
+    label: str,
+) -> tuple[dict[str, Any], bytes]:
+    data = _read_plain_regular_bytes_bounded(
+        path,
+        label=label,
+        maximum_bytes=MAX_TRANSACTION_ARCHIVE_FILE_BYTES,
+    )
+    try:
+        payload = json.loads(data.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError, RecursionError) as exc:
+        raise StateCorruptionError(f"{label} is not strict JSON: {path}") from exc
+    if not isinstance(payload, dict):
+        raise StateCorruptionError(f"{label} must be a JSON object: {path}")
+    if data != canonical_json_bytes(payload) + b"\n":
+        raise StateCorruptionError(f"{label} is not in canonical durable form: {path}")
+    return payload, data
 
 
 def _same_regular_file_snapshot(

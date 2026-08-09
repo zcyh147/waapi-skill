@@ -27,6 +27,7 @@ from wwise_waapi.transactions import (
     TransactionStore,
     UnsafeTransactionId,
     confirmation_token_for,
+    load_transaction_archive_snapshot,
     new_transaction_id,
     resolve_state_directory,
     validate_confirmation_token,
@@ -1223,3 +1224,29 @@ def test_journal_ahead_state_is_repaired_after_interrupted_materialization(tmp_p
     assert repaired.state is TransactionState.AWAITING_CONFIRMATION
     assert repaired.event_sequence == 2
     assert json.loads(_state_path(tmp_path, "tx-repair").read_text(encoding="utf-8"))["state"] == "awaiting_confirmation"
+
+
+def test_archive_snapshot_rejects_journal_ahead_state_without_repairing_it(
+    tmp_path: Path,
+) -> None:
+    store = TransactionStore(tmp_path)
+    store.create_preview("tx-archive-read-only", {"archive": True})
+    store.submit_for_confirmation("tx-archive-read-only")
+    state_path = _state_path(tmp_path, "tx-archive-read-only")
+    durable = json.loads(state_path.read_text(encoding="utf-8"))
+    first_event = store.read_events("tx-archive-read-only")[0]
+    durable.update(
+        {
+            "event_sequence": 1,
+            "last_event_hash": first_event["event_hash"],
+            "state": "draft",
+            "updated_at": first_event["timestamp"],
+        }
+    )
+    state_path.write_bytes(canonical_json_bytes(durable) + b"\n")
+    before = state_path.read_bytes()
+
+    with pytest.raises(StateCorruptionError, match="does not match its journal"):
+        load_transaction_archive_snapshot(tmp_path, "tx-archive-read-only")
+
+    assert state_path.read_bytes() == before
