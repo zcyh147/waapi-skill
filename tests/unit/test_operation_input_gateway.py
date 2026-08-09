@@ -244,6 +244,14 @@ def test_normal_object_set_schema_and_detail_expose_only_composer_input(
         "complete_request_authored_by_gateway": True,
     }
     assert schema["composer"]["contract"] == "waapi-skill.operation-composer/v1"
+    assert schema["composer"]["action_shapes"]["add_target"] == {
+        "fixed_fields": {
+            "contract": "waapi-skill.operation-draft-action/v1",
+            "action": "add_target",
+        },
+        "required_fields": ["selector"],
+        "optional_fields": [],
+    }
     assert schema["composer"]["start"] == {
         "subcommand": "draft-start",
         "gateway_argv": ["draft-start", "object.set"],

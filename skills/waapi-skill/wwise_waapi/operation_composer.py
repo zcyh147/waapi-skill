@@ -28,6 +28,45 @@ OPERATION_COMPOSER_CONTRACT = "waapi-skill.operation-composer/v1"
 OBJECT_SET_COMPOSER_OPERATION = "object.set"
 MAX_COMPOSER_ACTION_BYTES = 32 * 1024
 _TARGET_HANDLE_PATTERN = re.compile(r"^odh1-[0-9a-f]{24}$")
+_BASE_ACTION_FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
+    "set_request_option": (("name", "value"), ()),
+    "clear_request_option": (("name",), ()),
+    "add_target": (("selector",), ()),
+    "set_target_field": (("target_handle", "name", "value"), ()),
+    "clear_target_field": (("target_handle", "name"), ()),
+    "set_property": (("target_handle", "name", "value"), ()),
+    "remove_property": (("target_handle", "name"), ()),
+    "set_reference": (("owner_handle", "name", "target"), ()),
+    "remove_reference": (("owner_handle", "name"), ()),
+    "add_child": (("parent_handle", "type", "name"), ()),
+    "set_node_field": (("node_handle", "name", "value"), ()),
+    "clear_node_field": (("node_handle", "name"), ()),
+    "set_node_property": (("node_handle", "name", "value"), ()),
+    "remove_node_property": (("node_handle", "name"), ()),
+    "remove_node": (("node_handle",), ()),
+    "add_list": (("target_handle", "name"), ()),
+    "remove_list": (("list_handle",), ()),
+    "add_list_member": (("list_handle", "type", "name"), ()),
+    "remove_target": (("target_handle",), ()),
+}
+_IMPORT_ACTION_FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
+    "add_import_file": (
+        ("owner_handle",),
+        (
+            "audio_file",
+            "audio_file_base64",
+            "originals_subfolder",
+            "language",
+            "object_type",
+        ),
+    ),
+    "set_import_file_field": (("file_handle", "name", "value"), ()),
+    "clear_import_file_field": (("file_handle", "name"), ()),
+    "remove_import_file": (("file_handle",), ()),
+    "set_import_option": (("owner_handle", "name", "value"), ()),
+    "clear_import_option": (("owner_handle", "name"), ()),
+    "remove_import": (("owner_handle",), ()),
+}
 
 
 class OperationComposerError(ValueError):
@@ -65,44 +104,32 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             details={"operation": operation, "version": version},
         )
     fragments = object_set_composer_fragment_contract(version)
-    actions = [
-        "set_request_option",
-        "clear_request_option",
-        "add_target",
-        "set_target_field",
-        "clear_target_field",
-        "set_property",
-        "remove_property",
-        "set_reference",
-        "remove_reference",
-        "add_child",
-        "set_node_field",
-        "clear_node_field",
-        "set_node_property",
-        "remove_node_property",
-        "remove_node",
-        "add_list",
-        "remove_list",
-        "add_list_member",
-        "remove_target",
-    ]
+    action_fields = dict(_BASE_ACTION_FIELDS)
     if fragments["import_supported"]:
-        actions.extend(
-            [
-                "add_import_file",
-                "set_import_file_field",
-                "clear_import_file_field",
-                "remove_import_file",
-                "set_import_option",
-                "clear_import_option",
-                "remove_import",
-            ]
-        )
+        action_fields.update(_IMPORT_ACTION_FIELDS)
+    actions = list(action_fields)
     return {
         "contract": OPERATION_COMPOSER_CONTRACT,
         "operation": operation,
         "version": version,
         "action_contract": OPERATION_DRAFT_ACTION_CONTRACT,
+        "action_construction": {
+            "fixed_fields_are_required": True,
+            "include_every_required_field": True,
+            "include_only_selected_optional_fields": True,
+            "additional_fields": False,
+        },
+        "action_shapes": {
+            action_name: {
+                "fixed_fields": {
+                    "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+                    "action": action_name,
+                },
+                "required_fields": list(required_fields),
+                "optional_fields": list(optional_fields),
+            }
+            for action_name, (required_fields, optional_fields) in action_fields.items()
+        },
         "composition_contract": OPERATION_COMPOSITION_CONTRACT,
         "actions": actions,
         "limits": {

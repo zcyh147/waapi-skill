@@ -48,6 +48,48 @@ TARGET_HANDLE_RE = re.compile(r"^odh1-[0-9a-f]{24}$")
 TARGET_ID = "{01234567-89AB-CDEF-0123-456789ABCDEF}"
 PARENT_ID = "{11111111-1111-1111-1111-111111111111}"
 PROJECT_ID = "{22222222-2222-2222-2222-222222222222}"
+ACTION_CONTRACT = "waapi-skill.operation-draft-action/v1"
+
+
+BASE_ACTION_FIELDS = {
+    "set_request_option": (["name", "value"], []),
+    "clear_request_option": (["name"], []),
+    "add_target": (["selector"], []),
+    "set_target_field": (["target_handle", "name", "value"], []),
+    "clear_target_field": (["target_handle", "name"], []),
+    "set_property": (["target_handle", "name", "value"], []),
+    "remove_property": (["target_handle", "name"], []),
+    "set_reference": (["owner_handle", "name", "target"], []),
+    "remove_reference": (["owner_handle", "name"], []),
+    "add_child": (["parent_handle", "type", "name"], []),
+    "set_node_field": (["node_handle", "name", "value"], []),
+    "clear_node_field": (["node_handle", "name"], []),
+    "set_node_property": (["node_handle", "name", "value"], []),
+    "remove_node_property": (["node_handle", "name"], []),
+    "remove_node": (["node_handle"], []),
+    "add_list": (["target_handle", "name"], []),
+    "remove_list": (["list_handle"], []),
+    "add_list_member": (["list_handle", "type", "name"], []),
+    "remove_target": (["target_handle"], []),
+}
+IMPORT_ACTION_FIELDS = {
+    "add_import_file": (
+        ["owner_handle"],
+        [
+            "audio_file",
+            "audio_file_base64",
+            "originals_subfolder",
+            "language",
+            "object_type",
+        ],
+    ),
+    "set_import_file_field": (["file_handle", "name", "value"], []),
+    "clear_import_file_field": (["file_handle", "name"], []),
+    "remove_import_file": (["file_handle"], []),
+    "set_import_option": (["owner_handle", "name", "value"], []),
+    "clear_import_option": (["owner_handle", "name"], []),
+    "remove_import": (["owner_handle"], []),
+}
 
 
 @pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
@@ -98,6 +140,33 @@ def test_object_set_composer_contract_covers_every_registry_field_shape(
             "originals_subfolder",
         ],
     }
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+def test_object_set_composer_discloses_every_exact_typed_action_shape(
+    version: str,
+) -> None:
+    contract = operation_composer_contract("object.set", version)
+    expected = dict(BASE_ACTION_FIELDS)
+    if version != "2022.1":
+        expected.update(IMPORT_ACTION_FIELDS)
+
+    assert set(contract["action_shapes"]) == set(contract["actions"]) == set(expected)
+    assert contract["action_construction"] == {
+        "fixed_fields_are_required": True,
+        "include_every_required_field": True,
+        "include_only_selected_optional_fields": True,
+        "additional_fields": False,
+    }
+    for action_name, (required_fields, optional_fields) in expected.items():
+        assert contract["action_shapes"][action_name] == {
+            "fixed_fields": {
+                "contract": ACTION_CONTRACT,
+                "action": action_name,
+            },
+            "required_fields": required_fields,
+            "optional_fields": optional_fields,
+        }
     assert {"set_reference", "remove_reference"}.issubset(contract["actions"])
     assert ("add_import_file" in contract["actions"]) is (version != "2022.1")
 
