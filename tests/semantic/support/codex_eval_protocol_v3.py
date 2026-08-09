@@ -20,6 +20,7 @@ from tests.semantic.support.codex_gateway_broker import (
     ResponseBinding,
     SemanticJsonArgument,
     validate_commutative_read_only_step_groups,
+    validate_operation_draft_protocol_steps,
 )
 
 
@@ -125,6 +126,7 @@ class V3GatewayProtocol:
         names = tuple(step.name for step in self.steps)
         if len(names) != len(set(names)):
             raise ValueError("V3 gateway step names must be unique")
+        validate_operation_draft_protocol_steps(self.steps)
         groups = validate_commutative_read_only_step_groups(
             self.steps,
             self.commutative_read_only_step_groups,

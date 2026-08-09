@@ -29,6 +29,8 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     wait_topic_step,
 )
 from tests.semantic.support.codex_gateway_broker import (
+    DraftActionJsonArgument,
+    DraftActionResponseBinding,
     ExpectedGatewayStep,
     GatewayDerivedReferenceActivationAllowance,
     MetadataBoundJsonArgument,
@@ -1449,6 +1451,84 @@ def test_protocol_strict_round_trip_preserves_all_argument_kinds() -> None:
         "step": "transaction-show",
         "pointer": "/confirmation/token",
     }
+
+
+def test_typed_draft_action_protocol_round_trips_dynamic_handle_bindings() -> None:
+    action = DraftActionJsonArgument(
+        {
+            "contract": "waapi-skill.operation-draft-action/v1",
+            "action": "set_target_field",
+            "name": "notes",
+            "value": '雪 "quoted" \\ path; $(data)',
+        },
+        response_bindings=(
+            DraftActionResponseBinding(
+                "/target_handle",
+                "draft.target",
+                "/draft/current_facts/0/handle",
+            ),
+        ),
+    )
+    protocol = V3GatewayProtocol(
+        steps=(
+            ExpectedGatewayStep("draft.start", "draft-start", ("object.set",)),
+            ExpectedGatewayStep(
+                "draft.target",
+                "draft-apply",
+                (
+                    ResponseBinding("draft.start", "/draft/draft_id"),
+                    "--task-authority",
+                    ResponseBinding("draft.start", "/task_authority"),
+                    "--expected-revision",
+                    ResponseBinding("draft.start", "/draft/revision"),
+                    "--action-json",
+                    DraftActionJsonArgument(
+                        {
+                            "contract": "waapi-skill.operation-draft-action/v1",
+                            "action": "add_target",
+                            "selector": {"kind": "id", "value": 1},
+                        }
+                    ),
+                ),
+            ),
+            ExpectedGatewayStep(
+                "draft.notes",
+                "draft-apply",
+                (
+                    ResponseBinding("draft.start", "/draft/draft_id"),
+                    "--task-authority",
+                    ResponseBinding("draft.start", "/task_authority"),
+                    "--expected-revision",
+                    ResponseBinding("draft.target", "/draft/revision"),
+                    "--action-json",
+                    action,
+                ),
+            ),
+        ),
+        turn_prefix_counts=(3,),
+    )
+
+    serialized = serialize_protocol(protocol)
+    restored = deserialize_protocol(serialized)
+
+    assert restored == protocol
+    assert serialize_protocol(restored) == serialized
+    argument = serialized["steps"][2]["arguments"][6]
+    assert argument["kind"] == "draft_action_json"
+    assert argument["response_bindings"] == [
+        {
+            "pointer": "/target_handle",
+            "step": "draft.target",
+            "response_pointer": "/draft/current_facts/0/handle",
+        }
+    ]
+
+    tampered = json.loads(json.dumps(serialized))
+    tampered["steps"][2]["arguments"][6]["response_bindings"][0]["step"] = (
+        "other.task"
+    )
+    with pytest.raises(PromptProvenanceError):
+        deserialize_protocol(tampered)
 
 
 def test_soundbank_generate_equivalence_round_trips_and_rejects_wrong_route() -> None:

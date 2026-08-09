@@ -732,6 +732,157 @@ class ResponseBinding:
     pointer: str
 
 
+_DRAFT_HANDLE_ARGUMENT_NAMES = frozenset(
+    {
+        "target_handle",
+        "owner_handle",
+        "parent_handle",
+        "node_handle",
+        "list_handle",
+        "file_handle",
+    }
+)
+_DRAFT_HANDLE_POINTERS = frozenset(f"/{name}" for name in _DRAFT_HANDLE_ARGUMENT_NAMES)
+_DRAFT_FORBIDDEN_ACTION_KEYS = frozenset(
+    {"request", "arguments", "uri", "args", "options", "waql", "request_json"}
+)
+_DRAFT_ACTION_HANDLE_FIELD = {
+    "set_request_option": None,
+    "clear_request_option": None,
+    "add_target": None,
+    "set_target_field": "target_handle",
+    "clear_target_field": "target_handle",
+    "set_property": "target_handle",
+    "remove_property": "target_handle",
+    "set_reference": "owner_handle",
+    "remove_reference": "owner_handle",
+    "remove_target": "target_handle",
+    "add_child": "parent_handle",
+    "set_node_field": "node_handle",
+    "clear_node_field": "node_handle",
+    "set_node_property": "node_handle",
+    "remove_node_property": "node_handle",
+    "remove_node": "node_handle",
+    "add_list": "target_handle",
+    "remove_list": "list_handle",
+    "add_list_member": "list_handle",
+    "add_import_file": "owner_handle",
+    "set_import_option": "owner_handle",
+    "clear_import_option": "owner_handle",
+    "set_import_file_field": "file_handle",
+    "clear_import_file_field": "file_handle",
+    "remove_import_file": "file_handle",
+    "remove_import": "owner_handle",
+}
+
+
+def _draft_action_contains_forbidden_key(value: Any) -> bool:
+    if isinstance(value, Mapping):
+        for key, nested in value.items():
+            if (
+                not isinstance(key, str)
+                or key.startswith("@")
+                or key in _DRAFT_FORBIDDEN_ACTION_KEYS
+                or _draft_action_contains_forbidden_key(nested)
+            ):
+                return True
+        return False
+    if isinstance(value, list):
+        return any(_draft_action_contains_forbidden_key(item) for item in value)
+    return False
+
+
+@dataclass(frozen=True, slots=True)
+class DraftActionResponseBinding:
+    """Inject one Gateway-generated handle into a typed Draft action JSON."""
+
+    pointer: str
+    step: str
+    response_pointer: str
+
+    def __post_init__(self) -> None:
+        if self.pointer not in _DRAFT_HANDLE_POINTERS:
+            raise ValueError(
+                "DraftActionResponseBinding.pointer must name one reviewed handle field"
+            )
+        if (
+            not isinstance(self.step, str)
+            or not self.step
+            or self.step != self.step.strip()
+            or len(self.step) > 160
+        ):
+            raise ValueError("DraftActionResponseBinding.step must be one bounded step name")
+        if (
+            not isinstance(self.response_pointer, str)
+            or not self.response_pointer.startswith("/draft/current_facts/")
+            or not self.response_pointer.endswith("/handle")
+            or len(self.response_pointer) > 512
+        ):
+            raise ValueError(
+                "DraftActionResponseBinding.response_pointer must select one Gateway handle"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class DraftActionJsonArgument:
+    """One fixed business action with only Gateway response handles left dynamic."""
+
+    expected: Mapping[str, Any]
+    response_bindings: tuple[DraftActionResponseBinding, ...] = ()
+
+    def __post_init__(self) -> None:
+        try:
+            normalized = json.loads(_canonical_json_bytes(dict(self.expected)).decode("utf-8"))
+        except (
+            GatewayInvocationError,
+            RecursionError,
+            TypeError,
+            UnicodeError,
+            ValueError,
+        ) as exc:
+            raise ValueError("DraftActionJsonArgument.expected must be strict JSON") from exc
+        if (
+            not isinstance(normalized, dict)
+            or normalized.get("contract") != "waapi-skill.operation-draft-action/v1"
+            or not isinstance(normalized.get("action"), str)
+            or not normalized["action"]
+            or normalized["action"] != normalized["action"].strip()
+            or len(normalized["action"]) > 80
+        ):
+            raise ValueError(
+                "DraftActionJsonArgument requires one versioned typed action"
+            )
+        forbidden = _draft_action_contains_forbidden_key(normalized)
+        authored_handles = _DRAFT_HANDLE_ARGUMENT_NAMES & set(normalized)
+        if forbidden or authored_handles:
+            raise ValueError(
+                "DraftActionJsonArgument cannot contain a complete request, native payload, "
+                "or model-authored handle"
+            )
+        expected_handle = _DRAFT_ACTION_HANDLE_FIELD.get(str(normalized["action"]), ...)
+        if expected_handle is ...:
+            raise ValueError("DraftActionJsonArgument action is not in the reviewed vocabulary")
+        if (
+            not isinstance(self.response_bindings, tuple)
+            or any(
+                not isinstance(binding, DraftActionResponseBinding)
+                for binding in self.response_bindings
+            )
+            or len({binding.pointer for binding in self.response_bindings})
+            != len(self.response_bindings)
+        ):
+            raise ValueError(
+                "DraftActionJsonArgument.response_bindings must target unique handles"
+            )
+        bound_handle_fields = {
+            binding.pointer.removeprefix("/") for binding in self.response_bindings
+        }
+        if bound_handle_fields != ({expected_handle} if expected_handle is not None else set()):
+            raise ValueError(
+                "DraftActionJsonArgument must bind exactly the handle required by its action"
+            )
+
+
 ExpectedArgument = (
     str
     | SemanticJsonArgument
@@ -740,6 +891,7 @@ ExpectedArgument = (
     | BoundedIntegerArgument
     | MetadataBoundJsonArgument
     | ResponseBinding
+    | DraftActionJsonArgument
 )
 
 
@@ -1041,6 +1193,178 @@ def validate_commutative_read_only_step_groups(
         claimed.update(group)
         normalized.append((group[0], group[1]))
     return tuple(normalized)
+
+
+_DRAFT_SUBCOMMANDS = frozenset(
+    {
+        "draft-start",
+        "draft-inspect",
+        "draft-apply",
+        "draft-check",
+        "draft-cancel",
+        "preview-from-draft",
+    }
+)
+_DRAFT_ID_RE = re.compile(r"^od1-[0-9a-f]{32}$")
+_DRAFT_AUTHORITY_RE = re.compile(r"^da1-[0-9a-f]{40}$")
+_DRAFT_HANDLE_RE = re.compile(r"^odh1-[0-9a-f]{24}$")
+
+
+def validate_operation_draft_protocol_steps(
+    expected_steps: Sequence[ExpectedGatewayStep],
+) -> None:
+    """Fail closed unless one Draft flow binds all authority to prior responses."""
+
+    steps = tuple(expected_steps)
+    draft_steps = tuple(step for step in steps if step.subcommand in _DRAFT_SUBCOMMANDS)
+    if not draft_steps:
+        return
+    if any(step.subcommand in {"preview", "legacy-preview"} for step in steps):
+        raise ValueError(
+            "a typed Draft protocol cannot also expose a complete JSON Preview ingress"
+        )
+    starts = tuple(step for step in draft_steps if step.subcommand == "draft-start")
+    if len(starts) != 1:
+        raise ValueError("a typed Draft protocol requires exactly one draft-start step")
+    start = starts[0]
+    if (
+        len(start.arguments) != 1
+        or not isinstance(start.arguments[0], str)
+        or not start.arguments[0]
+        or start.arguments[0] != start.arguments[0].strip()
+    ):
+        raise ValueError("draft-start must bind one exact operation name")
+    indexes = {step.name: index for index, step in enumerate(steps)}
+    start_index = indexes[start.name]
+    terminal_draft_indexes = tuple(
+        indexes[step.name]
+        for step in draft_steps
+        if step.subcommand in {"draft-cancel", "preview-from-draft"}
+    )
+    if len(terminal_draft_indexes) > 1:
+        raise ValueError("a typed Draft protocol has only one terminal Draft command")
+    if (
+        terminal_draft_indexes
+        and terminal_draft_indexes[0] != indexes[draft_steps[-1].name]
+    ):
+        raise ValueError("no typed Draft command may follow its terminal command")
+    draft_end_index = (
+        terminal_draft_indexes[0]
+        if terminal_draft_indexes
+        else indexes[draft_steps[-1].name]
+    )
+    if any(
+        step.subcommand not in _DRAFT_SUBCOMMANDS
+        for step in steps[start_index : draft_end_index + 1]
+    ):
+        raise ValueError(
+            "typed Draft composition cannot be interrupted by another Gateway route"
+        )
+
+    def require_prior_binding(
+        value: Any,
+        *,
+        step: ExpectedGatewayStep,
+        source_step: str,
+        pointer: str,
+        label: str,
+    ) -> None:
+        if (
+            not isinstance(value, ResponseBinding)
+            or value.step != source_step
+            or value.pointer != pointer
+            or indexes.get(value.step, len(steps)) >= indexes[step.name]
+        ):
+            raise ValueError(f"{step.subcommand} must bind {label} to {source_step}{pointer}")
+
+    latest_revision_step = start.name
+    for step in draft_steps:
+        index = indexes[step.name]
+        if step is start:
+            continue
+        if index <= start_index:
+            raise ValueError("all typed Draft commands must follow draft-start")
+        arguments = step.arguments
+        minimum = 3 if step.subcommand == "draft-inspect" else 5
+        if len(arguments) < minimum:
+            raise ValueError(f"{step.subcommand} arguments are incomplete")
+        require_prior_binding(
+            arguments[0],
+            step=step,
+            source_step=start.name,
+            pointer="/draft/draft_id",
+            label="draft ID",
+        )
+        if arguments[1] != "--task-authority":
+            raise ValueError(f"{step.subcommand} must carry task authority")
+        require_prior_binding(
+            arguments[2],
+            step=step,
+            source_step=start.name,
+            pointer="/task_authority",
+            label="task authority",
+        )
+        if step.subcommand == "draft-inspect":
+            if len(arguments) != 3:
+                raise ValueError("draft-inspect accepts only its bound draft authority")
+            latest_revision_step = step.name
+            continue
+        if arguments[3] != "--expected-revision" or not isinstance(
+            arguments[4], ResponseBinding
+        ):
+            raise ValueError(f"{step.subcommand} must bind one expected revision")
+        revision_binding = arguments[4]
+        if (
+            revision_binding.pointer != "/draft/revision"
+            or revision_binding.step != latest_revision_step
+            or indexes.get(revision_binding.step, len(steps)) >= index
+            or steps[indexes[revision_binding.step]].subcommand
+            not in {"draft-start", "draft-apply", "draft-check", "draft-inspect"}
+        ):
+            raise ValueError(
+                f"{step.subcommand} expected revision must come from one prior Draft response"
+            )
+        if step.subcommand == "draft-apply":
+            if (
+                len(arguments) != 7
+                or arguments[5] != "--action-json"
+                or not isinstance(arguments[6], DraftActionJsonArgument)
+            ):
+                raise ValueError(
+                    "draft-apply must carry exactly one typed Draft action"
+                )
+            for binding in arguments[6].response_bindings:
+                source_index = indexes.get(binding.step)
+                if (
+                    source_index is None
+                    or source_index >= index
+                    or steps[source_index].subcommand != "draft-apply"
+                ):
+                    raise ValueError(
+                        "typed Draft action handles must come from one prior draft-apply response"
+                    )
+        elif any(isinstance(value, DraftActionJsonArgument) for value in arguments):
+            raise ValueError("typed Draft actions are valid only on draft-apply")
+        if step.subcommand in {"draft-check", "draft-cancel"} and len(arguments) != 5:
+            raise ValueError(f"{step.subcommand} accepts only bound Draft authority and revision")
+        if step.subcommand == "preview-from-draft":
+            trailing = arguments[5:]
+            valid_trailing = trailing in {
+                (),
+                ("--apply",),
+            } or (
+                len(trailing) in {2, 3}
+                and trailing[-2] == "--ttl"
+                and isinstance(trailing[-1], str)
+                and trailing[-1].isdigit()
+                and int(trailing[-1]) > 0
+                and (len(trailing) == 2 or trailing[0] == "--apply")
+            )
+            if not valid_trailing:
+                raise ValueError(
+                    "preview-from-draft trailing policy arguments must be fixed literals"
+                )
+        latest_revision_step = step.name
 
 
 def gateway_step_sequence_matches(
@@ -4272,6 +4596,7 @@ class CodexGatewayBroker:
         names = [step.name for step in self.expected_steps]
         if len(names) != len(set(names)):
             raise ValueError("ExpectedGatewayStep names must be unique")
+        validate_operation_draft_protocol_steps(self.expected_steps)
         terminal_execute_steps = tuple(
             index
             for index, step in enumerate(self.expected_steps)
@@ -5554,6 +5879,51 @@ class CodexGatewayBroker:
                             ],
                         )
                     )
+                elif isinstance(expected, DraftActionJsonArgument):
+                    actual_json = _decode_json_argument(
+                        supplied,
+                        reject_duplicate_keys=True,
+                    )
+                    bound_expected = json.loads(
+                        _canonical_json_bytes(dict(expected.expected)).decode("utf-8")
+                    )
+                    binding_evidence: list[dict[str, Any]] = []
+                    for binding in expected.response_bindings:
+                        source = self._payloads_by_step.get(binding.step)
+                        if source is None:
+                            raise GatewayInvocationError(
+                                f"step {step.name!r} Draft handle source "
+                                f"{binding.step!r} is unavailable"
+                            )
+                        bound = _json_pointer(source, binding.response_pointer)
+                        if (
+                            not isinstance(bound, str)
+                            or _DRAFT_HANDLE_RE.fullmatch(bound) is None
+                        ):
+                            raise GatewayInvocationError(
+                                f"step {step.name!r} Draft handle binding is invalid"
+                            )
+                        bound_expected[binding.pointer.removeprefix("/")] = bound
+                        binding_evidence.append(
+                            {
+                                "pointer": binding.pointer,
+                                "step": binding.step,
+                                "response_pointer": binding.response_pointer,
+                                "value": bound,
+                            }
+                        )
+                    if actual_json != bound_expected:
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} typed Draft action is not exactly equal "
+                            "to its business facts and Gateway response bindings"
+                        )
+                    semantic_values.extend(
+                        (
+                            dict(expected.expected),
+                            "draft-action-json/v1",
+                            binding_evidence,
+                        )
+                    )
                 elif isinstance(expected, ResponseBinding):
                     source = self._payloads_by_step.get(expected.step)
                     if source is None:
@@ -5724,6 +6094,8 @@ class CodexGatewayBroker:
                     raise GatewayInvocationError(
                         f"gateway payload command must be exactly {step.subcommand!r}"
                     )
+                if step.subcommand in _DRAFT_SUBCOMMANDS:
+                    self._validate_operation_draft_payload(step, payload)
             else:
                 if payload.get("ok") is not False:
                     raise GatewayInvocationError(
@@ -5815,6 +6187,118 @@ class CodexGatewayBroker:
                 self._terminal_state = _BROKER_FAILED
 
         return {"exit_code": response_exit, "stdout": stdout, "stderr": response_stderr}
+
+    def _validate_operation_draft_payload(
+        self,
+        step: ExpectedGatewayStep,
+        payload: Mapping[str, Any],
+    ) -> None:
+        """Bind every successful Draft response to the reviewed Draft flow."""
+
+        if "task_authority" in payload and step.subcommand != "draft-start":
+            raise GatewayInvocationError(
+                "only draft-start may disclose the task authority"
+            )
+        if step.subcommand == "preview-from-draft":
+            if not isinstance(payload.get("transaction_id"), str) or not payload[
+                "transaction_id"
+            ]:
+                raise GatewayInvocationError(
+                    "preview-from-draft must return one transaction ID"
+                )
+            if payload.get("state") not in {
+                "awaiting_confirmation",
+                "policy_authorized",
+            }:
+                raise GatewayInvocationError(
+                    "preview-from-draft must return one reviewable transaction state"
+                )
+            return
+
+        draft = payload.get("draft")
+        if not isinstance(draft, Mapping):
+            raise GatewayInvocationError(
+                f"{step.subcommand} must return one Draft projection"
+            )
+        draft_id = draft.get("draft_id")
+        revision = draft.get("revision")
+        lifecycle_state = draft.get("lifecycle_state")
+        binding = draft.get("binding")
+        if not isinstance(draft_id, str) or _DRAFT_ID_RE.fullmatch(draft_id) is None:
+            raise GatewayInvocationError("Draft response contains an invalid draft ID")
+        if type(revision) is not int or revision < 1:
+            raise GatewayInvocationError("Draft response contains an invalid revision")
+        if not isinstance(binding, Mapping):
+            raise GatewayInvocationError("Draft response is missing its immutable binding")
+
+        start = next(
+            value
+            for value in self.expected_steps
+            if value.subcommand == "draft-start"
+        )
+        operation = start.arguments[0]
+        version = binding.get("version")
+        if binding.get("operation") != operation:
+            raise GatewayInvocationError(
+                "Draft response operation does not match draft-start"
+            )
+        if not isinstance(version, str) or version not in _SUPPORTED_WWISE_VERSIONS:
+            raise GatewayInvocationError("Draft response contains an invalid Wwise version")
+        if self.expected_wwise_version and version != self.expected_wwise_version:
+            raise GatewayInvocationError(
+                "Draft response version does not match the sealed Wwise version"
+            )
+
+        if step.subcommand == "draft-start":
+            authority = payload.get("task_authority")
+            if (
+                not isinstance(authority, str)
+                or _DRAFT_AUTHORITY_RE.fullmatch(authority) is None
+            ):
+                raise GatewayInvocationError(
+                    "draft-start must return one valid task authority"
+                )
+            if revision != 1 or lifecycle_state != "editable":
+                raise GatewayInvocationError(
+                    "draft-start must return editable revision 1"
+                )
+            return
+
+        start_payload = self._payloads_by_step.get(start.name)
+        if not isinstance(start_payload, Mapping):
+            raise GatewayInvocationError("Draft response is missing its prior start binding")
+        start_draft = start_payload.get("draft")
+        if not isinstance(start_draft, Mapping) or draft_id != start_draft.get("draft_id"):
+            raise GatewayInvocationError(
+                "Draft response ID does not match draft-start"
+            )
+
+        step_index = self.expected_steps.index(step)
+        previous_draft: Mapping[str, Any] | None = None
+        for prior in reversed(self.expected_steps[:step_index]):
+            prior_payload = self._payloads_by_step.get(prior.name)
+            if not isinstance(prior_payload, Mapping):
+                continue
+            candidate = prior_payload.get("draft")
+            if isinstance(candidate, Mapping):
+                previous_draft = candidate
+                break
+        if previous_draft is None or type(previous_draft.get("revision")) is not int:
+            raise GatewayInvocationError(
+                "Draft response is missing its prior revision binding"
+            )
+        expected_revision = int(previous_draft["revision"])
+        if step.subcommand != "draft-inspect":
+            expected_revision += 1
+        if revision != expected_revision:
+            raise GatewayInvocationError(
+                "Draft response revision does not follow the reviewed transition"
+            )
+        expected_state = "cancelled" if step.subcommand == "draft-cancel" else "editable"
+        if lifecycle_state != expected_state:
+            raise GatewayInvocationError(
+                "Draft response lifecycle state does not follow the reviewed transition"
+            )
 
     def _reject(
         self,
@@ -5910,6 +6394,8 @@ __all__ = [
     "WINDOWS_COMMAND_SHIM_NAMES",
     "WINDOWS_SHIM_SCRIPT_NAME",
     "CodexGatewayBroker",
+    "DraftActionJsonArgument",
+    "DraftActionResponseBinding",
     "ExpectedGatewayStep",
     "GatewayBrokerError",
     "GatewayBrokerEvidence",
@@ -5940,5 +6426,6 @@ __all__ = [
     "reconcile_gateway_commands",
     "project_required_metadata_tokens",
     "resolve_gateway_invocation",
+    "validate_operation_draft_protocol_steps",
     "validate_transaction_show_confirmation_payload",
 ]

@@ -26,6 +26,8 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
     BROKER_TOKEN_ENV,
     BoundedIntegerArgument,
     CodexGatewayBroker,
+    DraftActionJsonArgument,
+    DraftActionResponseBinding,
     ExpectedGatewayStep,
     GATEWAY_REQUIRED_ENV,
     GatewayDerivedReferenceActivationAllowance,
@@ -532,7 +534,127 @@ for token_index in range(23, -1, -1):
     token_characters[token_index] = alphabet[token_value & 0x1F]
     token_value >>= 5
 confirmation_token = "ct1-" + "".join(token_characters)
-if command == "preview":
+if command == "draft-start":
+    draft_marker = {
+        "draft_id": "od1-11111111111111111111111111111111",
+        "task_authority": "da1-2222222222222222222222222222222222222222",
+        "revision": 1,
+        "current_facts": [],
+    }
+    (state / "draft-marker.json").write_text(
+        json.dumps(draft_marker),
+        encoding="utf-8",
+    )
+    payload["task_authority"] = draft_marker["task_authority"]
+    payload["draft"] = {
+        "draft_id": draft_marker["draft_id"],
+        "revision": draft_marker["revision"],
+        "lifecycle_state": "editable",
+        "binding": {"operation": command_arguments[0], "version": "2022.1"},
+        "current_facts": [],
+    }
+    if mode == "draft-wrong-binding":
+        payload["draft"]["binding"]["operation"] = "object.setRTPC"
+elif command == "draft-apply":
+    marker_path = state / "draft-marker.json"
+    draft_marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    assert command_arguments[:5] == [
+        draft_marker["draft_id"],
+        "--task-authority",
+        draft_marker["task_authority"],
+        "--expected-revision",
+        str(draft_marker["revision"]),
+    ]
+    assert command_arguments[5] == "--action-json"
+    draft_action = json.loads(command_arguments[6])
+    if draft_action["action"] == "add_target":
+        draft_marker["current_facts"] = [
+            {
+                "handle": "odh1-333333333333333333333333",
+                "selector": draft_action["selector"],
+            }
+        ]
+    draft_marker["revision"] += 1
+    marker_path.write_text(json.dumps(draft_marker), encoding="utf-8")
+    payload["draft"] = {
+        "draft_id": draft_marker["draft_id"],
+        "revision": draft_marker["revision"],
+        "lifecycle_state": "editable",
+        "binding": {"operation": "object.set", "version": "2022.1"},
+        "current_facts": draft_marker["current_facts"],
+    }
+elif command == "draft-inspect":
+    draft_marker = json.loads(
+        (state / "draft-marker.json").read_text(encoding="utf-8")
+    )
+    assert command_arguments == [
+        draft_marker["draft_id"],
+        "--task-authority",
+        draft_marker["task_authority"],
+    ]
+    payload["draft"] = {
+        "draft_id": draft_marker["draft_id"],
+        "revision": draft_marker["revision"],
+        "lifecycle_state": "editable",
+        "binding": {"operation": "object.set", "version": "2022.1"},
+        "current_facts": draft_marker["current_facts"],
+    }
+elif command == "draft-check":
+    marker_path = state / "draft-marker.json"
+    draft_marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    assert command_arguments == [
+        draft_marker["draft_id"],
+        "--task-authority",
+        draft_marker["task_authority"],
+        "--expected-revision",
+        str(draft_marker["revision"]),
+    ]
+    draft_marker["revision"] += 1
+    marker_path.write_text(json.dumps(draft_marker), encoding="utf-8")
+    payload["draft"] = {
+        "draft_id": draft_marker["draft_id"],
+        "revision": draft_marker["revision"],
+        "lifecycle_state": "editable",
+        "binding": {"operation": "object.set", "version": "2022.1"},
+        "current_facts": draft_marker["current_facts"],
+    }
+elif command == "draft-cancel":
+    marker_path = state / "draft-marker.json"
+    draft_marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    assert command_arguments == [
+        draft_marker["draft_id"],
+        "--task-authority",
+        draft_marker["task_authority"],
+        "--expected-revision",
+        str(draft_marker["revision"]),
+    ]
+    draft_marker["revision"] += 1
+    marker_path.write_text(json.dumps(draft_marker), encoding="utf-8")
+    payload["draft"] = {
+        "draft_id": draft_marker["draft_id"],
+        "revision": draft_marker["revision"],
+        "lifecycle_state": "cancelled",
+        "binding": {"operation": "object.set", "version": "2022.1"},
+        "current_facts": [],
+    }
+elif command == "preview-from-draft":
+    draft_marker = json.loads(
+        (state / "draft-marker.json").read_text(encoding="utf-8")
+    )
+    assert command_arguments[:5] == [
+        draft_marker["draft_id"],
+        "--task-authority",
+        draft_marker["task_authority"],
+        "--expected-revision",
+        str(draft_marker["revision"]),
+    ]
+    payload.update({
+        "status": "awaiting_confirmation",
+        "state": "awaiting_confirmation",
+        "transaction_id": transaction_id,
+        "artifact_hash": artifact_hash,
+    })
+elif command == "preview":
     (state / "preview-marker.json").write_text(
         json.dumps(
             {
@@ -907,6 +1029,498 @@ def test_broker_executes_exact_order_with_semantic_json_and_response_bindings(
 
         calls = (broker.state_directory / "fake-runner-calls.jsonl").read_text(encoding="utf-8").splitlines()
         assert len(calls) == 4
+
+
+def test_broker_executes_typed_draft_actions_with_gateway_response_bindings(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    hostile_notes = '雪 Field "A" \\ path; $(leave-as-data) & done'
+    action_contract = "waapi-skill.operation-draft-action/v1"
+    steps = (
+        ExpectedGatewayStep("draft.start", "draft-start", ("object.set",)),
+        ExpectedGatewayStep(
+            "draft.target",
+            "draft-apply",
+            (
+                ResponseBinding("draft.start", "/draft/draft_id"),
+                "--task-authority",
+                ResponseBinding("draft.start", "/task_authority"),
+                "--expected-revision",
+                ResponseBinding("draft.start", "/draft/revision"),
+                "--action-json",
+                DraftActionJsonArgument(
+                    {
+                        "contract": action_contract,
+                        "action": "add_target",
+                        "selector": {
+                            "kind": "id",
+                            "value": "{11111111-1111-1111-1111-111111111111}",
+                        },
+                    }
+                ),
+            ),
+        ),
+        ExpectedGatewayStep(
+            "draft.notes",
+            "draft-apply",
+            (
+                ResponseBinding("draft.start", "/draft/draft_id"),
+                "--task-authority",
+                ResponseBinding("draft.start", "/task_authority"),
+                "--expected-revision",
+                ResponseBinding("draft.target", "/draft/revision"),
+                "--action-json",
+                DraftActionJsonArgument(
+                    {
+                        "contract": action_contract,
+                        "action": "set_target_field",
+                        "name": "notes",
+                        "value": hostile_notes,
+                    },
+                    response_bindings=(
+                        DraftActionResponseBinding(
+                            "/target_handle",
+                            "draft.target",
+                            "/draft/current_facts/0/handle",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        ExpectedGatewayStep(
+            "draft.check",
+            "draft-check",
+            (
+                ResponseBinding("draft.start", "/draft/draft_id"),
+                "--task-authority",
+                ResponseBinding("draft.start", "/task_authority"),
+                "--expected-revision",
+                ResponseBinding("draft.notes", "/draft/revision"),
+            ),
+        ),
+        ExpectedGatewayStep(
+            "draft.preview",
+            "preview-from-draft",
+            (
+                ResponseBinding("draft.start", "/draft/draft_id"),
+                "--task-authority",
+                ResponseBinding("draft.start", "/task_authority"),
+                "--expected-revision",
+                ResponseBinding("draft.check", "/draft/revision"),
+                "--apply",
+                "--ttl",
+                "300",
+            ),
+        ),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        expected_wwise_version="2022.1",
+        transport="tcp",
+    ) as broker:
+        started_result = run_model_command(broker, ["draft-start", "object.set"])
+        started = json.loads(started_result.stdout[started_result.stdout.index("{") :])
+        draft_id = started["draft"]["draft_id"]
+        authority = started["task_authority"]
+
+        target_result = run_model_command(
+            broker,
+            [
+                "draft-apply",
+                draft_id,
+                "--task-authority",
+                authority,
+                "--expected-revision",
+                "1",
+                "--action-json",
+                json.dumps(steps[1].arguments[-1].expected),
+            ],
+        )
+        targeted = json.loads(target_result.stdout[target_result.stdout.index("{") :])
+        handle = targeted["draft"]["current_facts"][0]["handle"]
+        notes_action = {
+            **steps[2].arguments[-1].expected,
+            "target_handle": handle,
+        }
+        notes_result = run_model_command(
+            broker,
+            [
+                "draft-apply",
+                draft_id,
+                "--task-authority",
+                authority,
+                "--expected-revision",
+                "2",
+                "--action-json",
+                json.dumps(notes_action, ensure_ascii=False),
+            ],
+        )
+        check_result = run_model_command(
+            broker,
+            [
+                "draft-check",
+                draft_id,
+                "--task-authority",
+                authority,
+                "--expected-revision",
+                "3",
+            ],
+        )
+        preview_result = run_model_command(
+            broker,
+            [
+                "preview-from-draft",
+                draft_id,
+                "--task-authority",
+                authority,
+                "--expected-revision",
+                "4",
+                "--apply",
+                "--ttl",
+                "300",
+            ],
+        )
+
+        assert [
+            result.returncode
+            for result in (
+                started_result,
+                target_result,
+                notes_result,
+                check_result,
+                preview_result,
+            )
+        ] == [0, 0, 0, 0, 0]
+        assert broker.evidence().complete is True
+        assert broker.evidence().consumed_step_names == tuple(step.name for step in steps)
+        assert not (broker.state_directory / "mutation-executed").exists()
+
+
+def test_broker_rejects_stale_draft_revision_before_runner_dispatch(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    steps = (
+        ExpectedGatewayStep("draft.start", "draft-start", ("object.set",)),
+        ExpectedGatewayStep(
+            "draft.target",
+            "draft-apply",
+            (
+                ResponseBinding("draft.start", "/draft/draft_id"),
+                "--task-authority",
+                ResponseBinding("draft.start", "/task_authority"),
+                "--expected-revision",
+                ResponseBinding("draft.start", "/draft/revision"),
+                "--action-json",
+                DraftActionJsonArgument(
+                    {
+                        "contract": "waapi-skill.operation-draft-action/v1",
+                        "action": "add_target",
+                        "selector": {"kind": "id", "value": 1},
+                    }
+                ),
+            ),
+        ),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        transport="tcp",
+    ) as broker:
+        started_result = run_model_command(broker, ["draft-start", "object.set"])
+        started = json.loads(started_result.stdout[started_result.stdout.index("{") :])
+        rejected = run_model_command(
+            broker,
+            [
+                "draft-apply",
+                started["draft"]["draft_id"],
+                "--task-authority",
+                started["task_authority"],
+                "--expected-revision",
+                "2",
+                "--action-json",
+                json.dumps(steps[1].arguments[-1].expected),
+            ],
+        )
+
+        assert started_result.returncode == 0
+        assert rejected.returncode == 126
+        assert "does not match draft.start/draft/revision" in rejected.stderr
+        calls = (broker.state_directory / "fake-runner-calls.jsonl").read_text(
+            encoding="utf-8"
+        ).splitlines()
+        assert len(calls) == 1
+
+
+def test_broker_rejects_gateway_draft_binding_drift(tmp_path: Path) -> None:
+    skill = make_fake_skill(tmp_path)
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(
+            ExpectedGatewayStep("draft.start", "draft-start", ("object.set",)),
+        ),
+        expected_wwise_version="2022.1",
+        runner_environment={
+            **os.environ,
+            "FAKE_GATEWAY_MODE": "draft-wrong-binding",
+        },
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(broker, ["draft-start", "object.set"])
+
+        assert result.returncode == 125
+        assert "operation does not match draft-start" in result.stderr
+        evidence = broker.evidence()
+        assert evidence.terminal_state == "FAILED"
+        assert evidence.consumed_step_names == ()
+
+
+def test_broker_does_not_replace_wrong_typed_draft_business_values(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    action_contract = "waapi-skill.operation-draft-action/v1"
+    expected_notes = "release-ready | close"
+    steps = (
+        ExpectedGatewayStep("draft.start", "draft-start", ("object.set",)),
+        ExpectedGatewayStep(
+            "draft.target",
+            "draft-apply",
+            (
+                ResponseBinding("draft.start", "/draft/draft_id"),
+                "--task-authority",
+                ResponseBinding("draft.start", "/task_authority"),
+                "--expected-revision",
+                ResponseBinding("draft.start", "/draft/revision"),
+                "--action-json",
+                DraftActionJsonArgument(
+                    {
+                        "contract": action_contract,
+                        "action": "add_target",
+                        "selector": {"kind": "id", "value": 1},
+                    }
+                ),
+            ),
+        ),
+        ExpectedGatewayStep(
+            "draft.notes",
+            "draft-apply",
+            (
+                ResponseBinding("draft.start", "/draft/draft_id"),
+                "--task-authority",
+                ResponseBinding("draft.start", "/task_authority"),
+                "--expected-revision",
+                ResponseBinding("draft.target", "/draft/revision"),
+                "--action-json",
+                DraftActionJsonArgument(
+                    {
+                        "contract": action_contract,
+                        "action": "set_target_field",
+                        "name": "notes",
+                        "value": expected_notes,
+                    },
+                    response_bindings=(
+                        DraftActionResponseBinding(
+                            "/target_handle",
+                            "draft.target",
+                            "/draft/current_facts/0/handle",
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        expected_wwise_version="2022.1",
+        transport="tcp",
+    ) as broker:
+        started_result = run_model_command(broker, ["draft-start", "object.set"])
+        started = json.loads(started_result.stdout[started_result.stdout.index("{") :])
+        target_result = run_model_command(
+            broker,
+            [
+                "draft-apply",
+                started["draft"]["draft_id"],
+                "--task-authority",
+                started["task_authority"],
+                "--expected-revision",
+                "1",
+                "--action-json",
+                json.dumps(steps[1].arguments[-1].expected),
+            ],
+        )
+        targeted = json.loads(target_result.stdout[target_result.stdout.index("{") :])
+        wrong_action = {
+            **steps[2].arguments[-1].expected,
+            "target_handle": targeted["draft"]["current_facts"][0]["handle"],
+            "value": "release-ready | wrong",
+        }
+        rejected = run_model_command(
+            broker,
+            [
+                "draft-apply",
+                started["draft"]["draft_id"],
+                "--task-authority",
+                started["task_authority"],
+                "--expected-revision",
+                "2",
+                "--action-json",
+                json.dumps(wrong_action),
+            ],
+        )
+
+        assert started_result.returncode == 0
+        assert target_result.returncode == 0
+        assert rejected.returncode == 126
+        assert "not exactly equal to its business facts" in rejected.stderr
+        calls = (broker.state_directory / "fake-runner-calls.jsonl").read_text(
+            encoding="utf-8"
+        ).splitlines()
+        assert len(calls) == 2
+
+
+def test_broker_binds_draft_inspect_and_cancel_to_start_authority(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    steps = (
+        ExpectedGatewayStep("draft.start", "draft-start", ("object.set",)),
+        ExpectedGatewayStep(
+            "draft.inspect",
+            "draft-inspect",
+            (
+                ResponseBinding("draft.start", "/draft/draft_id"),
+                "--task-authority",
+                ResponseBinding("draft.start", "/task_authority"),
+            ),
+        ),
+        ExpectedGatewayStep(
+            "draft.cancel",
+            "draft-cancel",
+            (
+                ResponseBinding("draft.start", "/draft/draft_id"),
+                "--task-authority",
+                ResponseBinding("draft.start", "/task_authority"),
+                "--expected-revision",
+                ResponseBinding("draft.inspect", "/draft/revision"),
+            ),
+        ),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        transport="tcp",
+    ) as broker:
+        started_result = run_model_command(broker, ["draft-start", "object.set"])
+        started = json.loads(started_result.stdout[started_result.stdout.index("{") :])
+        inspected_result = run_model_command(
+            broker,
+            [
+                "draft-inspect",
+                started["draft"]["draft_id"],
+                "--task-authority",
+                started["task_authority"],
+            ],
+        )
+        cancelled_result = run_model_command(
+            broker,
+            [
+                "draft-cancel",
+                started["draft"]["draft_id"],
+                "--task-authority",
+                started["task_authority"],
+                "--expected-revision",
+                "1",
+            ],
+        )
+
+        assert [
+            started_result.returncode,
+            inspected_result.returncode,
+            cancelled_result.returncode,
+        ] == [0, 0, 0]
+        cancelled = json.loads(
+            cancelled_result.stdout[cancelled_result.stdout.index("{") :]
+        )
+        assert cancelled["draft"]["lifecycle_state"] == "cancelled"
+        assert broker.evidence().complete is True
+
+
+def test_typed_draft_protocol_rejects_prefilled_handles_and_json_bypass(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(ValueError, match="model-authored handle"):
+        DraftActionJsonArgument(
+            {
+                "contract": "waapi-skill.operation-draft-action/v1",
+                "action": "set_property",
+                "target_handle": "odh1-guessed",
+                "name": "Volume",
+                "value": -3,
+            }
+        )
+    with pytest.raises(ValueError, match="complete request"):
+        DraftActionJsonArgument(
+            {
+                "contract": "waapi-skill.operation-draft-action/v1",
+                "action": "set_property",
+                "request": {"operation": "object.set"},
+            }
+        )
+
+    skill = make_fake_skill(tmp_path)
+    steps = (
+        ExpectedGatewayStep("draft.start", "draft-start", ("object.set",)),
+        ExpectedGatewayStep(
+            "raw.preview",
+            "preview",
+            ("--request-json", SemanticJsonArgument({"operation": "object.set"})),
+        ),
+    )
+    with pytest.raises(ValueError, match="cannot also expose"):
+        CodexGatewayBroker(
+            skill_source=skill,
+            expected_steps=steps,
+            transport="tcp",
+        )
+
+    terminal_steps = (
+        ExpectedGatewayStep("draft.start", "draft-start", ("object.set",)),
+        ExpectedGatewayStep(
+            "draft.cancel",
+            "draft-cancel",
+            (
+                ResponseBinding("draft.start", "/draft/draft_id"),
+                "--task-authority",
+                ResponseBinding("draft.start", "/task_authority"),
+                "--expected-revision",
+                ResponseBinding("draft.start", "/draft/revision"),
+            ),
+        ),
+        ExpectedGatewayStep(
+            "draft.inspect-after-cancel",
+            "draft-inspect",
+            (
+                ResponseBinding("draft.start", "/draft/draft_id"),
+                "--task-authority",
+                ResponseBinding("draft.start", "/task_authority"),
+            ),
+        ),
+    )
+    with pytest.raises(ValueError, match="follow its terminal command"):
+        CodexGatewayBroker(
+            skill_source=skill,
+            expected_steps=terminal_steps,
+            transport="tcp",
+        )
 
 
 def test_broker_accepts_non_awaiting_status_show_without_confirmation(

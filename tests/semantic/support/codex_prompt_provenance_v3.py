@@ -31,6 +31,8 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     BoundedIntegerArgument,
+    DraftActionJsonArgument,
+    DraftActionResponseBinding,
     ExpectedGatewayStep,
     GatewayDerivedReferenceActivationAllowance,
     MetadataBoundJsonArgument,
@@ -529,13 +531,18 @@ def deserialize_protocol(value: Mapping[str, Any]) -> V3GatewayProtocol:
         commutative_groups = tuple(
             (group[0], group[1]) for group in raw_groups
         )
-    return V3GatewayProtocol(
-        tuple(_deserialize_step(item) for item in steps),
-        tuple(prefixes),
-        allowed,
-        terminal,
-        commutative_groups,
-    )
+    try:
+        return V3GatewayProtocol(
+            tuple(_deserialize_step(item) for item in steps),
+            tuple(prefixes),
+            allowed,
+            terminal,
+            commutative_groups,
+        )
+    except (TypeError, ValueError) as exc:
+        raise PromptProvenanceError(
+            f"protocol manifest topology is invalid: {exc}"
+        ) from exc
 
 
 def _serialize_step(step: ExpectedGatewayStep) -> dict[str, Any]:
@@ -603,6 +610,23 @@ def _serialize_step(step: ExpectedGatewayStep) -> dict[str, Any]:
                     "gateway_derived_reference_activations": [
                         value.as_dict()
                         for value in item.gateway_derived_reference_activations
+                    ],
+                }
+            )
+        elif isinstance(item, DraftActionJsonArgument):
+            cloned = _json_clone(item.expected)
+            arguments.append(
+                {
+                    "kind": "draft_action_json",
+                    "value": cloned,
+                    "sha256": _sha256_json(cloned),
+                    "response_bindings": [
+                        {
+                            "pointer": binding.pointer,
+                            "step": binding.step,
+                            "response_pointer": binding.response_pointer,
+                        }
+                        for binding in item.response_bindings
                     ],
                 }
             )
@@ -871,6 +895,47 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
             except (TypeError, ValueError) as exc:
                 raise PromptProvenanceError(
                     "metadata-bound JSON protocol argument is invalid"
+                ) from exc
+        elif kind == "draft_action_json" and set(row) == {
+            "kind",
+            "value",
+            "sha256",
+            "response_bindings",
+        }:
+            raw_bindings = row.get("response_bindings")
+            if (
+                row.get("sha256") != _sha256_json(row.get("value"))
+                or not isinstance(raw_bindings, list)
+                or any(
+                    not isinstance(binding, Mapping)
+                    or set(binding) != {"pointer", "step", "response_pointer"}
+                    or any(
+                        not isinstance(binding.get(field), str)
+                        for field in ("pointer", "step", "response_pointer")
+                    )
+                    for binding in raw_bindings
+                )
+            ):
+                raise PromptProvenanceError(
+                    "Draft-action JSON protocol argument is invalid"
+                )
+            try:
+                arguments.append(
+                    DraftActionJsonArgument(
+                        expected=_json_clone(row.get("value")),
+                        response_bindings=tuple(
+                            DraftActionResponseBinding(
+                                pointer=str(binding["pointer"]),
+                                step=str(binding["step"]),
+                                response_pointer=str(binding["response_pointer"]),
+                            )
+                            for binding in raw_bindings
+                        ),
+                    )
+                )
+            except (TypeError, ValueError) as exc:
+                raise PromptProvenanceError(
+                    "Draft-action JSON protocol argument is invalid"
                 ) from exc
         elif kind == "response_binding" and set(row) == {"kind", "step", "pointer"}:
             if not isinstance(row.get("step"), str) or not isinstance(row.get("pointer"), str):
