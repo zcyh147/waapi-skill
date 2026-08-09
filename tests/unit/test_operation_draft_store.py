@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
 
 import pytest  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.operation_drafts import (  # pyright: ignore[reportMissingImports]
+    DEFAULT_OPERATION_DRAFT_TTL_SECONDS,
+    OperationDraftExpired,
     OperationDraftInvalidTransition,
     OperationDraftNotAvailable,
     OperationDraftRevisionConflict,
@@ -112,3 +115,53 @@ def test_cancel_is_revision_bound_atomic_and_terminal(tmp_path) -> None:
             expected_revision=2,
         )
     assert record_path.read_bytes() == cancelled_bytes
+
+
+def test_editable_draft_expires_at_its_fixed_lifetime_and_cannot_resume(
+    tmp_path,
+) -> None:
+    created = datetime(2026, 8, 9, 1, 2, 3, tzinfo=timezone.utc)
+    store = OperationDraftStore(tmp_path)
+    started = store.start(
+        operation="object.set",
+        version="2022.1",
+        schema_digest="c" * 64,
+        now=created,
+    )
+
+    expected_expiry = created + timedelta(
+        seconds=DEFAULT_OPERATION_DRAFT_TTL_SECONDS
+    )
+    assert started.record.expires_at == expected_expiry.isoformat(
+        timespec="microseconds"
+    ).replace("+00:00", "Z")
+    assert store.inspect(
+        started.draft_id,
+        task_authority=started.task_authority,
+        now=expected_expiry - timedelta(microseconds=1),
+    ).state is OperationDraftState.EDITABLE
+
+    with pytest.raises(OperationDraftExpired) as expired:
+        store.inspect(
+            started.draft_id,
+            task_authority=started.task_authority,
+            now=expected_expiry,
+        )
+    assert expired.value.as_dict() == {
+        "error_code": "OPERATION_DRAFT_EXPIRED",
+        "message": "Operation Draft expired and cannot be resumed.",
+        "details": {},
+    }
+
+    durable = json.loads(next(tmp_path.rglob("*.json")).read_text(encoding="utf-8"))
+    assert durable["state"] == "expired"
+    assert durable["revision"] == 2
+    assert durable["terminal_at"] == started.record.expires_at
+
+    with pytest.raises(OperationDraftExpired):
+        store.cancel(
+            started.draft_id,
+            task_authority=started.task_authority,
+            expected_revision=1,
+            now=expected_expiry + timedelta(seconds=1),
+        )

@@ -33,6 +33,7 @@ tests/unit/test_platform_commands.py
 tests/unit/test_platform_process.py
 tests/unit/test_operation_draft_store.py
 tests/unit/test_operation_draft_gateway.py
+tests/unit/test_operation_draft_storage_security.py
 tests/unit/test_transaction_store.py
 tests/unit/test_transaction_cleanup.py
 tests/unit/test_operation_import.py

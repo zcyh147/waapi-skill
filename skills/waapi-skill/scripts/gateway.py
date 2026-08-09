@@ -9290,6 +9290,7 @@ def operation_draft_payload(
             },
             "created_at": record.created_at,
             "updated_at": record.updated_at,
+            "expires_at": record.expires_at,
             "current_facts": [],
             "missing_fields": [],
             "missing_fields_status": "no_operation_adapter",

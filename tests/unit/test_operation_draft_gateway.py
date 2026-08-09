@@ -4,8 +4,13 @@ import importlib.util
 import json
 import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from wwise_waapi.operation_drafts import (  # pyright: ignore[reportMissingImports]
+    OperationDraftStore,
+)
 
 
 SCRIPT_PATH = (
@@ -92,12 +97,14 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
         },
         "created_at": started["draft"]["created_at"],
         "updated_at": started["draft"]["updated_at"],
+        "expires_at": started["draft"]["expires_at"],
         "current_facts": [],
         "missing_fields": [],
         "missing_fields_status": "no_operation_adapter",
         "allowed_actions": ["inspect", "cancel"],
     }
     assert started["draft"]["created_at"] == started["draft"]["updated_at"]
+    assert started["draft"]["expires_at"] > started["draft"]["created_at"]
     assert task_authority not in json.dumps(started["session_context"])
 
     inspect_code, inspected = execute(
@@ -174,3 +181,31 @@ def test_public_draft_start_rejects_invalid_registry_bindings_before_state_write
         assert payload["error_code"] == error_code
 
     assert not (tmp_path / "state").exists()
+
+
+def test_public_draft_expiry_is_bounded_offline_and_does_not_create_preview(
+    tmp_path: Path,
+) -> None:
+    store = OperationDraftStore(tmp_path / "state")
+    started = store.start(
+        operation="object.set",
+        version="2022.1",
+        schema_digest=(
+            "2b6d3903c5b3e11618c3eaf0a3d5a26aa0045db26750320f3a8ce8c7da004cee"
+        ),
+        now=datetime(2000, 1, 1, tzinfo=timezone.utc),
+    )
+
+    exit_code, payload = execute(
+        tmp_path,
+        "draft-inspect",
+        started.draft_id,
+        "--task-authority",
+        started.task_authority,
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "OPERATION_DRAFT_EXPIRED"
+    assert payload["details"] == {}
+    assert started.task_authority not in json.dumps(payload)
+    assert not (tmp_path / "state" / "transactions").exists()
