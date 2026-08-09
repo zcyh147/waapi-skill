@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 import shutil
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Callable
 
 import pytest
 
+from tests.semantic.support import codex_integration_workflows as integration
 from tests.semantic.support.codex_integration_workflows import (
     COMPONENT_PROFILE_PATHS,
     LEGACY_UNIT_ID_BY_PUBLIC_ID,
@@ -19,6 +21,7 @@ from tests.semantic.support.codex_integration_workflows import (
     VERSIONS,
     WORKFLOW_ORDER,
     IntegrationProfileError,
+    canonicalize_integration_unit_ids,
     load_integration_profile,
 )
 
@@ -40,15 +43,64 @@ def _write_json(path: Path, value: Any) -> None:
     )
 
 
-def _copy_definition(tmp_path: Path) -> Path:
-    target = tmp_path / "data"
+def _copy_definition(
+    tmp_path: Path,
+    *,
+    include_projects: bool = False,
+) -> Path:
+    repository = tmp_path / "repo"
+    target = repository / "tests" / "semantic" / "data"
     for name in (
         "integration",
         "integration-workflows-v1",
         "integration-workflows-v2",
     ):
         shutil.copytree(DATA_ROOT / name, target / name)
+    if include_projects:
+        for version in VERSIONS:
+            shutil.copytree(
+                REPO_ROOT / "tests" / "_org" / version,
+                repository / "tests" / "_org" / version,
+            )
     return target / "integration" / "profile.json"
+
+
+def _copied_repo_root(profile_path: Path) -> Path:
+    return profile_path.parents[4]
+
+
+def _replace_with_symlink(path: Path, target: Path) -> None:
+    path.unlink()
+    try:
+        path.symlink_to(target)
+    except OSError as exc:
+        pytest.skip(f"file symlinks are unavailable: {exc}")
+
+
+def _simulate_reparse_before_resolve(
+    monkeypatch: pytest.MonkeyPatch,
+    target: Path,
+) -> None:
+    real_lstat = Path.lstat
+    real_resolve = Path.resolve
+    target_stat = real_lstat(target)
+    reparse_stat = SimpleNamespace(
+        st_mode=target_stat.st_mode,
+        st_file_attributes=0x400,
+    )
+
+    def simulated_lstat(path: Path):
+        if path == target:
+            return reparse_stat
+        return real_lstat(path)
+
+    def guarded_resolve(path: Path, strict: bool = False) -> Path:
+        if path == target:
+            pytest.fail("reparse target was resolved before rejection")
+        return real_resolve(path, strict=strict)
+
+    monkeypatch.setattr(Path, "lstat", simulated_lstat)
+    monkeypatch.setattr(Path, "resolve", guarded_resolve)
 
 
 def _rewrite(
@@ -211,11 +263,12 @@ def test_component_source_digests_are_namespaced_and_include_baselines(
 def test_component_bytes_participate_in_the_unified_definition_digest(
     tmp_path: Path,
 ) -> None:
-    copied = _copy_definition(tmp_path)
-    first = load_integration_profile(copied, repo_root=REPO_ROOT)
+    copied = _copy_definition(tmp_path, include_projects=True)
+    repository = _copied_repo_root(copied)
+    first = load_integration_profile(copied, repo_root=repository)
     workflows = copied.parent.parent / "integration-workflows-v1" / "workflows.json"
     workflows.write_bytes(workflows.read_bytes() + b"\n")
-    second = load_integration_profile(copied, repo_root=REPO_ROOT)
+    second = load_integration_profile(copied, repo_root=repository)
 
     assert first.definition_sha256 != second.definition_sha256
     assert first.units[0].unit_id == second.units[0].unit_id
@@ -229,6 +282,13 @@ def test_component_bytes_participate_in_the_unified_definition_digest(
             lambda root: root["component_profiles"].__setitem__(
                 0,
                 "../../outside/profile.json",
+            ),
+            "component profile order or identity drifted",
+        ),
+        (
+            lambda root: root["component_profiles"].__setitem__(
+                0,
+                "../integration-workflows-v1-near/profile.json",
             ),
             "component profile order or identity drifted",
         ),
@@ -247,7 +307,10 @@ def test_profile_rejects_schema_path_and_numeric_drift_before_loading_components
     _rewrite(copied, mutate)
 
     with pytest.raises(IntegrationProfileError, match=match):
-        load_integration_profile(copied, repo_root=REPO_ROOT)
+        load_integration_profile(
+            copied,
+            repo_root=_copied_repo_root(copied),
+        )
 
 
 def test_profile_rejects_a_component_directory_symlink_escape(
@@ -264,7 +327,227 @@ def test_profile_rejects_a_component_directory_symlink_escape(
         pytest.skip(f"directory symlinks are unavailable: {exc}")
 
     with pytest.raises(IntegrationProfileError, match="may not be a symlink"):
+        load_integration_profile(
+            copied,
+            repo_root=_copied_repo_root(copied),
+        )
+
+
+def test_preflight_rejects_workflows_symlink_escape_before_legacy_loaders(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    copied = _copy_definition(tmp_path)
+    workflows = (
+        copied.parent.parent
+        / "integration-workflows-v1"
+        / "workflows.json"
+    )
+    outside = tmp_path / "outside-workflows.json"
+    shutil.copy2(workflows, outside)
+    _replace_with_symlink(workflows, outside)
+
+    def forbidden_loader(*_args: Any, **_kwargs: Any) -> None:
+        pytest.fail("legacy loader ran before component source preflight")
+
+    monkeypatch.setattr(
+        integration,
+        "load_integration_workflows_profile",
+        forbidden_loader,
+    )
+    monkeypatch.setattr(
+        integration,
+        "load_integration_workflows_v2_profile",
+        forbidden_loader,
+    )
+    with pytest.raises(
+        IntegrationProfileError,
+        match="component-01/workflows.json may not be a link",
+    ):
+        load_integration_profile(
+            copied,
+            repo_root=_copied_repo_root(copied),
+        )
+
+
+def test_preflight_rejects_near_baseline_symlink_before_legacy_loaders(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    copied = _copy_definition(tmp_path)
+    baseline = (
+        copied.parent.parent
+        / "integration-workflows-v2"
+        / "baseline-2022.1.json"
+    )
+    near = baseline.with_name("baseline-2022.1-near.json")
+    shutil.copy2(baseline, near)
+    _replace_with_symlink(baseline, near)
+
+    def forbidden_loader(*_args: Any, **_kwargs: Any) -> None:
+        pytest.fail("legacy loader ran before component source preflight")
+
+    monkeypatch.setattr(
+        integration,
+        "load_integration_workflows_profile",
+        forbidden_loader,
+    )
+    monkeypatch.setattr(
+        integration,
+        "load_integration_workflows_v2_profile",
+        forbidden_loader,
+    )
+    with pytest.raises(
+        IntegrationProfileError,
+        match="component-02/baseline-2022.1.json may not be a link",
+    ):
+        load_integration_profile(
+            copied,
+            repo_root=_copied_repo_root(copied),
+        )
+
+
+def test_preflight_requires_fixed_sources_to_be_regular_files(
+    tmp_path: Path,
+) -> None:
+    copied = _copy_definition(tmp_path)
+    workflows = (
+        copied.parent.parent
+        / "integration-workflows-v2"
+        / "workflows.json"
+    )
+    workflows.unlink()
+    workflows.mkdir()
+
+    with pytest.raises(
+        IntegrationProfileError,
+        match="component-02/workflows.json must be a regular file",
+    ):
+        load_integration_profile(
+            copied,
+            repo_root=_copied_repo_root(copied),
+        )
+
+
+def test_meta_profile_reparse_is_rejected_before_resolve(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    copied = _copy_definition(tmp_path)
+    _simulate_reparse_before_resolve(monkeypatch, copied)
+
+    with pytest.raises(
+        IntegrationProfileError,
+        match="integration profile may not be a symlink or reparse point",
+    ):
+        load_integration_profile(
+            copied,
+            repo_root=_copied_repo_root(copied),
+        )
+
+
+def test_component_profile_reparse_is_rejected_before_resolve(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    copied = _copy_definition(tmp_path)
+    component_profile = (
+        copied.parent.parent
+        / "integration-workflows-v1"
+        / "profile.json"
+    )
+    _simulate_reparse_before_resolve(monkeypatch, component_profile)
+
+    with pytest.raises(
+        IntegrationProfileError,
+        match="component-01 may not be a symlink or reparse point",
+    ):
+        load_integration_profile(
+            copied,
+            repo_root=_copied_repo_root(copied),
+        )
+
+
+def test_component_directory_reparse_is_rejected_before_resolve(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    copied = _copy_definition(tmp_path)
+    component_root = (
+        copied.parent.parent / "integration-workflows-v2"
+    )
+    _simulate_reparse_before_resolve(monkeypatch, component_root)
+
+    with pytest.raises(
+        IntegrationProfileError,
+        match="component-02 may not be a symlink or reparse point",
+    ):
+        load_integration_profile(
+            copied,
+            repo_root=_copied_repo_root(copied),
+        )
+
+
+def test_baseline_root_reparse_is_rejected_before_resolve(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    copied = _copy_definition(tmp_path)
+    baseline_root = (
+        REPO_ROOT
+        / "tests"
+        / "semantic"
+        / "data"
+        / "integration-workflows-v2"
+    )
+    _simulate_reparse_before_resolve(monkeypatch, baseline_root)
+
+    with pytest.raises(
+        IntegrationProfileError,
+        match="component-02 repository root may not be a link",
+    ):
         load_integration_profile(copied, repo_root=REPO_ROOT)
+
+
+def test_baseline_source_reparse_is_rejected_before_resolve(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    copied = _copy_definition(tmp_path)
+    baseline = (
+        REPO_ROOT
+        / "tests"
+        / "semantic"
+        / "data"
+        / "integration-workflows-v2"
+        / "baseline-2025.1.json"
+    )
+    _simulate_reparse_before_resolve(monkeypatch, baseline)
+
+    with pytest.raises(
+        IntegrationProfileError,
+        match="component-02/baseline-2025.1.json may not be a link",
+    ):
+        load_integration_profile(copied, repo_root=REPO_ROOT)
+
+
+def test_public_unit_id_canonicalizer_is_closed() -> None:
+    assert canonicalize_integration_unit_ids(
+        (
+            "INT22-WEATHER",
+            "INT25-V2-RIFLE-SAFE-REIMPORT",
+        )
+    ) == ("INT22-WEATHER", "INT25-RIFLE")
+    assert canonicalize_integration_unit_ids(()) == ()
+    with pytest.raises(IntegrationProfileError, match="unknown integration"):
+        canonicalize_integration_unit_ids(("INT22-NEAR-WEATHER",))
+    with pytest.raises(IntegrationProfileError, match="same integration unit"):
+        canonicalize_integration_unit_ids(
+            (
+                "INT22-WEATHER",
+                "INT22-INTERACTIVE-WEATHER-BUILD",
+            )
+        )
 
 
 def test_case_selection_rejects_unknown_and_duplicate_aliases() -> None:

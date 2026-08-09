@@ -105,12 +105,12 @@ as evidence for UI or runtime lanes.
 Render the full review catalog without starting Codex or Wwise:
 
 ```bash
-python tests/semantic/render_v3_review.py --summary-only
-python tests/semantic/render_v3_review.py --version 2022.1 --summary-only
-python tests/semantic/render_v3_review.py --heavy-only --summary-only
-python tests/semantic/render_v3_review.py --heavy-only
-python tests/semantic/render_v3_review.py --api ak.wwise.core.object.copy
-python tests/semantic/render_v3_review.py --case-id OBJ22-F-COPY-01
+poetry run python tests/semantic/render_v3_review.py --summary-only
+poetry run python tests/semantic/render_v3_review.py --version 2022.1 --summary-only
+poetry run python tests/semantic/render_v3_review.py --heavy-only --summary-only
+poetry run python tests/semantic/render_v3_review.py --heavy-only
+poetry run python tests/semantic/render_v3_review.py --api ak.wwise.core.object.copy
+poetry run python tests/semantic/render_v3_review.py --case-id OBJ22-F-COPY-01
 ```
 
 The approved broad executable V3 scope is `heavy_cross_version_80`: five scenarios
@@ -130,21 +130,39 @@ SoundBank inclusions. Its 24 fresh tasks require 48 user turns when every
 preview reaches confirmation. This is a regression profile for request
 composition and business assertions, not additional API-coverage credit.
 
-The targeted `integration_workflows_cross_version_6` profile is defined by
-`tests/semantic/data/integration-workflows-v1/profile.json`. It runs three
-prewritten, cross-operation workflows once on Wwise 2022.1 and once on Wwise
-2025.1. The closed schedule is six fresh memory-off Codex tasks, 20 user turns,
-and 12 separately previewed transactions. It is fixed to `gpt-5.6-terra`,
-medium reasoning, and the default service tier, and it reuses the formal
-campaign, broker, sandbox, evidence, and cleanup paths. All tasks run
-sequentially. This profile is integration acceptance across already reviewed
-operations; it adds no per-API functional-coverage credit.
+The public `integration` profile is defined by
+`tests/semantic/data/integration/profile.json`. It runs six prewritten,
+cross-operation workflows once on Wwise 2022.1 and once on Wwise 2025.1. The
+closed schedule is 12 fresh memory-off Codex tasks, 36 user turns, and 20
+separately previewed transactions. The workflows are Weather construction,
+Alarm diagnosis and repair, Harbor SoundBank release, Rifle reimport,
+Footsteps Switch-assignment maintenance, and query-guided Weapons cleanup. It
+is fixed to `gpt-5.6-terra`, medium reasoning, and the default service tier,
+and it reuses the formal campaign, broker, sandbox, evidence, and cleanup
+paths. All tasks run sequentially. This profile is integration acceptance
+across already reviewed operations; it adds no per-API functional-coverage
+credit.
+
+The public profile composes two legacy internal component definitions. The
+committed fixed-baseline graph, media, and versioned manifests apply only to
+Rifle, Footsteps, and Weapons; Weather, Alarm, and Harbor retain their existing
+fixture contracts. Public callers select only `--profile integration` and do
+not pass `--suite`. The old `integration_workflows_cross_version_6` and
+`integration_workflows_v2_cross_version_6` IDs remain accepted only for sealed
+history and replay. Their campaign roots are not unified `integration` roots
+and cannot establish a single-candidate 12/12 result.
 
 Treat its first campaign as one frozen pass. Continue after ordinary semantic
 case failures so they can be consolidated, then repair once and start a new
 campaign root. Stop the pass early only for a systemic harness, source-sandbox,
 evidence, or cleanup fault that could invalidate later cases. The profile
 totals are a design contract.
+
+The legacy internal `integration_workflows_cross_version_6` component is
+defined by `tests/semantic/data/integration-workflows-v1/profile.json`. It
+supplies Weather, Alarm, and Harbor once per version: six tasks, 20 user turns,
+and 12 separately previewed transactions. The following evidence belongs to
+that exact component profile rather than the public composed profile.
 
 The completed 2026-07-31 historical macOS evidence is cumulative. The frozen initial
 `campaign-integration-workflows-v1-terra-20260731-a12` root passed the Alarm
@@ -156,8 +174,9 @@ the remaining 2022.1 and 2025.1 Weather units. Across those roots all six
 unique units have passing evidence, but there is no single final-candidate
 6/6 campaign. Passing sandboxes were cleaned, failed sandboxes were sealed and
 quarantined, and all source-project hashes and mtimes remained unchanged.
-All named V1 roots seal `runtime.platform=darwin`; no native-Windows V1
-semantic campaign is currently recorded.
+The roots named in this paragraph and the 2026-08-03 macOS paragraph below
+seal `runtime.platform=darwin`; later cross-host component reruns are recorded
+separately.
 
 The 2026-08-03 current-wording campaign used the same transaction topology,
 fixtures, and business oracles. The full frozen `current-r1` root passed five
@@ -175,9 +194,21 @@ the seven passing sandboxes were removed and the one failed sandbox is sealed
 and quarantined. Those V1 roots do not validate the newer V2 fixture, routing,
 or workflow contracts.
 
-The newer `integration_workflows_v2_cross_version_6` profile is defined by
-`tests/semantic/data/integration-workflows-v2/profile.json`. Its committed
-2022.1 and 2025.1 SampleProject sources contain the fixed `WAAPI Skill
+Later reruns still selected the legacy internal
+`integration_workflows_cross_version_6` component, not the public composed
+profile. At commit `9e75a1aea496abcb9ef2a61e1da685adb99f4b01`, macOS root
+`imac-wah-9e75a1a-r1` passed all six component units fresh and passed its
+identical `--resume --verify-only` audit. At commit
+`9b4de8f618855091a424700b50ab8b0fd1989270`, macOS root
+`imac-wah-9b4de8f-r1` passed five units and failed one, while native-Windows
+root `iwin-wah-9b4de8f-r1` passed three and failed three; both failed roots
+were frozen without verify-only replay. These results are exact legacy
+component provenance, not current `integration` acceptance and not unified
+12/12 evidence.
+
+The legacy internal `integration_workflows_v2_cross_version_6` component is
+defined by `tests/semantic/data/integration-workflows-v2/profile.json`; its
+committed 2022.1 and 2025.1 SampleProject sources contain the fixed `WAAPI Skill
 Integration V2` graph and required media. The profile runs these workflows on
 both versions:
 
@@ -211,11 +242,13 @@ Wwise nor mutates a project; all live reads go through the packaged public
 Gateway. It rejects the committed `tests/_org` source (and any overlapping
 path), so prepare the sandbox with the repository lifecycle and open that copy
 before collection. Collect 2022.1 and 2025.1 separately. A valid committed
-baseline is only a fixture prerequisite, not a semantic result. The v1
-campaigns above do not validate this V2 fixture, routing, or workflow contract.
+baseline is only a fixture prerequisite, not a semantic result. The legacy
+Weather/Alarm/Harbor campaigns above do not validate this fixed-baseline
+fixture, routing, or workflow contract.
 
-The completed 2026-08-03 macOS V2 evidence is cumulative across frozen roots,
-not one final-candidate 6/6 run. `r8` passed both Rifle units, `r12-2022` passed the
+The completed 2026-08-03 macOS evidence for that legacy component is
+cumulative across frozen roots, not one final-candidate 6/6 run. `r8` passed
+both Rifle units, `r12-2022` passed the
 2022.1 Weapons unit, `r23-2022-footsteps` passed the 2022.1 Footsteps unit, and
 `r24-2025-repairs` passed the 2025.1 Footsteps and Weapons units. All six unique
 units therefore have passing evidence across those roots. Passing sandboxes
@@ -225,7 +258,8 @@ unchanged. This evidence grants no per-API coverage credit and proves only the
 exact Rifle, Footsteps, and Weapons workflow paths, not advanced WAQL or
 unrelated routes.
 
-The later native-Windows V2 campaign is a separate cumulative evidence chain.
+The later native-Windows campaign for that legacy component is a separate
+cumulative evidence chain.
 At commit `0dfea2b`, `windows-v2-six-0dfea2b-r1` attempted all six units and
 passed 2022.1 Rifle, 2022.1 Footsteps, and 2025.1 Rifle; the remaining three
 failed, the outer campaign exited `1`, and no verify-only replay was run. At
@@ -273,7 +307,9 @@ remaining catalog still contains specification-only adapters, unresolved
 request mappings, UI/runtime/profiler lifecycle requirements, and unapproved
 execution surfaces. Do not describe all 444 V3 scenarios or all 198 reflected
 URIs as implemented or tested. V2 remains the default suite unless an approved
-V3 profile and its reviewed suite are selected explicitly.
+V3 profile is selected explicitly. Approved executable profiles bind their
+packaged default suite automatically; an explicit `--suite` only selects the
+reviewed alternate path supported by that profile.
 
 ## Memory-off isolation contract
 
@@ -307,9 +343,12 @@ The separately approved V3 executable profiles are:
 | --- | ---: | ---: | --- |
 | `heavy_cross_version_80` | 80 | 145 | Real sandboxed business-oracle coverage for the 16 implemented heavy APIs |
 | `compound_heavy_cross_version_24` | 24 | 48 | Complex batch composition and real business assertions on Wwise 2022.1 and 2025.1 |
-| `integration_workflows_cross_version_6` | 6 | 20 | Three prewritten cross-operation integration workflows on Wwise 2022.1 and 2025.1; no additional per-API coverage credit |
-| `integration_workflows_v2_cross_version_6` | 6 | 16 | Three fixed-baseline workflows on Wwise 2022.1 and 2025.1; eight previewed transactions and no additional per-API coverage credit |
+| `integration` | 12 | 36 | Six cross-operation workflows on Wwise 2022.1 and 2025.1; 20 previewed transactions and no additional per-API coverage credit |
 | `modification_policy_9` | 9 | 15 | Three isolated repetitions of each canonical project-modification policy on one reviewed object.create business case |
+
+The two older six-task integration profile IDs remain internal compatibility
+entrypoints for their exact sealed roots. They are deliberately absent from the
+public profile table.
 
 From the repository root, run each profile into a distinct campaign directory.
 Use the Skill-local Python so the runner-owned live fixture has the same pinned
@@ -328,8 +367,7 @@ profile also supports the bounded pilot selection shown below:
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile heavy_cross_version_80 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-heavy-v3-terra
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile heavy_cross_version_80 --case-id OBJ22-F-GET-01 --version 2022.1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-heavy-v3-pilot-object-get
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile compound_heavy_cross_version_24 --suite tests/semantic/data/compound-heavy-v1/profile.json --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-compound-heavy-v1
-skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile integration_workflows_cross_version_6 --suite tests/semantic/data/integration-workflows-v1/profile.json --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-integration-workflows-v1-terra
-skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile integration_workflows_v2_cross_version_6 --suite tests/semantic/data/integration-workflows-v2/profile.json --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-integration-workflows-v2-terra
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile integration --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-integration-new-candidate-r1
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile modification_policy_9 --campaign-root skills/waapi-skill-workspace/campaign-modification-policy-9
 ```
 
@@ -437,12 +475,14 @@ trusted runner owns Wwise fixture creation, sandbox mutation, direct readback,
 transaction state, and dispatcher evidence; the evaluated model cannot write
 those paths.
 
-For `integration_workflows_v2_cross_version_6`, the live config points to the
-committed 2022.1 or 2025.1 fixed source, but the lifecycle always copies that
-source before launch. The baseline manifest must match the committed source;
-Wwise and the evaluated model operate only on the unit-owned copy. A source
-full-tree hash or project-mtime drift is a hard lifecycle failure, not a case
-failure that may be graded or repaired in place.
+For the Rifle, Footsteps, and Weapons units in `integration`, the live config
+points to the committed 2022.1 or 2025.1 fixed source, but the lifecycle always
+copies that source before launch. The baseline manifest must match the
+committed source; Wwise and the evaluated model operate only on the unit-owned
+copy. A source full-tree hash or project-mtime drift is a hard lifecycle
+failure, not a case failure that may be graded or repaired in place. These
+fixed-baseline requirements do not apply to the Weather, Alarm, or Harbor
+units.
 
 For the five 2022.1 heavy `ak.wwise.cli.generateSoundbank` cases only, the
 trusted prelaunch step makes the private SampleProject copy independent of the
@@ -520,12 +560,16 @@ sealed. No campaign cleanup uses a global Wwise kill.
 These checks validate the suite, isolation harness, broker, grader, fixtures,
 and documentation without starting Codex CLI or Wwise:
 
+Developer checks use the repository Poetry environment. The Skill-local
+`.venv` shown in campaign commands above is reserved for the packaged Skill and
+real semantic runner; do not install the developer test stack into it.
+
 ```bash
-python -m pytest tests/semantic/test_codex_eval_suite.py tests/semantic/test_codex_harness.py tests/semantic/test_codex_gateway_broker.py -q
-python -m pytest tests/semantic/test_codex_eval_grading.py tests/semantic/test_codex_skill_matrix.py tests/semantic/test_docs_semantic_inventory.py -q
-python -m pytest tests/semantic/test_codex_campaign.py tests/semantic/test_codex_campaign_runner.py tests/semantic/test_run_codex_skill_campaign.py -q
-python -m pytest tests/semantic/test_run_codex_skill_campaign_heavy_v3.py -q
-python -m pytest tests/semantic/test_codex_integration_workflows_v2.py tests/semantic/test_codex_integration_profile_wiring_v2.py tests/semantic/test_codex_integration_harness_v2.py tests/semantic/test_codex_integration_original_paths_v2.py tests/semantic/test_codex_integration_rifle_runtime_v2.py tests/semantic/test_codex_integration_footsteps_runtime_v2.py tests/semantic/test_codex_integration_weapons_runtime_v2.py tests/unit/test_collect_integration_workflows_v2_baseline.py -q
+poetry run python -m pytest tests/semantic/test_codex_eval_suite.py tests/semantic/test_codex_harness.py tests/semantic/test_codex_gateway_broker.py -q
+poetry run python -m pytest tests/semantic/test_codex_eval_grading.py tests/semantic/test_codex_skill_matrix.py tests/semantic/test_docs_semantic_inventory.py -q
+poetry run python -m pytest tests/semantic/test_codex_campaign.py tests/semantic/test_codex_campaign_runner.py tests/semantic/test_run_codex_skill_campaign.py -q
+poetry run python -m pytest tests/semantic/test_run_codex_skill_campaign_heavy_v3.py -q
+poetry run python -m pytest tests/semantic/test_codex_integration_workflows.py tests/semantic/test_codex_integration_profile_cli_wiring.py tests/semantic/test_codex_integration_workflows_v2.py tests/semantic/test_codex_integration_profile_wiring_v2.py tests/semantic/test_codex_integration_harness_v2.py tests/semantic/test_codex_integration_original_paths_v2.py tests/semantic/test_codex_integration_rifle_runtime_v2.py tests/semantic/test_codex_integration_footsteps_runtime_v2.py tests/semantic/test_codex_integration_weapons_runtime_v2.py tests/unit/test_collect_integration_workflows_v2_baseline.py -q
 ```
 
 Passing these mocked/offline tests does not prove live semantic capability.

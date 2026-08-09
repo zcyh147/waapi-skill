@@ -276,6 +276,7 @@ INTEGRATION_WORKFLOWS_V1_PROFILE_ID = (
 INTEGRATION_WORKFLOWS_V2_PROFILE_ID = (
     matrix.INTEGRATION_WORKFLOWS_V2_PROFILE_ID
 )
+INTEGRATION_PROFILE_ID = matrix.INTEGRATION_PROFILE_ID
 _INTEGRATION_V1_WORKFLOW_IDS = frozenset(
     {
         "interactive_weather_build",
@@ -303,6 +304,7 @@ TERRA_LOCKED_V3_PROFILE_IDS = frozenset(
         COMPOUND_HEAVY_V1_PROFILE_ID,
         INTEGRATION_WORKFLOWS_V1_PROFILE_ID,
         INTEGRATION_WORKFLOWS_V2_PROFILE_ID,
+        INTEGRATION_PROFILE_ID,
     }
 )
 HEAVY_V3_EFFECTIVE_CONTRACT = "waapi-skill.codex-semantic-campaign-effective/v3"
@@ -1724,6 +1726,120 @@ def _windows_powershell_core_host_cli_json(
     ).decode("utf-8")
 
 
+_SUITE_TREE_EXCLUDE_NAMES = (
+    "__pycache__",
+    ".pytest_cache",
+    ".DS_Store",
+)
+
+
+def build_heavy_v3_suite_fingerprint(
+    options: CampaignOptions,
+) -> dict[str, Any]:
+    """Build the immutable suite projection shared by creation and replay.
+
+    Legacy profile projections intentionally retain their exact historical
+    shape.  The public composed integration profile adds its ordered component
+    definitions because its profile file contains references rather than the
+    workflow and committed-baseline bytes themselves.
+    """
+
+    result: dict[str, Any] = {
+        "path": str(options.suite_path),
+        "sha256": sha256_file(options.suite_path),
+    }
+    if options.profile in TERRA_LOCKED_V3_PROFILE_IDS:
+        dependency_root = options.suite_path.parent
+        result.update(
+            {
+                "dependency_root": str(dependency_root),
+                "dependency_tree_sha256": stable_tree_sha256(
+                    dependency_root,
+                    exclude_names=_SUITE_TREE_EXCLUDE_NAMES,
+                ),
+            }
+        )
+    if options.profile != INTEGRATION_PROFILE_ID:
+        return result
+
+    try:
+        integration_module = importlib.import_module(
+            "tests.semantic.support.codex_integration_workflows"
+        )
+        profile = integration_module.load_integration_profile(
+            options.suite_path,
+            repo_root=REPO_ROOT,
+        )
+    except (ImportError, OSError, RuntimeError, ValueError) as exc:
+        raise CampaignEvidenceError(
+            "cannot fingerprint composed integration suite: "
+            f"{type(exc).__name__}: {exc}"
+        ) from exc
+
+    component_rows: list[dict[str, Any]] = []
+    for component in profile.component_profiles:
+        source_rows: list[dict[str, str]] = []
+        committed_manifest_paths = {
+            f"baseline-{version}.json": manifest.path
+            for version, manifest in getattr(
+                component,
+                "baseline_manifests",
+                {},
+            ).items()
+        }
+        for relative_name, expected_digest in component.source_digests:
+            unresolved_source = committed_manifest_paths.get(
+                relative_name,
+                component.path.parent / relative_name,
+            )
+            try:
+                source_path = Path(unresolved_source).resolve(strict=True)
+                observed_digest = sha256_file(source_path)
+            except (OSError, RuntimeError) as exc:
+                raise CampaignEvidenceError(
+                    "cannot fingerprint composed integration source file: "
+                    f"{unresolved_source}"
+                ) from exc
+            if observed_digest != expected_digest:
+                raise CampaignEvidenceError(
+                    "composed integration loader digest disagrees with source file: "
+                    f"{source_path}"
+                )
+            source_rows.append(
+                {
+                    "relative_path": str(relative_name),
+                    "path": str(source_path),
+                    "sha256": str(expected_digest),
+                }
+            )
+        component_rows.append(
+            {
+                "profile_path": str(component.path),
+                "profile_sha256": sha256_file(component.path),
+                "dependency_root": str(component.path.parent),
+                "dependency_tree_sha256": stable_tree_sha256(
+                    component.path.parent,
+                    exclude_names=_SUITE_TREE_EXCLUDE_NAMES,
+                ),
+                "definition_sha256": str(component.definition_sha256),
+                "source_digests": [
+                    [str(name), str(digest)]
+                    for name, digest in component.source_digests
+                ],
+                "files": source_rows,
+            }
+        )
+    result["composition"] = {
+        "definition_sha256": str(profile.definition_sha256),
+        "source_digests": [
+            [str(name), str(digest)]
+            for name, digest in profile.source_digests
+        ],
+        "components": component_rows,
+    }
+    return result
+
+
 def build_heavy_v3_effective_config(
     options: CampaignOptions,
     *,
@@ -1779,25 +1895,7 @@ def build_heavy_v3_effective_config(
             ),
             "excluded_names": list(skill_excludes),
         },
-        "suite": {
-            "path": str(options.suite_path),
-            "sha256": sha256_file(options.suite_path),
-            **(
-                {
-                    "dependency_root": str(options.suite_path.parent),
-                    "dependency_tree_sha256": stable_tree_sha256(
-                        options.suite_path.parent,
-                        exclude_names=(
-                            "__pycache__",
-                            ".pytest_cache",
-                            ".DS_Store",
-                        ),
-                    ),
-                }
-                if options.profile in TERRA_LOCKED_V3_PROFILE_IDS
-                else {}
-            ),
-        },
+        "suite": build_heavy_v3_suite_fingerprint(options),
         "runner": {
             "campaign_path": str(campaign_runner),
             "campaign_sha256": sha256_file(campaign_runner),
@@ -2140,25 +2238,10 @@ def assert_heavy_v3_effective_inputs_frozen(
     effective: Mapping[str, Any],
 ) -> None:
     assert_effective_inputs_frozen(options, effective=effective)
-    if options.profile in TERRA_LOCKED_V3_PROFILE_IDS:
-        suite = effective.get("suite")
-        dependency_root = options.suite_path.parent
-        if (
-            not isinstance(suite, Mapping)
-            or suite.get("dependency_root") != str(dependency_root)
-            or suite.get("dependency_tree_sha256")
-            != stable_tree_sha256(
-                dependency_root,
-                exclude_names=(
-                    "__pycache__",
-                    ".pytest_cache",
-                    ".DS_Store",
-                ),
-            )
-        ):
-            raise CampaignEvidenceError(
-                f"{options.profile} transitive suite inputs drifted"
-            )
+    if effective.get("suite") != build_heavy_v3_suite_fingerprint(options):
+        raise CampaignEvidenceError(
+            f"{options.profile} transitive suite inputs drifted"
+        )
     runner = effective.get("runner")
     if not isinstance(runner, Mapping):
         raise CampaignEvidenceError("heavy campaign runner fingerprint is malformed")
@@ -13048,7 +13131,8 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     parser.add_argument("--verify-only", action="store_true")
     parser.add_argument(
         "--profile",
-        choices=(*PROFILE_IDS, *sorted(EXECUTABLE_V3_PROFILE_IDS)),
+        type=matrix.parse_profile_id,
+        metavar="{" + ",".join(matrix.PUBLIC_PROFILE_HELP_IDS) + "}",
         default="screening",
     )
     parser.add_argument("--suite")
@@ -13080,6 +13164,7 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     is_compound_v1 = args.profile == COMPOUND_HEAVY_V1_PROFILE_ID
     is_integration_v1 = args.profile == INTEGRATION_WORKFLOWS_V1_PROFILE_ID
     is_integration_v2 = args.profile == INTEGRATION_WORKFLOWS_V2_PROFILE_ID
+    is_integration = args.profile == INTEGRATION_PROFILE_ID
     is_terra_v3 = args.profile in TERRA_LOCKED_V3_PROFILE_IDS
     if args.verify_only and not args.resume:
         parser.error("--verify-only requires --resume")
@@ -13094,6 +13179,14 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     ):
         if len(set(values)) != len(values):
             parser.error(f"{name} values must be unique")
+    try:
+        case_ids = (
+            matrix.canonicalize_integration_case_ids(args.case_id)
+            if is_integration
+            else tuple(str(value) for value in args.case_id)
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
     if is_executable_v3 and args.pair_id:
         parser.error(f"--pair-id is not supported by {args.profile}")
     if is_executable_v3 and args.offline_only:
@@ -13104,7 +13197,12 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
             parser.error(
                 "unknown v2 --case-id values: " + ", ".join(unknown_case_ids)
             )
-    if (is_compound_v1 or is_integration_v1 or is_integration_v2) and any(
+    if (
+        is_compound_v1
+        or is_integration_v1
+        or is_integration_v2
+        or is_integration
+    ) and any(
         version not in {"2022.1", "2025.1"} for version in args.version
     ):
         parser.error(
@@ -13131,12 +13229,16 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
             matrix.DEFAULT_MODIFICATION_POLICY_V3_SUITE
             if is_policy_v3
             else (
-                matrix.DEFAULT_INTEGRATION_WORKFLOWS_V2_SUITE
-                if is_integration_v2
+                matrix.DEFAULT_INTEGRATION_SUITE
+                if is_integration
                 else (
-                    matrix.DEFAULT_INTEGRATION_WORKFLOWS_V1_SUITE
-                    if is_integration_v1
-                    else matrix.DEFAULT_COMPOUND_HEAVY_V1_SUITE
+                    matrix.DEFAULT_INTEGRATION_WORKFLOWS_V2_SUITE
+                    if is_integration_v2
+                    else (
+                        matrix.DEFAULT_INTEGRATION_WORKFLOWS_V1_SUITE
+                        if is_integration_v1
+                        else matrix.DEFAULT_COMPOUND_HEAVY_V1_SUITE
+                    )
                 )
             )
         )
@@ -13170,7 +13272,7 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         reasoning_effort=str(args.reasoning_effort),
         service_tier=str(service_tier),
         timeout_seconds=float(args.timeout),
-        case_ids=tuple(str(value) for value in args.case_id),
+        case_ids=case_ids,
         versions=tuple(str(value) for value in args.version),
         pair_ids=tuple(str(value) for value in args.pair_id),
         offline_only=bool(args.offline_only),

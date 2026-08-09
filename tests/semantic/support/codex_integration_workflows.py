@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import stat
 from dataclasses import dataclass, replace
 from pathlib import Path
 from types import MappingProxyType
@@ -70,6 +71,22 @@ _WORKFLOW_SPECS = (
     ("footsteps", 1, "footsteps_snow_assignment_maintenance"),
     ("weapons", 1, "weapons_query_guided_batch_cleanup"),
 )
+_COMPONENT_SOURCE_FILES = (
+    ("profile.json", "workflows.json"),
+    (
+        "profile.json",
+        "workflows.json",
+        "baseline-2022.1.json",
+        "baseline-2025.1.json",
+    ),
+)
+_V2_COMPONENT_REPO_PARTS = (
+    "tests",
+    "semantic",
+    "data",
+    "integration-workflows-v2",
+)
+_FILE_ATTRIBUTE_REPARSE_POINT = 0x400
 
 # This is intentionally explicit rather than derived from the component
 # naming algorithms.  A historical loader rename therefore cannot silently
@@ -199,6 +216,10 @@ def load_integration_profile(
             "integration component profile order or identity drifted"
         )
     component_paths = _resolve_component_paths(profile_path, component_values)
+    repository = _preflight_component_sources(
+        component_paths,
+        repo_root=repo_root,
+    )
 
     try:
         first = load_integration_workflows_profile(component_paths[0])
@@ -208,14 +229,14 @@ def load_integration_profile(
         second = load_integration_workflows_v2_profile(
             component_paths[1],
             require_committed_baselines=True,
-            repo_root=repo_root,
+            repo_root=repository,
         )
     except IntegrationWorkflowV2Error as exc:
         raise IntegrationProfileError("integration component-02 is invalid") from exc
     components = (first, second)
 
     complete_units, workflows = _compose_units(components)
-    requested_ids = _normalize_unit_ids(unit_ids)
+    requested_ids = canonicalize_integration_unit_ids(unit_ids)
     requested_versions = _unique_strings(versions, "versions")
     unknown_versions = sorted(set(requested_versions) - set(VERSIONS))
     if unknown_versions:
@@ -359,7 +380,11 @@ def _compose_units(
     return frozen_units, tuple(workflows)
 
 
-def _normalize_unit_ids(values: Sequence[str]) -> tuple[str, ...]:
+def canonicalize_integration_unit_ids(
+    values: Sequence[str],
+) -> tuple[str, ...]:
+    """Return public unit IDs while accepting the closed historical aliases."""
+
     requested = _unique_strings(values, "unit ids")
     known = set(LEGACY_UNIT_ID_BY_PUBLIC_ID)
     normalized: list[str] = []
@@ -381,6 +406,131 @@ def _normalize_unit_ids(values: Sequence[str]) -> tuple[str, ...]:
     return tuple(normalized)
 
 
+def _preflight_component_sources(
+    component_paths: tuple[Path, ...],
+    *,
+    repo_root: str | Path | None,
+) -> Path:
+    """Reject linked or displaced component inputs before legacy loaders run."""
+
+    repository = _resolve_repository_root(component_paths[1], repo_root)
+    baseline_root = repository.joinpath(*_V2_COMPONENT_REPO_PARTS)
+    try:
+        baseline_root_stat = baseline_root.lstat()
+    except OSError as exc:
+        raise IntegrationProfileError(
+            "cannot inspect integration component-02 repository root"
+        ) from exc
+    if _is_link_or_reparse(baseline_root, baseline_root_stat):
+        raise IntegrationProfileError(
+            "integration component-02 repository root may not be a link"
+        )
+    if not stat.S_ISDIR(baseline_root_stat.st_mode):
+        raise IntegrationProfileError(
+            "integration component-02 repository root must be a directory"
+        )
+    try:
+        resolved_baseline_root = baseline_root.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise IntegrationProfileError(
+            "cannot resolve integration component-02 repository root"
+        ) from exc
+    if not resolved_baseline_root.is_relative_to(repository):
+        raise IntegrationProfileError(
+            "integration component-02 baseline root escapes its repository"
+        )
+
+    source_groups = (
+        (1, component_paths[0].parent, _COMPONENT_SOURCE_FILES[0]),
+        (2, component_paths[1].parent, _COMPONENT_SOURCE_FILES[1][:2]),
+        (2, resolved_baseline_root, _COMPONENT_SOURCE_FILES[1][2:]),
+    )
+    for component_index, root, names in source_groups:
+        for name in names:
+            _preflight_component_source(
+                root,
+                name,
+                component_index=component_index,
+            )
+    return repository
+
+
+def _preflight_component_source(
+    root: Path,
+    name: str,
+    *,
+    component_index: int,
+) -> None:
+    label = f"integration component-{component_index:02d}/{name}"
+    lexical = root / name
+    try:
+        file_stat = lexical.lstat()
+    except OSError as exc:
+        raise IntegrationProfileError(f"cannot inspect {label}") from exc
+    if _is_link_or_reparse(lexical, file_stat):
+        raise IntegrationProfileError(f"{label} may not be a link")
+    if not stat.S_ISREG(file_stat.st_mode):
+        raise IntegrationProfileError(f"{label} must be a regular file")
+    try:
+        resolved = lexical.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise IntegrationProfileError(f"cannot resolve {label}") from exc
+    if resolved != lexical or resolved.parent != root:
+        raise IntegrationProfileError(f"{label} escapes its component root")
+
+
+def _resolve_repository_root(
+    component_profile: Path,
+    value: str | Path | None,
+) -> Path:
+    if value is None:
+        for parent in component_profile.parents:
+            if (parent / ".git").exists() and (parent / "tests").is_dir():
+                return parent.resolve()
+        raise IntegrationProfileError(
+            "cannot discover repository root for integration baselines"
+        )
+    try:
+        lexical = Path(value).expanduser()
+        root_stat = lexical.lstat()
+        if _is_link_or_reparse(lexical, root_stat):
+            raise IntegrationProfileError(
+                "integration repository root may not be a link"
+            )
+        if not stat.S_ISDIR(root_stat.st_mode):
+            raise IntegrationProfileError(
+                "integration repository root must be a directory"
+            )
+        root = lexical.resolve(strict=True)
+    except IntegrationProfileError:
+        raise
+    except (OSError, RuntimeError) as exc:
+        raise IntegrationProfileError(
+            f"cannot resolve integration repository root: {value}"
+        ) from exc
+    if not root.is_dir():
+        raise IntegrationProfileError(
+            "integration repository root must be a directory"
+        )
+    return root
+
+
+def _is_reparse_point(value: Any) -> bool:
+    return bool(
+        getattr(value, "st_file_attributes", 0)
+        & _FILE_ATTRIBUTE_REPARSE_POINT
+    )
+
+
+def _is_link_or_reparse(path: Path, value: Any) -> bool:
+    is_junction = getattr(path, "is_junction", None)
+    return bool(
+        path.is_symlink()
+        or (callable(is_junction) and is_junction())
+        or _is_reparse_point(value)
+    )
+
+
 def _resolve_component_paths(
     profile_path: Path,
     values: Sequence[str],
@@ -390,9 +540,28 @@ def _resolve_component_paths(
     for index, value in enumerate(values, start=1):
         expected_directory = f"integration-workflows-v{index}"
         lexical = data_root / expected_directory / "profile.json"
-        if lexical.is_symlink() or lexical.parent.is_symlink():
+        try:
+            directory_stat = lexical.parent.lstat()
+            profile_stat = lexical.lstat()
+        except OSError as exc:
             raise IntegrationProfileError(
-                f"integration component-{index:02d} may not be a symlink"
+                f"cannot inspect integration component-{index:02d}: {value}"
+            ) from exc
+        if _is_link_or_reparse(
+            lexical.parent,
+            directory_stat,
+        ) or _is_link_or_reparse(lexical, profile_stat):
+            raise IntegrationProfileError(
+                f"integration component-{index:02d} may not be a symlink "
+                "or reparse point"
+            )
+        if not stat.S_ISDIR(directory_stat.st_mode):
+            raise IntegrationProfileError(
+                f"integration component-{index:02d} root must be a directory"
+            )
+        if not stat.S_ISREG(profile_stat.st_mode):
+            raise IntegrationProfileError(
+                f"integration component-{index:02d} profile must be a regular file"
             )
         try:
             resolved = lexical.resolve(strict=True)
@@ -416,8 +585,13 @@ def _resolve_component_paths(
 def _resolve_regular_file(value: str | Path, label: str) -> Path:
     try:
         source = Path(value).expanduser()
-        if source.is_symlink():
-            raise IntegrationProfileError(f"{label} may not be a symlink")
+        source_stat = source.lstat()
+        if _is_link_or_reparse(source, source_stat):
+            raise IntegrationProfileError(
+                f"{label} may not be a symlink or reparse point"
+            )
+        if not stat.S_ISREG(source_stat.st_mode):
+            raise IntegrationProfileError(f"{label} must be a regular file")
         path = source.resolve(strict=True)
     except IntegrationProfileError:
         raise
@@ -509,5 +683,6 @@ __all__ = [
     "IntegrationProfile",
     "IntegrationProfileError",
     "IntegrationWorkflowUnit",
+    "canonicalize_integration_unit_ids",
     "load_integration_profile",
 ]

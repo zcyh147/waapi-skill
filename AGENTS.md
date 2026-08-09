@@ -243,6 +243,13 @@ user's approval.
 Start with the cheapest lane that proves the change. Expand only when the
 changed behavior requires it.
 
+Repository development and ordinary test execution use the Poetry environment:
+invoke `ci/test.sh`, which delegates to Poetry, rather than installing project
+test dependencies into the Skill environment. The packaged Skill runtime and
+formal semantic campaigns instead use `skills/waapi-skill/.venv`; do not replace
+that interpreter with Poetry or a global Python. This keeps developer tooling
+independent from the minimal environment shipped to Skill users.
+
 ### 1. Focused program tests
 
 Run the directly affected pytest files while iterating. Then run the fixed
@@ -388,14 +395,34 @@ requests that expense or a release criterion requires them. A partial, quota-
 blocked, or infrastructure-blocked campaign is not a semantic pass. Read
 `tests/semantic/README.md` before running any campaign.
 
-The targeted `integration_workflows_cross_version_6` acceptance profile is a
-separate design contract: three prewritten workflows run once on Wwise 2022.1
-and once on 2025.1, for six fresh memory-off Codex tasks, 20 user turns, and 12
-separately previewed transactions. It uses `gpt-5.6-terra`, medium reasoning,
-the default service tier, the formal campaign harness, and sequential
-execution. Freeze the first pass, consolidate ordinary case failures, and only
-then repair and start a new campaign root. This is cross-operation integration
-acceptance; it grants no additional per-API coverage credit.
+The public integration-acceptance profile is `integration`. It runs six
+prewritten workflows once on Wwise 2022.1 and once on 2025.1: 12 fresh
+memory-off Codex tasks, 36 user turns, and 20 separately previewed transactions.
+The workflows are Weather construction, Alarm diagnosis and repair, Harbor
+SoundBank release, Rifle reimport, Footsteps Switch-assignment maintenance, and
+query-guided Weapons cleanup. It uses `gpt-5.6-terra`, medium reasoning, the
+default service tier, the formal campaign harness, and sequential execution.
+The committed fixed-baseline graph and media apply only to Rifle, Footsteps,
+and Weapons. Freeze the first pass, consolidate ordinary case failures, and
+only then repair and start a new campaign root. This is cross-operation
+integration acceptance; it grants no additional per-API coverage credit.
+
+Run the public profile with the Skill-local interpreter and a new explicit
+campaign root; its default composed suite means no public `--suite` is needed:
+
+```bash
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py \
+  --profile integration \
+  --model gpt-5.6-terra \
+  --reasoning-effort medium \
+  --service-tier default \
+  --campaign-root skills/waapi-skill-workspace/campaign-integration-new-candidate-r1
+```
+
+The older `integration_workflows_cross_version_6` and
+`integration_workflows_v2_cross_version_6` names remain internal compatibility
+profiles for sealed history and replay. Their roots are component evidence,
+not a unified `integration` campaign and not a single-candidate 12/12 result.
 
 The completed 2026-07-31 macOS integration evidence is cumulative across frozen
 campaign roots, not one final-candidate 6/6 run. The initial `a12` root passed
@@ -408,8 +435,9 @@ Every passing sandbox was removed, failed sandboxes were sealed and
 quarantined, and both source SampleProjects retained identical full hashes and
 mtimes. This older evidence belongs to the candidate before the
 structured-query request and closed mutation-selector migration.
-Every named V1 campaign root seals `runtime.platform=darwin`; no
-native-Windows V1 semantic campaign is currently recorded.
+The roots named in this paragraph and the 2026-08-03 macOS paragraph below
+seal `runtime.platform=darwin`; later cross-host component reruns are recorded
+separately.
 
 The 2026-08-03 current-wording rerun is also cumulative, not one final-candidate
 6/6 run. `campaign-integration-workflows-v1-terra-20260803-current-r1` passed
@@ -426,8 +454,21 @@ recorded lifecycles preserved source hashes and mtimes; passing sandboxes were
 removed and the one failed sandbox remains quarantined. Those V1 roots do not
 validate the newer V2 fixture, routing, or workflow contracts.
 
-The newer `integration_workflows_v2_cross_version_6` profile is a distinct,
-fixed-baseline acceptance contract. Its three workflows run once on Wwise
+Later reruns used the legacy internal
+`integration_workflows_cross_version_6` component, not the public composed
+`integration` profile. At commit
+`9e75a1aea496abcb9ef2a61e1da685adb99f4b01`, macOS root
+`imac-wah-9e75a1a-r1` passed all six component units fresh and then passed
+`--resume --verify-only`. At commit
+`9b4de8f618855091a424700b50ab8b0fd1989270`, macOS root
+`imac-wah-9b4de8f-r1` passed five units and failed one, while native-Windows
+root `iwin-wah-9b4de8f-r1` passed three and failed three; both failed roots
+were frozen without verify-only replay. These results remain exact
+six-unit-component provenance and must not be reported as current public
+`integration` acceptance or combined into a unified 12/12 result.
+
+The legacy internal `integration_workflows_v2_cross_version_6` component is a
+distinct fixed-baseline contract. Its three workflows run once on Wwise
 2022.1 and once on 2025.1: six fresh memory-off Codex tasks, 16 user turns, and
 eight separately previewed transactions. It is fixed to `gpt-5.6-terra`,
 medium reasoning, the default service tier, and sequential execution. The
@@ -441,8 +482,9 @@ seal/quarantine every failed or indeterminate sandbox. The baseline collector
 may inspect only an already-running sandbox copy and must do so through the
 public Gateway; it is not permission to use a direct WAAPI client.
 
-The completed 2026-08-03 macOS V2 evidence is cumulative across frozen roots,
-not one final-candidate 6/6 run. `r8` passed both Rifle units, `r12-2022` passed the
+The completed 2026-08-03 macOS evidence for that legacy component is
+cumulative across frozen roots, not one final-candidate 6/6 run. `r8` passed
+both Rifle units, `r12-2022` passed the
 2022.1 Weapons unit, `r23-2022-footsteps` passed the 2022.1 Footsteps unit, and
 `r24-2025-repairs` passed the 2025.1 Footsteps and Weapons units. Thus all six
 unique units have passing evidence across those roots. Passing sandboxes were
@@ -451,7 +493,8 @@ every recorded source-project full hash and mtime remained unchanged. This
 grants no per-API coverage credit and proves only the exact Rifle, Footsteps,
 and Weapons workflow paths, not advanced WAQL or unrelated routes.
 
-The later native-Windows V2 evidence is also cumulative. At commit `0dfea2b`,
+The later native-Windows evidence for that legacy component is also cumulative.
+At commit `0dfea2b`,
 `windows-v2-six-0dfea2b-r1` attempted all six units, passed 2022.1 Rifle,
 2022.1 Footsteps, and 2025.1 Rifle, failed the other three, exited `1`, and had
 no verify-only replay. At `a516835`, `a516-w22-r1` passed 2022.1 Weapons fresh

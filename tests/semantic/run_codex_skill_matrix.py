@@ -135,6 +135,14 @@ DEFAULT_INTEGRATION_WORKFLOWS_V2_SUITE = (
     / "integration-workflows-v2"
     / "profile.json"
 )
+DEFAULT_INTEGRATION_SUITE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "integration"
+    / "profile.json"
+)
 DEFAULT_ITERATION_ROOT = SKILL_ROOT.parent / "waapi-skill-workspace" / "iteration-9-v2-matrix"
 DEFAULT_HEAVY_V3_ITERATION_ROOT = (
     SKILL_ROOT.parent / "waapi-skill-workspace" / "heavy-cross-version-80"
@@ -154,6 +162,9 @@ DEFAULT_INTEGRATION_WORKFLOWS_V2_ITERATION_ROOT = (
     SKILL_ROOT.parent
     / "waapi-skill-workspace"
     / "integration-workflows-v2-cross-version-6"
+)
+DEFAULT_INTEGRATION_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "integration"
 )
 DEFAULT_CODEX_BINARY: str | None = None
 DEFAULT_AUTH_JSON = Path.home() / ".codex" / "auth.json"
@@ -189,6 +200,7 @@ MODIFICATION_POLICY_V3_PROFILE_ID = "modification_policy_9"
 COMPOUND_HEAVY_V1_PROFILE_ID = "compound_heavy_cross_version_24"
 INTEGRATION_WORKFLOWS_V1_PROFILE_ID = "integration_workflows_cross_version_6"
 INTEGRATION_WORKFLOWS_V2_PROFILE_ID = "integration_workflows_v2_cross_version_6"
+INTEGRATION_PROFILE_ID = "integration"
 EXECUTABLE_V3_PROFILE_IDS = frozenset(
     {
         HEAVY_V3_PROFILE_ID,
@@ -196,8 +208,20 @@ EXECUTABLE_V3_PROFILE_IDS = frozenset(
         COMPOUND_HEAVY_V1_PROFILE_ID,
         INTEGRATION_WORKFLOWS_V1_PROFILE_ID,
         INTEGRATION_WORKFLOWS_V2_PROFILE_ID,
+        INTEGRATION_PROFILE_ID,
     }
 )
+PUBLIC_PROFILE_HELP_IDS = (
+    *PROFILE_IDS,
+    *sorted(
+        EXECUTABLE_V3_PROFILE_IDS
+        - {
+            INTEGRATION_WORKFLOWS_V1_PROFILE_ID,
+            INTEGRATION_WORKFLOWS_V2_PROFILE_ID,
+        }
+    ),
+)
+ACCEPTED_PROFILE_IDS = frozenset((*PROFILE_IDS, *EXECUTABLE_V3_PROFILE_IDS))
 HEAVY_V3_RUN_CONFIG_CONTRACT = "waapi-skill.codex-heavy-matrix-config/v3"
 HEAVY_V3_SUMMARY_CONTRACT = "waapi-skill.codex-heavy-matrix-summary/v3"
 HEAVY_V3_CASE_RECORD_CONTRACT = "waapi-skill.codex-heavy-matrix-case/v3"
@@ -257,6 +281,43 @@ class HeavyV3MatrixError(RuntimeError):
 
 class HeavyV3RunnerUnavailableError(HeavyV3MatrixError):
     """No closed project or CLI runner owns the selected V3 unit."""
+
+
+def parse_profile_id(value: str) -> str:
+    """Accept public and replay-only profiles without advertising the latter."""
+
+    profile_id = str(value)
+    if profile_id not in ACCEPTED_PROFILE_IDS:
+        public_ids = ", ".join(PUBLIC_PROFILE_HELP_IDS)
+        raise argparse.ArgumentTypeError(
+            f"unsupported profile {profile_id!r}; choose from: {public_ids}"
+        )
+    return profile_id
+
+
+def canonicalize_integration_case_ids(values: Sequence[str]) -> tuple[str, ...]:
+    """Adapt the core unit canonicalizer to the CLI's case-id vocabulary."""
+
+    integration_module = importlib.import_module(
+        "tests.semantic.support.codex_integration_workflows"
+    )
+    try:
+        return tuple(
+            integration_module.canonicalize_integration_unit_ids(values)
+        )
+    except integration_module.IntegrationProfileError as exc:
+        message = str(exc)
+        unknown_prefix = "unknown integration unit ids: "
+        if message.startswith(unknown_prefix):
+            raise ValueError(
+                "unknown integration --case-id values: "
+                + message.removeprefix(unknown_prefix)
+            ) from exc
+        if message == "unit ids select the same integration unit more than once":
+            raise ValueError(
+                "--case-id values select the same integration unit more than once"
+            ) from exc
+        raise ValueError(f"invalid integration --case-id values: {message}") from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -337,6 +398,17 @@ HeavyV3DependencyPreflight = Callable[[], Mapping[str, Any]]
 def load_heavy_v3_units(options: RunnerOptions) -> tuple[Any, ...]:
     """Load and filter the reviewed V3 bundle without importing live runners."""
 
+    if options.profile == INTEGRATION_PROFILE_ID:
+        integration_module = importlib.import_module(
+            "tests.semantic.support.codex_integration_workflows"
+        )
+        profile = integration_module.load_integration_profile(
+            options.suite_path,
+            unit_ids=options.case_ids,
+            versions=options.versions,
+            repo_root=REPO_ROOT,
+        )
+        return tuple(profile.units)
     if options.profile == INTEGRATION_WORKFLOWS_V2_PROFILE_ID:
         integration_module = importlib.import_module(
             "tests.semantic.support.codex_integration_workflows_v2"
@@ -3349,7 +3421,8 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--profile",
-        choices=(*PROFILE_IDS, *sorted(EXECUTABLE_V3_PROFILE_IDS)),
+        type=parse_profile_id,
+        metavar="{" + ",".join(PUBLIC_PROFILE_HELP_IDS) + "}",
         default="screening",
     )
     parser.add_argument("--suite")
@@ -3385,11 +3458,13 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     is_compound_v1 = args.profile == COMPOUND_HEAVY_V1_PROFILE_ID
     is_integration_v1 = args.profile == INTEGRATION_WORKFLOWS_V1_PROFILE_ID
     is_integration_v2 = args.profile == INTEGRATION_WORKFLOWS_V2_PROFILE_ID
+    is_integration = args.profile == INTEGRATION_PROFILE_ID
     is_terra_v3 = (
         is_policy_v3
         or is_compound_v1
         or is_integration_v1
         or is_integration_v2
+        or is_integration
     )
     if args.timeout <= 0:
         parser.error("--timeout must be greater than zero")
@@ -3397,6 +3472,14 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         parser.error("--version values must be unique")
     if len(set(args.pair_id)) != len(args.pair_id):
         parser.error("--pair-id values must be unique")
+    try:
+        case_ids = (
+            canonicalize_integration_case_ids(args.case_id)
+            if is_integration
+            else tuple(str(value) for value in args.case_id)
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
     if is_executable_v3 and args.pair_id:
         parser.error(f"--pair-id is not supported by {args.profile}")
     if is_executable_v3 and args.offline_only:
@@ -3411,7 +3494,12 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         parser.error(
             f"{MODIFICATION_POLICY_V3_PROFILE_ID} supports only --version 2022.1"
         )
-    if (is_compound_v1 or is_integration_v1 or is_integration_v2) and any(
+    if (
+        is_compound_v1
+        or is_integration_v1
+        or is_integration_v2
+        or is_integration
+    ) and any(
         version not in {"2022.1", "2025.1"} for version in args.version
     ):
         parser.error(
@@ -3438,12 +3526,16 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
             DEFAULT_MODIFICATION_POLICY_V3_SUITE
             if is_policy_v3
             else (
-                DEFAULT_INTEGRATION_WORKFLOWS_V2_SUITE
-                if is_integration_v2
+                DEFAULT_INTEGRATION_SUITE
+                if is_integration
                 else (
-                    DEFAULT_INTEGRATION_WORKFLOWS_V1_SUITE
-                    if is_integration_v1
-                    else DEFAULT_COMPOUND_HEAVY_V1_SUITE
+                    DEFAULT_INTEGRATION_WORKFLOWS_V2_SUITE
+                    if is_integration_v2
+                    else (
+                        DEFAULT_INTEGRATION_WORKFLOWS_V1_SUITE
+                        if is_integration_v1
+                        else DEFAULT_COMPOUND_HEAVY_V1_SUITE
+                    )
                 )
             )
         )
@@ -3455,12 +3547,16 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
             DEFAULT_MODIFICATION_POLICY_V3_ITERATION_ROOT
             if is_policy_v3
             else (
-                DEFAULT_INTEGRATION_WORKFLOWS_V2_ITERATION_ROOT
-                if is_integration_v2
+                DEFAULT_INTEGRATION_ITERATION_ROOT
+                if is_integration
                 else (
-                    DEFAULT_INTEGRATION_WORKFLOWS_V1_ITERATION_ROOT
-                    if is_integration_v1
-                    else DEFAULT_COMPOUND_HEAVY_V1_ITERATION_ROOT
+                    DEFAULT_INTEGRATION_WORKFLOWS_V2_ITERATION_ROOT
+                    if is_integration_v2
+                    else (
+                        DEFAULT_INTEGRATION_WORKFLOWS_V1_ITERATION_ROOT
+                        if is_integration_v1
+                        else DEFAULT_COMPOUND_HEAVY_V1_ITERATION_ROOT
+                    )
                 )
             )
         )
@@ -3494,7 +3590,7 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         reasoning_effort=str(args.reasoning_effort),
         service_tier=str(service_tier),
         timeout_seconds=float(args.timeout),
-        case_ids=tuple(str(value) for value in args.case_id),
+        case_ids=case_ids,
         versions=tuple(str(value) for value in args.version),
         pair_ids=tuple(str(value) for value in args.pair_id),
         offline_only=bool(args.offline_only),
