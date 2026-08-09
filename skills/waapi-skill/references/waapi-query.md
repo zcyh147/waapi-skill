@@ -416,15 +416,14 @@ Each exposes its stable terminal `agent_result`; do not rebuild it.
 
 ## Exact-hop playback diagnosis
 
-For a cross-reference diagnosis starting at one exact path, first resolve
-`id,name,type,path`. Follow only returned relationship ids, one hop at a time,
-with exact-id lookups. For an Event use bounded direct
-`--select children --take 100`, not broad descendants or same-name search.
-Request identity plus only fields needed at that hop: Action ->
-`ActionType,Target`; Sound -> `OverrideOutput,activeSource,OutputBus`.
-The Event children result is already the Action hop. When that Action row
-contains `ActionType` and `Target`, do not query the Action id again; use the
-returned `Target.id` directly for the next exact-id Sound lookup.
+For cross-reference diagnosis from an exact path, resolve
+`id,name,type,path`, then follow returned relationship ids by exact-id lookup.
+For Event use `--select children --take 100`, not descendants or same-name
+search. Request identity and hop fields: Action ->
+`ActionType,Target`; Sound -> `OverrideOutput,activeSource,OutputBus`. The Event
+children result is already the Action hop. With its `ActionType,Target`, do not
+query the Action id again; use the returned `Target.id` directly for the next
+exact-id Sound lookup.
 
 That Sound projection ends at `OutputBus`; do not add `@Volume` to the Sound
 hop unless the user asks for the Sound's own volume. For source file/language,
@@ -432,7 +431,8 @@ query `originalFilePath,audioSource:language` on the exact returned
 `activeSource` id. To distinguish routing from Bus mute, query `@Volume` only
 on the exact Bus identities: first the returned `OutputBus` id, then the
 requested comparison Bus path or id. Search only for discovery/disambiguation,
-never exact-identity translation.
+never exact-identity translation. Both exact Bus reads must use the same
+`id,name,type,path,@Volume` projection; never omit `@Volume` from comparison Bus.
 
 ## Topics and Authoring-only reads
 

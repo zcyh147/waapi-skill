@@ -138,13 +138,15 @@ Read: `references/waapi-setup.md`
 
 Use query for read-only inspection: selection, object lookup, hierarchy browsing, property reads, structured object discovery, project facts, topic waits/streams, and other non-mutating inspection.
 
-Classify the requested action, not background wording. A request to listen for, wait for, or report a SoundBank generation notification is a query-only topic task even when it says that a Bank is being generated or rebuilt and even when an old output file already exists. It never authorizes `soundbank.generate`, an operation-schema lookup, or another mutation.
+Classify the requested action, not background wording. A request to listen for, wait for, or report a SoundBank generation notification is query-only even if a Bank is rebuilt or output exists. It never authorizes `soundbank.generate`, an operation-schema lookup, or mutation.
 
 Default result shape: return the resolved structured result, not just “I called WAAPI”.
 
-For exact path/GUID existence or identity lookup, run exactly one fixed `query-object --path '<exact-object-path>' --return-field id --return-field name --return-field type --return-field path`; substitute `--object-id '<exact-guid>'` for a GUID. Keep all four return fields explicit. Exact `not_found` stays Gateway-owned in compact output; use `--detail` only for explicit compile/dispatch diagnostics. This route is complete: do not read the query reference before or after it, and do not retry a rejected or failed gateway invocation.
+Classify the complete task before its first hop. If it needs multiple or relationship hops, fully read `references/waapi-query.md` before any Gateway command; an exact path/GUID first hop does not make the whole task a complete fast route.
 
-For current-selection questions, prefer the live selected-object query path first. If the connected endpoint is a headless or command-line Wwise instance where the UI selection API is unavailable, report that boundary clearly instead of drifting into repo/docs research or pretending a selection result exists.
+For a complete single-hop exact path/GUID existence or identity lookup, run exactly `query-object --path '<exact-object-path>' --return-field id --return-field name --return-field type --return-field path`; substitute `--object-id '<exact-guid>'`. Keep all four return fields explicit. Exact `not_found` stays Gateway-owned in compact output; use `--detail` only for explicit compile/dispatch diagnostics. This route is complete: do not read the query reference before or after it; do not retry a rejected or failed gateway invocation.
+
+For current-selection questions, use the live selected-object query first. On a headless/command-line Wwise host, report the UI boundary; do not research or pretend a selection exists.
 
 For `query-object --where-json`, `=` is exact and `:` is contains/match; an exact-name restriction uses `=`.
 
@@ -188,7 +190,7 @@ In ordinary agent use, omit `--state-dir`: the Gateway owns a deterministic exte
 Fast route from this entry file:
 
 - Closed transaction operations are `waapi.call`, `waapi.undoGroup`, `object.create`, `object.createPlugin`, `object.set`, `object.setLinked`, `object.setRTPC`, `object.delete`, `object.setName`, `object.setNotes`, `object.setProperty`, `object.setReference`, `audio.import`, `audio.importTabDelimited`, `soundbank.setInclusions`, `soundbank.generate`, `soundbank.convertExternalSources`, `soundbank.processDefinitionFiles`, `switchContainer.addAssignment`, `switchContainer.removeAssignment`, `ui.captureScreen`, `ui.commands.execute`, `ui.commands.register`, `ui.commands.unregister`, `lua.executeCliFile`, `lua.executeCoreFile`, `lua.executeCoreInline`, `debug.setAsserts`, `debug.setAutomationMode`, `debug.restartWaapiServers`, `debug.testAssert`, and `debug.testCrash`. For a new request, read `references/waapi-operate.md` in its own tool call and follow its closed operation flow. For an existing transaction continuation, do not reread an already-visible Skill or operate reference; skip `operation-schema` and `preview`; start with `transaction-show`.
-- For a structure-only, no-media object tree, `object.set` is locked only by existing-root field/reference changes, multiple roots, or direct insertion into a named existing descendant below the request root; otherwise `object.create` handles a new root or descendants below one unchanged same-name root.
+- For structure-only changes, one existing object's single rename/notes/property/reference edit uses its dedicated operation. `object.set` is for broader atomic existing-target work; `object.create` handles a new root or descendants below one unchanged same-name root.
 - Choose overlaps by the complete outcome and returned selection guidance. When media import is primary, one `audio.import` owns its media-row target hierarchy as typed structure-only rows and same-row Event/Switch Assignation; never probe `object.create` or a separate assignment first. On Wwise 2023.1+, use `object.set` instead when import is subordinate to a broader atomic mutation of existing targets. Caller-supplied TSV/table workflows use `audio.importTabDelimited`; keep execution domains distinct.
 - The operate reference owns version-specific direct `waapi.call` fast routes and request mappings plus all remaining operation rules. Follow that reference literally after its one complete read.
 

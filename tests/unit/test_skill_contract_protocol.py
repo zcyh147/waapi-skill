@@ -164,6 +164,20 @@ def test_exact_identity_query_is_complete_in_entry_file() -> None:
     assert "keep those four fields explicit for an exact path/GUID identity lookup" in QUERY
 
 
+def test_multihop_query_reads_reference_before_a_fast_looking_first_hop() -> None:
+    first_hop_rule = "Classify the complete task before its first hop"
+    single_hop_rule = "For a complete single-hop exact path/GUID"
+
+    assert first_hop_rule in SKILL
+    assert "If it needs multiple or relationship hops" in SKILL
+    assert "fully read `references/waapi-query.md` before any Gateway command" in SKILL
+    assert (
+        "an exact path/GUID first hop does not make the whole task a complete fast route"
+        in SKILL
+    )
+    assert SKILL.index(first_hop_rule) < SKILL.index(single_hop_rule)
+
+
 def test_exact_hop_playback_diagnosis_does_not_repeat_the_action_lookup() -> None:
     section = QUERY.split("## Exact-hop playback diagnosis", 1)[1].split(
         "## Topics and Authoring-only reads", 1
@@ -174,6 +188,17 @@ def test_exact_hop_playback_diagnosis_does_not_repeat_the_action_lookup() -> Non
     assert "do not query the Action id again" in section_flat
     assert "use the returned `Target.id` directly" in section_flat
     assert "for the next exact-id Sound lookup" in section_flat
+
+
+def test_exact_hop_bus_comparison_uses_symmetric_volume_projections() -> None:
+    section = QUERY.split("## Exact-hop playback diagnosis", 1)[1].split(
+        "## Topics and Authoring-only reads", 1
+    )[0]
+    section_flat = " ".join(section.split())
+
+    assert "Both exact Bus reads must use the same" in section_flat
+    assert "`id,name,type,path,@Volume` projection" in section_flat
+    assert "never omit `@Volume` from comparison Bus" in section_flat
 
 
 def test_query_relationship_hops_reuse_returned_guids_without_weakening_guards() -> None:
@@ -757,7 +782,7 @@ def test_operate_business_selection_and_execution_domains_remain_explicit() -> N
         "not already exist and has no media or import-manifest intent"
     ) in compact
     skill_compact = " ".join(SKILL.split())
-    assert "For a structure-only, no-media object tree" in skill_compact
+    assert "For structure-only changes" in skill_compact
     assert "When media import is primary" in skill_compact
     assert "media-row target hierarchy as typed structure-only rows" in skill_compact
     assert "never probe `object.create` or a separate assignment first" in skill_compact
@@ -765,18 +790,19 @@ def test_operate_business_selection_and_execution_domains_remain_explicit() -> N
         "use `object.set` instead when import is subordinate to a broader "
         "atomic mutation of existing targets"
     ) in skill_compact
-    assert "request root itself does not count" in compact
-    assert "named request root itself does not count" in compact
-    assert "locks the whole batch to `object.set`" in compact
-    assert "even when the same request also adds a wholly new subtree" in compact
+    assert "An insertion target is not the request root" in compact
     assert (
-        "After any required selected-subset identity gate, its first "
-        "transaction-contract command is `operation-schema object.set`"
+        "Broad `object.set` is only for one larger atomic outcome"
+    ) in compact
+    assert "a root edit plus a new subtree" in compact
+    assert (
+        "After any required selected-subset identity gate, that batch starts with "
+        "`operation-schema object.set`"
     ) in compact
     assert "whose requested root does not already exist" in compact
-    assert "existing descendant container below the named request root" in compact
-    assert "explicitly identifies as the direct insertion target" in compact
-    assert "Each existing insertion target gets its own `objects[]` row" in compact
+    assert "insertion into a named existing descendant" in compact
+    assert "is not the request root" in compact
+    assert "give each one an `objects[]` row" in compact
     assert "only genuinely new direct descendants" in compact
     assert (
         "follow the selected operation's returned versioned target contract"
@@ -784,6 +810,48 @@ def test_operate_business_selection_and_execution_domains_remain_explicit() -> N
     assert "`object.create` same-name-root merge goes directly" in compact
     assert "`object.set` uses its returned target base and dynamic metadata scope" in compact
     assert "Do not insert `project-default-work-units`" in compact
+
+
+def test_single_existing_object_edit_uses_its_dedicated_operation_before_object_set() -> None:
+    compact = " ".join(OPERATE.split())
+    skill_compact = " ".join(SKILL.split())
+    dedicated_row = (
+        "| One existing object's single rename, notes, scalar-property, or "
+        "reference edit | `object.setName`, `object.setNotes`, "
+        "`object.setProperty`, or `object.setReference` | broad `object.set` |"
+    )
+    broad_row = "| Larger atomic existing-target batch:"
+
+    assert "Existing-root status alone does not select `object.set`" in compact
+    assert dedicated_row in OPERATE
+    assert OPERATE.index(dedicated_row) < OPERATE.index(broad_row)
+    assert (
+        "one existing object's single rename/notes/property/reference edit "
+        "uses its dedicated operation"
+    ) in skill_compact
+    assert "`object.set` is for broader atomic existing-target work" in skill_compact
+    for broad_case in (
+        "several fields/properties/references on one root",
+        "an ordinary closed object-list change",
+        "multiple roots",
+        "a root edit plus a new subtree",
+        "insertion into a named existing descendant",
+    ):
+        assert broad_case in compact
+    assert compact.count("several fields/properties/references on one root") == 3
+    assert compact.count("an ordinary closed object-list change") == 3
+    assert "Plug-in, RTPC, and platform-link changes keep their dedicated operations" in compact
+    assert "Single-edit, plug-in, RTPC, and platform-link operations take precedence" in compact
+    assert "when those `object.set` conditions are absent" in compact
+    assert "all three `object.set` conditions" not in compact
+    assert (
+        "A named root that already exists and receives any notes, property, "
+        "reference, or list change locks the whole batch to `object.set`"
+    ) not in compact
+    assert (
+        "`object.set` is locked when the request changes fields/references on "
+        "an existing root"
+    ) not in compact
 
 
 def test_operate_uses_one_bank_scoped_replace_for_a_complete_inclusion_post_state() -> None:
