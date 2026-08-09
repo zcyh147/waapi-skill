@@ -159,6 +159,7 @@ from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[re
     FORBIDDEN_MODEL_AUTHORED_COMMAND_FIELDS,
     OPERATION_REQUEST_CONTRACT,
     PACKAGED_TRANSACTION_READBACK_URIS,
+    PREPARED_OPERATION_CONTRACT,
     UI_COMMAND_OPERATIONS,
     OperationContractError,
     VerificationResult,
@@ -196,7 +197,7 @@ from wwise_waapi.transaction_runtime import (  # noqa: E402  # pyright: ignore[r
     TRANSACTION_PREVIEW_CONTRACT,
     TransactionGuardError,
     build_project_guard,
-    build_transaction_artifact,
+    build_transaction_preview_artifact,
     validate_transaction_context_runtime_guards,
     validate_transaction_guards,
 )
@@ -5633,6 +5634,217 @@ def prepared_wire_path_io_audit(
     return io_audit
 
 
+def create_transaction_preview(
+    request_payload: Mapping[str, Any],
+    *,
+    args: argparse.Namespace,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Create one durable Preview from raw canonical operation-request JSON.
+
+    This is the single production ingress shared by every current or future
+    request Adapter.  It owns the complete fail-fast host/locality checks,
+    project and runtime guards, canonical reparse/preparation, immutable store
+    write, authorization state, and bounded review result.
+    """
+
+    if not isinstance(request_payload, Mapping) or (
+        request_payload.get("contract")
+        in {PREPARED_OPERATION_CONTRACT, TRANSACTION_PREVIEW_CONTRACT}
+        or "prepared_operation" in request_payload
+    ):
+        raise GatewayInputError(
+            "Transaction preview ingress requires one raw canonical "
+            "operation-request JSON object; parsed, prepared, and Preview "
+            "objects cannot bypass canonical reparse."
+        )
+
+    authoring_boundary = live_authoring_transaction_boundary(
+        request_payload,
+        command="preview",
+        live_info=live_info,
+        common=common,
+    )
+    if authoring_boundary is not None:
+        return authoring_boundary
+    locality_boundary = local_filesystem_transaction_boundary(
+        request_payload,
+        command="preview",
+        endpoint_host=connection.host,
+        common=common,
+    )
+    if locality_boundary is not None:
+        return locality_boundary
+    project_guard_mode, target_project_path = transaction_project_guard_spec(
+        request_payload,
+        version=detected_version,
+    )
+    project, project_call = current_project(
+        dispatcher,
+        connection=connection,
+        version=detected_version,
+        allow_none=project_guard_mode != PROJECT_GUARD_INVARIANT,
+    )
+    state_dir = resolve_transaction_state_directory(args, env=env)
+    if project is not None:
+        require_runtime_directory_outside_project(state_dir, project=project)
+    if target_project_path is not None:
+        require_runtime_directory_outside_project(
+            state_dir,
+            project={"path": target_project_path},
+        )
+    store = TransactionStore(state_dir)
+    project_guard = build_project_guard(
+        endpoint=common["endpoint"],
+        version=detected_version,
+        live_info=live_info,
+        project=project,
+        project_guard_mode=project_guard_mode,
+        target_project_path=target_project_path,
+    )
+    read_call = transaction_read_call(
+        dispatcher,
+        connection=connection,
+        version=detected_version,
+    )
+    read_call = metadata_cached_read_call(
+        read_call,
+        connection=connection,
+        version=detected_version,
+        live_info=live_info,
+        project=project,
+        state_dir=state_dir,
+    )
+    artifact = build_transaction_preview_artifact(
+        request_payload,
+        live_version=detected_version,
+        read_call=read_call,
+        project_guard=project_guard,
+        skill_root=SKILL_ROOT,
+        ttl_seconds=args.ttl,
+    ).as_dict()
+    prepared = require_mapping(
+        artifact.get("prepared_operation"),
+        "prepared operation",
+    )
+    pre_state = require_mapping(
+        prepared.get("pre_state"),
+        "prepared pre-state",
+    )
+    sealed_contract = pre_state.get("execution_contract")
+    if (
+        isinstance(sealed_contract, Mapping)
+        and sealed_contract.get("effect") == "read"
+    ):
+        if sealed_read_transaction_contract(artifact) is None:
+            raise GatewayInputError(
+                "Read transaction preview did not match its current packaged "
+                "execution contract."
+            )
+        if args.apply:
+            raise GatewayInputError(
+                "preview --apply is reserved for project or process changes; "
+                "omit --apply for this read transaction."
+            )
+    transaction_id = new_transaction_id()
+    current_policy = load_gateway_config(env).config.project_modification_policy
+    if args.apply and current_policy == "read_only":
+        raise GatewayInputError(
+            "project_modification_policy=read_only blocks transaction "
+            "requested project change"
+        )
+    created = store.create_preview(transaction_id, artifact)
+    operation = request_payload.get("operation")
+    confirmation_only = operation in EXPLICIT_CONFIRMATION_ONLY_OPERATIONS
+    if args.apply and current_policy == "allow_changes" and not confirmation_only:
+        transaction = store.authorize_by_policy(
+            transaction_id,
+            policy="allow_changes",
+            authority=POLICY_AUTHORIZATION_AUTHORITY,
+        )
+        authorization = {
+            "mode": AUTHORIZATION_MODE_POLICY,
+            "policy": "allow_changes",
+            "authority": POLICY_AUTHORIZATION_AUTHORITY,
+            "explicit_confirmation": False,
+            "notice_required": True,
+        }
+        next_command = transaction_next_command(
+            "execute",
+            ["execute", transaction_id],
+        )
+        status = TransactionState.POLICY_AUTHORIZED.value
+    else:
+        transaction = store.submit_for_confirmation(transaction_id)
+        authorization = {
+            "mode": AUTHORIZATION_MODE_EXPLICIT_CONFIRMATION,
+            "policy": current_policy,
+            "explicit_confirmation": False,
+            "notice_required": True,
+            "requires_later_user_message": True,
+        }
+        if confirmation_only:
+            authorization["reason"] = "dangerous_host_control_requires_confirmation"
+        next_command = transaction_next_command(
+            "transaction-show",
+            ["transaction-show", transaction_id, "--summary-only"],
+            requires_later_user_message=True,
+        )
+        status = TransactionState.AWAITING_CONFIRMATION.value
+    cleanup = transaction_cleanup_payload(prepared, phase="preview")
+    try:
+        review = transaction_show_summary(
+            artifact,
+            store.read_events(transaction_id),
+        )
+    except GatewayResultShapeError as exc:
+        exc.details.update(
+            {
+                "transaction_id": transaction_id,
+                "state": transaction.state.value,
+                "artifact_hash": created.artifact_hash,
+            }
+        )
+        raise
+    project_call_summary = (
+        dispatch_call_summary(project_call)
+        if isinstance(project_call, Mapping)
+        else None
+    )
+    agent_result = transaction_agent_result(
+        request=require_mapping(artifact.get("request"), "transaction request"),
+        transaction_id=transaction_id,
+        artifact_hash=created.artifact_hash,
+        state=transaction.state.value,
+        executed=False,
+        authorization=authorization,
+        cleanup=cleanup,
+        next_command=next_command,
+    )
+    return {
+        "ok": True,
+        "status": status,
+        **common,
+        "transaction_id": transaction_id,
+        "state": transaction.state.value,
+        "artifact_hash": created.artifact_hash,
+        **review,
+        "project_call": project_call_summary,
+        "executed": False,
+        "verified": False,
+        "change_requested": bool(args.apply),
+        "authorization": authorization,
+        "cleanup": cleanup,
+        "next_command": next_command,
+        "agent_result": agent_result,
+    }
+
+
 def dispatch_transaction_command(
     args: argparse.Namespace,
     *,
@@ -5643,187 +5855,24 @@ def dispatch_transaction_command(
     dispatcher: WwiseDispatcher,
     common: Mapping[str, Any],
 ) -> dict[str, Any]:
+    if args.command == "preview":
+        request_payload = parse_preview_request_object(args.request_json)
+        return create_transaction_preview(
+            request_payload,
+            args=args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+
     read_call = transaction_read_call(
         dispatcher,
         connection=connection,
         version=detected_version,
     )
-    if args.command == "preview":
-        request_payload = parse_preview_request_object(args.request_json)
-        authoring_boundary = live_authoring_transaction_boundary(
-            request_payload,
-            command="preview",
-            live_info=live_info,
-            common=common,
-        )
-        if authoring_boundary is not None:
-            return authoring_boundary
-        locality_boundary = local_filesystem_transaction_boundary(
-            request_payload,
-            command="preview",
-            endpoint_host=connection.host,
-            common=common,
-        )
-        if locality_boundary is not None:
-            return locality_boundary
-        project_guard_mode, target_project_path = transaction_project_guard_spec(
-            request_payload,
-            version=detected_version,
-        )
-        project, project_call = current_project(
-            dispatcher,
-            connection=connection,
-            version=detected_version,
-            allow_none=project_guard_mode != PROJECT_GUARD_INVARIANT,
-        )
-        state_dir = resolve_transaction_state_directory(args, env=env)
-        if project is not None:
-            require_runtime_directory_outside_project(state_dir, project=project)
-        if target_project_path is not None:
-            require_runtime_directory_outside_project(
-                state_dir,
-                project={"path": target_project_path},
-            )
-        store = TransactionStore(state_dir)
-        project_guard = build_project_guard(
-            endpoint=common["endpoint"],
-            version=detected_version,
-            live_info=live_info,
-            project=project,
-            project_guard_mode=project_guard_mode,
-            target_project_path=target_project_path,
-        )
-        read_call = metadata_cached_read_call(
-            read_call,
-            connection=connection,
-            version=detected_version,
-            live_info=live_info,
-            project=project,
-            state_dir=state_dir,
-        )
-        artifact = build_transaction_artifact(
-            request_payload,
-            live_version=detected_version,
-            read_call=read_call,
-            project_guard=project_guard,
-            skill_root=SKILL_ROOT,
-            ttl_seconds=args.ttl,
-        ).as_dict()
-        prepared = require_mapping(
-            artifact.get("prepared_operation"),
-            "prepared operation",
-        )
-        pre_state = require_mapping(
-            prepared.get("pre_state"),
-            "prepared pre-state",
-        )
-        sealed_contract = pre_state.get("execution_contract")
-        if (
-            isinstance(sealed_contract, Mapping)
-            and sealed_contract.get("effect") == "read"
-        ):
-            if sealed_read_transaction_contract(artifact) is None:
-                raise GatewayInputError(
-                    "Read transaction preview did not match its current packaged "
-                    "execution contract."
-                )
-            if args.apply:
-                raise GatewayInputError(
-                    "preview --apply is reserved for project or process changes; "
-                    "omit --apply for this read transaction."
-                )
-        transaction_id = new_transaction_id()
-        current_policy = load_gateway_config(env).config.project_modification_policy
-        if args.apply and current_policy == "read_only":
-            raise GatewayInputError(
-                "project_modification_policy=read_only blocks transaction "
-                "requested project change"
-            )
-        created = store.create_preview(transaction_id, artifact)
-        operation = request_payload.get("operation")
-        confirmation_only = operation in EXPLICIT_CONFIRMATION_ONLY_OPERATIONS
-        if args.apply and current_policy == "allow_changes" and not confirmation_only:
-            transaction = store.authorize_by_policy(
-                transaction_id,
-                policy="allow_changes",
-                authority=POLICY_AUTHORIZATION_AUTHORITY,
-            )
-            authorization = {
-                "mode": AUTHORIZATION_MODE_POLICY,
-                "policy": "allow_changes",
-                "authority": POLICY_AUTHORIZATION_AUTHORITY,
-                "explicit_confirmation": False,
-                "notice_required": True,
-            }
-            next_command = transaction_next_command(
-                "execute",
-                ["execute", transaction_id],
-            )
-            status = TransactionState.POLICY_AUTHORIZED.value
-        else:
-            transaction = store.submit_for_confirmation(transaction_id)
-            authorization = {
-                "mode": AUTHORIZATION_MODE_EXPLICIT_CONFIRMATION,
-                "policy": current_policy,
-                "explicit_confirmation": False,
-                "notice_required": True,
-                "requires_later_user_message": True,
-            }
-            if confirmation_only:
-                authorization["reason"] = "dangerous_host_control_requires_confirmation"
-            next_command = transaction_next_command(
-                "transaction-show",
-                ["transaction-show", transaction_id, "--summary-only"],
-                requires_later_user_message=True,
-            )
-            status = TransactionState.AWAITING_CONFIRMATION.value
-        cleanup = transaction_cleanup_payload(prepared, phase="preview")
-        try:
-            review = transaction_show_summary(
-                artifact,
-                store.read_events(transaction_id),
-            )
-        except GatewayResultShapeError as exc:
-            exc.details.update(
-                {
-                    "transaction_id": transaction_id,
-                    "state": transaction.state.value,
-                    "artifact_hash": created.artifact_hash,
-                }
-            )
-            raise
-        project_call_summary = (
-            dispatch_call_summary(project_call)
-            if isinstance(project_call, Mapping)
-            else None
-        )
-        agent_result = transaction_agent_result(
-            request=require_mapping(artifact.get("request"), "transaction request"),
-            transaction_id=transaction_id,
-            artifact_hash=created.artifact_hash,
-            state=transaction.state.value,
-            executed=False,
-            authorization=authorization,
-            cleanup=cleanup,
-            next_command=next_command,
-        )
-        return {
-            "ok": True,
-            "status": status,
-            **common,
-            "transaction_id": transaction_id,
-            "state": transaction.state.value,
-            "artifact_hash": created.artifact_hash,
-            **review,
-            "project_call": project_call_summary,
-            "executed": False,
-            "verified": False,
-            "change_requested": bool(args.apply),
-            "authorization": authorization,
-            "cleanup": cleanup,
-            "next_command": next_command,
-            "agent_result": agent_result,
-        }
 
     store = resolve_transaction_store(args, env=env)
     transaction_id = args.transaction_id

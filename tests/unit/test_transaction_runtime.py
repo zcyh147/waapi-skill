@@ -8,13 +8,19 @@ from typing import Any, Mapping
 
 import pytest  # pyright: ignore[reportMissingImports]
 
-from wwise_waapi.operation_registry import OPERATION_REQUEST_CONTRACT  # pyright: ignore[reportMissingImports]
+from wwise_waapi.canonical import canonical_sha256  # pyright: ignore[reportMissingImports]
+from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
+    OPERATION_REQUEST_CONTRACT,
+    PREPARED_OPERATION_CONTRACT,
+    OperationContractError,
+    parse_operation_request,
+)
 from wwise_waapi.transaction_runtime import (  # pyright: ignore[reportMissingImports]
     TRANSACTION_PREVIEW_CONTRACT,
     TransactionGuardError,
     build_project_guard,
     build_runtime_guard,
-    build_transaction_artifact,
+    build_transaction_preview_artifact,
     canonical_project_path,
     validate_transaction_guards,
 )
@@ -108,7 +114,7 @@ def test_canonical_project_path_rejects_normalizing_or_relative_spelling(
 
 
 def test_transaction_artifact_binds_closed_preview_runtime_guard_and_expiry() -> None:
-    artifact = build_transaction_artifact(
+    artifact = build_transaction_preview_artifact(
         request(),
         live_version="2022.1",
         read_call=reader,
@@ -139,8 +145,96 @@ def test_transaction_artifact_binds_closed_preview_runtime_guard_and_expiry() ->
     assert artifact["expires_at"] == "2026-07-14T06:10:00.000000Z"
 
 
+def test_transaction_preview_ingress_preserves_the_legacy_json_artifact_contract() -> None:
+    raw_request = request()
+
+    artifact = build_transaction_preview_artifact(
+        raw_request,
+        live_version="2022.1",
+        read_call=reader,
+        project_guard=project_guard(),
+        skill_root=SKILL_ROOT,
+        now=NOW,
+        ttl_seconds=600,
+    ).as_dict()
+
+    prepared = artifact["prepared_operation"]
+    assert artifact["request"] == raw_request
+    assert prepared["request"] == raw_request
+    assert canonical_sha256(prepared["semantic_preview"]) == (
+        "b9aa45ddd7c2bfdcf504351f9692bb523c4facb33c368fba813d00df68c3eaf1"
+    )
+    assert prepared["dispatch"] == {
+        "uri": "ak.wwise.core.object.setNotes",
+        "args": {"object": GUID, "value": "after"},
+        "options": {},
+    }
+    assert prepared["verification_plan"] == {
+        "kind": "same-guid-notes",
+        "object_id": GUID,
+        "expected_notes": "after",
+    }
+    assert prepared["cleanup"] == {
+        "kind": "restore-pre-state",
+        "snapshot": {
+            "id": GUID,
+            "name": "Target",
+            "type": "Sound",
+            "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Target",
+            "parent": {"id": "{parent}"},
+            "notes": "before",
+        },
+    }
+    assert artifact["project_guard"] == project_guard()
+    assert artifact["runtime_guard"] == build_runtime_guard(SKILL_ROOT, "2022.1")
+
+
+@pytest.mark.parametrize(
+    "bypass",
+    (
+        pytest.param(
+            lambda raw: parse_operation_request(raw, expected_version="2022.1"),
+            id="preparsed-operation-request",
+        ),
+        pytest.param(
+            lambda raw: {
+                "contract": PREPARED_OPERATION_CONTRACT,
+                "request": raw,
+                "prepared_operation": {"dispatch": {"uri": "untrusted"}},
+            },
+            id="pseudo-prepared-operation",
+        ),
+    ),
+)
+def test_transaction_preview_ingress_rejects_prevalidated_bypasses_before_live_reads(
+    bypass: Any,
+) -> None:
+    live_reads: list[tuple[str, Mapping[str, Any], Mapping[str, Any]]] = []
+
+    def unexpected_reader(
+        uri: str,
+        args: Mapping[str, Any],
+        options: Mapping[str, Any],
+    ) -> Mapping[str, Any]:
+        live_reads.append((uri, args, options))
+        return {}
+
+    with pytest.raises(OperationContractError) as rejected:
+        build_transaction_preview_artifact(
+            bypass(request()),  # type: ignore[arg-type]
+            live_version="2022.1",
+            read_call=unexpected_reader,
+            project_guard=project_guard(),
+            skill_root=SKILL_ROOT,
+            now=NOW,
+        )
+
+    assert rejected.value.error_code == "INVALID_REQUEST"
+    assert live_reads == []
+
+
 def test_guard_validation_accepts_same_context_and_rejects_expiry_or_project_drift() -> None:
-    artifact = build_transaction_artifact(
+    artifact = build_transaction_preview_artifact(
         request(),
         live_version="2022.1",
         read_call=reader,

@@ -2522,7 +2522,7 @@ def test_preview_uses_bounded_review_for_set04_scale_artifact_without_losing_sta
 
     monkeypatch.setattr(
         waapi_gateway,
-        "build_transaction_artifact",
+        "build_transaction_preview_artifact",
         lambda *args, **kwargs: StubArtifact(),
     )
     payload = preview(
@@ -3678,6 +3678,125 @@ def test_preview_live_resolves_and_persists_immutable_awaiting_artifact_with_ttl
         "ak.wwise.core.object.get",
     ]
     assert not any(call[0] == "ak.wwise.core.object.create" for call in client.calls)
+
+
+def test_public_gateway_legacy_json_preview_preserves_canonical_ingress_evidence(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "legacy-parity-state"
+    raw_request = set_notes_request()
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [live_info()],
+            "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [{"return": [object_row()]}],
+        }
+    )
+
+    payload = preview(
+        raw_request,
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        client=client,
+    )
+
+    artifact = TransactionStore(state_dir).load_preview(
+        payload["transaction_id"]
+    ).artifact
+    prepared = artifact["prepared_operation"]
+    assert artifact["request"] == raw_request
+    assert prepared["request"] == raw_request
+    assert {
+        name: waapi_gateway.canonical_sha256(prepared[name])
+        for name in (
+            "semantic_preview",
+            "dispatch",
+            "resolved_roles",
+            "pre_state",
+            "verification_plan",
+            "cleanup",
+        )
+    } == {
+        "semantic_preview": "eceab7e87eca5a77bf7ae1ee9bc178427b68097b967a1535f7f93c8363c980ea",
+        "dispatch": "b8ccc42b55168a479fe6a14b7719f315138794c7b56bec2e27de6f336305c4c4",
+        "resolved_roles": "47338924af9577e18c63efd4be0b0cdaa61e641c06e201ad86f749225e1ede16",
+        "pre_state": "f0a2bc467715f31ed8a368bc47571331166ee6137dac1c6fb9730b7cfdf656f5",
+        "verification_plan": "1d3f23aafa5c99092c9454e85545de2333365ea7f89d710bd5753117a043fe21",
+        "cleanup": "f934bcfbbee2f0e6c1914e74b14b4b4277a16b493db78d23c2f0dcaee133cb66",
+    }
+    assert artifact["project_guard"] == waapi_gateway.build_project_guard(
+        endpoint=payload["endpoint"],
+        version="2022.1",
+        live_info=live_info(),
+        project=project(),
+    )
+    assert payload["preview_summary"] == {
+        "contract": artifact["contract"],
+        "request": raw_request,
+        "dispatch": prepared["dispatch"],
+        "resolved_roles": prepared["resolved_roles"],
+        "pre_state": prepared["pre_state"],
+        "verification_plan": prepared["verification_plan"],
+        "cleanup": waapi_gateway.transaction_cleanup_payload(
+            prepared,
+            phase="preview",
+        ),
+        "project_guard_fingerprint": artifact["project_guard"]["fingerprint"],
+        "runtime_guard_fingerprint": artifact["runtime_guard"]["fingerprint"],
+        "expires_at": artifact["expires_at"],
+    }
+    assert [call[0] for call in client.calls] == [
+        "ak.wwise.core.getInfo",
+        "ak.wwise.core.getProjectInfo",
+        "ak.wwise.core.object.get",
+    ]
+
+
+@pytest.mark.parametrize(
+    "bypass",
+    (
+        pytest.param(
+            parse_operation_request(set_notes_request(), expected_version="2022.1"),
+            id="preparsed-operation-request",
+        ),
+        pytest.param(
+            {
+                "contract": "waapi-skill.prepared-operation/v1",
+                "request": set_notes_request(),
+                "prepared_operation": {"dispatch": {"uri": "untrusted"}},
+            },
+            id="pseudo-prepared-operation",
+        ),
+    ),
+)
+def test_direct_transaction_preview_ingress_rejects_prevalidated_bypasses_before_io(
+    bypass: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class ForbiddenDependency:
+        def __getattribute__(self, name: str) -> Any:
+            raise AssertionError(f"preview bypass reached dependency {name}")
+
+    monkeypatch.setattr(
+        waapi_gateway,
+        "TransactionStore",
+        lambda *args, **kwargs: pytest.fail("preview bypass reached the store"),
+    )
+
+    with pytest.raises(
+        waapi_gateway.GatewayInputError,
+        match="raw canonical operation-request JSON object",
+    ):
+        waapi_gateway.create_transaction_preview(
+            bypass,  # type: ignore[arg-type]
+            args=ForbiddenDependency(),
+            env=ForbiddenDependency(),
+            connection=ForbiddenDependency(),
+            detected_version="2022.1",
+            live_info=ForbiddenDependency(),
+            dispatcher=ForbiddenDependency(),
+            common=ForbiddenDependency(),
+        )
 
 
 def test_preview_agent_result_preserves_quotes_backslashes_and_unicode_from_artifact(
@@ -6181,7 +6300,7 @@ def test_confirmed_named_soundbank_transaction_stays_confirmed_on_remote_execute
 
     monkeypatch.setattr(
         waapi_gateway,
-        "build_transaction_artifact",
+        "build_transaction_preview_artifact",
         lambda *args, **kwargs: StubArtifact(),
     )
     transaction = preview(

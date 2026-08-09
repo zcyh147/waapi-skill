@@ -264,7 +264,7 @@ def build_runtime_guard(skill_root: Path, version: str) -> dict[str, Any]:
     return {"contract": RUNTIME_GUARD_CONTRACT, **body, "fingerprint": canonical_sha256(body)}
 
 
-def build_transaction_artifact(
+def build_transaction_preview_artifact(
     request_payload: Mapping[str, Any],
     *,
     live_version: str,
@@ -274,6 +274,14 @@ def build_transaction_artifact(
     now: datetime | None = None,
     ttl_seconds: int = DEFAULT_PREVIEW_TTL_SECONDS,
 ) -> TransactionArtifact:
+    """Build a Preview from one raw canonical request, owning its reparse.
+
+    Callers must provide the JSON-shaped ``OperationRequest`` payload rather
+    than a parsed or prepared in-memory object.  This Interface deliberately
+    repeats strict parsing before every immutable Preview so no upstream
+    Adapter can bypass version, shape, preparation, or verification checks.
+    """
+
     if ttl_seconds <= 0:
         raise ValueError("ttl_seconds must be greater than zero")
     request = parse_operation_request(request_payload, expected_version=live_version)
@@ -750,7 +758,7 @@ __all__ = [
     "build_project_guard",
     "canonical_project_path",
     "build_runtime_guard",
-    "build_transaction_artifact",
+    "build_transaction_preview_artifact",
     "validate_transaction_context_runtime_guards",
     "validate_transaction_guards",
 ]
