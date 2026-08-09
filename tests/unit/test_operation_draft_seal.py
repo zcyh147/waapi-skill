@@ -251,6 +251,156 @@ class WeatherClient:
         self.disconnected = True
 
 
+WEAPONS_TARGETS = (
+    (
+        "{41000000-0000-0000-0000-000000000001}",
+        "Rifle_Close_Old",
+        r"\Actor-Mixer Hierarchy\Default Work Unit\Weapons\Rifle_Close_Old",
+    ),
+    (
+        "{41000000-0000-0000-0000-000000000002}",
+        "Rifle_Tail",
+        r"\Actor-Mixer Hierarchy\Default Work Unit\Weapons\Rifle_Tail",
+    ),
+    (
+        "{41000000-0000-0000-0000-000000000003}",
+        "Rifle_Mechanical",
+        r"\Actor-Mixer Hierarchy\Default Work Unit\Weapons\Rifle_Mechanical",
+    ),
+)
+WEAPONS_BUS_ID = "{42000000-0000-0000-0000-000000000001}"
+WEAPONS_BUS_PATH = r"\Master-Mixer Hierarchy\Default Work Unit\Weapons"
+
+
+def weapons_request(version: str) -> dict[str, Any]:
+    return {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": version,
+        "operation": "object.set",
+        "arguments": {
+            "objects": [
+                {
+                    "object": {"kind": "id", "value": WEAPONS_TARGETS[0][0]},
+                    "name": "RFL_Close",
+                    "notes": "release-ready | close",
+                    "references": [
+                        {
+                            "name": "OutputBus",
+                            "target": {"kind": "path", "value": WEAPONS_BUS_PATH},
+                        }
+                    ],
+                },
+                {
+                    "object": {"kind": "id", "value": WEAPONS_TARGETS[1][0]},
+                    "properties": [{"name": "Volume", "value": -3.0}],
+                },
+                {
+                    "object": {"kind": "id", "value": WEAPONS_TARGETS[2][0]},
+                    "notes": "release-ready | mechanical",
+                    "references": [
+                        {
+                            "name": "OutputBus",
+                            "target": {"kind": "path", "value": WEAPONS_BUS_PATH},
+                        }
+                    ],
+                },
+            ],
+            "on_name_conflict": "fail",
+        },
+    }
+
+
+class WeaponsClient:
+    def __init__(self, version: str) -> None:
+        self.version = version
+        self.calls: list[
+            tuple[str, Mapping[str, Any] | None, Mapping[str, Any] | None]
+        ] = []
+        self.disconnected = False
+        self._targets = {
+            object_id: {
+                "id": object_id,
+                "name": name,
+                "type": "Sound",
+                "path": path,
+                "parent": {"id": PARENT_GUID},
+                "notes": "before",
+                "Volume": 0.0,
+                "OverrideOutput": False,
+                "OutputBus": {"id": "{master-bus}"},
+            }
+            for object_id, name, path in WEAPONS_TARGETS
+        }
+        self._bus = {
+            "id": WEAPONS_BUS_ID,
+            "name": "Weapons",
+            "type": "Bus",
+            "path": WEAPONS_BUS_PATH,
+            "parent": {"id": "{master-work-unit}"},
+            "notes": "",
+        }
+
+    def call(
+        self,
+        uri: str,
+        args: Mapping[str, Any] | None = None,
+        options: Mapping[str, Any] | None = None,
+    ) -> Any:
+        self.calls.append((uri, args, options))
+        call_args = dict(args or {})
+        if uri == "ak.wwise.core.getInfo":
+            return live_info(self.version)
+        if uri == "ak.wwise.core.getProjectInfo":
+            return project_row()
+        if uri == "ak.wwise.core.object.getTypes":
+            return {"return": [{"classId": 1, "name": "Sound", "type": "Sound"}]}
+        if uri == "ak.wwise.core.object.getPropertyInfo":
+            token = call_args["property"]
+            if token == "Volume":
+                return {
+                    "name": "Volume",
+                    "type": "Real32",
+                    "restriction": {"type": "range", "min": -96.3, "max": 12.0},
+                }
+            if token == "OutputBus":
+                return {
+                    "name": "OutputBus",
+                    "type": "Reference",
+                    "supports": {"reference": True},
+                    "dependencies": [
+                        {
+                            "type": "override",
+                            "action": "Enable",
+                            "context": "Self",
+                            "property": "OverrideOutput",
+                        }
+                    ],
+                }
+            if token == "OverrideOutput":
+                return {"name": "OverrideOutput", "type": "Boolean"}
+            raise AssertionError(f"Unexpected property metadata token: {token}")
+        if uri != "ak.wwise.core.object.get":
+            raise AssertionError(f"Unexpected WAAPI call: {uri} {args!r} {options!r}")
+        source = call_args.get("from")
+        if isinstance(source, Mapping) and "path" in source:
+            if source["path"] == [WEAPONS_BUS_PATH]:
+                return {"return": [dict(self._bus)]}
+            expected_renamed_path = str(WEAPONS_TARGETS[0][2]).rsplit("\\", 1)[0]
+            expected_renamed_path += r"\RFL_Close"
+            assert source["path"] == [expected_renamed_path]
+            return {"return": []}
+        if isinstance(source, Mapping) and "id" in source:
+            object_id = source["id"][0]
+            row = self._targets[object_id]
+            if call_args.get("transform"):
+                return {"return": []}
+            return {"return": [dict(row)]}
+        raise AssertionError(f"Unexpected object.get shape: {args!r} {options!r}")
+
+    def disconnect(self) -> None:
+        self.disconnected = True
+
+
 def project_row() -> dict[str, Any]:
     return {
         "id": PROJECT_GUID,
@@ -1295,6 +1445,180 @@ def test_weather_batch_composer_matches_legacy_preview_exactly(
     assert composer_artifact["prepared_operation"]["dispatch"]["uri"] == (
         "ak.wwise.core.object.set"
     )
+    assert composer_client.calls == legacy_client.calls
+    assert check_client.disconnected is composer_client.disconnected is True
+    assert legacy_client.disconnected is True
+    assert list(composer_payload)[-1] == list(legacy_payload)[-1] == "agent_result"
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2025.1"))
+def test_weapons_mixed_batch_composer_matches_legacy_preview_exactly(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    version: str,
+) -> None:
+    original_builder = waapi_gateway.build_transaction_preview_artifact
+    fixed_now = datetime(2026, 8, 10, 12, 0, tzinfo=timezone.utc)
+
+    def deterministic_builder(*args: Any, **kwargs: Any) -> Any:
+        kwargs["now"] = fixed_now
+        return original_builder(*args, **kwargs)
+
+    monkeypatch.setattr(
+        waapi_gateway,
+        "build_transaction_preview_artifact",
+        deterministic_builder,
+    )
+    expected_request = weapons_request(version)
+    composer_root = tmp_path / "composer"
+    _code, started = offline_execute(
+        composer_root,
+        "--version",
+        version,
+        "draft-start",
+        "object.set",
+    )
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    revision = 1
+    configured = apply_action(
+        composer_root,
+        draft_id,
+        authority,
+        revision,
+        {"action": "set_request_option", "name": "on_name_conflict", "value": "fail"},
+    )
+    revision = configured["draft"]["revision"]
+    for expected_row in expected_request["arguments"]["objects"]:
+        targeted = apply_action(
+            composer_root,
+            draft_id,
+            authority,
+            revision,
+            {"action": "add_target", "selector": expected_row["object"]},
+        )
+        revision = targeted["draft"]["revision"]
+        target_handle = targeted["draft"]["current_facts"][-1]["handle"]
+        for field_name in ("name", "notes"):
+            if field_name in expected_row:
+                changed = apply_action(
+                    composer_root,
+                    draft_id,
+                    authority,
+                    revision,
+                    {
+                        "action": "set_target_field",
+                        "target_handle": target_handle,
+                        "name": field_name,
+                        "value": expected_row[field_name],
+                    },
+                )
+                revision = changed["draft"]["revision"]
+        for property_row in expected_row.get("properties", []):
+            changed = apply_action(
+                composer_root,
+                draft_id,
+                authority,
+                revision,
+                {
+                    "action": "set_property",
+                    "target_handle": target_handle,
+                    "name": property_row["name"],
+                    "value": property_row["value"],
+                },
+            )
+            revision = changed["draft"]["revision"]
+        for reference_row in expected_row.get("references", []):
+            changed = apply_action(
+                composer_root,
+                draft_id,
+                authority,
+                revision,
+                {
+                    "action": "set_reference",
+                    "owner_handle": target_handle,
+                    "name": reference_row["name"],
+                    "target": reference_row["target"],
+                },
+            )
+            revision = changed["draft"]["revision"]
+
+    check_client = WeaponsClient(version)
+    check_code, checked = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(composer_root / "state"),
+            "draft-check",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(revision),
+        ],
+        env=gateway_env(composer_root, version=version),
+        client_factory=lambda _url: check_client,
+    )
+    assert check_code == 0, json.dumps(
+        {"result": checked, "calls": check_client.calls},
+        indent=2,
+        sort_keys=True,
+    )
+    checked_revision = checked["draft"]["revision"]
+    composer_client = WeaponsClient(version)
+    composer_code, composer_payload = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(composer_root / "state"),
+            "preview-from-draft",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(checked_revision),
+            "--apply",
+            "--ttl",
+            "300",
+        ],
+        env=gateway_env(composer_root, version=version),
+        client_factory=lambda _url: composer_client,
+    )
+    assert composer_code == 0, composer_payload
+    composer_artifact = TransactionStore(composer_root / "state").load_preview(
+        composer_payload["transaction_id"]
+    ).artifact
+
+    legacy_root = tmp_path / "legacy"
+    legacy_client = WeaponsClient(version)
+    legacy_code, legacy_payload = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(legacy_root / "state"),
+            "legacy-preview",
+            "--request-json",
+            json.dumps(expected_request),
+            "--apply",
+            "--ttl",
+            "300",
+        ],
+        env=gateway_env(legacy_root, version=version),
+        client_factory=lambda _url: legacy_client,
+    )
+    assert legacy_code == 0, legacy_payload
+    legacy_artifact = TransactionStore(legacy_root / "state").load_preview(
+        legacy_payload["transaction_id"]
+    ).artifact
+
+    assert composer_artifact == legacy_artifact
+    assert composer_artifact["request"] == expected_request
+    assert composer_payload["artifact_hash"] == legacy_payload["artifact_hash"]
+    assert composer_payload["preview_summary"] == legacy_payload["preview_summary"]
+    assert composer_payload["authorization"] == legacy_payload["authorization"]
+    assert composer_payload["cleanup"] == legacy_payload["cleanup"]
+    dispatch = composer_artifact["prepared_operation"]["dispatch"]
+    assert dispatch["uri"] == "ak.wwise.core.object.set"
+    assert dispatch["args"]["objects"][0]["@OutputBus"] == WEAPONS_BUS_ID
+    assert dispatch["args"]["objects"][0]["@OverrideOutput"] is True
+    assert dispatch["args"]["objects"][2]["@OutputBus"] == WEAPONS_BUS_ID
     assert composer_client.calls == legacy_client.calls
     assert check_client.disconnected is composer_client.disconnected is True
     assert legacy_client.disconnected is True

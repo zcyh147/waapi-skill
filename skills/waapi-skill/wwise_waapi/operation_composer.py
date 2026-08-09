@@ -73,6 +73,8 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
         "clear_target_field",
         "set_property",
         "remove_property",
+        "set_reference",
+        "remove_reference",
         "add_child",
         "set_node_field",
         "clear_node_field",
@@ -222,6 +224,7 @@ def apply_composer_action(
                 "selector": selector,
                 "fields": {},
                 "properties": [],
+                "references": [],
                 "children": [],
                 "lists": [],
                 "import": None,
@@ -315,6 +318,49 @@ def apply_composer_action(
                 details={"name": name},
             )
         del properties[match_index]
+        return normalized, action_name
+    if action_name in {"set_reference", "remove_reference"}:
+        required = (
+            ("contract", "action", "owner_handle", "name", "target")
+            if action_name == "set_reference"
+            else ("contract", "action", "owner_handle", "name")
+        )
+        _require_exact_keys(action, required=required, label=f"{action_name} action")
+        owner = _owner_for_handle(normalized, action.get("owner_handle"))
+        references = owner["references"]
+        assert isinstance(references, list)
+        name = action.get("name")
+        match_index = next(
+            (
+                index
+                for index, existing in enumerate(references)
+                if existing["name"] == name
+            ),
+            None,
+        )
+        if action_name == "set_reference":
+            descriptor = _validate_fragment(
+                version,
+                fragment="reference",
+                payload={"name": name, "target": action.get("target")},
+            )
+            if match_index is None:
+                if len(references) >= _property_limit(version):
+                    raise OperationComposerError(
+                        "Owner reference ceiling has been reached.",
+                        details={"limit": _property_limit(version)},
+                    )
+                references.append(descriptor)
+            else:
+                references[match_index] = descriptor
+        else:
+            if match_index is None:
+                raise OperationComposerError(
+                    "The requested reference fact does not exist.",
+                    details={"name": name},
+                )
+            del references[match_index]
+        _materialize_if_complete(operation, version, normalized)
         return normalized, action_name
     if action_name == "remove_target":
         _require_exact_keys(
@@ -702,6 +748,11 @@ def materialize_operation_request(
                     else {}
                 ),
                 **(
+                    {"references": [dict(item) for item in target["references"]]}
+                    if target["references"]
+                    else {}
+                ),
+                **(
                     {"children": [_materialize_node(item) for item in target["children"]]}
                     if target["children"]
                     else {}
@@ -759,6 +810,7 @@ def composition_projection(
             "selector": dict(target["selector"]),
             **dict(target["fields"]),
             "properties": [dict(item) for item in target["properties"]],
+            "references": [dict(item) for item in target["references"]],
             "children": [_node_projection(item) for item in target["children"]],
             "lists": [
                 {
@@ -807,6 +859,8 @@ def composition_projection(
             "clear_request_option",
             "add_target",
             "set_property",
+            "set_reference",
+            "remove_reference",
             "set_target_field",
             "clear_target_field",
             "add_child",
@@ -835,6 +889,8 @@ def composition_projection(
             "clear_request_option",
             "add_target",
             "set_property",
+            "set_reference",
+            "remove_reference",
             "set_target_field",
             "clear_target_field",
             "add_child",
@@ -919,7 +975,13 @@ def _normalize_composition(
         _require_json_object(raw_target, label="composition target")
         actual_target_keys = set(raw_target)
         required_target_keys = {"handle", "selector", "properties"}
-        optional_target_keys = {"fields", "children", "lists", "import"}
+        optional_target_keys = {
+            "fields",
+            "references",
+            "children",
+            "lists",
+            "import",
+        }
         if (
             not required_target_keys.issubset(actual_target_keys)
             or actual_target_keys - required_target_keys - optional_target_keys
@@ -958,6 +1020,22 @@ def _normalize_composition(
         names = [str(item["name"]) for item in properties]
         if len(names) != len(set(names)):
             raise OperationComposerError("Operation Draft property facts must be unique.")
+        raw_references = raw_target.get("references", [])
+        if (
+            not isinstance(raw_references, list)
+            or len(raw_references) > _property_limit(version)
+        ):
+            raise OperationComposerError(
+                "Operation Draft target references are invalid or exceed their ceiling.",
+                details={"limit": _property_limit(version)},
+            )
+        references = [
+            _validate_fragment(version, fragment="reference", payload=item)
+            for item in raw_references
+        ]
+        reference_names = [str(item["name"]) for item in references]
+        if len(reference_names) != len(set(reference_names)):
+            raise OperationComposerError("Operation Draft reference facts must be unique.")
         raw_fields = raw_target.get("fields", {})
         if not isinstance(raw_fields, Mapping):
             raise OperationComposerError("Operation Draft target fields are invalid.")
@@ -999,6 +1077,7 @@ def _normalize_composition(
                 "selector": selector,
                 "fields": fields,
                 "properties": properties,
+                "references": references,
                 "children": children,
                 "lists": lists,
                 "import": import_fact,
@@ -1088,6 +1167,7 @@ def _new_node(
         "handle": _new_handle(handle_factory=handle_factory, label="node"),
         "fields": {"type": type_name, "name": name},
         "properties": [],
+        "references": [],
         "children": [],
         "import": None,
     }
@@ -1114,9 +1194,10 @@ def _normalize_node(
     depth: int,
 ) -> dict[str, Any]:
     _require_json_object(value, label="composition node")
-    _require_exact_keys(
+    _require_allowed_keys(
         value,
         required=("handle", "fields", "properties", "children", "import"),
+        optional=("references",),
         label="composition node",
     )
     if depth > _composer_limit(version, "depth"):
@@ -1144,6 +1225,18 @@ def _normalize_node(
     ]
     if len({item["name"] for item in properties}) != len(properties):
         raise OperationComposerError("Operation Draft node property facts must be unique.")
+    raw_references = value.get("references", [])
+    if (
+        not isinstance(raw_references, list)
+        or len(raw_references) > _property_limit(version)
+    ):
+        raise OperationComposerError("Operation Draft node references are invalid.")
+    references = [
+        _validate_fragment(version, fragment="reference", payload=item)
+        for item in raw_references
+    ]
+    if len({item["name"] for item in references}) != len(references):
+        raise OperationComposerError("Operation Draft node reference facts must be unique.")
     raw_children = value.get("children")
     if not isinstance(raw_children, list) or len(raw_children) > _composer_limit(
         version, "children_per_parent"
@@ -1157,6 +1250,7 @@ def _normalize_node(
         "handle": handle,
         "fields": fields,
         "properties": properties,
+        "references": references,
         "children": children,
         "import": _normalize_import(value.get("import"), version=version),
     }
@@ -1168,9 +1262,12 @@ def _materialize_node(node: Mapping[str, Any]) -> dict[str, Any]:
     fields = dict(node["fields"])
     result = dict(fields)
     properties = node["properties"]
+    references = node["references"]
     children = node["children"]
     if properties:
         result["properties"] = [dict(item) for item in properties]
+    if references:
+        result["references"] = [dict(item) for item in references]
     if children:
         result["children"] = [_materialize_node(item) for item in children]
     if node["import"] is not None:
@@ -1183,6 +1280,7 @@ def _node_projection(node: Mapping[str, Any]) -> dict[str, Any]:
         "handle": node["handle"],
         **dict(node["fields"]),
         "properties": [dict(item) for item in node["properties"]],
+        "references": [dict(item) for item in node["references"]],
         "children": [_node_projection(item) for item in node["children"]],
         "import": (
             None if node["import"] is None else _import_projection(node["import"])
@@ -1262,6 +1360,7 @@ def _target_has_change(target: Mapping[str, Any]) -> bool:
     return bool(
         any(name in target["fields"] for name in ("name", "notes"))
         or target["properties"]
+        or target["references"]
         or target["children"]
         or target["lists"]
         or target["import"] is not None
@@ -1273,12 +1372,14 @@ def _projected_target_has_change(target: Mapping[str, Any]) -> bool:
         "handle",
         "selector",
         "properties",
+        "references",
         "children",
         "lists",
         "import",
     }
     return bool(
         target["properties"]
+        or target["references"]
         or target["children"]
         or target["lists"]
         or target["import"] is not None

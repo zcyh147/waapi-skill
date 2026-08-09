@@ -3668,16 +3668,75 @@ def object_set_composer_fragment_contract(version: str) -> dict[str, Any]:
         selector = properties["object"]
         scalar_property = properties["properties"]["items"]
         node_properties = properties["children"]["items"]["properties"]
+        list_properties = properties["lists"]["items"]["properties"]
+        import_properties = properties["import"]["properties"]
+        import_file_properties = import_properties["files"]["items"]["properties"]
     except (KeyError, TypeError) as exc:  # pragma: no cover - registry invariant
         raise RuntimeError(
             "object.set Registry schema no longer exposes the reviewed Composer fragments"
         ) from exc
+    coverage = {
+        "request_fields": sorted(argument_properties),
+        "target_fields": sorted(properties),
+        "node_fields": sorted(node_properties),
+        "list_fields": sorted(list_properties),
+        "import_fields": sorted(import_properties),
+        "import_file_fields": sorted(import_file_properties),
+    }
+    expected_coverage = {
+        "request_fields": [
+            "auto_add_to_source_control",
+            "list_mode",
+            "objects",
+            "on_name_conflict",
+            "platform",
+        ],
+        "target_fields": [
+            "children",
+            "import",
+            "list_mode",
+            "lists",
+            "name",
+            "notes",
+            "object",
+            "on_name_conflict",
+            "platform",
+            "properties",
+            "references",
+        ],
+        "node_fields": [
+            "children",
+            "import",
+            "language",
+            "name",
+            "notes",
+            "platform",
+            "properties",
+            "references",
+            "type",
+        ],
+        "list_fields": ["name", "objects"],
+        "import_fields": ["auto_add_to_source_control", "files"],
+        "import_file_fields": [
+            "audio_file",
+            "audio_file_base64",
+            "language",
+            "object_type",
+            "originals_subfolder",
+        ],
+    }
+    if coverage != expected_coverage:
+        raise RuntimeError(
+            "object.set Registry fields changed without a complete Composer Adapter mapping"
+        )
     return {
         "contract": "waapi-skill.object-set-composer-fragments/v1",
         "operation": "object.set",
         "version": version,
         "target_selector": _json_mapping(selector),
         "scalar_property": _json_mapping(scalar_property),
+        "reference": _json_mapping(properties["references"]["items"]),
+        "coverage": coverage,
         "request_options": {
             name: _json_mapping(argument_properties[name])
             for name in (
@@ -3769,6 +3828,21 @@ def validate_object_set_composer_fragment(
             ) from exc
         if len(descriptors) != 1:  # pragma: no cover - normalizer invariant
             raise RuntimeError("one scalar property fragment did not normalize once")
+        return descriptors[0].as_dict()
+    if fragment == "reference":
+        try:
+            descriptors = normalize_reference_descriptors(
+                [payload],
+                request_path="$.arguments.objects[0].references",
+            )
+        except ObjectOperationContractError as exc:
+            raise OperationContractError(
+                exc.error_code,
+                str(exc),
+                details=exc.details,
+            ) from exc
+        if len(descriptors) != 1:  # pragma: no cover - normalizer invariant
+            raise RuntimeError("one reference fragment did not normalize once")
         return descriptors[0].as_dict()
     if fragment == "request_option":
         if not isinstance(payload, Mapping) or set(payload) != {"name", "value"}:

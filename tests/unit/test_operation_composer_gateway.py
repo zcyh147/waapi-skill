@@ -10,16 +10,20 @@ from typing import Any, Mapping, Sequence
 
 import pytest
 
+from wwise_waapi.canonical import canonical_sha256  # pyright: ignore[reportMissingImports]
 from wwise_waapi.operation_drafts import (  # pyright: ignore[reportMissingImports]
     OperationDraftStore,
 )
 from wwise_waapi.operation_composer import (  # pyright: ignore[reportMissingImports]
     OperationComposerError,
+    operation_composer_contract,
     operation_composer_digest,
 )
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     LEGACY_JSON_INPUT_MODE,
+    list_operation_specs,
     operation_input_mode,
+    operation_request_schema_digest,
 )
 
 SCRIPT_PATH = (
@@ -43,6 +47,98 @@ TARGET_HANDLE_RE = re.compile(r"^odh1-[0-9a-f]{24}$")
 TARGET_ID = "{01234567-89AB-CDEF-0123-456789ABCDEF}"
 PARENT_ID = "{11111111-1111-1111-1111-111111111111}"
 PROJECT_ID = "{22222222-2222-2222-2222-222222222222}"
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+def test_object_set_composer_contract_covers_every_registry_field_shape(
+    version: str,
+) -> None:
+    contract = operation_composer_contract("object.set", version)
+
+    assert contract["registry_fragments"]["coverage"] == {
+        "request_fields": [
+            "auto_add_to_source_control",
+            "list_mode",
+            "objects",
+            "on_name_conflict",
+            "platform",
+        ],
+        "target_fields": [
+            "children",
+            "import",
+            "list_mode",
+            "lists",
+            "name",
+            "notes",
+            "object",
+            "on_name_conflict",
+            "platform",
+            "properties",
+            "references",
+        ],
+        "node_fields": [
+            "children",
+            "import",
+            "language",
+            "name",
+            "notes",
+            "platform",
+            "properties",
+            "references",
+            "type",
+        ],
+        "list_fields": ["name", "objects"],
+        "import_fields": ["auto_add_to_source_control", "files"],
+        "import_file_fields": [
+            "audio_file",
+            "audio_file_base64",
+            "language",
+            "object_type",
+            "originals_subfolder",
+        ],
+    }
+    assert {"set_reference", "remove_reference"}.issubset(contract["actions"])
+    assert ("add_import_file" in contract["actions"]) is (version != "2022.1")
+
+
+def test_object_set_composer_does_not_change_other_operation_schema_digests() -> None:
+    non_object_set_digests = {
+        f"{spec.name}@{version}": operation_request_schema_digest(spec.name, version)
+        for spec in list_operation_specs()
+        if spec.implemented and spec.name != "object.set"
+        for version in spec.supported_versions
+    }
+
+    assert len(non_object_set_digests) == 139
+    assert canonical_sha256(non_object_set_digests) == (
+        "bd518ac0d8b29b40b6f6ee82002212f57d2a67d0d89d15e1de4a7ff8a01072c3"
+    )
+    assert {
+        version: operation_input_mode("object.set", version)
+        for version in ("2022.1", "2023.1", "2024.1", "2025.1")
+    } == {
+        "2022.1": LEGACY_JSON_INPUT_MODE,
+        "2023.1": LEGACY_JSON_INPUT_MODE,
+        "2024.1": LEGACY_JSON_INPUT_MODE,
+        "2025.1": LEGACY_JSON_INPUT_MODE,
+    }
+
+
+def test_object_set_composer_rejects_unsupported_version_before_state_write(
+    tmp_path: Path,
+) -> None:
+    exit_code, rejected = execute(
+        tmp_path,
+        "--version",
+        "2021.1",
+        "draft-start",
+        "object.set",
+    )
+
+    assert exit_code == 2
+    assert rejected["error_code"] == "UNAVAILABLE_IN_VERSION"
+    records_dir = tmp_path / "state" / "operation-drafts-v1" / "records"
+    assert not records_dir.exists() or list(records_dir.iterdir()) == []
 
 
 class FakeClient:
@@ -251,6 +347,7 @@ def test_object_set_typed_actions_build_one_target_scalar_fact_offline(
         "handle": handle,
         "selector": {"kind": "id", "value": TARGET_ID},
         "properties": [],
+        "references": [],
         "children": [],
         "lists": [],
         "import": None,
@@ -281,6 +378,7 @@ def test_object_set_typed_actions_build_one_target_scalar_fact_offline(
             "handle": handle,
             "selector": {"kind": "id", "value": TARGET_ID},
             "properties": [{"name": "Volume", "value": -6.0}],
+            "references": [],
             "children": [],
             "lists": [],
             "import": None,
@@ -945,11 +1043,17 @@ def test_target_and_recursive_child_facts_materialize_without_raw_tree_patches(
     child_handle = child["draft"]["current_facts"][0]["children"][0]["handle"]
     apply("set_node_field", node_handle=child_handle, name="notes", value="loop")
     apply("set_node_field", node_handle=child_handle, name="language", value="SFX")
-    final = apply(
+    apply(
         "set_node_property",
         node_handle=child_handle,
         name="Volume",
         value=-4.0,
+    )
+    final = apply(
+        "set_reference",
+        owner_handle=child_handle,
+        name="OutputBus",
+        target={"kind": "path", "value": r"\Master-Mixer Hierarchy\Default Work Unit\Weather"},
     )
 
     materialized = OperationDraftStore(tmp_path / "state").materialize_request(
@@ -972,6 +1076,15 @@ def test_target_and_recursive_child_facts_materialize_without_raw_tree_patches(
                         "notes": "loop",
                         "language": "SFX",
                         "properties": [{"name": "Volume", "value": -4.0}],
+                        "references": [
+                            {
+                                "name": "OutputBus",
+                                "target": {
+                                    "kind": "path",
+                                    "value": r"\Master-Mixer Hierarchy\Default Work Unit\Weather",
+                                },
+                            }
+                        ],
                     }
                 ],
             }
@@ -1014,7 +1127,13 @@ def test_closed_object_list_members_use_handles_and_keep_insertion_order(
     second = apply("add_list_member", list_handle=list_handle, type="Sound", name="Wind")
     second_handle = second["draft"]["current_facts"][0]["lists"][0]["objects"][1]["handle"]
     apply("set_node_field", node_handle=first_handle, name="notes", value="first")
-    final = apply("set_node_field", node_handle=second_handle, name="platform", value="Windows")
+    apply("set_node_field", node_handle=second_handle, name="platform", value="Windows")
+    final = apply(
+        "set_reference",
+        owner_handle=second_handle,
+        name="OutputBus",
+        target={"kind": "id", "value": 42},
+    )
 
     materialized = OperationDraftStore(tmp_path / "state").materialize_request(
         draft_id,
@@ -1028,7 +1147,17 @@ def test_closed_object_list_members_use_handles_and_keep_insertion_order(
             "name": "CustomList",
             "objects": [
                 {"type": "Sound", "name": "Rain", "notes": "first"},
-                {"type": "Sound", "name": "Wind", "platform": "Windows"},
+                {
+                    "type": "Sound",
+                    "name": "Wind",
+                    "platform": "Windows",
+                    "references": [
+                        {
+                            "name": "OutputBus",
+                            "target": {"kind": "id", "value": 42},
+                        }
+                    ],
+                },
             ],
         }
     ]
@@ -1312,3 +1441,156 @@ def test_empty_append_list_remains_incomplete_but_replace_all_can_clear_it(
         ],
         "list_mode": "replaceAll",
     }
+
+
+def test_reference_facts_are_typed_correctable_and_keep_exact_selectors(
+    tmp_path: Path,
+) -> None:
+    _code, started = execute(tmp_path, "draft-start", "object.set")
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    _code, targeted = execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--action-json",
+        action("add_target", selector={"kind": "id", "value": TARGET_ID}),
+    )
+    handle = targeted["draft"]["current_facts"][0]["handle"]
+    first_bus = r"\Master-Mixer Hierarchy\Default Work Unit\Weapons"
+    corrected_bus = r"\Master-Mixer Hierarchy\Default Work Unit\Weapons Release"
+
+    first_code, first = execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "2",
+        "--action-json",
+        action(
+            "set_reference",
+            owner_handle=handle,
+            name="OutputBus",
+            target={"kind": "path", "value": first_bus},
+        ),
+    )
+    assert first_code == 0
+    assert first["draft"]["current_facts"][0]["references"] == [
+        {
+            "name": "OutputBus",
+            "target": {"kind": "path", "value": first_bus},
+        }
+    ]
+
+    corrected_code, corrected = execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "3",
+        "--action-json",
+        action(
+            "set_reference",
+            owner_handle=handle,
+            name="OutputBus",
+            target={"kind": "path", "value": corrected_bus},
+        ),
+    )
+    assert corrected_code == 0
+    assert corrected["draft"]["current_facts"][0]["references"] == [
+        {
+            "name": "OutputBus",
+            "target": {"kind": "path", "value": corrected_bus},
+        }
+    ]
+    second_code, second = execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "4",
+        "--action-json",
+        action(
+            "set_reference",
+            owner_handle=handle,
+            name="UserAuxSend0",
+            target={"kind": "id", "value": 42},
+        ),
+    )
+    assert second_code == 0
+    expected_references = [
+        {
+            "name": "OutputBus",
+            "target": {"kind": "path", "value": corrected_bus},
+        },
+        {"name": "UserAuxSend0", "target": {"kind": "id", "value": 42}},
+    ]
+    assert second["draft"]["current_facts"][0]["references"] == expected_references
+    materialized = OperationDraftStore(tmp_path / "state").materialize_request(
+        draft_id,
+        task_authority=authority,
+        expected_revision=5,
+        schema_digest=started["draft"]["binding"]["schema_digest"],
+        composer_digest=operation_composer_digest("object.set", "2022.1"),
+    )
+    assert materialized.request["arguments"]["objects"][0]["references"] == (
+        expected_references
+    )
+
+    record_path = (
+        tmp_path
+        / "state"
+        / "operation-drafts-v1"
+        / "records"
+        / f"{draft_id}.json"
+    )
+    before = record_path.read_bytes()
+    rejected_code, rejected = execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "5",
+        "--action-json",
+        action(
+            "set_reference",
+            owner_handle=handle,
+            name="@OutputBus",
+            target={"kind": "id", "value": True},
+        ),
+    )
+    assert rejected_code == 2
+    assert rejected["error_code"] == "OPERATION_DRAFT_ACTION_INVALID"
+    assert record_path.read_bytes() == before
+
+    removed_code, removed = execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "5",
+        "--action-json",
+        action(
+            "remove_reference",
+            owner_handle=handle,
+            name="OutputBus",
+        ),
+    )
+    assert removed_code == 0
+    assert removed["draft"]["current_facts"][0]["references"] == [
+        {"name": "UserAuxSend0", "target": {"kind": "id", "value": 42}}
+    ]
