@@ -655,8 +655,12 @@ def _observe_successful_protocol(
     fake: FakeRifleWaapi,
     *,
     preserve_existing_source_guids: bool = False,
+    reverse_read_only_pair: bool = False,
 ) -> None:
-    for step in prepared.protocol.steps:
+    steps = list(prepared.protocol.steps)
+    if reverse_read_only_pair:
+        steps[:2] = reversed(steps[:2])
+    for step in steps:
         if step.name == "tx01.execute":
             fake.apply_import(
                 prepared.operation_request,
@@ -910,6 +914,68 @@ def test_rifle_read_only_preamble_accepts_only_the_declared_pair_swap(
         ),
         groups,
     )
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2025.1"])
+@pytest.mark.parametrize("reverse", [False, True])
+def test_rifle_observer_and_final_oracle_accept_declared_read_pair_orders(
+    tmp_path: Path,
+    version: str,
+    reverse: bool,
+) -> None:
+    prepared, fake, _runtime = _prepared(tmp_path, version=version)
+
+    _observe_successful_protocol(
+        prepared,
+        fake,
+        reverse_read_only_pair=reverse,
+    )
+    verification = prepared.verify_final()
+
+    verification.assert_passed()
+    assert verification.assertions["single_import_transaction"] is True
+    prepared.cleanup().assert_passed()
+
+
+def test_rifle_observer_rejects_duplicate_or_incomplete_read_pair(
+    tmp_path: Path,
+) -> None:
+    duplicate_root = tmp_path / "duplicate"
+    duplicate_root.mkdir()
+    duplicate, _fake, _runtime = _prepared(duplicate_root)
+    operation_schema = duplicate.protocol.steps[1]
+    duplicate.observe_payload(
+        operation_schema,
+        {"ok": True, "command": operation_schema.subcommand},
+    )
+    with pytest.raises(
+        RifleIntegrationRuntimeError,
+        match="duplicated or observed out of order",
+    ):
+        duplicate.observe_payload(
+            operation_schema,
+            {"ok": True, "command": operation_schema.subcommand},
+        )
+    duplicate.cleanup().assert_passed()
+
+    incomplete_root = tmp_path / "incomplete"
+    incomplete_root.mkdir()
+    incomplete, _fake, _runtime = _prepared(incomplete_root)
+    operation_schema = incomplete.protocol.steps[1]
+    preview = incomplete.protocol.steps[2]
+    incomplete.observe_payload(
+        operation_schema,
+        {"ok": True, "command": operation_schema.subcommand},
+    )
+    with pytest.raises(
+        RifleIntegrationRuntimeError,
+        match="duplicated or observed out of order",
+    ):
+        incomplete.observe_payload(
+            preview,
+            {"ok": True, "command": preview.subcommand},
+        )
+    incomplete.cleanup().assert_passed()
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])

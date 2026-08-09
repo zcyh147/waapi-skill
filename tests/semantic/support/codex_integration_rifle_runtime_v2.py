@@ -39,6 +39,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     ExpectedGatewayStep,
+    gateway_step_sequence_matches,
     project_required_metadata_tokens,
 )
 from tests.semantic.support.codex_integration_workflows_v2 import (
@@ -782,6 +783,8 @@ class _RifleSession:
             tuple(step.name for step in protocol.steps).count("tx01.execute")
             != 1
             or protocol.turn_prefix_counts != (3, 7)
+            or protocol.commutative_read_only_step_groups
+            != RIFLE_COMMUTATIVE_READ_ONLY_STEP_GROUPS
         ):
             raise RifleIntegrationRuntimeError(
                 "Rifle protocol is not one metadata-bound transaction"
@@ -842,7 +845,16 @@ class _RifleSession:
             )
         expected_names = tuple(row.name for row in protocol.steps)
         position = len(self.observed_steps)
-        if position >= len(expected_names) or step.name != expected_names[position]:
+        read_only_names = protocol.commutative_read_only_step_groups[0]
+        in_read_only_pair = position in {0, 1}
+        expected_at_position = (
+            step.name in read_only_names
+            and step.name not in self.observed_steps
+            if in_read_only_pair
+            else position < len(expected_names)
+            and step.name == expected_names[position]
+        )
+        if position >= len(expected_names) or not expected_at_position:
             raise RifleIntegrationRuntimeError(
                 "Rifle gateway steps were duplicated or observed out of order"
             )
@@ -1628,7 +1640,15 @@ class _RifleSession:
         )
         record(
             "single_import_transaction",
-            tuple(self.observed_steps) == expected_steps
+            gateway_step_sequence_matches(
+                expected_steps,
+                tuple(self.observed_steps),
+                (
+                    self.protocol.commutative_read_only_step_groups
+                    if self.protocol is not None
+                    else ()
+                ),
+            )
             and self.observed_steps.count("tx01.execute") == 1
             and self.observed_steps.count("tx01.verify") == 1,
             "the exact one-transaction broker protocol was not fully observed",

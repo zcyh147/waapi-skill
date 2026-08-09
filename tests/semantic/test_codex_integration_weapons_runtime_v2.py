@@ -548,8 +548,17 @@ def _preview_broker(
     return broker, preview
 
 
-def _observe(prepared: Any, fake: FakeWeaponsWaapi, *, apply: bool = True) -> None:
-    for step in prepared.protocol.steps:
+def _observe(
+    prepared: Any,
+    fake: FakeWeaponsWaapi,
+    *,
+    apply: bool = True,
+    reverse_output_bus_pair: bool = False,
+) -> None:
+    steps = list(prepared.protocol.steps)
+    if reverse_output_bus_pair:
+        steps[1:3] = reversed(steps[1:3])
+    for step in steps:
         if step.name == "tx01.execute" and apply:
             fake.apply_set(prepared.operation_request)
         payload = (
@@ -1029,6 +1038,21 @@ def test_output_bus_hops_accept_both_orders_and_finish_only_after_both(
         observed,
         prepared.protocol.commutative_read_only_step_groups,
     )
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2025.1"])
+def test_reversed_output_bus_hops_pass_final_business_oracle(
+    tmp_path: Path,
+    version: str,
+) -> None:
+    prepared, fake, _runtime = _prepared(tmp_path, version=version)
+
+    _observe(prepared, fake, reverse_output_bus_pair=True)
+    verification = prepared.verify_final()
+
+    verification.assert_passed()
+    assert verification.assertions["single_object_set_batch"] is True
+    prepared.cleanup().assert_passed()
 
 
 @pytest.mark.parametrize(

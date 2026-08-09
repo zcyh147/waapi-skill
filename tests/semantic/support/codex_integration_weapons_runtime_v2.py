@@ -34,6 +34,7 @@ from tests.semantic.support.codex_gateway_broker import (
     ExpectedGatewayStep,
     SealedQueryIdentityBoundJsonArgument,
     SemanticJsonArgument,
+    gateway_step_sequence_matches,
 )
 from tests.semantic.support.codex_integration_workflows_v2 import (
     BaselineManifest,
@@ -1594,7 +1595,15 @@ class _WeaponsSession:
         )
         record(
             "single_object_set_batch",
-            tuple(self.observed_steps) == expected_steps
+            gateway_step_sequence_matches(
+                expected_steps,
+                tuple(self.observed_steps),
+                (
+                    self.protocol.commutative_read_only_step_groups
+                    if self.protocol is not None
+                    else ()
+                ),
+            )
             and self.observed_steps.count("tx01.execute") == 1
             and self.observed_steps.count("tx01.verify") == 1,
             "the audit, OutputBus hops, selected exact-ID readbacks, and "
