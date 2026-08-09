@@ -217,7 +217,10 @@ def completed_record(
     status: str = "completed",
 ) -> CodexCommandRecord:
     argv, has_operators, parse_error, parser_kind = (
-        codex_harness_module._parse_command_argv(command)
+        codex_harness_module._parse_command_argv(
+            command,
+            platform_name="posix",
+        )
     )
     return CodexCommandRecord(
         command=command,
