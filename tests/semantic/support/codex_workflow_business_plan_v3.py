@@ -87,6 +87,14 @@ _TRANSACTION_STEP_KINDS = (
     ("execute", "execute"),
     ("verify", "verify"),
 )
+_OBJECT_SET_COMPOSER_TAIL_KINDS = (
+    ("check", "operation_compose_check"),
+    ("preview", "preview"),
+    ("transaction-show", "transaction_show"),
+    ("confirm", "confirm"),
+    ("execute", "execute"),
+    ("verify", "verify"),
+)
 _NON_TRANSACTION_STEP_KINDS = frozenset(
     {"diagnostic", "checkpoint", "cleanup"}
 )
@@ -403,12 +411,6 @@ def _validate_workflow_steps(
     first_transaction_position: int | None = None
     last_transaction_position: int | None = None
     transaction_by_id = {row["transaction_id"]: row for row in transactions}
-    expected_kind_by_name = {
-        f"{transaction['transaction_id']}.{suffix}": kind
-        for transaction in transactions
-        for suffix, kind in _TRANSACTION_STEP_KINDS
-    }
-
     for index, row in enumerate(rows):
         if type(row) is not dict or set(row) != _STEP_KEYS:
             raise WorkflowBusinessPlanError(
@@ -444,8 +446,7 @@ def _validate_workflow_steps(
             )
         transaction = transaction_by_id[transaction_id]
         if (
-            name not in expected_kind_by_name
-            or kind != expected_kind_by_name[name]
+            not name.startswith(f"{transaction_id}.")
             or api != transaction["api"]
             or phase != transaction["phase"]
         ):
@@ -464,12 +465,8 @@ def _validate_workflow_steps(
     for transaction in transactions:
         transaction_id = transaction["transaction_id"]
         positions = transaction_positions[transaction_id]
-        expected_names = [
-            f"{transaction_id}.{suffix}"
-            for suffix, _kind in _TRANSACTION_STEP_KINDS
-        ]
-        actual_names = [rows[index]["name"] for index in positions]
-        if actual_names != expected_names:
+        transaction_steps = [rows[index] for index in positions]
+        if not _matches_transaction_step_sequence(transaction, transaction_steps):
             raise WorkflowBusinessPlanError(
                 f"workflow {transaction_id} does not contain one complete transaction"
             )
@@ -490,6 +487,38 @@ def _validate_workflow_steps(
             raise WorkflowBusinessPlanError(
                 "workflow cleanup steps must follow every transaction"
             )
+
+
+def _matches_transaction_step_sequence(
+    transaction: Mapping[str, Any],
+    rows: Sequence[Mapping[str, Any]],
+) -> bool:
+    transaction_id = transaction["transaction_id"]
+    actual = [(row["name"], row["kind"]) for row in rows]
+    legacy = [
+        (f"{transaction_id}.{suffix}", kind)
+        for suffix, kind in _TRANSACTION_STEP_KINDS
+    ]
+    if actual == legacy:
+        return True
+    if transaction.get("operation") != "object.set" or len(actual) < 9:
+        return False
+    if actual[:2] != [
+        (f"{transaction_id}.operation-schema", "operation_schema"),
+        (f"{transaction_id}.draft-start", "operation_compose"),
+    ]:
+        return False
+    tail = [
+        (f"{transaction_id}.{suffix}", kind)
+        for suffix, kind in _OBJECT_SET_COMPOSER_TAIL_KINDS
+    ]
+    if actual[-len(tail) :] != tail:
+        return False
+    actions = actual[2 : -len(tail)]
+    return actions == [
+        (f"{transaction_id}.action.{index:03d}", "operation_compose")
+        for index in range(1, len(actions) + 1)
+    ]
 
 
 def _validate_diagnostic_evidence(

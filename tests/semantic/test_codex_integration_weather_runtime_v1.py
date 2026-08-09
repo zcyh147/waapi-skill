@@ -42,6 +42,9 @@ from tests.semantic.support.codex_prompt_provenance_v3 import (
     deserialize_protocol,
     serialize_protocol,
 )
+from tests.semantic.support.codex_workflow_business_plan_v3 import (
+    compile_workflow_business_plan_sections,
+)
 
 
 def _targets(tmp_path: Path) -> tuple[WeatherTarget, ...]:
@@ -585,6 +588,21 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         "object.set",
         "object.setRTPC",
     )
+    compiled = compile_workflow_business_plan_sections(
+        workflow_id="interactive_weather_build",
+        transactions=_weather_plan_transactions(),
+        workflow_steps=plan_steps,
+        diagnostic_evidence=(),
+        live_bindings={"version": "2022.1"},
+        transaction_expectations=tuple(
+            {
+                "transaction_id": f"tx{index:02d}",
+                "expectation": {"checked": True},
+            }
+            for index in range(1, 4)
+        ),
+    )
+    assert compiled.static_expectation["workflow_steps"]
 
 
 def test_weather_verification_fails_closed() -> None:
