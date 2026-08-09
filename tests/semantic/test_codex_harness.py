@@ -1694,11 +1694,44 @@ def test_windows_workspace_skill_copy_is_filtered_detached_and_attested(tmp_path
         )
 
 
+def test_workspace_skill_install_creates_closed_repository_boundary(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "waapi-skill"
+    source.mkdir()
+    (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    workspace = tmp_path / "workspace"
+
+    prepare_workspace_skill_install(workspace, source, platform_name="posix")
+
+    boundary = workspace / ".git"
+    assert boundary.is_dir() and not boundary.is_symlink()
+    assert tuple(boundary.iterdir()) == ()
+    assert tuple(sorted(path.name for path in workspace.iterdir())) == (
+        ".agents",
+        ".git",
+    )
+    assert verify_workspace_skill_install(
+        workspace,
+        source,
+        platform_name="posix",
+    ) == workspace_skill_install_path(workspace)
+
+    (boundary / "unexpected").write_text("drift\n", encoding="utf-8")
+    with pytest.raises(CodexHarnessError, match="repository boundary"):
+        verify_workspace_skill_install(
+            workspace,
+            source,
+            platform_name="posix",
+        )
+
+
 def test_windows_workspace_skill_copy_rejects_hardlink_alias(tmp_path: Path) -> None:
     source = tmp_path / "waapi-skill"
     source.mkdir()
     (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
     workspace = tmp_path / "workspace"
+    (workspace / ".git").mkdir(parents=True)
     install = workspace_skill_install_path(workspace)
     install.mkdir(parents=True)
     os.link(source / "SKILL.md", install / "SKILL.md")

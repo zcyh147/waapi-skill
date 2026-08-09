@@ -6098,7 +6098,11 @@ def _validate_integration_workflow_business_plan(
     }
     transaction_step_kind = {
         "operation-schema": "operation_schema",
+        "draft-start": "operation_compose",
+        "draft-apply": "operation_compose",
+        "draft-check": "operation_compose_check",
         "preview": "preview",
+        "preview-from-draft": "preview",
         "transaction-show": "transaction_show",
         "confirm": "confirm",
         "execute": "execute",

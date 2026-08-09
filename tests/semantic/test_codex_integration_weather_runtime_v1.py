@@ -593,7 +593,7 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         transactions=_weather_plan_transactions(),
         workflow_steps=plan_steps,
         diagnostic_evidence=(),
-        live_bindings={"version": "2022.1"},
+        live_bindings={"version": "2022.1", "visible_values": {}},
         transaction_expectations=tuple(
             {
                 "transaction_id": f"tx{index:02d}",
@@ -603,6 +603,20 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         ),
     )
     assert compiled.static_expectation["workflow_steps"]
+    from tests.semantic import run_codex_skill_campaign as campaign
+
+    campaign._validate_integration_workflow_business_plan(
+        compiled,
+        expected_unit=SimpleNamespace(
+            workflow_id="interactive_weather_build",
+            version="2022.1",
+            transactions=tuple(
+                SimpleNamespace(api=row["api"], operation=row["operation"])
+                for row in _weather_plan_transactions()
+            ),
+        ),
+        provenance=SimpleNamespace(protocol=protocol, visible_values={}),
+    )
 
 
 def test_weather_verification_fails_closed() -> None:

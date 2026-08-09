@@ -1029,6 +1029,34 @@ def workspace_skill_install_path(workspace: Path) -> Path:
     return Path(workspace) / ".agents" / "skills" / "waapi-skill"
 
 
+def _prepare_workspace_repository_boundary(workspace: Path) -> None:
+    """Stop Codex from inheriting skills and instructions from an outer repo."""
+
+    workspace.mkdir(parents=True, exist_ok=True)
+    existing = tuple(workspace.iterdir())
+    if existing:
+        raise CodexHarnessError(
+            "Agent workspace must be empty before its repository boundary is prepared"
+        )
+    (workspace / ".git").mkdir()
+
+
+def _verify_workspace_repository_boundary(workspace: Path) -> None:
+    if is_link_or_junction(workspace) or not workspace.is_dir():
+        raise CodexHarnessError("Agent workspace repository boundary root is not a real directory")
+    entries = tuple(sorted(path.name for path in workspace.iterdir()))
+    if entries != (".agents", ".git"):
+        raise CodexHarnessError(
+            "Agent workspace repository boundary has unexpected entries: "
+            f"{', '.join(entries) or '<none>'}"
+        )
+    boundary = workspace / ".git"
+    if is_link_or_junction(boundary) or not boundary.is_dir():
+        raise CodexHarnessError("Agent workspace repository boundary is not a real directory")
+    if tuple(boundary.iterdir()):
+        raise CodexHarnessError("Agent workspace repository boundary must remain empty")
+
+
 def prepare_workspace_skill_install(
     workspace: Path,
     skill_source: Path,
@@ -1049,6 +1077,7 @@ def prepare_workspace_skill_install(
     source = source_path.expanduser().resolve(strict=True)
     if not source.is_dir():
         raise CodexHarnessError(f"Skill source must be a directory: {source}")
+    _prepare_workspace_repository_boundary(Path(workspace))
     install = workspace_skill_install_path(workspace)
     install.parent.mkdir(parents=True, exist_ok=False)
     if _is_windows(platform_name):
@@ -1087,6 +1116,7 @@ def verify_workspace_skill_install(
     """Verify the platform-specific install without accepting a weaker shape."""
 
     source = Path(skill_source).expanduser().resolve(strict=True)
+    _verify_workspace_repository_boundary(Path(workspace))
     install = workspace_skill_install_path(workspace)
     if _is_windows(platform_name):
         if is_link_or_junction(install) or not install.is_dir():
