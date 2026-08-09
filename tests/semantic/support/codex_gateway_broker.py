@@ -231,7 +231,7 @@ _OBJECT_SET_ARGUMENT_FIELDS = frozenset(
 _OBJECT_SET_SUPPORTED_VERSIONS = frozenset(
     {"2022.1", "2023.1", "2024.1", "2025.1"}
 )
-_OBJECT_SET_SCHEMA_DEFAULTS = MappingProxyType(
+OBJECT_SET_SCHEMA_DEFAULTS = MappingProxyType(
     {
         "list_mode": "append",
         "on_name_conflict": "fail",
@@ -2177,7 +2177,7 @@ def _normalize_object_set_request(value: Any) -> dict[str, Any]:
         )
 
     normalized_arguments = dict(arguments)
-    for field, default in _OBJECT_SET_SCHEMA_DEFAULTS.items():
+    for field, default in OBJECT_SET_SCHEMA_DEFAULTS.items():
         if (
             field in normalized_arguments
             and type(normalized_arguments[field]) is type(default)
@@ -6561,6 +6561,7 @@ __all__ = [
     "MetadataBoundJsonArgument",
     "MetadataQueryArgument",
     "MetadataTokenProjection",
+    "OBJECT_SET_SCHEMA_DEFAULTS",
     "ResolvedGatewayInvocation",
     "ResponseBinding",
     "SealedQueryIdentityBoundJsonArgument",

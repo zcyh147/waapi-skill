@@ -671,7 +671,7 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
         "tx01.operation-schema",
         "tx01.draft-start",
     )
-    assert prepared.protocol.turn_prefix_counts == (3, 20, 24)
+    assert prepared.protocol.turn_prefix_counts == (3, 19, 23)
     assert prepared.protocol.commutative_read_only_step_groups == (
         (
             "relationship.output_bus.01",
@@ -680,7 +680,7 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
     )
     serialized = serialize_protocol(prepared.protocol)
     assert deserialize_protocol(serialized) == prepared.protocol
-    composer_steps = prepared.protocol.steps[7:20]
+    composer_steps = prepared.protocol.steps[7:19]
     assert composer_steps[0].subcommand == "draft-start"
     assert [step.subcommand for step in composer_steps[-2:]] == [
         "draft-check",
@@ -689,7 +689,7 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
     action_steps = [
         step for step in composer_steps if step.subcommand == "draft-apply"
     ]
-    assert len(action_steps) == 10
+    assert len(action_steps) == 9
     assert all(
         isinstance(step.arguments[-1], DraftActionJsonArgument)
         for step in action_steps

@@ -12,6 +12,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     V3ProtocolError,
     build_direct_protocol,
     build_metadata_transaction_protocol,
+    build_object_set_composer_transaction_steps,
     build_schema_query_transaction_protocol,
     build_transaction_protocol,
     call_step,
@@ -38,6 +39,91 @@ def _request(index: int = 1) -> dict[str, object]:
         "operation": "object.create",
         "arguments": {"parent": {"kind": "path", "value": "\\Root"}, "name": f"N{index}", "type": "Sound"},
     }
+
+
+def _object_set_request(**options: object) -> dict[str, object]:
+    return {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.set",
+        "arguments": {
+            **options,
+            "objects": [
+                {
+                    "object": {
+                        "kind": "path",
+                        "value": r"\Actor-Mixer Hierarchy\Target",
+                    },
+                    "properties": [{"name": "Volume", "value": -3.0}],
+                }
+            ],
+        },
+    }
+
+
+def test_object_set_composer_lets_gateway_own_schema_defaults() -> None:
+    steps = build_object_set_composer_transaction_steps(
+        _object_set_request(
+            list_mode="append",
+            on_name_conflict="fail",
+            auto_add_to_source_control=False,
+        ),
+        label="tx01",
+    )
+    actions = [
+        step.arguments[-1].expected
+        for step in steps
+        if step.subcommand == "draft-apply"
+    ]
+
+    assert [action["action"] for action in actions] == [
+        "add_target",
+        "set_property",
+    ]
+
+
+def test_object_set_composer_keeps_nondefault_request_options_explicit() -> None:
+    steps = build_object_set_composer_transaction_steps(
+        _object_set_request(
+            platform="Windows",
+            list_mode="replaceAll",
+            on_name_conflict="merge",
+            auto_add_to_source_control=True,
+        ),
+        label="tx01",
+    )
+    actions = [
+        step.arguments[-1].expected
+        for step in steps
+        if step.subcommand == "draft-apply"
+    ]
+
+    assert actions[:4] == [
+        {
+            "contract": "waapi-skill.operation-draft-action/v1",
+            "action": "set_request_option",
+            "name": "platform",
+            "value": "Windows",
+        },
+        {
+            "contract": "waapi-skill.operation-draft-action/v1",
+            "action": "set_request_option",
+            "name": "list_mode",
+            "value": "replaceAll",
+        },
+        {
+            "contract": "waapi-skill.operation-draft-action/v1",
+            "action": "set_request_option",
+            "name": "on_name_conflict",
+            "value": "merge",
+        },
+        {
+            "contract": "waapi-skill.operation-draft-action/v1",
+            "action": "set_request_option",
+            "name": "auto_add_to_source_control",
+            "value": True,
+        },
+    ]
 
 
 def test_single_transaction_spans_two_turn_prefixes_with_response_bindings() -> None:

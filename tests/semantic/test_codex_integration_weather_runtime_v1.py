@@ -510,7 +510,7 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         for step in protocol.steps
         if step.name.startswith("tx02.action.")
     ]
-    assert len(action_steps) == 16
+    assert len(action_steps) == 15
     assert all(step.subcommand == "draft-apply" for step in action_steps)
     assert all(
         isinstance(step.arguments[-1], DraftActionJsonArgument)
@@ -518,9 +518,15 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
     )
     assert action_steps[0].arguments[-1].expected == {
         "contract": "waapi-skill.operation-draft-action/v1",
-        "action": "set_request_option",
-        "name": "on_name_conflict",
-        "value": "fail",
+        "action": "add_target",
+        "selector": {
+            "kind": "direct-child",
+            "parent": {
+                "kind": "path",
+                "value": targets[0].event_path,
+            },
+            "type": "Action",
+        },
     }
     add_targets = [
         step.arguments[-1].expected

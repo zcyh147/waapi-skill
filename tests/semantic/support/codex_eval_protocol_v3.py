@@ -20,6 +20,7 @@ from tests.semantic.support.codex_gateway_broker import (
     MetadataBoundJsonArgument,
     MetadataQueryArgument,
     MetadataTokenProjection,
+    OBJECT_SET_SCHEMA_DEFAULTS,
     ResponseBinding,
     SemanticJsonArgument,
     validate_commutative_read_only_step_groups,
@@ -62,6 +63,13 @@ def build_object_set_composer_transaction_steps(
         "auto_add_to_source_control",
     ):
         if option_name in arguments:
+            default = OBJECT_SET_SCHEMA_DEFAULTS.get(option_name)
+            if (
+                option_name in OBJECT_SET_SCHEMA_DEFAULTS
+                and type(arguments[option_name]) is type(default)
+                and arguments[option_name] == default
+            ):
+                continue
             action_specs.append(
                 (
                     {
