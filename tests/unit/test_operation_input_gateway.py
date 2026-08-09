@@ -248,6 +248,41 @@ def test_normal_object_set_schema_and_detail_expose_only_composer_input(
         "subcommand": "draft-start",
         "gateway_argv": ["draft-start", "object.set"],
     }
+    assert schema["composer"]["apply"]["gateway_argv"] == [
+        "draft-apply",
+        "<draft_id>",
+        "--task-authority",
+        "<task_authority>",
+        "--expected-revision",
+        "<revision>",
+        "--action-json",
+        "<typed-action-json>",
+    ]
+    assert schema["composer"]["check"]["gateway_argv"] == [
+        "draft-check",
+        "<draft_id>",
+        "--task-authority",
+        "<task_authority>",
+        "--expected-revision",
+        "<revision>",
+    ]
+    assert schema["composer"]["seal"]["gateway_argv"] == [
+        "preview-from-draft",
+        "<draft_id>",
+        "--task-authority",
+        "<task_authority>",
+        "--expected-revision",
+        "<revision>",
+    ]
+    assert schema["composer"]["seal"]["optional_apply_flag"] == "--apply"
+    assert schema["composer"]["cancel"]["gateway_argv"] == [
+        "draft-cancel",
+        "<draft_id>",
+        "--task-authority",
+        "<task_authority>",
+        "--expected-revision",
+        "<revision>",
+    ]
     assert schema["composer"]["seal_subcommand"] == "preview-from-draft"
     assert "request_contract" not in schema["operation"]
     assert "argument_contract" not in schema["operation"]

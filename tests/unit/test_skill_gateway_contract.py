@@ -124,6 +124,7 @@ def test_query_reference_has_no_raw_client_fallback() -> None:
     assert "`owner` remain outside the packaged boundary" in query_reference
     assert "existing `--take N` or explicit user-requested `--all-results` rule" in query_reference
     assert "`--all-results`" in query_reference
+    assert "`all`, `全部`, or `都列出来`" in query_flat
     assert "between `0` and `1000`" in query_reference
     assert "`QUERY_OBJECT_REQUIRED`" in query_reference
     assert "`buses` response above 1000 is protocol drift" in query_reference

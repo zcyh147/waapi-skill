@@ -332,7 +332,8 @@ apply presentation logic only to its complete result.
   identity or a direct parent-child relationship.
 - When the user supplies a numeric maximum, copy that exact number to `--take`
   on the simple route or to the terminal structured `take` transform. Use
-  simple `--all-results` only when explicitly requested. When a broad or
+  simple `--all-results` for explicit exhaustive wording: `all`, `全部`, or
+  `都列出来`. When a broad or
   expanding query has no bound, ask for a limit instead of inventing one.
   Reaching the bound makes the rows and every derived count/group/list
   potentially incomplete.
