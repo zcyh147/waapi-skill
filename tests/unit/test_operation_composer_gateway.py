@@ -20,6 +20,7 @@ from wwise_waapi.operation_composer import (  # pyright: ignore[reportMissingImp
     operation_composer_digest,
 )
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
+    COMPOSER_INPUT_MODE,
     LEGACY_JSON_INPUT_MODE,
     list_operation_specs,
     operation_input_mode,
@@ -117,10 +118,10 @@ def test_object_set_composer_does_not_change_other_operation_schema_digests() ->
         version: operation_input_mode("object.set", version)
         for version in ("2022.1", "2023.1", "2024.1", "2025.1")
     } == {
-        "2022.1": LEGACY_JSON_INPUT_MODE,
-        "2023.1": LEGACY_JSON_INPUT_MODE,
-        "2024.1": LEGACY_JSON_INPUT_MODE,
-        "2025.1": LEGACY_JSON_INPUT_MODE,
+        "2022.1": COMPOSER_INPUT_MODE,
+        "2023.1": COMPOSER_INPUT_MODE,
+        "2024.1": COMPOSER_INPUT_MODE,
+        "2025.1": COMPOSER_INPUT_MODE,
     }
 
 
@@ -687,7 +688,7 @@ def test_legacy_record_is_readable_but_composer_requires_recreate_without_write(
 def test_composer_is_exactly_isolated_from_shared_uri_operations(
     tmp_path: Path,
 ) -> None:
-    assert operation_input_mode("object.set", "2022.1") == LEGACY_JSON_INPUT_MODE
+    assert operation_input_mode("object.set", "2022.1") == COMPOSER_INPUT_MODE
     assert operation_input_mode("object.setRTPC", "2022.1") == LEGACY_JSON_INPUT_MODE
     _code, started = execute(tmp_path, "draft-start", "object.setRTPC")
     draft_id = started["draft"]["draft_id"]

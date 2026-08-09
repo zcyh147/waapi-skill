@@ -157,6 +157,7 @@ from wwise_waapi.execution_contracts import (  # noqa: E402  # pyright: ignore[r
     PROJECT_GUARD_TRANSITION_TO_PATH,
 )
 from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    COMPOSER_INPUT_MODE,
     FORBIDDEN_MODEL_AUTHORED_COMMAND_FIELDS,
     LEGACY_JSON_INPUT_MODE,
     OPERATION_REQUEST_CONTRACT,
@@ -187,6 +188,7 @@ from wwise_waapi.operation_drafts import (  # noqa: E402  # pyright: ignore[repo
 from wwise_waapi.operation_composer import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     OBJECT_SET_COMPOSER_OPERATION,
     composition_projection,
+    operation_composer_contract,
     operation_composer_digest,
 )
 from wwise_waapi.platform_paths import (  # noqa: E402  # pyright: ignore[reportMissingImports]
@@ -2930,6 +2932,81 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
                 parse_json_object(value, option_name)
 
 
+_LEGACY_OPERATION_PROJECTION_FIELDS = frozenset(
+    {
+        "request_contract",
+        "required_arguments",
+        "optional_arguments",
+        "additional_properties",
+        "argument_contract",
+        "constraints",
+        "identity_contract",
+        "parent_child_contract",
+        "file_read_policy",
+        "preview_owns",
+    }
+)
+
+
+def composer_operation_projection(
+    spec: Any,
+    *,
+    version: str | None,
+) -> dict[str, Any]:
+    """Return normal discovery without a copyable Legacy request shape."""
+
+    projection = spec.as_dict(version=version)
+    for field in _LEGACY_OPERATION_PROJECTION_FIELDS:
+        projection.pop(field, None)
+    return projection
+
+
+def operation_composer_input_contract(
+    operation: str,
+    version: str,
+    *,
+    inventory: bool = False,
+) -> dict[str, Any]:
+    """Project the single normal Composer entry and its typed lifecycle."""
+
+    contract = operation_composer_contract(operation, version)
+    if inventory:
+        fragments = require_mapping(
+            contract.get("registry_fragments"),
+            "operation Composer registry fragments",
+        )
+        return {
+            "contract": contract["contract"],
+            "operation": operation,
+            "version": version,
+            "action_contract": contract["action_contract"],
+            "actions": list(contract["actions"]),
+            "limits": dict(contract["limits"]),
+            "registry_source_schema_digest": fragments["source_schema_digest"],
+            "inspect_with": f"operation-schema {operation}",
+        }
+    return {
+        **contract,
+        "start": {
+            "subcommand": "draft-start",
+            "gateway_argv": ["draft-start", operation],
+        },
+        "apply": {
+            "subcommand": "draft-apply",
+            "action_flag": "--action-json",
+            "bind_from_prior_response": [
+                "draft_id",
+                "task_authority",
+                "revision",
+            ],
+        },
+        "check_subcommand": "draft-check",
+        "seal_subcommand": "preview-from-draft",
+        "cancel_subcommand": "draft-cancel",
+        "complete_request_authored_by_gateway": True,
+    }
+
+
 def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]) -> dict[str, Any]:
     """Run catalog commands without requiring a WAAPI port or live Wwise."""
 
@@ -3285,10 +3362,29 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             },
         }
     if args.command == "operations":
-        operations = [
-            spec.as_dict() if args.detail else spec.as_compact_dict()
-            for spec in list_operation_specs()
-        ]
+        operations: list[dict[str, Any]] = []
+        for spec in list_operation_specs():
+            if not args.detail:
+                operations.append(spec.as_compact_dict())
+                continue
+            modes = {
+                version: operation_input_mode(spec.name, version)
+                for version in spec.supported_versions
+            }
+            if COMPOSER_INPUT_MODE not in modes.values():
+                operations.append(spec.as_dict())
+                continue
+            projection = composer_operation_projection(spec, version=None)
+            projection["composer_contracts_by_version"] = {
+                version: operation_composer_input_contract(
+                    spec.name,
+                    version,
+                    inventory=True,
+                )
+                for version, mode in modes.items()
+                if mode == COMPOSER_INPUT_MODE
+            }
+            operations.append(projection)
         return {
             "contract": GATEWAY_RESULT_CONTRACT,
             "ok": True,
@@ -3327,13 +3423,30 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 "arguments": {},
             }
             request_envelope_status = "ready"
-        operation_projection = spec.as_dict(version=request_version)
+        input_mode = (
+            operation_input_mode(spec.name, request_version)
+            if request_version in spec.supported_versions
+            else None
+        )
+        normal_composer = (
+            not legacy_compatibility and input_mode == COMPOSER_INPUT_MODE
+        )
+        operation_projection = (
+            composer_operation_projection(spec, version=request_version)
+            if normal_composer
+            else spec.as_dict(version=request_version)
+        )
         if legacy_compatibility:
             # Compatibility automation needs the complete machine request
             # shape, not duplicated normal-Agent routing prose.  Both
             # projections still derive from this exact Registry spec.
             operation_projection.pop("summary", None)
             operation_projection.pop("selection_guidance", None)
+            if input_mode == COMPOSER_INPUT_MODE:
+                operation_projection["input_mode"] = LEGACY_JSON_INPUT_MODE
+        if normal_composer:
+            request_envelope = None
+            request_envelope_status = "composer_ready"
         payload = {
             "contract": GATEWAY_RESULT_CONTRACT,
             "ok": True,
@@ -3342,57 +3455,71 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "offline": True,
             "operation": operation_projection,
             "request_envelope": request_envelope,
-            "request_envelope_policy": {
-                "status": request_envelope_status,
-                "required_top_level_keys": [
-                    "contract",
-                    "version",
-                    "operation",
-                    "arguments",
-                ],
-                "copy_top_level_exactly": True,
-                "replace_only": "arguments",
-                "argument_container_path": "$.arguments",
-                "argument_paths": {
-                    name: f"$.arguments.{name}" for name in argument_names
-                },
-                "shell_transport": {
-                    "outer_quoting": "single_quote_entire_compact_json",
-                    "json_string_serialization": "exactly_once",
-                    "decoded_value_rules": {
-                        "embedded_quotes": (
-                            "ordinary quotation marks with no preceding "
-                            "backslash"
-                        ),
-                        "wwise_path_separator": "one backslash",
-                    },
-                    "forbidden": [
-                        "double_escape_json_string_contents",
-                        "leave_json_escape_backslashes_in_decoded_values",
-                        "repair_or_retry_invalid_json_in_the_same_turn",
+            "request_envelope_policy": (
+                {
+                    "status": "composer_ready",
+                    "complete_request_authored_by_gateway": True,
+                }
+                if normal_composer
+                else {
+                    "status": request_envelope_status,
+                    "required_top_level_keys": [
+                        "contract",
+                        "version",
+                        "operation",
+                        "arguments",
                     ],
-                },
-                "preview_invocation": {
-                    "intended_change": {
-                        "subcommand": (
-                            "legacy-preview" if legacy_compatibility else "preview"
-                        ),
-                        "required_flag": "--apply",
-                        "effect": (
-                            "required even when the user asks to see only a "
-                            "preview; creates a durable confirmation-bound "
-                            "preview and does not execute the change"
-                        ),
-                        "includes_later_ordered_transactions": True,
+                    "copy_top_level_exactly": True,
+                    "replace_only": "arguments",
+                    "argument_container_path": "$.arguments",
+                    "argument_paths": {
+                        name: f"$.arguments.{name}" for name in argument_names
                     },
-                    "omit_apply_only_when": [
-                        "hypothetical",
-                        "design_only",
-                        "explicitly_non_executable",
-                    ],
-                },
-            },
+                    "shell_transport": {
+                        "outer_quoting": "single_quote_entire_compact_json",
+                        "json_string_serialization": "exactly_once",
+                        "decoded_value_rules": {
+                            "embedded_quotes": (
+                                "ordinary quotation marks with no preceding "
+                                "backslash"
+                            ),
+                            "wwise_path_separator": "one backslash",
+                        },
+                        "forbidden": [
+                            "double_escape_json_string_contents",
+                            "leave_json_escape_backslashes_in_decoded_values",
+                            "repair_or_retry_invalid_json_in_the_same_turn",
+                        ],
+                    },
+                    "preview_invocation": {
+                        "intended_change": {
+                            "subcommand": (
+                                "legacy-preview"
+                                if legacy_compatibility
+                                else "preview"
+                            ),
+                            "required_flag": "--apply",
+                            "effect": (
+                                "required even when the user asks to see only a "
+                                "preview; creates a durable confirmation-bound "
+                                "preview and does not execute the change"
+                            ),
+                            "includes_later_ordered_transactions": True,
+                        },
+                        "omit_apply_only_when": [
+                            "hypothetical",
+                            "design_only",
+                            "explicitly_non_executable",
+                        ],
+                    },
+                }
+            ),
         }
+        if normal_composer and request_version is not None:
+            payload["composer"] = operation_composer_input_contract(
+                spec.name,
+                request_version,
+            )
         if legacy_compatibility:
             payload["compatibility"] = {
                 "contract": LEGACY_OPERATION_JSON_ADAPTER_CONTRACT,

@@ -891,22 +891,15 @@ def test_main_prints_object_set_operation_schema_as_bounded_compact_json(
     assert exit_code == 0
     assert parsed == payload
     assert list(parsed) == list(payload)
-    shell_transport = parsed["request_envelope_policy"]["shell_transport"]
-    assert shell_transport == {
-        "outer_quoting": "single_quote_entire_compact_json",
-        "json_string_serialization": "exactly_once",
-        "decoded_value_rules": {
-            "embedded_quotes": (
-                "ordinary quotation marks with no preceding backslash"
-            ),
-            "wwise_path_separator": "one backslash",
-        },
-        "forbidden": [
-            "double_escape_json_string_contents",
-            "leave_json_escape_backslashes_in_decoded_values",
-            "repair_or_retry_invalid_json_in_the_same_turn",
-        ],
+    assert parsed["request_envelope"] is None
+    assert parsed["request_envelope_policy"] == {
+        "status": "composer_ready",
+        "complete_request_authored_by_gateway": True,
     }
+    assert parsed["composer"]["start"]["gateway_argv"] == [
+        "draft-start",
+        "object.set",
+    ]
     assert stdout.count("\n") == 1
     assert stdout == (
         json.dumps(

@@ -709,7 +709,13 @@ def preview(
     apply: bool = False,
     policy: str = "ask_before_changes",
 ) -> dict[str, Any]:
-    arguments = ["preview"]
+    # These registry-preparation fixtures author full canonical requests.  The
+    # object.set normal surface is Composer-only; its reviewed JSON fixtures
+    # therefore exercise the explicit compatibility adapter.
+    command = (
+        "legacy-preview" if request.get("operation") == "object.set" else "preview"
+    )
+    arguments = [command]
     if apply:
         arguments.append("--apply")
     arguments.extend(
@@ -1595,11 +1601,6 @@ def test_object_create_operation_schema_discloses_versioned_parent_and_merge_con
     ("version", "default_work_unit_path", "actor_mixer_type"),
     (
         (
-            "2021.1",
-            r"\Actor-Mixer Hierarchy\Default Work Unit",
-            "ActorMixer",
-        ),
-        (
             "2022.1",
             r"\Actor-Mixer Hierarchy\Default Work Unit",
             "ActorMixer",
@@ -1630,9 +1631,8 @@ def test_object_set_operation_schema_discloses_versioned_target_and_metadata_sco
     )
 
     assert exit_code == 0
-    contract = payload["operation"]["argument_contract"][
-        "default_container_target_contract"
-    ]
+    fragments = payload["composer"]["registry_fragments"]
+    contract = fragments["default_container_target_contract"]
     assert contract["resolved_target"] == {
         "wwise_version": version,
         "default_container_work_unit_path": default_work_unit_path,
@@ -1644,9 +1644,7 @@ def test_object_set_operation_schema_discloses_versioned_target_and_metadata_sco
     assert contract["forbidden_intermediate_routes"] == [
         "project-default-work-units"
     ]
-    on_name_conflict = payload["operation"]["argument_contract"]["properties"][
-        "on_name_conflict"
-    ]
+    on_name_conflict = fragments["request_options"]["on_name_conflict"]
     assert on_name_conflict["default"] == "fail"
     assert "Omission defaults to fail" in on_name_conflict["description"]
 
@@ -1663,11 +1661,9 @@ def test_object_set_schema_maps_live_query_accessors_to_canonical_mutation_token
     )
 
     assert exit_code == 0
-    fields = payload["operation"]["argument_contract"]["properties"][
-        "objects"
-    ]["items"]["properties"]
-    property_name = fields["properties"]["items"]["properties"]["name"]
-    reference_name = fields["references"]["items"]["properties"]["name"]
+    fragments = payload["composer"]["registry_fragments"]
+    property_name = fragments["scalar_property"]["properties"]["name"]
+    reference_name = fragments["reference"]["properties"]["name"]
 
     assert property_name["pattern"] == r"^[:_a-zA-Z0-9]+$"
     assert property_name["live_query_accessor_mapping"] == {
@@ -6168,12 +6164,13 @@ def test_remote_local_filesystem_previews_fail_before_project_or_path_proof(
         "operation": operation,
         "arguments": dict(arguments),
     }
+    preview_command = "legacy-preview" if operation == "object.set" else "preview"
 
     exit_code, payload = execute(
         [
             "--host",
             "192.0.2.10",
-            "preview",
+            preview_command,
             "--request-json",
             json.dumps(request),
         ],

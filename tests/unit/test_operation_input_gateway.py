@@ -17,6 +17,7 @@ from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImp
     OPERATION_INPUT_MODE_LANES,
     OPERATION_REQUEST_CONTRACT,
     OperationInputModeLane,
+    describe_operation,
 )
 from wwise_waapi.transactions import (  # pyright: ignore[reportMissingImports]
     TransactionStore,
@@ -147,12 +148,35 @@ def set_notes_request(*, version: str = "2022.1") -> dict[str, Any]:
     }
 
 
+def object_set_request(*, version: str = "2022.1") -> dict[str, Any]:
+    return {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": version,
+        "operation": "object.set",
+        "arguments": {
+            "objects": [
+                {
+                    "object": {"kind": "id", "value": OBJECT_GUID},
+                    "notes": "after",
+                }
+            ]
+        },
+    }
+
+
 def preview_client(*, year: int = 2022) -> FakeClient:
     return FakeClient(
         {
             "ak.wwise.core.getInfo": [live_info(year=year)],
             "ak.wwise.core.getProjectInfo": [project_row()],
-            "ak.wwise.core.object.get": [{"return": [object_row()]}],
+            "ak.wwise.core.object.getTypes": [
+                {"return": [{"classId": 1, "name": "Sound", "type": "Sound"}]}
+            ],
+            "ak.wwise.core.object.get": [
+                {"return": [object_row()]},
+                {"return": [object_row()]},
+                {"return": []},
+            ],
         }
     )
 
@@ -190,7 +214,7 @@ def _without_route_specific_schema_fields(payload: Mapping[str, Any]) -> dict[st
     return result
 
 
-def test_normal_schema_and_detail_expose_one_versioned_mode_without_legacy_peer_route(
+def test_normal_object_set_schema_and_detail_expose_only_composer_input(
     tmp_path: Path,
 ) -> None:
     schema_code, schema = offline_execute(
@@ -203,17 +227,37 @@ def test_normal_schema_and_detail_expose_one_versioned_mode_without_legacy_peer_
     detail_code, detail = offline_execute(tmp_path, "operations", "--detail")
 
     assert schema_code == detail_code == 0
-    assert schema["operation"]["input_mode"] == LEGACY_JSON_INPUT_MODE
+    assert schema["operation"]["input_mode"] == COMPOSER_INPUT_MODE
     assert "input_modes_by_version" not in schema["operation"]
     expected_modes = {
-        "2022.1": LEGACY_JSON_INPUT_MODE,
-        "2023.1": LEGACY_JSON_INPUT_MODE,
-        "2024.1": LEGACY_JSON_INPUT_MODE,
-        "2025.1": LEGACY_JSON_INPUT_MODE,
+        "2022.1": COMPOSER_INPUT_MODE,
+        "2023.1": COMPOSER_INPUT_MODE,
+        "2024.1": COMPOSER_INPUT_MODE,
+        "2025.1": COMPOSER_INPUT_MODE,
     }
     rows = {row["name"]: row for row in detail["operations"]}
     assert rows["object.set"]["input_modes_by_version"] == expected_modes
     assert "input_mode" not in rows["object.set"]
+    assert schema["request_envelope"] is None
+    assert schema["request_envelope_policy"] == {
+        "status": "composer_ready",
+        "complete_request_authored_by_gateway": True,
+    }
+    assert schema["composer"]["contract"] == "waapi-skill.operation-composer/v1"
+    assert schema["composer"]["start"] == {
+        "subcommand": "draft-start",
+        "gateway_argv": ["draft-start", "object.set"],
+    }
+    assert schema["composer"]["seal_subcommand"] == "preview-from-draft"
+    assert "request_contract" not in schema["operation"]
+    assert "argument_contract" not in schema["operation"]
+    assert "required_arguments" not in schema["operation"]
+    assert "optional_arguments" not in schema["operation"]
+    assert "request_contract" not in rows["object.set"]
+    assert "argument_contract" not in rows["object.set"]
+    assert set(rows["object.set"]["composer_contracts_by_version"]) == set(
+        expected_modes
+    )
     assert "legacy-preview" not in json.dumps(schema)
     assert "legacy-operation-schema" not in json.dumps(schema)
     assert "legacy-preview" not in json.dumps(detail)
@@ -245,6 +289,7 @@ def test_legacy_schema_is_explicit_deprecated_and_uses_the_same_registry_contrac
         "input_mode": LEGACY_JSON_INPUT_MODE,
         "submit_command": "legacy-preview",
     }
+    assert legacy["operation"]["input_mode"] == LEGACY_JSON_INPUT_MODE
     assert {
         key: value
         for key, value in normal["operation"].items()
@@ -260,6 +305,39 @@ def test_legacy_schema_is_explicit_deprecated_and_uses_the_same_registry_contrac
     assert "\n" not in waapi_gateway.gateway_stdout_json_encoder(legacy).encode(
         legacy
     )
+
+
+def test_object_set_legacy_schema_retains_only_the_explicit_compatibility_contract(
+    tmp_path: Path,
+) -> None:
+    normal_code, normal = offline_execute(
+        tmp_path,
+        "--version",
+        "2022.1",
+        "operation-schema",
+        "object.set",
+    )
+    legacy_code, legacy = offline_execute(
+        tmp_path,
+        "--version",
+        "2022.1",
+        "legacy-operation-schema",
+        "object.set",
+    )
+
+    assert normal_code == legacy_code == 0
+    assert normal["operation"]["input_mode"] == COMPOSER_INPUT_MODE
+    assert normal["request_envelope"] is None
+    assert "request_contract" not in normal["operation"]
+    assert legacy["compatibility"]["input_mode"] == LEGACY_JSON_INPUT_MODE
+    assert legacy["compatibility"]["submit_command"] == "legacy-preview"
+    assert legacy["operation"]["input_mode"] == LEGACY_JSON_INPUT_MODE
+    assert legacy["request_envelope"]["operation"] == "object.set"
+    expected_operation = describe_operation("object.set").as_dict(version="2022.1")
+    expected_operation.pop("summary", None)
+    expected_operation.pop("selection_guidance", None)
+    expected_operation["input_mode"] = LEGACY_JSON_INPUT_MODE
+    assert legacy["operation"] == expected_operation
 
 
 def test_all_legacy_operation_schemas_fit_the_existing_compact_output_budget(
@@ -294,7 +372,7 @@ def test_schema_input_mode_projection_is_isolated_by_exact_operation_key(
 ) -> None:
     import wwise_waapi.operation_registry as registry
 
-    migrated_names = {"object.set", "lua.executeCoreInline"}
+    migrated_names = {"object.set"}
     monkeypatch.setattr(
         registry,
         "OPERATION_INPUT_MODE_LANES",
@@ -316,7 +394,7 @@ def test_schema_input_mode_projection_is_isolated_by_exact_operation_key(
         ("object.set", "2025.1", COMPOSER_INPUT_MODE),
         ("object.setRTPC", "2025.1", LEGACY_JSON_INPUT_MODE),
         ("object.createPlugin", "2025.1", LEGACY_JSON_INPUT_MODE),
-        ("lua.executeCoreInline", "2025.1", COMPOSER_INPUT_MODE),
+        ("lua.executeCoreInline", "2025.1", LEGACY_JSON_INPUT_MODE),
         ("lua.executeCoreFile", "2025.1", LEGACY_JSON_INPUT_MODE),
     )
     for operation, version, expected in cases:
@@ -608,6 +686,47 @@ def test_normal_preview_enforces_the_exact_operation_version_input_mode(
     assert legacy_code == 0, legacy
     stored = TransactionStore(state_dir).load_preview(legacy["transaction_id"])
     assert stored.artifact["request"] == set_notes_request()
+
+
+def test_object_set_json_submission_requires_the_explicit_legacy_surface(
+    tmp_path: Path,
+) -> None:
+    request = object_set_request()
+    connections: list[str] = []
+
+    normal_code, normal = waapi_gateway.execute_gateway(
+        ["preview", "--request-json", json.dumps(request)],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: connections.append(url),
+    )
+
+    assert normal_code == 2
+    assert normal["error_code"] == "INPUT_MODE_MISMATCH"
+    assert normal["details"] == {
+        "operation": "object.set",
+        "version": "2022.1",
+        "required_input_mode": COMPOSER_INPUT_MODE,
+        "submitted_input_mode": LEGACY_JSON_INPUT_MODE,
+    }
+    assert connections == []
+
+    state_dir = tmp_path / "object-set-legacy"
+    client = preview_client()
+    legacy_code, legacy = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(state_dir),
+            "legacy-preview",
+            "--request-json",
+            json.dumps(request),
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert legacy_code == 0, legacy
+    stored = TransactionStore(state_dir).load_preview(legacy["transaction_id"])
+    assert stored.artifact["request"] == request
 
 
 @pytest.mark.parametrize(

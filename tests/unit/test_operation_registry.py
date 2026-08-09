@@ -71,7 +71,7 @@ EXPECTED_ACTOR_MIXER_METADATA_TYPES = {
 }
 
 
-def test_every_supported_operation_version_has_one_explicit_legacy_json_input_mode() -> None:
+def test_every_supported_operation_version_has_one_explicit_normal_input_mode() -> None:
     specs = {spec.name: spec for spec in list_operation_specs()}
 
     assert len(specs) == 34
@@ -79,12 +79,15 @@ def test_every_supported_operation_version_has_one_explicit_legacy_json_input_mo
         len(spec.supported_versions) for spec in specs.values()
     )
     for name, spec in specs.items():
+        expected_mode = (
+            COMPOSER_INPUT_MODE if name == "object.set" else LEGACY_JSON_INPUT_MODE
+        )
         assert operation_input_modes_by_version(name) == {
-            version: LEGACY_JSON_INPUT_MODE
+            version: expected_mode
             for version in spec.supported_versions
         }
         for version in spec.supported_versions:
-            assert operation_input_mode(name, version) == LEGACY_JSON_INPUT_MODE
+            assert operation_input_mode(name, version) == expected_mode
 
 
 @pytest.mark.parametrize(

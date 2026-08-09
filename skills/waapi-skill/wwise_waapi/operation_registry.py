@@ -3451,7 +3451,7 @@ _OPERATION_INPUT_MODE_DECLARATIONS: tuple[
     ("object.createPlugin", ("2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
     ("object.delete", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
     ("object.move", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("object.set", ("2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("object.set", ("2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
     ("object.setLinked", ("2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
     ("object.setName", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
     ("object.setNotes", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
@@ -3736,6 +3736,9 @@ def object_set_composer_fragment_contract(version: str) -> dict[str, Any]:
         "target_selector": _json_mapping(selector),
         "scalar_property": _json_mapping(scalar_property),
         "reference": _json_mapping(properties["references"]["items"]),
+        "default_container_target_contract": _json_mapping(
+            machine["argument_contract"]["default_container_target_contract"]
+        ),
         "coverage": coverage,
         "request_options": {
             name: _json_mapping(argument_properties[name])

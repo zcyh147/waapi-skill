@@ -721,8 +721,12 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "`describe <uri>`" in OPERATE
     assert "There is deliberately no unconditional schema-to-preview shortcut" in compact
     assert "gateway.py operation-schema <operation-name>" not in OPERATE
-    assert "`request_envelope_policy.status` is `ready`" in compact
-    assert "copy `request_envelope` exactly" in compact
+    assert "Follow the schema's single `input_mode`" in OPERATE
+    assert "For `composer`, run its exact `composer.start.gateway_argv`" in OPERATE
+    assert "Gateway-generated handles" in OPERATE
+    assert "`draft-check`, then `preview-from-draft`" in OPERATE
+    assert "For `legacy_json`, copy `request_envelope` exactly" in OPERATE
+    assert "Never choose between two normal inputs" in OPERATE
     assert "Unknown fields fail" in OPERATE
     assert "serialize every JSON string exactly once" in OPERATE
     assert "Operation requests use only closed selectors, never raw WAQL" in OPERATE
@@ -732,7 +736,7 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert r"A raw `\` is invalid or escape-changing" in OPERATE
     assert "never paste a decoded/displayed Wwise path" in OPERATE
     assert (
-        "Each later intended-change preview still uses `preview --apply`"
+        "Each later intended change still creates its own executable preview"
         in OPERATE
     )
     assert (
@@ -928,13 +932,12 @@ def test_operate_metadata_and_import_prose_only_rules_are_preserved() -> None:
 def test_operate_maps_only_live_query_accessors_to_mutation_tokens() -> None:
     compact = " ".join(OPERATE.split())
 
-    assert "exact property/reference accessor is already visible in a successful live query" in compact
-    assert "property accessor `@Foo` becomes mutation metadata token `Foo`" in compact
+    assert "exact property/reference accessor visible in a successful live query" in compact
+    assert "`@Foo` becomes `Foo`" in compact
     assert "removing exactly one leading `@`" in compact
-    assert "reference accessor `OutputBus` remains `OutputBus`" in compact
-    assert "evidence-bound to that returned accessor" in compact
-    assert "never strip or invent a token from arbitrary user/model text" in compact
-    assert "preview the canonical token" in compact
+    assert "`OutputBus` remains `OutputBus`" in compact
+    assert "This mapping is evidence-bound" in compact
+    assert "never infer a token" in compact
 
 
 def test_operate_cli_and_authoring_fast_routes_keep_unstructured_materialization_rules() -> None:

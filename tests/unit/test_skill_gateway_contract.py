@@ -255,6 +255,26 @@ def test_existing_transaction_continuation_precedes_named_operation_schema() -> 
     )
 
 
+def test_normal_change_prose_stays_business_facing() -> None:
+    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+    operate = (SKILL_ROOT / "references" / "waapi-operate.md").read_text(
+        encoding="utf-8"
+    )
+
+    for document in (skill, operate):
+        assert (
+            "Normal prose covers only objects, changes, results, risks, and whether "
+            "anything changed."
+            in document
+        )
+        assert (
+            "Hide API/operation names, Draft/transaction internals, ids, hashes, tokens, "
+            "states, and commands."
+            in document
+        )
+        assert "Keep exact `agent_result` machine-readable" in document
+
+
 def test_public_readmes_route_users_only_through_the_packaged_gateway() -> None:
     readmes = (
         (REPO_ROOT / "README.md").read_text(encoding="utf-8"),
@@ -319,7 +339,7 @@ def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
         assert "**656**" in readme
         assert "**152**" in readme
         assert "**6**" in readme
-        assert "2641" in readme
+        assert "2784" in readme
         assert "./skills/waapi-skill/references/waapi-coverage.md" in readme
 
     assert "198 unique routed WAAPI URIs" in english
@@ -328,4 +348,4 @@ def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
     assert "仍要求实时宿主为 Authoring" in " ".join(chinese.split())
     assert "not a claim that all 808 rows have been exercised against a real Wwise process" in english
     assert "不等于已经在真实 Wwise 进程中逐一运行了全部 808 行" in chinese
-    assert "currently contains 2641 passing tests" in coverage_contract
+    assert "currently contains 2784 passing tests" in coverage_contract

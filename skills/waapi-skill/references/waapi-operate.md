@@ -42,7 +42,7 @@ After any required selected-subset identity gate, choose exactly one of these fi
 
 For direct `audio.import`, its schema owns fixed fields and same-row Event/Switch Assignation. Without dynamic `properties[]`/`references[]`, start `operation-schema audio.import`. For dynamic tokens on media Sound rows, `Sound` fixes scope; metadata/schema are independent and may swap, but both precede preview and neither repeats. Fixed-column table import also starts `operation-schema audio.importTabDelimited`; unknown dynamic `Property[...]`/`Reference[...]`/`@...` columns stay metadata-first. Use `operations` only for broad inventory. Dedicated operations own their URIs; `waapi.call` is rejected unless the catalog lists it for that URI. The three Undo Group URIs use only `waapi.undoGroup`.
 
-After the required discovery/schema sequence, construct only the closed request returned by the schema and preview it. There is deliberately no unconditional schema-to-preview shortcut: missing metadata, version, identity, file, or user input must be resolved by the branch that owns it. Conversely, do not add metadata discovery when an exact property/reference accessor is already visible in a successful live query from this conversation. Apply only the operation schema's mapping: property accessor `@Foo` becomes mutation metadata token `Foo` by removing exactly one leading `@`; reference accessor `OutputBus` remains `OutputBus`. This mapping is evidence-bound to that returned accessor—never strip or invent a token from arbitrary user/model text. Then preview the canonical token.
+Follow the schema's single `input_mode`. There is deliberately no unconditional schema-to-preview shortcut: resolve missing inputs. Reuse only an exact property/reference accessor visible in a successful live query, removing exactly one leading `@` (`@Foo` becomes `Foo`); `OutputBus` remains `OutputBus`. This mapping is evidence-bound; never infer a token. For `composer`, run its exact `composer.start.gateway_argv`; use returned actions/bindings and Gateway-generated handles. One fact/action. Rejection preserves revision; correct it. Intent changes need user. Run `draft-check`, then `preview-from-draft`; `--apply` requests execution. Gateway authors request. For `legacy_json`, copy `request_envelope` exactly, replace only `arguments`, keep `version`, and use `preview --request-json`. Never choose between two normal inputs; hide Legacy.
 
 Public mutation identities are closed to `id`, `path`, `exact-type-name`,
 `direct-child`, and `scoped-name`. Use a schema-fitting selector directly in
@@ -173,17 +173,17 @@ Compact 2022 materialization rules not yet represented structurally:
 
 For exact `ak.wwise.core.audio.convert` in `2024.1`/`2025.1`, use `operation-schema waapi.call` first without `describe`/`capabilities`. Apply it only after the result proves one of those versions. Copy `direct_fast_route_contract.canonical_request_template` and replace only its listed values: non-empty ordered string arrays for exact object paths, platforms, and languages, plus the user's stated absolute `io_root` unchanged. An exact object path may be formed only from an explicitly supplied parent plus named direct children, in user order; never search recursively or add unnamed descendants. Explicit SFX targets use `languages:["SFX"]`; explicit localized languages replace it. Ask when a required input remains ambiguous.
 
-## Closed request, preview, and policy
+## Closed input, preview, and policy
 
-The successful named schema is the sole authority for request fields, identities, constraints, version support, and argument paths. When `request_envelope_policy.status` is `ready`, copy `request_envelope` exactly and replace only its empty `arguments` with fields allowed by that same schema. Unknown fields fail. Runtime-owned identity evidence, metadata records, dispatcher args/options, and raw `@Property` members are never model inputs to a dedicated operation.
+The successful schema is the sole authority for fields, identities, constraints, version support, and paths. Unknown fields fail. Runtime identity evidence, metadata records, dispatcher args/options, and raw `@Property` members are not model inputs.
 
-For an unambiguous actual change use one standalone:
+Legacy JSON uses one standalone command:
 
 ```bash
 python /absolute/path/to/waapi-skill/scripts/run.py gateway.py preview --apply --request-json '<closed-request-json>'
 ```
 
-Single-quote the compact shell request and serialize every JSON string exactly once. Raw JSON spells each Wwise separator `\\`; decoding yields `\`. A raw `\` is invalid or escape-changing; never paste a decoded/displayed Wwise path. Operation requests use only closed selectors, never raw WAQL. Invalid JSON stops before preview; do not repair or retry that turn.
+Single-quote its compact request and serialize every JSON string exactly once. Raw JSON spells each Wwise separator `\\`; decoding yields `\`. A raw `\` is invalid or escape-changing; never paste a decoded/displayed Wwise path. Operation requests use only closed selectors, never raw WAQL. Invalid JSON stops before preview; do not repair or retry that turn.
 
 Under `ask_before_changes`, a user asking to see the preview before confirming an intended change still uses `preview --apply`: that flag creates the durable confirmation-bound preview and does not execute the change. Omit `--apply` only for a hypothetical, design-only, or explicitly non-executable preview.
 In ordinary use omit `--state-dir`: the Gateway owns the external transaction store. Pass it only when a trusted caller explicitly supplied an absolute override, then reuse that path unchanged.
@@ -196,11 +196,12 @@ Policy behavior:
 
 | Policy | Behavior |
 |---|---|
-| `read_only` | block `preview --apply`; a design-only preview remains possible |
+| `read_only` | block executable preview; a design-only preview remains possible |
 | `ask_before_changes` | preview returns `awaiting_confirmation`; present the concrete expected result and decision-relevant risk/cleanup/verifier limit, say nothing changed, ask whether to proceed, and end the turn |
 | `allow_changes` | preview may return `policy_authorized`; after preview and before execution, tell the user the concrete impending change and that current mode permits it, then continue in the same turn |
 
 Dangerous debug host controls remain confirmation-only even under `allow_changes`; obey their schema acknowledgement and never infer ordinary "yes" as the required value.
+Normal prose covers only objects, changes, results, risks, and whether anything changed. Hide API/operation names, Draft/transaction internals, ids, hashes, tokens, states, and commands. Keep exact `agent_result` machine-readable.
 
 ## Continue only from Gateway-owned commands
 
@@ -219,7 +220,7 @@ Treat every phase as separately gated and inspect its complete JSON before the n
 The show result's confirmation token binds the stored id, full artifact hash, state, and event chain. Never reconstruct or substitute it, use the artifact hash as a token, or run `confirm --help`. If confirm output is incomplete, stop before execute/verify. Risks already disclosed by the immutable preview are decision information, not a second Agent veto after the user clearly confirms that same request. A changed project/path/scope requires a fresh preview.
 
 For an original ordered multi-transaction request, apply the current policy to each item independently after the prior item reaches terminal verification. Never infer, add, combine, or reorder an item.
-Each later intended-change preview still uses `preview --apply`; completing the prior transaction does not turn the next one into a design-only preview.
+Each later intended change still creates its own executable preview; completing one does not turn the next one into a design-only preview.
 
 ## Terminal states and reporting
 
