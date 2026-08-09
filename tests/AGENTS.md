@@ -180,7 +180,7 @@ then make one repair batch and start a new campaign root; stop early only for a
 systemic harness, sandbox, evidence, or cleanup fault. These totals define the
 planned profile.
 
-Historical evidence is split across three frozen 2026-07-31 roots. Initial
+Historical macOS evidence is split across three frozen 2026-07-31 roots. Initial
 `a12` passed the four Alarm/Harbor version units and failed both Weather units;
 fresh `a20-int22-weather` and `a24-int25-weather` roots passed the repaired
 Weather units. This is passing evidence for all six unique units across roots,
@@ -192,6 +192,8 @@ disclosed bounded advanced-WAQL layer, and the removal of raw WAQL mutation
 selectors. Those V1 roots do not validate the newer routing contracts; keep
 the historical integration result attached only to its migration-before
 candidate. The V2 evidence below applies only to its exact workflow paths.
+Every named V1 campaign root seals `runtime.platform=darwin`; no
+native-Windows V1 semantic campaign is currently recorded.
 
 The natural-language prompt revision received a fresh 2026-08-03 campaign.
 `campaign-integration-workflows-v1-terra-20260803-current-r1` passed five of
@@ -220,14 +222,24 @@ fixture itself. The lifecycle records the source full-tree hash and project
 mtime before and after each attempt, removes a passing sandbox, and seals and
 quarantines a failed, blocked, retryable, or indeterminate one.
 
-The completed 2026-08-03 V2 evidence is cumulative across frozen roots, not one
-final-candidate 6/6 run. `r8` passed both Rifle units, `r12-2022` passed the
+The completed 2026-08-03 macOS V2 evidence is cumulative across frozen roots,
+not one final-candidate 6/6 run. `r8` passed both Rifle units, `r12-2022` passed the
 2022.1 Weapons unit, `r23-2022-footsteps` passed the 2022.1 Footsteps unit, and
 `r24-2025-repairs` passed the 2025.1 Footsteps and Weapons units. All six unique
 units therefore have passing evidence across those roots. Passing sandboxes
 were removed; failed or blocked diagnostic sandboxes were sealed and
 quarantined; every recorded source-project full hash and mtime remained
 unchanged.
+
+The later native-Windows V2 evidence is also cumulative. Commit `0dfea2b` root
+`windows-v2-six-0dfea2b-r1` attempted all six units, passed 2022.1 Rifle,
+2022.1 Footsteps, and 2025.1 Rifle, failed the other three, exited `1`, and had
+no verify-only replay. At `a516835`, `a516-w22-r1` passed 2022.1 Weapons fresh
+and verify-only; `a516-f25-r1` failed 2025.1 Footsteps and was frozen without
+verify-only. At `f1b6a51`, `f1b-f25-r1` and `f1b-w25-r1` passed 2025.1
+Footsteps and Weapons fresh and verify-only. All six V2 units therefore have
+native-Windows passing evidence across these frozen roots, but there is no
+single-root or single-candidate Windows 6/6 result.
 
 The committed v2 baseline manifests are maintenance evidence, not semantic
 passes. To refresh one, first prepare and open an isolated copy with the normal

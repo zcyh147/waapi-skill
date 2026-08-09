@@ -146,7 +146,7 @@ campaign root. Stop the pass early only for a systemic harness, source-sandbox,
 evidence, or cleanup fault that could invalidate later cases. The profile
 totals are a design contract.
 
-The completed 2026-07-31 historical evidence is cumulative. The frozen initial
+The completed 2026-07-31 historical macOS evidence is cumulative. The frozen initial
 `campaign-integration-workflows-v1-terra-20260731-a12` root passed the Alarm
 and Harbor workflows on both versions and failed both Weather workflows.
 Fresh repaired roots
@@ -156,6 +156,8 @@ the remaining 2022.1 and 2025.1 Weather units. Across those roots all six
 unique units have passing evidence, but there is no single final-candidate
 6/6 campaign. Passing sandboxes were cleaned, failed sandboxes were sealed and
 quarantined, and all source-project hashes and mtimes remained unchanged.
+All named V1 roots seal `runtime.platform=darwin`; no native-Windows V1
+semantic campaign is currently recorded.
 
 The 2026-08-03 current-wording campaign used the same transaction topology,
 fixtures, and business oracles. The full frozen `current-r1` root passed five
@@ -212,8 +214,8 @@ before collection. Collect 2022.1 and 2025.1 separately. A valid committed
 baseline is only a fixture prerequisite, not a semantic result. The v1
 campaigns above do not validate this V2 fixture, routing, or workflow contract.
 
-The completed 2026-08-03 V2 evidence is cumulative across frozen roots, not one
-final-candidate 6/6 run. `r8` passed both Rifle units, `r12-2022` passed the
+The completed 2026-08-03 macOS V2 evidence is cumulative across frozen roots,
+not one final-candidate 6/6 run. `r8` passed both Rifle units, `r12-2022` passed the
 2022.1 Weapons unit, `r23-2022-footsteps` passed the 2022.1 Footsteps unit, and
 `r24-2025-repairs` passed the 2025.1 Footsteps and Weapons units. All six unique
 units therefore have passing evidence across those roots. Passing sandboxes
@@ -222,6 +224,20 @@ quarantined; every recorded source-project full hash and mtime remained
 unchanged. This evidence grants no per-API coverage credit and proves only the
 exact Rifle, Footsteps, and Weapons workflow paths, not advanced WAQL or
 unrelated routes.
+
+The later native-Windows V2 campaign is a separate cumulative evidence chain.
+At commit `0dfea2b`, `windows-v2-six-0dfea2b-r1` attempted all six units and
+passed 2022.1 Rifle, 2022.1 Footsteps, and 2025.1 Rifle; the remaining three
+failed, the outer campaign exited `1`, and no verify-only replay was run. At
+`a516835`, fresh `a516-w22-r1` passed 2022.1 Weapons and its identical
+`--resume --verify-only` replay; fresh `a516-f25-r1` failed 2025.1 Footsteps on
+a metadata-routing detour and was frozen without verify-only. At `f1b6a51`,
+fresh `f1b-f25-r1` and `f1b-w25-r1` passed 2025.1 Footsteps and 2025.1 Weapons,
+and both passed identical verify-only replay. The final Weapons root reconciled
+12/12 Broker records, preserved the exact quoted `@Volume` token, retained an
+unchanged source, and removed its passing sandbox. All six V2 units therefore
+have native-Windows passing evidence across these frozen roots, but there is no
+single-root or single-candidate Windows 6/6 campaign.
 
 The focused `modification_policy_9` profile reuses the existing
 `OBJ22-F-CREATE-01` fixture, runner, broker, lifecycle, and business oracle. It

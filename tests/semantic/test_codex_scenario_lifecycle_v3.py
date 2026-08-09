@@ -89,6 +89,7 @@ def _install_fakes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, shutdown_
             host="127.0.0.1",
             port=49152,
             command=("WwiseConsole", str(sandbox.sandbox_project)),
+            launch_cwd=sandbox.sandbox_root.resolve(strict=True),
         )
 
     def fake_shutdown(_lifecycle, _sandbox, *, suppress_errors: bool):
@@ -161,6 +162,7 @@ def _install_home_populating_launch(
             host="127.0.0.1",
             port=49152,
             command=("WwiseConsole", str(sandbox.sandbox_project)),
+            launch_cwd=sandbox.sandbox_root.resolve(strict=True),
         )
 
     monkeypatch.setattr(lifecycle_v3, "launch_sandboxed_wwise", launch)
@@ -172,6 +174,12 @@ def test_passing_scenario_deletes_all_owned_runtime_state(monkeypatch, tmp_path)
     controller = _controller(tmp_path)
     runtime = controller.start()
     (runtime.asset_root / "input.wav").write_bytes(b"audio")
+    start = json.loads(
+        (runtime.evidence_root / "start.json").read_text(encoding="utf-8")
+    )
+
+    assert start["launch_cwd"] == str(runtime.sandbox.sandbox_root.resolve(strict=True))
+    assert start["launch_cwd"] != start["sandbox_project"]
 
     result = controller.finish("PASS")
 

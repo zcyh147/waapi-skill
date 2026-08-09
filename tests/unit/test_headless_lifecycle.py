@@ -310,6 +310,106 @@ def test_launch_preserves_project_path_with_spaces_as_single_argument(tmp_path: 
     lifecycle.shutdown()
 
 
+def test_launch_decouples_long_absolute_project_from_short_explicit_cwd(
+    tmp_path: Path,
+) -> None:
+    executable = make_executable(tmp_path)
+    launch_cwd = tmp_path / "launch-cwd"
+    launch_cwd.mkdir()
+    project = (
+        tmp_path
+        / ("long-project-parent-" + "a" * 180)
+        / ("nested-" + "b" * 80)
+        / "SampleProject.wproj"
+    ).resolve(strict=False)
+    assert len(str(project)) > 260
+    commands: list[list[str]] = []
+    seen_kwargs: list[dict[str, Any]] = []
+
+    def process_factory(command: list[str], **kwargs: Any) -> FakeProcess:
+        commands.append(command)
+        seen_kwargs.append(kwargs)
+        return FakeProcess()
+
+    lifecycle = HeadlessLifecycle(
+        console_path=executable,
+        project_path=project,
+        launch_cwd_path=launch_cwd,
+        process_factory=process_factory,
+    )
+    lifecycle.launch()
+
+    assert commands[0][2] == str(project)
+    assert seen_kwargs[0]["cwd"] == str(launch_cwd.resolve(strict=True))
+    assert lifecycle.launch_cwd == launch_cwd.resolve(strict=True)
+    assert lifecycle.launch_cwd != project.parent
+    lifecycle.shutdown()
+
+
+def test_launch_rejects_missing_explicit_cwd_before_process_creation(
+    tmp_path: Path,
+) -> None:
+    executable = make_executable(tmp_path)
+    process_calls: list[list[str]] = []
+    lifecycle = HeadlessLifecycle(
+        console_path=executable,
+        launch_cwd_path=tmp_path / "missing",
+        process_factory=lambda command, **kwargs: process_calls.append(command)
+        or FakeProcess(),
+    )
+
+    with pytest.raises(HeadlessLifecycleError, match="launch_cwd_path does not exist"):
+        lifecycle.launch()
+
+    assert process_calls == []
+
+
+def test_launch_rejects_explicit_cwd_symlink(
+    tmp_path: Path,
+) -> None:
+    executable = make_executable(tmp_path)
+    target = tmp_path / "target"
+    target.mkdir()
+    alias = tmp_path / "alias"
+    try:
+        alias.symlink_to(target, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"symlink creation is unavailable: {exc}")
+    lifecycle = HeadlessLifecycle(
+        console_path=executable,
+        launch_cwd_path=alias,
+        process_factory=lambda command, **kwargs: FakeProcess(),
+    )
+
+    with pytest.raises(HeadlessLifecycleError, match="symlink, junction, or reparse"):
+        lifecycle.launch()
+
+
+def test_launch_rejects_explicit_cwd_with_junction_ancestor(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    executable = make_executable(tmp_path)
+    junction = tmp_path / "junction"
+    launch_cwd = junction / "child"
+    launch_cwd.mkdir(parents=True)
+    real_is_junction = getattr(Path, "is_junction", lambda _self: False)
+    monkeypatch.setattr(
+        Path,
+        "is_junction",
+        lambda self: self == junction or real_is_junction(self),
+        raising=False,
+    )
+    lifecycle = HeadlessLifecycle(
+        console_path=executable,
+        launch_cwd_path=launch_cwd,
+        process_factory=lambda command, **kwargs: FakeProcess(),
+    )
+
+    with pytest.raises(HeadlessLifecycleError, match="launch_cwd_path contains"):
+        lifecycle.launch()
+
+
 def test_launch_passes_launch_env_to_process_factory(tmp_path: Path) -> None:
     executable = make_executable(tmp_path)
     seen_kwargs: list[dict[str, Any]] = []

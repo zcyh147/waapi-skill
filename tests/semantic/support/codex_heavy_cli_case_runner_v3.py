@@ -399,6 +399,7 @@ class _HeadlessCliPhase:
             port=self.port,
             host=self.host,
             launch_env=dict(launch_environment),
+            launch_cwd_path=Path(spec.cwd) if spec.cwd else None,
             process_factory=process_factory,
         )
 

@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Iterable, Protocol, TextIO
 
+from .filesystem_security import path_is_link_or_reparse  # pyright: ignore[reportMissingImports]
 from .platform_paths import build_wwise_console_command  # pyright: ignore[reportMissingImports]
 
 
@@ -236,6 +237,49 @@ def _default_process_factory(command: list[str], **kwargs: Any) -> subprocess.Po
     return subprocess.Popen(command, **kwargs)
 
 
+def _require_explicit_launch_cwd(value: Path) -> Path:
+    """Resolve one real launch cwd without accepting a filesystem alias."""
+
+    candidate = Path(value).expanduser()
+    if not candidate.is_absolute():
+        raise HeadlessLifecycleError(
+            f"WwiseConsole launch_cwd_path must be absolute: {candidate}"
+        )
+    if any(component in {".", ".."} for component in candidate.parts[1:]):
+        raise HeadlessLifecycleError(
+            f"WwiseConsole launch_cwd_path must be normalized: {candidate}"
+        )
+    current = Path(candidate.anchor)
+    chain = [current]
+    for component in candidate.parts[1:]:
+        current = current / component
+        chain.append(current)
+    leaf_metadata: Any | None = None
+    for current in chain:
+        try:
+            metadata = current.lstat()
+        except OSError as exc:
+            raise HeadlessLifecycleError(
+                f"WwiseConsole launch_cwd_path does not exist: {candidate}"
+            ) from exc
+        if path_is_link_or_reparse(current, metadata=metadata):
+            raise HeadlessLifecycleError(
+                "WwiseConsole launch_cwd_path contains a symlink, junction, or "
+                f"reparse point: {current}"
+            )
+        leaf_metadata = metadata
+    if leaf_metadata is None or not candidate.is_dir():
+        raise HeadlessLifecycleError(
+            f"WwiseConsole launch_cwd_path is not a directory: {candidate}"
+        )
+    try:
+        return candidate.resolve(strict=True)
+    except OSError as exc:
+        raise HeadlessLifecycleError(
+            f"WwiseConsole launch_cwd_path cannot be resolved: {candidate}"
+        ) from exc
+
+
 def find_free_port(host: str = DEFAULT_HOST) -> int:
     """Select an available Wwise server port outside common ephemeral ranges."""
 
@@ -336,6 +380,7 @@ class HeadlessLifecycle:
     process_factory: ProcessFactory = _default_process_factory
     command_extra_args: list[str] = field(default_factory=list)
     launch_env: dict[str, str] | None = None
+    launch_cwd_path: Path | None = None
     process: Any = field(init=False, default=None)
     output: ProcessOutput = field(init=False, default_factory=ProcessOutput)
     ready_result: Any = field(init=False, default=None)
@@ -366,7 +411,13 @@ class HeadlessLifecycle:
         self.port = selected_port
         self.console_path = resolved_path
         launch_project_path = Path(self.project_path).expanduser().resolve(strict=False) if self.project_path is not None else None
-        self.launch_cwd = launch_project_path.parent if launch_project_path is not None else None
+        self.launch_cwd = (
+            _require_explicit_launch_cwd(self.launch_cwd_path)
+            if self.launch_cwd_path is not None
+            else launch_project_path.parent
+            if launch_project_path is not None
+            else None
+        )
         self.command = build_wwise_console_command(
             resolved_path,
             selected_port,

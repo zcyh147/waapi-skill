@@ -722,7 +722,7 @@ class CliRuntimePlan:
                 console,
                 setup_port,
                 project_path=self.project_path,
-                cwd=self.project_path.parent,
+                cwd=self.case_root,
             )
             if self.requires_setup
             else None
@@ -735,7 +735,7 @@ class CliRuntimePlan:
             console,
             business_port,
             project_path=self.business_server_project_path,
-            cwd=self.business_server_project_path.parent,
+            cwd=self.case_root,
         )
         oracle = (
             _phase_spec(
@@ -743,7 +743,7 @@ class CliRuntimePlan:
                 console,
                 oracle_port,
                 project_path=self.project_path,
-                cwd=self.project_path.parent,
+                cwd=self.case_root,
                 read_only_oracle=True,
             )
             if self.requires_oracle

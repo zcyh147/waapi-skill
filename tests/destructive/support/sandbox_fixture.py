@@ -198,6 +198,7 @@ class SandboxMetadata:
     process_pid: int | None = None
     wine_prefix_path: str | None = None
     launch_project_path: str | None = None
+    launch_cwd_path: str | None = None
     ready_duration_seconds: float | None = None
     get_info_version: dict[str, Any] | None = None
     get_info_display_name: str | None = None
@@ -424,13 +425,16 @@ def launch_sandboxed_wwise(
     if contract.active_destructive_project != sandbox.sandbox_project.resolve(strict=False):
         raise SandboxFixtureError("destructive environment did not select the sandbox project")
 
+    launch_cwd = sandbox.sandbox_root.resolve(strict=True)
     lifecycle = HeadlessLifecycle(
         console_path=contract.console_path,
         project_path=sandbox.sandbox_project,
         port=port,
         timeouts=timeouts or _timeouts_from_env(env_map),
         launch_env=env_map,
+        launch_cwd_path=launch_cwd,
     )
+    sandbox.metadata.launch_cwd_path = str(launch_cwd)
     try:
         ready_started = time.perf_counter()
         lifecycle.run_until_ready()
@@ -439,6 +443,10 @@ def launch_sandboxed_wwise(
             lifecycle,
             expected_version=contract.version,
         )
+        if lifecycle.launch_cwd != launch_cwd:
+            raise SandboxFixtureError(
+                "WwiseConsole lifecycle did not retain the exact sandbox-root cwd"
+            )
         sandbox.metadata.selected_port = lifecycle.port
         sandbox.metadata.command = list(lifecycle.command)
         sandbox.metadata.process_pid = getattr(lifecycle.process, "pid", None)
@@ -544,6 +552,7 @@ def _strict_real_launch_audit_payload(sandbox: SandboxProject) -> dict[str, Any]
             ("selected_port", metadata.selected_port),
             ("command", metadata.command),
             ("launch_project_path", metadata.launch_project_path),
+            ("launch_cwd_path", metadata.launch_cwd_path),
             ("ready_duration_seconds", metadata.ready_duration_seconds),
             ("get_info_version", metadata.get_info_version),
             ("get_info_display_name", metadata.get_info_display_name),
@@ -560,6 +569,7 @@ def _strict_real_launch_audit_payload(sandbox: SandboxProject) -> dict[str, Any]
         "command": list(metadata.command or []),
         "wine_prefix_path": metadata.wine_prefix_path,
         "launch_project_path": metadata.launch_project_path,
+        "launch_cwd_path": metadata.launch_cwd_path,
         "sandbox_project_path": metadata.sandbox_project_path,
         "ready_duration_seconds": metadata.ready_duration_seconds,
         "get_info_version": metadata.get_info_version,

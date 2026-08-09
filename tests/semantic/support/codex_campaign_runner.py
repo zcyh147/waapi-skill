@@ -1221,6 +1221,7 @@ def _validate_live_runtime(
     ):
         raise CampaignEvidenceError("Wwise getInfo version does not match the requested version")
     launch_project = metadata.get("launch_project_path")
+    launch_cwd = metadata.get("launch_cwd_path")
     sandbox_project = metadata.get("sandbox_project_path")
     sandbox_path = metadata.get("sandbox_path")
     source_project = metadata.get("source_path")
@@ -1229,6 +1230,7 @@ def _validate_live_runtime(
     command = metadata.get("command")
     if (
         not isinstance(launch_project, str)
+        or not isinstance(launch_cwd, str)
         or not isinstance(sandbox_project, str)
         or not isinstance(sandbox_path, str)
         or not isinstance(source_project, str)
@@ -1246,12 +1248,18 @@ def _validate_live_runtime(
     recorded_sandbox = Path(sandbox_path).expanduser().resolve(strict=False)
     recorded_sandbox_project = Path(sandbox_project).expanduser().resolve(strict=False)
     recorded_launch_project = Path(launch_project).expanduser().resolve(strict=False)
+    recorded_launch_cwd = _strict_absolute_path(
+        launch_cwd,
+        label="Wwise launch cwd",
+        kind="directory",
+    )
     recorded_source_root = Path(source_root).expanduser().resolve(strict=False)
     recorded_source_project = Path(source_project).expanduser().resolve(strict=False)
     recorded_console = Path(command[0]).expanduser().resolve(strict=False)
     if (
         recorded_console != expected_console.resolve(strict=False)
         or recorded_sandbox_root != expected_sandbox_root
+        or recorded_launch_cwd != expected_sandbox_root
         or not expected_sandbox_root.is_dir()
         or expected_sandbox_root.is_symlink()
         or recorded_sandbox.parent != expected_sandbox_root
@@ -1457,6 +1465,11 @@ def _validate_pre_session_live_readiness_runtime(
         label="launch project",
         kind="file",
     )
+    launch_cwd = _strict_absolute_path(
+        metadata.get("launch_cwd_path"),
+        label="Wwise launch cwd",
+        kind="directory",
+    )
     source_root = _strict_absolute_path(
         metadata.get("source_root"),
         label="source root",
@@ -1474,6 +1487,7 @@ def _validate_pre_session_live_readiness_runtime(
     )
     if (
         sandbox.parent != expected_sandbox_root
+        or launch_cwd != expected_sandbox_root
         or launch_project != sandbox_project
         or sandbox_project.parent != sandbox
         or sandbox_project.name != "SampleProject.wproj"
@@ -1564,7 +1578,7 @@ def _validate_pre_session_live_readiness_runtime(
     if (
         f"; port={selected_port};" not in terminal
         or f"argv={exact_command!r}" not in terminal
-        or f"cwd={str(sandbox)!r}" not in terminal
+        or f"cwd={str(launch_cwd)!r}" not in terminal
         or f"WAMP server failed to start (port {selected_port})" not in terminal
     ):
         raise CampaignEvidenceError(

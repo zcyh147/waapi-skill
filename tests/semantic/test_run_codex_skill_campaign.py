@@ -622,6 +622,13 @@ def test_sealed_pass_resumes_verify_only_without_starting_another_child(
     assert len(attempts) == 1
     assert (attempts[0] / ATTEMPT_MANIFEST_FILE).is_file()
 
+    monkeypatch.setattr(
+        campaign,
+        "_require_standard_windows_path_budget",
+        lambda *_args, **_kwargs: pytest.fail(
+            "verify-only must not apply a process-cwd launch budget"
+        ),
+    )
     resume = replace(options, resume=True, verify_only=True)
     assert campaign.run_campaign(resume) == campaign.EXIT_PASS
     assert len(child_calls) == 1

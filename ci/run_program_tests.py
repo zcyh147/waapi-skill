@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 from typing import Sequence
@@ -13,9 +14,42 @@ PROGRAM_PYTEST_ARGS = (
     "--ignore=tests/live",
     "--ignore=tests/destructive",
 )
-PROGRAM_PYTEST_OPTIONS_REQUIRING_VALUE = frozenset(
-    {"-k", "--maxfail", "--tb", "--color", "--durations", "--capture"}
+PROGRAM_PYTEST_VALUE_FREE_OPTIONS = frozenset(
+    {
+        "-q",
+        "--quiet",
+        "-v",
+        "--verbose",
+        "--collect-only",
+        "--co",
+        "-x",
+        "--exitfirst",
+        "-s",
+        "--disable-warnings",
+        "--showlocals",
+        "--no-showlocals",
+        "--no-header",
+        "--no-summary",
+    }
 )
+PROGRAM_PYTEST_OPTIONS_REQUIRING_VALUE = frozenset(
+    {
+        "-k",
+        "--maxfail",
+        "--tb",
+        "--color",
+        "--capture",
+        "--durations",
+        "--durations-min",
+    }
+)
+_PROGRAM_PYTEST_LONG_VALUE_PREFIXES = tuple(
+    f"{option}="
+    for option in PROGRAM_PYTEST_OPTIONS_REQUIRING_VALUE
+    if option.startswith("--")
+)
+_PROGRAM_PYTEST_REPEATED_VERBOSITY = re.compile(r"-(?:q{2,}|v{2,})\Z")
+_PROGRAM_PYTEST_REPORT = re.compile(r"-r[aAEFfNpPSswxX]+\Z")
 
 
 class ProgramManifestError(ValueError):
@@ -79,23 +113,45 @@ def load_program_nodes(manifest_path: Path, *, repo_root: Path = REPO_ROOT) -> l
 
 
 def validate_program_pytest_args(arguments: Sequence[str]) -> list[str]:
-    """Return exact pytest arguments after rejecting collection-widening inputs."""
+    """Return exact pytest arguments from a closed, non-widening allowlist."""
 
     validated = list(arguments)
     expects_value_for: str | None = None
     for argument in validated:
         if expects_value_for is not None:
+            if not argument:
+                raise ProgramPytestArgsError(
+                    "program mode received an invalid value for pytest option: "
+                    f"{expects_value_for}"
+                )
             expects_value_for = None
             continue
         if argument in PROGRAM_PYTEST_OPTIONS_REQUIRING_VALUE:
             expects_value_for = argument
             continue
-        if argument == "--pyargs" or argument.startswith("--pyargs="):
-            raise ProgramPytestArgsError(f"program mode does not allow --pyargs: {argument}")
-        if argument.startswith("-"):
+        if argument in PROGRAM_PYTEST_VALUE_FREE_OPTIONS:
             continue
+        if argument.startswith(_PROGRAM_PYTEST_LONG_VALUE_PREFIXES):
+            option, value = argument.split("=", 1)
+            if not value:
+                raise ProgramPytestArgsError(
+                    "program mode received a pytest option without its required value: "
+                    f"{option}"
+                )
+            continue
+        if _PROGRAM_PYTEST_REPEATED_VERBOSITY.fullmatch(argument):
+            continue
+        if argument == "-r":
+            expects_value_for = argument
+            continue
+        if _PROGRAM_PYTEST_REPORT.fullmatch(argument):
+            continue
+        if argument.startswith("-"):
+            raise ProgramPytestArgsError(
+                f"program mode does not allow pytest option: {argument}"
+            )
         raise ProgramPytestArgsError(
-            "program mode accepts pytest flags and filter values, "
+            "program mode accepts allowlisted pytest flags and filter values, "
             f"not additional test paths: {argument}"
         )
 

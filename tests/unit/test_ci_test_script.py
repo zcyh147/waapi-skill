@@ -463,9 +463,17 @@ def _write_fake_python(bin_dir: Path, fail_on_nonlive: bool = False) -> Path:
         "        raise AssertionError('live child did not reuse the active Python interpreter')\n"
         "    with log_path.open('a', encoding='utf-8') as handle:\n"
         "        handle.write(json.dumps(child_argv) + '\\n')\n"
+        f"    if {str(fail_on_nonlive)} and child_argv[1:5] == ['-m', 'pytest', '-m', 'not live and not destructive']:\n"
+        "        return subprocess.CompletedProcess(command, 7)\n"
         "    return subprocess.CompletedProcess(command, 0)\n"
         "argv = sys.argv[1:]\n"
+        "if len(argv) >= 2 and argv[0] == '--directory':\n"
+        "    argv = argv[2:]\n"
         "effective_argv = argv[3:] if argv[:3] == ['run', '--', 'python'] else (argv[2:] if argv[:2] == ['run', 'python'] else argv)\n"
+        "if effective_argv and Path(effective_argv[0]).name == 'test_driver.py':\n"
+        "    sys.path.insert(0, str(Path(effective_argv[0]).resolve().parent))\n"
+        "    from test_driver import main\n"
+        "    sys.exit(main(effective_argv[1:], environment=os.environ, python_executable=sys.executable, command_runner=record_live_child))\n"
         "if effective_argv and Path(effective_argv[0]).name == 'run_live_test_command.py':\n"
         "    sys.path.insert(0, str(Path(effective_argv[0]).resolve().parent))\n"
         "    from run_live_test_command import main\n"
@@ -498,6 +506,12 @@ def _write_fake_python(bin_dir: Path, fail_on_nonlive: bool = False) -> Path:
             encoding="utf-8",
         )
         launcher.chmod(0o755)
+        poetry = bin_dir / "poetry"
+        poetry.write_text(
+            f"#!/usr/bin/env bash\n\"{sys.executable}\" \"{script}\" \"$@\"\n",
+            encoding="utf-8",
+        )
+        poetry.chmod(0o755)
     return script
 
 
@@ -735,4 +749,4 @@ def test_ci_test_sh_rejects_missing_explicit_live_environment_config(
     result = _run_ci_test(env, "--version", "2024.1", "--mode", "live")
 
     assert result.returncode != 0
-    assert "Explicit WWISE_TEST_CONFIG does not exist" in result.stderr
+    assert "explicit WWISE_TEST_CONFIG does not exist" in result.stderr

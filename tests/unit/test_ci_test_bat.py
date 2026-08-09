@@ -16,11 +16,20 @@ from ci.run_program_tests import (
     load_program_nodes,
     validate_program_pytest_args,
 )
+from ci.test_driver import (
+    DESTRUCTIVE_TEST_NODES,
+    LIVE_TEST_NODES,
+    SUPPORTED_VERSIONS,
+    TestDriverError as DriverError,
+    default_live_paths,
+    parse_request,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CI_TEST_BAT = REPO_ROOT / "ci" / "test.bat"
 CI_TEST_SH = REPO_ROOT / "ci" / "test.sh"
+CI_TEST_DRIVER = REPO_ROOT / "ci" / "test_driver.py"
 PROGRAM_TEST_MANIFEST = REPO_ROOT / "ci" / "program-test-nodes.txt"
 
 
@@ -45,6 +54,7 @@ def _write_fake_python(bin_dir: Path, fail_on: str | None = None) -> None:
         "        'WWISE_SANDBOX_ROOT': environment.get('WWISE_SANDBOX_ROOT'),\n"
         "        'WWISE_TEST_CONFIG': environment.get('WWISE_TEST_CONFIG'),\n"
         "        'PYTEST_ADDOPTS': environment.get('PYTEST_ADDOPTS'),\n"
+        "        'PYTEST_PLUGINS': environment.get('PYTEST_PLUGINS'),\n"
         "    }\n"
         "    if options is not None:\n"
         "        entry.update({\n"
@@ -69,7 +79,19 @@ def _write_fake_python(bin_dir: Path, fail_on: str | None = None) -> None:
         "    if not child_argv or os.path.normcase(child_argv[0]) != os.path.normcase(sys.executable):\n"
         "        raise AssertionError('live child did not reuse the active Python interpreter')\n"
         "    child_environment = options['env']\n"
-        "    append_entry(child_argv, child_environment, options=options)\n"
+        "    program_manifest_nodes = None\n"
+        "    if len(child_argv) >= 3 and Path(child_argv[1]).name == 'run_program_tests.py':\n"
+        "        manifest_path = Path(child_argv[2])\n"
+        "        if manifest_path.name == 'program-test-nodes.txt':\n"
+        "            program_manifest_nodes = [line for line in manifest_path.read_text(encoding='utf-8-sig').splitlines() if line and not line.startswith('#')]\n"
+        "        sys.path.insert(0, str(Path(child_argv[1]).resolve().parents[1]))\n"
+        "        from ci.run_program_tests import ProgramPytestArgsError, validate_program_pytest_args\n"
+        "        try:\n"
+        "            validate_program_pytest_args(child_argv[3:])\n"
+        "        except ProgramPytestArgsError as exc:\n"
+        "            print(str(exc), file=sys.stderr)\n"
+        "            return subprocess.CompletedProcess(command, 1)\n"
+        "    append_entry(child_argv, child_environment, program_manifest_nodes, options=options)\n"
         "    is_smoke = bool(child_argv[1:]) and child_argv[1].endswith('wwise_smoke.py')\n"
         "    builds = {'2021.1': '2021.1.14.8108', '2022.1': '2022.1.19.8584', '2023.1': '2023.1.19.8928', '2024.1': '2024.1.13.9056', '2025.1': '2025.1.7.9143'}\n"
         "    version = child_environment.get('WWISE_VERSION')\n"
@@ -80,10 +102,16 @@ def _write_fake_python(bin_dir: Path, fail_on: str | None = None) -> None:
         "    smoke_stderr = '' if is_smoke else None\n"
         "    return subprocess.CompletedProcess(command, selected_returncode(child_argv[1:]), stdout=smoke_stdout, stderr=smoke_stderr)\n"
         "argv = sys.argv[1:]\n"
+        "if len(argv) >= 2 and argv[0] == '--directory':\n"
+        "    argv = argv[2:]\n"
         "if argv[:2] == ['run', 'python'] and '--version' in argv:\n"
         "    print('Poetry (version 2.2.1)')\n"
         "    sys.exit(0)\n"
         "effective_argv = argv[3:] if argv[:3] == ['run', '--', 'python'] else (argv[2:] if argv[:2] == ['run', 'python'] else argv)\n"
+        "if effective_argv and Path(effective_argv[0]).name == 'test_driver.py':\n"
+        "    sys.path.insert(0, str(Path(effective_argv[0]).resolve().parent))\n"
+        "    from test_driver import main\n"
+        "    sys.exit(main(effective_argv[1:], environment=os.environ, python_executable=sys.executable, command_runner=record_live_child, windows=True))\n"
         "if effective_argv and Path(effective_argv[0]).name == 'run_live_test_command.py':\n"
         "    sys.path.insert(0, str(Path(effective_argv[0]).resolve().parent))\n"
         "    from run_live_test_command import main\n"
@@ -216,6 +244,56 @@ def _program_manifest_nodes() -> list[str]:
     ]
 
 
+@pytest.mark.parametrize(
+    ("arguments", "expected"),
+    (
+        (("--mode", "program"), ("none", "program", ())),
+        (("--mode", "all", "--", "-q", "-ra"), ("all", "all", ("-q", "-ra"))),
+        (("all", "focused", "--", "-k", "gateway or lock"), ("all", "focused", ("-k", "gateway or lock"))),
+        (("2024.1", "live"), ("2024.1", "live", ())),
+    ),
+)
+def test_python_driver_owns_cli_defaults_and_exact_pytest_passthrough(
+    arguments: tuple[str, ...],
+    expected: tuple[str, str, tuple[str, ...]],
+) -> None:
+    request = parse_request(arguments)
+
+    assert request is not None
+    assert (request.version, request.mode, request.pytest_args) == expected
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    (
+        ("--mode", "live"),
+        ("--version", "2024.1", "--mode", "all"),
+        ("--version", "2024.1", "--mode", "matrix"),
+        ("--version", "none", "--mode", "smoke"),
+        ("--version", "2099.1", "--mode", "live"),
+    ),
+)
+def test_python_driver_rejects_unsafe_mode_version_combinations(
+    arguments: tuple[str, ...],
+) -> None:
+    with pytest.raises(DriverError):
+        parse_request(arguments)
+
+
+def test_python_driver_owns_all_platform_defaults_and_pytest_nodes() -> None:
+    for version in SUPPORTED_VERSIONS:
+        windows = default_live_paths(version, "live", windows=True)
+        posix = default_live_paths(version, "live", windows=False)
+
+        assert str(windows.console).startswith(r"C:\Audiokinetic\Wwise")
+        assert str(windows.project).endswith(
+            str(Path("tests") / "_org" / version / "SampleProject.wproj")
+        )
+        assert str(posix.console).startswith("/Applications/Audiokinetic/Wwise")
+        for node in (*LIVE_TEST_NODES[version], *DESTRUCTIVE_TEST_NODES[version]):
+            assert (REPO_ROOT / node.split("::", 1)[0]).is_file()
+
+
 def test_program_manifest_is_the_single_ordered_cross_platform_node_source() -> None:
     lines = PROGRAM_TEST_MANIFEST.read_text(encoding="utf-8").splitlines()
     nodes = load_program_nodes(PROGRAM_TEST_MANIFEST)
@@ -237,14 +315,16 @@ def test_program_manifest_is_the_single_ordered_cross_platform_node_source() -> 
 
     shell_source = CI_TEST_SH.read_text(encoding="utf-8")
     batch_source = CI_TEST_BAT.read_text(encoding="utf-8")
-    assert 'PROGRAM_TEST_MANIFEST="$ROOT_DIR/ci/program-test-nodes.txt"' in shell_source
-    assert 'python "$ROOT_DIR/ci/run_program_tests.py" "${program_args[@]}"' in shell_source
-    assert 'set "PROGRAM_TEST_MANIFEST=%SCRIPT_DIR%program-test-nodes.txt"' in batch_source
-    assert '"%ROOT_DIR%\\ci\\run_program_tests.py" "%PROGRAM_TEST_MANIFEST%"' in batch_source
-    assert shell_source.count("program-test-nodes.txt") == 1
-    assert batch_source.count("program-test-nodes.txt") == 1
+    driver_source = CI_TEST_DRIVER.read_text(encoding="utf-8")
+    assert '"program-test-nodes.txt"' in driver_source
+    assert '"run_program_tests.py"' in driver_source
+    assert "program-test-nodes.txt" not in shell_source
+    assert "program-test-nodes.txt" not in batch_source
+    assert driver_source.count("program-test-nodes.txt") == 1
     assert "test_gateway_session_context.py" not in shell_source
     assert "test_gateway_session_context.py" not in batch_source
+    assert "--mode" not in shell_source
+    assert "--mode" not in batch_source
 
 
 def test_program_manifest_loader_allows_comments_and_blank_lines(tmp_path: Path) -> None:
@@ -303,6 +383,11 @@ def test_program_pytest_argument_validator_preserves_complex_filters() -> None:
         "1",
         "-q",
         "-ra",
+        "-rN",
+        "-rE",
+        "--tb=short",
+        "--durations-min",
+        "0.5",
     ]
 
     assert validate_program_pytest_args(arguments) == arguments
@@ -322,7 +407,19 @@ def test_program_pytest_argument_validator_preserves_complex_filters() -> None:
         ["tests/unit/test_ci_test_bat.py::test_program_manifest_loader_allows_comments_and_blank_lines"],
         ["--pyargs", "tests.unit.test_ci_test_bat"],
         ["--pyargs=tests.unit.test_ci_test_bat"],
+        ["--override-ini=addopts=tests/semantic"],
+        ["--override-ini", "addopts=tests/live"],
+        ["-o=addopts=tests/destructive"],
+        ["-oaddopts=tests/semantic"],
+        ["-c", "pytest.ini"],
+        ["--rootdir", "tests/live"],
+        ["-p", "unsafe_plugin"],
+        ["-m", "live"],
+        ["@pytest-args.txt"],
+        ["--unknown-plugin-option"],
         ["-k"],
+        ["-k", ""],
+        ["--tb="],
     ],
 )
 def test_program_pytest_argument_validator_rejects_collection_widening_and_missing_values(
@@ -334,6 +431,8 @@ def test_program_pytest_argument_validator_rejects_collection_widening_and_missi
 
 def test_ci_test_bat_program_loads_every_shared_node_and_forwards_all_flags(tmp_path: Path) -> None:
     env, log_path = _base_env(tmp_path)
+    env["PYTEST_ADDOPTS"] = "tests/live"
+    env["PYTEST_PLUGINS"] = "unsafe_plugin"
     expression = "transaction and (gateway or lock)"
 
     result = _run_ci_test(
@@ -368,6 +467,7 @@ def test_ci_test_bat_program_loads_every_shared_node_and_forwards_all_flags(tmp_
     assert call["WWISE_SAMPLE_PROJECT_PATH"] is None
     assert call["WWISE_SANDBOX_ROOT"] is None
     assert call["PYTEST_ADDOPTS"] is None
+    assert call["PYTEST_PLUGINS"] is None
 
 
 def test_ci_test_bat_program_rejects_extra_paths_and_incomplete_filter_flags(tmp_path: Path) -> None:
@@ -378,7 +478,7 @@ def test_ci_test_bat_program_rejects_extra_paths_and_incomplete_filter_flags(tmp
 
     assert extra_path.returncode == 1
     assert (
-        "accepts pytest flags and filter values, not additional test paths"
+        "accepts allowlisted pytest flags and filter values, not additional test paths"
         in extra_path.stderr
     )
     assert missing_filter.returncode == 1
@@ -395,39 +495,51 @@ def test_ci_test_bat_help_matches_shell_parity_surface() -> None:
     assert "all          Run non-live suite first, then strict real matrix" in result.stdout
     assert "smoke        Run focused WAAPI getInfo smoke via HeadlessLifecycle" in result.stdout
     assert "ci\\test.bat all matrix" in result.stdout
-    assert "poetry run -- python ..." in result.stdout
     assert "WWISE_TEST_CONFIG" in result.stdout
 
 
 def test_ci_test_bat_and_shell_share_pathlib_config_resolver() -> None:
     shell_source = CI_TEST_SH.read_text(encoding="utf-8")
     batch_source = CI_TEST_BAT.read_text(encoding="utf-8")
+    driver_source = CI_TEST_DRIVER.read_text(encoding="utf-8")
     live_runner_source = (
         REPO_ROOT / "ci" / "run_live_test_command.py"
     ).read_text(encoding="utf-8")
 
-    assert shell_source.count("ci/resolve_live_test_config.py") == 1
-    assert "ci\\run_live_test_command.py" in batch_source
+    assert (
+        'poetry --directory "$SCRIPT_DIR/.." run -- python '
+        '"$SCRIPT_DIR/test_driver.py" "$@"'
+    ) in shell_source
+    assert (
+        'call poetry --directory "%~dp0.." run -- python '
+        '"%~dp0test_driver.py" %*'
+    ) in batch_source
+    assert "run_live_test_command" in driver_source
     assert "resolve_live_test_config" in live_runner_source
-    assert batch_source.count("call poetry run -- python") == 13
-    assert "call poetry run python" not in batch_source
-    assert shell_source.count('python "$ROOT_DIR/ci/wwise_smoke.py"') == 1
+    assert batch_source.count(
+        'call poetry --directory "%~dp0.." run -- python '
+        '"%~dp0test_driver.py" %*'
+    ) == 1
+    assert len(shell_source.splitlines()) == 5
+    assert len(batch_source.splitlines()) == 4
     assert "from wwise_waapi.headless import" not in shell_source
 
 
-def test_ci_test_bat_includes_shared_gateway_nodes_for_every_matrix_version() -> None:
-    batch_source = CI_TEST_BAT.read_text(encoding="utf-8")
-
-    assert batch_source.count(
+def test_python_driver_includes_shared_gateway_nodes_for_every_matrix_version() -> None:
+    shared_live = (
         "tests/live/test_gateway_live_matrix.py::"
         "test_gateway_read_only_matrix_runs_once_against_copied_sandbox"
-    ) == 5
-    assert batch_source.count(
-        "tests/destructive/test_gateway_transaction_matrix.py"
-    ) == 5
-    assert batch_source.count(
-        "tests/destructive/test_gateway_workflow_transaction_matrix.py"
-    ) == 5
+    )
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        assert shared_live in LIVE_TEST_NODES[version]
+        assert (
+            "tests/destructive/test_gateway_transaction_matrix.py"
+            in DESTRUCTIVE_TEST_NODES[version]
+        )
+        assert (
+            "tests/destructive/test_gateway_workflow_transaction_matrix.py"
+            in DESTRUCTIVE_TEST_NODES[version]
+        )
 
 
 def test_ci_test_bat_all_mode_defaults_to_all_and_runs_full_matrix(tmp_path: Path) -> None:

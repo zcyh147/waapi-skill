@@ -582,6 +582,7 @@ def _write_live_runtime(
         "source_path": str(source_project),
         "source_root": str(source_root),
         "launch_project_path": str(sandbox_project),
+        "launch_cwd_path": str(sandbox_root),
         "sandbox_project_path": str(sandbox_project),
         "sandbox_path": str(sandbox),
         "command": [
@@ -678,7 +679,7 @@ def _write_pre_session_readiness_failure(
         "wwise_waapi.headless.ReadinessTimeout: WAAPI readiness timed out; "
         f"port={selected_port}; timeout=60.0; duration=60.1s; "
         "last_exception_type=ConnectionRefusedError; "
-        f"argv={command!r}; cwd={str(sandbox)!r}; pid=None; "
+        f"argv={command!r}; cwd={metadata['launch_cwd_path']!r}; pid=None; "
         "process_state=not-started; exit_code=None; "
         "stdout_tail=\"WAAPI\\tFatal Error\\tWampFailedStartingServer\\t"
         f"WAMP server failed to start (port {selected_port}), will retry every 10s.\"; "
@@ -2239,6 +2240,7 @@ def test_live_child_process_cleanup_is_fail_closed(tmp_path: Path) -> None:
     (
         ("iteration-root", "exact campaign sandbox"),
         ("project-outside-sandbox", "exact campaign sandbox"),
+        ("launch-cwd", "exact campaign sandbox"),
         ("wamp-port", "WAMP port"),
         ("http-port", "HTTP transport"),
         ("console", "exact campaign sandbox"),
@@ -2271,6 +2273,10 @@ def test_live_child_rejects_sandbox_and_command_binding_drift(
         metadata["launch_project_path"] = str(external)
         metadata["sandbox_project_path"] = str(external)
         metadata["command"][2] = str(external)
+    elif drift == "launch-cwd":
+        wrong_cwd = root / "wrong-launch-cwd"
+        wrong_cwd.mkdir()
+        metadata["launch_cwd_path"] = str(wrong_cwd)
     elif drift == "wamp-port":
         metadata["command"][metadata["command"].index("--wamp-port") + 1] = "65535"
     elif drift == "http-port":

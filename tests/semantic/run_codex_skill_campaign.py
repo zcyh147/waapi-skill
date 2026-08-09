@@ -200,6 +200,11 @@ from tests.semantic.support.codex_filesystem_security import (  # noqa: E402
     read_bounded_exclusive_regular_file,
     write_utf8_text_bytes,
 )
+from tests.semantic.support.codex_windows_path_budget import (  # noqa: E402
+    WindowsCampaignPathBudget,
+    WindowsCampaignPathBudgetError,
+    require_windows_campaign_path_budget,
+)
 from tests.semantic.support.codex_prompt_asset_reads_v3 import (  # noqa: E402
     PromptAssetReadError,
     remove_validated_command_occurrences,
@@ -681,6 +686,16 @@ def run_campaign(options: CampaignOptions) -> int:
     if not sessions:
         raise CampaignConfigError("no semantic sessions matched the requested filters")
     required_units = required_unit_map(sessions)
+    windows_path_budget = None
+    if not options.verify_only:
+        try:
+            windows_path_budget = _require_standard_windows_path_budget(
+                options,
+                sessions=sessions,
+            )
+        except (ValueError, WindowsCampaignPathBudgetError) as exc:
+            raise CampaignConfigError(str(exc)) from exc
+    _print_windows_path_budget(windows_path_budget)
     try:
         effective = build_effective_config(options, sessions=sessions, required_units=required_units)
     except (CampaignEvidenceError, OSError, subprocess.SubprocessError) as exc:
@@ -918,6 +933,16 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
     except (SystemExit, ValueError) as exc:
         raise CampaignConfigError(str(exc)) from exc
     required_units = {str(unit.unit_id): (HEAVY_V3_PHASE,) for unit in units}
+    windows_path_budget = None
+    if not options.verify_only:
+        try:
+            windows_path_budget = _require_heavy_windows_path_budget(
+                options,
+                units=units,
+            )
+        except (ValueError, WindowsCampaignPathBudgetError) as exc:
+            raise CampaignConfigError(str(exc)) from exc
+    _print_windows_path_budget(windows_path_budget)
     try:
         effective = build_heavy_v3_effective_config(
             options,
@@ -3812,6 +3837,13 @@ def _heavy_v3_retryable_cli_phases_are_clean(
 ) -> bool:
     if not isinstance(value, list) or not value:
         return False
+    try:
+        expected_launch_cwd = _require_real_directory(
+            owned_root / "case",
+            label="retryable CLI case root",
+        )
+    except CampaignEvidenceError:
+        return False
     roles: list[str] = []
     phase_keys = {
         "evidence",
@@ -3876,7 +3908,7 @@ def _heavy_v3_retryable_cli_phases_are_clean(
         working_directory = Path(cwd)
         try:
             project_metadata = project.lstat()
-            _require_real_directory(
+            validated_working_directory = _require_real_directory(
                 working_directory,
                 label="retryable CLI working directory",
             )
@@ -3888,8 +3920,8 @@ def _heavy_v3_retryable_cli_phases_are_clean(
             or not stat.S_ISREG(project_metadata.st_mode)
             or not _path_is_within(project, owned_root)
             or not working_directory.is_absolute()
-            or not _path_is_within(working_directory, owned_root)
-            or working_directory != project.parent
+            or validated_working_directory != expected_launch_cwd
+            or not _path_is_within(project, expected_launch_cwd)
             or open_project not in argv
         ):
             return False
@@ -3912,20 +3944,33 @@ def _validate_heavy_v3_retryable_project_start(
         "source_hash_before",
         "source_mtime_before_ns",
         "sandbox_project",
+        "launch_cwd",
         "endpoint",
         "isolated_launch_environment",
+        "owned_wine_prefix",
     }:
         raise CampaignEvidenceError(
             "retryable heavy project start evidence has an invalid shape"
         )
     sandbox_project_value = start.get("sandbox_project")
+    launch_cwd_value = start.get("launch_cwd")
     endpoint = start.get("endpoint")
     isolated_environment = start.get("isolated_launch_environment")
-    if not isinstance(sandbox_project_value, str):
+    if not isinstance(sandbox_project_value, str) or not isinstance(
+        launch_cwd_value, str
+    ):
         raise CampaignEvidenceError(
-            "retryable heavy project start sandbox path is malformed"
+            "retryable heavy project start launch paths are malformed"
         )
     sandbox_project = Path(sandbox_project_value)
+    launch_cwd = _require_real_directory(
+        Path(launch_cwd_value),
+        label="retryable Wwise launch cwd",
+    )
+    expected_launch_cwd = _require_real_directory(
+        owned_root / "sandbox-root",
+        label="retryable owned sandbox root",
+    )
     try:
         sandbox_project_metadata = sandbox_project.lstat()
     except OSError as exc:
@@ -3947,6 +3992,8 @@ def _validate_heavy_v3_retryable_project_start(
         )
         or not stat.S_ISREG(sandbox_project_metadata.st_mode)
         or not _path_is_within(sandbox_project, owned_root)
+        or launch_cwd != expected_launch_cwd
+        or not _path_is_within(sandbox_project, launch_cwd)
         or not isinstance(endpoint, Mapping)
         or set(endpoint) != {"host", "port"}
         or endpoint.get("host") not in {"127.0.0.1", "localhost", "::1"}
@@ -12131,21 +12178,51 @@ def _validate_heavy_v3_pass_lifecycle(
         ):
             raise CampaignEvidenceError("passing project lifecycle proof is invalid")
         start = load_strict_regular_json(task_root.parent / "start.json")
+        expected_start_keys = {
+            "contract",
+            "scenario_id",
+            "version",
+            "started_at",
+            "source_hash_before",
+            "source_mtime_before_ns",
+            "sandbox_project",
+            "launch_cwd",
+            "endpoint",
+            "isolated_launch_environment",
+            "owned_wine_prefix",
+        }
+        sandbox_project_value = start.get("sandbox_project") if isinstance(start, Mapping) else None
+        launch_cwd_value = start.get("launch_cwd") if isinstance(start, Mapping) else None
+        expected_launch_cwd = scenario_root.resolve(strict=True) / "owned" / "sandbox-root"
+        sandbox_project = (
+            Path(sandbox_project_value)
+            if isinstance(sandbox_project_value, str)
+            else None
+        )
+        launch_cwd = (
+            Path(launch_cwd_value)
+            if isinstance(launch_cwd_value, str)
+            else None
+        )
         if (
             not isinstance(start, Mapping)
+            or set(start) != expected_start_keys
             or start.get("contract") != HEAVY_V3_PROJECT_LIFECYCLE_CONTRACT
             or start.get("scenario_id") != scenario_id
             or start.get("version") != version
             or start.get("source_hash_before") != lifecycle.get("source_hash_before")
             or start.get("source_mtime_before_ns")
             != lifecycle.get("source_mtime_before_ns")
+            or not _valid_heavy_utc_timestamp(start.get("started_at"))
             or not isinstance(start.get("endpoint"), Mapping)
             or start["endpoint"].get("host") not in {"127.0.0.1", "localhost", "::1"}
             or type(start["endpoint"].get("port")) is not int
-            or not _path_is_within(
-                Path(str(start.get("sandbox_project"))),
-                scenario_root / "owned",
-            )
+            or sandbox_project is None
+            or not sandbox_project.is_absolute()
+            or not _path_is_within(sandbox_project, expected_launch_cwd)
+            or launch_cwd is None
+            or not launch_cwd.is_absolute()
+            or launch_cwd != expected_launch_cwd
         ):
             raise CampaignEvidenceError("passing project start proof is invalid")
         return
@@ -12185,6 +12262,7 @@ def _validate_heavy_v3_pass_lifecycle(
     if not isinstance(phase_order, list) or len(phase_order) != len(phases):
         raise CampaignEvidenceError("passing CLI phase-order proof is invalid")
     observed_roles: list[str] = []
+    expected_launch_cwd = scenario_root.resolve(strict=True) / "owned" / "case"
     for phase in phases:
         if not isinstance(phase, Mapping):
             raise CampaignEvidenceError("passing CLI phase proof is malformed")
@@ -12207,11 +12285,19 @@ def _validate_heavy_v3_pass_lifecycle(
         ):
             raise CampaignEvidenceError("passing CLI process phase is not clean")
         cwd = evidence.get("cwd")
-        if cwd is not None and not _path_is_within(Path(str(cwd)), scenario_root):
-            raise CampaignEvidenceError("passing CLI process cwd escapes its scenario")
+        if (
+            not isinstance(cwd, str)
+            or not Path(cwd).is_absolute()
+            or Path(cwd) != expected_launch_cwd
+        ):
+            raise CampaignEvidenceError(
+                "passing CLI process cwd is not the exact case-owned root"
+            )
         opened = evidence.get("open_project_path")
-        if opened is not None and not _path_is_within(
-            Path(str(opened)), scenario_root / "owned"
+        if (
+            not isinstance(opened, str)
+            or not Path(opened).is_absolute()
+            or not _path_is_within(Path(opened), expected_launch_cwd)
         ):
             raise CampaignEvidenceError(
                 "passing CLI phase opened a project outside owned state"
@@ -12447,6 +12533,110 @@ def build_child_groups(
     if grouped_ids != {session.session_id for session in selected}:
         raise CampaignEvidenceError("scheduled sessions did not map to exactly one child group")
     return tuple(groups)
+
+
+def _require_standard_windows_path_budget(
+    options: CampaignOptions,
+    *,
+    sessions: Sequence[EvalSession],
+) -> WindowsCampaignPathBudget | None:
+    """Project every ordinary matrix directory passed to ``CreateProcessW``."""
+
+    groups = build_child_groups(
+        sessions,
+        scheduled_unit_ids=ordered_unique(session.pair_id for session in sessions),
+    )
+    projected: list[tuple[str, Path]] = []
+    attempt = Path("attempts") / "attempt-999999" / "runs"
+    for group in groups:
+        matrix_root = attempt / group.group_id / "matrix"
+        for session in group.sessions:
+            workspace = (
+                matrix_root
+                / "sessions"
+                / matrix.safe_session_name(session.session_id)
+                / "agent-workspace"
+            )
+            projected.append(
+                (f"Codex/pwsh cwd for {session.session_id}", workspace)
+            )
+        if group.version is not None:
+            sandbox_cwd = (
+                matrix_root
+                / "versions"
+                / group.version
+                / "sandbox-root"
+            )
+            projected.append(
+                (f"WwiseConsole cwd for {group.version}", sandbox_cwd)
+            )
+    return require_windows_campaign_path_budget(
+        options.campaign_root,
+        projected,
+    )
+
+
+def _require_heavy_windows_path_budget(
+    options: CampaignOptions,
+    *,
+    units: Sequence[Any],
+) -> WindowsCampaignPathBudget | None:
+    """Project every heavy/integration process cwd before campaign creation."""
+
+    projected: list[tuple[str, Path]] = []
+    scenarios = (
+        Path("attempts")
+        / "attempt-999999"
+        / "runs"
+        / HEAVY_V3_GROUP_ID
+        / "matrix"
+        / "scenarios"
+    )
+    for sequence, unit in enumerate(units, start=1):
+        unit_id = str(unit.unit_id)
+        scenario = scenarios / f"{sequence:03d}-{matrix.safe_session_name(unit_id)}"
+        projected.extend(
+            (
+                (
+                    f"Codex/pwsh cwd for {unit_id}",
+                    scenario / "evidence" / "codex-task" / "agent-workspace",
+                ),
+                (
+                    f"WwiseConsole sandbox cwd for {unit_id}",
+                    scenario / "owned" / "sandbox-root",
+                ),
+                (
+                    f"WwiseConsole CLI case cwd for {unit_id}",
+                    scenario / "owned" / "case",
+                ),
+            )
+        )
+    return require_windows_campaign_path_budget(
+        options.campaign_root,
+        projected,
+    )
+
+
+def _print_windows_path_budget(
+    budget: WindowsCampaignPathBudget | None,
+) -> None:
+    if budget is None:
+        return
+    worst = budget.worst
+    policy = (
+        "enabled"
+        if budget.long_paths_enabled is True
+        else "disabled"
+        if budget.long_paths_enabled is False
+        else "unknown"
+    )
+    print(
+        "[campaign-preflight] Windows process cwd budget "
+        f"ok worst={worst.utf16_units}/{budget.limit_utf16_units} "
+        f"max_campaign_root={budget.max_campaign_root_utf16_units} "
+        f"LongPathsEnabled={policy} label={worst.label!r}",
+        flush=True,
+    )
 
 
 def build_child_argv(

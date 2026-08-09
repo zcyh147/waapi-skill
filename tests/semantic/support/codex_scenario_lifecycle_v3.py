@@ -341,6 +341,7 @@ class ScenarioLifecycle:
                     "source_hash_before": asdict(source_hash_before),
                     "source_mtime_before_ns": source_mtime_before_ns,
                     "sandbox_project": str(sandbox.sandbox_project),
+                    "launch_cwd": str(lifecycle.launch_cwd),
                     "endpoint": {"host": lifecycle.host, "port": lifecycle.port},
                     "isolated_launch_environment": {
                         key: value

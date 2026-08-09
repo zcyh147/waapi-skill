@@ -834,8 +834,9 @@ def _mark_codex_infrastructure_block(
     quarantine_path = evidence_root / "quarantine.json"
     runner = matrix_case["runner"]
     if runner == "cli":
-        control_project = owned_root / "business-host" / "SampleProject.wproj"
-        control_project.parent.mkdir()
+        case_root = owned_root / "case"
+        control_project = case_root / "business-host" / "SampleProject.wproj"
+        control_project.parent.mkdir(parents=True)
         control_project.write_text("<WwiseDocument/>\n", encoding="utf-8")
         empty_sha256 = hashlib.sha256(b"").hexdigest()
         lifecycle = {
@@ -856,7 +857,7 @@ def _mark_codex_infrastructure_block(
                             "waapi-server",
                             str(control_project),
                         ],
-                        "cwd": str(control_project.parent),
+                        "cwd": str(case_root),
                         "shell": False,
                         "started": True,
                         "ready": True,
@@ -912,8 +913,10 @@ def _mark_codex_infrastructure_block(
                 "source_hash_before": source_hash,
                 "source_mtime_before_ns": 123456,
                 "sandbox_project": str(sandbox_project),
+                "launch_cwd": str(sandbox_project.parent),
                 "endpoint": {"host": "127.0.0.1", "port": 18080},
                 "isolated_launch_environment": {},
+                "owned_wine_prefix": None,
             },
         )
         quarantine = {
@@ -2335,7 +2338,7 @@ def _synthetic_command(
     platform_name: str | None = None,
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
 ) -> str:
-    """Encode synthetic Codex evidence with the grammar used by that host."""
+    """Encode synthetic Codex JSONL with its host-independent shlex grammar."""
 
     effective_platform = os.name if platform_name is None else platform_name
     if effective_platform == "nt":
@@ -2344,7 +2347,7 @@ def _synthetic_command(
                 "synthetic Windows commands require one attested PowerShell Core host"
             )
         encoded_continuation = encode_windows_powershell_argv(argv)
-        return subprocess.list2cmdline(
+        return shlex.join(
             (
                 windows_powershell_core_host.executable,
                 "-NoProfile",
@@ -2371,15 +2374,12 @@ def test_synthetic_command_uses_exact_host_command_grammar() -> None:
         native_argument_passing="Windows",
         sha256="a" * 64,
     )
-    outer = tuple(
-        shlex.split(
-            _synthetic_command(
-                argv,
-                platform_name="nt",
-                windows_powershell_core_host=host,
-            ),
-            posix=True,
-        )
+    rendered = _synthetic_command(
+        argv, platform_name="nt", windows_powershell_core_host=host
+    )
+    outer = tuple(shlex.split(rendered, posix=True))
+    assert rendered == shlex.join(
+        (host.executable, "-NoProfile", "-Command", outer[3])
     )
     assert outer[:3] == (host.executable, "-NoProfile", "-Command")
     assert decode_windows_powershell_argv(outer[3]) == argv
@@ -4671,8 +4671,12 @@ def _write_passing_project_outcome(
             "sandbox_project": str(
                 scenario_root.resolve() / "owned" / "sandbox-root" / "SampleProject.wproj"
             ),
+            "launch_cwd": str(
+                scenario_root.resolve() / "owned" / "sandbox-root"
+            ),
             "endpoint": {"host": "127.0.0.1", "port": 18080},
             "isolated_launch_environment": {},
+            "owned_wine_prefix": None,
         },
     )
     shutil.rmtree(scenario_root / "owned")
@@ -4865,6 +4869,37 @@ def test_heavy_validator_preserves_fail_and_later_pass_observations(tmp_path: Pa
     ]
     assert [row["status"] for row in result.observations] == ["PASS", "FAIL", "PASS"]
     assert result.pending_session_ids == ()
+
+
+def test_heavy_validator_rejects_passing_launch_cwd_drift(tmp_path: Path) -> None:
+    options = _options(tmp_path)
+    units = (_unit(1),)
+    root = tmp_path / "matrix"
+    _write_matrix_evidence(
+        root,
+        options=options,
+        units=units,
+        statuses=("PASS",),
+    )
+    start_path = (
+        root
+        / "scenarios"
+        / "001-OBJ22-F-GET-01"
+        / "evidence"
+        / "start.json"
+    )
+    start = json.loads(start_path.read_text(encoding="utf-8"))
+    start["launch_cwd"] = str(start_path.parent.parent / "owned")
+    matrix.write_json(start_path, start)
+
+    result = campaign.validate_heavy_v3_child_run(
+        root,
+        expected_units=units,
+        options=options,
+        returncode=0,
+    )
+
+    _assert_single_heavy_case_blocked(result, reason="project start proof is invalid")
 
 
 def _assert_single_heavy_case_blocked(
@@ -6026,6 +6061,49 @@ def test_heavy_validator_rejects_retryable_lifecycle_archive_drift(
     _assert_single_heavy_case_blocked(result, reason="embedded lifecycle differs")
 
 
+def test_heavy_validator_rejects_retryable_launch_cwd_drift(
+    tmp_path: Path,
+) -> None:
+    options = _options(tmp_path)
+    units = (_unit(1),)
+    root = tmp_path / "matrix"
+    _write_matrix_evidence(
+        root,
+        options=options,
+        units=units,
+        statuses=("BLOCKED",),
+        stop_reason="blocked:OBJ22-F-GET-01",
+        run_errors=("[heavy-unit:OBJ22-F-GET-01] BLOCKED: quota",),
+    )
+    _mark_codex_infrastructure_block(
+        root,
+        options=options,
+        unit=units[0],
+        sequence=1,
+        category="quota_or_rate_limit",
+    )
+    start_path = (
+        root
+        / "scenarios"
+        / "001-OBJ22-F-GET-01"
+        / "evidence"
+        / "start.json"
+    )
+    start = json.loads(start_path.read_text(encoding="utf-8"))
+    wrong_cwd = start_path.parent.parent / "owned"
+    start["launch_cwd"] = str(wrong_cwd.resolve())
+    matrix.write_json(start_path, start)
+
+    result = campaign.validate_heavy_v3_child_run(
+        root,
+        expected_units=units,
+        options=options,
+        returncode=1,
+    )
+
+    _assert_single_heavy_case_blocked(result, reason="not bound to its lifecycle")
+
+
 def test_heavy_validator_rejects_retryable_quarantine_tree_drift(
     tmp_path: Path,
 ) -> None:
@@ -6086,6 +6164,48 @@ def test_heavy_validator_rejects_retryable_cli_residual_phase(
     scenario_root = root / "scenarios" / "001-O22-CLI-MIGRATE-01"
     outcome = json.loads((scenario_root / "outcome.json").read_text(encoding="utf-8"))
     outcome["lifecycle"]["phases"][0]["evidence"]["residual_pids"] = [4242]
+    matrix.write_json(
+        scenario_root / "evidence" / "lifecycle.json",
+        outcome["lifecycle"],
+    )
+    _persist_runner_outcome(scenario_root, outcome)
+
+    result = campaign.validate_heavy_v3_child_run(
+        root,
+        expected_units=units,
+        options=options,
+        returncode=1,
+    )
+
+    _assert_single_heavy_case_blocked(result, reason="cleanup uncertainty")
+
+
+def test_heavy_validator_rejects_retryable_cli_launch_cwd_drift(
+    tmp_path: Path,
+) -> None:
+    options = _options(tmp_path)
+    units = (_cli_unit(1),)
+    root = tmp_path / "matrix"
+    _write_matrix_evidence(
+        root,
+        options=options,
+        units=units,
+        statuses=("BLOCKED",),
+        stop_reason="blocked:O22-CLI-MIGRATE-01",
+        run_errors=("[heavy-unit:O22-CLI-MIGRATE-01] BLOCKED: quota",),
+    )
+    _mark_codex_infrastructure_block(
+        root,
+        options=options,
+        unit=units[0],
+        sequence=1,
+        category="quota_or_rate_limit",
+    )
+    scenario_root = root / "scenarios" / "001-O22-CLI-MIGRATE-01"
+    outcome = json.loads((scenario_root / "outcome.json").read_text(encoding="utf-8"))
+    outcome["lifecycle"]["phases"][0]["evidence"]["cwd"] = str(
+        scenario_root / "owned"
+    )
     matrix.write_json(
         scenario_root / "evidence" / "lifecycle.json",
         outcome["lifecycle"],
@@ -6459,10 +6579,23 @@ def test_heavy_resume_verify_only_and_resume_schedule_only_pending(
     assert child_case_ids == [(units[0].unit_id, units[1].unit_id)]
     assert len(list_campaign_attempts(options.campaign_root)) == 1
 
+    path_budget = campaign._require_heavy_windows_path_budget
+    monkeypatch.setattr(
+        campaign,
+        "_require_heavy_windows_path_budget",
+        lambda *_args, **_kwargs: pytest.fail(
+            "verify-only must not apply a process-cwd launch budget"
+        ),
+    )
     verify_only = replace(options, resume=True, verify_only=True)
     assert campaign.run_campaign(verify_only) == campaign.EXIT_PENDING
     assert len(child_case_ids) == 1
 
+    monkeypatch.setattr(
+        campaign,
+        "_require_heavy_windows_path_budget",
+        path_budget,
+    )
     resume = replace(options, resume=True, verify_only=False)
     assert campaign.run_campaign(resume) == campaign.EXIT_PASS
     assert child_case_ids[-1] == (units[1].unit_id,)

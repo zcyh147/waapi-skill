@@ -338,6 +338,7 @@ def test_launch_uses_sandbox_project_and_records_command(monkeypatch: pytest.Mon
             seen_ports.append(self.port)
             self.project_path = kwargs["project_path"]
             self.launch_env = kwargs["launch_env"]
+            self.launch_cwd = kwargs["launch_cwd_path"]
             self.command = [
                 str(kwargs["console_path"]),
                 "waapi-server",
@@ -379,6 +380,10 @@ def test_launch_uses_sandbox_project_and_records_command(monkeypatch: pytest.Mon
     assert str(source_project) not in " ".join(sandbox.metadata.command or [])
     assert sandbox.metadata.selected_port == 31337
     assert sandbox.metadata.launch_project_path == str(sandbox.sandbox_project)
+    assert sandbox.metadata.launch_cwd_path == str(
+        sandbox.sandbox_root.resolve(strict=True)
+    )
+    assert lifecycle.launch_cwd == sandbox.sandbox_root.resolve(strict=True)
     assert sandbox.metadata.ready_duration_seconds is not None
     assert sandbox.metadata.get_info_version == {
         "displayName": "fake Wwise 2022.1",
@@ -416,6 +421,7 @@ def test_launch_uses_fresh_case_owned_wine_prefix_without_precreating_it(
             self.port = 31341
             self.project_path = kwargs["project_path"]
             self.launch_env = kwargs["launch_env"]
+            self.launch_cwd = kwargs["launch_cwd_path"]
             self.command = [str(kwargs["console_path"]), "waapi-server", str(self.project_path)]
             self.ready_result: object = None
             self.cleanup_report: CleanupReport | None = None
@@ -613,6 +619,7 @@ def test_strict_real_launch_audit_is_written_after_shutdown(monkeypatch: pytest.
             self.port = 31337
             self.project_path = kwargs["project_path"]
             self.launch_env = kwargs["launch_env"]
+            self.launch_cwd = kwargs["launch_cwd_path"]
             self.command = [
                 str(kwargs["console_path"]),
                 "waapi-server",
@@ -665,6 +672,7 @@ def test_strict_real_launch_audit_is_written_after_shutdown(monkeypatch: pytest.
     ]
     assert record["wine_prefix_path"] == str(sandbox.wine_prefix_path)
     assert record["launch_project_path"] == str(sandbox.sandbox_project)
+    assert record["launch_cwd_path"] == str(sandbox.sandbox_root.resolve(strict=True))
     assert record["sandbox_project_path"] == str(sandbox.sandbox_project)
     assert record["ready_duration_seconds"] >= 0
     assert record["get_info_version"] == {
@@ -694,6 +702,7 @@ def test_non_strict_launch_does_not_write_persistent_audit(monkeypatch: pytest.M
             self.port = 31337
             self.project_path = kwargs["project_path"]
             self.launch_env = kwargs["launch_env"]
+            self.launch_cwd = kwargs["launch_cwd_path"]
             self.command = [
                 str(kwargs["console_path"]),
                 "waapi-server",
@@ -780,6 +789,7 @@ def test_launch_shuts_down_when_ready_proof_is_invalid(
             self.port = 31338
             self.project_path = kwargs["project_path"]
             self.launch_env = kwargs["launch_env"]
+            self.launch_cwd = kwargs["launch_cwd_path"]
             self.command = [
                 str(kwargs["console_path"]),
                 "waapi-server",
@@ -830,6 +840,9 @@ def test_launch_shuts_down_when_ready_proof_is_invalid(
         assert persisted["process_pid"] == FakeProcess.pid
         assert persisted["wine_prefix_path"] == str(wine_prefix.resolve(strict=False))
         assert persisted["launch_project_path"] == str(sandbox.sandbox_project)
+        assert persisted["launch_cwd_path"] == str(
+            sandbox.sandbox_root.resolve(strict=True)
+        )
         assert persisted["process_cleanup_result"] == "cleaned"
         assert persisted["process_cleanup_details"]["launch_pid"] == FakeProcess.pid
         assert persisted["process_cleanup_details"]["wine_prefix"] == str(
@@ -869,6 +882,7 @@ def test_launch_failure_records_existing_cleanup_report(
             self.port = 31339
             self.project_path = kwargs["project_path"]
             self.launch_env = kwargs["launch_env"]
+            self.launch_cwd = kwargs["launch_cwd_path"]
             self.command = [
                 str(kwargs["console_path"]),
                 "waapi-server",
@@ -909,6 +923,9 @@ def test_launch_failure_records_existing_cleanup_report(
         assert persisted["process_pid"] == 5151
         assert persisted["wine_prefix_path"] == str(sandbox.wine_prefix_path)
         assert persisted["launch_project_path"] == str(sandbox.sandbox_project)
+        assert persisted["launch_cwd_path"] == str(
+            sandbox.sandbox_root.resolve(strict=True)
+        )
         assert persisted["process_cleanup_result"] == expected_cleanup_result
         assert persisted["process_cleanup_details"]["launch_pid"] == 5151
         assert persisted["process_cleanup_details"]["residual_processes"] == [
@@ -942,6 +959,7 @@ def test_launch_shuts_down_when_run_until_ready_raises(monkeypatch: pytest.Monke
             self.port = 31338
             self.project_path = kwargs["project_path"]
             self.launch_env = kwargs["launch_env"]
+            self.launch_cwd = kwargs["launch_cwd_path"]
             self.command = [
                 str(kwargs["console_path"]),
                 "waapi-server",
@@ -980,6 +998,9 @@ def test_launch_shuts_down_when_run_until_ready_raises(monkeypatch: pytest.Monke
         assert persisted["process_pid"] == FakeProcess.pid
         assert persisted["wine_prefix_path"] == str(sandbox.wine_prefix_path)
         assert persisted["launch_project_path"] == str(sandbox.sandbox_project)
+        assert persisted["launch_cwd_path"] == str(
+            sandbox.sandbox_root.resolve(strict=True)
+        )
         assert persisted["process_cleanup_details"] is None
         assert persisted["process_cleanup_result"] == "error:RuntimeError:cleanup failed"
         assert persisted["get_info_version"] is None
@@ -1001,6 +1022,7 @@ def test_shutdown_raises_when_cleanup_report_has_residual_processes(monkeypatch:
             self.port = 31337
             self.project_path = kwargs["project_path"]
             self.launch_env = kwargs["launch_env"]
+            self.launch_cwd = kwargs["launch_cwd_path"]
             self.command = [
                 str(kwargs["console_path"]),
                 "waapi-server",

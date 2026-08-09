@@ -397,7 +397,7 @@ execution. Freeze the first pass, consolidate ordinary case failures, and only
 then repair and start a new campaign root. This is cross-operation integration
 acceptance; it grants no additional per-API coverage credit.
 
-The completed 2026-07-31 integration evidence is cumulative across frozen
+The completed 2026-07-31 macOS integration evidence is cumulative across frozen
 campaign roots, not one final-candidate 6/6 run. The initial `a12` root passed
 both Alarm and Harbor workflows on both versions and failed both Weather
 workflows. Fresh repaired roots `a20-int22-weather` and
@@ -408,6 +408,8 @@ Every passing sandbox was removed, failed sandboxes were sealed and
 quarantined, and both source SampleProjects retained identical full hashes and
 mtimes. This older evidence belongs to the candidate before the
 structured-query request and closed mutation-selector migration.
+Every named V1 campaign root seals `runtime.platform=darwin`; no
+native-Windows V1 semantic campaign is currently recorded.
 
 The 2026-08-03 current-wording rerun is also cumulative, not one final-candidate
 6/6 run. `campaign-integration-workflows-v1-terra-20260803-current-r1` passed
@@ -439,8 +441,8 @@ seal/quarantine every failed or indeterminate sandbox. The baseline collector
 may inspect only an already-running sandbox copy and must do so through the
 public Gateway; it is not permission to use a direct WAAPI client.
 
-The completed 2026-08-03 V2 evidence is cumulative across frozen roots, not one
-final-candidate 6/6 run. `r8` passed both Rifle units, `r12-2022` passed the
+The completed 2026-08-03 macOS V2 evidence is cumulative across frozen roots,
+not one final-candidate 6/6 run. `r8` passed both Rifle units, `r12-2022` passed the
 2022.1 Weapons unit, `r23-2022-footsteps` passed the 2022.1 Footsteps unit, and
 `r24-2025-repairs` passed the 2025.1 Footsteps and Weapons units. Thus all six
 unique units have passing evidence across those roots. Passing sandboxes were
@@ -448,6 +450,16 @@ removed; failed or blocked diagnostic sandboxes were sealed and quarantined;
 every recorded source-project full hash and mtime remained unchanged. This
 grants no per-API coverage credit and proves only the exact Rifle, Footsteps,
 and Weapons workflow paths, not advanced WAQL or unrelated routes.
+
+The later native-Windows V2 evidence is also cumulative. At commit `0dfea2b`,
+`windows-v2-six-0dfea2b-r1` attempted all six units, passed 2022.1 Rifle,
+2022.1 Footsteps, and 2025.1 Rifle, failed the other three, exited `1`, and had
+no verify-only replay. At `a516835`, `a516-w22-r1` passed 2022.1 Weapons fresh
+and verify-only; `a516-f25-r1` failed 2025.1 Footsteps and was frozen without
+verify-only. At `f1b6a51`, `f1b-f25-r1` and `f1b-w25-r1` passed 2025.1
+Footsteps and Weapons fresh and verify-only. All six V2 units therefore have
+native-Windows passing evidence across these frozen roots, but there is no
+single-root or single-candidate Windows 6/6 result.
 
 For harness-only CI checks that start neither Codex nor Wwise, use the focused
 pytest commands in `tests/semantic/README.md`.

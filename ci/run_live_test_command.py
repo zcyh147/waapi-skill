@@ -33,11 +33,12 @@ def resolve_live_python_command(
 ) -> tuple[str, ...]:
     """Replace the already-active Poetry prefix with this interpreter.
 
-    ``run_live_test_command.py`` itself is launched by ``poetry run python``.
-    Starting another bare ``poetry`` child is unnecessary and is unreliable on
-    Windows where the Poetry shim may be a batch file that CreateProcess cannot
-    execute directly.  The remaining argv is kept as data without any shell or
-    quoting round-trip.
+    The accepted prefix is the legacy child-command schema used by this
+    helper's standalone CLI.  ``ci/test_driver.py`` also calls the helper
+    in-process.  In both cases starting another bare ``poetry`` child is
+    unnecessary and unreliable on Windows, where the Poetry shim may be a
+    batch file that CreateProcess cannot execute directly.  The remaining argv
+    stays data without a shell or quoting round-trip.
     """
 
     if isinstance(command, (str, bytes)):
@@ -356,6 +357,7 @@ def main(
     *,
     command_runner: Callable[..., subprocess.CompletedProcess[Any]] | None = None,
     python_executable: str | None = None,
+    environment: Mapping[str, str] | None = None,
 ) -> int:
     args = _build_parser().parse_args(argv)
     command = list(args.command)
@@ -372,7 +374,7 @@ def main(
             python_executable=python_executable,
         )
         environment = build_live_test_environment(
-            os.environ,
+            os.environ if environment is None else environment,
             version=args.version,
             mode=args.mode,
             repo_root=args.repo_root,
