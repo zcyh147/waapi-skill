@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import copy
 from collections import defaultdict, deque
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -13,16 +14,23 @@ from wwise_waapi.operation_import import (  # pyright: ignore[reportMissingImpor
     allowed_import_hierarchy_roots,
 )
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
+    COMPOSER_INPUT_MODE,
+    LEGACY_JSON_INPUT_MODE,
+    OPERATION_INPUT_MODE_LANES,
     OPERATION_REQUEST_CONTRACT,
     UNDO_GROUP_INNER_URIS_BY_VERSION,
     OperationContractError,
+    OperationInputModeLane,
     _materialize_audio_import_dynamic_rows,
     describe_operation,
     list_operation_specs,
+    operation_input_mode,
+    operation_input_modes_by_version,
     operation_request_machine_contract,
     operation_request_schema_digest,
     parse_operation_request,
     prepare_operation,
+    validate_operation_input_mode_lanes,
     validate_prepared_roles,
     verify_prepared_operation,
 )
@@ -61,6 +69,122 @@ EXPECTED_ACTOR_MIXER_METADATA_TYPES = {
     "2024.1": "ActorMixer",
     "2025.1": "PropertyContainer",
 }
+
+
+def test_every_supported_operation_version_has_one_explicit_legacy_json_input_mode() -> None:
+    specs = {spec.name: spec for spec in list_operation_specs()}
+
+    assert len(specs) == 34
+    assert len(OPERATION_INPUT_MODE_LANES) == sum(
+        len(spec.supported_versions) for spec in specs.values()
+    )
+    for name, spec in specs.items():
+        assert operation_input_modes_by_version(name) == {
+            version: LEGACY_JSON_INPUT_MODE
+            for version in spec.supported_versions
+        }
+        for version in spec.supported_versions:
+            assert operation_input_mode(name, version) == LEGACY_JSON_INPUT_MODE
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (lambda lanes: lanes[1:], "missing"),
+        (lambda lanes: (*lanes, lanes[0]), "duplicate"),
+        (
+            lambda lanes: (
+                replace(lanes[0], input_mode="unreviewed_raw_json"),
+                *lanes[1:],
+            ),
+            "unknown input mode",
+        ),
+        (
+            lambda lanes: (
+                *lanes,
+                OperationInputModeLane(
+                    operation="missing.operation",
+                    version="2022.1",
+                    input_mode=LEGACY_JSON_INPUT_MODE,
+                ),
+            ),
+            "unknown operation",
+        ),
+        (
+            lambda lanes: (
+                *lanes,
+                OperationInputModeLane(
+                    operation="object.set",
+                    version="2021.1",
+                    input_mode=LEGACY_JSON_INPUT_MODE,
+                ),
+            ),
+            "unsupported version lane",
+        ),
+    ],
+)
+def test_operation_input_mode_registry_rejects_missing_duplicate_unknown_and_extra_lanes(
+    mutate: Any,
+    message: str,
+) -> None:
+    invalid_lanes = tuple(mutate(OPERATION_INPUT_MODE_LANES))
+
+    with pytest.raises(OperationContractError, match=message):
+        validate_operation_input_mode_lanes(invalid_lanes)
+
+
+def test_input_mode_selection_is_isolated_by_exact_operation_not_shared_native_uri(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    shared_object_set = {
+        "object.set",
+        "object.setRTPC",
+        "object.createPlugin",
+    }
+    shared_core_lua = {
+        "lua.executeCoreFile",
+        "lua.executeCoreInline",
+    }
+    assert {
+        describe_operation(name).uri for name in shared_object_set
+    } == {"ak.wwise.core.object.set"}
+    assert {
+        describe_operation(name).uri for name in shared_core_lua
+    } == {"ak.wwise.core.executeLuaScript"}
+
+    migrated = tuple(
+        replace(lane, input_mode=COMPOSER_INPUT_MODE)
+        if lane.operation in {"object.set", "lua.executeCoreInline"}
+        else lane
+        for lane in OPERATION_INPUT_MODE_LANES
+    )
+    validate_operation_input_mode_lanes(migrated)
+
+    import wwise_waapi.operation_registry as registry
+
+    before_digests = {
+        (spec.name, version): operation_request_schema_digest(spec.name, version)
+        for spec in list_operation_specs()
+        for version in spec.supported_versions
+        if spec.implemented
+    }
+    monkeypatch.setattr(registry, "OPERATION_INPUT_MODE_LANES", migrated)
+
+    assert operation_input_mode("object.set", "2022.1") == COMPOSER_INPUT_MODE
+    assert operation_input_mode("object.setRTPC", "2022.1") == LEGACY_JSON_INPUT_MODE
+    assert operation_input_mode("object.createPlugin", "2022.1") == LEGACY_JSON_INPUT_MODE
+    assert operation_input_mode("lua.executeCoreInline", "2025.1") == COMPOSER_INPUT_MODE
+    assert operation_input_mode("lua.executeCoreFile", "2025.1") == LEGACY_JSON_INPUT_MODE
+    assert {
+        (spec.name, version): operation_request_schema_digest(spec.name, version)
+        for spec in list_operation_specs()
+        for version in spec.supported_versions
+        if spec.implemented and spec.name not in {"object.set", "lua.executeCoreInline"}
+    } == {
+        key: digest
+        for key, digest in before_digests.items()
+        if key[0] not in {"object.set", "lua.executeCoreInline"}
+    }
 
 
 def test_operation_request_schema_digest_owns_only_versioned_machine_contract() -> None:

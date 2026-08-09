@@ -69,6 +69,7 @@ tests/unit/test_operation_ui_commands_registry.py
 tests/unit/test_authoring_ui_gateway.py
 tests/unit/test_operation_soundbank.py
 tests/unit/test_operation_registry.py
+tests/unit/test_operation_input_gateway.py
 tests/unit/test_operation_registry_import_verifier.py
 tests/unit/test_workflow_evidence.py
 tests/unit/test_operation_verification_kind_ownership.py

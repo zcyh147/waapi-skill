@@ -157,6 +157,7 @@ from wwise_waapi.execution_contracts import (  # noqa: E402  # pyright: ignore[r
 )
 from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     FORBIDDEN_MODEL_AUTHORED_COMMAND_FIELDS,
+    LEGACY_JSON_INPUT_MODE,
     OPERATION_REQUEST_CONTRACT,
     PACKAGED_TRANSACTION_READBACK_URIS,
     PREPARED_OPERATION_CONTRACT,
@@ -166,6 +167,7 @@ from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[re
     build_undo_group_execution_plan,
     describe_operation,
     list_operation_specs,
+    operation_input_mode,
     operation_request_schema_digest,
     validate_prepared_roles,
     verify_prepared_operation,
@@ -252,6 +254,7 @@ OFFLINE_COMMANDS = frozenset(
         "describe",
         "operations",
         "operation-schema",
+        "legacy-operation-schema",
         "query-schema",
         "object-types",
         "config-show",
@@ -271,6 +274,9 @@ GATEWAY_SESSION_CONTEXT_CONTRACT = "waapi-skill.session-context/v2"
 GATEWAY_SESSION_INTRODUCTION_CONTRACT = "waapi-skill.session-introduction/v2"
 GATEWAY_OPERATION_SCHEMA_DIRECT_FAST_ROUTE_CONTRACT = (
     "waapi-skill.operation-schema-direct-fast-route/v1"
+)
+LEGACY_OPERATION_JSON_ADAPTER_CONTRACT = (
+    "waapi-skill.legacy-operation-json-adapter/v1"
 )
 GATEWAY_DEADLINE_PROVENANCE = "waapi-skill.gateway-deadline/v1"
 GATEWAY_RESULT_CEILING_PROVENANCE = "waapi-skill.gateway-live-result-json-ceiling/v1"
@@ -1330,6 +1336,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Describe one closed operation request shape, versioned CLI templates when applicable, and its execution boundary offline",
     )
     operation_schema.add_argument("operation")
+    legacy_operation_schema = subparsers.add_parser(
+        "legacy-operation-schema",
+        help=(
+            "Compatibility-only description of the deprecated full-JSON "
+            "operation request adapter"
+        ),
+    )
+    legacy_operation_schema.add_argument("operation")
 
     query_schema = subparsers.add_parser(
         "query-schema",
@@ -1451,25 +1465,40 @@ def build_parser() -> argparse.ArgumentParser:
     reject.add_argument("transaction_id")
     reject.add_argument("--reason", default="rejected by user")
 
-    preview = subparsers.add_parser(
-        "preview",
-        help=(
-            "Live-resolve a closed operation and persist an immutable preview; "
-            "--apply marks an explicit request to carry out the change under "
-            "the configured project modification policy"
+    for preview_command, preview_help in (
+        (
+            "preview",
+            "Live-resolve the operation's sole normal input mode and persist "
+            "an immutable preview",
         ),
-    )
-    preview.add_argument(
-        "--apply",
-        action="store_true",
-        help=(
-            "Mark this as an explicit change request. read_only blocks it, "
-            "ask_before_changes waits for later confirmation, and allow_changes "
-            "policy-authorizes the immutable preview for same-turn execution."
+        (
+            "legacy-preview",
+            "Compatibility-only submission of one deprecated full-JSON "
+            "operation request to the canonical preview ingress",
         ),
-    )
-    preview.add_argument("--request-json", required=True)
-    preview.add_argument("--ttl", type=int, default=DEFAULT_PREVIEW_TTL_SECONDS)
+    ):
+        preview = subparsers.add_parser(
+            preview_command,
+            help=(
+                f"{preview_help}; --apply marks an explicit request to carry "
+                "out the change under the configured project modification policy"
+            ),
+        )
+        preview.add_argument(
+            "--apply",
+            action="store_true",
+            help=(
+                "Mark this as an explicit change request. read_only blocks it, "
+                "ask_before_changes waits for later confirmation, and allow_changes "
+                "policy-authorizes the immutable preview for same-turn execution."
+            ),
+        )
+        preview.add_argument("--request-json", required=True)
+        preview.add_argument(
+            "--ttl",
+            type=int,
+            default=DEFAULT_PREVIEW_TTL_SECONDS,
+        )
 
     execute = subparsers.add_parser(
         "execute",
@@ -1580,7 +1609,7 @@ def _execute_gateway_unconstrained(
             )
         if args.command == "execute":
             require_transaction_preconnection_policy(args, env=source_env)
-        elif args.command == "preview" and args.apply:
+        elif args.command in {"preview", "legacy-preview"} and args.apply:
             require_project_modification_policy(
                 env=source_env,
                 action="requested project change",
@@ -1876,7 +1905,8 @@ def gateway_stdout_json_encoder(value: Any | None = None) -> json.JSONEncoder:
     }
     if (
         isinstance(value, Mapping)
-        and value.get("command") in {"operation-schema", "query-schema"}
+        and value.get("command")
+        in {"operation-schema", "legacy-operation-schema", "query-schema"}
     ):
         options["separators"] = (",", ":")
     else:
@@ -2832,8 +2862,10 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
             raise GatewayInputError(
                 f"wait-topic --event-count must be between 1 and {MAX_WAIT_EVENT_COUNT}"
             )
-    elif args.command == "preview":
-        parse_preview_request_object(args.request_json)
+    elif args.command in {"preview", "legacy-preview"}:
+        request_payload = parse_preview_request_object(args.request_json)
+        if args.command == "preview":
+            require_normal_legacy_preview_input_mode(request_payload)
     elif args.command == "debug-validate-call":
         for field_name, option_name in (
             ("args_json", "--args-json"),
@@ -3183,7 +3215,8 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "implemented_count": sum(item["implemented"] is True for item in operations),
             "operations": operations,
         }
-    if args.command == "operation-schema":
+    if args.command in {"operation-schema", "legacy-operation-schema"}:
+        legacy_compatibility = args.command == "legacy-operation-schema"
         spec = describe_operation(args.operation)
         request_version = resolve_operation_schema_version(args, env=env)
         direct_fast_route_contract = build_operation_schema_direct_fast_route_contract(
@@ -3210,13 +3243,20 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 "arguments": {},
             }
             request_envelope_status = "ready"
+        operation_projection = spec.as_dict(version=request_version)
+        if legacy_compatibility:
+            # Compatibility automation needs the complete machine request
+            # shape, not duplicated normal-Agent routing prose.  Both
+            # projections still derive from this exact Registry spec.
+            operation_projection.pop("summary", None)
+            operation_projection.pop("selection_guidance", None)
         payload = {
             "contract": GATEWAY_RESULT_CONTRACT,
             "ok": True,
             "status": "ok" if spec.implemented else "unsupported_boundary",
-            "command": "operation-schema",
+            "command": args.command,
             "offline": True,
-            "operation": spec.as_dict(version=request_version),
+            "operation": operation_projection,
             "request_envelope": request_envelope,
             "request_envelope_policy": {
                 "status": request_envelope_status,
@@ -3250,7 +3290,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 },
                 "preview_invocation": {
                     "intended_change": {
-                        "subcommand": "preview",
+                        "subcommand": (
+                            "legacy-preview" if legacy_compatibility else "preview"
+                        ),
                         "required_flag": "--apply",
                         "effect": (
                             "required even when the user asks to see only a "
@@ -3267,6 +3309,13 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 },
             },
         }
+        if legacy_compatibility:
+            payload["compatibility"] = {
+                "contract": LEGACY_OPERATION_JSON_ADAPTER_CONTRACT,
+                "deprecation_status": "deprecated",
+                "input_mode": LEGACY_JSON_INPUT_MODE,
+                "submit_command": "legacy-preview",
+            }
         if direct_fast_route_contract is not None:
             # Keep the version/API-specific product contract prominent at the
             # end of the offline result.  ``finish`` appends only the bounded
@@ -4056,7 +4105,7 @@ def resolve_connection(args: argparse.Namespace, *, env: Mapping[str, str]) -> G
             if args.timeout is not None
             else (
                 DEFAULT_TRANSACTION_TIMEOUT
-                if args.command in {"preview", "execute", "verify"}
+                if args.command in {"preview", "legacy-preview", "execute", "verify"}
                 else DEFAULT_METADATA_DISCOVERY_TIMEOUT
                 if args.command == "metadata" and args.operation == "discover"
                 else DEFAULT_TIMEOUT
@@ -5041,7 +5090,7 @@ def dispatch_command(
         payload["event_validations"] = event_validations
         payload["cleanup"] = cleanup
         return payload
-    if args.command in {"preview", "execute", "verify"}:
+    if args.command in {"preview", "legacy-preview", "execute", "verify"}:
         return dispatch_transaction_command(
             args,
             env=env,
@@ -5738,7 +5787,7 @@ def create_transaction_preview(
 
     authoring_boundary = live_authoring_transaction_boundary(
         request_payload,
-        command="preview",
+        command=args.command,
         live_info=live_info,
         common=common,
     )
@@ -5746,7 +5795,7 @@ def create_transaction_preview(
         return authoring_boundary
     locality_boundary = local_filesystem_transaction_boundary(
         request_payload,
-        command="preview",
+        command=args.command,
         endpoint_host=connection.host,
         common=common,
     )
@@ -5927,7 +5976,7 @@ def dispatch_transaction_command(
     dispatcher: WwiseDispatcher,
     common: Mapping[str, Any],
 ) -> dict[str, Any]:
-    if args.command == "preview":
+    if args.command in {"preview", "legacy-preview"}:
         request_payload = parse_preview_request_object(args.request_json)
         return create_transaction_preview(
             request_payload,
@@ -10387,6 +10436,42 @@ def parse_preview_request_object(text: str) -> dict[str, Any]:
         max_document_bytes=MAX_PREVIEW_JSON_INPUT_BYTES,
         max_string_bytes=MAX_PREVIEW_JSON_STRING_BYTES,
     )
+
+
+def require_normal_legacy_preview_input_mode(
+    request_payload: Mapping[str, Any],
+) -> None:
+    """Keep raw full JSON on ``preview`` only while it is the normal mode.
+
+    Unknown, malformed, or version-unavailable requests continue to the
+    canonical parser so ``preview`` and ``legacy-preview`` retain identical
+    request-contract errors.  A valid exact lane whose normal mode migrated to
+    the Composer is rejected before connecting; only the explicit
+    compatibility command may then submit full JSON.
+    """
+
+    operation = request_payload.get("operation")
+    version = request_payload.get("version")
+    if not isinstance(operation, str) or not isinstance(version, str):
+        return
+    try:
+        input_mode = operation_input_mode(operation, version)
+    except OperationContractError as exc:
+        if exc.error_code in {"UNKNOWN_OPERATION", "UNAVAILABLE_IN_VERSION"}:
+            return
+        raise
+    if input_mode != LEGACY_JSON_INPUT_MODE:
+        raise OperationContractError(
+            "INPUT_MODE_MISMATCH",
+            "The normal preview route does not accept legacy full-JSON input "
+            "for this exact operation and Wwise version.",
+            details={
+                "operation": operation,
+                "version": version,
+                "required_input_mode": input_mode,
+                "submitted_input_mode": LEGACY_JSON_INPUT_MODE,
+            },
+        )
 
 
 def parse_optional_json(text: str | None, option_name: str) -> Any:

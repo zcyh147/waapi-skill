@@ -171,6 +171,11 @@ OPERATION_REQUEST_CONTRACT = "waapi-skill.operation-request/v1"
 PREPARED_OPERATION_CONTRACT = "waapi-skill.prepared-operation/v1"
 VERIFICATION_RESULT_CONTRACT = "waapi-skill.operation-verification/v1"
 ROLE_VALIDATION_CONTRACT = "waapi-skill.role-validation/v1"
+LEGACY_JSON_INPUT_MODE = "legacy_json"
+COMPOSER_INPUT_MODE = "composer"
+SUPPORTED_OPERATION_INPUT_MODES = frozenset(
+    {LEGACY_JSON_INPUT_MODE, COMPOSER_INPUT_MODE}
+)
 OBJECT_GET_URI = "ak.wwise.core.object.get"
 OBJECT_GET_TYPES_URI = "ak.wwise.core.object.getTypes"
 OBJECT_IS_LINKED_URI = "ak.wwise.core.object.isLinked"
@@ -1585,6 +1590,20 @@ class OperationRequest:
 
 
 @dataclass(frozen=True, slots=True)
+class OperationInputModeLane:
+    """One explicit normal model-input choice for an operation/version lane.
+
+    Lanes intentionally remain a sequence until validation.  A mapping would
+    silently discard duplicate operation/version declarations before the
+    Registry could reject them.
+    """
+
+    operation: str
+    version: str
+    input_mode: str
+
+
+@dataclass(frozen=True, slots=True)
 class OperationSpec:
     name: str
     uri: str
@@ -1641,6 +1660,12 @@ class OperationSpec:
             ),
             "constraints": list(self.constraints),
         }
+        if version is not None and version in self.supported_versions:
+            result["input_mode"] = operation_input_mode(self.name, version)
+        elif version is None:
+            result["input_modes_by_version"] = operation_input_modes_by_version(
+                self.name
+            )
         if self.file_read_policy is not None:
             result["file_read_policy"] = self.file_read_policy
         if self.next_step is not None:
@@ -3398,6 +3423,148 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         ),
     ),
 }
+
+
+_OPERATION_INPUT_MODE_DECLARATIONS: tuple[
+    tuple[str, tuple[str, ...], str], ...
+] = (
+    ("audio.import", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("audio.importTabDelimited", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("debug.restartWaapiServers", ("2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("debug.setAsserts", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("debug.setAutomationMode", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("debug.testAssert", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("debug.testCrash", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("lua.executeCliFile", ("2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("lua.executeCoreFile", ("2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("lua.executeCoreInline", ("2025.1",), LEGACY_JSON_INPUT_MODE),
+    ("object.copy", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("object.create", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("object.createPlugin", ("2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("object.delete", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("object.move", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("object.set", ("2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("object.setLinked", ("2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("object.setName", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("object.setNotes", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("object.setProperty", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("object.setRTPC", ("2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("object.setReference", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("soundbank.convertExternalSources", ("2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("soundbank.generate", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("soundbank.processDefinitionFiles", ("2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("soundbank.setInclusions", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("switchContainer.addAssignment", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("switchContainer.removeAssignment", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("ui.captureScreen", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("ui.commands.execute", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("ui.commands.register", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("ui.commands.unregister", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("waapi.call", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("waapi.undoGroup", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+)
+
+OPERATION_INPUT_MODE_LANES: tuple[OperationInputModeLane, ...] = tuple(
+    OperationInputModeLane(
+        operation=operation,
+        version=version,
+        input_mode=input_mode,
+    )
+    for operation, versions, input_mode in _OPERATION_INPUT_MODE_DECLARATIONS
+    for version in versions
+)
+
+
+def validate_operation_input_mode_lanes(
+    lanes: Sequence[OperationInputModeLane],
+) -> None:
+    """Require exactly one reviewed normal input mode for every Registry lane."""
+
+    expected = {
+        (spec.name, version)
+        for spec in OPERATION_SPECS.values()
+        for version in spec.supported_versions
+    }
+    observed: set[tuple[str, str]] = set()
+    for lane in lanes:
+        if not isinstance(lane, OperationInputModeLane):
+            raise OperationContractError(
+                "INVALID_INPUT_MODE_REGISTRY",
+                "operation input mode lanes must use OperationInputModeLane records.",
+            )
+        spec = OPERATION_SPECS.get(lane.operation)
+        if spec is None:
+            raise OperationContractError(
+                "INVALID_INPUT_MODE_REGISTRY",
+                f"operation input mode lane names unknown operation {lane.operation!r}.",
+            )
+        if lane.version not in spec.supported_versions:
+            raise OperationContractError(
+                "INVALID_INPUT_MODE_REGISTRY",
+                "operation input mode registry contains an unsupported version lane: "
+                f"{lane.operation!r} {lane.version!r}.",
+            )
+        if lane.input_mode not in SUPPORTED_OPERATION_INPUT_MODES:
+            raise OperationContractError(
+                "INVALID_INPUT_MODE_REGISTRY",
+                f"operation input mode registry contains unknown input mode {lane.input_mode!r}.",
+            )
+        key = (lane.operation, lane.version)
+        if key in observed:
+            raise OperationContractError(
+                "INVALID_INPUT_MODE_REGISTRY",
+                "operation input mode registry contains a duplicate lane: "
+                f"{lane.operation!r} {lane.version!r}.",
+            )
+        observed.add(key)
+    missing = sorted(expected - observed)
+    if missing:
+        raise OperationContractError(
+            "INVALID_INPUT_MODE_REGISTRY",
+            "operation input mode registry has missing supported lanes.",
+            details={"missing": [list(item) for item in missing]},
+        )
+
+
+def _operation_input_mode_index(
+    lanes: Sequence[OperationInputModeLane],
+) -> dict[tuple[str, str], str]:
+    validate_operation_input_mode_lanes(lanes)
+    return {
+        (lane.operation, lane.version): lane.input_mode
+        for lane in lanes
+    }
+
+
+def operation_input_mode(name: str, version: str) -> str:
+    """Return the sole normal input mode for one exact operation/version key."""
+
+    spec = describe_operation(name)
+    if version not in spec.supported_versions:
+        raise OperationContractError(
+            "UNAVAILABLE_IN_VERSION",
+            f"{name} is not reflected for Wwise {version}.",
+            details={
+                "operation": name,
+                "version": version,
+                "supported_versions": list(spec.supported_versions),
+            },
+        )
+    return _operation_input_mode_index(OPERATION_INPUT_MODE_LANES)[(name, version)]
+
+
+def operation_input_modes_by_version(name: str) -> dict[str, str]:
+    """Project one operation's unique normal lane for every supported version."""
+
+    spec = describe_operation(name)
+    index = _operation_input_mode_index(OPERATION_INPUT_MODE_LANES)
+    return {
+        version: index[(name, version)]
+        for version in spec.supported_versions
+    }
+
+
+validate_operation_input_mode_lanes(OPERATION_INPUT_MODE_LANES)
 
 
 def list_operation_specs() -> tuple[OperationSpec, ...]:
@@ -19611,25 +19778,33 @@ def _audio_import_object_path_contract(
 
 
 __all__ = [
+    "COMPOSER_INPUT_MODE",
     "CONDITIONAL_LOCAL_FILESYSTEM_OPERATIONS",
     "DYNAMIC_LOCAL_FILESYSTEM_OPERATIONS",
     "LOCAL_FILESYSTEM_OPERATION_ROLES",
     "NO_LOCAL_FILESYSTEM_OPERATIONS",
+    "LEGACY_JSON_INPUT_MODE",
+    "OPERATION_INPUT_MODE_LANES",
     "OPERATION_REQUEST_CONTRACT",
     "PREPARED_OPERATION_CONTRACT",
     "VERIFICATION_RESULT_CONTRACT",
     "ROLE_VALIDATION_CONTRACT",
+    "SUPPORTED_OPERATION_INPUT_MODES",
     "OperationContractError",
+    "OperationInputModeLane",
     "OperationRequest",
     "OperationSpec",
     "PreparedOperation",
     "VerificationResult",
     "describe_operation",
     "list_operation_specs",
+    "operation_input_mode",
+    "operation_input_modes_by_version",
     "operation_request_machine_contract",
     "operation_request_schema_digest",
     "parse_operation_request",
     "prepare_operation",
+    "validate_operation_input_mode_lanes",
     "validate_prepared_roles",
     "verify_prepared_operation",
 ]
