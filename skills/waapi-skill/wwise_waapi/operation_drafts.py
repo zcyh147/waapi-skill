@@ -25,6 +25,15 @@ from typing import Any, Callable, Iterator, Mapping
 
 from .canonical import canonical_json_bytes, canonical_sha256
 from .filesystem_security import path_is_link_or_reparse
+from .operation_composer import (
+    OPERATION_COMPOSITION_CONTRACT,
+    OperationComposerError,
+    apply_composer_action,
+    composition_projection,
+    materialize_operation_request,
+    new_composition,
+)
+from .transactions import validate_transaction_id
 
 try:  # pragma: no branch - absence is exercised through the backend seam.
     import fcntl as _fcntl
@@ -45,7 +54,10 @@ OPERATION_DRAFT_AUDIT_EVENT_CONTRACT = (
 OPERATION_DRAFT_RECORD_DIGEST_CONTRACT = (
     "waapi-skill.operation-draft-record-digest/v1"
 )
-OPERATION_DRAFT_SCHEMA_VERSION = 1
+OPERATION_DRAFT_CHECK_CONTRACT = "waapi-skill.operation-draft-check/v1"
+OPERATION_DRAFT_SEAL_CONTRACT = "waapi-skill.operation-draft-seal/v1"
+LEGACY_OPERATION_DRAFT_SCHEMA_VERSION = 1
+OPERATION_DRAFT_SCHEMA_VERSION = 2
 DEFAULT_OPERATION_DRAFT_TTL_SECONDS = 24 * 60 * 60
 DEFAULT_OPERATION_DRAFT_TERMINAL_RETENTION_SECONDS = 24 * 60 * 60
 DEFAULT_OPERATION_DRAFT_STALE_TEMP_SECONDS = 5 * 60
@@ -58,6 +70,11 @@ MAX_OPERATION_DRAFT_FIELDS_PER_ROW = 64
 MAX_OPERATION_DRAFT_RECORD_BYTES = 1024 * 1024
 MAX_OPERATION_DRAFT_EVIDENCE_BYTES = 256 * 1024
 MAX_OPERATION_DRAFT_RESULT_BYTES = 256 * 1024
+# Facts are the only caller-shaped portion of the public Draft projection.
+# Reserving three quarters of the complete result ceiling for the fixed
+# envelope, session context, binding, timestamps, and check/seal summaries
+# makes the pre-write proof independent of Gateway serialization order.
+MAX_OPERATION_DRAFT_FACTS_BYTES = MAX_OPERATION_DRAFT_RESULT_BYTES // 4
 _DRAFT_ID_PATTERN = re.compile(r"^od1-[0-9a-f]{32}$")
 _TASK_AUTHORITY_PATTERN = re.compile(r"^da1-[0-9a-f]{40}$")
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -138,10 +155,36 @@ class OperationDraftInvalidTransition(OperationDraftError):
     error_code = "OPERATION_DRAFT_INVALID_TRANSITION"
 
 
+class OperationDraftBindingDrift(OperationDraftError):
+    """The current Registry/Composer contract differs from the durable binding."""
+
+    error_code = "OPERATION_DRAFT_BINDING_DRIFT"
+
+
+class OperationDraftRecreateRequired(OperationDraftError):
+    """A legacy Draft is readable but cannot be silently reinterpreted."""
+
+    error_code = "OPERATION_DRAFT_RECREATE_REQUIRED"
+
+
+class OperationDraftCheckRequired(OperationDraftError):
+    """The current editable revision lacks matching successful live evidence."""
+
+    error_code = "OPERATION_DRAFT_CHECK_REQUIRED"
+
+
+class OperationDraftSealReplayMismatch(OperationDraftError):
+    """A replay disagrees with the one durable source-revision reservation."""
+
+    error_code = "OPERATION_DRAFT_SEAL_REPLAY_MISMATCH"
+
+
 class OperationDraftState(str, Enum):
     """Closed states in the initial editable-draft lifecycle."""
 
     EDITABLE = "editable"
+    SEAL_RESERVED = "seal_reserved"
+    SEALED = "sealed"
     CANCELLED = "cancelled"
     EXPIRED = "expired"
 
@@ -294,9 +337,14 @@ class OperationDraftRecord:
     terminal_at: str | None
     audit: tuple[Mapping[str, Any], ...]
     limits_digest: str
+    schema_version: int = LEGACY_OPERATION_DRAFT_SCHEMA_VERSION
+    composer_digest: str | None = None
+    composition: Mapping[str, Any] | None = None
+    check: Mapping[str, Any] | None = None
+    seal: Mapping[str, Any] | None = None
 
     def as_digest_material_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "audit": [dict(event) for event in self.audit],
             "authority_digest": self.authority_digest,
             "contract": OPERATION_DRAFT_CONTRACT,
@@ -307,12 +355,24 @@ class OperationDraftRecord:
             "operation": self.operation,
             "revision": self.revision,
             "schema_digest": self.schema_digest,
-            "schema_version": OPERATION_DRAFT_SCHEMA_VERSION,
+            "schema_version": self.schema_version,
             "state": self.state.value,
             "terminal_at": self.terminal_at,
             "updated_at": self.updated_at,
             "version": self.version,
         }
+        if self.schema_version == OPERATION_DRAFT_SCHEMA_VERSION:
+            payload.update(
+                {
+                    "check": None if self.check is None else dict(self.check),
+                    "composer_digest": self.composer_digest,
+                    "composition": (
+                        None if self.composition is None else dict(self.composition)
+                    ),
+                    "seal": None if self.seal is None else dict(self.seal),
+                }
+            )
+        return payload
 
     def as_durable_dict(self) -> dict[str, Any]:
         payload = self.as_digest_material_dict()
@@ -328,6 +388,25 @@ class OperationDraftStart:
     @property
     def draft_id(self) -> str:
         return self.record.draft_id
+
+
+@dataclass(frozen=True, slots=True)
+class OperationDraftMaterialization:
+    record: OperationDraftRecord
+    request: Mapping[str, Any]
+    request_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class OperationDraftSealReservation:
+    record: OperationDraftRecord
+    request: Mapping[str, Any]
+    transaction_id: str
+    source_revision: int
+    project_guard: Mapping[str, Any]
+    check_prepared_digest: str
+    check_runtime_guard_fingerprint: str
+    replayed: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -379,9 +458,15 @@ class OperationDraftStore:
         operation: str,
         version: str,
         schema_digest: str,
+        composer_digest: str | None = None,
         now: datetime | None = None,
     ) -> OperationDraftStart:
         _require_binding(operation, version, schema_digest)
+        if composer_digest is not None and (
+            not isinstance(composer_digest, str)
+            or not _SHA256_PATTERN.fullmatch(composer_digest)
+        ):
+            raise ValueError("composer_digest must be a lowercase SHA-256 digest")
         created_datetime = _utc_datetime(now)
         created_at = _timestamp(created_datetime)
         expires_at = _timestamp(
@@ -426,6 +511,19 @@ class OperationDraftStore:
                         ),
                     ),
                     limits_digest=OPERATION_DRAFT_LIMITS_DIGEST,
+                    schema_version=(
+                        OPERATION_DRAFT_SCHEMA_VERSION
+                        if composer_digest is not None
+                        else LEGACY_OPERATION_DRAFT_SCHEMA_VERSION
+                    ),
+                    composer_digest=composer_digest,
+                    composition=(
+                        new_composition(operation, version)
+                        if composer_digest is not None
+                        else None
+                    ),
+                    check=None,
+                    seal=None,
                 )
                 try:
                     self._write_record(
@@ -439,6 +537,555 @@ class OperationDraftStore:
                     task_authority=task_authority,
                 )
         raise OperationDraftError("Could not allocate a unique Operation Draft id.")
+
+    def apply_action(
+        self,
+        draft_id: str,
+        *,
+        task_authority: str,
+        expected_revision: int,
+        schema_digest: str,
+        composer_digest: str,
+        action: Mapping[str, Any],
+        now: datetime | None = None,
+    ) -> OperationDraftRecord:
+        """Atomically apply one typed Adapter action to an editable Draft."""
+
+        if not isinstance(draft_id, str) or not _DRAFT_ID_PATTERN.fullmatch(draft_id):
+            raise _not_available()
+        current = _utc_datetime(now)
+        with self._existing_draft_lock(draft_id):
+            loaded = self._inspect_unlocked(
+                draft_id,
+                task_authority=task_authority,
+                now=current,
+            )
+            record = loaded.record
+            _require_expected_revision(record, expected_revision)
+            if record.state is not OperationDraftState.EDITABLE:
+                raise OperationDraftInvalidTransition(
+                    "Only an editable Operation Draft accepts typed actions.",
+                    details={"state": record.state.value},
+                )
+            if record.schema_version != OPERATION_DRAFT_SCHEMA_VERSION:
+                raise OperationDraftRecreateRequired(
+                    "This legacy Operation Draft can be inspected or cancelled, "
+                    "but must be recreated before using Composer actions."
+                )
+            _require_current_binding(
+                record,
+                schema_digest=schema_digest,
+                composer_digest=composer_digest,
+            )
+            if record.composition is None:
+                raise OperationDraftStorageCorruption(
+                    "Composer-backed Operation Draft is missing its composition."
+                )
+            # Validation and normalization happen entirely before the first
+            # durable write, so every invalid action leaves identical bytes.
+            try:
+                composition, action_name = apply_composer_action(
+                    record.operation,
+                    record.version,
+                    record.composition,
+                    action,
+                )
+            except OperationComposerError:
+                raise
+            _require_composition_projection_budget(
+                record.operation,
+                record.version,
+                composition,
+            )
+            updated_at = _timestamp(current)
+            updated = OperationDraftRecord(
+                draft_id=record.draft_id,
+                state=record.state,
+                revision=record.revision + 1,
+                operation=record.operation,
+                version=record.version,
+                schema_digest=record.schema_digest,
+                authority_digest=record.authority_digest,
+                created_at=record.created_at,
+                updated_at=updated_at,
+                expires_at=record.expires_at,
+                terminal_at=None,
+                audit=(
+                    *record.audit,
+                    _build_audit_event(
+                        draft_id=record.draft_id,
+                        sequence=len(record.audit) + 1,
+                        revision=record.revision + 1,
+                        event_type=f"action.{action_name}",
+                        from_state=record.state,
+                        to_state=record.state,
+                        timestamp=updated_at,
+                        previous_event_hash=str(record.audit[-1]["event_hash"]),
+                    ),
+                ),
+                limits_digest=record.limits_digest,
+                schema_version=record.schema_version,
+                composer_digest=record.composer_digest,
+                composition=composition,
+                check=None,
+                seal=None,
+            )
+            self._replace_record(
+                self._record_path(draft_id),
+                updated.as_durable_dict(),
+                expected_previous=loaded,
+            )
+            return updated
+
+    def materialize_request(
+        self,
+        draft_id: str,
+        *,
+        task_authority: str,
+        expected_revision: int,
+        schema_digest: str,
+        composer_digest: str,
+        now: datetime | None = None,
+    ) -> OperationDraftMaterialization:
+        """Return one locally revalidated canonical request without writing."""
+
+        if not isinstance(draft_id, str) or not _DRAFT_ID_PATTERN.fullmatch(draft_id):
+            raise _not_available()
+        current = _utc_datetime(now)
+        with self._existing_draft_lock(draft_id):
+            loaded = self._inspect_unlocked(
+                draft_id,
+                task_authority=task_authority,
+                now=current,
+            )
+            record = loaded.record
+            _require_expected_revision(record, expected_revision)
+            if record.state is not OperationDraftState.EDITABLE:
+                raise OperationDraftInvalidTransition(
+                    "Only an editable Operation Draft can be checked.",
+                    details={"state": record.state.value},
+                )
+            if record.schema_version != OPERATION_DRAFT_SCHEMA_VERSION:
+                raise OperationDraftRecreateRequired(
+                    "This legacy Operation Draft must be recreated before it can be checked."
+                )
+            _require_current_binding(
+                record,
+                schema_digest=schema_digest,
+                composer_digest=composer_digest,
+            )
+            if record.composition is None:
+                raise OperationDraftStorageCorruption(
+                    "Composer-backed Operation Draft is missing its composition."
+                )
+            request = materialize_operation_request(
+                record.operation,
+                record.version,
+                record.composition,
+            )
+            return OperationDraftMaterialization(
+                record=record,
+                request=request,
+                request_digest=canonical_sha256(request),
+            )
+
+    def record_check(
+        self,
+        draft_id: str,
+        *,
+        task_authority: str,
+        expected_revision: int,
+        schema_digest: str,
+        composer_digest: str,
+        request_digest: str,
+        project_guard: Mapping[str, Any],
+        runtime_guard_fingerprint: str,
+        prepared_digest: str,
+        now: datetime | None = None,
+    ) -> OperationDraftRecord:
+        """CAS-publish bounded successful live-check evidence."""
+
+        for name, value in (
+            ("request_digest", request_digest),
+            ("runtime_guard_fingerprint", runtime_guard_fingerprint),
+            ("prepared_digest", prepared_digest),
+        ):
+            if not isinstance(value, str) or not _SHA256_PATTERN.fullmatch(value):
+                raise ValueError(f"{name} must be a lowercase SHA-256 digest")
+        normalized_project_guard = _validate_optional_json_object(
+            project_guard,
+            label="project guard",
+        )
+        assert normalized_project_guard is not None
+        if len(canonical_json_bytes(normalized_project_guard)) > MAX_OPERATION_DRAFT_EVIDENCE_BYTES:
+            raise OperationDraftLimitExceeded(
+                "Operation Draft check evidence exceeds its fixed byte ceiling.",
+                details={"limit_bytes": MAX_OPERATION_DRAFT_EVIDENCE_BYTES},
+            )
+        if not isinstance(draft_id, str) or not _DRAFT_ID_PATTERN.fullmatch(draft_id):
+            raise _not_available()
+        current = _utc_datetime(now)
+        with self._existing_draft_lock(draft_id):
+            loaded = self._inspect_unlocked(
+                draft_id,
+                task_authority=task_authority,
+                now=current,
+            )
+            record = loaded.record
+            _require_expected_revision(record, expected_revision)
+            if record.state is not OperationDraftState.EDITABLE:
+                raise OperationDraftInvalidTransition(
+                    "Only an editable Operation Draft can record a live check.",
+                    details={"state": record.state.value},
+                )
+            if record.schema_version != OPERATION_DRAFT_SCHEMA_VERSION:
+                raise OperationDraftRecreateRequired(
+                    "This legacy Operation Draft must be recreated before it can record a check."
+                )
+            _require_current_binding(
+                record,
+                schema_digest=schema_digest,
+                composer_digest=composer_digest,
+            )
+            if record.composition is None:
+                raise OperationDraftStorageCorruption(
+                    "Composer-backed Operation Draft is missing its composition."
+                )
+            current_request = materialize_operation_request(
+                record.operation,
+                record.version,
+                record.composition,
+            )
+            current_request_digest = canonical_sha256(current_request)
+            if not hmac.compare_digest(current_request_digest, request_digest):
+                raise OperationDraftRevisionConflict(
+                    "Operation Draft facts changed before live check evidence could be recorded.",
+                    details={"actual_revision": record.revision},
+                )
+            checked_at = _timestamp(current)
+            check = {
+                "checked_at": checked_at,
+                "composer_digest": record.composer_digest,
+                "contract": OPERATION_DRAFT_CHECK_CONTRACT,
+                "live_version": record.version,
+                "prepared_digest": prepared_digest,
+                "project_guard": dict(normalized_project_guard),
+                "project_guard_digest": canonical_sha256(normalized_project_guard),
+                "request_digest": current_request_digest,
+                "runtime_guard_fingerprint": runtime_guard_fingerprint,
+                "schema_digest": record.schema_digest,
+                "source_revision": record.revision,
+            }
+            if len(canonical_json_bytes(check)) > MAX_OPERATION_DRAFT_EVIDENCE_BYTES:
+                raise OperationDraftLimitExceeded(
+                    "Operation Draft check evidence exceeds its fixed byte ceiling.",
+                    details={"limit_bytes": MAX_OPERATION_DRAFT_EVIDENCE_BYTES},
+                )
+            updated = OperationDraftRecord(
+                draft_id=record.draft_id,
+                state=record.state,
+                revision=record.revision + 1,
+                operation=record.operation,
+                version=record.version,
+                schema_digest=record.schema_digest,
+                authority_digest=record.authority_digest,
+                created_at=record.created_at,
+                updated_at=checked_at,
+                expires_at=record.expires_at,
+                terminal_at=None,
+                audit=(
+                    *record.audit,
+                    _build_audit_event(
+                        draft_id=record.draft_id,
+                        sequence=len(record.audit) + 1,
+                        revision=record.revision + 1,
+                        event_type="checked",
+                        from_state=record.state,
+                        to_state=record.state,
+                        timestamp=checked_at,
+                        previous_event_hash=str(record.audit[-1]["event_hash"]),
+                    ),
+                ),
+                limits_digest=record.limits_digest,
+                schema_version=record.schema_version,
+                composer_digest=record.composer_digest,
+                composition=record.composition,
+                check=check,
+                seal=None,
+            )
+            self._replace_record(
+                self._record_path(draft_id),
+                updated.as_durable_dict(),
+                expected_previous=loaded,
+            )
+            return updated
+
+    def reserve_seal(
+        self,
+        draft_id: str,
+        *,
+        task_authority: str,
+        expected_revision: int,
+        schema_digest: str,
+        composer_digest: str,
+        transaction_id: str,
+        apply: bool,
+        ttl_seconds: int,
+        policy: str,
+        now: datetime | None = None,
+    ) -> OperationDraftSealReservation:
+        """Bind one source revision to exactly one transaction id durably."""
+
+        transaction_id = validate_transaction_id(transaction_id)
+        if not isinstance(apply, bool):
+            raise TypeError("apply must be a boolean")
+        if (
+            isinstance(ttl_seconds, bool)
+            or not isinstance(ttl_seconds, int)
+            or ttl_seconds < 1
+        ):
+            raise ValueError("ttl_seconds must be a positive integer")
+        if policy not in {"read_only", "ask_before_changes", "allow_changes"}:
+            raise ValueError("policy is invalid")
+        if not isinstance(draft_id, str) or not _DRAFT_ID_PATTERN.fullmatch(draft_id):
+            raise _not_available()
+        current = _utc_datetime(now)
+        with self._existing_draft_lock(draft_id):
+            loaded = self._inspect_unlocked(
+                draft_id,
+                task_authority=task_authority,
+                now=current,
+            )
+            record = loaded.record
+            if record.schema_version != OPERATION_DRAFT_SCHEMA_VERSION:
+                raise OperationDraftRecreateRequired(
+                    "This legacy Operation Draft must be recreated before it can be sealed."
+                )
+            _require_current_binding(
+                record,
+                schema_digest=schema_digest,
+                composer_digest=composer_digest,
+            )
+            if record.state in {
+                OperationDraftState.SEAL_RESERVED,
+                OperationDraftState.SEALED,
+            }:
+                return _replay_seal_reservation(
+                    record,
+                    expected_revision=expected_revision,
+                    apply=apply,
+                    ttl_seconds=ttl_seconds,
+                    policy=policy,
+                )
+            _require_expected_revision(record, expected_revision)
+            if record.state is not OperationDraftState.EDITABLE:
+                raise OperationDraftInvalidTransition(
+                    "Only a checked editable Operation Draft can be sealed.",
+                    details={"state": record.state.value},
+                )
+            if record.composition is None or record.check is None:
+                raise OperationDraftCheckRequired(
+                    "The current Operation Draft revision needs a successful "
+                    "live check before Preview."
+                )
+            check_source_revision = record.check.get("source_revision")
+            if check_source_revision != record.revision - 1:
+                raise OperationDraftCheckRequired(
+                    "Operation Draft check evidence is stale for the current revision."
+                )
+            request = materialize_operation_request(
+                record.operation,
+                record.version,
+                record.composition,
+            )
+            request_digest = canonical_sha256(request)
+            if (
+                not hmac.compare_digest(
+                    str(record.check.get("request_digest")),
+                    request_digest,
+                )
+                or record.check.get("schema_digest") != record.schema_digest
+                or record.check.get("composer_digest") != record.composer_digest
+                or record.check.get("live_version") != record.version
+            ):
+                raise OperationDraftCheckRequired(
+                    "Operation Draft check evidence no longer matches its facts and bindings."
+                )
+            reserved_at = _timestamp(current)
+            seal = {
+                "apply": apply,
+                "artifact_hash": None,
+                "check_prepared_digest": record.check["prepared_digest"],
+                "check_runtime_guard_fingerprint": record.check[
+                    "runtime_guard_fingerprint"
+                ],
+                "composer_digest": record.composer_digest,
+                "contract": OPERATION_DRAFT_SEAL_CONTRACT,
+                "policy": policy,
+                "project_guard": dict(record.check["project_guard"]),
+                "project_guard_digest": record.check["project_guard_digest"],
+                "request": request,
+                "request_digest": request_digest,
+                "reserved_at": reserved_at,
+                "schema_digest": record.schema_digest,
+                "source_revision": record.revision,
+                "transaction_id": transaction_id,
+                "transaction_state": None,
+                "ttl_seconds": ttl_seconds,
+            }
+            reserved = OperationDraftRecord(
+                draft_id=record.draft_id,
+                state=OperationDraftState.SEAL_RESERVED,
+                revision=record.revision + 1,
+                operation=record.operation,
+                version=record.version,
+                schema_digest=record.schema_digest,
+                authority_digest=record.authority_digest,
+                created_at=record.created_at,
+                updated_at=reserved_at,
+                expires_at=record.expires_at,
+                terminal_at=None,
+                audit=(
+                    *record.audit,
+                    _build_audit_event(
+                        draft_id=record.draft_id,
+                        sequence=len(record.audit) + 1,
+                        revision=record.revision + 1,
+                        event_type="seal_reserved",
+                        from_state=record.state,
+                        to_state=OperationDraftState.SEAL_RESERVED,
+                        timestamp=reserved_at,
+                        previous_event_hash=str(record.audit[-1]["event_hash"]),
+                    ),
+                ),
+                limits_digest=record.limits_digest,
+                schema_version=record.schema_version,
+                composer_digest=record.composer_digest,
+                composition=record.composition,
+                check=record.check,
+                seal=seal,
+            )
+            self._replace_record(
+                self._record_path(draft_id),
+                reserved.as_durable_dict(),
+                expected_previous=loaded,
+            )
+            return _seal_reservation_from_record(reserved, replayed=False)
+
+    def commit_seal(
+        self,
+        draft_id: str,
+        *,
+        task_authority: str,
+        source_revision: int,
+        transaction_id: str,
+        artifact_hash: str,
+        transaction_state: str,
+        now: datetime | None = None,
+    ) -> OperationDraftRecord:
+        """Commit the exact reserved Preview binding, or replay it unchanged."""
+
+        transaction_id = validate_transaction_id(transaction_id)
+        if not isinstance(artifact_hash, str) or not _SHA256_PATTERN.fullmatch(
+            artifact_hash
+        ):
+            raise ValueError("artifact_hash must be a lowercase SHA-256 digest")
+        if transaction_state not in {"awaiting_confirmation", "policy_authorized"}:
+            raise ValueError("transaction_state is not a sealable Preview state")
+        if not isinstance(draft_id, str) or not _DRAFT_ID_PATTERN.fullmatch(draft_id):
+            raise _not_available()
+        current = _utc_datetime(now)
+        with self._existing_draft_lock(draft_id):
+            loaded = self._inspect_unlocked(
+                draft_id,
+                task_authority=task_authority,
+                now=current,
+            )
+            record = loaded.record
+            seal = record.seal
+            if not isinstance(seal, Mapping):
+                raise OperationDraftInvalidTransition(
+                    "Operation Draft has no durable seal reservation."
+                )
+            if (
+                seal.get("source_revision") != source_revision
+                or seal.get("transaction_id") != transaction_id
+            ):
+                raise OperationDraftSealReplayMismatch(
+                    "Seal commit does not match the durable source-revision reservation."
+                )
+            expected_transaction_state = (
+                "policy_authorized"
+                if seal.get("apply") is True
+                and seal.get("policy") == "allow_changes"
+                else "awaiting_confirmation"
+            )
+            if transaction_state != expected_transaction_state:
+                raise OperationDraftSealReplayMismatch(
+                    "Preview authorization state does not match the durable seal intent.",
+                    details={
+                        "expected_state": expected_transaction_state,
+                        "actual_state": transaction_state,
+                    },
+                )
+            if record.state is OperationDraftState.SEALED:
+                if (
+                    seal.get("artifact_hash") == artifact_hash
+                    and seal.get("transaction_state") == transaction_state
+                ):
+                    return record
+                raise OperationDraftSealReplayMismatch(
+                    "Sealed Operation Draft is already bound to different Preview evidence."
+                )
+            if record.state is not OperationDraftState.SEAL_RESERVED:
+                raise OperationDraftInvalidTransition(
+                    "Only a seal-reserved Operation Draft can commit Preview evidence.",
+                    details={"state": record.state.value},
+                )
+            sealed_at = _timestamp(current)
+            committed_seal = {
+                **dict(seal),
+                "artifact_hash": artifact_hash,
+                "transaction_state": transaction_state,
+            }
+            sealed = OperationDraftRecord(
+                draft_id=record.draft_id,
+                state=OperationDraftState.SEALED,
+                revision=record.revision + 1,
+                operation=record.operation,
+                version=record.version,
+                schema_digest=record.schema_digest,
+                authority_digest=record.authority_digest,
+                created_at=record.created_at,
+                updated_at=sealed_at,
+                expires_at=record.expires_at,
+                terminal_at=sealed_at,
+                audit=(
+                    *record.audit,
+                    _build_audit_event(
+                        draft_id=record.draft_id,
+                        sequence=len(record.audit) + 1,
+                        revision=record.revision + 1,
+                        event_type="sealed",
+                        from_state=record.state,
+                        to_state=OperationDraftState.SEALED,
+                        timestamp=sealed_at,
+                        previous_event_hash=str(record.audit[-1]["event_hash"]),
+                    ),
+                ),
+                limits_digest=record.limits_digest,
+                schema_version=record.schema_version,
+                composer_digest=record.composer_digest,
+                composition=record.composition,
+                check=record.check,
+                seal=committed_seal,
+            )
+            self._replace_record(
+                self._record_path(draft_id),
+                sealed.as_durable_dict(),
+                expected_previous=loaded,
+            )
+            return sealed
 
     def inspect(
         self,
@@ -536,6 +1183,11 @@ class OperationDraftStore:
                     ),
                 ),
                 limits_digest=record.limits_digest,
+                schema_version=record.schema_version,
+                composer_digest=record.composer_digest,
+                composition=record.composition,
+                check=record.check,
+                seal=record.seal,
             )
             self._replace_record(
                 self._record_path(draft_id),
@@ -555,7 +1207,10 @@ class OperationDraftStore:
             raise OperationDraftExpired(
                 "Operation Draft expired and cannot be resumed."
             )
-        if record.state is not OperationDraftState.EDITABLE:
+        if record.state not in {
+            OperationDraftState.EDITABLE,
+            OperationDraftState.SEAL_RESERVED,
+        }:
             return loaded
         current = _utc_datetime(now)
         if current < _parse_timestamp(record.updated_at):
@@ -600,6 +1255,11 @@ class OperationDraftStore:
                 ),
             ),
             limits_digest=record.limits_digest,
+            schema_version=record.schema_version,
+            composer_digest=record.composer_digest,
+            composition=record.composition,
+            check=record.check,
+            seal=record.seal,
         )
 
     def _collect_and_count_active(self, *, now: datetime | None) -> int:
@@ -647,7 +1307,10 @@ class OperationDraftStore:
                 raise OperationDraftStorageCorruption(
                     "Operation Draft record cannot be validated during cleanup."
                 ) from exc
-            if record.state is OperationDraftState.EDITABLE:
+            if record.state in {
+                OperationDraftState.EDITABLE,
+                OperationDraftState.SEAL_RESERVED,
+            }:
                 expiry = _parse_timestamp(record.expires_at)
                 if current < expiry:
                     active += 1
@@ -1070,6 +1733,405 @@ def _require_binding(operation: str, version: str, schema_digest: str) -> None:
         raise ValueError("schema_digest must be a lowercase SHA-256 digest")
 
 
+def _require_expected_revision(
+    record: OperationDraftRecord,
+    expected_revision: int,
+) -> None:
+    if (
+        isinstance(expected_revision, bool)
+        or not isinstance(expected_revision, int)
+        or expected_revision < 1
+        or expected_revision != record.revision
+    ):
+        raise OperationDraftRevisionConflict(
+            "Operation Draft revision no longer matches the requested edit.",
+            details={
+                "expected_revision": expected_revision,
+                "actual_revision": record.revision,
+            },
+        )
+
+
+def _require_current_binding(
+    record: OperationDraftRecord,
+    *,
+    schema_digest: str,
+    composer_digest: str,
+) -> None:
+    if (
+        not isinstance(schema_digest, str)
+        or not _SHA256_PATTERN.fullmatch(schema_digest)
+        or not isinstance(composer_digest, str)
+        or not _SHA256_PATTERN.fullmatch(composer_digest)
+        or not hmac.compare_digest(record.schema_digest, schema_digest)
+        or record.composer_digest is None
+        or not hmac.compare_digest(record.composer_digest, composer_digest)
+    ):
+        raise OperationDraftBindingDrift(
+            "Operation Draft Registry or Composer binding changed; recreate "
+            "the Draft before continuing."
+        )
+
+
+def _seal_reservation_from_record(
+    record: OperationDraftRecord,
+    *,
+    replayed: bool,
+) -> OperationDraftSealReservation:
+    seal = record.seal
+    if not isinstance(seal, Mapping):
+        raise OperationDraftStorageCorruption(
+            "Operation Draft seal state is missing its durable reservation."
+        )
+    request = seal.get("request")
+    project_guard = seal.get("project_guard")
+    if not isinstance(request, Mapping) or not isinstance(project_guard, Mapping):
+        raise OperationDraftStorageCorruption(
+            "Operation Draft seal reservation is incomplete."
+        )
+    return OperationDraftSealReservation(
+        record=record,
+        request=dict(request),
+        transaction_id=str(seal["transaction_id"]),
+        source_revision=int(seal["source_revision"]),
+        project_guard=dict(project_guard),
+        check_prepared_digest=str(seal["check_prepared_digest"]),
+        check_runtime_guard_fingerprint=str(
+            seal["check_runtime_guard_fingerprint"]
+        ),
+        replayed=replayed,
+    )
+
+
+def _replay_seal_reservation(
+    record: OperationDraftRecord,
+    *,
+    expected_revision: int,
+    apply: bool,
+    ttl_seconds: int,
+    policy: str,
+) -> OperationDraftSealReservation:
+    seal = record.seal
+    if not isinstance(seal, Mapping):
+        raise OperationDraftStorageCorruption(
+            "Reserved Operation Draft is missing its seal record."
+        )
+    if seal.get("source_revision") != expected_revision:
+        raise OperationDraftRevisionConflict(
+            "Operation Draft revision no longer matches the reserved seal source.",
+            details={
+                "expected_revision": expected_revision,
+                "actual_revision": record.revision,
+                "seal_source_revision": seal.get("source_revision"),
+            },
+        )
+    if (
+        seal.get("apply") is not apply
+        or seal.get("ttl_seconds") != ttl_seconds
+        or seal.get("policy") != policy
+        or seal.get("schema_digest") != record.schema_digest
+        or seal.get("composer_digest") != record.composer_digest
+    ):
+        raise OperationDraftSealReplayMismatch(
+            "Seal replay options or bindings differ from the durable reservation."
+        )
+    if record.composition is None:
+        raise OperationDraftStorageCorruption(
+            "Reserved Operation Draft is missing its composition."
+        )
+    current_request = materialize_operation_request(
+        record.operation,
+        record.version,
+        record.composition,
+    )
+    if (
+        seal.get("request") != current_request
+        or seal.get("request_digest") != canonical_sha256(current_request)
+    ):
+        raise OperationDraftSealReplayMismatch(
+            "Seal replay facts differ from the durable canonical request."
+        )
+    return _seal_reservation_from_record(record, replayed=True)
+
+
+def _validate_durable_composition(value: Any) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping) or set(value) != {"contract", "targets"}:
+        raise ValueError("draft composition fields are invalid")
+    if value.get("contract") != OPERATION_COMPOSITION_CONTRACT:
+        raise ValueError("draft composition contract is invalid")
+    targets = value.get("targets")
+    if not isinstance(targets, list) or len(targets) > 1:
+        raise ValueError("draft composition targets are invalid")
+    for target in targets:
+        if not isinstance(target, Mapping) or set(target) != {
+            "handle",
+            "selector",
+            "properties",
+        }:
+            raise ValueError("draft composition target fields are invalid")
+        handle = target.get("handle")
+        if (
+            not isinstance(handle, str)
+            or re.fullmatch(r"odh1-[0-9a-f]{24}", handle) is None
+        ):
+            raise ValueError("draft composition target handle is invalid")
+        if not isinstance(target.get("selector"), Mapping):
+            raise ValueError("draft composition selector is invalid")
+        properties = target.get("properties")
+        if (
+            not isinstance(properties, list)
+            or len(properties) > MAX_OPERATION_DRAFT_FIELDS_PER_ROW
+        ):
+            raise ValueError("draft composition properties are invalid")
+        for descriptor in properties:
+            if (
+                not isinstance(descriptor, Mapping)
+                or set(descriptor) != {"name", "value"}
+                or not isinstance(descriptor.get("name"), str)
+            ):
+                raise ValueError("draft composition property is invalid")
+    try:
+        normalized = json.loads(canonical_json_bytes(dict(value)).decode("utf-8"))
+    except (RecursionError, TypeError, UnicodeError, ValueError) as exc:
+        raise ValueError("draft composition is not strict JSON") from exc
+    if not isinstance(normalized, Mapping):  # pragma: no cover - mapping invariant
+        raise ValueError("draft composition is invalid")
+    return normalized
+
+
+def _require_composition_projection_budget(
+    operation: str,
+    version: str,
+    composition: Mapping[str, Any],
+) -> None:
+    projection = composition_projection(operation, version, composition)
+    observed = len(canonical_json_bytes(projection))
+    if observed > MAX_OPERATION_DRAFT_FACTS_BYTES:
+        raise OperationDraftLimitExceeded(
+            "Operation Draft facts exceed the pre-write public result budget.",
+            details={
+                "facts_bytes": observed,
+                "facts_limit_bytes": MAX_OPERATION_DRAFT_FACTS_BYTES,
+                "result_limit_bytes": MAX_OPERATION_DRAFT_RESULT_BYTES,
+            },
+        )
+
+
+def _validate_optional_json_object(
+    value: Any,
+    *,
+    label: str,
+) -> Mapping[str, Any] | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{label} must be an object or null")
+    try:
+        normalized = json.loads(canonical_json_bytes(dict(value)).decode("utf-8"))
+    except (RecursionError, TypeError, UnicodeError, ValueError) as exc:
+        raise ValueError(f"{label} is not strict JSON") from exc
+    if not isinstance(normalized, Mapping):  # pragma: no cover - mapping invariant
+        raise ValueError(f"{label} is invalid")
+    return normalized
+
+
+def _validate_durable_check(
+    value: Any,
+    *,
+    revision: int,
+    state: OperationDraftState,
+    operation_version: str,
+    schema_digest: str,
+    composer_digest: str,
+    updated_at: str,
+) -> Mapping[str, Any] | None:
+    check = _validate_optional_json_object(value, label="draft check")
+    if check is None:
+        return None
+    expected = {
+        "checked_at",
+        "composer_digest",
+        "contract",
+        "live_version",
+        "prepared_digest",
+        "project_guard",
+        "project_guard_digest",
+        "request_digest",
+        "runtime_guard_fingerprint",
+        "schema_digest",
+        "source_revision",
+    }
+    if set(check) != expected or check.get("contract") != OPERATION_DRAFT_CHECK_CONTRACT:
+        raise ValueError("draft check fields are invalid")
+    source_revision = check.get("source_revision")
+    if (
+        isinstance(source_revision, bool)
+        or not isinstance(source_revision, int)
+        or source_revision < 1
+        or source_revision >= revision
+    ):
+        raise ValueError("draft check source revision is invalid")
+    checked_at = check.get("checked_at")
+    if not isinstance(checked_at, str):
+        raise ValueError("draft check timestamp is invalid")
+    if _parse_timestamp(checked_at) > _parse_timestamp(updated_at):
+        raise ValueError("draft check timestamp exceeds the record timestamp")
+    if (
+        check.get("live_version") != operation_version
+        or check.get("schema_digest") != schema_digest
+        or check.get("composer_digest") != composer_digest
+    ):
+        raise ValueError("draft check binding is invalid")
+    for field in (
+        "prepared_digest",
+        "project_guard_digest",
+        "request_digest",
+        "runtime_guard_fingerprint",
+    ):
+        digest = check.get(field)
+        if not isinstance(digest, str) or not _SHA256_PATTERN.fullmatch(digest):
+            raise ValueError(f"draft check {field} is invalid")
+    project_guard = check.get("project_guard")
+    if (
+        not isinstance(project_guard, Mapping)
+        or canonical_sha256(project_guard) != check.get("project_guard_digest")
+    ):
+        raise ValueError("draft check project guard digest is invalid")
+    if len(canonical_json_bytes(check)) > MAX_OPERATION_DRAFT_EVIDENCE_BYTES:
+        raise ValueError("draft check exceeds its fixed byte ceiling")
+    if state is OperationDraftState.EDITABLE and revision != source_revision + 1:
+        raise ValueError("editable draft check is stale")
+    return check
+
+
+def _validate_durable_seal(
+    value: Any,
+    *,
+    revision: int,
+    state: OperationDraftState,
+    operation: str,
+    version: str,
+    schema_digest: str,
+    composer_digest: str,
+    check: Mapping[str, Any] | None,
+    updated_at: str,
+) -> Mapping[str, Any] | None:
+    seal = _validate_optional_json_object(value, label="draft seal")
+    if seal is None:
+        if state in {OperationDraftState.SEAL_RESERVED, OperationDraftState.SEALED}:
+            raise ValueError("sealed draft state is missing its reservation")
+        return None
+    expected = {
+        "apply",
+        "artifact_hash",
+        "check_prepared_digest",
+        "check_runtime_guard_fingerprint",
+        "composer_digest",
+        "contract",
+        "policy",
+        "project_guard",
+        "project_guard_digest",
+        "request",
+        "request_digest",
+        "reserved_at",
+        "schema_digest",
+        "source_revision",
+        "transaction_id",
+        "transaction_state",
+        "ttl_seconds",
+    }
+    if set(seal) != expected or seal.get("contract") != OPERATION_DRAFT_SEAL_CONTRACT:
+        raise ValueError("draft seal fields are invalid")
+    if check is None:
+        raise ValueError("draft seal is missing its source check")
+    source_revision = seal.get("source_revision")
+    if (
+        isinstance(source_revision, bool)
+        or not isinstance(source_revision, int)
+        or source_revision < 1
+        or source_revision >= revision
+    ):
+        raise ValueError("draft seal source revision is invalid")
+    if not isinstance(seal.get("apply"), bool):
+        raise ValueError("draft seal apply binding is invalid")
+    ttl_seconds = seal.get("ttl_seconds")
+    if (
+        isinstance(ttl_seconds, bool)
+        or not isinstance(ttl_seconds, int)
+        or ttl_seconds < 1
+    ):
+        raise ValueError("draft seal TTL binding is invalid")
+    if seal.get("policy") not in {
+        "read_only",
+        "ask_before_changes",
+        "allow_changes",
+    }:
+        raise ValueError("draft seal policy binding is invalid")
+    try:
+        validate_transaction_id(seal.get("transaction_id"))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("draft seal transaction id is invalid") from exc
+    if (
+        seal.get("schema_digest") != schema_digest
+        or seal.get("composer_digest") != composer_digest
+        or seal.get("check_prepared_digest") != check.get("prepared_digest")
+        or seal.get("check_runtime_guard_fingerprint")
+        != check.get("runtime_guard_fingerprint")
+        or seal.get("project_guard") != check.get("project_guard")
+        or seal.get("project_guard_digest") != check.get("project_guard_digest")
+    ):
+        raise ValueError("draft seal binding does not match its source check")
+    request = seal.get("request")
+    if not isinstance(request, Mapping) or set(request) != {
+        "contract",
+        "version",
+        "operation",
+        "arguments",
+    }:
+        raise ValueError("draft seal request is invalid")
+    if (
+        request.get("contract") != "waapi-skill.operation-request/v1"
+        or request.get("version") != version
+        or request.get("operation") != operation
+        or not isinstance(request.get("arguments"), Mapping)
+        or canonical_sha256(request) != seal.get("request_digest")
+        or seal.get("request_digest") != check.get("request_digest")
+    ):
+        raise ValueError("draft seal request binding is invalid")
+    reserved_at = seal.get("reserved_at")
+    if not isinstance(reserved_at, str) or _parse_timestamp(reserved_at) > _parse_timestamp(
+        updated_at
+    ):
+        raise ValueError("draft seal reservation timestamp is invalid")
+    artifact_hash = seal.get("artifact_hash")
+    transaction_state = seal.get("transaction_state")
+    if state is OperationDraftState.SEAL_RESERVED:
+        if (
+            revision != source_revision + 1
+            or artifact_hash is not None
+            or transaction_state is not None
+        ):
+            raise ValueError("draft seal reservation state is invalid")
+    elif state is OperationDraftState.SEALED:
+        expected_transaction_state = (
+            "policy_authorized"
+            if seal.get("apply") is True and seal.get("policy") == "allow_changes"
+            else "awaiting_confirmation"
+        )
+        if (
+            revision != source_revision + 2
+            or not isinstance(artifact_hash, str)
+            or not _SHA256_PATTERN.fullmatch(artifact_hash)
+            or transaction_state != expected_transaction_state
+        ):
+            raise ValueError("committed draft seal state is invalid")
+    elif state is not OperationDraftState.EXPIRED:
+        raise ValueError("non-seal draft state unexpectedly contains a seal")
+    if len(canonical_json_bytes(seal)) > MAX_OPERATION_DRAFT_EVIDENCE_BYTES:
+        raise ValueError("draft seal exceeds its fixed byte ceiling")
+    return seal
+
+
 def _parse_canonical_record_bytes(
     data: bytes,
     *,
@@ -1092,6 +2154,9 @@ def _record_from_mapping(
 ) -> OperationDraftRecord:
     if not isinstance(payload, Mapping):
         raise TypeError("draft record must be an object")
+    schema_version = payload.get("schema_version")
+    if isinstance(schema_version, bool) or not isinstance(schema_version, int):
+        raise ValueError("draft schema version is invalid")
     expected = {
         "audit",
         "authority_digest",
@@ -1110,6 +2175,10 @@ def _record_from_mapping(
         "updated_at",
         "version",
     }
+    if schema_version == OPERATION_DRAFT_SCHEMA_VERSION:
+        expected.update({"check", "composer_digest", "composition", "seal"})
+    elif schema_version != LEGACY_OPERATION_DRAFT_SCHEMA_VERSION:
+        raise ValueError("draft schema version is invalid")
     if set(payload) != expected:
         raise ValueError("draft record fields are invalid")
     stored_record_digest = payload["record_digest"]
@@ -1127,8 +2196,6 @@ def _record_from_mapping(
         raise ValueError("record digest does not match")
     if payload["contract"] != OPERATION_DRAFT_CONTRACT:
         raise ValueError("draft contract is invalid")
-    if payload["schema_version"] != OPERATION_DRAFT_SCHEMA_VERSION:
-        raise ValueError("draft schema version is invalid")
     if payload["limits_digest"] != OPERATION_DRAFT_LIMITS_DIGEST:
         raise ValueError("draft limits digest is invalid")
     draft_id = payload["draft_id"]
@@ -1167,9 +2234,9 @@ def _record_from_mapping(
         raise ValueError("draft expiry does not match its fixed lifetime")
     if updated_at < created_at or updated_at > expires_at:
         raise ValueError("draft updated_at is outside its fixed lifetime")
-    if state is OperationDraftState.EDITABLE:
+    if state in {OperationDraftState.EDITABLE, OperationDraftState.SEAL_RESERVED}:
         if terminal_at is not None or updated_at >= expires_at:
-            raise ValueError("editable draft lifetime fields are invalid")
+            raise ValueError("active draft lifetime fields are invalid")
     elif terminal_at is None:
         raise ValueError("terminal draft is missing terminal_at")
     else:
@@ -1180,7 +2247,46 @@ def _record_from_mapping(
             if parsed_terminal_at != expires_at:
                 raise ValueError("expired draft must terminate at expires_at")
         elif parsed_terminal_at >= expires_at:
-            raise ValueError("cancelled draft must terminate before expires_at")
+            raise ValueError("terminal draft must terminate before expires_at")
+    if schema_version == LEGACY_OPERATION_DRAFT_SCHEMA_VERSION and state not in {
+        OperationDraftState.EDITABLE,
+        OperationDraftState.CANCELLED,
+        OperationDraftState.EXPIRED,
+    }:
+        raise ValueError("legacy draft state is invalid")
+    if schema_version == OPERATION_DRAFT_SCHEMA_VERSION:
+        composer_digest = payload["composer_digest"]
+        if (
+            not isinstance(composer_digest, str)
+            or not _SHA256_PATTERN.fullmatch(composer_digest)
+        ):
+            raise ValueError("composer digest is invalid")
+        composition = _validate_durable_composition(payload["composition"])
+        check = _validate_durable_check(
+            payload["check"],
+            revision=revision,
+            state=state,
+            operation_version=payload["version"],
+            schema_digest=schema_digest,
+            composer_digest=composer_digest,
+            updated_at=payload["updated_at"],
+        )
+        seal = _validate_durable_seal(
+            payload["seal"],
+            revision=revision,
+            state=state,
+            operation=payload["operation"],
+            version=payload["version"],
+            schema_digest=schema_digest,
+            composer_digest=composer_digest,
+            check=check,
+            updated_at=payload["updated_at"],
+        )
+    else:
+        composer_digest = None
+        composition = None
+        check = None
+        seal = None
     audit = _validate_audit(
         payload["audit"],
         draft_id=draft_id,
@@ -1188,6 +2294,7 @@ def _record_from_mapping(
         state=state,
         created_at=created_at,
         updated_at=updated_at,
+        schema_version=schema_version,
     )
     return OperationDraftRecord(
         draft_id=draft_id,
@@ -1203,6 +2310,11 @@ def _record_from_mapping(
         terminal_at=terminal_at,
         audit=audit,
         limits_digest=OPERATION_DRAFT_LIMITS_DIGEST,
+        schema_version=schema_version,
+        composer_digest=composer_digest,
+        composition=composition,
+        check=check,
+        seal=seal,
     )
 
 
@@ -1274,6 +2386,7 @@ def _validate_audit(
     state: OperationDraftState,
     created_at: datetime,
     updated_at: datetime,
+    schema_version: int,
 ) -> tuple[Mapping[str, Any], ...]:
     if (
         not isinstance(value, list)
@@ -1335,15 +2448,40 @@ def _validate_audit(
         ):
             raise ValueError("draft audit event type is invalid")
         if sequence > 1:
-            if previous_state != OperationDraftState.EDITABLE.value:
+            allowed_previous = {OperationDraftState.EDITABLE.value}
+            if schema_version == OPERATION_DRAFT_SCHEMA_VERSION:
+                allowed_previous.add(OperationDraftState.SEAL_RESERVED.value)
+            if previous_state not in allowed_previous:
                 raise ValueError("draft audit cannot continue after a terminal state")
             if to_state is OperationDraftState.CANCELLED:
-                if event["event_type"] != "cancelled" or sequence != len(value):
+                if (
+                    previous_state != OperationDraftState.EDITABLE.value
+                    or event["event_type"] != "cancelled"
+                    or sequence != len(value)
+                ):
                     raise ValueError("draft audit cancellation event is invalid")
             elif to_state is OperationDraftState.EXPIRED:
                 if event["event_type"] != "expired" or sequence != len(value):
                     raise ValueError("draft audit expiry event is invalid")
-            elif to_state is not OperationDraftState.EDITABLE:
+            elif to_state is OperationDraftState.EDITABLE:
+                if previous_state != OperationDraftState.EDITABLE.value:
+                    raise ValueError("draft audit editable transition is invalid")
+            elif to_state is OperationDraftState.SEAL_RESERVED:
+                if (
+                    schema_version != OPERATION_DRAFT_SCHEMA_VERSION
+                    or previous_state != OperationDraftState.EDITABLE.value
+                    or event["event_type"] != "seal_reserved"
+                ):
+                    raise ValueError("draft audit reservation transition is invalid")
+            elif to_state is OperationDraftState.SEALED:
+                if (
+                    schema_version != OPERATION_DRAFT_SCHEMA_VERSION
+                    or previous_state != OperationDraftState.SEAL_RESERVED.value
+                    or event["event_type"] != "sealed"
+                    or sequence != len(value)
+                ):
+                    raise ValueError("draft audit sealed transition is invalid")
+            else:  # pragma: no cover - exhaustive enum boundary
                 raise ValueError("draft audit transition is invalid")
         previous_hash = stored_hash
         previous_state = event["to_state"]
@@ -1869,6 +3007,10 @@ def _lexists(path: Path) -> bool:
 
 __all__ = [
     "OPERATION_DRAFT_CONTRACT",
+    "OPERATION_DRAFT_CHECK_CONTRACT",
+    "OPERATION_DRAFT_SEAL_CONTRACT",
+    "LEGACY_OPERATION_DRAFT_SCHEMA_VERSION",
+    "OPERATION_DRAFT_SCHEMA_VERSION",
     "DEFAULT_OPERATION_DRAFT_LOCK_TIMEOUT_SECONDS",
     "DEFAULT_OPERATION_DRAFT_TERMINAL_RETENTION_SECONDS",
     "DEFAULT_OPERATION_DRAFT_STALE_TEMP_SECONDS",
@@ -1877,6 +3019,7 @@ __all__ = [
     "MAX_MANAGED_OPERATION_DRAFT_ENTRIES",
     "MAX_OPERATION_DRAFT_ACTIONS",
     "MAX_OPERATION_DRAFT_EVIDENCE_BYTES",
+    "MAX_OPERATION_DRAFT_FACTS_BYTES",
     "MAX_OPERATION_DRAFT_FIELDS_PER_ROW",
     "MAX_OPERATION_DRAFT_RECORD_BYTES",
     "MAX_OPERATION_DRAFT_RESULT_BYTES",
@@ -1884,6 +3027,8 @@ __all__ = [
     "OPERATION_DRAFT_LIMITS",
     "OPERATION_DRAFT_LIMITS_DIGEST",
     "OperationDraftError",
+    "OperationDraftBindingDrift",
+    "OperationDraftCheckRequired",
     "OperationDraftExpired",
     "OperationDraftInvalidTransition",
     "OperationDraftLockUnavailable",
@@ -1891,8 +3036,12 @@ __all__ = [
     "OperationDraftLimits",
     "OperationDraftNotAvailable",
     "OperationDraftRecord",
+    "OperationDraftMaterialization",
+    "OperationDraftRecreateRequired",
     "OperationDraftRevisionConflict",
     "OperationDraftStorageCorruption",
+    "OperationDraftSealReplayMismatch",
+    "OperationDraftSealReservation",
     "OperationDraftStart",
     "OperationDraftState",
     "OperationDraftStore",

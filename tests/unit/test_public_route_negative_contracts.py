@@ -380,16 +380,31 @@ def test_transaction_default_deadline_preserves_isolated_contract_timeout(tmp_pa
     preview_args = waapi_gateway.build_parser().parse_args(
         ["preview", "--request-json", "{}"]
     )
+    draft_preview_args = waapi_gateway.build_parser().parse_args(
+        [
+            "preview-from-draft",
+            "od1-" + ("0" * 32),
+            "--task-authority",
+            "da1-" + ("0" * 40),
+            "--expected-revision",
+            "1",
+        ]
+    )
     status_args = waapi_gateway.build_parser().parse_args(["status"])
     explicit_args = waapi_gateway.build_parser().parse_args(
         ["--timeout", "5", "execute", "tx-example"]
     )
 
     preview_connection = waapi_gateway.resolve_connection(preview_args, env=env)
+    draft_preview_connection = waapi_gateway.resolve_connection(
+        draft_preview_args,
+        env=env,
+    )
     status_connection = waapi_gateway.resolve_connection(status_args, env=env)
     explicit_connection = waapi_gateway.resolve_connection(explicit_args, env=env)
 
     assert preview_connection.timeout == waapi_gateway.DEFAULT_TRANSACTION_TIMEOUT == 150.0
+    assert draft_preview_connection.timeout == waapi_gateway.DEFAULT_TRANSACTION_TIMEOUT
     assert preview_connection.timeout > 120.0
     assert status_connection.timeout == waapi_gateway.DEFAULT_TIMEOUT == 10.0
     assert explicit_connection.timeout == 5.0

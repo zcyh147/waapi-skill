@@ -80,6 +80,7 @@ from .operation_import import (
     verify_regular_file_proof as verify_import_file_proof,
 )
 from .operation_object import (
+    DEFAULT_MAX_FIELDS_PER_NODE,
     DEFAULT_MAX_NODES,
     DEFAULT_MAX_REQUEST_BYTES,
     ObjectImportDescriptor,
@@ -3642,6 +3643,89 @@ def operation_request_schema_digest(name: str, version: str) -> str:
     """Bind one Draft to the exact Registry-owned request machine contract."""
 
     return canonical_sha256(operation_request_machine_contract(name, version))
+
+
+def object_set_composer_fragment_contract(version: str) -> dict[str, Any]:
+    """Project only the Registry-owned fragments used by Composer issue #7.
+
+    This intentionally does not expose a generic schema-pointer API.  A later
+    Adapter must add another reviewed projection rather than selecting an
+    arbitrary subtree or smuggling a complete request through this seam.
+    """
+
+    machine = operation_request_machine_contract("object.set", version)
+    try:
+        row = machine["argument_contract"]["properties"]["objects"]["items"]
+        properties = row["properties"]
+        selector = properties["object"]
+        scalar_property = properties["properties"]["items"]
+    except (KeyError, TypeError) as exc:  # pragma: no cover - registry invariant
+        raise RuntimeError(
+            "object.set Registry schema no longer exposes the reviewed Composer fragments"
+        ) from exc
+    return {
+        "contract": "waapi-skill.object-set-composer-fragments/v1",
+        "operation": "object.set",
+        "version": version,
+        "target_selector": _json_mapping(selector),
+        "scalar_property": _json_mapping(scalar_property),
+        "limits": {
+            "targets": 1,
+            "properties_per_target": DEFAULT_MAX_FIELDS_PER_NODE,
+            "canonical_request_bytes": machine["argument_contract"].get(
+                "maximumCanonicalRequestBytes"
+            ),
+        },
+        "source_schema_digest": canonical_sha256(machine),
+    }
+
+
+def validate_object_set_composer_fragment(
+    version: str,
+    *,
+    fragment: str,
+    payload: Any,
+) -> dict[str, Any]:
+    """Validate one exact object.set Composer fragment through Registry rules."""
+
+    # Resolve the exact supported operation/version lane before accepting any
+    # fragment.  This keeps shared-URI operations outside the Adapter.
+    object_set_composer_fragment_contract(version)
+    if fragment == "target_selector":
+        try:
+            descriptors = normalize_reference_descriptors(
+                [{"name": "ComposerTarget", "target": payload}],
+                request_path="$.arguments.objects[0].composer_identity_probe",
+            )
+        except ObjectOperationContractError as exc:
+            raise OperationContractError(
+                exc.error_code,
+                str(exc),
+                details=exc.details,
+            ) from exc
+        if len(descriptors) != 1:  # pragma: no cover - normalizer invariant
+            raise RuntimeError("one target selector fragment did not normalize once")
+        return descriptors[0].target.as_dict()
+    if fragment == "scalar_property":
+        try:
+            descriptors = normalize_property_descriptors(
+                [payload],
+                request_path="$.arguments.objects[0].properties",
+            )
+        except ObjectOperationContractError as exc:
+            raise OperationContractError(
+                exc.error_code,
+                str(exc),
+                details=exc.details,
+            ) from exc
+        if len(descriptors) != 1:  # pragma: no cover - normalizer invariant
+            raise RuntimeError("one scalar property fragment did not normalize once")
+        return descriptors[0].as_dict()
+    raise OperationContractError(
+        "OPERATION_DRAFT_ADAPTER_UNAVAILABLE",
+        "Only the exact object.set target selector and scalar property fragments are reviewed.",
+        details={"operation": "object.set", "version": version, "fragment": fragment},
+    )
 
 
 def parse_operation_request(payload: Mapping[str, Any], *, expected_version: str | None = None) -> OperationRequest:
@@ -19802,9 +19886,11 @@ __all__ = [
     "operation_input_modes_by_version",
     "operation_request_machine_contract",
     "operation_request_schema_digest",
+    "object_set_composer_fragment_contract",
     "parse_operation_request",
     "prepare_operation",
     "validate_operation_input_mode_lanes",
+    "validate_object_set_composer_fragment",
     "validate_prepared_roles",
     "verify_prepared_operation",
 ]

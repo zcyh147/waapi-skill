@@ -99,9 +99,11 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
         "updated_at": started["draft"]["updated_at"],
         "expires_at": started["draft"]["expires_at"],
         "current_facts": [],
-        "missing_fields": [],
-        "missing_fields_status": "no_operation_adapter",
-        "allowed_actions": ["inspect", "cancel"],
+        "missing_fields": ["target"],
+        "missing_fields_status": "incomplete",
+        "allowed_actions": ["add_target", "inspect", "cancel"],
+        "check": None,
+        "seal": None,
     }
     assert started["draft"]["created_at"] == started["draft"]["updated_at"]
     assert started["draft"]["expires_at"] > started["draft"]["created_at"]

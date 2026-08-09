@@ -15,6 +15,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
@@ -169,14 +170,23 @@ from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[re
     list_operation_specs,
     operation_input_mode,
     operation_request_schema_digest,
+    parse_operation_request,
     validate_prepared_roles,
     verify_prepared_operation,
 )
 from wwise_waapi.operation_drafts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     OPERATION_DRAFT_CONTRACT,
+    OperationDraftBindingDrift,
+    OperationDraftCheckRequired,
     OperationDraftRecord,
+    OperationDraftSealReplayMismatch,
     OperationDraftState,
     OperationDraftStore,
+)
+from wwise_waapi.operation_composer import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    OBJECT_SET_COMPOSER_OPERATION,
+    composition_projection,
+    operation_composer_digest,
 )
 from wwise_waapi.platform_paths import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     WWISE_WIRE_PATH_INPUT_AUDIT_CONTRACT,
@@ -220,6 +230,7 @@ from wwise_waapi.transactions import (  # noqa: E402  # pyright: ignore[reportMi
     CONFIRMATION_TOKEN_MATERIAL_CONTRACT,
     STATE_DIRECTORY_ENV,
     InvalidTransition,
+    PreviewAlreadyExists,
     TransactionNotFound,
     TransactionState,
     TransactionStore,
@@ -260,6 +271,7 @@ OFFLINE_COMMANDS = frozenset(
         "config-show",
         "config-set",
         "draft-start",
+        "draft-apply",
         "draft-inspect",
         "draft-cancel",
         "transaction-show",
@@ -1423,6 +1435,43 @@ def build_parser() -> argparse.ArgumentParser:
     )
     draft_start.add_argument("operation")
 
+    draft_apply = subparsers.add_parser(
+        "draft-apply",
+        help="Apply one closed typed action to an authorized Operation Draft offline",
+    )
+    draft_apply.add_argument("draft_id")
+    draft_apply.add_argument("--task-authority", required=True)
+    draft_apply.add_argument("--expected-revision", required=True, type=int)
+    draft_apply.add_argument("--action-json", required=True)
+
+    draft_check = subparsers.add_parser(
+        "draft-check",
+        help=(
+            "Live-validate one complete Operation Draft against bounded identity, "
+            "metadata, project, and runtime evidence without creating a Preview"
+        ),
+    )
+    draft_check.add_argument("draft_id")
+    draft_check.add_argument("--task-authority", required=True)
+    draft_check.add_argument("--expected-revision", required=True, type=int)
+
+    preview_from_draft = subparsers.add_parser(
+        "preview-from-draft",
+        help=(
+            "Seal one successfully checked Operation Draft through the canonical "
+            "transaction Preview ingress"
+        ),
+    )
+    preview_from_draft.add_argument("draft_id")
+    preview_from_draft.add_argument("--task-authority", required=True)
+    preview_from_draft.add_argument("--expected-revision", required=True, type=int)
+    preview_from_draft.add_argument("--apply", action="store_true")
+    preview_from_draft.add_argument(
+        "--ttl",
+        type=int,
+        default=DEFAULT_PREVIEW_TTL_SECONDS,
+    )
+
     draft_inspect = subparsers.add_parser(
         "draft-inspect",
         help="Inspect one authorized Operation Draft without connecting to Wwise",
@@ -1609,7 +1658,11 @@ def _execute_gateway_unconstrained(
             )
         if args.command == "execute":
             require_transaction_preconnection_policy(args, env=source_env)
-        elif args.command in {"preview", "legacy-preview"} and args.apply:
+        elif args.command in {
+            "preview",
+            "legacy-preview",
+            "preview-from-draft",
+        } and args.apply:
             require_project_modification_policy(
                 env=source_env,
                 action="requested project change",
@@ -2862,6 +2915,8 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
             raise GatewayInputError(
                 f"wait-topic --event-count must be between 1 and {MAX_WAIT_EVENT_COUNT}"
             )
+    elif args.command == "draft-apply":
+        parse_json_object(args.action_json, "--action-json")
     elif args.command in {"preview", "legacy-preview"}:
         request_payload = parse_preview_request_object(args.request_json)
         if args.command == "preview":
@@ -2890,6 +2945,11 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             args.operation,
             request_version,
         )
+        composer_digest = (
+            operation_composer_digest(args.operation, request_version)
+            if args.operation == OBJECT_SET_COMPOSER_OPERATION
+            else None
+        )
         store = OperationDraftStore(
             resolve_transaction_state_directory(args, env=env)
         )
@@ -2897,10 +2957,36 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             operation=args.operation,
             version=request_version,
             schema_digest=schema_digest,
+            composer_digest=composer_digest,
         )
         payload = operation_draft_payload(args.command, started.record)
         payload["task_authority"] = started.task_authority
         return payload
+    if args.command == "draft-apply":
+        store = OperationDraftStore(
+            resolve_transaction_state_directory(args, env=env)
+        )
+        inspected = store.inspect(
+            args.draft_id,
+            task_authority=args.task_authority,
+        )
+        schema_digest = operation_request_schema_digest(
+            inspected.operation,
+            inspected.version,
+        )
+        composer_digest = operation_composer_digest(
+            inspected.operation,
+            inspected.version,
+        )
+        record = store.apply_action(
+            args.draft_id,
+            task_authority=args.task_authority,
+            expected_revision=args.expected_revision,
+            schema_digest=schema_digest,
+            composer_digest=composer_digest,
+            action=parse_json_object(args.action_json, "--action-json"),
+        )
+        return operation_draft_payload(args.command, record)
     if args.command in {"draft-inspect", "draft-cancel"}:
         store = OperationDraftStore(
             resolve_transaction_state_directory(args, env=env)
@@ -4105,7 +4191,14 @@ def resolve_connection(args: argparse.Namespace, *, env: Mapping[str, str]) -> G
             if args.timeout is not None
             else (
                 DEFAULT_TRANSACTION_TIMEOUT
-                if args.command in {"preview", "legacy-preview", "execute", "verify"}
+                if args.command
+                in {
+                    "preview",
+                    "legacy-preview",
+                    "preview-from-draft",
+                    "execute",
+                    "verify",
+                }
                 else DEFAULT_METADATA_DISCOVERY_TIMEOUT
                 if args.command == "metadata" and args.operation == "discover"
                 else DEFAULT_TIMEOUT
@@ -4151,6 +4244,26 @@ def dispatch_command(
         "detected_version": detected_version,
         "is_command_line": bool(live_info.get("isCommandLine")),
     }
+    if args.command == "draft-check":
+        return dispatch_operation_draft_check(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "preview-from-draft":
+        return dispatch_operation_draft_preview(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
     if args.command == "status":
         info = dispatch(
             dispatcher,
@@ -5755,6 +5868,343 @@ def prepared_wire_path_io_audit(
     return io_audit
 
 
+def dispatch_operation_draft_check(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Run a bounded live validation, then CAS-publish only check evidence."""
+
+    state_dir = resolve_transaction_state_directory(args, env=env)
+    store = OperationDraftStore(state_dir)
+    inspected = store.inspect(
+        args.draft_id,
+        task_authority=args.task_authority,
+    )
+    schema_digest = operation_request_schema_digest(
+        inspected.operation,
+        inspected.version,
+    )
+    composer_digest = operation_composer_digest(
+        inspected.operation,
+        inspected.version,
+    )
+    materialized = store.materialize_request(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+    )
+    if materialized.record.version != detected_version:
+        raise OperationDraftBindingDrift(
+            "Operation Draft version does not match the connected Wwise version.",
+            details={
+                "draft_version": materialized.record.version,
+                "live_version": detected_version,
+            },
+        )
+    request_payload = dict(materialized.request)
+    authoring_boundary = live_authoring_transaction_boundary(
+        request_payload,
+        command=args.command,
+        live_info=live_info,
+        common=common,
+    )
+    if authoring_boundary is not None:
+        return authoring_boundary
+    locality_boundary = local_filesystem_transaction_boundary(
+        request_payload,
+        command=args.command,
+        endpoint_host=connection.host,
+        common=common,
+    )
+    if locality_boundary is not None:
+        return locality_boundary
+    project_guard_mode, target_project_path = transaction_project_guard_spec(
+        request_payload,
+        version=detected_version,
+    )
+    project, project_call = current_project(
+        dispatcher,
+        connection=connection,
+        version=detected_version,
+        allow_none=project_guard_mode != PROJECT_GUARD_INVARIANT,
+    )
+    if project is not None:
+        require_runtime_directory_outside_project(state_dir, project=project)
+    if target_project_path is not None:
+        require_runtime_directory_outside_project(
+            state_dir,
+            project={"path": target_project_path},
+        )
+    project_guard = build_project_guard(
+        endpoint=common["endpoint"],
+        version=detected_version,
+        live_info=live_info,
+        project=project,
+        project_guard_mode=project_guard_mode,
+        target_project_path=target_project_path,
+    )
+    read_call = transaction_read_call(
+        dispatcher,
+        connection=connection,
+        version=detected_version,
+    )
+    read_call = metadata_cached_read_call(
+        read_call,
+        connection=connection,
+        version=detected_version,
+        live_info=live_info,
+        project=project,
+        state_dir=state_dir,
+    )
+    checked_artifact = build_transaction_preview_artifact(
+        request_payload,
+        live_version=detected_version,
+        read_call=read_call,
+        project_guard=project_guard,
+        skill_root=SKILL_ROOT,
+        ttl_seconds=DEFAULT_PREVIEW_TTL_SECONDS,
+    ).as_dict()
+    prepared = require_mapping(
+        checked_artifact.get("prepared_operation"),
+        "checked prepared operation",
+    )
+    runtime_guard = require_mapping(
+        checked_artifact.get("runtime_guard"),
+        "checked runtime guard",
+    )
+    runtime_fingerprint = runtime_guard.get("fingerprint")
+    if not isinstance(runtime_fingerprint, str):
+        raise GatewayInputError("Checked runtime guard lacks its fingerprint")
+    record = store.record_check(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+        request_digest=materialized.request_digest,
+        project_guard=project_guard,
+        runtime_guard_fingerprint=runtime_fingerprint,
+        prepared_digest=canonical_sha256(prepared),
+    )
+    payload = operation_draft_payload(args.command, record, offline=False)
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "is_command_line": common["is_command_line"],
+            "project_call": dispatch_call_summary(project_call),
+        }
+    )
+    return payload
+
+
+def dispatch_operation_draft_preview(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Reserve, create/resume through canonical ingress, then commit the seal."""
+
+    state_dir = resolve_transaction_state_directory(args, env=env)
+    draft_store = OperationDraftStore(state_dir)
+    inspected = draft_store.inspect(
+        args.draft_id,
+        task_authority=args.task_authority,
+    )
+    schema_digest = operation_request_schema_digest(
+        inspected.operation,
+        inspected.version,
+    )
+    composer_digest = operation_composer_digest(
+        inspected.operation,
+        inspected.version,
+    )
+    if inspected.version != detected_version:
+        raise OperationDraftBindingDrift(
+            "Operation Draft version does not match the connected Wwise version.",
+            details={
+                "draft_version": inspected.version,
+                "live_version": detected_version,
+            },
+        )
+    policy = load_gateway_config(env).config.project_modification_policy
+    reservation: Any | None = None
+    reserve_transaction_id: Callable[[], str] | None = None
+    if inspected.state is OperationDraftState.EDITABLE:
+        materialized = draft_store.materialize_request(
+            args.draft_id,
+            task_authority=args.task_authority,
+            expected_revision=args.expected_revision,
+            schema_digest=schema_digest,
+            composer_digest=composer_digest,
+        )
+        check = inspected.check
+        if (
+            not isinstance(check, Mapping)
+            or check.get("source_revision") != inspected.revision - 1
+            or check.get("request_digest") != materialized.request_digest
+            or check.get("schema_digest") != inspected.schema_digest
+            or check.get("composer_digest") != inspected.composer_digest
+            or check.get("live_version") != inspected.version
+            or not isinstance(check.get("project_guard"), Mapping)
+            or not isinstance(check.get("prepared_digest"), str)
+            or not isinstance(check.get("runtime_guard_fingerprint"), str)
+        ):
+            raise OperationDraftCheckRequired(
+                "The current Operation Draft revision needs matching successful "
+                "live-check evidence before Preview."
+            )
+        request_payload = materialized.request
+        expected_project_guard = check["project_guard"]
+        expected_prepared_digest = check["prepared_digest"]
+        expected_runtime_guard_fingerprint = check[
+            "runtime_guard_fingerprint"
+        ]
+
+        def reserve_after_live_validation() -> str:
+            nonlocal reservation
+            reservation = draft_store.reserve_seal(
+                args.draft_id,
+                task_authority=args.task_authority,
+                expected_revision=args.expected_revision,
+                schema_digest=schema_digest,
+                composer_digest=composer_digest,
+                transaction_id=new_transaction_id(),
+                apply=bool(args.apply),
+                ttl_seconds=args.ttl,
+                policy=policy,
+            )
+            return reservation.transaction_id
+
+        reserve_transaction_id = reserve_after_live_validation
+    else:
+        reservation = draft_store.reserve_seal(
+            args.draft_id,
+            task_authority=args.task_authority,
+            expected_revision=args.expected_revision,
+            schema_digest=schema_digest,
+            composer_digest=composer_digest,
+            transaction_id=new_transaction_id(),
+            apply=bool(args.apply),
+            ttl_seconds=args.ttl,
+            policy=policy,
+        )
+        request_payload = reservation.request
+        expected_project_guard = reservation.project_guard
+        expected_prepared_digest = reservation.check_prepared_digest
+        expected_runtime_guard_fingerprint = (
+            reservation.check_runtime_guard_fingerprint
+        )
+    sealed_transaction_state: str | None = None
+    sealed_artifact_hash: str | None = None
+    if (
+        reservation is not None
+        and reservation.record.state is OperationDraftState.SEALED
+    ):
+        seal = reservation.record.seal
+        if not isinstance(seal, Mapping):
+            raise OperationDraftSealReplayMismatch(
+                "Sealed Operation Draft is missing its durable Preview binding."
+            )
+        sealed_transaction_state = seal.get("transaction_state")
+        sealed_artifact_hash = seal.get("artifact_hash")
+        if not isinstance(sealed_transaction_state, str) or not isinstance(
+            sealed_artifact_hash, str
+        ):
+            raise OperationDraftSealReplayMismatch(
+                "Sealed Operation Draft has an incomplete durable Preview binding."
+            )
+        transaction_store = TransactionStore(state_dir)
+        try:
+            sealed_snapshot = transaction_store.load_snapshot(
+                reservation.transaction_id
+            )
+        except TransactionNotFound as exc:
+            raise OperationDraftSealReplayMismatch(
+                "Sealed Operation Draft cannot be replayed because its immutable "
+                "transaction Preview is missing."
+            ) from exc
+        _validate_draft_transaction_snapshot(
+            snapshot=sealed_snapshot,
+            reservation=reservation,
+            artifact_hash=sealed_artifact_hash,
+            transaction_state=sealed_transaction_state,
+            ttl_seconds=args.ttl,
+        )
+    previewed = create_transaction_preview(
+        request_payload,
+        args=args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+        common=common,
+        reserved_transaction_id=(
+            None if reservation is None else reservation.transaction_id
+        ),
+        reserve_transaction_id=reserve_transaction_id,
+        expected_project_guard=expected_project_guard,
+        expected_policy=policy,
+        expected_prepared_digest=expected_prepared_digest,
+        expected_runtime_guard_fingerprint=expected_runtime_guard_fingerprint,
+        existing_preview_required=(
+            reservation is not None
+            and reservation.record.state is OperationDraftState.SEALED
+        ),
+        expected_artifact_hash=sealed_artifact_hash,
+        expected_transaction_state=sealed_transaction_state,
+    )
+    if previewed.get("ok") is not True:
+        return previewed
+    if reservation is None:
+        raise OperationDraftSealReplayMismatch(
+            "Canonical ingress completed without publishing the Draft seal reservation."
+        )
+    transaction_id = previewed.get("transaction_id")
+    artifact_hash = previewed.get("artifact_hash")
+    transaction_state = previewed.get("state")
+    if (
+        transaction_id != reservation.transaction_id
+        or not isinstance(artifact_hash, str)
+        or not isinstance(transaction_state, str)
+    ):
+        raise OperationDraftSealReplayMismatch(
+            "Canonical ingress returned a different reserved Preview binding."
+        )
+    transaction_store = TransactionStore(state_dir)
+    snapshot = transaction_store.load_snapshot(reservation.transaction_id)
+    _validate_draft_transaction_snapshot(
+        snapshot=snapshot,
+        reservation=reservation,
+        artifact_hash=artifact_hash,
+        transaction_state=transaction_state,
+        ttl_seconds=args.ttl,
+    )
+    draft_store.commit_seal(
+        args.draft_id,
+        task_authority=args.task_authority,
+        source_revision=reservation.source_revision,
+        transaction_id=reservation.transaction_id,
+        artifact_hash=artifact_hash,
+        transaction_state=transaction_state,
+    )
+    return previewed
+
+
 def create_transaction_preview(
     request_payload: Mapping[str, Any],
     *,
@@ -5765,6 +6215,15 @@ def create_transaction_preview(
     live_info: Mapping[str, Any],
     dispatcher: WwiseDispatcher,
     common: Mapping[str, Any],
+    reserved_transaction_id: str | None = None,
+    reserve_transaction_id: Callable[[], str] | None = None,
+    expected_project_guard: Mapping[str, Any] | None = None,
+    expected_policy: str | None = None,
+    expected_prepared_digest: str | None = None,
+    expected_runtime_guard_fingerprint: str | None = None,
+    existing_preview_required: bool = False,
+    expected_artifact_hash: str | None = None,
+    expected_transaction_state: str | None = None,
 ) -> dict[str, Any]:
     """Create one durable Preview from raw canonical operation-request JSON.
 
@@ -5774,6 +6233,10 @@ def create_transaction_preview(
     write, authorization state, and bounded review result.
     """
 
+    if reserved_transaction_id is not None and reserve_transaction_id is not None:
+        raise ValueError(
+            "reserved_transaction_id and reserve_transaction_id are mutually exclusive"
+        )
     if not isinstance(request_payload, Mapping) or (
         request_payload.get("contract")
         in {PREPARED_OPERATION_CONTRACT, TRANSACTION_PREVIEW_CONTRACT}
@@ -5801,8 +6264,17 @@ def create_transaction_preview(
     )
     if locality_boundary is not None:
         return locality_boundary
-    project_guard_mode, target_project_path = transaction_project_guard_spec(
+
+    # Every request that reaches Preview construction is reparsed here.  The
+    # artifact builder below repeats that parse at the immutable seam.  The
+    # raw host/locality boundaries intentionally precede semantic parsing so
+    # unavailable-host and remote-filesystem failures remain fail-fast.
+    canonical_request = parse_operation_request(
         request_payload,
+        expected_version=detected_version,
+    ).as_dict()
+    project_guard_mode, target_project_path = transaction_project_guard_spec(
+        canonical_request,
         version=detected_version,
     )
     project, project_call = current_project(
@@ -5819,7 +6291,6 @@ def create_transaction_preview(
             state_dir,
             project={"path": target_project_path},
         )
-    store = TransactionStore(state_dir)
     project_guard = build_project_guard(
         endpoint=common["endpoint"],
         version=detected_version,
@@ -5828,6 +6299,56 @@ def create_transaction_preview(
         project_guard_mode=project_guard_mode,
         target_project_path=target_project_path,
     )
+    if expected_project_guard is not None and (
+        not isinstance(expected_project_guard, Mapping)
+        or dict(expected_project_guard) != project_guard
+    ):
+        raise OperationDraftBindingDrift(
+            "Live project/runtime context changed after the Operation Draft check."
+        )
+    current_policy = load_gateway_config(env).config.project_modification_policy
+    if expected_policy is not None and current_policy != expected_policy:
+        raise OperationDraftSealReplayMismatch(
+            "Project modification policy changed after the seal reservation.",
+            details={
+                "reserved_policy": expected_policy,
+                "current_policy": current_policy,
+            },
+        )
+    if args.apply and current_policy == "read_only":
+        raise GatewayInputError(
+            "project_modification_policy=read_only blocks transaction "
+            "requested project change"
+        )
+    store = TransactionStore(state_dir)
+    if reserved_transaction_id is not None:
+        try:
+            existing_snapshot = store.load_snapshot(reserved_transaction_id)
+        except TransactionNotFound:
+            existing_snapshot = None
+        if existing_snapshot is not None:
+            return _resume_reserved_transaction_preview(
+                snapshot=existing_snapshot,
+                store=store,
+                canonical_request=canonical_request,
+                project_guard=project_guard,
+                ttl_seconds=args.ttl,
+                apply=bool(args.apply),
+                policy=current_policy,
+                common=common,
+                project_call=project_call,
+                expected_prepared_digest=expected_prepared_digest,
+                expected_runtime_guard_fingerprint=(
+                    expected_runtime_guard_fingerprint
+                ),
+                expected_artifact_hash=expected_artifact_hash,
+                expected_transaction_state=expected_transaction_state,
+            )
+        if existing_preview_required:
+            raise OperationDraftSealReplayMismatch(
+                "Sealed Operation Draft cannot be replayed because its immutable "
+                "transaction Preview is missing."
+            )
     read_call = transaction_read_call(
         dispatcher,
         connection=connection,
@@ -5872,15 +6393,49 @@ def create_transaction_preview(
                 "preview --apply is reserved for project or process changes; "
                 "omit --apply for this read transaction."
             )
-    transaction_id = new_transaction_id()
-    current_policy = load_gateway_config(env).config.project_modification_policy
-    if args.apply and current_policy == "read_only":
-        raise GatewayInputError(
-            "project_modification_policy=read_only blocks transaction "
-            "requested project change"
+    if (
+        expected_prepared_digest is not None
+        and canonical_sha256(prepared) != expected_prepared_digest
+    ):
+        raise OperationDraftBindingDrift(
+            "Live identity, metadata, or pre-state changed after the Operation Draft check."
         )
-    created = store.create_preview(transaction_id, artifact)
-    operation = request_payload.get("operation")
+    runtime_guard = require_mapping(artifact.get("runtime_guard"), "runtime guard")
+    if (
+        expected_runtime_guard_fingerprint is not None
+        and runtime_guard.get("fingerprint") != expected_runtime_guard_fingerprint
+    ):
+        raise OperationDraftBindingDrift(
+            "Packaged runtime changed after the Operation Draft check."
+        )
+    transaction_id = (
+        reserved_transaction_id
+        or (reserve_transaction_id() if reserve_transaction_id is not None else None)
+        or new_transaction_id()
+    )
+    try:
+        created = store.create_preview(transaction_id, artifact)
+    except PreviewAlreadyExists:
+        if reserved_transaction_id is None:
+            raise
+        existing_snapshot = store.load_snapshot(transaction_id)
+        return _resume_reserved_transaction_preview(
+            snapshot=existing_snapshot,
+            store=store,
+            canonical_request=canonical_request,
+            project_guard=project_guard,
+            ttl_seconds=args.ttl,
+            apply=bool(args.apply),
+            policy=current_policy,
+            common=common,
+            project_call=project_call,
+            candidate_artifact=artifact,
+            expected_prepared_digest=expected_prepared_digest,
+            expected_runtime_guard_fingerprint=(
+                expected_runtime_guard_fingerprint
+            ),
+        )
+    operation = canonical_request.get("operation")
     confirmation_only = operation in EXPLICIT_CONFIRMATION_ONLY_OPERATIONS
     if args.apply and current_policy == "allow_changes" and not confirmation_only:
         transaction = store.authorize_by_policy(
@@ -5963,6 +6518,228 @@ def create_transaction_preview(
         "cleanup": cleanup,
         "next_command": next_command,
         "agent_result": agent_result,
+    }
+
+
+def _resume_reserved_transaction_preview(
+    *,
+    snapshot: Any,
+    store: TransactionStore,
+    canonical_request: Mapping[str, Any],
+    project_guard: Mapping[str, Any],
+    ttl_seconds: int,
+    apply: bool,
+    policy: str,
+    common: Mapping[str, Any],
+    project_call: Mapping[str, Any],
+    candidate_artifact: Mapping[str, Any] | None = None,
+    expected_prepared_digest: str | None = None,
+    expected_runtime_guard_fingerprint: str | None = None,
+    expected_artifact_hash: str | None = None,
+    expected_transaction_state: str | None = None,
+) -> dict[str, Any]:
+    """Resume one reserved immutable Preview without allocating another id."""
+
+    artifact = snapshot.preview.artifact
+    if not isinstance(artifact, Mapping):
+        raise OperationDraftSealReplayMismatch(
+            "Reserved transaction Preview is not a JSON object."
+        )
+    if (
+        artifact.get("request") != canonical_request
+        or artifact.get("project_guard") != project_guard
+        or _preview_artifact_ttl_seconds(artifact) != ttl_seconds
+    ):
+        raise OperationDraftSealReplayMismatch(
+            "Reserved transaction Preview does not match the durable Draft seal."
+        )
+    prepared = artifact.get("prepared_operation")
+    runtime_guard = artifact.get("runtime_guard")
+    if not isinstance(prepared, Mapping) or not isinstance(runtime_guard, Mapping):
+        raise OperationDraftSealReplayMismatch(
+            "Reserved transaction is missing its checked prepared/runtime binding."
+        )
+    if (
+        expected_prepared_digest is not None
+        and canonical_sha256(prepared) != expected_prepared_digest
+    ):
+        raise OperationDraftSealReplayMismatch(
+            "Reserved transaction prepared state differs from the checked Draft."
+        )
+    if (
+        expected_runtime_guard_fingerprint is not None
+        and runtime_guard.get("fingerprint")
+        != expected_runtime_guard_fingerprint
+    ):
+        raise OperationDraftSealReplayMismatch(
+            "Reserved transaction runtime differs from the checked Draft."
+        )
+    if candidate_artifact is not None and _preview_artifact_replay_core(
+        artifact
+    ) != _preview_artifact_replay_core(candidate_artifact):
+        raise OperationDraftSealReplayMismatch(
+            "Concurrent seal preparation disagreed with the immutable reserved Preview."
+        )
+    if (
+        expected_artifact_hash is not None
+        and snapshot.preview.artifact_hash != expected_artifact_hash
+    ):
+        raise OperationDraftSealReplayMismatch(
+            "Reserved transaction artifact hash differs from the sealed Draft."
+        )
+    transaction_id = snapshot.record.transaction_id
+    operation = canonical_request.get("operation")
+    confirmation_only = operation in EXPLICIT_CONFIRMATION_ONLY_OPERATIONS
+    desired_state = (
+        TransactionState.POLICY_AUTHORIZED
+        if apply and policy == "allow_changes" and not confirmation_only
+        else TransactionState.AWAITING_CONFIRMATION
+    )
+    record = snapshot.record
+    if (
+        expected_transaction_state is not None
+        and record.state.value != expected_transaction_state
+    ):
+        raise OperationDraftSealReplayMismatch(
+            "Reserved transaction state differs from the sealed Draft.",
+            details={
+                "expected_state": expected_transaction_state,
+                "actual_state": record.state.value,
+            },
+        )
+    if record.state is TransactionState.DRAFT:
+        if desired_state is TransactionState.POLICY_AUTHORIZED:
+            record = store.authorize_by_policy(
+                transaction_id,
+                policy="allow_changes",
+                authority=POLICY_AUTHORIZATION_AUTHORITY,
+            )
+        else:
+            record = store.submit_for_confirmation(transaction_id)
+    elif record.state is not desired_state:
+        raise OperationDraftSealReplayMismatch(
+            "Reserved transaction already advanced to an incompatible state.",
+            details={
+                "expected_state": desired_state.value,
+                "actual_state": record.state.value,
+            },
+        )
+    if desired_state is TransactionState.POLICY_AUTHORIZED:
+        authorization = {
+            "mode": AUTHORIZATION_MODE_POLICY,
+            "policy": "allow_changes",
+            "authority": POLICY_AUTHORIZATION_AUTHORITY,
+            "explicit_confirmation": False,
+            "notice_required": True,
+        }
+        next_command = transaction_next_command(
+            "execute",
+            ["execute", transaction_id],
+        )
+    else:
+        authorization = {
+            "mode": AUTHORIZATION_MODE_EXPLICIT_CONFIRMATION,
+            "policy": policy,
+            "explicit_confirmation": False,
+            "notice_required": True,
+            "requires_later_user_message": True,
+        }
+        if confirmation_only:
+            authorization["reason"] = "dangerous_host_control_requires_confirmation"
+        next_command = transaction_next_command(
+            "transaction-show",
+            ["transaction-show", transaction_id, "--summary-only"],
+            requires_later_user_message=True,
+        )
+    cleanup = transaction_cleanup_payload(prepared, phase="preview")
+    events = store.read_events(transaction_id)
+    review = transaction_show_summary(artifact, events)
+    agent_result = transaction_agent_result(
+        request=require_mapping(artifact.get("request"), "transaction request"),
+        transaction_id=transaction_id,
+        artifact_hash=snapshot.preview.artifact_hash,
+        state=record.state.value,
+        executed=False,
+        authorization=authorization,
+        cleanup=cleanup,
+        next_command=next_command,
+    )
+    return {
+        "ok": True,
+        "status": record.state.value,
+        **common,
+        "transaction_id": transaction_id,
+        "state": record.state.value,
+        "artifact_hash": snapshot.preview.artifact_hash,
+        **review,
+        "project_call": dispatch_call_summary(project_call),
+        "executed": False,
+        "verified": False,
+        "change_requested": apply,
+        "authorization": authorization,
+        "cleanup": cleanup,
+        "next_command": next_command,
+        "agent_result": agent_result,
+    }
+
+
+def _validate_draft_transaction_snapshot(
+    *,
+    snapshot: Any,
+    reservation: Any,
+    artifact_hash: str,
+    transaction_state: str,
+    ttl_seconds: int,
+) -> None:
+    """Require the exact immutable transaction bound to one Draft reservation."""
+
+    artifact = snapshot.preview.artifact
+    if not isinstance(artifact, Mapping):
+        raise OperationDraftSealReplayMismatch(
+            "Operation Draft transaction Preview is not a JSON object."
+        )
+    prepared = artifact.get("prepared_operation")
+    runtime_guard = artifact.get("runtime_guard")
+    if not isinstance(prepared, Mapping) or not isinstance(runtime_guard, Mapping):
+        raise OperationDraftSealReplayMismatch(
+            "Draft transaction is missing its checked prepared/runtime binding."
+        )
+    if (
+        snapshot.preview.artifact_hash != artifact_hash
+        or snapshot.record.state.value != transaction_state
+        or artifact.get("request") != reservation.request
+        or artifact.get("project_guard") != reservation.project_guard
+        or _preview_artifact_ttl_seconds(artifact) != ttl_seconds
+        or canonical_sha256(prepared) != reservation.check_prepared_digest
+        or runtime_guard.get("fingerprint")
+        != reservation.check_runtime_guard_fingerprint
+    ):
+        raise OperationDraftSealReplayMismatch(
+            "Immutable transaction state does not match the durable Draft binding."
+        )
+
+
+def _preview_artifact_ttl_seconds(artifact: Mapping[str, Any]) -> int | None:
+    created_at = artifact.get("created_at")
+    expires_at = artifact.get("expires_at")
+    if not isinstance(created_at, str) or not isinstance(expires_at, str):
+        return None
+    try:
+        created = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        expires = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    seconds = (expires - created).total_seconds()
+    return int(seconds) if seconds.is_integer() and seconds > 0 else None
+
+
+def _preview_artifact_replay_core(
+    artifact: Mapping[str, Any],
+) -> dict[str, Any]:
+    return {
+        key: value
+        for key, value in artifact.items()
+        if key not in {"created_at", "expires_at"}
     }
 
 
@@ -9313,20 +10090,73 @@ def transaction_state_payload(command: str, record: Any, *, offline: bool) -> di
 def operation_draft_payload(
     command: str,
     record: OperationDraftRecord,
+    *,
+    offline: bool = True,
 ) -> dict[str, Any]:
     """Project bounded lifecycle facts without inventing adapter-owned fields."""
 
-    allowed_actions = (
-        ["inspect", "cancel"]
-        if record.state is OperationDraftState.EDITABLE
-        else []
-    )
+    if record.composer_digest is not None and record.composition is not None:
+        projection = composition_projection(
+            record.operation,
+            record.version,
+            record.composition,
+        )
+        if record.state is not OperationDraftState.EDITABLE:
+            projection["allowed_actions"] = []
+            if record.state in {
+                OperationDraftState.CANCELLED,
+                OperationDraftState.EXPIRED,
+            }:
+                projection["missing_fields"] = []
+                projection["missing_fields_status"] = "lifecycle_terminal"
+        if record.check is None:
+            projection["check"] = None
+        else:
+            projection["check"] = {
+                "status": "passed",
+                "checked_at": record.check["checked_at"],
+                "source_revision": record.check["source_revision"],
+                "request_digest": record.check["request_digest"],
+            }
+            if record.state is OperationDraftState.EDITABLE:
+                projection["allowed_actions"] = [
+                    action
+                    for action in projection["allowed_actions"]
+                    if action != "check"
+                ]
+                projection["allowed_actions"].extend(
+                    ["check", "preview-from-draft"]
+                )
+        if record.seal is None:
+            projection["seal"] = None
+        else:
+            projection["seal"] = {
+                "status": (
+                    "sealed"
+                    if record.state is OperationDraftState.SEALED
+                    else "reserved"
+                ),
+                "source_revision": record.seal["source_revision"],
+                "transaction_id": record.seal["transaction_id"],
+                "artifact_hash": record.seal["artifact_hash"],
+            }
+    else:
+        projection = {
+            "current_facts": [],
+            "missing_fields": [],
+            "missing_fields_status": "no_operation_adapter",
+            "allowed_actions": (
+                ["inspect", "cancel"]
+                if record.state is OperationDraftState.EDITABLE
+                else []
+            ),
+        }
     return {
         "contract": GATEWAY_RESULT_CONTRACT,
         "ok": True,
         "status": record.state.value,
         "command": command,
-        "offline": True,
+        "offline": offline,
         "draft": {
             "contract": OPERATION_DRAFT_CONTRACT,
             "draft_id": record.draft_id,
@@ -9340,10 +10170,7 @@ def operation_draft_payload(
             "created_at": record.created_at,
             "updated_at": record.updated_at,
             "expires_at": record.expires_at,
-            "current_facts": [],
-            "missing_fields": [],
-            "missing_fields_status": "no_operation_adapter",
-            "allowed_actions": allowed_actions,
+            **projection,
         },
     }
 
