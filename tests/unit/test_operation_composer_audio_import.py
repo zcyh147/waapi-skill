@@ -313,6 +313,8 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
             },
             "user_fact_checklist": {
                 "copy_every_explicit_fact_for_this_row": True,
+                "copy_only_explicit_user_facts": True,
+                "unrequested_dependency_candidates_are_not_action_fields": True,
                 "batch_facts_apply_to_each_affected_row": True,
                 "mixed_structure_and_media_defaults_are_not_safe": True,
                 "media_row_examples": [
@@ -372,6 +374,8 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
             },
             "user_fact_checklist": {
                 "copy_every_explicit_fact_for_this_row": True,
+                "copy_only_explicit_user_facts": True,
+                "unrequested_dependency_candidates_are_not_action_fields": True,
                 "batch_facts_apply_to_each_affected_row": True,
                 "mixed_structure_and_media_defaults_are_not_safe": True,
                 "media_row_examples": [
@@ -438,6 +442,10 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
             "query_granularity": "one_successful_command_per_object_type",
             "all_required_tokens_share_that_result": True,
             "split_required_tokens_across_queries": False,
+            "action_fields_source": "explicit_user_request_only",
+            "unrequested_dependency_candidates": (
+                "validation_only_do_not_copy_into_action"
+            ),
             "complete_before": (
                 "first-draft-apply-using-properties-or-references"
             ),
