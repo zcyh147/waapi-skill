@@ -15,6 +15,7 @@ from typing import Any, Mapping, Sequence
 
 from tests.semantic.support.codex_gateway_broker import (
     DraftActionJsonArgument,
+    DraftActionMetadataBinding,
     DraftActionQueryIdentityBinding,
     ExpectedGatewayStep,
     MetadataBoundJsonArgument,
@@ -202,6 +203,183 @@ def build_object_set_composer_transaction_steps(
             )
         )
         latest_revision_step = action_name
+    check_name = f"{label}.check"
+    preview_name = f"{label}.preview"
+    show_name = f"{label}.transaction-show"
+    confirm_name = f"{label}.confirm"
+    execute_name = f"{label}.execute"
+    steps.extend(
+        (
+            ExpectedGatewayStep(
+                name=check_name,
+                subcommand="draft-check",
+                arguments=(
+                    ResponseBinding(f"{label}.draft-start", "/draft/draft_id"),
+                    "--task-authority",
+                    ResponseBinding(f"{label}.draft-start", "/task_authority"),
+                    "--expected-revision",
+                    ResponseBinding(latest_revision_step, "/draft/revision"),
+                ),
+            ),
+            ExpectedGatewayStep(
+                name=preview_name,
+                subcommand="preview-from-draft",
+                arguments=(
+                    ResponseBinding(f"{label}.draft-start", "/draft/draft_id"),
+                    "--task-authority",
+                    ResponseBinding(f"{label}.draft-start", "/task_authority"),
+                    "--expected-revision",
+                    ResponseBinding(check_name, "/draft/revision"),
+                    "--apply",
+                ),
+            ),
+            ExpectedGatewayStep(
+                name=show_name,
+                subcommand="transaction-show",
+                arguments=(ResponseBinding(preview_name, "/transaction_id"), "--summary-only"),
+            ),
+            ExpectedGatewayStep(
+                name=confirm_name,
+                subcommand="confirm",
+                arguments=(
+                    ResponseBinding(show_name, "/transaction_id"),
+                    "--confirmation-token",
+                    ResponseBinding(show_name, "/confirmation/token"),
+                ),
+            ),
+            ExpectedGatewayStep(
+                name=execute_name,
+                subcommand="execute",
+                arguments=(ResponseBinding(confirm_name, "/transaction_id"),),
+                allowed_exit_codes=(0, 2),
+            ),
+            ExpectedGatewayStep(
+                name=f"{label}.verify",
+                subcommand="verify",
+                arguments=(ResponseBinding(execute_name, "/transaction_id"),),
+            ),
+        )
+    )
+    return tuple(steps)
+
+
+def build_audio_import_composer_transaction_steps(
+    request: Mapping[str, Any],
+    *,
+    label: str,
+    metadata_binding: DraftActionMetadataBinding | None = None,
+) -> tuple[ExpectedGatewayStep, ...]:
+    """Translate one closed audio.import request into typed Draft actions."""
+
+    normalized = _validate_operation_request(request)
+    if normalized["operation"] != "audio.import":
+        raise V3ProtocolError("Composer transaction builder requires audio.import")
+    if not isinstance(label, str) or not re.fullmatch(r"tx[0-9]{2}", label):
+        raise V3ProtocolError("Composer transaction label must be txNN")
+    arguments = normalized["arguments"]
+    imports = arguments.get("imports")
+    if not isinstance(imports, list) or not imports:
+        raise V3ProtocolError("audio.import Composer request requires import rows")
+    allowed_request_fields = {
+        "imports",
+        "defaults",
+        "import_operation",
+        "auto_add_to_source_control",
+        "auto_check_out_to_source_control",
+    }
+    if set(arguments) - allowed_request_fields:
+        raise V3ProtocolError("audio.import Composer request fields are not supported")
+
+    action_specs: list[tuple[dict[str, Any], DraftActionMetadataBinding | None]] = []
+    for option_name in (
+        "import_operation",
+        "auto_add_to_source_control",
+        "auto_check_out_to_source_control",
+    ):
+        if option_name in arguments:
+            action_specs.append(
+                (
+                    {
+                        "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+                        "action": "set_import_option",
+                        "name": option_name,
+                        "value": arguments[option_name],
+                    },
+                    None,
+                )
+            )
+    defaults = arguments.get("defaults", {})
+    if not isinstance(defaults, Mapping):
+        raise V3ProtocolError("audio.import Composer defaults must be an object")
+    for name, value in defaults.items():
+        action = {
+            "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+            "action": "set_import_default",
+            "name": name,
+            "value": value,
+        }
+        action_specs.append(
+            (
+                action,
+                metadata_binding
+                if name in {"properties", "references"}
+                else None,
+            )
+        )
+    for raw_row in imports:
+        if not isinstance(raw_row, Mapping):
+            raise V3ProtocolError("audio.import Composer row must be an object")
+        action = {
+            "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+            "action": "add_import_row",
+            **dict(raw_row),
+        }
+        action_specs.append(
+            (
+                action,
+                metadata_binding
+                if any(name in raw_row for name in ("properties", "references"))
+                else None,
+            )
+        )
+
+    steps: list[ExpectedGatewayStep] = [
+        ExpectedGatewayStep(
+            name=f"{label}.operation-schema",
+            subcommand="operation-schema",
+            arguments=("audio.import",),
+        ),
+        ExpectedGatewayStep(
+            name=f"{label}.draft-start",
+            subcommand="draft-start",
+            arguments=("audio.import",),
+        ),
+    ]
+    latest_revision_step = f"{label}.draft-start"
+    for index, (action, action_metadata) in enumerate(action_specs, start=1):
+        action_name = f"{label}.action.{index:03d}"
+        steps.append(
+            ExpectedGatewayStep(
+                name=action_name,
+                subcommand="draft-apply",
+                arguments=(
+                    ResponseBinding(f"{label}.draft-start", "/draft/draft_id"),
+                    "--task-authority",
+                    ResponseBinding(f"{label}.draft-start", "/task_authority"),
+                    "--expected-revision",
+                    ResponseBinding(latest_revision_step, "/draft/revision"),
+                    "--compact",
+                    "--action-json",
+                    DraftActionJsonArgument(
+                        expected=action,
+                        operation="audio.import",
+                        metadata_binding=action_metadata,
+                    ),
+                ),
+            )
+        )
+        latest_revision_step = action_name
+
     check_name = f"{label}.check"
     preview_name = f"{label}.preview"
     show_name = f"{label}.transaction-show"
@@ -1118,6 +1296,7 @@ __all__ = [
     "V3GatewayProtocol",
     "V3ProtocolError",
     "build_direct_protocol",
+    "build_audio_import_composer_transaction_steps",
     "build_object_set_composer_transaction_steps",
     "build_modification_policy_protocol",
     "build_metadata_transaction_protocol",

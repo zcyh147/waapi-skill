@@ -30,6 +30,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     DraftActionJsonArgument,
+    DraftActionMetadataBinding,
     DraftActionResponseBinding,
     ExpectedGatewayStep,
     GatewayDerivedReferenceActivationAllowance,
@@ -1527,6 +1528,92 @@ def test_typed_draft_action_protocol_round_trips_dynamic_handle_bindings() -> No
     tampered["steps"][2]["arguments"][6]["response_bindings"][0]["step"] = (
         "other.task"
     )
+    with pytest.raises(PromptProvenanceError):
+        deserialize_protocol(tampered)
+
+
+def test_audio_import_draft_action_protocol_round_trips_metadata_authority() -> None:
+    metadata_binding = DraftActionMetadataBinding(
+        step="metadata.discover",
+        object_type="Sound",
+        required_tokens=("Volume", "OutputBus"),
+        expected_projection=(
+            MetadataTokenProjection("Volume", "property", "Real32"),
+            MetadataTokenProjection("OutputBus", "reference", ""),
+        ),
+    )
+    action = DraftActionJsonArgument(
+        {
+            "contract": "waapi-skill.operation-draft-action/v1",
+            "action": "add_import_row",
+            "audio_file": r"C:\\音频\\rifle.wav",
+            "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rifle",
+            "properties": [{"name": "Volume", "value": -3.0}],
+            "references": [
+                {
+                    "name": "OutputBus",
+                    "target": {
+                        "kind": "path",
+                        "value": r"\Master-Mixer Hierarchy\Default Work Unit\Weapons",
+                    },
+                }
+            ],
+        },
+        operation="audio.import",
+        metadata_binding=metadata_binding,
+    )
+    protocol = V3GatewayProtocol(
+        steps=(
+            ExpectedGatewayStep(
+                "metadata.discover",
+                "metadata",
+                ("discover", "--object-type", "Sound", "--query", "volume", "--limit", "8"),
+            ),
+            ExpectedGatewayStep(
+                "tx01.operation-schema",
+                "operation-schema",
+                ("audio.import",),
+            ),
+            ExpectedGatewayStep(
+                "tx01.draft-start",
+                "draft-start",
+                ("audio.import",),
+            ),
+            ExpectedGatewayStep(
+                "tx01.action.001",
+                "draft-apply",
+                (
+                    ResponseBinding("tx01.draft-start", "/draft/draft_id"),
+                    "--task-authority",
+                    ResponseBinding("tx01.draft-start", "/task_authority"),
+                    "--expected-revision",
+                    ResponseBinding("tx01.draft-start", "/draft/revision"),
+                    "--action-json",
+                    action,
+                ),
+            ),
+        ),
+        turn_prefix_counts=(4,),
+    )
+
+    serialized = serialize_protocol(protocol)
+    assert deserialize_protocol(serialized) == protocol
+    encoded = serialized["steps"][3]["arguments"][-1]
+    assert encoded["operation"] == "audio.import"
+    assert encoded["metadata_binding"] == {
+        "step": "metadata.discover",
+        "object_type": "Sound",
+        "required_tokens": ["Volume", "OutputBus"],
+        "expected_projection": [
+            {"name": "Volume", "kind": "property", "metadata_type": "Real32"},
+            {"name": "OutputBus", "kind": "reference", "metadata_type": ""},
+        ],
+    }
+
+    tampered = json.loads(json.dumps(serialized))
+    tampered["steps"][3]["arguments"][-1]["metadata_binding"][
+        "required_tokens"
+    ] = ["Volume"]
     with pytest.raises(PromptProvenanceError):
         deserialize_protocol(tampered)
 

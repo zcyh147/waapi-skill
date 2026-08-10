@@ -35,6 +35,7 @@ from tests.semantic.support.codex_campaign import canonical_json_bytes
 from tests.semantic.support.codex_eval_protocol_v3 import (
     OPERATION_REQUEST_CONTRACT,
     V3GatewayProtocol,
+    build_audio_import_composer_transaction_steps,
     build_transaction_protocol,
 )
 from tests.semantic.support.codex_gateway_broker import (
@@ -497,11 +498,38 @@ def prepare_footsteps_integration_runtime(
     )
     try:
         before, visible_values, requests = session.prepare()
-        protocol = build_transaction_protocol(
+        legacy_protocol = build_transaction_protocol(
             requests,
             request_equivalences=(
                 "audio_import_default_operation_v1",
                 "switch_container_remove_assignment_v1",
+            ),
+        )
+        composer_tx01 = build_audio_import_composer_transaction_steps(
+            requests[0],
+            label="tx01",
+        )
+        steps = (
+            *composer_tx01,
+            *(
+                step
+                for step in legacy_protocol.steps
+                if not step.name.startswith("tx01.")
+            ),
+        )
+        protocol = V3GatewayProtocol(
+            steps=steps,
+            turn_prefix_counts=tuple(
+                next(
+                    index
+                    for index, step in enumerate(steps, start=1)
+                    if step.name == checkpoint
+                )
+                for checkpoint in (
+                    "tx01.preview",
+                    "tx02.preview",
+                    "tx02.verify",
+                )
             ),
         )
         session.bind_protocol(protocol)
@@ -737,8 +765,9 @@ class _FootstepsSession:
             )
         names = tuple(step.name for step in protocol.steps)
         if (
-            len(names) != 12
-            or protocol.turn_prefix_counts != (2, 8, 12)
+            protocol.turn_prefix_counts[-1] != len(names)
+            or names[protocol.turn_prefix_counts[0] - 1] != "tx01.preview"
+            or names[protocol.turn_prefix_counts[1] - 1] != "tx02.preview"
             or names.count("tx01.execute") != 1
             or names.count("tx02.execute") != 1
             or names[0] != "tx01.operation-schema"

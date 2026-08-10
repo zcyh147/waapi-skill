@@ -29,7 +29,7 @@ from tests.semantic.support.codex_integration_rifle_runtime_v2 import (
     prepare_rifle_integration_runtime,
 )
 from tests.semantic.support.codex_gateway_broker import (
-    MetadataBoundJsonArgument,
+    DraftActionJsonArgument,
     gateway_step_sequence_matches,
 )
 from tests.semantic.support.codex_integration_workflows_v2 import (
@@ -715,16 +715,19 @@ def test_prepares_exact_metadata_bound_use_existing_batch(
             },
         }
     ]
-    assert tuple(step.name for step in prepared.protocol.steps) == (
+    assert tuple(step.name for step in prepared.protocol.steps[:3]) == (
         "metadata.discover",
         "tx01.operation-schema",
+        "tx01.draft-start",
+    )
+    assert tuple(step.name for step in prepared.protocol.steps[-5:]) == (
         "tx01.preview",
         "tx01.transaction-show",
         "tx01.confirm",
         "tx01.execute",
         "tx01.verify",
     )
-    assert prepared.protocol.turn_prefix_counts == (3, 7)
+    assert prepared.protocol.turn_prefix_counts == (10, 14)
     assert prepared.protocol.commutative_read_only_step_groups == (
         RIFLE_COMMUTATIVE_READ_ONLY_STEP_GROUPS
     )
@@ -740,44 +743,40 @@ def test_prepares_exact_metadata_bound_use_existing_batch(
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-def test_rifle_preview_accepts_only_production_defaulted_sound_row_types(
+def test_rifle_composer_preserves_every_exact_import_row_and_metadata_binding(
     tmp_path: Path,
     version: str,
 ) -> None:
     prepared, _fake, _runtime = _prepared(tmp_path, version=version)
-    preview_step = next(
-        step for step in prepared.protocol.steps if step.name == "tx01.preview"
-    )
-    bound_request = preview_step.arguments[2]
-    assert isinstance(bound_request, MetadataBoundJsonArgument)
-
-    actual = _plain(prepared.operation_request)
-    for row in actual["arguments"]["imports"][:3]:
-        row.pop("object_type")
-
-    assert broker_module._metadata_bound_json_equal(  # noqa: SLF001
-        actual,
-        bound_request,
-    )
+    action_arguments = [
+        step.arguments[-1]
+        for step in prepared.protocol.steps
+        if step.name.startswith("tx01.action.")
+    ]
+    assert len(action_arguments) == 5
     assert all(
-        "object_type" not in row
-        for row in actual["arguments"]["imports"][:3]
+        isinstance(argument, DraftActionJsonArgument)
+        and argument.operation == "audio.import"
+        for argument in action_arguments
     )
-    assert actual["arguments"]["imports"][3]["object_type"] == "Sound SFX"
-
-    wrong_type = copy.deepcopy(actual)
-    wrong_type["arguments"]["imports"][0]["object_type"] = "Sound Voice"
-    assert not broker_module._metadata_bound_json_equal(  # noqa: SLF001
-        wrong_type,
-        bound_request,
-    )
-
-    wrong_target = copy.deepcopy(actual)
-    wrong_target["arguments"]["imports"][1]["object_path"] += "_Other"
-    assert not broker_module._metadata_bound_json_equal(  # noqa: SLF001
-        wrong_target,
-        bound_request,
-    )
+    assert action_arguments[0].expected == {
+        "contract": "waapi-skill.operation-draft-action/v1",
+        "action": "set_import_option",
+        "name": "import_operation",
+        "value": "useExisting",
+    }
+    rows = _plain(prepared.operation_request)["arguments"]["imports"]
+    assert [argument.expected for argument in action_arguments[1:]] == [
+        {
+            "contract": "waapi-skill.operation-draft-action/v1",
+            "action": "add_import_row",
+            **row,
+        }
+        for row in rows
+    ]
+    assert action_arguments[-1].metadata_binding is not None
+    assert action_arguments[-1].metadata_binding.step == "metadata.discover"
+    assert action_arguments[-1].metadata_binding.required_tokens == METADATA_TOKENS
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
@@ -871,7 +870,7 @@ def test_rifle_read_only_preamble_accepts_only_the_declared_pair_swap(
     assert canonical == (
         "metadata.discover",
         "tx01.operation-schema",
-        "tx01.preview",
+        "tx01.draft-start",
     )
     assert gateway_step_sequence_matches(canonical, canonical, groups)
     assert gateway_step_sequence_matches(
@@ -879,28 +878,28 @@ def test_rifle_read_only_preamble_accepts_only_the_declared_pair_swap(
         (
             "tx01.operation-schema",
             "metadata.discover",
-            "tx01.preview",
+            "tx01.draft-start",
         ),
         groups,
     )
 
-    # Both read-only prerequisites remain mandatory, and preview cannot join
+    # Both read-only prerequisites remain mandatory, and draft-start cannot join
     # or cross their one explicitly declared commutative pair.
     assert not gateway_step_sequence_matches(
         canonical,
-        ("metadata.discover", "tx01.preview"),
+        ("metadata.discover", "tx01.draft-start"),
         groups,
     )
     assert not gateway_step_sequence_matches(
         canonical,
-        ("tx01.operation-schema", "tx01.preview"),
+        ("tx01.operation-schema", "tx01.draft-start"),
         groups,
     )
     assert not gateway_step_sequence_matches(
         canonical,
         (
             "metadata.discover",
-            "tx01.preview",
+            "tx01.draft-start",
             "tx01.operation-schema",
         ),
         groups,
@@ -908,7 +907,7 @@ def test_rifle_read_only_preamble_accepts_only_the_declared_pair_swap(
     assert not gateway_step_sequence_matches(
         canonical,
         (
-            "tx01.preview",
+            "tx01.draft-start",
             "tx01.operation-schema",
             "metadata.discover",
         ),

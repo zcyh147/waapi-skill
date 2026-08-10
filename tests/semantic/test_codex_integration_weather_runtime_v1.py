@@ -492,13 +492,33 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
             (first, preview_name, second),
             groups,
         )
-    preview = next(
+    import_preview = next(
         step for step in protocol.steps if step.name == "tx01.preview"
     )
-    assert isinstance(preview.arguments[2], MetadataBoundJsonArgument)
-    assert (
-        preview.arguments[2].gateway_derived_reference_activations
-        == activation_allowances
+    assert import_preview.subcommand == "preview-from-draft"
+    assert "--request-json" not in import_preview.arguments
+    import_actions = [
+        step.arguments[-1]
+        for step in protocol.steps
+        if step.name.startswith("tx01.action.")
+    ]
+    assert import_actions
+    assert all(
+        isinstance(argument, DraftActionJsonArgument)
+        and argument.operation == "audio.import"
+        for argument in import_actions
+    )
+    metadata_bound_actions = [
+        argument
+        for argument in import_actions
+        if argument.metadata_binding is not None
+    ]
+    assert metadata_bound_actions
+    assert all(
+        argument.metadata_binding.step == "tx01.metadata"
+        and argument.metadata_binding.required_tokens == sound_tokens
+        and argument.metadata_binding.expected_projection == sound_projection
+        for argument in metadata_bound_actions
     )
     action_preview = next(
         step for step in protocol.steps if step.name == "tx02.preview"

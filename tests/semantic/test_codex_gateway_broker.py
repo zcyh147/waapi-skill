@@ -27,6 +27,7 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
     BoundedIntegerArgument,
     CodexGatewayBroker,
     DraftActionJsonArgument,
+    DraftActionMetadataBinding,
     DraftActionResponseBinding,
     ExpectedGatewayStep,
     GATEWAY_REQUIRED_ENV,
@@ -56,6 +57,7 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
     resolve_gateway_invocation,
 )
 from .support.codex_eval_protocol_v3 import (  # pyright: ignore[reportMissingImports]
+    build_audio_import_composer_transaction_steps,
     build_object_set_composer_transaction_steps,
 )
 from wwise_waapi.operation_composer import (
@@ -1532,6 +1534,256 @@ def test_numbered_draft_actions_follow_handle_dependencies_not_fixture_order(
     ]
 
 
+def test_audio_import_numbered_actions_remain_strictly_ordered(tmp_path: Path) -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "import_operation": "createNew",
+            "imports": [
+                {
+                    "audio_file": r"C:\\inputs\\a.wav",
+                    "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\A",
+                    "object_type": "Sound SFX",
+                },
+                {
+                    "audio_file": r"C:\\inputs\\b.wav",
+                    "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\B",
+                    "object_type": "Sound SFX",
+                },
+            ],
+        },
+    }
+    steps = build_audio_import_composer_transaction_steps(request, label="tx01")
+    broker = CodexGatewayBroker(
+        skill_source=make_fake_skill(tmp_path),
+        expected_steps=steps,
+        expected_wwise_version="2022.1",
+    )
+    first_action_index = next(
+        index for index, step in enumerate(steps) if step.name == "tx01.action.001"
+    )
+    broker._next_step = first_action_index  # noqa: SLF001
+
+    start = next(step for step in steps if step.subcommand == "draft-start")
+    draft_id = "od1-" + "1" * 32
+    authority = "da1-" + "2" * 40
+    broker._payloads_by_step[start.name] = {  # noqa: SLF001
+        "task_authority": authority,
+        "draft": {"draft_id": draft_id, "revision": 1},
+    }
+    second_action = steps[first_action_index + 1]
+    out_of_order = (
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--compact",
+        "--action-json",
+        json.dumps(
+            second_action.arguments[-1].expected,
+            separators=(",", ":"),
+        ),
+    )
+
+    assert broker._match_dependency_ready_draft_action(out_of_order) is None  # noqa: SLF001
+    with pytest.raises(GatewayInvocationError, match="typed Draft action"):
+        broker._validate_step(steps[first_action_index], out_of_order)  # noqa: SLF001
+
+
+def test_audio_import_action_handle_binding_rejects_cross_row_or_stale_handle(
+    tmp_path: Path,
+) -> None:
+    contract = "waapi-skill.operation-draft-action/v1"
+    start = ExpectedGatewayStep(
+        "tx01.draft-start",
+        "draft-start",
+        ("audio.import",),
+    )
+
+    def add_row(name: str, source_revision: str) -> ExpectedGatewayStep:
+        return ExpectedGatewayStep(
+            name,
+            "draft-apply",
+            (
+                ResponseBinding(start.name, "/draft/draft_id"),
+                "--task-authority",
+                ResponseBinding(start.name, "/task_authority"),
+                "--expected-revision",
+                ResponseBinding(source_revision, "/draft/revision"),
+                "--action-json",
+                DraftActionJsonArgument(
+                    {
+                        "contract": contract,
+                        "action": "add_import_row",
+                        "audio_file": rf"C:\\inputs\\{name}.wav",
+                        "object_path": (
+                            "\\Actor-Mixer Hierarchy\\Default Work Unit\\"
+                            + name
+                        ),
+                    },
+                    operation="audio.import",
+                ),
+            ),
+        )
+
+    row_a = add_row("tx01.action.001", start.name)
+    row_b = add_row("tx01.action.002", row_a.name)
+    edit_a = ExpectedGatewayStep(
+        "tx01.action.003",
+        "draft-apply",
+        (
+            ResponseBinding(start.name, "/draft/draft_id"),
+            "--task-authority",
+            ResponseBinding(start.name, "/task_authority"),
+            "--expected-revision",
+            ResponseBinding(row_b.name, "/draft/revision"),
+            "--action-json",
+            DraftActionJsonArgument(
+                {
+                    "contract": contract,
+                    "action": "set_import_row_field",
+                    "name": "import_language",
+                    "value": "SFX",
+                },
+                response_bindings=(
+                    DraftActionResponseBinding(
+                        "/import_handle",
+                        row_a.name,
+                        "/draft/action_result/created_handles/0",
+                    ),
+                ),
+                operation="audio.import",
+            ),
+        ),
+    )
+    broker = CodexGatewayBroker(
+        skill_source=make_fake_skill(tmp_path),
+        expected_steps=(start, row_a, row_b, edit_a),
+        expected_wwise_version="2022.1",
+    )
+    draft_id = "od1-" + "1" * 32
+    authority = "da1-" + "2" * 40
+    handle_a = "odh1-" + "3" * 24
+    handle_b = "odh1-" + "4" * 24
+    broker._payloads_by_step[start.name] = {  # noqa: SLF001
+        "task_authority": authority,
+        "draft": {"draft_id": draft_id, "revision": 1},
+    }
+    for revision, step, handle in (
+        (2, row_a, handle_a),
+        (3, row_b, handle_b),
+    ):
+        broker._payloads_by_step[step.name] = {  # noqa: SLF001
+            "draft": {
+                "revision": revision,
+                "action_result": {"created_handles": [handle]},
+            }
+        }
+
+    def argv(handle: str) -> tuple[str, ...]:
+        action = {**dict(edit_a.arguments[-1].expected), "import_handle": handle}
+        return (
+            "draft-apply",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "3",
+            "--action-json",
+            json.dumps(action, separators=(",", ":")),
+        )
+
+    broker._validate_step(edit_a, argv(handle_a))  # noqa: SLF001
+    for injected in (handle_b, "odh1-" + "5" * 24):
+        with pytest.raises(GatewayInvocationError, match="typed Draft action"):
+            broker._validate_step(edit_a, argv(injected))  # noqa: SLF001
+
+
+def test_audio_import_action_binds_dynamic_tokens_to_live_metadata(
+    tmp_path: Path,
+) -> None:
+    metadata = ExpectedGatewayStep(
+        "metadata.discover",
+        "metadata",
+        ("discover", "--object-type", "Sound", "--query", "volume", "--limit", "8"),
+    )
+    start = ExpectedGatewayStep(
+        "tx01.draft-start",
+        "draft-start",
+        ("audio.import",),
+    )
+    action_value = {
+        "contract": "waapi-skill.operation-draft-action/v1",
+        "action": "add_import_row",
+        "audio_file": r"C:\\inputs\\雪.wav",
+        "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\雪",
+        "properties": [{"name": "Volume", "value": -3.0}],
+    }
+    action = ExpectedGatewayStep(
+        "tx01.action.001",
+        "draft-apply",
+        (
+            ResponseBinding(start.name, "/draft/draft_id"),
+            "--task-authority",
+            ResponseBinding(start.name, "/task_authority"),
+            "--expected-revision",
+            ResponseBinding(start.name, "/draft/revision"),
+            "--action-json",
+            DraftActionJsonArgument(
+                action_value,
+                operation="audio.import",
+                metadata_binding=DraftActionMetadataBinding(
+                    step=metadata.name,
+                    object_type="Sound",
+                    required_tokens=("Volume",),
+                    expected_projection=(
+                        MetadataTokenProjection("Volume", "property", "Real32"),
+                    ),
+                ),
+            ),
+        ),
+    )
+    broker = CodexGatewayBroker(
+        skill_source=make_fake_skill(tmp_path),
+        expected_steps=(metadata, start, action),
+        expected_wwise_version="2022.1",
+    )
+    broker._payloads_by_step[metadata.name] = _metadata_discovery_payload(  # noqa: SLF001
+        object_type="Sound",
+        candidate_names=("Volume",),
+        dependency_names=(),
+    )
+    broker._payloads_by_step[start.name] = {  # noqa: SLF001
+        "task_authority": "da1-" + "2" * 40,
+        "draft": {"draft_id": "od1-" + "1" * 32, "revision": 1},
+    }
+    actual = (
+        "draft-apply",
+        "od1-" + "1" * 32,
+        "--task-authority",
+        "da1-" + "2" * 40,
+        "--expected-revision",
+        "1",
+        "--action-json",
+        json.dumps(action_value, ensure_ascii=False, separators=(",", ":")),
+    )
+
+    broker._validate_step(action, actual)  # noqa: SLF001
+    wrong = _metadata_discovery_payload(
+        object_type="Sound",
+        candidate_names=("Volume",),
+        dependency_names=(),
+    )
+    wrong["agent_result"]["candidates"][0]["metadata"]["type"] = "Int32"
+    broker._payloads_by_step[metadata.name] = wrong  # noqa: SLF001
+    with pytest.raises(GatewayInvocationError, match="metadata projection differs"):
+        broker._validate_step(action, actual)  # noqa: SLF001
+
+
 def test_numbered_draft_action_sequence_matches_any_exact_permutation() -> None:
     expected = (
         "tx01.draft-start",
@@ -1684,6 +1936,92 @@ def test_draft_replay_uses_the_validated_submitted_numeric_spelling(
     )
 
     assert replayed["arguments"]["objects"][0]["properties"][0]["value"] == 0.0
+
+
+def test_draft_replay_is_scoped_to_the_preview_flow_in_multi_transaction_protocol(
+    tmp_path: Path,
+) -> None:
+    object_set = _object_set_metadata_request()
+    audio_import = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "import_operation": "createNew",
+            "imports": [
+                {
+                    "audio_file": str(tmp_path / "雪.wav"),
+                    "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\雪",
+                    "object_type": "Sound SFX",
+                }
+            ],
+        },
+    }
+    object_steps = build_object_set_composer_transaction_steps(
+        object_set,
+        label="tx01",
+    )
+    audio_steps = build_audio_import_composer_transaction_steps(
+        audio_import,
+        label="tx02",
+    )
+    broker = CodexGatewayBroker(
+        skill_source=make_fake_skill(tmp_path),
+        expected_steps=(*object_steps, *audio_steps),
+        expected_wwise_version="2022.1",
+    )
+    object_start = next(
+        step for step in object_steps if step.subcommand == "draft-start"
+    )
+    audio_start = next(
+        step for step in audio_steps if step.subcommand == "draft-start"
+    )
+    broker._payloads_by_step[object_start.name] = {  # noqa: SLF001
+        "draft": {
+            "draft_id": "od1-" + "1" * 32,
+            "revision": 1,
+            "binding": {"operation": "object.set", "version": "2022.1"},
+        }
+    }
+    broker._payloads_by_step[audio_start.name] = {  # noqa: SLF001
+        "draft": {
+            "draft_id": "od1-" + "2" * 32,
+            "revision": 1,
+            "binding": {"operation": "audio.import", "version": "2022.1"},
+        }
+    }
+    composition = new_composition("audio.import", "2022.1")
+    revision = 1
+    handles = iter(("odh1-" + "3" * 24,))
+    for action_step in (
+        step for step in audio_steps if step.subcommand == "draft-apply"
+    ):
+        action = dict(action_step.arguments[-1].expected)
+        composition, _ = apply_composer_action(
+            "audio.import",
+            "2022.1",
+            composition,
+            action,
+            handle_factory=lambda: next(handles),
+        )
+        revision += 1
+        broker._payloads_by_step[action_step.name] = {  # noqa: SLF001
+            "draft": {
+                "revision": revision,
+                **composition_projection(
+                    "audio.import",
+                    "2022.1",
+                    composition,
+                ),
+            }
+        }
+    preview = next(
+        step for step in audio_steps if step.subcommand == "preview-from-draft"
+    )
+
+    assert broker._replay_expected_operation_draft_request(  # noqa: SLF001
+        preview
+    ) == audio_import
 
 
 def test_broker_rejects_stale_draft_revision_before_runner_dispatch(
@@ -5942,7 +6280,20 @@ def test_weather_limit_two_metadata_step_crosses_broker_validation(
 
     def request(operation: str, sentinel: int) -> dict[str, object]:
         arguments: dict[str, object] = {"sentinel": sentinel}
-        if operation == "object.set":
+        if operation == "audio.import":
+            arguments = {
+                "import_operation": "createNew",
+                "imports": [
+                    {
+                        "audio_file": r"C:\\inputs\\rain.wav",
+                        "object_path": (
+                            r"\\Actor-Mixer Hierarchy\\Default Work Unit\\Rain"
+                        ),
+                        "object_type": "Sound SFX",
+                    }
+                ],
+            }
+        elif operation == "object.set":
             arguments = {
                 "objects": [
                     {

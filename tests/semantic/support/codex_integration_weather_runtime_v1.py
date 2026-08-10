@@ -21,11 +21,13 @@ from typing import Any, Callable, Mapping, Sequence
 
 from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
+    build_audio_import_composer_transaction_steps,
     build_object_set_composer_transaction_steps,
     build_transaction_protocol,
     metadata_candidate_limit,
 )
 from tests.semantic.support.codex_gateway_broker import (
+    DraftActionMetadataBinding,
     ExpectedGatewayStep,
     GatewayDerivedReferenceActivationAllowance,
     MetadataBoundJsonArgument,
@@ -1209,23 +1211,50 @@ def _build_metadata_workflow_protocol(
             reused_projection,
             "object_set_rtpc_v1",
         )
+    tx01_metadata = metadata[0]
+    if tx01_metadata is None or requests[0].get("operation") != "audio.import":
+        raise IntegrationWeatherRuntimeError(
+            "weather tx01 must be one metadata-bound audio.import transaction"
+        )
+    (
+        tx01_object_type,
+        _tx01_queries,
+        tx01_tokens,
+        tx01_projection,
+        _tx01_equivalence,
+    ) = tx01_metadata
+    composer_tx01 = build_audio_import_composer_transaction_steps(
+        requests[0],
+        label="tx01",
+        metadata_binding=DraftActionMetadataBinding(
+            step="tx01.metadata",
+            object_type=tx01_object_type,
+            required_tokens=tuple(tx01_tokens),
+            expected_projection=tuple(tx01_projection),
+        ),
+    )
     legacy_base = build_transaction_protocol(requests)
     composer_tx02 = build_object_set_composer_transaction_steps(
         requests[1],
         label="tx02",
     )
+    composer_by_tx = {
+        "tx01": composer_tx01,
+        "tx02": composer_tx02,
+    }
     base_steps: list[ExpectedGatewayStep] = []
-    inserted_tx02 = False
+    inserted_composer: set[str] = set()
     for step in legacy_base.steps:
         prefix = step.name.split(".", 1)[0]
-        if prefix != "tx02":
+        composer_steps = composer_by_tx.get(prefix)
+        if composer_steps is None:
             base_steps.append(step)
-        elif not inserted_tx02:
-            base_steps.extend(composer_tx02)
-            inserted_tx02 = True
-    if not inserted_tx02:
+        elif prefix not in inserted_composer:
+            base_steps.extend(composer_steps)
+            inserted_composer.add(prefix)
+    if inserted_composer != set(composer_by_tx):
         raise IntegrationWeatherRuntimeError(
-            "weather object.set transaction is missing from the base protocol"
+            "weather Composer transactions are missing from the base protocol"
         )
     metadata_by_tx = {
         f"tx{index:02d}": row

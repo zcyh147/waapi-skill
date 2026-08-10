@@ -501,7 +501,10 @@ def _matches_transaction_step_sequence(
     ]
     if actual == legacy:
         return True
-    if transaction.get("operation") != "object.set" or len(actual) < 9:
+    if (
+        transaction.get("operation") not in {"object.set", "audio.import"}
+        or len(actual) < 9
+    ):
         return False
     if actual[:2] != [
         (f"{transaction_id}.operation-schema", "operation_schema"),

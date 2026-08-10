@@ -629,7 +629,8 @@ class MetadataBoundJsonArgument:
                 "MetadataBoundJsonArgument.object_type must be one bounded exact name"
             )
         if (
-            not self.required_tokens
+            not isinstance(self.required_tokens, tuple)
+            or not self.required_tokens
             or any(
                 not isinstance(value, str)
                 or not value
@@ -766,39 +767,52 @@ _DRAFT_HANDLE_ARGUMENT_NAMES = frozenset(
         "node_handle",
         "list_handle",
         "file_handle",
+        "import_handle",
     }
 )
 _DRAFT_HANDLE_POINTERS = frozenset(f"/{name}" for name in _DRAFT_HANDLE_ARGUMENT_NAMES)
 _DRAFT_FORBIDDEN_ACTION_KEYS = frozenset(
     {"request", "arguments", "uri", "args", "options", "waql", "request_json"}
 )
-_DRAFT_ACTION_HANDLE_FIELD = {
-    "set_request_option": None,
-    "clear_request_option": None,
-    "add_target": None,
-    "set_target_field": "target_handle",
-    "clear_target_field": "target_handle",
-    "set_property": "target_handle",
-    "remove_property": "target_handle",
-    "set_reference": "owner_handle",
-    "remove_reference": "owner_handle",
-    "remove_target": "target_handle",
-    "add_child": "parent_handle",
-    "set_node_field": "node_handle",
-    "clear_node_field": "node_handle",
-    "set_node_property": "node_handle",
-    "remove_node_property": "node_handle",
-    "remove_node": "node_handle",
-    "add_list": "target_handle",
-    "remove_list": "list_handle",
-    "add_list_member": "list_handle",
-    "add_import_file": "owner_handle",
-    "set_import_option": "owner_handle",
-    "clear_import_option": "owner_handle",
-    "set_import_file_field": "file_handle",
-    "clear_import_file_field": "file_handle",
-    "remove_import_file": "file_handle",
-    "remove_import": "owner_handle",
+_DRAFT_ACTION_HANDLE_FIELDS_BY_OPERATION = {
+    "object.set": {
+        "set_request_option": None,
+        "clear_request_option": None,
+        "add_target": None,
+        "set_target_field": "target_handle",
+        "clear_target_field": "target_handle",
+        "set_property": "target_handle",
+        "remove_property": "target_handle",
+        "set_reference": "owner_handle",
+        "remove_reference": "owner_handle",
+        "remove_target": "target_handle",
+        "add_child": "parent_handle",
+        "set_node_field": "node_handle",
+        "clear_node_field": "node_handle",
+        "set_node_property": "node_handle",
+        "remove_node_property": "node_handle",
+        "remove_node": "node_handle",
+        "add_list": "target_handle",
+        "remove_list": "list_handle",
+        "add_list_member": "list_handle",
+        "add_import_file": "owner_handle",
+        "set_import_option": "owner_handle",
+        "clear_import_option": "owner_handle",
+        "set_import_file_field": "file_handle",
+        "clear_import_file_field": "file_handle",
+        "remove_import_file": "file_handle",
+        "remove_import": "owner_handle",
+    },
+    "audio.import": {
+        "set_import_option": None,
+        "clear_import_option": None,
+        "set_import_default": None,
+        "clear_import_default": None,
+        "add_import_row": None,
+        "set_import_row_field": "import_handle",
+        "clear_import_row_field": "import_handle",
+        "remove_import_row": "import_handle",
+    },
 }
 
 
@@ -882,12 +896,67 @@ class DraftActionQueryIdentityBinding:
 
 
 @dataclass(frozen=True, slots=True)
+class DraftActionMetadataBinding:
+    """Bind dynamic property/reference tokens to one prior live discovery."""
+
+    step: str
+    object_type: str
+    required_tokens: tuple[str, ...]
+    expected_projection: tuple[MetadataTokenProjection, ...] | None = None
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.step, str)
+            or not self.step
+            or self.step != self.step.strip()
+            or len(self.step) > 160
+        ):
+            raise ValueError("Draft action metadata step must be bounded")
+        if (
+            not isinstance(self.object_type, str)
+            or not self.object_type
+            or self.object_type != self.object_type.strip()
+            or len(self.object_type) > 256
+        ):
+            raise ValueError("Draft action metadata object type must be bounded")
+        if (
+            not self.required_tokens
+            or any(
+                not isinstance(token, str)
+                or not token
+                or token != token.strip()
+                or token.startswith("@")
+                or len(token) > 256
+                for token in self.required_tokens
+            )
+            or len({token.casefold() for token in self.required_tokens})
+            != len(self.required_tokens)
+        ):
+            raise ValueError("Draft action metadata tokens must be unique exact names")
+        if self.expected_projection is not None:
+            if (
+                not isinstance(self.expected_projection, tuple)
+                or any(
+                    not isinstance(item, MetadataTokenProjection)
+                    for item in self.expected_projection
+                )
+                or tuple(item.name for item in self.expected_projection)
+                != self.required_tokens
+            ):
+                raise ValueError(
+                    "Draft action metadata projection must match required tokens"
+                )
+
+
+@dataclass(frozen=True, slots=True)
 class DraftActionJsonArgument:
     """One fixed business action with only Gateway response handles left dynamic."""
 
     expected: Mapping[str, Any]
     response_bindings: tuple[DraftActionResponseBinding, ...] = ()
     query_identity_bindings: tuple[DraftActionQueryIdentityBinding, ...] = ()
+    operation: str = "object.set"
+    metadata_binding: DraftActionMetadataBinding | None = None
 
     def __post_init__(self) -> None:
         try:
@@ -918,7 +987,17 @@ class DraftActionJsonArgument:
                 "DraftActionJsonArgument cannot contain a complete request, native payload, "
                 "or model-authored handle"
             )
-        expected_handle = _DRAFT_ACTION_HANDLE_FIELD.get(str(normalized["action"]), ...)
+        if (
+            not isinstance(self.operation, str)
+            or not self.operation
+            or self.operation != self.operation.strip()
+            or len(self.operation) > 160
+        ):
+            raise ValueError("DraftActionJsonArgument operation must be bounded")
+        operation_actions = _DRAFT_ACTION_HANDLE_FIELDS_BY_OPERATION.get(self.operation)
+        if operation_actions is None:
+            raise ValueError("DraftActionJsonArgument operation is not reviewed")
+        expected_handle = operation_actions.get(str(normalized["action"]), ...)
         if expected_handle is ...:
             raise ValueError("DraftActionJsonArgument action is not in the reviewed vocabulary")
         if (
@@ -940,6 +1019,41 @@ class DraftActionJsonArgument:
             raise ValueError(
                 "DraftActionJsonArgument must bind exactly the handle required by its action"
             )
+        if self.metadata_binding is not None:
+            if self.operation != "audio.import" or not isinstance(
+                self.metadata_binding, DraftActionMetadataBinding
+            ):
+                raise ValueError(
+                    "Draft action metadata binding is valid only for audio.import"
+                )
+            dynamic_tokens: set[str] = set()
+            if normalized["action"] == "add_import_row":
+                for field in ("properties", "references"):
+                    rows = normalized.get(field, [])
+                    if isinstance(rows, list):
+                        dynamic_tokens.update(
+                            str(row.get("name"))
+                            for row in rows
+                            if isinstance(row, Mapping)
+                            and isinstance(row.get("name"), str)
+                        )
+            elif (
+                normalized["action"] == "set_import_default"
+                and normalized.get("name") in {"properties", "references"}
+                and isinstance(normalized.get("value"), list)
+            ):
+                dynamic_tokens.update(
+                    str(row.get("name"))
+                    for row in normalized["value"]
+                    if isinstance(row, Mapping)
+                    and isinstance(row.get("name"), str)
+                )
+            if not dynamic_tokens or not dynamic_tokens.issubset(
+                set(self.metadata_binding.required_tokens)
+            ):
+                raise ValueError(
+                    "Draft action dynamic tokens must come from its metadata binding"
+                )
         if (
             not isinstance(self.query_identity_bindings, tuple)
             or any(
@@ -1378,13 +1492,51 @@ def _draft_compact_action_result(
 def validate_operation_draft_protocol_steps(
     expected_steps: Sequence[ExpectedGatewayStep],
 ) -> None:
-    """Fail closed unless one Draft flow binds all authority to prior responses."""
+    """Fail closed unless every Draft flow binds authority to prior responses."""
 
     steps = tuple(expected_steps)
     draft_steps = tuple(step for step in steps if step.subcommand in _DRAFT_SUBCOMMANDS)
     if not draft_steps:
         return
     starts = tuple(step for step in draft_steps if step.subcommand == "draft-start")
+    if len(starts) > 1:
+        indexes = {step.name: index for index, step in enumerate(steps)}
+        start_indexes = tuple(indexes[step.name] for step in starts)
+        terminal_indexes: list[int] = []
+        for flow_index, start_index in enumerate(start_indexes):
+            next_start = (
+                start_indexes[flow_index + 1]
+                if flow_index + 1 < len(start_indexes)
+                else len(steps)
+            )
+            terminals = tuple(
+                index
+                for index in range(start_index + 1, next_start)
+                if steps[index].subcommand
+                in {"draft-cancel", "preview-from-draft"}
+            )
+            if len(terminals) != 1:
+                raise ValueError(
+                    "each typed Draft flow requires exactly one terminal command"
+                )
+            terminal_indexes.append(terminals[0])
+        covered_draft_indexes: set[int] = set()
+        for flow_index, terminal_index in enumerate(terminal_indexes):
+            segment_start = (
+                0 if flow_index == 0 else terminal_indexes[flow_index - 1] + 1
+            )
+            segment = steps[segment_start : terminal_index + 1]
+            validate_operation_draft_protocol_steps(segment)
+            covered_draft_indexes.update(
+                range(segment_start, terminal_index + 1)
+            )
+        if any(
+            index not in covered_draft_indexes
+            for index, step in enumerate(steps)
+            if step.subcommand in _DRAFT_SUBCOMMANDS
+        ):
+            raise ValueError("typed Draft command lies outside one complete flow")
+        return
     if len(starts) != 1:
         raise ValueError("a typed Draft protocol requires exactly one draft-start step")
     start = starts[0]
@@ -1523,6 +1675,10 @@ def validate_operation_draft_protocol_steps(
                 )
             action_argument = arguments[-1]
             assert isinstance(action_argument, DraftActionJsonArgument)
+            if action_argument.operation != draft_operation:
+                raise ValueError(
+                    "typed Draft action operation must match draft-start"
+                )
             for binding in action_argument.response_bindings:
                 source_index = indexes.get(binding.step)
                 if (
@@ -1543,6 +1699,17 @@ def validate_operation_draft_protocol_steps(
                     raise ValueError(
                         "typed Draft action query identities must come from one "
                         "pre-Draft query-object response"
+                    )
+            metadata_binding = action_argument.metadata_binding
+            if metadata_binding is not None:
+                source_index = indexes.get(metadata_binding.step)
+                if (
+                    source_index is None
+                    or source_index >= start_index
+                    or steps[source_index].subcommand != "metadata"
+                ):
+                    raise ValueError(
+                        "typed Draft action metadata must come from one pre-Draft read"
                     )
         elif any(isinstance(value, DraftActionJsonArgument) for value in arguments):
             raise ValueError("typed Draft actions are valid only on draft-apply")
@@ -6161,6 +6328,23 @@ class CodexGatewayBroker:
         current_match = _NUMBERED_DRAFT_ACTION_STEP_RE.fullmatch(current.name)
         if current.subcommand != "draft-apply" or current_match is None:
             return None
+        current_argument = next(
+            (
+                argument
+                for argument in current.arguments
+                if isinstance(argument, DraftActionJsonArgument)
+            ),
+            None,
+        )
+        if (
+            isinstance(current_argument, DraftActionJsonArgument)
+            and current_argument.operation == "audio.import"
+        ):
+            # Import row order is part of the canonical operation request and
+            # therefore part of its business meaning.  Unlike object.set's
+            # handle-independent edits, audio.import actions are not
+            # commutative.
+            return None
         prefix = current_match.group("prefix")
         matches: list[
             tuple[int, ExpectedGatewayStep, str, tuple[str, ...]]
@@ -6561,6 +6745,52 @@ class CodexGatewayBroker:
                                 "path": identity["path"],
                             }
                         )
+                    metadata_evidence: dict[str, Any] | None = None
+                    metadata_binding = expected.metadata_binding
+                    if metadata_binding is not None:
+                        source = self._payloads_by_step.get(metadata_binding.step)
+                        source_steps = tuple(
+                            candidate
+                            for candidate in self.expected_steps
+                            if candidate.name == metadata_binding.step
+                        )
+                        if (
+                            source is None
+                            or len(source_steps) != 1
+                            or source_steps[0].subcommand != "metadata"
+                            or len(source_steps[0].arguments) < 3
+                            or source_steps[0].arguments[:2]
+                            != ("discover", "--object-type")
+                            or source_steps[0].arguments[2]
+                            != metadata_binding.object_type
+                        ):
+                            raise GatewayInvocationError(
+                                f"step {step.name!r} Draft metadata source is unavailable"
+                            )
+                        actual_projection = project_required_metadata_tokens(
+                            source,
+                            object_type=metadata_binding.object_type,
+                            required_tokens=metadata_binding.required_tokens,
+                        )
+                        if (
+                            metadata_binding.expected_projection is not None
+                            and actual_projection
+                            != metadata_binding.expected_projection
+                        ):
+                            raise GatewayInvocationError(
+                                f"step {step.name!r} live metadata projection differs "
+                                "from the trusted Draft projection"
+                            )
+                        metadata_evidence = {
+                            "step": metadata_binding.step,
+                            "object_type": metadata_binding.object_type,
+                            "required_tokens": list(
+                                metadata_binding.required_tokens
+                            ),
+                            "projection": [
+                                item.as_dict() for item in actual_projection
+                            ],
+                        }
                     if normalized_actual != bound_expected:
                         raise GatewayInvocationError(
                             f"step {step.name!r} typed Draft action is not exactly equal "
@@ -6574,6 +6804,14 @@ class CodexGatewayBroker:
                             identity_evidence,
                         )
                     )
+                    if expected.operation != "object.set":
+                        semantic_values.extend(
+                            (
+                                "draft-action-operation/v1",
+                                expected.operation,
+                                metadata_evidence,
+                            )
+                        )
                 elif isinstance(expected, ResponseBinding):
                     source = self._payloads_by_step.get(expected.step)
                     if (
@@ -6965,11 +7203,17 @@ class CodexGatewayBroker:
         if not isinstance(binding, Mapping):
             raise GatewayInvocationError("Draft response is missing its immutable binding")
 
-        start = next(
+        step_index = self._execution_steps.index(step)
+        prior_starts = tuple(
             value
-            for value in self.expected_steps
+            for value in self._execution_steps[: step_index + 1]
             if value.subcommand == "draft-start"
         )
+        if not prior_starts:
+            raise GatewayInvocationError(
+                "Draft response is missing its flow-local draft-start"
+            )
+        start = prior_starts[-1]
         operation = start.arguments[0]
         version = binding.get("version")
         if binding.get("operation") != operation:
@@ -7007,9 +7251,9 @@ class CodexGatewayBroker:
                 "Draft response ID does not match draft-start"
             )
 
-        step_index = self._execution_steps.index(step)
         previous_draft: Mapping[str, Any] | None = None
-        for prior in reversed(self._execution_steps[:step_index]):
+        start_index = self._execution_steps.index(start)
+        for prior in reversed(self._execution_steps[start_index:step_index]):
             prior_payload = self._payloads_by_step.get(prior.name)
             if not isinstance(prior_payload, Mapping):
                 continue
@@ -7101,9 +7345,18 @@ class CodexGatewayBroker:
         self,
         preview_step: ExpectedGatewayStep,
     ) -> Mapping[str, Any]:
-        start = next(
-            step for step in self.expected_steps if step.subcommand == "draft-start"
+        preview_index = self._execution_steps.index(preview_step)
+        prior_starts = tuple(
+            step
+            for step in self._execution_steps[:preview_index]
+            if step.subcommand == "draft-start"
         )
+        if not prior_starts:
+            raise GatewayInvocationError(
+                "Draft canonical replay is missing its flow-local draft-start"
+            )
+        start = prior_starts[-1]
+        start_index = self._execution_steps.index(start)
         operation = str(start.arguments[0])
         start_payload = self._payloads_by_step.get(start.name)
         start_draft = (
@@ -7123,8 +7376,7 @@ class CodexGatewayBroker:
             )
         composition = new_composition(operation, version)
         actual_composition = new_composition(operation, version)
-        preview_index = self._execution_steps.index(preview_step)
-        for action_step in self._execution_steps[:preview_index]:
+        for action_step in self._execution_steps[start_index + 1 : preview_index]:
             if action_step.subcommand != "draft-apply":
                 continue
             argument = action_step.arguments[-1]
@@ -7410,6 +7662,7 @@ __all__ = [
     "WINDOWS_SHIM_SCRIPT_NAME",
     "CodexGatewayBroker",
     "DraftActionJsonArgument",
+    "DraftActionMetadataBinding",
     "DraftActionQueryIdentityBinding",
     "DraftActionResponseBinding",
     "ExpectedGatewayStep",

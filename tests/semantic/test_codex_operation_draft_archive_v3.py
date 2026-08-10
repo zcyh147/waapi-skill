@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -19,6 +20,7 @@ from tests.semantic.support.codex_operation_draft_archive_v3 import (
     classify_composer_failure_stage,
     validate_operation_draft_archive,
 )
+from tests.semantic.support import codex_operation_draft_archive_v3 as archive_module
 from wwise_waapi.canonical import canonical_sha256
 from wwise_waapi.operation_composer import composition_projection
 from wwise_waapi.operation_drafts import OperationDraftRecord, OperationDraftStore
@@ -33,6 +35,30 @@ from wwise_waapi.transactions import (
 ACTION_CONTRACT = "waapi-skill.operation-draft-action/v1"
 GATEWAY_CONTRACT = "waapi-skill.gateway-result/v1"
 OBJECT_ID = "{11111111-1111-1111-1111-111111111111}"
+
+
+def test_archive_uses_each_operation_composer_action_byte_ceiling() -> None:
+    inline_audio = {
+        "contract": ACTION_CONTRACT,
+        "action": "add_import_row",
+        "audio_file_base64": "A" * (40 * 1024),
+        "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\Inline",
+        "object_type": "Sound SFX",
+    }
+    raw = json.dumps(inline_audio, separators=(",", ":"))
+    arguments = ("--action-json", raw)
+
+    assert archive_module._strict_action(  # noqa: SLF001
+        arguments,
+        operation="audio.import",
+        version="2023.1",
+    ) == inline_audio
+    with pytest.raises(ComposerArchiveError, match="byte ceiling"):
+        archive_module._strict_action(  # noqa: SLF001
+            arguments,
+            operation="object.set",
+            version="2023.1",
+        )
 
 
 def _draft_payload(
@@ -460,6 +486,55 @@ def test_composer_archive_reconstructs_actions_request_preview_and_cleanup(
     )
     assert evidence["preview_binding"]["transaction_final_state"] == "verified"
     assert evidence["cleanup_outcome"]["status"] == "not_required"
+
+
+def test_composer_archive_replays_multiple_prefixed_flows_independently(
+    tmp_path: Path,
+) -> None:
+    state_dir, steps, records = _sealed_archive(tmp_path)
+
+    def prefixed(
+        prefix: str,
+    ) -> tuple[tuple[ExpectedGatewayStep, ...], list[dict[str, Any]]]:
+        action_index = 0
+        names: list[str] = []
+        for step in steps:
+            if step.subcommand == "draft-start":
+                suffix = "draft-start"
+            elif step.subcommand == "draft-apply":
+                action_index += 1
+                suffix = f"action.{action_index:03d}"
+            elif step.subcommand == "draft-check":
+                suffix = "check"
+            elif step.subcommand == "preview-from-draft":
+                suffix = "preview"
+            else:
+                suffix = step.subcommand
+            names.append(f"{prefix}.{suffix}")
+        renamed_steps = tuple(
+            replace(step, name=name)
+            for step, name in zip(steps, names, strict=True)
+        )
+        renamed_records = copy.deepcopy(records)
+        for record, name in zip(renamed_records, names, strict=True):
+            record["step_name"] = name
+        return renamed_steps, renamed_records
+
+    first_steps, first_records = prefixed("tx01")
+    second_steps, second_records = prefixed("tx02")
+    evidence = validate_operation_draft_archive(
+        state_directory=state_dir,
+        steps=(*first_steps, *second_steps),
+        broker_records=(*first_records, *second_records),
+    )
+
+    assert evidence is not None
+    assert evidence["flow_count"] == 2
+    assert [flow["operation"] for flow in evidence["flows"]] == [
+        "object.set",
+        "object.set",
+    ]
+    assert evidence["flows_sha256"] == canonical_sha256(evidence["flows"])
 
 
 def test_composer_archive_accepts_canonical_key_sorted_payload_records(

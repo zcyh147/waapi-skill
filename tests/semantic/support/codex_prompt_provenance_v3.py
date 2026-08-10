@@ -32,6 +32,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
 from tests.semantic.support.codex_gateway_broker import (
     BoundedIntegerArgument,
     DraftActionJsonArgument,
+    DraftActionMetadataBinding,
     DraftActionQueryIdentityBinding,
     DraftActionResponseBinding,
     ExpectedGatewayStep,
@@ -637,6 +638,23 @@ def _serialize_step(step: ExpectedGatewayStep) -> dict[str, Any]:
                     }
                     for binding in item.query_identity_bindings
                 ]
+            if item.operation != "object.set":
+                row["operation"] = item.operation
+            if item.metadata_binding is not None:
+                binding = item.metadata_binding
+                row["metadata_binding"] = {
+                    "step": binding.step,
+                    "object_type": binding.object_type,
+                    "required_tokens": list(binding.required_tokens),
+                    "expected_projection": (
+                        None
+                        if binding.expected_projection is None
+                        else [
+                            item.as_dict()
+                            for item in binding.expected_projection
+                        ]
+                    ),
+                }
             arguments.append(row)
         elif isinstance(item, ResponseBinding):
             arguments.append(
@@ -904,20 +922,20 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
                 raise PromptProvenanceError(
                     "metadata-bound JSON protocol argument is invalid"
                 ) from exc
-        elif kind == "draft_action_json" and frozenset(row) in {
-            frozenset({"kind", "value", "sha256", "response_bindings"}),
-            frozenset(
-                {
-                    "kind",
-                    "value",
-                    "sha256",
-                    "response_bindings",
-                    "query_identity_bindings",
-                }
-            ),
-        }:
+        elif kind == "draft_action_json" and set(row).issubset(
+            {
+                "kind",
+                "value",
+                "sha256",
+                "response_bindings",
+                "query_identity_bindings",
+                "operation",
+                "metadata_binding",
+            }
+        ) and {"kind", "value", "sha256", "response_bindings"}.issubset(row):
             raw_bindings = row.get("response_bindings")
             raw_identity_bindings = row.get("query_identity_bindings", [])
+            raw_metadata_binding = row.get("metadata_binding")
             if (
                 row.get("sha256") != _sha256_json(row.get("value"))
                 or not isinstance(raw_bindings, list)
@@ -937,6 +955,55 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
                     or not isinstance(binding.get("pointer"), str)
                     or not isinstance(binding.get("step"), str)
                     for binding in raw_identity_bindings
+                )
+                or (
+                    "operation" in row
+                    and not isinstance(row.get("operation"), str)
+                )
+                or (
+                    raw_metadata_binding is not None
+                    and (
+                        not isinstance(raw_metadata_binding, Mapping)
+                        or set(raw_metadata_binding)
+                        != {
+                            "step",
+                            "object_type",
+                            "required_tokens",
+                            "expected_projection",
+                        }
+                        or not isinstance(
+                            raw_metadata_binding.get("required_tokens"),
+                            list,
+                        )
+                        or not all(
+                            isinstance(token, str)
+                            for token in raw_metadata_binding.get(
+                                "required_tokens",
+                                (),
+                            )
+                        )
+                        or (
+                            raw_metadata_binding.get("expected_projection")
+                            is not None
+                            and (
+                                not isinstance(
+                                    raw_metadata_binding.get(
+                                        "expected_projection"
+                                    ),
+                                    list,
+                                )
+                                or any(
+                                    not isinstance(item, Mapping)
+                                    or set(item)
+                                    != {"name", "kind", "metadata_type"}
+                                    for item in raw_metadata_binding.get(
+                                        "expected_projection",
+                                        (),
+                                    )
+                                )
+                            )
+                        )
+                    )
                 )
             ):
                 raise PromptProvenanceError(
@@ -960,6 +1027,39 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
                                 step=str(binding["step"]),
                             )
                             for binding in raw_identity_bindings
+                        ),
+                        operation=str(row.get("operation", "object.set")),
+                        metadata_binding=(
+                            None
+                            if raw_metadata_binding is None
+                            else DraftActionMetadataBinding(
+                                step=str(raw_metadata_binding["step"]),
+                                object_type=str(
+                                    raw_metadata_binding["object_type"]
+                                ),
+                                required_tokens=tuple(
+                                    raw_metadata_binding["required_tokens"]
+                                ),
+                                expected_projection=(
+                                    None
+                                    if raw_metadata_binding[
+                                        "expected_projection"
+                                    ]
+                                    is None
+                                    else tuple(
+                                        MetadataTokenProjection(
+                                            name=str(item["name"]),
+                                            kind=str(item["kind"]),
+                                            metadata_type=str(
+                                                item["metadata_type"]
+                                            ),
+                                        )
+                                        for item in raw_metadata_binding[
+                                            "expected_projection"
+                                        ]
+                                    )
+                                ),
+                            )
                         ),
                     )
                 )

@@ -22,7 +22,7 @@ import stat
 import struct
 import wave
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Protocol
@@ -35,10 +35,13 @@ from tests.semantic.support.codex_campaign import canonical_json_bytes
 from tests.semantic.support.codex_eval_protocol_v3 import (
     OPERATION_REQUEST_CONTRACT,
     V3GatewayProtocol,
-    build_metadata_transaction_protocol,
+    build_audio_import_composer_transaction_steps,
+    metadata_candidate_limit,
 )
 from tests.semantic.support.codex_gateway_broker import (
+    DraftActionMetadataBinding,
     ExpectedGatewayStep,
+    MetadataQueryArgument,
     gateway_step_sequence_matches,
     project_required_metadata_tokens,
 )
@@ -490,14 +493,41 @@ def prepare_rifle_integration_runtime(
             object_type="Sound",
             required_tokens=METADATA_TOKENS,
         )
-        protocol = replace(
-            build_metadata_transaction_protocol(
-                (operation_request,),
+        metadata_arguments: list[Any] = [
+            "discover",
+            "--object-type",
+            "Sound",
+        ]
+        for query in METADATA_QUERIES:
+            metadata_arguments.extend(("--query", MetadataQueryArgument(query)))
+        metadata_arguments.extend(
+            ("--limit", str(metadata_candidate_limit(METADATA_QUERIES)))
+        )
+        metadata_step = ExpectedGatewayStep(
+            name="metadata.discover",
+            subcommand="metadata",
+            arguments=tuple(metadata_arguments),
+        )
+        composer_steps = build_audio_import_composer_transaction_steps(
+            operation_request,
+            label="tx01",
+            metadata_binding=DraftActionMetadataBinding(
+                step=metadata_step.name,
                 object_type="Sound",
-                metadata_queries=METADATA_QUERIES,
                 required_tokens=METADATA_TOKENS,
-                expected_required_token_projection=projection,
-                equivalence="audio_import_v1",
+                expected_projection=projection,
+            ),
+        )
+        steps = (metadata_step, *composer_steps)
+        protocol = V3GatewayProtocol(
+            steps=steps,
+            turn_prefix_counts=(
+                next(
+                    index
+                    for index, step in enumerate(steps, start=1)
+                    if step.name == "tx01.preview"
+                ),
+                len(steps),
             ),
             commutative_read_only_step_groups=(
                 RIFLE_COMMUTATIVE_READ_ONLY_STEP_GROUPS
@@ -782,7 +812,10 @@ class _RifleSession:
         if (
             tuple(step.name for step in protocol.steps).count("tx01.execute")
             != 1
-            or protocol.turn_prefix_counts != (3, 7)
+            or len(protocol.turn_prefix_counts) != 2
+            or protocol.turn_prefix_counts[-1] != len(protocol.steps)
+            or protocol.steps[protocol.turn_prefix_counts[0] - 1].name
+            != "tx01.preview"
             or protocol.commutative_read_only_step_groups
             != RIFLE_COMMUTATIVE_READ_ONLY_STEP_GROUPS
         ):

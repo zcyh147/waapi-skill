@@ -6,12 +6,19 @@ import json
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
+from tests.semantic.support.codex_gateway_broker import (
+    DraftActionJsonArgument,
+    GatewayInvocationError,
+    project_required_metadata_tokens,
+)
+
 from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
 from wwise_waapi.operation_composer import (
     OperationComposerError,
     apply_composer_action,
     composition_projection,
     new_composition,
+    operation_composer_contract,
 )
 from wwise_waapi.operation_drafts import (
     OperationDraftError,
@@ -28,7 +35,6 @@ from wwise_waapi.transactions import (
 
 COMPOSER_ARCHIVE_CONTRACT = "waapi-skill.codex-composer-archive/v1"
 MAX_COMPOSER_ARCHIVE_ACTIONS = 512
-MAX_COMPOSER_ARCHIVE_ACTION_BYTES = 32 * 1024
 MAX_COMPOSER_ARCHIVE_BYTES = 1024 * 1024
 _DRAFT_SUBCOMMANDS = frozenset(
     {
@@ -180,9 +186,19 @@ def _option(arguments: tuple[str, ...], name: str) -> str:
     return arguments[indexes[0] + 1]
 
 
-def _strict_action(arguments: tuple[str, ...]) -> Mapping[str, Any]:
+def _strict_action(
+    arguments: tuple[str, ...],
+    *,
+    operation: str,
+    version: str,
+) -> Mapping[str, Any]:
     raw = _option(arguments, "--action-json")
-    if len(raw.encode("utf-8")) > MAX_COMPOSER_ARCHIVE_ACTION_BYTES:
+    contract = operation_composer_contract(operation, version)
+    limits = _mapping(contract.get("limits"), label="Composer contract limits")
+    action_bytes = limits.get("action_bytes")
+    if type(action_bytes) is not int or action_bytes <= 0:
+        _fail("Composer contract is missing its action byte ceiling")
+    if len(raw.encode("utf-8")) > action_bytes:
         _fail("Composer action exceeds its archive byte ceiling")
     try:
         action = json.loads(raw)
@@ -371,6 +387,41 @@ def _validate_operation_draft_archive(
     if len(steps) != len(broker_records):
         _fail("Composer Broker record count does not match the sealed protocol")
     starts = [step for step in steps if step.subcommand == "draft-start"]
+    if len(starts) > 1:
+        prefixes: list[str] = []
+        for start in starts:
+            suffix = ".draft-start"
+            if not start.name.endswith(suffix):
+                _fail("Multi-Composer draft-start names must have one flow prefix")
+            prefix = start.name[: -len(suffix)]
+            if not prefix or prefix in prefixes:
+                _fail("Multi-Composer flow prefixes must be unique")
+            prefixes.append(prefix)
+        flows: list[Mapping[str, Any]] = []
+        for prefix in prefixes:
+            indexes = tuple(
+                index
+                for index, step in enumerate(steps)
+                if step.name == prefix or step.name.startswith(f"{prefix}.")
+            )
+            if not indexes:
+                _fail("Multi-Composer flow has no archived steps")
+            flows.append(
+                _validate_operation_draft_archive(
+                    state_directory=state_directory,
+                    steps=tuple(steps[index] for index in indexes),
+                    broker_records=tuple(broker_records[index] for index in indexes),
+                )
+            )
+        evidence = {
+            "contract": COMPOSER_ARCHIVE_CONTRACT,
+            "flow_count": len(flows),
+            "flows": flows,
+            "flows_sha256": canonical_sha256(flows),
+        }
+        if len(canonical_json_bytes(evidence)) > MAX_COMPOSER_ARCHIVE_BYTES:
+            _fail("Composer evidence exceeds its fixed archive byte ceiling")
+        return evidence
     if len(starts) != 1:
         _fail("Composer protocol must contain exactly one draft-start")
 
@@ -443,7 +494,39 @@ def _validate_operation_draft_archive(
         if step.subcommand == "draft-apply":
             if len(action_rows) >= MAX_COMPOSER_ARCHIVE_ACTIONS:
                 _fail("Composer archive action count exceeds its fixed ceiling")
-            action = _strict_action(arguments)
+            action = _strict_action(
+                arguments,
+                operation=operation,
+                version=version,
+            )
+            expected_argument = step.arguments[-1]
+            if not isinstance(expected_argument, DraftActionJsonArgument):
+                _fail("Composer archive action lacks its typed protocol argument")
+            metadata_binding = expected_argument.metadata_binding
+            if metadata_binding is not None:
+                source_indexes = tuple(
+                    index
+                    for index, candidate in enumerate(steps)
+                    if candidate.name == metadata_binding.step
+                    and candidate.subcommand == "metadata"
+                )
+                if len(source_indexes) != 1:
+                    _fail("Composer archive metadata source is unavailable")
+                try:
+                    source_projection = project_required_metadata_tokens(
+                        payloads[source_indexes[0]],
+                        object_type=metadata_binding.object_type,
+                        required_tokens=metadata_binding.required_tokens,
+                    )
+                except GatewayInvocationError as exc:
+                    raise ComposerArchiveError(
+                        "Composer archive metadata source is invalid"
+                    ) from exc
+                if (
+                    metadata_binding.expected_projection is not None
+                    and source_projection != metadata_binding.expected_projection
+                ):
+                    _fail("Composer archive metadata projection drifted")
             response_draft = _draft_projection(payload, command="draft-apply")
             response_facts = response_draft.get("current_facts")
             compact: tuple[str, set[str], set[str], Mapping[str, Any]] | None = None

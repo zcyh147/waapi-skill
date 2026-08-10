@@ -20,6 +20,7 @@ from tests.semantic.support.codex_integration_fixture_tree_v2 import (
     wwise_fixture_tree_sha256,
 )
 from tests.semantic.support.codex_gateway_broker import (
+    DraftActionJsonArgument,
     CodexGatewayBroker,
     GatewayInvocationError,
     SemanticJsonArgument,
@@ -580,14 +581,14 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
         "surface_group_path": case.fake._path("surface_group"),
         "footsteps_event_path": case.fake._path("play_footsteps_event"),
     }
-    assert prepared.protocol.turn_prefix_counts == (2, 8, 12)
-    assert len(prepared.protocol.steps) == 12
+    assert prepared.protocol.turn_prefix_counts == (10, 16, 20)
+    assert len(prepared.protocol.steps) == 20
     assert [
         (step.name, step.subcommand)
         for step in prepared.protocol.steps[:2]
     ] == [
         ("tx01.operation-schema", "operation-schema"),
-        ("tx01.preview", "preview"),
+        ("tx01.draft-start", "draft-start"),
     ]
     assert prepared.protocol.steps[0].arguments == ("audio.import",)
     assert all(
@@ -618,10 +619,18 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
     import_preview_step = next(
         step for step in prepared.protocol.steps if step.name == "tx01.preview"
     )
-    import_semantic_argument = import_preview_step.arguments[2]
-    assert isinstance(import_semantic_argument, SemanticJsonArgument)
-    assert import_semantic_argument.equivalence == (
-        "audio_import_default_operation_v1"
+    assert import_preview_step.subcommand == "preview-from-draft"
+    assert "--request-json" not in import_preview_step.arguments
+    import_actions = [
+        step.arguments[-1]
+        for step in prepared.protocol.steps
+        if step.name.startswith("tx01.action.")
+    ]
+    assert len(import_actions) == 6
+    assert all(
+        isinstance(argument, DraftActionJsonArgument)
+        and argument.operation == "audio.import"
+        for argument in import_actions
     )
     imports = import_request["arguments"]["imports"]
     assert len(imports) == 5
@@ -657,33 +666,20 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
         },
     }
 
-    broker = CodexGatewayBroker(
-        skill_source=(
-            Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
-        ),
-        expected_steps=(import_preview_step,),
-    )
-    omitted_default = copy.deepcopy(_plain(import_request))
-    omitted_default["arguments"].pop("import_operation")
-    omitted_json = json.dumps(omitted_default, separators=(",", ":"))
-    _, execution_arguments = broker._validate_step(  # noqa: SLF001
-        import_preview_step,
-        ("preview", "--apply", "--request-json", omitted_json),
-    )
-    assert execution_arguments[-1] == omitted_json
-
-    non_default = copy.deepcopy(_plain(import_request))
-    non_default["arguments"]["import_operation"] = "replaceExisting"
-    with pytest.raises(GatewayInvocationError, match="semantically equal"):
-        broker._validate_step(  # noqa: SLF001
-            import_preview_step,
-            (
-                "preview",
-                "--apply",
-                "--request-json",
-                json.dumps(non_default, separators=(",", ":")),
-            ),
-        )
+    assert import_actions[0].expected == {
+        "contract": "waapi-skill.operation-draft-action/v1",
+        "action": "set_import_option",
+        "name": "import_operation",
+        "value": "createNew",
+    }
+    assert [argument.expected for argument in import_actions[1:]] == [
+        {
+            "contract": "waapi-skill.operation-draft-action/v1",
+            "action": "add_import_row",
+            **row,
+        }
+        for row in imports
+    ]
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
@@ -816,13 +812,16 @@ def test_observer_preserves_exact_terminal_indeterminate_execute(
 ) -> None:
     case = _case(tmp_path, version=version)
     steps = case.prepared.protocol.steps
-    for step in steps[:4]:
+    execute_index = next(
+        index for index, step in enumerate(steps) if step.name == "tx01.execute"
+    )
+    for step in steps[:execute_index]:
         case.prepared.observe_payload(
             step,
             {"ok": True, "command": step.subcommand},
         )
 
-    execute = steps[4]
+    execute = steps[execute_index]
     case.prepared.observe_payload(
         execute,
         {
@@ -835,7 +834,7 @@ def test_observer_preserves_exact_terminal_indeterminate_execute(
         },
     )
 
-    assert case.prepared.protocol.turn_prefix_counts == (2, 8, 12)
+    assert case.prepared.protocol.turn_prefix_counts == (10, 16, 20)
     assert case.prepared.operation_requests[0]["arguments"]["imports"][0][
         "switch_assignment"
     ] == "Snow"
@@ -917,7 +916,10 @@ def test_observer_rejects_non_exact_terminal_indeterminate_execute(
 ) -> None:
     case = _case(tmp_path)
     steps = case.prepared.protocol.steps
-    for step in steps[:4]:
+    execute_index = next(
+        index for index, step in enumerate(steps) if step.name == "tx01.execute"
+    )
+    for step in steps[:execute_index]:
         case.prepared.observe_payload(
             step,
             {"ok": True, "command": step.subcommand},
@@ -933,10 +935,10 @@ def test_observer_rejects_non_exact_terminal_indeterminate_execute(
     payload[field] = bad_value
 
     with pytest.raises(FootstepsIntegrationRuntimeError):
-        case.prepared.observe_payload(steps[4], payload)
+        case.prepared.observe_payload(steps[execute_index], payload)
 
     case.prepared.observe_payload(
-        steps[4],
+        steps[execute_index],
         {
             "contract": "waapi-skill.gateway-result/v1",
             "ok": False,
@@ -1038,14 +1040,13 @@ def test_business_oracle_plan_has_two_unambiguous_transaction_deltas(
         ),
     ]
     workflow_steps = static["workflow_steps"]
-    assert len(workflow_steps) == 13
+    assert len(workflow_steps) == len(case.prepared.protocol.steps) + 1
     assert [row["name"] for row in workflow_steps[:-1]] == [
         step.name for step in case.prepared.protocol.steps
     ]
-    assert all(
-        row["transaction_id"] == ("tx01" if index < 6 else "tx02")
-        for index, row in enumerate(workflow_steps[:-1])
-    )
+    assert [row["transaction_id"] for row in workflow_steps[:-1]] == [
+        step.name.split(".", 1)[0] for step in case.prepared.protocol.steps
+    ]
     assert workflow_steps[-1] == {
         "name": "cleanup.success",
         "kind": "cleanup",

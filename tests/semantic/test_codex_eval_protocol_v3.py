@@ -10,6 +10,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     StructuredRefusal,
     V3GatewayProtocol,
     V3ProtocolError,
+    build_audio_import_composer_transaction_steps,
     build_direct_protocol,
     build_metadata_transaction_protocol,
     build_object_set_composer_transaction_steps,
@@ -22,6 +23,8 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     CodexGatewayBroker,
+    DraftActionJsonArgument,
+    DraftActionMetadataBinding,
     ExpectedGatewayStep,
     MetadataBoundJsonArgument,
     MetadataQueryArgument,
@@ -59,6 +62,85 @@ def _object_set_request(**options: object) -> dict[str, object]:
             ],
         },
     }
+
+
+def _audio_import_request() -> dict[str, object]:
+    return {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "import_operation": "createNew",
+            "auto_add_to_source_control": False,
+            "defaults": {
+                "import_language": "SFX",
+                "object_type": "Sound SFX",
+                "properties": [{"name": "Volume", "value": -3.0}],
+            },
+            "imports": [
+                {
+                    "audio_file": r"C:\\音频\\rain.wav",
+                    "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+                    "event": "Play_Rain",
+                    "references": [
+                        {
+                            "name": "OutputBus",
+                            "target": {
+                                "kind": "path",
+                                "value": r"\Master-Mixer Hierarchy\Default Work Unit\Master Audio Bus",
+                            },
+                        }
+                    ],
+                }
+            ],
+        },
+    }
+
+
+def test_audio_import_composer_emits_ordered_typed_actions_without_full_json() -> None:
+    metadata = DraftActionMetadataBinding(
+        step="tx01.metadata",
+        object_type="Sound",
+        required_tokens=("Volume", "OutputBus"),
+    )
+    steps = build_audio_import_composer_transaction_steps(
+        _audio_import_request(),
+        label="tx01",
+        metadata_binding=metadata,
+    )
+    action_arguments = [
+        step.arguments[-1]
+        for step in steps
+        if step.subcommand == "draft-apply"
+    ]
+
+    assert all(isinstance(value, DraftActionJsonArgument) for value in action_arguments)
+    assert [value.operation for value in action_arguments] == ["audio.import"] * 6
+    assert [value.expected["action"] for value in action_arguments] == [
+        "set_import_option",
+        "set_import_option",
+        "set_import_default",
+        "set_import_default",
+        "set_import_default",
+        "add_import_row",
+    ]
+    assert action_arguments[4].metadata_binding == metadata
+    assert action_arguments[5].metadata_binding == metadata
+    assert next(step for step in steps if step.name == "tx01.preview").subcommand == (
+        "preview-from-draft"
+    )
+    assert all(
+        "--request-json" not in step.arguments
+        for step in steps
+    )
+
+
+def test_audio_import_composer_rejects_unreviewed_request_fields() -> None:
+    request = _audio_import_request()
+    request["arguments"]["native_args"] = {}  # type: ignore[index]
+
+    with pytest.raises(V3ProtocolError, match="fields are not supported"):
+        build_audio_import_composer_transaction_steps(request, label="tx01")
 
 
 def test_object_set_composer_lets_gateway_own_schema_defaults() -> None:
