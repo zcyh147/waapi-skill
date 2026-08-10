@@ -10443,6 +10443,14 @@ def operation_draft_payload(
                     current_facts=current_facts,
                 )
             )
+            projection = {
+                key: projection[key]
+                for key in (
+                    "missing_fields_status",
+                    "current_facts_summary",
+                    "action_result",
+                )
+            }
     else:
         projection = {
             "current_facts": [],
@@ -10464,9 +10472,15 @@ def operation_draft_payload(
             "version": record.version,
             "schema_digest": record.schema_digest,
         },
-        "created_at": record.created_at,
-        "updated_at": record.updated_at,
-        "expires_at": record.expires_at,
+        **(
+            {}
+            if compact_action is not None
+            else {
+                "created_at": record.created_at,
+                "updated_at": record.updated_at,
+                "expires_at": record.expires_at,
+            }
+        ),
         **projection,
     }
     if record.state is OperationDraftState.EDITABLE:

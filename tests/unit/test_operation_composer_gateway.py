@@ -609,6 +609,17 @@ def test_compact_weather_shaped_action_responses_remain_constant_size(
             ),
         )
         assert code == 0
+        assert set(targeted["draft"]) == {
+            "contract",
+            "draft_id",
+            "lifecycle_state",
+            "revision",
+            "binding",
+            "missing_fields_status",
+            "current_facts_summary",
+            "action_result",
+            "next_action_binding",
+        }
         handle = targeted["draft"]["action_result"]["created_handles"][0]
         revision += 1
         response_sizes.append(len(json.dumps(targeted).encode("utf-8")))
@@ -637,8 +648,8 @@ def test_compact_weather_shaped_action_responses_remain_constant_size(
             response_sizes.append(len(json.dumps(changed).encode("utf-8")))
 
     assert len(response_sizes) == 15
-    assert max(response_sizes) < 2_500
-    assert max(response_sizes) - min(response_sizes) < 768
+    assert max(response_sizes) < 1_800
+    assert max(response_sizes) - min(response_sizes) < 256
     inspect_code, inspected = execute(
         tmp_path,
         "draft-inspect",
