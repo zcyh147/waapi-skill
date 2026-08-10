@@ -3015,12 +3015,10 @@ def operation_composer_input_contract(
                                 "dynamic_metadata"
                             ]
                         ),
-                        "gateway_argv_status": (
-                            "available_only_after_preconditions"
-                        ),
-                        "do_not_run_before": ["dynamic_metadata"],
+                        "draft_start_may_precede": True,
+                        "typed_actions_wait_for": ["dynamic_metadata"],
                         "failure_policy": (
-                            "do_not_start_then_backfill_metadata"
+                            "do_not_apply_dynamic_fields_then_backfill_metadata"
                         ),
                     }
                 }

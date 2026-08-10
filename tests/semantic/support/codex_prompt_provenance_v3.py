@@ -453,6 +453,11 @@ def serialize_protocol(protocol: V3GatewayProtocol) -> dict[str, Any]:
             list(group)
             for group in protocol.commutative_read_only_step_groups
         ]
+    if protocol.commutative_composer_setup_step_groups:
+        value["commutative_composer_setup_step_groups"] = [
+            list(group)
+            for group in protocol.commutative_composer_setup_step_groups
+        ]
     return value
 
 
@@ -483,6 +488,7 @@ def deserialize_protocol(value: Mapping[str, Any]) -> V3GatewayProtocol:
         *required_keys,
         *optional_prefix_keys,
         "commutative_read_only_step_groups",
+        "commutative_composer_setup_step_groups",
     }
     if (
         not required_keys.issubset(keys)
@@ -502,6 +508,7 @@ def deserialize_protocol(value: Mapping[str, Any]) -> V3GatewayProtocol:
     allowed: tuple[tuple[int, ...], ...] = ()
     terminal: tuple[int, ...] = ()
     commutative_groups: tuple[tuple[str, str], ...] = ()
+    composer_setup_groups: tuple[tuple[str, str], ...] = ()
     if "allowed_turn_prefix_counts" in value:
         raw_allowed = value.get("allowed_turn_prefix_counts")
         raw_terminal = value.get("terminal_prefix_counts")
@@ -537,6 +544,23 @@ def deserialize_protocol(value: Mapping[str, Any]) -> V3GatewayProtocol:
         commutative_groups = tuple(
             (group[0], group[1]) for group in raw_groups
         )
+    if "commutative_composer_setup_step_groups" in value:
+        raw_groups = value.get("commutative_composer_setup_step_groups")
+        if (
+            not isinstance(raw_groups, list)
+            or any(
+                not isinstance(group, list)
+                or len(group) != 2
+                or any(not isinstance(item, str) for item in group)
+                for group in raw_groups
+            )
+        ):
+            raise PromptProvenanceError(
+                "commutative Composer setup protocol groups are invalid"
+            )
+        composer_setup_groups = tuple(
+            (group[0], group[1]) for group in raw_groups
+        )
     try:
         return V3GatewayProtocol(
             tuple(_deserialize_step(item) for item in steps),
@@ -544,6 +568,7 @@ def deserialize_protocol(value: Mapping[str, Any]) -> V3GatewayProtocol:
             allowed,
             terminal,
             commutative_groups,
+            composer_setup_groups,
         )
     except (TypeError, ValueError) as exc:
         raise PromptProvenanceError(

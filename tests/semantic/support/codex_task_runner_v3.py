@@ -325,6 +325,9 @@ def run_v3_codex_task(
         commutative_read_only_step_groups=(
             protocol.commutative_read_only_step_groups
         ),
+        commutative_composer_setup_step_groups=(
+            protocol.commutative_composer_setup_step_groups
+        ),
         expected_wwise_version=version,
         project_modification_policy=project_modification_policy,
         runner_environment=runner_environment,
@@ -633,10 +636,13 @@ def _broker_terminal_protocol_passed(
     if (
         evidence.commutative_read_only_step_groups
         != protocol.commutative_read_only_step_groups
+        or evidence.commutative_composer_setup_step_groups
+        != protocol.commutative_composer_setup_step_groups
         or not gateway_step_sequence_matches(
             expected_names,
             evidence.consumed_step_names,
             protocol.commutative_read_only_step_groups,
+            protocol.commutative_composer_setup_step_groups,
         )
         or len(evidence.records) != consumed_count
         or tuple(record.step_name for record in evidence.records)
@@ -1355,6 +1361,7 @@ def _validate_infrastructure_failure(
                 expected_prefix_names,
                 broker_evidence.consumed_step_names,
                 broker_evidence.commutative_read_only_step_groups,
+                broker_evidence.commutative_composer_setup_step_groups,
             )
             and len(broker_records) == previous_broker_prefix
             and tuple(record.step_name for record in broker_records)

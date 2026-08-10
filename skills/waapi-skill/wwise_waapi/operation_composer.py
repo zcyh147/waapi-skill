@@ -237,8 +237,11 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             "planning_discipline": {
                 "dynamic_metadata": {
                     "fields": ["properties", "references"],
-                    "complete_before": "draft-start",
+                    "complete_before": (
+                        "first-draft-apply-using-properties-or-references"
+                    ),
                     "schema_and_metadata_may_swap": True,
+                    "draft_start_may_precede": True,
                 },
                 "import_operation": {
                     "source": (

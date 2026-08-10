@@ -303,6 +303,63 @@ def test_commutative_read_only_groups_are_adjacent_and_cannot_cross_turns() -> N
         )
 
 
+def test_commutative_composer_setup_groups_are_narrow_and_cannot_cross_turns() -> None:
+    schema = ExpectedGatewayStep(
+        "tx01.operation-schema",
+        "operation-schema",
+        ("audio.import",),
+    )
+    metadata = ExpectedGatewayStep(
+        "tx01.metadata",
+        "metadata",
+        (
+            "discover",
+            "--object-type",
+            "Sound",
+            "--query",
+            MetadataQueryArgument("volume"),
+            "--limit",
+            "8",
+        ),
+    )
+    draft_start = ExpectedGatewayStep(
+        "tx01.draft-start",
+        "draft-start",
+        ("audio.import",),
+    )
+
+    protocol = V3GatewayProtocol(
+        (schema, metadata, draft_start),
+        (3,),
+        commutative_read_only_step_groups=(
+            ("tx01.operation-schema", "tx01.metadata"),
+        ),
+        commutative_composer_setup_step_groups=(
+            ("tx01.metadata", "tx01.draft-start"),
+        ),
+    )
+    assert protocol.commutative_composer_setup_step_groups == (
+        ("tx01.metadata", "tx01.draft-start"),
+    )
+
+    with pytest.raises(ValueError, match="cannot cross a turn prefix"):
+        V3GatewayProtocol(
+            (schema, metadata, draft_start),
+            (2, 3),
+            commutative_composer_setup_step_groups=(
+                ("tx01.metadata", "tx01.draft-start"),
+            ),
+        )
+    with pytest.raises(ValueError, match="limited to one metadata/draft-start"):
+        V3GatewayProtocol(
+            (schema, metadata, draft_start),
+            (3,),
+            commutative_composer_setup_step_groups=(
+                ("tx01.operation-schema", "tx01.metadata"),
+            ),
+        )
+
+
 def test_non_object_transaction_request_keeps_wire_exact_json() -> None:
     request = {
         **_request(),

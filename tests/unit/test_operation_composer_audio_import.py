@@ -369,8 +369,11 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
     assert contract["planning_discipline"] == {
         "dynamic_metadata": {
             "fields": ["properties", "references"],
-            "complete_before": "draft-start",
+            "complete_before": (
+                "first-draft-apply-using-properties-or-references"
+            ),
             "schema_and_metadata_may_swap": True,
+            "draft_start_may_precede": True,
         },
         "import_operation": {
             "source": "registry_fragments.request_options.import_operation",

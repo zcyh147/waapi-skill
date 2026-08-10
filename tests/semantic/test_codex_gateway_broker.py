@@ -6002,6 +6002,58 @@ def test_broker_accepts_only_declared_read_only_pair_linearizations(
 @pytest.mark.parametrize(
     "runtime_order",
     (
+        ("schema", "metadata.discover", "draft.start"),
+        ("metadata.discover", "schema", "draft.start"),
+        ("schema", "draft.start", "metadata.discover"),
+    ),
+)
+def test_broker_accepts_only_dependency_safe_composer_setup_orders(
+    tmp_path: Path,
+    runtime_order: tuple[str, str, str],
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    steps = (
+        ExpectedGatewayStep("schema", "operation-schema", ("audio.import",)),
+        _metadata_step_with_limit(BoundedIntegerArgument(1, 8)),
+        ExpectedGatewayStep("draft.start", "draft-start", ("audio.import",)),
+    )
+    commands = {
+        "schema": ["operation-schema", "audio.import"],
+        "metadata.discover": [
+            "metadata",
+            "discover",
+            "--object-type",
+            "ActorMixer",
+            "--query",
+            "volume",
+            "--limit",
+            "3",
+        ],
+        "draft.start": ["draft-start", "audio.import"],
+    }
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        commutative_read_only_step_groups=(("schema", "metadata.discover"),),
+        commutative_composer_setup_step_groups=(
+            ("metadata.discover", "draft.start"),
+        ),
+        transport="tcp",
+    ) as broker:
+        completed = [
+            run_model_command(broker, commands[name])
+            for name in runtime_order
+        ]
+        assert [result.returncode for result in completed] == [0, 0, 0]
+        evidence = broker.evidence()
+        assert evidence.consumed_step_names == runtime_order
+        assert evidence.passed is True
+        assert broker.reconcile([result.args for result in completed]).passed
+
+
+@pytest.mark.parametrize(
+    "runtime_order",
+    (
         ("relationship.output_bus.01", "relationship.output_bus.02"),
         ("relationship.output_bus.02", "relationship.output_bus.01"),
     ),

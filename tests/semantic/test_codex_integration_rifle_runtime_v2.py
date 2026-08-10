@@ -24,6 +24,7 @@ from tests.semantic.support.codex_integration_rifle_runtime_v2 import (
     METADATA_QUERIES,
     METADATA_TOKENS,
     RIFLE_CANONICAL_STATE_FIELDS,
+    RIFLE_COMMUTATIVE_COMPOSER_SETUP_STEP_GROUPS,
     RIFLE_COMMUTATIVE_READ_ONLY_STEP_GROUPS,
     RifleIntegrationRuntimeError,
     prepare_rifle_integration_runtime,
@@ -655,11 +656,15 @@ def _observe_successful_protocol(
     fake: FakeRifleWaapi,
     *,
     preserve_existing_source_guids: bool = False,
-    reverse_read_only_pair: bool = False,
+    preamble_order: str = "canonical",
 ) -> None:
     steps = list(prepared.protocol.steps)
-    if reverse_read_only_pair:
+    if preamble_order == "metadata-first":
         steps[:2] = reversed(steps[:2])
+    elif preamble_order == "draft-before-metadata":
+        steps[1:3] = reversed(steps[1:3])
+    elif preamble_order != "canonical":
+        raise ValueError("unsupported Rifle preamble order")
     for step in steps:
         if step.name == "tx01.execute":
             fake.apply_import(
@@ -716,8 +721,8 @@ def test_prepares_exact_metadata_bound_use_existing_batch(
         }
     ]
     assert tuple(step.name for step in prepared.protocol.steps[:3]) == (
-        "metadata.discover",
         "tx01.operation-schema",
+        "metadata.discover",
         "tx01.draft-start",
     )
     assert tuple(step.name for step in prepared.protocol.steps[-5:]) == (
@@ -731,9 +736,12 @@ def test_prepares_exact_metadata_bound_use_existing_batch(
     assert prepared.protocol.commutative_read_only_step_groups == (
         RIFLE_COMMUTATIVE_READ_ONLY_STEP_GROUPS
     )
+    assert prepared.protocol.commutative_composer_setup_step_groups == (
+        RIFLE_COMMUTATIVE_COMPOSER_SETUP_STEP_GROUPS
+    )
     assert METADATA_QUERIES == ("volume", "output bus")
     assert METADATA_TOKENS == ("Volume", "OutputBus")
-    assert prepared.protocol.steps[0].arguments[-2:] == ("--limit", "8")
+    assert prepared.protocol.steps[1].arguments[-2:] == ("--limit", "8")
     assert prepared.expected_dispatches[0].api == IMPORT_API
     assert prepared.expected_dispatches[0].count == 1
     assert len(prepared.before_snapshot.objects) == 10
@@ -859,41 +867,56 @@ def test_campaign_archive_rejects_other_empty_name_shapes(
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-def test_rifle_read_only_preamble_accepts_only_the_declared_pair_swap(
+def test_rifle_preamble_accepts_only_declared_dependency_safe_orders(
     tmp_path: Path,
     version: str,
 ) -> None:
     prepared, _fake, _runtime = _prepared(tmp_path, version=version)
     canonical = tuple(step.name for step in prepared.protocol.steps[:3])
     groups = prepared.protocol.commutative_read_only_step_groups
+    setup_groups = prepared.protocol.commutative_composer_setup_step_groups
 
     assert canonical == (
-        "metadata.discover",
         "tx01.operation-schema",
+        "metadata.discover",
         "tx01.draft-start",
     )
-    assert gateway_step_sequence_matches(canonical, canonical, groups)
+    assert gateway_step_sequence_matches(
+        canonical, canonical, groups, setup_groups
+    )
+    assert gateway_step_sequence_matches(
+        canonical,
+        (
+            "metadata.discover",
+            "tx01.operation-schema",
+            "tx01.draft-start",
+        ),
+        groups,
+        setup_groups,
+    )
     assert gateway_step_sequence_matches(
         canonical,
         (
             "tx01.operation-schema",
-            "metadata.discover",
             "tx01.draft-start",
+            "metadata.discover",
         ),
         groups,
+        setup_groups,
     )
 
-    # Both read-only prerequisites remain mandatory, and draft-start cannot join
-    # or cross their one explicitly declared commutative pair.
+    # Schema and metadata both remain mandatory before the first typed action.
     assert not gateway_step_sequence_matches(
         canonical,
         ("metadata.discover", "tx01.draft-start"),
         groups,
+        setup_groups,
     )
     assert not gateway_step_sequence_matches(
         canonical,
         ("tx01.operation-schema", "tx01.draft-start"),
         groups,
+        setup_groups,
     )
     assert not gateway_step_sequence_matches(
         canonical,
@@ -903,6 +926,7 @@ def test_rifle_read_only_preamble_accepts_only_the_declared_pair_swap(
             "tx01.operation-schema",
         ),
         groups,
+        setup_groups,
     )
     assert not gateway_step_sequence_matches(
         canonical,
@@ -912,22 +936,26 @@ def test_rifle_read_only_preamble_accepts_only_the_declared_pair_swap(
             "metadata.discover",
         ),
         groups,
+        setup_groups,
     )
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-@pytest.mark.parametrize("reverse", [False, True])
-def test_rifle_observer_and_final_oracle_accept_declared_read_pair_orders(
+@pytest.mark.parametrize(
+    "preamble_order",
+    ("canonical", "metadata-first", "draft-before-metadata"),
+)
+def test_rifle_observer_and_final_oracle_accept_declared_preamble_orders(
     tmp_path: Path,
     version: str,
-    reverse: bool,
+    preamble_order: str,
 ) -> None:
     prepared, fake, _runtime = _prepared(tmp_path, version=version)
 
     _observe_successful_protocol(
         prepared,
         fake,
-        reverse_read_only_pair=reverse,
+        preamble_order=preamble_order,
     )
     verification = prepared.verify_final()
 
@@ -942,7 +970,7 @@ def test_rifle_observer_rejects_duplicate_or_incomplete_read_pair(
     duplicate_root = tmp_path / "duplicate"
     duplicate_root.mkdir()
     duplicate, _fake, _runtime = _prepared(duplicate_root)
-    operation_schema = duplicate.protocol.steps[1]
+    operation_schema = duplicate.protocol.steps[0]
     duplicate.observe_payload(
         operation_schema,
         {"ok": True, "command": operation_schema.subcommand},
@@ -960,19 +988,24 @@ def test_rifle_observer_rejects_duplicate_or_incomplete_read_pair(
     incomplete_root = tmp_path / "incomplete"
     incomplete_root.mkdir()
     incomplete, _fake, _runtime = _prepared(incomplete_root)
-    operation_schema = incomplete.protocol.steps[1]
-    preview = incomplete.protocol.steps[2]
+    operation_schema = incomplete.protocol.steps[0]
+    draft_start = incomplete.protocol.steps[2]
+    first_action = incomplete.protocol.steps[3]
     incomplete.observe_payload(
         operation_schema,
         {"ok": True, "command": operation_schema.subcommand},
+    )
+    incomplete.observe_payload(
+        draft_start,
+        {"ok": True, "command": draft_start.subcommand},
     )
     with pytest.raises(
         RifleIntegrationRuntimeError,
         match="duplicated or observed out of order",
     ):
         incomplete.observe_payload(
-            preview,
-            {"ok": True, "command": preview.subcommand},
+            first_action,
+            {"ok": True, "command": first_action.subcommand},
         )
     incomplete.cleanup().assert_passed()
 

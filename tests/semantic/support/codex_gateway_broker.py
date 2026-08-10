@@ -1339,6 +1339,7 @@ class GatewayBrokerRecord:
 
 
 CommutativeReadOnlyStepGroups = tuple[tuple[str, str], ...]
+CommutativeComposerSetupStepGroups = tuple[tuple[str, str], ...]
 
 
 def _is_closed_exact_id_query_step(step: ExpectedGatewayStep) -> bool:
@@ -1402,6 +1403,50 @@ def validate_commutative_read_only_step_groups(
                 "commutative read-only groups are limited to one "
                 "operation-schema/metadata pair or two closed exact-ID "
                 "query-object steps"
+            )
+        claimed.update(group)
+        normalized.append((group[0], group[1]))
+    return tuple(normalized)
+
+
+def validate_commutative_composer_setup_step_groups(
+    expected_steps: Sequence[ExpectedGatewayStep],
+    groups: Sequence[Sequence[str]],
+) -> CommutativeComposerSetupStepGroups:
+    """Validate adjacent metadata/Draft-start setup permutations.
+
+    Starting one empty local Draft has no Wwise side effect.  It may therefore
+    precede its dynamic metadata discovery, while every typed action remains
+    ordered after both setup steps.
+    """
+
+    steps = tuple(expected_steps)
+    names = tuple(step.name for step in steps)
+    indexes = {name: index for index, name in enumerate(names)}
+    normalized: list[tuple[str, str]] = []
+    claimed: set[str] = set()
+    for raw_group in groups:
+        group = tuple(raw_group)
+        if (
+            len(group) != 2
+            or any(not isinstance(name, str) or not name for name in group)
+            or group[0] == group[1]
+            or any(name not in indexes for name in group)
+            or indexes[group[1]] != indexes[group[0]] + 1
+            or any(name in claimed for name in group)
+        ):
+            raise ValueError(
+                "commutative Composer setup groups must name disjoint adjacent "
+                "expected steps in canonical order"
+            )
+        grouped_steps = (steps[indexes[group[0]]], steps[indexes[group[1]]])
+        if tuple(step.subcommand for step in grouped_steps) != (
+            "metadata",
+            "draft-start",
+        ):
+            raise ValueError(
+                "commutative Composer setup groups are limited to one "
+                "metadata/draft-start pair"
             )
         claimed.update(group)
         normalized.append((group[0], group[1]))
@@ -1739,6 +1784,7 @@ def gateway_step_prefix_matches(
     expected: Sequence[str],
     actual: Sequence[str],
     groups: Sequence[Sequence[str]] = (),
+    composer_setup_groups: Sequence[Sequence[str]] = (),
 ) -> bool:
     """Match one dependency-valid observed prefix of the expected sequence."""
 
@@ -1746,11 +1792,40 @@ def gateway_step_prefix_matches(
     actual_names = tuple(actual)
     if len(actual_names) > len(expected_names):
         return False
-    group_by_first = {
-        tuple(group)[0]: tuple(group)
-        for group in groups
+    permitted_pairs = {
+        frozenset(tuple(group))
+        for group in (*tuple(groups), *tuple(composer_setup_groups))
         if len(tuple(group)) == 2
     }
+    reachable = {expected_names}
+    pending = [expected_names]
+    while pending:
+        current = pending.pop()
+        for index in range(len(current) - 1):
+            if frozenset(current[index : index + 2]) not in permitted_pairs:
+                continue
+            swapped = (
+                *current[:index],
+                current[index + 1],
+                current[index],
+                *current[index + 2 :],
+            )
+            if swapped not in reachable:
+                reachable.add(swapped)
+                pending.append(swapped)
+
+    return any(
+        _gateway_step_prefix_matches_one_order(order, actual_names)
+        for order in reachable
+    )
+
+
+def _gateway_step_prefix_matches_one_order(
+    expected_names: tuple[str, ...],
+    actual_names: tuple[str, ...],
+) -> bool:
+    """Match one fixed order plus dependency-ready numbered Draft actions."""
+
     index = 0
     while index < len(actual_names):
         numbered = _NUMBERED_DRAFT_ACTION_STEP_RE.fullmatch(
@@ -1777,20 +1852,6 @@ def gateway_step_prefix_matches(
                 return False
             index += len(supplied_group)
             continue
-        group = group_by_first.get(expected_names[index])
-        if (
-            group is not None
-            and index + 1 < len(expected_names)
-            and expected_names[index : index + 2] == group
-        ):
-            supplied = actual_names[index : min(index + 2, len(actual_names))]
-            if supplied not in {
-                group[: len(supplied)],
-                tuple(reversed(group))[: len(supplied)],
-            }:
-                return False
-            index += len(supplied)
-            continue
         if actual_names[index] != expected_names[index]:
             return False
         index += 1
@@ -1801,6 +1862,7 @@ def gateway_step_sequence_matches(
     expected: Sequence[str],
     actual: Sequence[str],
     groups: Sequence[Sequence[str]] = (),
+    composer_setup_groups: Sequence[Sequence[str]] = (),
 ) -> bool:
     """Match declared pair swaps and exact numbered Draft-action permutations."""
 
@@ -1808,6 +1870,7 @@ def gateway_step_sequence_matches(
         expected,
         actual,
         groups,
+        composer_setup_groups,
     )
 
 
@@ -1824,6 +1887,7 @@ class GatewayBrokerEvidence:
     terminal_state: str
     complete: bool
     commutative_read_only_step_groups: CommutativeReadOnlyStepGroups = ()
+    commutative_composer_setup_step_groups: CommutativeComposerSetupStepGroups = ()
 
     @property
     def rejected_records(self) -> tuple[GatewayBrokerRecord, ...]:
@@ -1852,6 +1916,7 @@ class GatewayBrokerEvidence:
                 self.expected_step_names,
                 self.consumed_step_names,
                 self.commutative_read_only_step_groups,
+                self.commutative_composer_setup_step_groups,
             )
         )
 
@@ -1888,6 +1953,8 @@ class GatewayBrokerEvidence:
         payload = asdict(self)
         if not self.commutative_read_only_step_groups:
             payload.pop("commutative_read_only_step_groups")
+        if not self.commutative_composer_setup_step_groups:
+            payload.pop("commutative_composer_setup_step_groups")
         payload["passed"] = self.passed
         for record_payload, record in zip(payload["records"], self.records):
             record_payload["succeeded"] = record.succeeded
@@ -4407,6 +4474,7 @@ def reconcile_gateway_command_prefix(
         expected_prefix,
         evidence.consumed_step_names,
         evidence.commutative_read_only_step_groups,
+        evidence.commutative_composer_setup_step_groups,
     ):
         errors.append(
             "broker consumed steps do not match the requested expected-step prefix"
@@ -5148,6 +5216,7 @@ class CodexGatewayBroker:
         invocation_skill_source: Path | None = None,
         expected_steps: Sequence[ExpectedGatewayStep],
         commutative_read_only_step_groups: Sequence[Sequence[str]] = (),
+        commutative_composer_setup_step_groups: Sequence[Sequence[str]] = (),
         gateway_global_arguments: Sequence[str] = (),
         expected_wwise_version: str = "",
         project_modification_policy: str = "ask_before_changes",
@@ -5180,14 +5249,19 @@ class CodexGatewayBroker:
                 commutative_read_only_step_groups,
             )
         )
-        self._execution_steps = list(self.expected_steps)
-        self._commutative_group_start_indexes = {
-            next(
-                index
-                for index, step in enumerate(self.expected_steps)
-                if step.name == group[0]
+        self.commutative_composer_setup_step_groups = (
+            validate_commutative_composer_setup_step_groups(
+                self.expected_steps,
+                commutative_composer_setup_step_groups,
             )
-            for group in self.commutative_read_only_step_groups
+        )
+        self._execution_steps = list(self.expected_steps)
+        self._commutative_step_pairs = {
+            frozenset(group)
+            for group in (
+                *self.commutative_read_only_step_groups,
+                *self.commutative_composer_setup_step_groups,
+            )
         }
         self.gateway_global_arguments = tuple(str(value) for value in gateway_global_arguments)
         self.expected_wwise_version = str(expected_wwise_version)
@@ -5735,6 +5809,9 @@ class CodexGatewayBroker:
             commutative_read_only_step_groups=(
                 self.commutative_read_only_step_groups
             ),
+            commutative_composer_setup_step_groups=(
+                self.commutative_composer_setup_step_groups
+            ),
         )
 
     def reconcile(self, command_argvs: Sequence[Sequence[str]]) -> GatewayBrokerReconciliation:
@@ -6260,7 +6337,7 @@ class CodexGatewayBroker:
                     )
                 if reordered is not None:
                     step, semantic_hash, execution_arguments = reordered
-                elif self._next_step not in self._commutative_group_start_indexes:
+                elif self._next_step + 1 >= len(self._execution_steps):
                     return self._reject_locked(
                         resolved,
                         str(first_error),
@@ -6268,6 +6345,14 @@ class CodexGatewayBroker:
                     )
                 else:
                     alternate = self._execution_steps[self._next_step + 1]
+                    if frozenset((step.name, alternate.name)) not in (
+                        self._commutative_step_pairs
+                    ):
+                        return self._reject_locked(
+                            resolved,
+                            str(first_error),
+                            authenticated=True,
+                        )
                     try:
                         semantic_hash, execution_arguments = self._validate_step(
                             alternate,
@@ -6276,7 +6361,7 @@ class CodexGatewayBroker:
                     except GatewayInvocationError as second_error:
                         return self._reject_locked(
                             resolved,
-                            "command matches neither declared commutative read-only "
+                            "command matches neither declared commutative "
                             f"step: {first_error}; {second_error}",
                             authenticated=True,
                         )

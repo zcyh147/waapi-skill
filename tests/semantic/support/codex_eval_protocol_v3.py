@@ -24,6 +24,7 @@ from tests.semantic.support.codex_gateway_broker import (
     OBJECT_SET_SCHEMA_DEFAULTS,
     ResponseBinding,
     SemanticJsonArgument,
+    validate_commutative_composer_setup_step_groups,
     validate_commutative_read_only_step_groups,
     validate_operation_draft_protocol_steps,
 )
@@ -632,6 +633,7 @@ class V3GatewayProtocol:
     allowed_turn_prefix_counts: tuple[tuple[int, ...], ...] = ()
     terminal_prefix_counts: tuple[int, ...] = ()
     commutative_read_only_step_groups: tuple[tuple[str, str], ...] = ()
+    commutative_composer_setup_step_groups: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self) -> None:
         if not self.steps:
@@ -702,6 +704,14 @@ class V3GatewayProtocol:
             raise ValueError(
                 "commutative read-only step groups must use canonical tuples"
             )
+        setup_groups = validate_commutative_composer_setup_step_groups(
+            self.steps,
+            self.commutative_composer_setup_step_groups,
+        )
+        if setup_groups != self.commutative_composer_setup_step_groups:
+            raise ValueError(
+                "commutative Composer setup step groups must use canonical tuples"
+            )
         checkpoint_counts = set(self.turn_prefix_counts)
         for allowed in self.allowed_turn_prefix_counts:
             checkpoint_counts.update(allowed)
@@ -710,6 +720,11 @@ class V3GatewayProtocol:
             if indexes[first] + 1 in checkpoint_counts:
                 raise ValueError(
                     "a commutative read-only group cannot cross a turn prefix"
+                )
+        for first, _second in setup_groups:
+            if indexes[first] + 1 in checkpoint_counts:
+                raise ValueError(
+                    "a commutative Composer setup group cannot cross a turn prefix"
                 )
 
     def allowed_prefixes_for_turn(self, index: int) -> tuple[int, ...]:

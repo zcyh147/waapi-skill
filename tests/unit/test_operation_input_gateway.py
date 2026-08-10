@@ -393,12 +393,15 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
     assert schema["composer"]["start"]["preconditions"] == {
         "dynamic_metadata": {
             "fields": ["properties", "references"],
-            "complete_before": "draft-start",
+            "complete_before": (
+                "first-draft-apply-using-properties-or-references"
+            ),
             "schema_and_metadata_may_swap": True,
+            "draft_start_may_precede": True,
         },
-        "gateway_argv_status": "available_only_after_preconditions",
-        "do_not_run_before": ["dynamic_metadata"],
-        "failure_policy": "do_not_start_then_backfill_metadata",
+        "draft_start_may_precede": True,
+        "typed_actions_wait_for": ["dynamic_metadata"],
+        "failure_policy": "do_not_apply_dynamic_fields_then_backfill_metadata",
     }
     assert schema["composer"]["action_shapes"]["add_import_row"] == {
         "fixed_fields": {
@@ -454,8 +457,11 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         "dynamic_metadata"
     ] == {
         "fields": ["properties", "references"],
-        "complete_before": "draft-start",
+        "complete_before": (
+            "first-draft-apply-using-properties-or-references"
+        ),
         "schema_and_metadata_may_swap": True,
+        "draft_start_may_precede": True,
     }
     assert schema["composer"]["planning_discipline"]["import_operation"] == {
         "source": "registry_fragments.request_options.import_operation",

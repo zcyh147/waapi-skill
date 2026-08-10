@@ -42,6 +42,7 @@ from tests.semantic.support.codex_gateway_broker import (
     DraftActionMetadataBinding,
     ExpectedGatewayStep,
     MetadataQueryArgument,
+    gateway_step_prefix_matches,
     gateway_step_sequence_matches,
     project_required_metadata_tokens,
 )
@@ -71,7 +72,10 @@ IMPORT_API = "ak.wwise.core.audio.import"
 METADATA_QUERIES = ("volume", "output bus")
 METADATA_TOKENS = ("Volume", "OutputBus")
 RIFLE_COMMUTATIVE_READ_ONLY_STEP_GROUPS = (
-    ("metadata.discover", "tx01.operation-schema"),
+    ("tx01.operation-schema", "metadata.discover"),
+)
+RIFLE_COMMUTATIVE_COMPOSER_SETUP_STEP_GROUPS = (
+    ("metadata.discover", "tx01.draft-start"),
 )
 
 _GUID_RE = re.compile(
@@ -518,7 +522,11 @@ def prepare_rifle_integration_runtime(
                 expected_projection=projection,
             ),
         )
-        steps = (metadata_step, *composer_steps)
+        steps = (
+            composer_steps[0],
+            metadata_step,
+            *composer_steps[1:],
+        )
         protocol = V3GatewayProtocol(
             steps=steps,
             turn_prefix_counts=(
@@ -531,6 +539,9 @@ def prepare_rifle_integration_runtime(
             ),
             commutative_read_only_step_groups=(
                 RIFLE_COMMUTATIVE_READ_ONLY_STEP_GROUPS
+            ),
+            commutative_composer_setup_step_groups=(
+                RIFLE_COMMUTATIVE_COMPOSER_SETUP_STEP_GROUPS
             ),
         )
         session.bind_protocol(protocol)
@@ -818,6 +829,8 @@ class _RifleSession:
             != "tx01.preview"
             or protocol.commutative_read_only_step_groups
             != RIFLE_COMMUTATIVE_READ_ONLY_STEP_GROUPS
+            or protocol.commutative_composer_setup_step_groups
+            != RIFLE_COMMUTATIVE_COMPOSER_SETUP_STEP_GROUPS
         ):
             raise RifleIntegrationRuntimeError(
                 "Rifle protocol is not one metadata-bound transaction"
@@ -877,17 +890,13 @@ class _RifleSession:
                 "Rifle observer received an invalid step or payload"
             )
         expected_names = tuple(row.name for row in protocol.steps)
-        position = len(self.observed_steps)
-        read_only_names = protocol.commutative_read_only_step_groups[0]
-        in_read_only_pair = position in {0, 1}
-        expected_at_position = (
-            step.name in read_only_names
-            and step.name not in self.observed_steps
-            if in_read_only_pair
-            else position < len(expected_names)
-            and step.name == expected_names[position]
-        )
-        if position >= len(expected_names) or not expected_at_position:
+        candidate = (*self.observed_steps, step.name)
+        if not gateway_step_prefix_matches(
+            expected_names,
+            candidate,
+            protocol.commutative_read_only_step_groups,
+            protocol.commutative_composer_setup_step_groups,
+        ):
             raise RifleIntegrationRuntimeError(
                 "Rifle gateway steps were duplicated or observed out of order"
             )
@@ -1678,6 +1687,11 @@ class _RifleSession:
                 tuple(self.observed_steps),
                 (
                     self.protocol.commutative_read_only_step_groups
+                    if self.protocol is not None
+                    else ()
+                ),
+                (
+                    self.protocol.commutative_composer_setup_step_groups
                     if self.protocol is not None
                     else ()
                 ),
@@ -2542,6 +2556,7 @@ __all__ = [
     "METADATA_QUERIES",
     "METADATA_TOKENS",
     "RIFLE_CANONICAL_STATE_FIELDS",
+    "RIFLE_COMMUTATIVE_COMPOSER_SETUP_STEP_GROUPS",
     "RIFLE_COMMUTATIVE_READ_ONLY_STEP_GROUPS",
     "RIFLE_FIXTURE_ADAPTER",
     "RIFLE_WORKFLOW_ID",

@@ -519,6 +519,7 @@ class _FakeBrokerEvidence:
         self.expected_step_names = expected_names
         self.consumed_step_names = expected_names[:consumed_count]
         self.commutative_read_only_step_groups = ()
+        self.commutative_composer_setup_step_groups = ()
         self.records = tuple(
             SimpleNamespace(
                 sequence=index,

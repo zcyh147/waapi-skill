@@ -3663,6 +3663,16 @@ def _validate_heavy_v3_retryable_partial_broker(
     ]
     if expected_groups:
         top_keys.add("commutative_read_only_step_groups")
+    expected_setup_groups = [
+        list(group)
+        for group in getattr(
+            protocol,
+            "commutative_composer_setup_step_groups",
+            (),
+        )
+    ]
+    if expected_setup_groups:
+        top_keys.add("commutative_composer_setup_step_groups")
     if not isinstance(value, Mapping) or set(value) != top_keys:
         raise CampaignEvidenceError(
             "retryable heavy partial broker evidence has an invalid shape"
@@ -3689,9 +3699,12 @@ def _validate_heavy_v3_retryable_partial_broker(
             expected_names[:previous_prefix],
             consumed_names,
             expected_groups,
+            expected_setup_groups,
         )
         or value.get("commutative_read_only_step_groups", [])
         != expected_groups
+        or value.get("commutative_composer_setup_step_groups", [])
+        != expected_setup_groups
         or not isinstance(records, list)
         or len(records) != previous_prefix
         or len(command_records) != previous_prefix
@@ -4761,6 +4774,16 @@ def _validate_heavy_v3_broker_result(
     ]
     if expected_groups:
         top_keys.add("commutative_read_only_step_groups")
+    expected_setup_groups = [
+        list(group)
+        for group in getattr(
+            protocol,
+            "commutative_composer_setup_step_groups",
+            (),
+        )
+    ]
+    if expected_setup_groups:
+        top_keys.add("commutative_composer_setup_step_groups")
     if not isinstance(value, Mapping) or set(value) != top_keys:
         raise CampaignEvidenceError("passing heavy task broker evidence is malformed")
     expected_names = [step.name for step in protocol.steps]
@@ -4788,9 +4811,12 @@ def _validate_heavy_v3_broker_result(
             expected_names[:consumed_count],
             consumed_names,
             expected_groups,
+            expected_setup_groups,
         )
         or value.get("commutative_read_only_step_groups", [])
         != expected_groups
+        or value.get("commutative_composer_setup_step_groups", [])
+        != expected_setup_groups
         or len(expected_names) != len(set(expected_names))
         or not isinstance(records, list)
         or len(records) != consumed_count
