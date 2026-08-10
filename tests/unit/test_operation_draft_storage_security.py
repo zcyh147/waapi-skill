@@ -9,7 +9,7 @@ import stat
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import pytest  # pyright: ignore[reportMissingImports]
 
@@ -52,6 +52,16 @@ class _StatWithChangedCtime:
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._metadata, name)
+
+
+def _attempt_open_path_substitution(action: Callable[[], None]) -> bool:
+    try:
+        action()
+    except PermissionError:
+        if os.name != "nt":
+            raise
+        return False
+    return True
 
 
 def _race_cancel(
@@ -845,13 +855,19 @@ def test_lock_acquisition_rechecks_directory_identity_before_store_work(
     store = OperationDraftStore(tmp_path / "state")
     original = tmp_path / "original-locks"
     replacement_bytes: dict[str, bytes] = {}
+    substituted = False
 
     class SwapAfterAcquireBackend:
         @staticmethod
         def acquire(_handle: Any) -> None:
-            store.locks_dir.rename(original)
-            shutil.copytree(original, store.locks_dir)
-            replacement_bytes.update(_tree_regular_bytes(store.locks_dir))
+            nonlocal substituted
+
+            def substitute() -> None:
+                store.locks_dir.rename(original)
+                shutil.copytree(original, store.locks_dir)
+                replacement_bytes.update(_tree_regular_bytes(store.locks_dir))
+
+            substituted = _attempt_open_path_substitution(substitute)
 
         @staticmethod
         def release(_handle: Any) -> None:
@@ -863,15 +879,25 @@ def test_lock_acquisition_rechecks_directory_identity_before_store_work(
         lambda _platform_name: SwapAfterAcquireBackend(),
     )
 
-    with pytest.raises(OperationDraftStorageCorruption, match="directory|identity"):
-        store.start(
+    if os.name == "nt":
+        started = store.start(
             operation="object.set",
             version="2022.1",
             schema_digest="e" * 64,
         )
+        assert started.record.revision == 1
+        assert substituted is False
+        assert len(list(store.records_dir.iterdir())) == 1
+    else:
+        with pytest.raises(OperationDraftStorageCorruption, match="directory|identity"):
+            store.start(
+                operation="object.set",
+                version="2022.1",
+                schema_digest="e" * 64,
+            )
 
-    assert list(store.records_dir.iterdir()) == []
-    assert _tree_regular_bytes(store.locks_dir) == replacement_bytes
+        assert list(store.records_dir.iterdir()) == []
+        assert _tree_regular_bytes(store.locks_dir) == replacement_bytes
 
 
 def test_lock_path_identity_is_rechecked_after_acquisition(
@@ -881,13 +907,19 @@ def test_lock_path_identity_is_rechecked_after_acquisition(
     store = OperationDraftStore(tmp_path / "state")
     lock_path = store.locks_dir / "store-admission.lock"
     original_lock = tmp_path / "original-admission.lock"
+    substituted = False
 
     class SwapLockFileAfterAcquireBackend:
         @staticmethod
         def acquire(_handle: Any) -> None:
-            lock_path.rename(original_lock)
-            lock_path.write_bytes(b"")
-            lock_path.chmod(0o600)
+            nonlocal substituted
+
+            def substitute() -> None:
+                lock_path.rename(original_lock)
+                lock_path.write_bytes(b"")
+                lock_path.chmod(0o600)
+
+            substituted = _attempt_open_path_substitution(substitute)
 
         @staticmethod
         def release(_handle: Any) -> None:
@@ -899,16 +931,27 @@ def test_lock_path_identity_is_rechecked_after_acquisition(
         lambda _platform_name: SwapLockFileAfterAcquireBackend(),
     )
 
-    with pytest.raises(OperationDraftStorageCorruption, match="path changed|identity"):
-        store.start(
+    if os.name == "nt":
+        started = store.start(
             operation="object.set",
             version="2022.1",
             schema_digest="e" * 64,
         )
+        assert started.record.revision == 1
+        assert substituted is False
+        assert lock_path.read_bytes() == b""
+        assert not original_lock.exists()
+    else:
+        with pytest.raises(OperationDraftStorageCorruption, match="path changed|identity"):
+            store.start(
+                operation="object.set",
+                version="2022.1",
+                schema_digest="e" * 64,
+            )
 
-    assert list(store.records_dir.iterdir()) == []
-    assert lock_path.read_bytes() == b""
-    assert original_lock.read_bytes() == b""
+        assert list(store.records_dir.iterdir()) == []
+        assert lock_path.read_bytes() == b""
+        assert original_lock.read_bytes() == b""
 
 
 def test_record_read_rechecks_directory_identity_before_first_byte(
@@ -924,7 +967,9 @@ def test_record_read_rechecks_directory_identity_before_first_byte(
     original = tmp_path / "original-records"
     replacement_bytes: dict[str, bytes] = {}
     real_require_opened = draft_module._require_opened_private_regular_file
+    real_read = draft_module.os.read
     switched = False
+    substituted = False
 
     def swap_after_record_open(
         path: Path,
@@ -932,7 +977,7 @@ def test_record_read_rechecks_directory_identity_before_first_byte(
         descriptor: int,
         label: str,
     ) -> os.stat_result:
-        nonlocal switched
+        nonlocal substituted, switched
         metadata = real_require_opened(
             path,
             descriptor=descriptor,
@@ -940,9 +985,13 @@ def test_record_read_rechecks_directory_identity_before_first_byte(
         )
         if not switched and label == "Operation Draft record":
             switched = True
-            store.records_dir.rename(original)
-            shutil.copytree(original, store.records_dir)
-            replacement_bytes.update(_tree_regular_bytes(store.records_dir))
+
+            def substitute() -> None:
+                store.records_dir.rename(original)
+                shutil.copytree(original, store.records_dir)
+                replacement_bytes.update(_tree_regular_bytes(store.records_dir))
+
+            substituted = _attempt_open_path_substitution(substitute)
         return metadata
 
     monkeypatch.setattr(
@@ -950,21 +999,29 @@ def test_record_read_rechecks_directory_identity_before_first_byte(
         "_require_opened_private_regular_file",
         swap_after_record_open,
     )
-    monkeypatch.setattr(
-        draft_module.os,
-        "read",
-        lambda _descriptor, _maximum: pytest.fail(
-            "record bytes were read after directory substitution"
-        ),
-    )
+    def guarded_read(descriptor: int, maximum: int) -> bytes:
+        if substituted:
+            pytest.fail("record bytes were read after directory substitution")
+        return real_read(descriptor, maximum)
 
-    with pytest.raises(OperationDraftStorageCorruption, match="directory|identity"):
-        store.inspect(
+    monkeypatch.setattr(draft_module.os, "read", guarded_read)
+
+    if os.name == "nt":
+        inspected = store.inspect(
             started.draft_id,
             task_authority=started.task_authority,
         )
+        assert inspected == started.record
+        assert switched is True
+        assert substituted is False
+    else:
+        with pytest.raises(OperationDraftStorageCorruption, match="directory|identity"):
+            store.inspect(
+                started.draft_id,
+                task_authority=started.task_authority,
+            )
 
-    assert _tree_regular_bytes(store.records_dir) == replacement_bytes
+        assert _tree_regular_bytes(store.records_dir) == replacement_bytes
 
 
 def test_record_write_rechecks_directory_identity_before_first_byte(
@@ -976,6 +1033,7 @@ def test_record_write_rechecks_directory_identity_before_first_byte(
     replacement_bytes: dict[str, bytes] = {}
     real_require_opened = draft_module._require_opened_private_regular_file
     switched = False
+    substituted = False
 
     def swap_after_record_open(
         path: Path,
@@ -983,7 +1041,7 @@ def test_record_write_rechecks_directory_identity_before_first_byte(
         descriptor: int,
         label: str,
     ) -> os.stat_result:
-        nonlocal switched
+        nonlocal substituted, switched
         metadata = real_require_opened(
             path,
             descriptor=descriptor,
@@ -991,9 +1049,13 @@ def test_record_write_rechecks_directory_identity_before_first_byte(
         )
         if not switched and label == "Operation Draft record":
             switched = True
-            store.records_dir.rename(original)
-            shutil.copytree(original, store.records_dir)
-            replacement_bytes.update(_tree_regular_bytes(store.records_dir))
+
+            def substitute() -> None:
+                store.records_dir.rename(original)
+                shutil.copytree(original, store.records_dir)
+                replacement_bytes.update(_tree_regular_bytes(store.records_dir))
+
+            substituted = _attempt_open_path_substitution(substitute)
         return metadata
 
     monkeypatch.setattr(
@@ -1002,15 +1064,25 @@ def test_record_write_rechecks_directory_identity_before_first_byte(
         swap_after_record_open,
     )
 
-    with pytest.raises(OperationDraftStorageCorruption, match="directory|identity"):
-        store.start(
+    if os.name == "nt":
+        started = store.start(
             operation="object.set",
             version="2022.1",
             schema_digest="e" * 64,
         )
+        assert started.record.revision == 1
+        assert switched is True
+        assert substituted is False
+    else:
+        with pytest.raises(OperationDraftStorageCorruption, match="directory|identity"):
+            store.start(
+                operation="object.set",
+                version="2022.1",
+                schema_digest="e" * 64,
+            )
 
-    assert _tree_regular_bytes(store.records_dir) == replacement_bytes
-    assert set(replacement_bytes.values()) == {b""}
+        assert _tree_regular_bytes(store.records_dir) == replacement_bytes
+        assert set(replacement_bytes.values()) == {b""}
 
 
 def test_write_error_after_directory_swap_does_not_cleanup_the_substitute_tree(
@@ -1020,23 +1092,33 @@ def test_write_error_after_directory_swap_does_not_cleanup_the_substitute_tree(
     store = OperationDraftStore(tmp_path / "state")
     original = tmp_path / "original-records"
     replacement_bytes: dict[str, bytes] = {}
+    substituted = False
 
     def swap_then_fail_fsync(_descriptor: int) -> None:
-        store.records_dir.rename(original)
-        shutil.copytree(original, store.records_dir)
-        replacement_bytes.update(_tree_regular_bytes(store.records_dir))
+        nonlocal substituted
+
+        def substitute() -> None:
+            store.records_dir.rename(original)
+            shutil.copytree(original, store.records_dir)
+            replacement_bytes.update(_tree_regular_bytes(store.records_dir))
+
+        substituted = _attempt_open_path_substitution(substitute)
         raise OSError("synthetic fsync failure after directory substitution")
 
     monkeypatch.setattr(draft_module.os, "fsync", swap_then_fail_fsync)
 
-    with pytest.raises(OperationDraftStorageCorruption, match="directory|identity"):
+    with pytest.raises(OperationDraftStorageCorruption):
         store.start(
             operation="object.set",
             version="2022.1",
             schema_digest="e" * 64,
         )
 
-    assert _tree_regular_bytes(store.records_dir) == replacement_bytes
+    if os.name == "nt":
+        assert substituted is False
+        assert list(store.records_dir.iterdir()) == []
+    else:
+        assert _tree_regular_bytes(store.records_dir) == replacement_bytes
 
 
 def test_initial_publish_rechecks_record_path_after_file_fsync(
@@ -1047,30 +1129,46 @@ def test_initial_publish_rechecks_record_path_after_file_fsync(
     original_record = tmp_path / "original-initial-record.json"
     substitute_bytes = b"SUBSTITUTE-INITIAL-RECORD"
     swapped = False
+    substituted = False
 
     def swap_record_during_fsync(_descriptor: int) -> None:
-        nonlocal swapped
+        nonlocal substituted, swapped
         if not swapped:
             swapped = True
             record_path = next(store.records_dir.glob("*.json"))
-            record_path.rename(original_record)
-            record_path.write_bytes(substitute_bytes)
-            record_path.chmod(0o600)
+
+            def substitute() -> None:
+                record_path.rename(original_record)
+                record_path.write_bytes(substitute_bytes)
+                record_path.chmod(0o600)
+
+            substituted = _attempt_open_path_substitution(substitute)
 
     monkeypatch.setattr(draft_module.os, "fsync", swap_record_during_fsync)
 
-    with pytest.raises(
-        OperationDraftStorageCorruption,
-        match="path changed|identity changed",
-    ):
-        store.start(
+    if os.name == "nt":
+        started = store.start(
             operation="object.set",
             version="2022.1",
             schema_digest="e" * 64,
         )
+        assert started.record.revision == 1
+        assert swapped is True
+        assert substituted is False
+        assert not original_record.exists()
+    else:
+        with pytest.raises(
+            OperationDraftStorageCorruption,
+            match="path changed|identity changed",
+        ):
+            store.start(
+                operation="object.set",
+                version="2022.1",
+                schema_digest="e" * 64,
+            )
 
-    assert original_record.is_file()
-    assert next(store.records_dir.glob("*.json")).read_bytes() == substitute_bytes
+        assert original_record.is_file()
+        assert next(store.records_dir.glob("*.json")).read_bytes() == substitute_bytes
 
 
 def test_atomic_replace_rechecks_temporary_file_identity_before_publish(

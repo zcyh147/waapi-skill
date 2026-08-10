@@ -300,11 +300,11 @@ def live_info() -> dict[str, Any]:
     }
 
 
-def project_row() -> dict[str, Any]:
+def project_row(tmp_path: Path) -> dict[str, Any]:
     return {
         "id": PROJECT_ID,
         "name": "SampleProject",
-        "path": "/project/SampleProject.wproj",
+        "path": str((tmp_path / "project" / "SampleProject.wproj").resolve()),
     }
 
 
@@ -322,11 +322,11 @@ def target_row(*, volume: float | None = None) -> dict[str, Any]:
     return row
 
 
-def check_client() -> FakeClient:
+def check_client(tmp_path: Path) -> FakeClient:
     return FakeClient(
         {
             "ak.wwise.core.getInfo": [live_info()],
-            "ak.wwise.core.getProjectInfo": [project_row()],
+            "ak.wwise.core.getProjectInfo": [project_row(tmp_path)],
             "ak.wwise.core.object.getTypes": [
                 {"return": [{"classId": 1, "name": "Sound", "type": "Sound"}]}
             ],
@@ -1026,7 +1026,7 @@ def test_live_check_is_bounded_durable_and_any_edit_invalidates_it(
     tmp_path: Path,
 ) -> None:
     draft_id, authority, handle = complete_draft(tmp_path)
-    client = check_client()
+    client = check_client(tmp_path)
 
     check_code, checked = waapi_gateway.execute_gateway(
         [
@@ -1153,7 +1153,7 @@ def test_live_check_reports_all_invalid_target_rows_without_writing(
     client = FakeClient(
         {
             "ak.wwise.core.getInfo": [live_info()],
-            "ak.wwise.core.getProjectInfo": [project_row()],
+            "ak.wwise.core.getProjectInfo": [project_row(tmp_path)],
             "ak.wwise.core.object.getTypes": [
                 {"return": [{"classId": 1, "name": "Sound", "type": "Sound"}]}
             ],
