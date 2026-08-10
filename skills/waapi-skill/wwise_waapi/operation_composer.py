@@ -139,6 +139,16 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
         },
         "registry_fragments": fragments,
         "complete_request_is_never_an_action": True,
+        "completion_discipline": {
+            "successful_action_response_is_complete": True,
+            "compact_projection_is_not_truncation": True,
+            "schema_required_fields_status_scope": (
+                "structural_preview_readiness_only"
+            ),
+            "user_intent_coverage": (
+                "agent_must_compare_all_planned_actions_before_check"
+            ),
+        },
     }
 
 

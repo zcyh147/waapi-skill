@@ -279,6 +279,16 @@ def test_normal_object_set_schema_and_detail_expose_only_composer_input(
         ],
         "precompute_or_increment_revision": False,
     }
+    assert schema["composer"]["completion_discipline"] == {
+        "successful_action_response_is_complete": True,
+        "compact_projection_is_not_truncation": True,
+        "schema_required_fields_status_scope": (
+            "structural_preview_readiness_only"
+        ),
+        "user_intent_coverage": (
+            "agent_must_compare_all_planned_actions_before_check"
+        ),
+    }
     assert schema["composer"]["check"]["gateway_argv"] == [
         "draft-check",
         "<draft_id>",

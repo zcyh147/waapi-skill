@@ -4862,6 +4862,45 @@ def _codex_command_exit_status_aligns(
     return command_record.get("status") == expected_status
 
 
+def _archived_draft_action(
+    gateway_arguments: Sequence[str],
+    *,
+    label: str,
+) -> Mapping[str, Any]:
+    """Recover the exact submitted Draft action for deterministic replay."""
+
+    indexes = [
+        index
+        for index, value in enumerate(gateway_arguments)
+        if value == "--action-json"
+    ]
+    if len(indexes) != 1 or indexes[0] + 1 >= len(gateway_arguments):
+        raise CampaignEvidenceError(
+            f"{label} Draft action argv does not contain one action JSON value"
+        )
+
+    def reject_duplicate_keys(pairs: Sequence[tuple[str, Any]]) -> dict[str, Any]:
+        decoded: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in decoded:
+                raise ValueError(f"duplicate JSON key: {key}")
+            decoded[key] = value
+        return decoded
+
+    try:
+        decoded = json.loads(
+            gateway_arguments[indexes[0] + 1],
+            object_pairs_hook=reject_duplicate_keys,
+        )
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise CampaignEvidenceError(
+            f"{label} Draft action argv is not strict JSON"
+        ) from exc
+    if not isinstance(decoded, Mapping):
+        raise CampaignEvidenceError(f"{label} Draft action JSON is not an object")
+    return decoded
+
+
 def _validate_heavy_v3_broker_records(
     records: Sequence[Any],
     *,
@@ -4980,6 +5019,14 @@ def _validate_heavy_v3_broker_records(
             raise CampaignEvidenceError(
                 f"{label} broker argv cannot replay protocol step {step.name}: {exc}"
             ) from exc
+        submitted_draft_action = (
+            _archived_draft_action(
+                resolved.gateway_arguments,
+                label=f"{label} protocol step {step.name}",
+            )
+            if step.subcommand == "draft-apply"
+            else None
+        )
         payload = record["payload"]
         _validate_heavy_v3_gateway_payload(
             payload,
@@ -5130,6 +5177,10 @@ def _validate_heavy_v3_broker_records(
                     f"{label} Draft response cannot replay protocol step "
                     f"{step.name}: {exc}"
                 ) from exc
+        if submitted_draft_action is not None:
+            replay._submitted_draft_actions_by_step[step.name] = (  # noqa: SLF001
+                submitted_draft_action
+            )
         replay._payloads_by_step[step.name] = payload  # noqa: SLF001
 
 

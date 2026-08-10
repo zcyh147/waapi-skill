@@ -203,6 +203,38 @@ def test_consumed_composer_order_rebinds_each_revision_to_its_actual_predecessor
     )
 
 
+def test_archived_draft_action_preserves_submitted_json_spelling() -> None:
+    action = campaign._archived_draft_action(
+        (
+            "draft-apply",
+            "od1-draft",
+            "--action-json",
+            '{"contract":"waapi-skill.operation-draft-action/v1",'
+            '"action":"set_property","value":0}',
+        ),
+        label="synthetic action",
+    )
+
+    assert action["value"] == 0
+    assert type(action["value"]) is int
+
+
+def test_archived_draft_action_rejects_duplicate_json_keys() -> None:
+    with pytest.raises(
+        CampaignEvidenceError,
+        match="Draft action argv is not strict JSON",
+    ):
+        campaign._archived_draft_action(
+            (
+                "draft-apply",
+                "od1-draft",
+                "--action-json",
+                '{"action":"set_property","action":"remove_property"}',
+            ),
+            label="synthetic action",
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class _PrimaryDispatch:
     count: int = 1

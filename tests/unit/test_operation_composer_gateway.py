@@ -519,6 +519,14 @@ def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
         "canonical_sha256": summary["canonical_sha256"],
         "complete_projection_command": "draft-inspect",
     }
+    assert draft["schema_required_fields_status"] == "incomplete"
+    assert "missing_fields_status" not in draft
+    assert draft["response_integrity"] == {
+        "complete": True,
+        "truncated": False,
+        "projection": "action_delta_and_draft_receipt",
+        "user_intent_coverage": "not_evaluated",
+    }
     handle = draft["action_result"]["created_handles"][0]
     assert TARGET_HANDLE_RE.fullmatch(handle)
     assert draft["action_result"] == {
@@ -541,6 +549,11 @@ def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
         "--action-json",
         "<typed-action-json>",
     ]
+    assert set(draft["next_action_binding"]) == {
+        "contract",
+        "fixed_full_argv_template",
+        "replace_only",
+    }
 
     code, changed = execute(
         tmp_path,
@@ -615,9 +628,10 @@ def test_compact_weather_shaped_action_responses_remain_constant_size(
             "lifecycle_state",
             "revision",
             "binding",
-            "missing_fields_status",
+            "schema_required_fields_status",
             "current_facts_summary",
             "action_result",
+            "response_integrity",
             "next_action_binding",
         }
         handle = targeted["draft"]["action_result"]["created_handles"][0]
@@ -644,6 +658,12 @@ def test_compact_weather_shaped_action_responses_remain_constant_size(
             assert code == 0
             assert "session_context" not in changed
             assert "current_facts" not in changed["draft"]
+            assert changed["draft"]["response_integrity"]["complete"] is True
+            assert changed["draft"]["response_integrity"]["truncated"] is False
+            assert (
+                changed["draft"]["response_integrity"]["user_intent_coverage"]
+                == "not_evaluated"
+            )
             revision += 1
             response_sizes.append(len(json.dumps(changed).encode("utf-8")))
 

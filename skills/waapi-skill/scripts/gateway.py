@@ -10443,12 +10443,22 @@ def operation_draft_payload(
                     current_facts=current_facts,
                 )
             )
+            projection["schema_required_fields_status"] = projection.pop(
+                "missing_fields_status"
+            )
+            projection["response_integrity"] = {
+                "complete": True,
+                "truncated": False,
+                "projection": "action_delta_and_draft_receipt",
+                "user_intent_coverage": "not_evaluated",
+            }
             projection = {
                 key: projection[key]
                 for key in (
-                    "missing_fields_status",
+                    "schema_required_fields_status",
                     "current_facts_summary",
                     "action_result",
+                    "response_integrity",
                 )
             }
     else:
@@ -10486,12 +10496,17 @@ def operation_draft_payload(
     if record.state is OperationDraftState.EDITABLE:
         next_action_binding: dict[str, Any] = {
             "contract": "waapi-skill.operation-draft-next-action/v1",
-            "draft_id": record.draft_id,
-            "expected_revision": record.revision,
-            "one_action_only": True,
-            "then_read_next_response": True,
-            "precompute_or_increment_revision": False,
         }
+        if compact_action is None:
+            next_action_binding.update(
+                {
+                    "draft_id": record.draft_id,
+                    "expected_revision": record.revision,
+                    "one_action_only": True,
+                    "then_read_next_response": True,
+                    "precompute_or_increment_revision": False,
+                }
+            )
         next_action_binding.update(
             {
                 "fixed_full_argv_template": [
@@ -10512,9 +10527,10 @@ def operation_draft_payload(
                     "<task-authority-from-draft-start>",
                     "<typed-action-json>",
                 ],
-                "copy_all_other_values_exactly": True,
             }
         )
+        if compact_action is None:
+            next_action_binding["copy_all_other_values_exactly"] = True
         draft["next_action_binding"] = next_action_binding
     return {
         "contract": GATEWAY_RESULT_CONTRACT,
