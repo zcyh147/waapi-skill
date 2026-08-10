@@ -79,6 +79,72 @@ def _mapping(value: Any, *, label: str) -> Mapping[str, Any]:
     return value
 
 
+def _verification_projection_matches_journal(
+    projected: Any,
+    journal: Any,
+) -> bool:
+    """Bind the bounded stdout verification summary to full journal evidence."""
+
+    if projected == journal:
+        return True
+    if not isinstance(projected, Mapping) or not isinstance(journal, Mapping):
+        return False
+    expected_keys = {
+        "summary_contract",
+        "contract",
+        "operation",
+        "status",
+        "ok",
+        "verification_strength",
+        "business_state_verified",
+        "assertion_count",
+        "passed_assertion_count",
+        "failed_assertion_count",
+        "assertions_canonical_sha256",
+        "readback_count",
+        "readbacks_canonical_sha256",
+        "canonical_sha256",
+        "full_evidence_in_stdout",
+    }
+    if set(projected) != expected_keys:
+        return False
+    assertions = journal.get("assertions")
+    readbacks = journal.get("readbacks")
+    if not isinstance(assertions, list) or not isinstance(readbacks, list):
+        return False
+    if any(not isinstance(row, Mapping) for row in assertions):
+        return False
+    passed = sum(row.get("passed") is True for row in assertions)
+    expected = {
+        "summary_contract": "waapi-skill.transaction-verification-result-summary/v1",
+        "contract": journal.get("contract"),
+        "operation": journal.get("operation"),
+        "status": journal.get("status"),
+        "ok": journal.get("ok"),
+        "verification_strength": journal.get("verification_strength"),
+        "business_state_verified": journal.get("business_state_verified"),
+        "assertion_count": len(assertions),
+        "passed_assertion_count": passed,
+        "failed_assertion_count": len(assertions) - passed,
+        "assertions_canonical_sha256": canonical_sha256(assertions),
+        "readback_count": len(readbacks),
+        "readbacks_canonical_sha256": canonical_sha256(readbacks),
+        "canonical_sha256": canonical_sha256(journal),
+        "full_evidence_in_stdout": False,
+    }
+    if any(
+        type(projected[name]) is not int
+        for name in (
+            "assertion_count",
+            "passed_assertion_count",
+            "failed_assertion_count",
+            "readback_count",
+        )
+    ):
+        return False
+    return projected == expected
+
+
 def _record_payload(record: Mapping[str, Any], *, index: int) -> Mapping[str, Any]:
     if record.get("succeeded") is False:
         _fail(f"Composer Broker record {index} did not succeed")
@@ -597,8 +663,10 @@ def _validate_operation_draft_archive(
         final_transaction_payload = transaction_payloads[-1] if transaction_payloads else {}
         if (
             "verification" in final_transaction_payload
-            and final_event_details.get("verification")
-            != final_transaction_payload["verification"]
+            and not _verification_projection_matches_journal(
+                final_transaction_payload["verification"],
+                final_event_details.get("verification"),
+            )
         ):
             _fail("Composer verification result does not match the transaction journal")
         preview_binding = {

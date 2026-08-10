@@ -33,6 +33,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
 from tests.semantic.support.codex_gateway_broker import (
     ExpectedGatewayStep,
     SemanticJsonArgument,
+    gateway_step_prefix_matches,
     gateway_step_sequence_matches,
 )
 from tests.semantic.support.codex_integration_workflows_v2 import (
@@ -724,17 +725,12 @@ class _WeaponsSession:
                 "Weapons observer received an invalid step or payload"
             )
         expected_names = tuple(row.name for row in protocol.steps)
-        position = len(self.observed_steps)
-        output_bus_names = protocol.commutative_read_only_step_groups[0]
-        in_output_bus_pair = position in {1, 2}
-        expected_at_position = (
-            step.name in output_bus_names
-            and step.name not in self.observed_steps
-            if in_output_bus_pair
-            else position < len(expected_names)
-            and step.name == expected_names[position]
-        )
-        if position >= len(expected_names) or not expected_at_position:
+        observed_prefix = (*self.observed_steps, step.name)
+        if not gateway_step_prefix_matches(
+            expected_names,
+            observed_prefix,
+            protocol.commutative_read_only_step_groups,
+        ):
             raise WeaponsIntegrationRuntimeError(
                 "Weapons gateway steps were duplicated or observed out of order"
             )

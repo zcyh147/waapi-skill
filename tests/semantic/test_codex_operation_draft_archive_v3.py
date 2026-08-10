@@ -193,10 +193,22 @@ def _sealed_archive(
         expected_authorization=confirmed.state,
     )
     transaction_store.mark_executed_unverified(transaction_id)
+    full_verification = {
+        "contract": "waapi-skill.operation-verification/v1",
+        "operation": "object.set",
+        "status": "verified",
+        "ok": True,
+        "verification_strength": "operation_specific_readback",
+        "business_state_verified": True,
+        "assertions": [
+            {"name": "reviewed object readback", "passed": True}
+        ],
+        "readbacks": [{"uri": "ak.wwise.core.object.get"}],
+    }
     verified = transaction_store.record_verification(
         transaction_id,
         TransactionState.VERIFIED,
-        details={"verification": {"status": "verified"}},
+        details={"verification": full_verification},
     )
 
     start_step = ExpectedGatewayStep("draft.start", "draft-start", ("object.set",))
@@ -408,7 +420,7 @@ def _sealed_archive(
                 "transaction_id": transaction_id,
                 "state": verified.state.value,
                 "cleanup": cleanup,
-                "verification": {"status": "verified"},
+                "verification": full_verification,
                 "agent_result": {
                     **preview_agent_result,
                     "state": verified.state.value,
@@ -447,6 +459,65 @@ def test_composer_archive_reconstructs_actions_request_preview_and_cleanup(
     )
     assert evidence["preview_binding"]["transaction_final_state"] == "verified"
     assert evidence["cleanup_outcome"]["status"] == "not_required"
+
+
+def test_composer_archive_binds_bounded_verification_summary_to_full_journal(
+    tmp_path: Path,
+) -> None:
+    state_dir, steps, records = _sealed_archive(tmp_path)
+    summary_records = copy.deepcopy(records)
+    full = records[-1]["payload"]["verification"]
+    assertions = full["assertions"]
+    readbacks = full["readbacks"]
+    summary_records[-1]["payload"]["verification"] = {
+        "summary_contract": (
+            "waapi-skill.transaction-verification-result-summary/v1"
+        ),
+        "contract": full["contract"],
+        "operation": full["operation"],
+        "status": full["status"],
+        "ok": full["ok"],
+        "verification_strength": full["verification_strength"],
+        "business_state_verified": full["business_state_verified"],
+        "assertion_count": len(assertions),
+        "passed_assertion_count": sum(
+            row.get("passed") is True for row in assertions
+        ),
+        "failed_assertion_count": sum(
+            row.get("passed") is not True for row in assertions
+        ),
+        "assertions_canonical_sha256": canonical_sha256(assertions),
+        "readback_count": len(readbacks),
+        "readbacks_canonical_sha256": canonical_sha256(readbacks),
+        "canonical_sha256": canonical_sha256(full),
+        "full_evidence_in_stdout": False,
+    }
+
+    evidence = validate_operation_draft_archive(
+        state_directory=state_dir,
+        steps=steps,
+        broker_records=summary_records,
+    )
+
+    assert evidence is not None
+    assert evidence["preview_binding"]["transaction_final_state"] == "verified"
+
+    for field, value in (
+        ("canonical_sha256", "0" * 64),
+        ("readback_count", len(readbacks) + 1),
+        ("unexpected", True),
+    ):
+        tampered = copy.deepcopy(summary_records)
+        tampered[-1]["payload"]["verification"][field] = value
+        with pytest.raises(
+            ComposerArchiveError,
+            match="verification result does not match",
+        ):
+            validate_operation_draft_archive(
+                state_directory=state_dir,
+                steps=steps,
+                broker_records=tampered,
+            )
 
 
 def test_composer_archive_replays_compact_action_evidence(

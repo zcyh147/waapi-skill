@@ -675,10 +675,32 @@ def _observe(
     *,
     apply: bool = True,
     reverse_output_bus_pair: bool = False,
+    add_all_targets_before_fields: bool = False,
 ) -> None:
     steps = list(prepared.protocol.steps)
     if reverse_output_bus_pair:
         steps[1:3] = reversed(steps[1:3])
+    if add_all_targets_before_fields:
+        action_indexes = [
+            index
+            for index, step in enumerate(steps)
+            if step.subcommand == "draft-apply"
+        ]
+        action_steps = [steps[index] for index in action_indexes]
+        reordered = [
+            *(
+                step
+                for step in action_steps
+                if step.arguments[-1].expected.get("action") == "add_target"
+            ),
+            *(
+                step
+                for step in action_steps
+                if step.arguments[-1].expected.get("action") != "add_target"
+            ),
+        ]
+        for index, step in zip(action_indexes, reordered, strict=True):
+            steps[index] = step
     for step in steps:
         if step.name == "tx01.execute" and apply:
             fake.apply_set(prepared.operation_request)
@@ -1332,6 +1354,21 @@ def test_reversed_output_bus_hops_pass_final_business_oracle(
     prepared, fake, _runtime = _prepared(tmp_path, version=version)
 
     _observe(prepared, fake, reverse_output_bus_pair=True)
+    verification = prepared.verify_final()
+
+    verification.assert_passed()
+    assert verification.assertions["single_object_set_batch"] is True
+    prepared.cleanup().assert_passed()
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2025.1"])
+def test_dependency_valid_draft_action_order_passes_business_observer(
+    tmp_path: Path,
+    version: str,
+) -> None:
+    prepared, fake, _runtime = _prepared(tmp_path, version=version)
+
+    _observe(prepared, fake, add_all_targets_before_fields=True)
     verification = prepared.verify_final()
 
     verification.assert_passed()

@@ -1542,16 +1542,16 @@ def validate_operation_draft_protocol_steps(
         latest_revision_step = step.name
 
 
-def gateway_step_sequence_matches(
+def gateway_step_prefix_matches(
     expected: Sequence[str],
     actual: Sequence[str],
     groups: Sequence[Sequence[str]] = (),
 ) -> bool:
-    """Match declared pair swaps and exact numbered Draft-action permutations."""
+    """Match one dependency-valid observed prefix of the expected sequence."""
 
     expected_names = tuple(expected)
     actual_names = tuple(actual)
-    if len(expected_names) != len(actual_names):
+    if len(actual_names) > len(expected_names):
         return False
     group_by_first = {
         tuple(group)[0]: tuple(group)
@@ -1559,7 +1559,7 @@ def gateway_step_sequence_matches(
         if len(tuple(group)) == 2
     }
     index = 0
-    while index < len(expected_names):
+    while index < len(actual_names):
         numbered = _NUMBERED_DRAFT_ACTION_STEP_RE.fullmatch(
             expected_names[index]
         )
@@ -1576,14 +1576,13 @@ def gateway_step_sequence_matches(
             ):
                 end += 1
             expected_group = expected_names[index:end]
-            supplied_group = actual_names[index:end]
+            supplied_group = actual_names[index : min(end, len(actual_names))]
             if (
-                len(supplied_group) != len(expected_group)
-                or len(set(supplied_group)) != len(supplied_group)
-                or set(supplied_group) != set(expected_group)
+                len(set(supplied_group)) != len(supplied_group)
+                or not set(supplied_group) <= set(expected_group)
             ):
                 return False
-            index = end
+            index += len(supplied_group)
             continue
         group = group_by_first.get(expected_names[index])
         if (
@@ -1591,15 +1590,32 @@ def gateway_step_sequence_matches(
             and index + 1 < len(expected_names)
             and expected_names[index : index + 2] == group
         ):
-            supplied = actual_names[index : index + 2]
-            if supplied not in {group, tuple(reversed(group))}:
+            supplied = actual_names[index : min(index + 2, len(actual_names))]
+            if supplied not in {
+                group[: len(supplied)],
+                tuple(reversed(group))[: len(supplied)],
+            }:
                 return False
-            index += 2
+            index += len(supplied)
             continue
         if actual_names[index] != expected_names[index]:
             return False
         index += 1
     return True
+
+
+def gateway_step_sequence_matches(
+    expected: Sequence[str],
+    actual: Sequence[str],
+    groups: Sequence[Sequence[str]] = (),
+) -> bool:
+    """Match declared pair swaps and exact numbered Draft-action permutations."""
+
+    return len(tuple(expected)) == len(tuple(actual)) and gateway_step_prefix_matches(
+        expected,
+        actual,
+        groups,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -4871,6 +4887,7 @@ class CodexGatewayBroker:
         self._records: list[GatewayBrokerRecord] = []
         self._next_step = 0
         self._payloads_by_step: dict[str, Mapping[str, Any]] = {}
+        self._submitted_draft_actions_by_step: dict[str, Mapping[str, Any]] = {}
         self._terminal_state = _BROKER_READY
         self._started = False
         self._ever_started = False
@@ -5839,11 +5856,29 @@ class CodexGatewayBroker:
                     payload_error=str(exc),
                 )
 
+        submitted_draft_action: Mapping[str, Any] | None = None
+        if step.subcommand == "draft-apply":
+            action_index = resolved.gateway_arguments.index("--action-json") + 1
+            decoded_action = _decode_json_argument(
+                resolved.gateway_arguments[action_index],
+                reject_duplicate_keys=True,
+            )
+            if not isinstance(decoded_action, Mapping):
+                return self._reject(
+                    resolved.raw_model_argv,
+                    "validated typed Draft action did not decode to an object",
+                    authenticated=True,
+                )
+            submitted_draft_action = json.loads(
+                _canonical_json_bytes(decoded_action).decode("utf-8")
+            )
+
         return self._execute(
             step,
             resolved,
             semantic_hash,
             execution_arguments=execution_arguments,
+            submitted_draft_action=submitted_draft_action,
         )
 
     def _match_dependency_ready_draft_action(
@@ -6325,6 +6360,7 @@ class CodexGatewayBroker:
         semantic_hash: str,
         *,
         execution_arguments: Sequence[str],
+        submitted_draft_action: Mapping[str, Any] | None,
     ) -> dict[str, Any]:
         started_at_unix_ns = time.time_ns()
         started = started_at_unix_ns / 1_000_000_000
@@ -6549,6 +6585,10 @@ class CodexGatewayBroker:
             record = self._append_record_locked(record)
             if record.succeeded:
                 self._payloads_by_step[step.name] = payload
+                if submitted_draft_action is not None:
+                    self._submitted_draft_actions_by_step[step.name] = (
+                        submitted_draft_action
+                    )
                 self._next_step += 1
                 if terminal_indeterminate:
                     self._terminal_state = _BROKER_INDETERMINATE
@@ -6804,8 +6844,13 @@ class CodexGatewayBroker:
                     )
                 action[binding.pointer.removeprefix("/")] = bound
 
+            submitted_action = self._submitted_draft_actions_by_step.get(
+                action_step.name
+            )
             actual_action = json.loads(
-                _canonical_json_bytes(action).decode("utf-8")
+                _canonical_json_bytes(
+                    submitted_action if submitted_action is not None else action
+                ).decode("utf-8")
             )
             for binding in argument.query_identity_bindings:
                 source = self._payloads_by_step.get(binding.step)
@@ -6835,10 +6880,19 @@ class CodexGatewayBroker:
                         "Draft canonical replay query identity differs from the "
                         "reviewed path"
                     )
-                actual_action[binding.pointer.removeprefix("/")] = {
-                    "kind": "id",
-                    "value": identity["id"],
-                }
+                if submitted_action is None:
+                    actual_action[binding.pointer.removeprefix("/")] = {
+                        "kind": "id",
+                        "value": identity["id"],
+                    }
+                elif _json_pointer(actual_action, binding.pointer) not in (
+                    expected_target,
+                    {"kind": "id", "value": identity["id"]},
+                ):
+                    raise GatewayInvocationError(
+                        "Draft canonical replay submitted query identity differs "
+                        "from the exact Bus row"
+                    )
 
             response = self._payloads_by_step.get(action_step.name)
             response_draft = (
@@ -6943,7 +6997,8 @@ class CodexGatewayBroker:
                 )
             if not compact_matches:
                 raise GatewayInvocationError(
-                    "Draft action response does not match deterministic composition"
+                    "Draft action response for "
+                    f"{action_step.name!r} does not match deterministic composition"
                 )
         try:
             return materialize_operation_request(operation, version, composition)

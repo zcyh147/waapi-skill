@@ -48,11 +48,20 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
     TrustedSubscriptionAckSpec,
     WINDOWS_COMMAND_SHIM_NAMES,
     WINDOWS_SHIM_SCRIPT_NAME,
+    gateway_step_prefix_matches,
     gateway_step_sequence_matches,
     reconcile_gateway_command_prefix,
     reconcile_gateway_commands,
     project_required_metadata_tokens,
     resolve_gateway_invocation,
+)
+from .support.codex_eval_protocol_v3 import (  # pyright: ignore[reportMissingImports]
+    build_object_set_composer_transaction_steps,
+)
+from wwise_waapi.operation_composer import (
+    apply_composer_action,
+    composition_projection,
+    new_composition,
 )
 from wwise_waapi.transactions import confirmation_token_for
 from wwise_waapi.platform_commands import (
@@ -1489,6 +1498,133 @@ def test_numbered_draft_action_sequence_matches_any_exact_permutation() -> None:
             "tx01.draft-check",
         ),
     )
+    assert gateway_step_prefix_matches(
+        expected,
+        (
+            "tx01.draft-start",
+            "tx01.action.003",
+            "tx01.action.001",
+        ),
+    )
+    assert not gateway_step_prefix_matches(
+        expected,
+        (
+            "tx01.draft-start",
+            "tx01.action.003",
+            "tx01.draft-check",
+        ),
+    )
+
+
+def test_draft_replay_uses_the_validated_submitted_numeric_spelling(
+    tmp_path: Path,
+) -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.set",
+        "arguments": {
+            "objects": [
+                {
+                    "object": {
+                        "kind": "id",
+                        "value": "{11111111-1111-1111-1111-111111111111}",
+                    },
+                    "properties": [{"name": "Volume", "value": 0.0}],
+                }
+            ]
+        },
+    }
+    steps = build_object_set_composer_transaction_steps(request, label="tx01")
+    broker = CodexGatewayBroker(
+        skill_source=make_fake_skill(tmp_path),
+        expected_steps=steps,
+        expected_wwise_version="2022.1",
+    )
+    start = next(step for step in steps if step.subcommand == "draft-start")
+    actions = [step for step in steps if step.subcommand == "draft-apply"]
+    preview = next(
+        step for step in steps if step.subcommand == "preview-from-draft"
+    )
+    handle = "odh1-" + "3" * 24
+    broker._payloads_by_step[start.name] = {  # noqa: SLF001
+        "task_authority": "da1-" + "2" * 40,
+        "draft": {
+            "draft_id": "od1-" + "1" * 32,
+            "revision": 1,
+            "binding": {"operation": "object.set", "version": "2022.1"},
+        },
+    }
+    composition = new_composition("object.set", "2022.1")
+    submitted_actions = (
+        dict(actions[0].arguments[-1].expected),
+        {
+            **dict(actions[1].arguments[-1].expected),
+            "target_handle": handle,
+            # JSON 0 is semantically equal to the reviewed 0.0, but its
+            # deterministic composition digest is intentionally different.
+            "value": 0,
+        },
+    )
+    for revision, (step, action) in enumerate(
+        zip(actions, submitted_actions, strict=True),
+        start=2,
+    ):
+        created = [handle] if action["action"] == "add_target" else []
+
+        def handle_factory() -> str:
+            return created.pop(0)
+
+        composition, action_name = apply_composer_action(
+            "object.set",
+            "2022.1",
+            composition,
+            action,
+            handle_factory=handle_factory,
+        )
+        facts = composition_projection(
+            "object.set", "2022.1", composition
+        )["current_facts"]
+        broker._payloads_by_step[step.name] = {  # noqa: SLF001
+            "draft": {
+                "revision": revision,
+                "current_facts_summary": {
+                    "contract": (
+                        "waapi-skill.operation-draft-facts-summary/v1"
+                    ),
+                    "target_count": len(facts),
+                    "handle_count": len(
+                        broker_module._draft_projection_handles(facts)  # noqa: SLF001
+                    ),
+                    "canonical_sha256": broker_module._sha256_bytes(  # noqa: SLF001
+                        broker_module._canonical_json_bytes(facts)  # noqa: SLF001
+                    ),
+                    "complete_projection_command": "draft-inspect",
+                },
+                "action_result": {
+                    "contract": (
+                        "waapi-skill.operation-draft-action-result/v1"
+                    ),
+                    "action": action_name,
+                    "created_handles": (
+                        [handle] if action_name == "add_target" else []
+                    ),
+                    "affected_handles": (
+                        [handle] if action_name == "set_property" else []
+                    ),
+                },
+            }
+        }
+    broker._submitted_draft_actions_by_step = {  # noqa: SLF001
+        step.name: action
+        for step, action in zip(actions, submitted_actions, strict=True)
+    }
+
+    replayed = broker._replay_expected_operation_draft_request(  # noqa: SLF001
+        preview
+    )
+
+    assert replayed["arguments"]["objects"][0]["properties"][0]["value"] == 0.0
 
 
 def test_broker_rejects_stale_draft_revision_before_runner_dispatch(
