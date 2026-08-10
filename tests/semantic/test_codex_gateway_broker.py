@@ -1619,13 +1619,11 @@ def test_draft_replay_uses_the_validated_submitted_numeric_spelling(
     }
     composition = new_composition("object.set", "2022.1")
     submitted_actions = (
-        dict(actions[0].arguments[-1].expected),
         {
-            **dict(actions[1].arguments[-1].expected),
-            "target_handle": handle,
+            **dict(actions[0].arguments[-1].expected),
             # JSON 0 is semantically equal to the reviewed 0.0, but its
             # deterministic composition digest is intentionally different.
-            "value": 0,
+            "properties": [{"name": "Volume", "value": 0}],
         },
     )
     for revision, (step, action) in enumerate(

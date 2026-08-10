@@ -564,12 +564,22 @@ def _typed_action_broker(
     action: str,
     occurrence: int = 0,
 ) -> tuple[CodexGatewayBroker, Any, dict[str, Any]]:
+    def matches_requested_action(step: Any) -> bool:
+        if step.subcommand != "draft-apply" or not isinstance(
+            step.arguments[-1], DraftActionJsonArgument
+        ):
+            return False
+        expected = step.arguments[-1].expected
+        if action == "set_property":
+            return bool(expected.get("properties"))
+        if action == "set_reference":
+            return bool(expected.get("references"))
+        return expected.get("action") == action
+
     matches = [
         step
         for step in prepared.protocol.steps
-        if step.subcommand == "draft-apply"
-        and isinstance(step.arguments[-1], DraftActionJsonArgument)
-        and step.arguments[-1].expected.get("action") == action
+        if matches_requested_action(step)
     ]
     step = matches[occurrence]
     argument = step.arguments[-1]
@@ -647,7 +657,7 @@ def _typed_action_broker(
                     "id": source_step.arguments[1],
                     "name": "Weapons_Bus",
                     "type": "Bus",
-                    "path": supplied_action["target"]["value"],
+                    "path": supplied_action["references"][0]["target"]["value"],
                 }
             ],
         }
@@ -655,7 +665,9 @@ def _typed_action_broker(
 
 
 def _typed_action_argv(step: Any, action: Mapping[str, Any]) -> tuple[str, ...]:
-    revision = "99"
+    revision_binding = step.arguments[4]
+    assert isinstance(revision_binding, ResponseBinding)
+    revision = "1" if revision_binding.step.endswith(".draft-start") else "99"
     return (
         step.subcommand,
         "od1-" + "2" * 32,
@@ -667,6 +679,17 @@ def _typed_action_argv(step: Any, action: Mapping[str, Any]) -> tuple[str, ...]:
         "--action-json",
         json.dumps(action, separators=(",", ":")),
     )
+
+
+def _set_action_pointer(action: dict[str, Any], pointer: str, value: Any) -> None:
+    parts = pointer.removeprefix("/").split("/")
+    current: Any = action
+    for part in parts[:-1]:
+        current = current[int(part)] if isinstance(current, list) else current[part]
+    if isinstance(current, list):
+        current[int(parts[-1])] = value
+    else:
+        current[parts[-1]] = value
 
 
 def _observe(
@@ -739,7 +762,7 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
         "tx01.operation-schema",
         "tx01.draft-start",
     )
-    assert prepared.protocol.turn_prefix_counts == (3, 19, 23)
+    assert prepared.protocol.turn_prefix_counts == (3, 13, 17)
     assert prepared.protocol.commutative_read_only_step_groups == (
         (
             "relationship.output_bus.01",
@@ -764,7 +787,7 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
         match="pre-Draft query-object response",
     ):
         deserialize_protocol(tampered)
-    composer_steps = prepared.protocol.steps[7:19]
+    composer_steps = prepared.protocol.steps[7:13]
     assert composer_steps[0].subcommand == "draft-start"
     assert [step.subcommand for step in composer_steps[-2:]] == [
         "draft-check",
@@ -773,7 +796,7 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
     action_steps = [
         step for step in composer_steps if step.subcommand == "draft-apply"
     ]
-    assert len(action_steps) == 9
+    assert len(action_steps) == 3
     assert all(
         isinstance(step.arguments[-1], DraftActionJsonArgument)
         for step in action_steps
@@ -781,14 +804,14 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
     reference_actions = [
         step.arguments[-1]
         for step in action_steps
-        if step.arguments[-1].expected["action"] == "set_reference"
+        if step.arguments[-1].expected.get("references")
     ]
     assert len(reference_actions) == 2
     assert all(
         argument.query_identity_bindings
         == (
             DraftActionQueryIdentityBinding(
-                pointer="/target",
+                pointer="/references/0/target",
                 step="relationship.output_bus.02",
             ),
         )
@@ -896,11 +919,10 @@ def test_weapons_fast_path_keeps_canonical_volume_and_rejects_query_accessor(
         action="set_property",
     )
 
-    assert action["name"] == "Volume"
-    assert action["value"] == -3.0
+    assert action["properties"] == [{"name": "Volume", "value": -3.0}]
     broker._validate_step(step, _typed_action_argv(step, action))  # noqa: SLF001
 
-    action["name"] = "@Volume"
+    action["properties"][0]["name"] = "@Volume"
     with pytest.raises(GatewayInvocationError, match="typed Draft action"):
         broker._validate_step(  # noqa: SLF001
             step,
@@ -915,11 +937,11 @@ def test_composer_repeats_the_exact_reviewed_output_bus_path(
 ) -> None:
     prepared, _fake, _runtime = _prepared(tmp_path, version=version)
     references = [
-        step.arguments[-1].expected
+        step.arguments[-1].expected["references"][0]
         for step in prepared.protocol.steps
         if step.subcommand == "draft-apply"
         and isinstance(step.arguments[-1], DraftActionJsonArgument)
-        and step.arguments[-1].expected.get("action") == "set_reference"
+        and step.arguments[-1].expected.get("references")
     ]
 
     assert len(references) == 2
@@ -947,7 +969,11 @@ def test_composer_repeats_the_exact_reviewed_output_bus_path(
             for candidate in prepared.protocol.steps
             if candidate.name == binding.step
         )
-        action["target"] = {"kind": "id", "value": source_step.arguments[1]}
+        _set_action_pointer(
+            action,
+            binding.pointer,
+            {"kind": "id", "value": source_step.arguments[1]},
+        )
         broker._validate_step(step, _typed_action_argv(step, action))  # noqa: SLF001
 
 
@@ -1017,10 +1043,14 @@ def test_compact_draft_replay_accepts_only_the_exact_queried_bus_guid(
             source_step = next(
                 step for step in prepared.protocol.steps if step.name == binding.step
             )
-            actual_action["target"] = {
-                "kind": "id",
-                "value": str(source_step.arguments[1]),
-            }
+            _set_action_pointer(
+                actual_action,
+                binding.pointer,
+                {
+                    "kind": "id",
+                    "value": str(source_step.arguments[1]),
+                },
+            )
 
         created_handle: str | None = None
         if actual_action["action"] == "add_target":
@@ -1137,12 +1167,14 @@ def test_composer_rejects_wrong_output_bus_guid_or_path(
         action="set_reference",
         occurrence=reference_index,
     )
-    target = action["target"]
+    binding = step.arguments[-1].query_identity_bindings[0]
+    target = action["references"][0]["target"]
     if wrong_identity == "guid":
-        action["target"] = {
-            "kind": "id",
-            "value": _guid("wrong-output-bus"),
-        }
+        _set_action_pointer(
+            action,
+            binding.pointer,
+            {"kind": "id", "value": _guid("wrong-output-bus")},
+        )
     else:
         target["value"] += "_Wrong"
 

@@ -510,7 +510,7 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         for step in protocol.steps
         if step.name.startswith("tx02.action.")
     ]
-    assert len(action_steps) == 15
+    assert len(action_steps) == 5
     assert all(step.subcommand == "draft-apply" for step in action_steps)
     assert all(
         isinstance(step.arguments[-1], DraftActionJsonArgument)
@@ -527,21 +527,34 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
             },
             "type": "Action",
         },
+        "properties": [
+            {"name": "FadeTime", "value": targets[0].fade_time},
+            {"name": "Delay", "value": targets[0].delay},
+        ],
     }
     add_targets = [
         step.arguments[-1].expected
         for step in action_steps
         if step.arguments[-1].expected["action"] == "add_target"
     ]
-    assert [row["selector"] for row in add_targets] == [
-        {
-            "kind": "direct-child",
-            "parent": {
-                "kind": "path",
-                "value": target.event_path,
+    assert [
+        (row["selector"], row["properties"])
+        for row in add_targets
+    ] == [
+        (
+            {
+                "kind": "direct-child",
+                "parent": {
+                    "kind": "path",
+                    "value": target.event_path,
+                },
+                "type": "Action",
             },
-            "type": "Action",
-        }
+            [
+                {"name": "FadeTime", "value": target.fade_time},
+                {"name": "Delay", "value": target.delay},
+            ],
+        )
         for target in targets
     ]
     assert not any(

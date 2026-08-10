@@ -76,9 +76,16 @@ def test_object_set_composer_lets_gateway_own_schema_defaults() -> None:
         if step.subcommand == "draft-apply"
     ]
 
-    assert [action["action"] for action in actions] == [
-        "add_target",
-        "set_property",
+    assert actions == [
+        {
+            "contract": "waapi-skill.operation-draft-action/v1",
+            "action": "add_target",
+            "selector": {
+                "kind": "path",
+                "value": r"\Actor-Mixer Hierarchy\Target",
+            },
+            "properties": [{"name": "Volume", "value": -3.0}],
+        }
     ]
 
 

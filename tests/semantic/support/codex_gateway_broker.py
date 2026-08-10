@@ -863,9 +863,12 @@ class DraftActionQueryIdentityBinding:
     step: str
 
     def __post_init__(self) -> None:
-        if self.pointer != "/target":
+        if not (
+            self.pointer == "/target"
+            or re.fullmatch(r"/references/(0|[1-9][0-9]*)/target", self.pointer)
+        ):
             raise ValueError(
-                "DraftActionQueryIdentityBinding.pointer must be /target"
+                "DraftActionQueryIdentityBinding.pointer must select one typed reference target"
             )
         if (
             not isinstance(self.step, str)
@@ -951,16 +954,22 @@ class DraftActionJsonArgument:
             raise ValueError(
                 "DraftActionJsonArgument query identity bindings must be unique"
             )
-        if self.query_identity_bindings:
+        for binding in self.query_identity_bindings:
             try:
-                target = _json_pointer(normalized, "/target")
+                target = _json_pointer(normalized, binding.pointer)
             except GatewayInvocationError as exc:
                 raise ValueError(
                     "DraftActionJsonArgument query-bound target is absent"
                 ) from exc
+            valid_binding_shape = (
+                normalized.get("action") == "set_reference"
+                and binding.pointer == "/target"
+            ) or (
+                normalized.get("action") == "add_target"
+                and binding.pointer.startswith("/references/")
+            )
             if (
-                normalized.get("action") != "set_reference"
-                or len(self.query_identity_bindings) != 1
+                not valid_binding_shape
                 or not isinstance(target, Mapping)
                 or set(target) != {"kind", "value"}
                 or target.get("kind") != "path"
@@ -4312,6 +4321,34 @@ def _json_pointer(payload: Any, pointer: str) -> Any:
     return current
 
 
+def _set_json_pointer(payload: Any, pointer: str, value: Any) -> None:
+    if not pointer.startswith("/") or pointer == "/":
+        raise GatewayInvocationError(
+            f"response binding pointer must select one field: {pointer!r}"
+        )
+    parts = pointer[1:].split("/")
+    parent_pointer = "" if len(parts) == 1 else "/" + "/".join(parts[:-1])
+    parent = _json_pointer(payload, parent_pointer)
+    part = parts[-1].replace("~1", "/").replace("~0", "~")
+    if isinstance(parent, Mapping):
+        if part not in parent or not isinstance(parent, dict):
+            raise GatewayInvocationError(
+                f"response binding field is absent or immutable: {pointer!r}"
+            )
+        parent[part] = value
+        return
+    if isinstance(parent, list):
+        try:
+            index = int(part)
+            parent[index] = value
+        except (ValueError, IndexError) as exc:
+            raise GatewayInvocationError(
+                f"response binding index is invalid: {pointer!r}"
+            ) from exc
+        return
+    raise GatewayInvocationError(f"response binding cannot update: {pointer!r}")
+
+
 def _sealed_query_identity_object_operation_equal(
     actual: Any,
     expected: SealedQueryIdentityBoundJsonArgument,
@@ -7148,10 +7185,14 @@ class CodexGatewayBroker:
                         "reviewed path"
                     )
                 if submitted_action is None:
-                    actual_action[binding.pointer.removeprefix("/")] = {
-                        "kind": "id",
-                        "value": identity["id"],
-                    }
+                    _set_json_pointer(
+                        actual_action,
+                        binding.pointer,
+                        {
+                            "kind": "id",
+                            "value": identity["id"],
+                        },
+                    )
                 elif _json_pointer(actual_action, binding.pointer) not in (
                     expected_target,
                     {"kind": "id", "value": identity["id"]},

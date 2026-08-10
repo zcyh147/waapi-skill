@@ -250,7 +250,15 @@ def test_normal_object_set_schema_and_detail_expose_only_composer_input(
             "action": "add_target",
         },
         "required_fields": ["selector"],
-        "optional_fields": [],
+        "optional_fields": [
+            "name",
+            "notes",
+            "platform",
+            "list_mode",
+            "on_name_conflict",
+            "properties",
+            "references",
+        ],
     }
     assert schema["composer"]["start"] == {
         "subcommand": "draft-start",

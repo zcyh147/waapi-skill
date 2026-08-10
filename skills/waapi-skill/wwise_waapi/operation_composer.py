@@ -31,7 +31,18 @@ _TARGET_HANDLE_PATTERN = re.compile(r"^odh1-[0-9a-f]{24}$")
 _BASE_ACTION_FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "set_request_option": (("name", "value"), ()),
     "clear_request_option": (("name",), ()),
-    "add_target": (("selector",), ()),
+    "add_target": (
+        ("selector",),
+        (
+            "name",
+            "notes",
+            "platform",
+            "list_mode",
+            "on_name_conflict",
+            "properties",
+            "references",
+        ),
+    ),
     "set_target_field": (("target_handle", "name", "value"), ()),
     "clear_target_field": (("target_handle", "name"), ()),
     "set_property": (("target_handle", "name", "value"), ()),
@@ -226,9 +237,18 @@ def apply_composer_action(
         _materialize_if_complete(operation, version, normalized)
         return normalized, action_name
     if action_name == "add_target":
-        _require_exact_keys(
+        _require_allowed_keys(
             action,
             required=("contract", "action", "selector"),
+            optional=(
+                "name",
+                "notes",
+                "platform",
+                "list_mode",
+                "on_name_conflict",
+                "properties",
+                "references",
+            ),
             label="add_target action",
         )
         target_limit = _target_limit(version)
@@ -242,6 +262,62 @@ def apply_composer_action(
             fragment="target_selector",
             payload=action.get("selector"),
         )
+        fields: dict[str, Any] = {}
+        for name in (
+            "name",
+            "notes",
+            "platform",
+            "list_mode",
+            "on_name_conflict",
+        ):
+            if name not in action:
+                continue
+            descriptor = _validate_fragment(
+                version,
+                fragment="target_field",
+                payload={"name": name, "value": action[name]},
+            )
+            fields[descriptor["name"]] = descriptor["value"]
+        raw_properties = action.get("properties", [])
+        if (
+            not isinstance(raw_properties, list)
+            or len(raw_properties) > _property_limit(version)
+        ):
+            raise OperationComposerError(
+                "add_target properties are invalid or exceed their ceiling.",
+                details={"limit": _property_limit(version)},
+            )
+        properties = [
+            _validate_fragment(
+                version,
+                fragment="scalar_property",
+                payload=item,
+            )
+            for item in raw_properties
+        ]
+        property_names = [str(item["name"]) for item in properties]
+        if len(property_names) != len(set(property_names)):
+            raise OperationComposerError(
+                "add_target property facts must be unique."
+            )
+        raw_references = action.get("references", [])
+        if (
+            not isinstance(raw_references, list)
+            or len(raw_references) > _property_limit(version)
+        ):
+            raise OperationComposerError(
+                "add_target references are invalid or exceed their ceiling.",
+                details={"limit": _property_limit(version)},
+            )
+        references = [
+            _validate_fragment(version, fragment="reference", payload=item)
+            for item in raw_references
+        ]
+        reference_names = [str(item["name"]) for item in references]
+        if len(reference_names) != len(set(reference_names)):
+            raise OperationComposerError(
+                "add_target reference facts must be unique."
+            )
         selector_key = canonical_json_bytes(selector)
         if any(
             canonical_json_bytes(item["selector"]) == selector_key
@@ -260,9 +336,9 @@ def apply_composer_action(
             {
                 "handle": handle,
                 "selector": selector,
-                "fields": {},
-                "properties": [],
-                "references": [],
+                "fields": fields,
+                "properties": properties,
+                "references": references,
                 "children": [],
                 "lists": [],
                 "import": None,

@@ -54,7 +54,18 @@ ACTION_CONTRACT = "waapi-skill.operation-draft-action/v1"
 BASE_ACTION_FIELDS = {
     "set_request_option": (["name", "value"], []),
     "clear_request_option": (["name"], []),
-    "add_target": (["selector"], []),
+    "add_target": (
+        ["selector"],
+        [
+            "name",
+            "notes",
+            "platform",
+            "list_mode",
+            "on_name_conflict",
+            "properties",
+            "references",
+        ],
+    ),
     "set_target_field": (["target_handle", "name", "value"], []),
     "clear_target_field": (["target_handle", "name"], []),
     "set_property": (["target_handle", "name", "value"], []),
@@ -1290,30 +1301,18 @@ def test_weather_shape_keeps_multiple_targets_and_request_options_in_business_or
             "--expected-revision",
             str(revision),
             "--action-json",
-            action("add_target", selector=selector),
+            action(
+                "add_target",
+                selector=selector,
+                properties=[
+                    {"name": name, "value": value}
+                    for name, value in properties
+                ],
+            ),
         )
         assert code == 0
         revision = targeted["draft"]["revision"]
         handles.append(targeted["draft"]["current_facts"][-1]["handle"])
-        for name, value in properties:
-            code, updated = execute(
-                tmp_path,
-                "draft-apply",
-                draft_id,
-                "--task-authority",
-                authority,
-                "--expected-revision",
-                str(revision),
-                "--action-json",
-                action(
-                    "set_property",
-                    target_handle=handles[-1],
-                    name=name,
-                    value=value,
-                ),
-            )
-            assert code == 0
-            revision = updated["draft"]["revision"]
 
     materialized = OperationDraftStore(tmp_path / "state").materialize_request(
         draft_id,
@@ -1341,7 +1340,60 @@ def test_weather_shape_keeps_multiple_targets_and_request_options_in_business_or
             "on_name_conflict": "fail",
         },
     }
-    assert [row["handle"] for row in updated["draft"]["current_facts"]] == handles
+    assert revision == 4
+    assert [row["handle"] for row in targeted["draft"]["current_facts"]] == handles
+
+
+def test_complete_target_row_is_atomic_when_one_inline_reference_is_invalid(
+    tmp_path: Path,
+) -> None:
+    _code, started = execute(tmp_path, "draft-start", "object.set")
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    record_path = (
+        tmp_path
+        / "state"
+        / "operation-drafts-v1"
+        / "records"
+        / f"{draft_id}.json"
+    )
+    before = record_path.read_bytes()
+
+    code, rejected = execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--action-json",
+        action(
+            "add_target",
+            selector={"kind": "id", "value": TARGET_ID},
+            name="Reviewed Target",
+            notes="complete row",
+            properties=[{"name": "Volume", "value": -3.0}],
+            references=[
+                {
+                    "name": "OutputBus",
+                    "target": {"kind": "id", "value": PARENT_ID},
+                },
+                {
+                    "name": "OutputBus",
+                    "target": {"kind": "path", "value": r"\Master-Mixer Hierarchy"},
+                },
+            ],
+        ),
+    )
+
+    assert code == 2
+    assert rejected["error_code"] == "OPERATION_DRAFT_ACTION_INVALID"
+    assert record_path.read_bytes() == before
+    assert OperationDraftStore(tmp_path / "state").inspect(
+        draft_id,
+        task_authority=authority,
+    ).revision == 1
 
 
 def test_target_and_recursive_child_facts_materialize_without_raw_tree_patches(
