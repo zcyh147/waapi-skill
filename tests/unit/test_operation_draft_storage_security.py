@@ -6,6 +6,7 @@ import multiprocessing
 import os
 import shutil
 import stat
+import subprocess
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -14,7 +15,7 @@ from typing import Any, Callable
 import pytest  # pyright: ignore[reportMissingImports]
 
 import wwise_waapi.operation_drafts as draft_module
-from tests.support.platform_filesystem import create_symlink_or_skip
+from tests.support.platform_filesystem import is_windows_symlink_privilege_error
 from wwise_waapi.operation_drafts import (  # pyright: ignore[reportMissingImports]
     DEFAULT_OPERATION_DRAFT_TERMINAL_RETENTION_SECONDS,
     DEFAULT_OPERATION_DRAFT_STALE_TEMP_SECONDS,
@@ -62,6 +63,43 @@ def _attempt_open_path_substitution(action: Callable[[], None]) -> bool:
             raise
         return False
     return True
+
+
+def _create_security_link(
+    link: Path,
+    target: Path,
+    *,
+    target_is_directory: bool = False,
+) -> str:
+    """Create a native link without requiring Windows symlink privilege."""
+
+    try:
+        link.symlink_to(target, target_is_directory=target_is_directory)
+    except OSError as exc:
+        if not is_windows_symlink_privilege_error(exc):
+            raise
+        if target_is_directory:
+            completed = subprocess.run(
+                ["cmd.exe", "/d", "/c", "mklink", "/J", str(link), str(target)],
+                check=False,
+                capture_output=True,
+            )
+            if completed.returncode != 0:
+                pytest.fail(
+                    "native Windows junction fixture failed: "
+                    f"exit {completed.returncode}"
+                )
+            return "junction"
+        os.link(target, link)
+        return "hard-link"
+    return "symlink"
+
+
+def _remove_directory_security_link(link: Path, link_kind: str) -> None:
+    if link_kind == "junction":
+        link.rmdir()
+    else:
+        link.unlink()
 
 
 def _race_cancel(
@@ -782,17 +820,31 @@ def test_store_and_managed_files_reject_links_without_touching_their_targets(
     outside = tmp_path / "outside"
     outside.mkdir()
     linked_root = tmp_path / "linked-state"
-    create_symlink_or_skip(linked_root, outside, target_is_directory=True)
-    with pytest.raises(OperationDraftStorageCorruption, match="link|reparse"):
-        OperationDraftStore(linked_root)
+    root_link_kind = _create_security_link(
+        linked_root,
+        outside,
+        target_is_directory=True,
+    )
+    try:
+        with pytest.raises(OperationDraftStorageCorruption, match="link|reparse"):
+            OperationDraftStore(linked_root)
+    finally:
+        _remove_directory_security_link(linked_root, root_link_kind)
     assert list(outside.iterdir()) == []
 
     state_dir = tmp_path / "state"
     state_dir.mkdir(mode=0o700)
     linked_store = state_dir / "operation-drafts-v1"
-    create_symlink_or_skip(linked_store, outside, target_is_directory=True)
-    with pytest.raises(OperationDraftStorageCorruption, match="link|reparse"):
-        OperationDraftStore(state_dir)
+    store_link_kind = _create_security_link(
+        linked_store,
+        outside,
+        target_is_directory=True,
+    )
+    try:
+        with pytest.raises(OperationDraftStorageCorruption, match="link|reparse"):
+            OperationDraftStore(state_dir)
+    finally:
+        _remove_directory_security_link(linked_store, store_link_kind)
     assert list(outside.iterdir()) == []
 
     store = OperationDraftStore(tmp_path / "ordinary")
@@ -806,7 +858,7 @@ def test_store_and_managed_files_reject_links_without_touching_their_targets(
     external_bytes = record_path.read_bytes()
     external_record.write_bytes(external_bytes)
     record_path.unlink()
-    create_symlink_or_skip(record_path, external_record)
+    _create_security_link(record_path, external_record)
 
     with pytest.raises(OperationDraftNotAvailable):
         store.inspect(
@@ -1340,7 +1392,7 @@ def test_linked_lock_fails_closed_without_modifying_external_bytes(
     original = b"outside-lock"
     external.write_bytes(original)
     lock_path.unlink()
-    create_symlink_or_skip(lock_path, external)
+    _create_security_link(lock_path, external)
 
     with pytest.raises(OperationDraftStorageCorruption, match="link|reparse"):
         store.inspect(
