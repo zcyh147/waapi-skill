@@ -821,8 +821,14 @@ class DraftActionResponseBinding:
             raise ValueError("DraftActionResponseBinding.step must be one bounded step name")
         if (
             not isinstance(self.response_pointer, str)
-            or not self.response_pointer.startswith("/draft/current_facts/")
-            or not self.response_pointer.endswith("/handle")
+            or not (
+                (
+                    self.response_pointer.startswith("/draft/current_facts/")
+                    and self.response_pointer.endswith("/handle")
+                )
+                or self.response_pointer
+                == "/draft/action_result/created_handles/0"
+            )
             or len(self.response_pointer) > 512
         ):
             raise ValueError(
@@ -1289,6 +1295,59 @@ def _draft_projection_handles(value: Any) -> set[str]:
     return handles
 
 
+def _draft_compact_action_result(
+    draft: Mapping[str, Any],
+) -> tuple[str, set[str], set[str], Mapping[str, Any]]:
+    result = draft.get("action_result")
+    summary = draft.get("current_facts_summary")
+    if (
+        not isinstance(result, Mapping)
+        or set(result)
+        != {"contract", "action", "created_handles", "affected_handles"}
+        or result.get("contract")
+        != "waapi-skill.operation-draft-action-result/v1"
+        or not isinstance(result.get("action"), str)
+        or not isinstance(result.get("created_handles"), list)
+        or not isinstance(result.get("affected_handles"), list)
+        or any(
+            not isinstance(handle, str)
+            or _DRAFT_HANDLE_RE.fullmatch(handle) is None
+            for key in ("created_handles", "affected_handles")
+            for handle in result[key]
+        )
+        or len(set(result["created_handles"])) != len(result["created_handles"])
+        or len(set(result["affected_handles"])) != len(result["affected_handles"])
+        or not isinstance(summary, Mapping)
+        or set(summary)
+        != {
+            "contract",
+            "target_count",
+            "handle_count",
+            "canonical_sha256",
+            "complete_projection_command",
+        }
+        or summary.get("contract")
+        != "waapi-skill.operation-draft-facts-summary/v1"
+        or type(summary.get("target_count")) is not int
+        or type(summary.get("handle_count")) is not int
+        or summary["target_count"] < 0
+        or summary["handle_count"] < 0
+        or not isinstance(summary.get("canonical_sha256"), str)
+        or re.fullmatch(r"[0-9a-f]{64}", summary["canonical_sha256"]) is None
+        or summary.get("complete_projection_command") != "draft-inspect"
+        or "current_facts" in draft
+    ):
+        raise GatewayInvocationError(
+            "compact Draft action response has an invalid bounded projection"
+        )
+    return (
+        str(result["action"]),
+        set(result["created_handles"]),
+        set(result["affected_handles"]),
+        summary,
+    )
+
+
 def validate_operation_draft_protocol_steps(
     expected_steps: Sequence[ExpectedGatewayStep],
 ) -> None:
@@ -1421,15 +1480,23 @@ def validate_operation_draft_protocol_steps(
                 f"{step.subcommand} expected revision must come from one prior Draft response"
             )
         if step.subcommand == "draft-apply":
-            if (
-                len(arguments) != 7
-                or arguments[5] != "--action-json"
-                or not isinstance(arguments[6], DraftActionJsonArgument)
-            ):
+            compact_action = (
+                len(arguments) == 8
+                and arguments[5:7] == ("--compact", "--action-json")
+                and isinstance(arguments[7], DraftActionJsonArgument)
+            )
+            legacy_full_action = (
+                len(arguments) == 7
+                and arguments[5] == "--action-json"
+                and isinstance(arguments[6], DraftActionJsonArgument)
+            )
+            if not compact_action and not legacy_full_action:
                 raise ValueError(
                     "draft-apply must carry exactly one typed Draft action"
                 )
-            for binding in arguments[6].response_bindings:
+            action_argument = arguments[-1]
+            assert isinstance(action_argument, DraftActionJsonArgument)
+            for binding in action_argument.response_bindings:
                 source_index = indexes.get(binding.step)
                 if (
                     source_index is None
@@ -1439,7 +1506,7 @@ def validate_operation_draft_protocol_steps(
                     raise ValueError(
                         "typed Draft action handles must come from one prior draft-apply response"
                     )
-            for binding in arguments[6].query_identity_bindings:
+            for binding in action_argument.query_identity_bindings:
                 source_index = indexes.get(binding.step)
                 if (
                     source_index is None
@@ -6410,7 +6477,11 @@ class CodexGatewayBroker:
                     "preview-from-draft must return one exact agent_result"
                 )
             expected_request = self._replay_expected_operation_draft_request(step)
-            if agent_result.get("request") != expected_request:
+            actual_request = self._normalize_operation_draft_query_identities(
+                agent_result.get("request"),
+                preview_step=step,
+            )
+            if actual_request != expected_request:
                 raise GatewayInvocationError(
                     "preview-from-draft canonical request does not replay from "
                     "the reviewed typed actions"
@@ -6506,6 +6577,69 @@ class CodexGatewayBroker:
                 "Draft response lifecycle state does not follow the reviewed transition"
             )
 
+    def _normalize_operation_draft_query_identities(
+        self,
+        value: Any,
+        *,
+        preview_step: ExpectedGatewayStep,
+    ) -> Any:
+        """Normalize only exact pre-Draft Bus GUIDs to their reviewed paths."""
+
+        preview_index = self.expected_steps.index(preview_step)
+        identities: dict[str, str] = {}
+        for action_step in self.expected_steps[:preview_index]:
+            if action_step.subcommand != "draft-apply":
+                continue
+            argument = action_step.arguments[-1]
+            if not isinstance(argument, DraftActionJsonArgument):
+                continue
+            for binding in argument.query_identity_bindings:
+                source = self._payloads_by_step.get(binding.step)
+                source_step = next(
+                    (
+                        candidate
+                        for candidate in self.expected_steps
+                        if candidate.name == binding.step
+                    ),
+                    None,
+                )
+                if not isinstance(source, Mapping) or source_step is None:
+                    raise GatewayInvocationError(
+                        "Draft query identity normalization lacks its exact source"
+                    )
+                identity = _exact_query_bus_identity(
+                    source_payload=source,
+                    source_step=source_step,
+                    expected_step_name=binding.step,
+                )
+                expected_target = _json_pointer(argument.expected, binding.pointer)
+                if expected_target != {
+                    "kind": "path",
+                    "value": identity["path"],
+                }:
+                    raise GatewayInvocationError(
+                        "Draft query identity normalization differs from the reviewed path"
+                    )
+                identities[identity["id"]] = identity["path"]
+
+        def normalize(item: Any) -> Any:
+            if isinstance(item, Mapping):
+                if (
+                    set(item) == {"kind", "value"}
+                    and item.get("kind") == "id"
+                    and item.get("value") in identities
+                ):
+                    return {
+                        "kind": "path",
+                        "value": identities[str(item["value"])],
+                    }
+                return {str(key): normalize(nested) for key, nested in item.items()}
+            if isinstance(item, list):
+                return [normalize(nested) for nested in item]
+            return item
+
+        return normalize(value)
+
     def _replay_expected_operation_draft_request(
         self,
         preview_step: ExpectedGatewayStep,
@@ -6531,6 +6665,7 @@ class CodexGatewayBroker:
                 "Draft canonical replay is missing its version binding"
             )
         composition = new_composition(operation, version)
+        actual_composition = new_composition(operation, version)
         preview_index = self.expected_steps.index(preview_step)
         for action_step in self.expected_steps[:preview_index]:
             if action_step.subcommand != "draft-apply":
@@ -6556,6 +6691,42 @@ class CodexGatewayBroker:
                     )
                 action[binding.pointer.removeprefix("/")] = bound
 
+            actual_action = json.loads(
+                _canonical_json_bytes(action).decode("utf-8")
+            )
+            for binding in argument.query_identity_bindings:
+                source = self._payloads_by_step.get(binding.step)
+                source_step = next(
+                    (
+                        candidate
+                        for candidate in self.expected_steps
+                        if candidate.name == binding.step
+                    ),
+                    None,
+                )
+                if not isinstance(source, Mapping) or source_step is None:
+                    raise GatewayInvocationError(
+                        "Draft canonical replay lacks its exact query identity"
+                    )
+                identity = _exact_query_bus_identity(
+                    source_payload=source,
+                    source_step=source_step,
+                    expected_step_name=binding.step,
+                )
+                expected_target = _json_pointer(action, binding.pointer)
+                if expected_target != {
+                    "kind": "path",
+                    "value": identity["path"],
+                }:
+                    raise GatewayInvocationError(
+                        "Draft canonical replay query identity differs from the "
+                        "reviewed path"
+                    )
+                actual_action[binding.pointer.removeprefix("/")] = {
+                    "kind": "id",
+                    "value": identity["id"],
+                }
+
             response = self._payloads_by_step.get(action_step.name)
             response_draft = (
                 response.get("draft") if isinstance(response, Mapping) else None
@@ -6564,15 +6735,26 @@ class CodexGatewayBroker:
                 raise GatewayInvocationError(
                     "Draft canonical replay is missing an action response"
                 )
-            before_handles = _draft_projection_handles(
-                composition_projection(operation, version, composition)[
-                    "current_facts"
-                ]
-            )
-            after_handles = _draft_projection_handles(
-                response_draft.get("current_facts")
-            )
-            remaining_handles = sorted(after_handles - before_handles)
+            compact_result: tuple[
+                str,
+                set[str],
+                set[str],
+                Mapping[str, Any],
+            ] | None = None
+            response_facts = response_draft.get("current_facts")
+            if isinstance(response_facts, list):
+                before_handles = _draft_projection_handles(
+                    composition_projection(operation, version, composition)[
+                        "current_facts"
+                    ]
+                )
+                after_handles = _draft_projection_handles(response_facts)
+                remaining_handles = sorted(after_handles - before_handles)
+            else:
+                compact_result = _draft_compact_action_result(response_draft)
+                remaining_handles = sorted(compact_result[1])
+
+            created_handles = list(remaining_handles)
 
             def handle_factory() -> str:
                 if not remaining_handles:
@@ -6582,7 +6764,7 @@ class CodexGatewayBroker:
                 return remaining_handles.pop(0)
 
             try:
-                composition, _action_name = apply_composer_action(
+                composition, action_name = apply_composer_action(
                     operation,
                     version,
                     composition,
@@ -6593,11 +6775,60 @@ class CodexGatewayBroker:
                 raise GatewayInvocationError(
                     f"Draft canonical replay rejected one reviewed action: {exc}"
                 ) from exc
-            projection = composition_projection(operation, version, composition)
-            if remaining_handles or any(
-                response_draft.get(key) != value
-                for key, value in projection.items()
-            ):
+            actual_handles = list(created_handles)
+
+            def actual_handle_factory() -> str:
+                if not actual_handles:
+                    raise OperationComposerError(
+                        "Draft action response is missing its generated handle."
+                    )
+                return actual_handles.pop(0)
+
+            try:
+                actual_composition, actual_action_name = apply_composer_action(
+                    operation,
+                    version,
+                    actual_composition,
+                    actual_action,
+                    handle_factory=actual_handle_factory,
+                )
+            except OperationComposerError as exc:
+                raise GatewayInvocationError(
+                    f"Draft canonical replay rejected one query-bound action: {exc}"
+                ) from exc
+            if actual_handles or actual_action_name != action_name:
+                raise GatewayInvocationError(
+                    "Draft canonical replay produced inconsistent action facts"
+                )
+            actual_projection = composition_projection(
+                operation,
+                version,
+                actual_composition,
+            )
+            if compact_result is not None:
+                result_action, _created, affected, summary = compact_result
+                expected_affected = {
+                    value
+                    for key, value in action.items()
+                    if key.endswith("_handle") and isinstance(value, str)
+                }
+                projected_facts = actual_projection["current_facts"]
+                projected_handles = _draft_projection_handles(projected_facts)
+                compact_matches = (
+                    not remaining_handles
+                    and result_action == action_name
+                    and affected == expected_affected
+                    and summary["target_count"] == len(projected_facts)
+                    and summary["handle_count"] == len(projected_handles)
+                    and summary["canonical_sha256"]
+                    == _sha256_bytes(_canonical_json_bytes(projected_facts))
+                )
+            else:
+                compact_matches = not remaining_handles and not any(
+                    response_draft.get(key) != value
+                    for key, value in actual_projection.items()
+                )
+            if not compact_matches:
                 raise GatewayInvocationError(
                     "Draft action response does not match deterministic composition"
                 )

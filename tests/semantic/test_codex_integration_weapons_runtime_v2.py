@@ -44,6 +44,13 @@ from wwise_waapi.builders.metadata import (
     GET_PROPERTY_INFO_URI,
     GET_TYPES_URI,
 )
+from wwise_waapi.canonical import canonical_sha256
+from wwise_waapi.operation_composer import (
+    apply_composer_action,
+    composition_projection,
+    materialize_operation_request,
+    new_composition,
+)
 
 
 DATA_ROOT = Path(__file__).resolve().parent / "data" / "integration-workflows-v2"
@@ -572,6 +579,17 @@ def _typed_action_broker(
         {"handle": handle, "selector": {"kind": "id", "value": _guid(str(index))}}
         for index, handle in enumerate(handles, start=1)
     ]
+    add_target_steps = [
+        candidate
+        for candidate in prepared.protocol.steps
+        if candidate.subcommand == "draft-apply"
+        and isinstance(candidate.arguments[-1], DraftActionJsonArgument)
+        and candidate.arguments[-1].expected.get("action") == "add_target"
+    ]
+    handle_by_step = {
+        candidate.name: handle
+        for candidate, handle in zip(add_target_steps, handles, strict=True)
+    }
     start = next(
         candidate
         for candidate in prepared.protocol.steps
@@ -602,12 +620,18 @@ def _typed_action_broker(
         }
     for binding in argument.response_bindings:
         broker._payloads_by_step[binding.step] = {  # noqa: SLF001
-            "draft": {"revision": 99, "current_facts": current_facts}
+            "draft": {
+                "revision": 99,
+                "action_result": {
+                    "created_handles": [handle_by_step[binding.step]],
+                },
+            }
         }
     supplied_action = copy.deepcopy(dict(argument.expected))
     for binding in argument.response_bindings:
-        target_index = int(binding.response_pointer.split("/")[3])
-        supplied_action[binding.pointer.removeprefix("/")] = handles[target_index]
+        supplied_action[binding.pointer.removeprefix("/")] = handle_by_step[
+            binding.step
+        ]
     for binding in argument.query_identity_bindings:
         source_step = next(
             candidate
@@ -639,6 +663,7 @@ def _typed_action_argv(step: Any, action: Mapping[str, Any]) -> tuple[str, ...]:
         "da1-" + "1" * 40,
         "--expected-revision",
         revision,
+        "--compact",
         "--action-json",
         json.dumps(action, separators=(",", ":")),
     )
@@ -902,6 +927,159 @@ def test_composer_repeats_the_exact_reviewed_output_bus_path(
         )
         action["target"] = {"kind": "id", "value": source_step.arguments[1]}
         broker._validate_step(step, _typed_action_argv(step, action))  # noqa: SLF001
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2025.1"])
+def test_compact_draft_replay_accepts_only_the_exact_queried_bus_guid(
+    tmp_path: Path,
+    version: str,
+) -> None:
+    prepared, fake, _runtime = _prepared(tmp_path, version=version)
+    broker = CodexGatewayBroker(
+        skill_source=Path(__file__).resolve().parents[2] / "skills" / "waapi-skill",
+        expected_steps=prepared.protocol.steps,
+        commutative_read_only_step_groups=(
+            prepared.protocol.commutative_read_only_step_groups
+        ),
+    )
+    for source_step in prepared.protocol.steps[1:3]:
+        broker._payloads_by_step[source_step.name] = fake.object_id_payload(  # noqa: SLF001
+            str(source_step.arguments[1])
+        )
+    start = next(
+        step for step in prepared.protocol.steps if step.subcommand == "draft-start"
+    )
+    broker._payloads_by_step[start.name] = {  # noqa: SLF001
+        "task_authority": "da1-" + "1" * 40,
+        "draft": {
+            "draft_id": "od1-" + "2" * 32,
+            "revision": 1,
+            "binding": {"operation": "object.set", "version": version},
+        },
+    }
+
+    composition = new_composition("object.set", version)
+    handle_by_step: dict[str, str] = {}
+    handle_index = 0
+    revision = 1
+    for action_step in (
+        step for step in prepared.protocol.steps if step.subcommand == "draft-apply"
+    ):
+        argument = action_step.arguments[-1]
+        assert isinstance(argument, DraftActionJsonArgument)
+        actual_action = copy.deepcopy(dict(argument.expected))
+        for binding in argument.response_bindings:
+            actual_action[binding.pointer.removeprefix("/")] = handle_by_step[
+                binding.step
+            ]
+        for binding in argument.query_identity_bindings:
+            source_step = next(
+                step for step in prepared.protocol.steps if step.name == binding.step
+            )
+            actual_action["target"] = {
+                "kind": "id",
+                "value": str(source_step.arguments[1]),
+            }
+
+        created_handle: str | None = None
+        if actual_action["action"] == "add_target":
+            handle_index += 1
+            created_handle = f"odh1-{handle_index:024x}"
+
+        def create_handle() -> str:
+            assert created_handle is not None
+            return created_handle
+
+        composition, action_name = apply_composer_action(
+            "object.set",
+            version,
+            composition,
+            actual_action,
+            handle_factory=create_handle,
+        )
+        created_handles = [created_handle] if created_handle is not None else []
+        if created_handle is not None:
+            handle_by_step[action_step.name] = created_handle
+        facts = composition_projection(
+            "object.set",
+            version,
+            composition,
+        )["current_facts"]
+        revision += 1
+        broker._payloads_by_step[action_step.name] = {  # noqa: SLF001
+            "draft": {
+                "draft_id": "od1-" + "2" * 32,
+                "revision": revision,
+                "action_result": {
+                    "contract": "waapi-skill.operation-draft-action-result/v1",
+                    "action": action_name,
+                    "created_handles": created_handles,
+                    "affected_handles": sorted(
+                        value
+                        for key, value in actual_action.items()
+                        if key.endswith("_handle") and isinstance(value, str)
+                    ),
+                },
+                "current_facts_summary": {
+                    "contract": "waapi-skill.operation-draft-facts-summary/v1",
+                    "target_count": len(facts),
+                    "handle_count": len(
+                        {
+                            row["handle"]
+                            for row in facts
+                            if isinstance(row, Mapping) and "handle" in row
+                        }
+                    ),
+                    "canonical_sha256": canonical_sha256(facts),
+                    "complete_projection_command": "draft-inspect",
+                },
+            }
+        }
+
+    preview = next(
+        step
+        for step in prepared.protocol.steps
+        if step.subcommand == "preview-from-draft"
+    )
+    actual_request = materialize_operation_request(
+        "object.set",
+        version,
+        composition,
+    )
+    payload = {
+        "transaction_id": "tx1-compact-guid-replay",
+        "state": "awaiting_confirmation",
+        "agent_result": {"request": actual_request},
+    }
+    broker._validate_operation_draft_payload(preview, payload)  # noqa: SLF001
+
+    compact_action = next(
+        step
+        for step in reversed(prepared.protocol.steps)
+        if step.subcommand == "draft-apply"
+    )
+    compact_response = broker._payloads_by_step[compact_action.name]  # noqa: SLF001
+    compact_response["draft"]["current_facts_summary"]["canonical_sha256"] = (
+        "0" * 64
+    )
+    with pytest.raises(
+        GatewayInvocationError,
+        match="deterministic composition",
+    ):
+        broker._validate_operation_draft_payload(preview, payload)  # noqa: SLF001
+    compact_response["draft"]["current_facts_summary"]["canonical_sha256"] = (
+        canonical_sha256(facts)
+    )
+
+    tampered = copy.deepcopy(payload)
+    tampered["agent_result"]["request"]["arguments"]["objects"][0][
+        "references"
+    ][0]["target"]["value"] = _guid("wrong-preview-bus")
+    with pytest.raises(
+        GatewayInvocationError,
+        match="canonical request does not replay",
+    ):
+        broker._validate_operation_draft_payload(preview, tampered)  # noqa: SLF001
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])

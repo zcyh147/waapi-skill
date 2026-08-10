@@ -108,7 +108,7 @@ def build_object_set_composer_transaction_steps(
         raise V3ProtocolError("object.set Composer request fields are not supported")
 
     action_index = len(action_specs)
-    for target_index, raw_target in enumerate(objects):
+    for raw_target in objects:
         if not isinstance(raw_target, Mapping) or not isinstance(
             raw_target.get("object"), Mapping
         ):
@@ -129,12 +129,12 @@ def build_object_set_composer_transaction_steps(
         handle_binding = DraftActionResponseBinding(
             pointer="/target_handle",
             step=target_step_name,
-            response_pointer=f"/draft/current_facts/{target_index}/handle",
+            response_pointer="/draft/action_result/created_handles/0",
         )
         reference_binding = DraftActionResponseBinding(
             pointer="/owner_handle",
             step=target_step_name,
-            response_pointer=f"/draft/current_facts/{target_index}/handle",
+            response_pointer="/draft/action_result/created_handles/0",
         )
         for field_name in (
             "name",
@@ -248,6 +248,7 @@ def build_object_set_composer_transaction_steps(
                     ResponseBinding(f"{label}.draft-start", "/task_authority"),
                     "--expected-revision",
                     ResponseBinding(latest_revision_step, "/draft/revision"),
+                    "--compact",
                     "--action-json",
                     DraftActionJsonArgument(
                         expected=action,

@@ -420,6 +420,25 @@ def test_object_set_typed_actions_build_one_target_scalar_fact_offline(
         "one_action_only": True,
         "then_read_next_response": True,
         "precompute_or_increment_revision": False,
+        "fixed_full_argv_template": [
+            "python",
+            str(waapi_gateway.GATEWAY_RUNNER_PATH),
+            "gateway.py",
+            "draft-apply",
+            draft_id,
+            "--task-authority",
+            "<task-authority-from-draft-start>",
+            "--expected-revision",
+            "2",
+            "--compact",
+            "--action-json",
+            "<typed-action-json>",
+        ],
+        "replace_only": [
+            "<task-authority-from-draft-start>",
+            "<typed-action-json>",
+        ],
+        "copy_all_other_values_exactly": True,
     }
     assert target_fact == {
         "handle": handle,
@@ -466,6 +485,169 @@ def test_object_set_typed_actions_build_one_target_scalar_fact_offline(
     assert property_result["draft"]["missing_fields_status"] == "complete"
     assert "check" in property_result["draft"]["allowed_actions"]
     assert not (tmp_path / "state" / "transactions").exists()
+
+
+def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
+    tmp_path: Path,
+) -> None:
+    _code, started = execute(tmp_path, "draft-start", "object.set")
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+
+    code, targeted = execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--compact",
+        "--action-json",
+        action("add_target", selector={"kind": "id", "value": TARGET_ID}),
+    )
+
+    assert code == 0
+    draft = targeted["draft"]
+    assert "session_context" not in targeted
+    assert "current_facts" not in draft
+    summary = draft["current_facts_summary"]
+    assert summary == {
+        "contract": "waapi-skill.operation-draft-facts-summary/v1",
+        "target_count": 1,
+        "handle_count": 1,
+        "canonical_sha256": summary["canonical_sha256"],
+        "complete_projection_command": "draft-inspect",
+    }
+    handle = draft["action_result"]["created_handles"][0]
+    assert TARGET_HANDLE_RE.fullmatch(handle)
+    assert draft["action_result"] == {
+        "contract": "waapi-skill.operation-draft-action-result/v1",
+        "action": "add_target",
+        "created_handles": [handle],
+        "affected_handles": [],
+    }
+    assert draft["next_action_binding"]["fixed_full_argv_template"] == [
+        "python",
+        str(waapi_gateway.GATEWAY_RUNNER_PATH),
+        "gateway.py",
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        "<task-authority-from-draft-start>",
+        "--expected-revision",
+        "2",
+        "--compact",
+        "--action-json",
+        "<typed-action-json>",
+    ]
+
+    code, changed = execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "2",
+        "--compact",
+        "--action-json",
+        action(
+            "set_property",
+            target_handle=handle,
+            name="Volume",
+            value=-3.0,
+        ),
+    )
+
+    assert code == 0
+    assert changed["draft"]["action_result"] == {
+        "contract": "waapi-skill.operation-draft-action-result/v1",
+        "action": "set_property",
+        "created_handles": [],
+        "affected_handles": [handle],
+    }
+    inspect_code, inspected = execute(
+        tmp_path,
+        "draft-inspect",
+        draft_id,
+        "--task-authority",
+        authority,
+    )
+    assert inspect_code == 0
+    assert inspected["draft"]["current_facts"][0]["properties"] == [
+        {"name": "Volume", "value": -3.0}
+    ]
+
+
+def test_compact_weather_shaped_action_responses_remain_constant_size(
+    tmp_path: Path,
+) -> None:
+    _code, started = execute(tmp_path, "draft-start", "object.set")
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    revision = 1
+    response_sizes: list[int] = []
+
+    for index in range(5):
+        code, targeted = execute(
+            tmp_path,
+            "draft-apply",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(revision),
+            "--compact",
+            "--action-json",
+            action(
+                "add_target",
+                selector={
+                    "kind": "id",
+                    "value": f"{{00000000-0000-0000-0000-{index + 1:012d}}}",
+                },
+            ),
+        )
+        assert code == 0
+        handle = targeted["draft"]["action_result"]["created_handles"][0]
+        revision += 1
+        response_sizes.append(len(json.dumps(targeted).encode("utf-8")))
+        for name, value in (("FadeTime", 0.25 + index / 10), ("Delay", index / 10)):
+            code, changed = execute(
+                tmp_path,
+                "draft-apply",
+                draft_id,
+                "--task-authority",
+                authority,
+                "--expected-revision",
+                str(revision),
+                "--compact",
+                "--action-json",
+                action(
+                    "set_property",
+                    target_handle=handle,
+                    name=name,
+                    value=value,
+                ),
+            )
+            assert code == 0
+            assert "session_context" not in changed
+            assert "current_facts" not in changed["draft"]
+            revision += 1
+            response_sizes.append(len(json.dumps(changed).encode("utf-8")))
+
+    assert len(response_sizes) == 15
+    assert max(response_sizes) < 2_500
+    assert max(response_sizes) - min(response_sizes) < 768
+    inspect_code, inspected = execute(
+        tmp_path,
+        "draft-inspect",
+        draft_id,
+        "--task-authority",
+        authority,
+    )
+    assert inspect_code == 0
+    assert len(inspected["draft"]["current_facts"]) == 5
 
 
 def test_property_correction_and_removal_are_ordered_typed_edits(

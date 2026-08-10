@@ -263,12 +263,20 @@ def test_normal_object_set_schema_and_detail_expose_only_composer_input(
         "<task_authority>",
         "--expected-revision",
         "<revision>",
+        "--compact",
         "--action-json",
         "<typed-action-json>",
     ]
     assert schema["composer"]["apply"]["revision_discipline"] == {
         "mode": "one_action_then_read_next_response",
         "expected_revision_source": "/draft/revision",
+        "next_action_template_source": (
+            "/draft/next_action_binding/fixed_full_argv_template"
+        ),
+        "replace_only": [
+            "<task-authority-from-draft-start>",
+            "<typed-action-json>",
+        ],
         "precompute_or_increment_revision": False,
     }
     assert schema["composer"]["check"]["gateway_argv"] == [

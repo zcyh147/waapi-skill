@@ -154,6 +154,53 @@ def _handle_factory(handles: set[str]) -> tuple[Callable[[], str], list[str]]:
     return create, remaining
 
 
+def _compact_action_projection(
+    draft: Mapping[str, Any],
+) -> tuple[str, set[str], set[str], Mapping[str, Any]]:
+    result = _mapping(
+        draft.get("action_result"),
+        label="compact Composer action result",
+    )
+    summary = _mapping(
+        draft.get("current_facts_summary"),
+        label="compact Composer facts summary",
+    )
+    created = result.get("created_handles")
+    affected = result.get("affected_handles")
+    if (
+        set(result)
+        != {"contract", "action", "created_handles", "affected_handles"}
+        or result.get("contract")
+        != "waapi-skill.operation-draft-action-result/v1"
+        or not isinstance(result.get("action"), str)
+        or not isinstance(created, list)
+        or not isinstance(affected, list)
+        or not all(isinstance(handle, str) for handle in (*created, *affected))
+        or len(set(created)) != len(created)
+        or len(set(affected)) != len(affected)
+        or set(summary)
+        != {
+            "contract",
+            "target_count",
+            "handle_count",
+            "canonical_sha256",
+            "complete_projection_command",
+        }
+        or summary.get("contract")
+        != "waapi-skill.operation-draft-facts-summary/v1"
+        or type(summary.get("target_count")) is not int
+        or type(summary.get("handle_count")) is not int
+        or summary["target_count"] < 0
+        or summary["handle_count"] < 0
+        or not isinstance(summary.get("canonical_sha256"), str)
+        or len(summary["canonical_sha256"]) != 64
+        or summary.get("complete_projection_command") != "draft-inspect"
+        or "current_facts" in draft
+    ):
+        _fail("Compact Composer action projection is invalid")
+    return str(result["action"]), set(created), set(affected), summary
+
+
 def _draft_projection(payload: Mapping[str, Any], *, command: str) -> Mapping[str, Any]:
     if payload.get("command") != command:
         _fail(f"Composer payload command does not match {command!r}")
@@ -302,9 +349,16 @@ def _validate_operation_draft_archive(
             action = _strict_action(arguments)
             response_draft = _draft_projection(payload, command="draft-apply")
             response_facts = response_draft.get("current_facts")
-            new_handles = _handles(response_facts) - _handles(
-                composition_projection(operation, version, composition)["current_facts"]
-            )
+            compact: tuple[str, set[str], set[str], Mapping[str, Any]] | None = None
+            if isinstance(response_facts, list):
+                new_handles = _handles(response_facts) - _handles(
+                    composition_projection(operation, version, composition)[
+                        "current_facts"
+                    ]
+                )
+            else:
+                compact = _compact_action_projection(response_draft)
+                new_handles = compact[1]
             factory, unused_handles = _handle_factory(new_handles)
             composition, action_name = apply_composer_action(
                 operation,
@@ -317,16 +371,33 @@ def _validate_operation_draft_archive(
                 _fail("Composer action response disclosed an unexplained handle")
             revision += 1
             projection = composition_projection(operation, version, composition)
-            _require_projection(
-                response_draft,
-                draft_id=draft_id,
-                revision=revision,
-                lifecycle_state="editable",
-                operation=operation,
-                version=version,
-                schema_digest=schema_digest,
-                projection=projection,
-            )
+            if compact is None:
+                _require_projection(
+                    response_draft,
+                    draft_id=draft_id,
+                    revision=revision,
+                    lifecycle_state="editable",
+                    operation=operation,
+                    version=version,
+                    schema_digest=schema_digest,
+                    projection=projection,
+                )
+            else:
+                compact_action, _created, affected, summary = compact
+                expected_affected = {
+                    value
+                    for key, value in action.items()
+                    if key.endswith("_handle") and isinstance(value, str)
+                }
+                facts = projection["current_facts"]
+                if (
+                    compact_action != action_name
+                    or affected != expected_affected
+                    or summary["target_count"] != len(facts)
+                    or summary["handle_count"] != len(_handles(facts))
+                    or summary["canonical_sha256"] != canonical_sha256(facts)
+                ):
+                    _fail("Compact Composer action summary does not replay")
             action_rows.append(
                 {
                     "step_name": step.name,

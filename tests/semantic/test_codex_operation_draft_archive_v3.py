@@ -449,6 +449,97 @@ def test_composer_archive_reconstructs_actions_request_preview_and_cleanup(
     assert evidence["cleanup_outcome"]["status"] == "not_required"
 
 
+def test_composer_archive_replays_compact_action_evidence(
+    tmp_path: Path,
+) -> None:
+    state_dir, steps, records = _sealed_archive(tmp_path)
+    target_step = steps[1]
+    property_step = steps[2]
+    target_record = records[1]
+    property_record = records[2]
+    target_handle = property_record["gateway_arguments"][-1]
+    property_action = json.loads(target_handle)
+    target_handle = property_action["target_handle"]
+
+    compact_target_step = ExpectedGatewayStep(
+        target_step.name,
+        target_step.subcommand,
+        (*target_step.arguments[:5], "--compact", *target_step.arguments[5:]),
+    )
+    property_argument = property_step.arguments[-1]
+    assert isinstance(property_argument, DraftActionJsonArgument)
+    compact_property_step = ExpectedGatewayStep(
+        property_step.name,
+        property_step.subcommand,
+        (
+            *property_step.arguments[:5],
+            "--compact",
+            "--action-json",
+            DraftActionJsonArgument(
+                property_argument.expected,
+                response_bindings=(
+                    DraftActionResponseBinding(
+                        "/target_handle",
+                        target_step.name,
+                        "/draft/action_result/created_handles/0",
+                    ),
+                ),
+            ),
+        ),
+    )
+    compact_steps = (
+        steps[0],
+        compact_target_step,
+        compact_property_step,
+        *steps[3:],
+    )
+    compact_records = copy.deepcopy(records)
+    compact_records[1]["gateway_arguments"].insert(-2, "--compact")
+    compact_records[2]["gateway_arguments"].insert(-2, "--compact")
+    # The durable store is sealed, so reconstruct the historical action
+    # projections from their already frozen full payloads instead of mutating it.
+    for index, action_name, created, affected in (
+        (1, "add_target", [target_handle], []),
+        (2, "set_property", [], [target_handle]),
+    ):
+        full_draft = records[index]["payload"]["draft"]
+        facts = full_draft["current_facts"]
+        compact_records[index]["payload"]["draft"] = {
+            key: copy.deepcopy(value)
+            for key, value in full_draft.items()
+            if key != "current_facts"
+        }
+        compact_records[index]["payload"]["draft"].update(
+            {
+                "current_facts_summary": {
+                    "contract": "waapi-skill.operation-draft-facts-summary/v1",
+                    "target_count": len(facts),
+                    "handle_count": len({row["handle"] for row in facts}),
+                    "canonical_sha256": canonical_sha256(facts),
+                    "complete_projection_command": "draft-inspect",
+                },
+                "action_result": {
+                    "contract": "waapi-skill.operation-draft-action-result/v1",
+                    "action": action_name,
+                    "created_handles": created,
+                    "affected_handles": affected,
+                },
+            }
+        )
+
+    evidence = validate_operation_draft_archive(
+        state_directory=state_dir,
+        steps=compact_steps,
+        broker_records=compact_records,
+    )
+
+    assert evidence is not None
+    assert [row["action"] for row in evidence["actions"]] == [
+        "add_target",
+        "set_property",
+    ]
+
+
 def test_composer_archive_ignores_other_legacy_transaction_payloads(
     tmp_path: Path,
 ) -> None:

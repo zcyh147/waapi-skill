@@ -1442,6 +1442,14 @@ def build_parser() -> argparse.ArgumentParser:
     draft_apply.add_argument("draft_id")
     draft_apply.add_argument("--task-authority", required=True)
     draft_apply.add_argument("--expected-revision", required=True, type=int)
+    draft_apply.add_argument(
+        "--compact",
+        action="store_true",
+        help=(
+            "Return only this action's result and a bounded composition summary; "
+            "use draft-inspect for the complete current facts"
+        ),
+    )
     draft_apply.add_argument("--action-json", required=True)
 
     draft_check = subparsers.add_parser(
@@ -1642,6 +1650,13 @@ def _execute_gateway_unconstrained(
             enriched["endpoint"] = dict(runtime_endpoint)
         if runtime_detected_version is not None and "detected_version" not in enriched:
             enriched["detected_version"] = runtime_detected_version
+        if args.command == "draft-apply" and getattr(args, "compact", False):
+            # The Draft start response has already supplied the bounded
+            # conversation/session introduction. Repeating that complete
+            # projection after every typed edit makes a long composition grow
+            # the model transcript without adding action-local facts. Compact
+            # edits therefore return only their durable delta and continuation.
+            return exit_code, enriched
         return exit_code, attach_gateway_session_context(
             enriched,
             args=args,
@@ -3001,6 +3016,7 @@ def operation_composer_input_contract(
                 "<task_authority>",
                 "--expected-revision",
                 "<revision>",
+                "--compact",
                 "--action-json",
                 "<typed-action-json>",
             ],
@@ -3012,6 +3028,13 @@ def operation_composer_input_contract(
             "revision_discipline": {
                 "mode": "one_action_then_read_next_response",
                 "expected_revision_source": "/draft/revision",
+                "next_action_template_source": (
+                    "/draft/next_action_binding/fixed_full_argv_template"
+                ),
+                "replace_only": [
+                    "<task-authority-from-draft-start>",
+                    "<typed-action-json>",
+                ],
                 "precompute_or_increment_revision": False,
             },
         },
@@ -3102,15 +3125,21 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             inspected.operation,
             inspected.version,
         )
+        parsed_action = parse_json_object(args.action_json, "--action-json")
         record = store.apply_action(
             args.draft_id,
             task_authority=args.task_authority,
             expected_revision=args.expected_revision,
             schema_digest=schema_digest,
             composer_digest=composer_digest,
-            action=parse_json_object(args.action_json, "--action-json"),
+            action=parsed_action,
         )
-        return operation_draft_payload(args.command, record)
+        return operation_draft_payload(
+            args.command,
+            record,
+            compact_action=parsed_action if args.compact else None,
+            prior_record=inspected if args.compact else None,
+        )
     if args.command in {"draft-inspect", "draft-cancel"}:
         store = OperationDraftStore(
             resolve_transaction_state_directory(args, env=env)
@@ -3126,7 +3155,10 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 task_authority=args.task_authority,
                 expected_revision=args.expected_revision,
             )
-        return operation_draft_payload(args.command, record)
+        return operation_draft_payload(
+            args.command,
+            record,
+        )
 
     if args.command == "config-show":
         return config_result_payload("config-show", load_gateway_config(env))
@@ -6177,7 +6209,11 @@ def dispatch_operation_draft_check(
         runtime_guard_fingerprint=runtime_fingerprint,
         prepared_digest=canonical_sha256(prepared),
     )
-    payload = operation_draft_payload(args.command, record, offline=False)
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+    )
     payload.update(
         {
             "endpoint": dict(common["endpoint"]),
@@ -10270,11 +10306,77 @@ def transaction_state_payload(command: str, record: Any, *, offline: bool) -> di
     return payload
 
 
+def _operation_draft_projection_handles(value: Any) -> set[str]:
+    handles: set[str] = set()
+    if isinstance(value, Mapping):
+        handle = value.get("handle")
+        if isinstance(handle, str):
+            handles.add(handle)
+        for nested in value.values():
+            handles.update(_operation_draft_projection_handles(nested))
+    elif isinstance(value, list):
+        for nested in value:
+            handles.update(_operation_draft_projection_handles(nested))
+    return handles
+
+
+def _operation_draft_compact_action_projection(
+    *,
+    action: Mapping[str, Any],
+    prior_record: OperationDraftRecord,
+    record: OperationDraftRecord,
+    current_facts: list[Any],
+) -> dict[str, Any]:
+    if (
+        prior_record.composition is None
+        or record.composition is None
+        or prior_record.operation != record.operation
+        or prior_record.version != record.version
+    ):
+        raise GatewayInputError(
+            "Compact Draft action projection requires one bound Composer transition."
+        )
+    prior_facts = composition_projection(
+        prior_record.operation,
+        prior_record.version,
+        prior_record.composition,
+    )["current_facts"]
+    prior_handles = _operation_draft_projection_handles(prior_facts)
+    current_handles = _operation_draft_projection_handles(current_facts)
+    action_name = action.get("action")
+    if not isinstance(action_name, str) or not action_name:
+        raise GatewayInputError("Compact Draft action result lacks its action name.")
+    affected_handles = sorted(
+        {
+            value
+            for key, value in action.items()
+            if key.endswith("_handle") and isinstance(value, str)
+        }
+    )
+    return {
+        "current_facts_summary": {
+            "contract": "waapi-skill.operation-draft-facts-summary/v1",
+            "target_count": len(current_facts),
+            "handle_count": len(current_handles),
+            "canonical_sha256": canonical_sha256(current_facts),
+            "complete_projection_command": "draft-inspect",
+        },
+        "action_result": {
+            "contract": "waapi-skill.operation-draft-action-result/v1",
+            "action": action_name,
+            "created_handles": sorted(current_handles - prior_handles),
+            "affected_handles": affected_handles,
+        },
+    }
+
+
 def operation_draft_payload(
     command: str,
     record: OperationDraftRecord,
     *,
     offline: bool = True,
+    compact_action: Mapping[str, Any] | None = None,
+    prior_record: OperationDraftRecord | None = None,
 ) -> dict[str, Any]:
     """Project bounded lifecycle facts without inventing adapter-owned fields."""
 
@@ -10323,6 +10425,24 @@ def operation_draft_payload(
                 "transaction_id": record.seal["transaction_id"],
                 "artifact_hash": record.seal["artifact_hash"],
             }
+        if compact_action is not None:
+            if command != "draft-apply" or prior_record is None:
+                raise GatewayInputError(
+                    "Compact Draft action projection is valid only for draft-apply."
+                )
+            current_facts = projection.pop("current_facts")
+            if not isinstance(current_facts, list):
+                raise GatewayInputError(
+                    "Compact Draft action projection requires bounded current facts."
+                )
+            projection.update(
+                _operation_draft_compact_action_projection(
+                    action=compact_action,
+                    prior_record=prior_record,
+                    record=record,
+                    current_facts=current_facts,
+                )
+            )
     else:
         projection = {
             "current_facts": [],
@@ -10350,7 +10470,7 @@ def operation_draft_payload(
         **projection,
     }
     if record.state is OperationDraftState.EDITABLE:
-        draft["next_action_binding"] = {
+        next_action_binding: dict[str, Any] = {
             "contract": "waapi-skill.operation-draft-next-action/v1",
             "draft_id": record.draft_id,
             "expected_revision": record.revision,
@@ -10358,6 +10478,30 @@ def operation_draft_payload(
             "then_read_next_response": True,
             "precompute_or_increment_revision": False,
         }
+        next_action_binding.update(
+            {
+                "fixed_full_argv_template": [
+                    "python",
+                    str(GATEWAY_RUNNER_PATH),
+                    "gateway.py",
+                    "draft-apply",
+                    record.draft_id,
+                    "--task-authority",
+                    "<task-authority-from-draft-start>",
+                    "--expected-revision",
+                    str(record.revision),
+                    "--compact",
+                    "--action-json",
+                    "<typed-action-json>",
+                ],
+                "replace_only": [
+                    "<task-authority-from-draft-start>",
+                    "<typed-action-json>",
+                ],
+                "copy_all_other_values_exactly": True,
+            }
+        )
+        draft["next_action_binding"] = next_action_binding
     return {
         "contract": GATEWAY_RESULT_CONTRACT,
         "ok": True,
