@@ -227,6 +227,8 @@ def test_prompts_read_as_user_requests_and_close_visible_inputs() -> None:
     assert "-4 dB/2" not in weather_prompt
     assert "0.25/0 秒" not in weather_prompt
     assert "Rain_Bed 的音量设为 -4 dB，最大实例数设为 2" in weather_prompt
+    assert "一个名为 Thunder 的 Random Container" in weather_prompt
+    assert "每一步都直接生成并展示预览，预览前不要询问" in weather_prompt
     assert (
         "Play_Thunder_Near 的 FadeTime 设为 0.05 秒，"
         "Delay 设为 0 秒"
