@@ -461,6 +461,22 @@ def test_composer_archive_reconstructs_actions_request_preview_and_cleanup(
     assert evidence["cleanup_outcome"]["status"] == "not_required"
 
 
+def test_composer_archive_accepts_canonical_key_sorted_payload_records(
+    tmp_path: Path,
+) -> None:
+    state_dir, steps, records = _sealed_archive(tmp_path)
+    sorted_records = json.loads(json.dumps(records, sort_keys=True))
+
+    evidence = validate_operation_draft_archive(
+        state_directory=state_dir,
+        steps=steps,
+        broker_records=sorted_records,
+    )
+
+    assert evidence is not None
+    assert evidence["preview_binding"]["transaction_final_state"] == "verified"
+
+
 def test_composer_archive_binds_bounded_verification_summary_to_full_journal(
     tmp_path: Path,
 ) -> None:

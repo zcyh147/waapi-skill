@@ -154,8 +154,6 @@ def _record_payload(record: Mapping[str, Any], *, index: int) -> Mapping[str, An
         or payload.get("ok") is not True
     ):
         _fail(f"Composer Broker payload {index} is not one successful Gateway result")
-    if "agent_result" in payload and list(payload)[-1] != "agent_result":
-        _fail(f"Composer Broker payload {index} does not keep agent_result final")
     return payload
 
 

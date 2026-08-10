@@ -55,6 +55,7 @@ from tests.semantic.support.codex_campaign_runner import (
 from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
     build_direct_protocol,
+    build_object_set_composer_transaction_steps,
     build_transaction_protocol,
     query_object_step,
 )
@@ -129,6 +130,77 @@ from wwise_waapi.transactions import (
     TransactionStore,
     confirmation_token_for,
 )
+
+
+def test_consumed_composer_order_rebinds_each_revision_to_its_actual_predecessor(
+) -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.set",
+        "arguments": {
+            "objects": [
+                {
+                    "object": {
+                        "kind": "id",
+                        "value": f"{{{index:08d}-1111-1111-1111-111111111111}}",
+                    },
+                    "properties": [{"name": "Volume", "value": index}],
+                }
+                for index in range(1, 4)
+            ]
+        },
+    }
+    canonical = build_object_set_composer_transaction_steps(
+        request,
+        label="tx01",
+    )
+    action_steps = [
+        step for step in canonical if step.subcommand == "draft-apply"
+    ]
+    reordered_actions = [
+        *(
+            step
+            for step in action_steps
+            if step.arguments[-1].expected["action"] == "add_target"
+        ),
+        *(
+            step
+            for step in action_steps
+            if step.arguments[-1].expected["action"] != "add_target"
+        ),
+    ]
+    consumed = [step.name for step in canonical]
+    action_indexes = [
+        index
+        for index, step in enumerate(canonical)
+        if step.subcommand == "draft-apply"
+    ]
+    for index, step in zip(action_indexes, reordered_actions, strict=True):
+        consumed[index] = step.name
+
+    linearized = campaign._steps_in_consumed_order(canonical, consumed)
+
+    latest = next(
+        step.name for step in linearized if step.subcommand == "draft-start"
+    )
+    for step in linearized:
+        if step.subcommand in {
+            "draft-apply",
+            "draft-check",
+            "draft-cancel",
+            "preview-from-draft",
+        }:
+            assert step.arguments[4] == ResponseBinding(
+                latest,
+                "/draft/revision",
+            )
+            latest = step.name
+    CodexGatewayBroker(
+        skill_source=Path("skills/waapi-skill"),
+        expected_steps=linearized,
+        expected_wwise_version="2022.1",
+    )
 
 
 @dataclass(frozen=True, slots=True)

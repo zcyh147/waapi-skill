@@ -3578,7 +3578,7 @@ def _steps_in_consumed_order(
     canonical_steps: Sequence[Any],
     consumed_names: Sequence[str],
 ) -> tuple[Any, ...]:
-    """Resolve one already-validated protocol linearization by exact name."""
+    """Resolve one validated linearization and rebind its revision chain."""
 
     by_name = {step.name: step for step in canonical_steps}
     if (
@@ -3589,7 +3589,45 @@ def _steps_in_consumed_order(
         raise CampaignEvidenceError(
             "broker consumed names cannot linearize the sealed protocol"
         )
-    return tuple(by_name[name] for name in consumed_names)
+    ordered = [by_name[name] for name in consumed_names]
+    latest_revision_step: str | None = None
+    rebound: list[Any] = []
+    for step in ordered:
+        if step.subcommand == "draft-start":
+            latest_revision_step = step.name
+        elif step.subcommand == "draft-inspect":
+            if latest_revision_step is None:
+                raise CampaignEvidenceError(
+                    "consumed Draft inspect precedes draft-start"
+                )
+            latest_revision_step = step.name
+        elif step.subcommand in {
+            "draft-apply",
+            "draft-check",
+            "draft-cancel",
+            "preview-from-draft",
+        }:
+            if latest_revision_step is None:
+                raise CampaignEvidenceError(
+                    "consumed Draft mutation precedes draft-start"
+                )
+            arguments = list(step.arguments)
+            if (
+                len(arguments) < 5
+                or arguments[3] != "--expected-revision"
+                or not isinstance(arguments[4], ResponseBinding)
+            ):
+                raise CampaignEvidenceError(
+                    "consumed Draft step has no sealed revision binding"
+                )
+            arguments[4] = ResponseBinding(
+                latest_revision_step,
+                "/draft/revision",
+            )
+            step = replace(step, arguments=tuple(arguments))
+            latest_revision_step = step.name
+        rebound.append(step)
+    return tuple(rebound)
 
 
 def _validate_heavy_v3_retryable_partial_broker(
@@ -4951,16 +4989,6 @@ def _validate_heavy_v3_broker_records(
                 expected_project_modification_policy
             ),
         )
-        if (
-            step.subcommand.startswith("draft-")
-            or step.subcommand == "preview-from-draft"
-        ):
-            try:
-                replay._validate_operation_draft_payload(step, payload)  # noqa: SLF001
-            except Exception as exc:
-                raise CampaignEvidenceError(
-                    f"{label} Draft response cannot replay protocol step {step.name}: {exc}"
-                ) from exc
         if step.subcommand == "transaction-show":
             try:
                 validate_transaction_show_confirmation_against_store(
@@ -5088,6 +5116,20 @@ def _validate_heavy_v3_broker_records(
             raise CampaignEvidenceError(
                 f"{label} Codex command output does not keep agent_result final"
             )
+        if (
+            step.subcommand.startswith("draft-")
+            or step.subcommand == "preview-from-draft"
+        ):
+            try:
+                replay._validate_operation_draft_payload(  # noqa: SLF001
+                    step,
+                    observed_payload,
+                )
+            except Exception as exc:
+                raise CampaignEvidenceError(
+                    f"{label} Draft response cannot replay protocol step "
+                    f"{step.name}: {exc}"
+                ) from exc
         replay._payloads_by_step[step.name] = payload  # noqa: SLF001
 
 
