@@ -930,7 +930,12 @@ def test_gateway_import_schemas_share_semantic_import_operation_contract(
 ) -> None:
     env = gateway_env(tmp_path)
     direct_exit_code, direct_payload = waapi_gateway.execute_gateway(
-        ["--version", "2022.1", "operation-schema", "audio.import"],
+        [
+            "--version",
+            "2022.1",
+            "legacy-operation-schema",
+            "audio.import",
+        ],
         env=env,
     )
     tab_exit_code, tab_payload = waapi_gateway.execute_gateway(

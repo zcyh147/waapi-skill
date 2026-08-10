@@ -1543,12 +1543,12 @@ def test_audio_import_numbered_actions_remain_strictly_ordered(tmp_path: Path) -
             "import_operation": "createNew",
             "imports": [
                 {
-                    "audio_file": r"C:\\inputs\\a.wav",
+                    "audio_file": "/owned/inputs/a.wav",
                     "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\A",
                     "object_type": "Sound SFX",
                 },
                 {
-                    "audio_file": r"C:\\inputs\\b.wav",
+                    "audio_file": "/owned/inputs/b.wav",
                     "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\B",
                     "object_type": "Sound SFX",
                 },
@@ -6285,10 +6285,10 @@ def test_weather_limit_two_metadata_step_crosses_broker_validation(
                 "import_operation": "createNew",
                 "imports": [
                     {
-                        "audio_file": r"C:\\inputs\\rain.wav",
-                        "object_path": (
-                            r"\\Actor-Mixer Hierarchy\\Default Work Unit\\Rain"
-                        ),
+                            "audio_file": "/owned/inputs/rain.wav",
+                            "object_path": (
+                                r"\Actor-Mixer Hierarchy\Default Work Unit\Rain"
+                            ),
                         "object_type": "Sound SFX",
                     }
                 ],

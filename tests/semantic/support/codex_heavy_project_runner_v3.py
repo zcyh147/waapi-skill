@@ -50,6 +50,7 @@ from tests.semantic.support.codex_filesystem_security import (
 from tests.semantic.support.codex_eval_protocol_v3 import (
     StructuredRefusal,
     V3GatewayProtocol,
+    build_audio_import_composer_protocol,
     build_direct_protocol,
     build_metadata_transaction_protocol,
     build_modification_policy_protocol,
@@ -4301,9 +4302,17 @@ def _prepare_case(
                 ),
             )
         else:
-            protocol = build_transaction_protocol(
-                materialized.operation_requests,
-                refusal=StructuredRefusal(refusal_code) if refusal_code else None,
+            protocol = (
+                build_audio_import_composer_protocol(
+                    materialized.operation_requests[0]
+                )
+                if scenario.api == "ak.wwise.core.audio.import"
+                else build_transaction_protocol(
+                    materialized.operation_requests,
+                    refusal=(
+                        StructuredRefusal(refusal_code) if refusal_code else None
+                    ),
+                )
             )
         before = import_runtime.hidden_before
         if before is None:

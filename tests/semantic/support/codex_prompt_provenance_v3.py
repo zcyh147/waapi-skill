@@ -23,10 +23,14 @@ from tests.semantic.support.codex_business_oracle_plan_v3 import (
 )
 from tests.semantic.support.codex_filesystem_security import binary_file_open_flags
 from tests.semantic.support.codex_eval_bundle_v3 import OnlineScenario
-from tests.semantic.support.codex_eval_protocol_v3 import V3GatewayProtocol
+from tests.semantic.support.codex_eval_protocol_v3 import (
+    V3GatewayProtocol,
+    V3ProtocolError,
+)
 from tests.semantic.support.codex_eval_protocol_v3 import (
     build_modification_policy_protocol,
     build_transaction_protocol,
+    materialize_audio_import_composer_protocol_request,
     operation_request_equivalence,
 )
 from tests.semantic.support.codex_gateway_broker import (
@@ -1396,7 +1400,11 @@ def _derive_input(
             trusted_sources=trusted_sources,
         )
 
-    requests = _protocol_requests(protocol_value)
+    scenario_versions = tuple(getattr(scenario, "versions", ()))
+    requests = _protocol_requests(
+        protocol_value,
+        version=(scenario_versions[0] if len(scenario_versions) == 1 else None),
+    )
     api = scenario.api
     if api in {
         "ak.wwise.core.object.get",
@@ -1440,6 +1448,15 @@ def _derive_input(
                     },
                 )
             value = arguments.get("imports")
+            if base.startswith("/composer/"):
+                if not isinstance(value, list):
+                    raise PromptProvenanceError(
+                        "audio.import Composer request rows are invalid"
+                    )
+                return _DerivedInput(
+                    _canonical_json_bytes(value).decode("utf-8"),
+                    _audio_import_composer_row_origins(protocol_value, value),
+                )
             pointer = base + "/arguments/imports"
             return _structured_derived(value, pointer)
 
@@ -1639,6 +1656,8 @@ def _derive_cli_input(
 
 def _protocol_requests(
     protocol_value: Mapping[str, Any],
+    *,
+    version: str | None = None,
 ) -> tuple[tuple[str, Mapping[str, Any]], ...]:
     steps = protocol_value.get("steps")
     if not isinstance(steps, list):
@@ -1809,7 +1828,97 @@ def _protocol_requests(
                 request,
             )
         )
-    return tuple(result)
+    if result:
+        return tuple(result)
+    protocol = deserialize_protocol(protocol_value)
+    starts = [
+        (index, step)
+        for index, step in enumerate(protocol.steps)
+        if step.subcommand == "draft-start"
+        and step.arguments == ("audio.import",)
+    ]
+    previews = [
+        (index, step)
+        for index, step in enumerate(protocol.steps)
+        if step.subcommand == "preview-from-draft"
+    ]
+    if not starts and not previews:
+        return ()
+    if version is None or len(starts) != 1 or len(previews) != 1:
+        raise PromptProvenanceError(
+            "Composer preview request topology or version binding drifted"
+        )
+    start_index, _start = starts[0]
+    preview_index, preview = previews[0]
+    if start_index >= preview_index:
+        raise PromptProvenanceError("Composer preview precedes its draft start")
+    try:
+        request = materialize_audio_import_composer_protocol_request(
+            protocol,
+            version=version,
+        )
+    except V3ProtocolError as exc:
+        raise PromptProvenanceError(
+            "audio.import Composer provenance cannot materialize its request"
+        ) from exc
+    return ((f"/composer/{preview.name}", request),)
+
+
+def _audio_import_composer_row_origins(
+    protocol_value: Mapping[str, Any],
+    rows: Sequence[Any],
+) -> Mapping[str, str]:
+    """Bind every visible import-row leaf to its exact typed action leaf."""
+
+    steps = protocol_value.get("steps")
+    if not isinstance(steps, list):
+        raise PromptProvenanceError("protocol steps are unavailable")
+    action_rows: list[tuple[int, int, Mapping[str, Any]]] = []
+    for step_index, step in enumerate(steps):
+        if not isinstance(step, Mapping) or step.get("subcommand") != "draft-apply":
+            continue
+        arguments = step.get("arguments")
+        if not isinstance(arguments, list):
+            raise PromptProvenanceError("draft-apply arguments are invalid")
+        for argument_index, argument in enumerate(arguments):
+            if (
+                not isinstance(argument, Mapping)
+                or argument.get("kind") != "draft_action_json"
+                or argument.get("operation") != "audio.import"
+            ):
+                continue
+            action = argument.get("value")
+            if (
+                isinstance(action, Mapping)
+                and action.get("contract")
+                == "waapi-skill.operation-draft-action/v1"
+                and action.get("action") == "add_import_row"
+            ):
+                action_rows.append((step_index, argument_index, action))
+    if len(action_rows) != len(rows):
+        raise PromptProvenanceError(
+            "audio.import visible rows differ from typed row actions"
+        )
+    origins: dict[str, str] = {}
+    for row_index, (row, (step_index, argument_index, action)) in enumerate(
+        zip(rows, action_rows, strict=True)
+    ):
+        if not isinstance(row, Mapping):
+            raise PromptProvenanceError("audio.import visible row is invalid")
+        action_fields = {
+            key: value
+            for key, value in action.items()
+            if key not in {"contract", "action"}
+        }
+        if not _json_equal(action_fields, row):
+            raise PromptProvenanceError(
+                "audio.import visible row differs from its typed action"
+            )
+        for pointer, _leaf in _walk_leaves(row):
+            origins[f"/{row_index}{pointer}"] = (
+                f"/steps/{step_index}/arguments/{argument_index}/value{pointer}"
+            )
+    return origins
 
 
 def _structured_derived(value: Any, base_pointer: str) -> _DerivedInput:

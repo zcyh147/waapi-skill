@@ -23,6 +23,7 @@ from wwise_waapi.operation_drafts import (  # pyright: ignore[reportMissingImpor
     OperationDraftStore,
 )
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
+    COMPOSER_INPUT_MODE,
     LEGACY_JSON_INPUT_MODE,
     operation_input_mode,
     operation_request_schema_digest,
@@ -227,7 +228,7 @@ def _action(action_name: str, **fields: Any) -> str:
 
 
 @pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
-def test_base_audio_import_adapter_is_registry_derived_but_not_normal_cutover(
+def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
     version: str,
 ) -> None:
     contract = operation_composer_contract("audio.import", version)
@@ -339,7 +340,7 @@ def test_base_audio_import_adapter_is_registry_derived_but_not_normal_cutover(
     assert contract["registry_fragments"]["source_schema_digest"] == (
         operation_request_schema_digest("audio.import", version)
     )
-    assert operation_input_mode("audio.import", version) == LEGACY_JSON_INPUT_MODE
+    assert operation_input_mode("audio.import", version) == COMPOSER_INPUT_MODE
     assert operation_input_mode("audio.importTabDelimited", version) == LEGACY_JSON_INPUT_MODE
 
 
@@ -900,7 +901,7 @@ def test_new_audio_import_composition_does_not_enable_tab_delimited_adapter() ->
     assert exc_info.value.error_code == "OPERATION_DRAFT_ADAPTER_UNAVAILABLE"
 
 
-def test_base_audio_import_adapter_is_not_disclosed_as_normal_input_before_cutover(
+def test_base_audio_import_adapter_is_the_only_disclosed_normal_input_after_cutover(
     tmp_path: Path,
 ) -> None:
     schema_code, schema = _execute(
@@ -912,10 +913,14 @@ def test_base_audio_import_adapter_is_not_disclosed_as_normal_input_before_cutov
     )
 
     assert schema_code == 0
-    assert schema["operation"]["input_mode"] == LEGACY_JSON_INPUT_MODE
-    assert schema["request_envelope"]["operation"] == "audio.import"
-    assert "composer" not in schema
-    assert "add_import_row" not in json.dumps(schema)
+    assert schema["operation"]["input_mode"] == COMPOSER_INPUT_MODE
+    assert schema["request_envelope"] is None
+    assert schema["composer"]["start"]["gateway_argv"] == [
+        "draft-start",
+        "audio.import",
+    ]
+    assert "add_import_row" in schema["composer"]["action_shapes"]
+    assert "legacy-preview" not in json.dumps(schema)
 
 
 def test_audio_import_materializer_rejects_incomplete_empty_composition() -> None:

@@ -15,6 +15,11 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Mapping, Sequence
 
+from wwise_waapi.operation_import import (
+    ImportContractError,
+    normalize_originals_subfolder,
+)
+
 from .codex_eval_bundle_v3 import OnlineScenario
 from .codex_version_layout_v3 import (
     CodexVersionLayoutError,
@@ -2026,7 +2031,16 @@ def _audio_import_row(
     ):
         value = row.get(source_name)
         if value is not None:
-            request[request_name] = str(value)
+            if request_name == "originals_subfolder":
+                try:
+                    request[request_name] = normalize_originals_subfolder(
+                        value,
+                        field="rows.originals_subfolder",
+                    )
+                except ImportContractError as exc:
+                    raise ImportAssetMaterializationError(str(exc)) from exc
+            else:
+                request[request_name] = str(value)
     event = row.get("event")
     if event is not None:
         request["event"] = {

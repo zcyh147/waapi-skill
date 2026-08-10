@@ -358,6 +358,87 @@ def test_normal_object_set_schema_and_detail_expose_only_composer_input(
     assert "legacy-operation-schema" not in json.dumps(detail)
 
 
+def test_normal_audio_import_schema_exposes_only_its_composer_input(
+    tmp_path: Path,
+) -> None:
+    schema_code, schema = offline_execute(
+        tmp_path,
+        "--version",
+        "2022.1",
+        "operation-schema",
+        "audio.import",
+    )
+    detail_code, detail = offline_execute(tmp_path, "operations", "--detail")
+    tab_code, tab_schema = offline_execute(
+        tmp_path,
+        "--version",
+        "2022.1",
+        "operation-schema",
+        "audio.importTabDelimited",
+    )
+
+    assert schema_code == detail_code == tab_code == 0
+    assert schema["operation"]["input_mode"] == COMPOSER_INPUT_MODE
+    assert schema["request_envelope"] is None
+    assert schema["request_envelope_policy"] == {
+        "status": "composer_ready",
+        "complete_request_authored_by_gateway": True,
+    }
+    assert schema["composer"]["operation"] == "audio.import"
+    assert schema["composer"]["start"]["gateway_argv"] == [
+        "draft-start",
+        "audio.import",
+    ]
+    assert schema["composer"]["action_shapes"]["add_import_row"] == {
+        "fixed_fields": {
+            "contract": "waapi-skill.operation-draft-action/v1",
+            "action": "add_import_row",
+        },
+        "required_fields": [],
+        "optional_fields": [
+            "audio_file",
+            "audio_file_base64",
+            "audio_source_notes",
+            "dialogue_event",
+            "event",
+            "import_language",
+            "import_location",
+            "notes",
+            "object_path",
+            "object_type",
+            "originals_subfolder",
+            "properties",
+            "references",
+            "switch_assignment",
+        ],
+    }
+    assert "request_contract" not in schema["operation"]
+    assert "argument_contract" not in schema["operation"]
+
+    rows = {row["name"]: row for row in detail["operations"]}
+    assert rows["audio.import"]["input_modes_by_version"] == {
+        version: COMPOSER_INPUT_MODE
+        for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
+    }
+    assert "request_contract" not in rows["audio.import"]
+    assert set(rows["audio.import"]["composer_contracts_by_version"]) == {
+        "2021.1",
+        "2022.1",
+        "2023.1",
+        "2024.1",
+        "2025.1",
+    }
+    assert tab_schema["operation"]["input_mode"] == LEGACY_JSON_INPUT_MODE
+    assert tab_schema["request_envelope"]["operation"] == (
+        "audio.importTabDelimited"
+    )
+    assert "composer" not in tab_schema
+
+    normal_surfaces = json.dumps({"schema": schema, "detail": detail})
+    assert "legacy-preview" not in normal_surfaces
+    assert "legacy-operation-schema" not in normal_surfaces
+
+
 def test_legacy_schema_is_explicit_deprecated_and_uses_the_same_registry_contract(
     tmp_path: Path,
 ) -> None:
@@ -821,6 +902,43 @@ def test_object_set_json_submission_requires_the_explicit_legacy_surface(
     assert legacy_code == 0, legacy
     stored = TransactionStore(state_dir).load_preview(legacy["transaction_id"])
     assert stored.artifact["request"] == request
+
+
+def test_audio_import_json_submission_requires_the_explicit_legacy_surface(
+    tmp_path: Path,
+) -> None:
+    request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "imports": [
+                {
+                    "object_path": (
+                        r"\Actor-Mixer Hierarchy\Default Work Unit\Target"
+                    ),
+                    "object_type": "Sound",
+                }
+            ]
+        },
+    }
+    connections: list[str] = []
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["preview", "--request-json", json.dumps(request)],
+        env=gateway_env(tmp_path),
+        client_factory=lambda url: connections.append(url),
+    )
+
+    assert exit_code == 2
+    assert payload["error_code"] == "INPUT_MODE_MISMATCH"
+    assert payload["details"] == {
+        "operation": "audio.import",
+        "version": "2022.1",
+        "required_input_mode": COMPOSER_INPUT_MODE,
+        "submitted_input_mode": LEGACY_JSON_INPUT_MODE,
+    }
+    assert connections == []
 
 
 @pytest.mark.parametrize(

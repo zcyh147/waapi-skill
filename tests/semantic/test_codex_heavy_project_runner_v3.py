@@ -1155,7 +1155,17 @@ def test_prepare_compound_import_uses_two_stage_reference_and_metadata_binding(
         "contract": "waapi-skill.operation-request/v1",
         "version": "2025.1",
         "operation": "audio.import",
-        "arguments": {"imports": [{"object_path": "<Sound>Bound"}]},
+        "arguments": {
+            "imports": [
+                {
+                    "object_path": r"\Containers\Default Work Unit\Bound",
+                    "object_type": "Sound",
+                    "properties": [
+                        {"name": "IsLoopingEnabled", "value": True}
+                    ],
+                }
+            ]
+        },
     }
     bound = SimpleNamespace(
         operation_requests=(request,),
@@ -1311,7 +1321,10 @@ def test_prepare_compound_import_uses_two_stage_reference_and_metadata_binding(
     )
 
     assert calls == ["references", "metadata-bind", "runtime"]
-    assert prepared.protocol.turn_prefix_counts == (3, 7)
+    assert prepared.protocol.turn_prefix_counts == (6, 10)
+    assert next(
+        step for step in prepared.protocol.steps if step.name == "tx01.preview"
+    ).subcommand == "preview-from-draft"
     assert prepared.prompt == "sealed compound import prompt"
     assert prepared.cleanup_success is import_runtime.cleanup_success
     assert prepared.prompt_sources == {

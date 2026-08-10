@@ -16,6 +16,11 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Mapping, Sequence
 
+from wwise_waapi.operation_import import (
+    ImportContractError,
+    normalize_originals_subfolder,
+)
+
 from tests.semantic.support.codex_archive_paths import (
     ArchiveRelativePathError,
     archive_absolute_has_relative_suffix,
@@ -25,6 +30,7 @@ from tests.semantic.support.codex_archive_paths import (
 from tests.semantic.support.codex_eval_protocol_v3 import (
     StructuredRefusal,
     V3GatewayProtocol,
+    build_audio_import_composer_protocol,
     build_metadata_transaction_protocol,
     build_transaction_protocol,
 )
@@ -314,9 +320,13 @@ def _validate_expected_protocol(
             ),
         )
     else:
-        expected = build_transaction_protocol(
-            plan.operation_requests,
-            refusal=StructuredRefusal(refusal) if refusal else None,
+        expected = (
+            build_audio_import_composer_protocol(plan.operation_requests[0])
+            if plan.api == "ak.wwise.core.audio.import"
+            else build_transaction_protocol(
+                plan.operation_requests,
+                refusal=StructuredRefusal(refusal) if refusal else None,
+            )
         )
     if _plain(serialize_protocol(protocol)) != _plain(serialize_protocol(expected)):
         raise ImportBusinessPlanError("import protocol does not exactly bind sealed requests and transaction order")
@@ -685,13 +695,17 @@ def _validate_static_archive(static: Mapping[str, Any], live: Mapping[str, Any],
             ),
         )
     else:
-        expected = build_transaction_protocol(
-            requests,
-            refusal=(
-                StructuredRefusal(static["refusal_error_code"])
-                if count == 0
-                else None
-            ),
+        expected = (
+            build_audio_import_composer_protocol(requests[0])
+            if static["api"] == "ak.wwise.core.audio.import"
+            else build_transaction_protocol(
+                requests,
+                refusal=(
+                    StructuredRefusal(static["refusal_error_code"])
+                    if count == 0
+                    else None
+                ),
+            )
         )
     if _plain(serialize_protocol(protocol)) != _plain(serialize_protocol(expected)) or static["protocol_sha256"] != _hash(serialize_protocol(protocol)):
         raise ImportBusinessPlanError("archived import protocol/request order drifted")
@@ -816,7 +830,16 @@ def _expected_audio_import_row(raw: Mapping[str, Any], source_paths: Mapping[str
     value = {"object_path": raw.get("object_path"), "audio_file": source_paths[source_key], "object_type": raw.get("object_type"), "import_language": canonical_wwise_language(str(raw.get("language") or ""))}
     for raw_name, request_name in (("originals_subfolder", "originals_subfolder"), ("notes", "notes"), ("audio_source_notes", "audio_source_notes")):
         if raw.get(raw_name) is not None:
-            value[request_name] = str(raw[raw_name])
+            if request_name == "originals_subfolder":
+                try:
+                    value[request_name] = normalize_originals_subfolder(
+                        raw[raw_name],
+                        field="rows.originals_subfolder",
+                    )
+                except ImportContractError as exc:
+                    raise ImportBusinessPlanError(str(exc)) from exc
+            else:
+                value[request_name] = str(raw[raw_name])
     if raw.get("event") is not None:
         event = raw["event"]
         if not isinstance(event, Mapping):

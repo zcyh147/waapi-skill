@@ -12,6 +12,7 @@ import pytest
 from tests.semantic.support.codex_eval_bundle_v3 import load_eval_bundle_v3
 from tests.semantic.support.codex_eval_protocol_v3 import (
     StructuredRefusal,
+    build_audio_import_composer_protocol,
     build_metadata_transaction_protocol,
     build_transaction_protocol,
 )
@@ -66,7 +67,11 @@ def _case(tmp_path: Path, scenario_id: str):
     plan = build_import_runtime_plan(scenario, materialized, sandbox_project=project)
     before = _snapshot(plan, before=True)
     refusal = StructuredRefusal("INPUT_FILE_NOT_FOUND") if plan.expected_primary_dispatch_count == 0 else None
-    protocol = build_transaction_protocol(plan.operation_requests, refusal=refusal)
+    protocol = (
+        build_audio_import_composer_protocol(plan.operation_requests[0])
+        if plan.api == "ak.wwise.core.audio.import"
+        else build_transaction_protocol(plan.operation_requests, refusal=refusal)
+    )
     return scenario, materialized, plan, before, protocol
 
 

@@ -22,6 +22,7 @@ from tests.semantic.support.codex_eval_bundle_v3 import (
 from tests.semantic.support.codex_eval_protocol_v3 import (
     OPERATION_REQUEST_CONTRACT,
     V3GatewayProtocol,
+    build_audio_import_composer_protocol,
     build_direct_protocol,
     build_metadata_transaction_protocol,
     build_transaction_protocol,
@@ -33,8 +34,6 @@ from tests.semantic.support.codex_gateway_broker import (
     DraftActionMetadataBinding,
     DraftActionResponseBinding,
     ExpectedGatewayStep,
-    GatewayDerivedReferenceActivationAllowance,
-    MetadataBoundJsonArgument,
     MetadataTokenProjection,
     ResponseBinding,
     SemanticJsonArgument,
@@ -497,7 +496,11 @@ def _audio_import_case(
             "audio_file": str(audio),
             "import_language": "SFX",
             "object_path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Forest",
-            "metadata": {"loop": True, "priority": 7},
+            "object_type": "Sound SFX",
+            "event": {
+                "path": r"\Events\Default Work Unit\Play_Forest",
+                "action": "Play",
+            },
         }
     ]
     encoded_rows = json.dumps(
@@ -514,8 +517,8 @@ def _audio_import_case(
         prompt="请按这组定义导入目录 {media_directory} 中的素材：{import_rows}",
         protocol="preview_confirm",
     )
-    protocol = build_transaction_protocol(
-        (_operation_request("audio.import", {"imports": rows}),)
+    protocol = build_audio_import_composer_protocol(
+        _operation_request("audio.import", {"imports": rows})
     )
     return scenario, protocol, {
         "media_directory": str(sources),
@@ -1263,15 +1266,14 @@ def test_structured_input_binds_every_leaf_to_exact_pointer(tmp_path: Path) -> N
 
     assert set(bindings) == {
         "/0/audio_file",
+        "/0/event/action",
+        "/0/event/path",
         "/0/import_language",
-        "/0/metadata/loop",
-        "/0/metadata/priority",
         "/0/object_path",
+        "/0/object_type",
     }
     for pointer, binding in bindings.items():
-        assert binding["origin_pointer"].endswith(
-            "/arguments/imports" + pointer
-        )
+        assert binding["origin_pointer"].endswith(pointer.removeprefix("/0"))
     assert bindings["/0/audio_file"]["origin_kind"] == "owned_path"
     assert bindings["/0/audio_file"]["path_kind"] == "file"
     assert all(
@@ -1934,7 +1936,9 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
         {
             "imports": [
                 {
-                    "object_path": r"\Actor-Mixer Hierarchy\Target",
+                    "object_path": (
+                        r"\Actor-Mixer Hierarchy\Default Work Unit\Target"
+                    ),
                     "audio_file": "/owned/source.wav",
                     "properties": [
                         {"name": "OverrideOutput", "value": True}
@@ -1981,42 +1985,31 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
         ),
         equivalence="audio_import_v1",
     )
-    preview = protocol.steps[2]
-    metadata_argument = preview.arguments[2]
-    assert isinstance(metadata_argument, MetadataBoundJsonArgument)
-    allowance = GatewayDerivedReferenceActivationAllowance(
-        row_index=0,
-        property_name="OverrideOutput",
-        property_value=True,
-        reference_name="OutputBus",
-    )
-    protocol = replace(
-        protocol,
-        steps=(
-            *protocol.steps[:2],
-            replace(
-                preview,
-                arguments=(
-                    *preview.arguments[:2],
-                    replace(
-                        metadata_argument,
-                        gateway_derived_reference_activations=(allowance,),
-                    ),
-                ),
-            ),
-            *protocol.steps[3:],
-        ),
+    metadata_arguments = [
+        step.arguments[-1]
+        for step in protocol.steps
+        if step.subcommand == "draft-apply"
+        and isinstance(step.arguments[-1], DraftActionJsonArgument)
+        and step.arguments[-1].metadata_binding is not None
+    ]
+    assert len(metadata_arguments) == 2
+    assert all(item.operation == "audio.import" for item in metadata_arguments)
+    assert all(
+        item.metadata_binding.required_tokens
+        == ("IsLoopingEnabled", "OverrideOutput", "OutputBus")
+        for item in metadata_arguments
     )
     serialized = serialize_protocol(protocol)
-    argument = serialized["steps"][2]["arguments"][2]
-
-    assert argument["equivalence"] == "audio_import_v1"
-    assert argument["gateway_derived_reference_activations"] == [
-        allowance.as_dict()
+    serialized_metadata_rows = [
+        step["arguments"][-1]
+        for step in serialized["steps"]
+        if step["subcommand"] == "draft-apply"
+        and step["arguments"][-1].get("metadata_binding") is not None
     ]
+    assert len(serialized_metadata_rows) == 2
     assert deserialize_protocol(serialized) == protocol
-    assert _protocol_requests(serialized) == (
-        ("/steps/2/arguments/2/value", request),
+    assert _protocol_requests(serialized, version="2022.1") == (
+        ("/composer/tx01.preview", request),
     )
 
     scenario = _scenario(
@@ -2030,9 +2023,15 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
         protocol=protocol,
     )
     payload = json.loads(evidence.path.read_text(encoding="utf-8"))
-    payload["protocol"]["value"]["steps"][2]["arguments"][2][
-        "gateway_derived_reference_activations"
-    ][0]["row_index"] = 1
+    metadata_row = next(
+        step["arguments"][-1]
+        for step in payload["protocol"]["value"]["steps"]
+        if step["subcommand"] == "draft-apply"
+        and step["arguments"][-1].get("metadata_binding") is not None
+    )
+    metadata_row["metadata_binding"]["expected_projection"][0]["name"] = (
+        "Tampered"
+    )
     payload["protocol"]["sha256"] = hashlib.sha256(
         json.dumps(
             payload["protocol"]["value"],
@@ -2046,7 +2045,7 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
 
     with pytest.raises(
         PromptProvenanceError,
-        match="metadata-bound JSON protocol argument is invalid",
+        match="Draft-action JSON protocol argument is invalid",
     ):
         _read_again(
             evidence.path,

@@ -1434,24 +1434,16 @@ def test_audio_import_operation_schema_discloses_versioned_hierarchy_roots(
 
     assert exit_code == 0
     assert payload["offline"] is True
-    assert payload["request_envelope"]["version"] == version
-    properties = payload["operation"]["argument_contract"]["properties"]
-    row_path_contract = properties["imports"]["items"]["properties"][
-        "object_path"
-    ]["path_contract"]
-    default_path_contract = properties["defaults"]["properties"]["object_path"][
-        "path_contract"
-    ]
-    row_object_type = properties["imports"]["items"]["properties"][
-        "object_type"
-    ]
-    default_object_type = properties["defaults"]["properties"]["object_type"]
-    row_switch_assignment = properties["imports"]["items"]["properties"][
-        "switch_assignment"
-    ]
-    default_switch_assignment = properties["defaults"]["properties"][
-        "switch_assignment"
-    ]
+    assert payload["request_envelope"] is None
+    fragments = payload["composer"]["registry_fragments"]
+    assert fragments["version"] == version
+    properties = fragments["row_fields"]
+    row_path_contract = properties["object_path"]["path_contract"]
+    default_path_contract = properties["object_path"]["path_contract"]
+    row_object_type = properties["object_type"]
+    default_object_type = properties["object_type"]
+    row_switch_assignment = properties["switch_assignment"]
+    default_switch_assignment = properties["switch_assignment"]
     assert row_path_contract["contract"] == (
         "waapi-skill.audio-import-object-path/v1"
     )
@@ -1492,9 +1484,7 @@ def test_audio_import_operation_schema_discloses_versioned_hierarchy_roots(
     assert "do not pass the value object's path" in (
         row_switch_assignment["description"]
     )
-    inline_audio = properties["imports"]["items"]["properties"][
-        "audio_file_base64"
-    ]
+    inline_audio = properties["audio_file_base64"]
     assert inline_audio["verbatim_contract"]["contract"] == (
         "waapi-skill.audio-file-base64-verbatim/v1"
     )
@@ -1504,7 +1494,7 @@ def test_audio_import_operation_schema_discloses_versioned_hierarchy_roots(
     assert inline_audio["verbatim_contract"][
         "on_unreliable_preservation"
     ] == "stop_before_preview"
-    import_operation = properties["import_operation"]
+    import_operation = fragments["request_options"]["import_operation"]
     assert import_operation["default"] == "createNew"
     assert "$.arguments.import_operation" in import_operation["description"]
     assert "Never place it inside an imports[] row" in import_operation["description"]
@@ -6164,7 +6154,11 @@ def test_remote_local_filesystem_previews_fail_before_project_or_path_proof(
         "operation": operation,
         "arguments": dict(arguments),
     }
-    preview_command = "legacy-preview" if operation == "object.set" else "preview"
+    preview_command = (
+        "legacy-preview"
+        if operation in {"audio.import", "object.set"}
+        else "preview"
+    )
 
     exit_code, payload = execute(
         [

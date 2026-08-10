@@ -721,15 +721,16 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "`describe <uri>`" in OPERATE
     assert "There is deliberately no unconditional schema-to-preview shortcut" in compact
     assert "gateway.py operation-schema <operation-name>" not in OPERATE
-    assert "Follow the schema's single `input_mode`" in OPERATE
-    assert "For `composer`, run its exact `composer.start.gateway_argv`" in OPERATE
-    assert "Gateway-generated handles" in OPERATE
-    assert "Put every known flat row field in its `add_target`" in OPERATE
-    assert "never split that row" in OPERATE
-    assert "Later actions only correct/add nesting" in OPERATE
+    assert "Follow the schema's sole `input_mode`; never seek another" in OPERATE
+    assert "For `composer`, run `composer.start.gateway_argv`" in OPERATE
+    assert "returned actions/handles" in OPERATE
+    assert "Start each flat row once" in OPERATE
+    assert "`object.set` uses `add_target`" in OPERATE
+    assert "`audio.import` uses `add_import_row`" in OPERATE
+    assert "Later actions only correct or nest" in OPERATE
     assert "`draft-check`, then `preview-from-draft`" in OPERATE
-    assert "For `legacy_json`, copy `request_envelope` exactly" in OPERATE
-    assert "Never choose between two normal inputs" in OPERATE
+    assert "For `legacy_json`, copy `request_envelope`" in OPERATE
+    assert "Hide Legacy from normal use" in OPERATE
     assert "Unknown fields fail" in OPERATE
     assert "serialize every JSON string exactly once" in OPERATE
     assert "Operation requests use only closed selectors, never raw WAQL" in OPERATE

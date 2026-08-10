@@ -54,6 +54,7 @@ from tests.semantic.support.codex_campaign_runner import (
 )
 from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
+    build_audio_import_composer_protocol,
     build_direct_protocol,
     build_object_set_composer_transaction_steps,
     build_transaction_protocol,
@@ -6839,7 +6840,7 @@ def test_campaign_typed_import_plan_and_archived_oracle_join(
         sandbox_project=project,
     )
     before = _snapshot(plan, before=True)
-    protocol = build_transaction_protocol(plan.operation_requests)
+    protocol = build_audio_import_composer_protocol(plan.operation_requests[0])
     sections = compile_import_business_plan(
         scenario,
         materialized,

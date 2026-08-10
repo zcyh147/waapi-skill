@@ -27,6 +27,16 @@ from tests.semantic.support.codex_gateway_broker import (
     validate_commutative_read_only_step_groups,
     validate_operation_draft_protocol_steps,
 )
+from wwise_waapi.operation_composer import (
+    OperationComposerError,
+    apply_composer_action,
+    materialize_operation_request,
+    new_composition,
+)
+from wwise_waapi.operation_registry import (
+    OperationContractError,
+    parse_operation_request,
+)
 
 
 OPERATION_REQUEST_CONTRACT = "waapi-skill.operation-request/v1"
@@ -343,6 +353,29 @@ def build_audio_import_composer_transaction_steps(
             )
         )
 
+    try:
+        materialized = _materialize_audio_import_composer_actions(
+            tuple(action for action, _metadata in action_specs),
+            version=normalized["version"],
+        )
+    except (OperationComposerError, StopIteration) as exc:
+        raise V3ProtocolError(
+            "Composer transaction builder requires one valid audio.import request"
+        ) from exc
+    try:
+        canonical_request = parse_operation_request(
+            normalized,
+            expected_version=normalized["version"],
+        ).as_dict()
+    except OperationContractError as exc:
+        raise V3ProtocolError(
+            "Composer transaction builder requires one valid audio.import request"
+        ) from exc
+    if materialized != canonical_request:
+        raise V3ProtocolError(
+            "audio.import typed actions do not reproduce the sealed request"
+        )
+
     steps: list[ExpectedGatewayStep] = [
         ExpectedGatewayStep(
             name=f"{label}.operation-schema",
@@ -438,6 +471,117 @@ def build_audio_import_composer_transaction_steps(
         )
     )
     return tuple(steps)
+
+
+def _materialize_audio_import_composer_actions(
+    actions: Sequence[Mapping[str, Any]],
+    *,
+    version: str,
+) -> dict[str, Any]:
+    composition = new_composition("audio.import", version)
+    handles = iter(
+        f"odh1-{index:024x}" for index in range(1, len(actions) + 1)
+    )
+    for action in actions:
+        composition, _action_name = apply_composer_action(
+            "audio.import",
+            version,
+            composition,
+            action,
+            handle_factory=lambda: next(handles),
+        )
+    return materialize_operation_request("audio.import", version, composition)
+
+
+def materialize_audio_import_composer_protocol_request(
+    protocol: V3GatewayProtocol,
+    *,
+    version: str,
+) -> dict[str, Any]:
+    """Replay one reviewed audio.import Draft protocol into its canonical request."""
+
+    starts = [
+        (index, step)
+        for index, step in enumerate(protocol.steps)
+        if step.subcommand == "draft-start"
+        and step.arguments == ("audio.import",)
+    ]
+    previews = [
+        (index, step)
+        for index, step in enumerate(protocol.steps)
+        if step.subcommand == "preview-from-draft"
+    ]
+    if len(starts) != 1 or len(previews) != 1 or starts[0][0] >= previews[0][0]:
+        raise V3ProtocolError(
+            "audio.import Composer protocol topology is invalid"
+        )
+    start_index = starts[0][0]
+    preview_index = previews[0][0]
+    actions: list[Mapping[str, Any]] = []
+    for step in protocol.steps[start_index + 1 : preview_index]:
+        if step.subcommand != "draft-apply":
+            continue
+        argument = step.arguments[-1] if step.arguments else None
+        if (
+            not isinstance(argument, DraftActionJsonArgument)
+            or argument.operation != "audio.import"
+            or argument.response_bindings
+            or argument.query_identity_bindings
+        ):
+            raise V3ProtocolError(
+                "audio.import Composer protocol contains a dynamic action"
+            )
+        actions.append(argument.expected)
+    try:
+        return _materialize_audio_import_composer_actions(
+            tuple(actions),
+            version=version,
+        )
+    except (OperationComposerError, StopIteration) as exc:
+        raise V3ProtocolError(
+            "audio.import Composer protocol cannot materialize its request"
+        ) from exc
+
+
+def build_audio_import_composer_protocol(
+    request: Mapping[str, Any],
+    *,
+    metadata_binding: DraftActionMetadataBinding | None = None,
+    metadata_step: ExpectedGatewayStep | None = None,
+    schema_first: bool = False,
+) -> V3GatewayProtocol:
+    """Build one complete normal-input audio.import transaction."""
+
+    if (metadata_binding is None) != (metadata_step is None):
+        raise V3ProtocolError(
+            "audio.import Composer metadata step and binding must be paired"
+        )
+    steps = list(
+        build_audio_import_composer_transaction_steps(
+            request,
+            label="tx01",
+            metadata_binding=metadata_binding,
+        )
+    )
+    commutative_groups: tuple[tuple[str, str], ...] = ()
+    if metadata_step is not None:
+        metadata_index = 1 if schema_first else 0
+        steps.insert(metadata_index, metadata_step)
+        commutative_groups = ((steps[0].name, steps[1].name),)
+    preview_indexes = tuple(
+        index
+        for index, step in enumerate(steps, start=1)
+        if step.subcommand == "preview-from-draft"
+    )
+    if len(preview_indexes) != 1 or preview_indexes[0] >= len(steps):
+        raise V3ProtocolError(
+            "audio.import Composer protocol requires one nonterminal preview"
+        )
+    return V3GatewayProtocol(
+        steps=tuple(steps),
+        turn_prefix_counts=(preview_indexes[0], len(steps)),
+        commutative_read_only_step_groups=commutative_groups,
+    )
 
 
 def metadata_candidate_limit(queries: Sequence[str]) -> int:
@@ -890,7 +1034,6 @@ def build_metadata_transaction_protocol(
             "expected required-token projection must match required_tokens in order"
         )
 
-    base = build_transaction_protocol(requests)
     metadata_step_name = "metadata.discover"
     metadata_arguments: list[Any] = [
         "discover",
@@ -912,6 +1055,23 @@ def build_metadata_transaction_protocol(
         subcommand="metadata",
         arguments=tuple(metadata_arguments),
     )
+    if equivalence == "audio_import_v1":
+        if len(requests) != 1:
+            raise V3ProtocolError(
+                "audio.import Composer metadata protocol requires one request"
+            )
+        return build_audio_import_composer_protocol(
+            requests[0],
+            metadata_binding=DraftActionMetadataBinding(
+                step=metadata_step_name,
+                object_type=object_type,
+                required_tokens=tuple(tokens),
+                expected_projection=projection,
+            ),
+            metadata_step=metadata_step,
+            schema_first=schema_first,
+        )
+    base = build_transaction_protocol(requests)
     if schema_first:
         if (
             len(base.steps) < 2
@@ -1296,6 +1456,7 @@ __all__ = [
     "V3GatewayProtocol",
     "V3ProtocolError",
     "build_direct_protocol",
+    "build_audio_import_composer_protocol",
     "build_audio_import_composer_transaction_steps",
     "build_object_set_composer_transaction_steps",
     "build_modification_policy_protocol",
@@ -1304,6 +1465,7 @@ __all__ = [
     "build_transaction_protocol",
     "call_step",
     "metadata_candidate_limit",
+    "materialize_audio_import_composer_protocol_request",
     "operation_request_equivalence",
     "query_object_step",
     "wait_topic_step",

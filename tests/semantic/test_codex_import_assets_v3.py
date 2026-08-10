@@ -15,7 +15,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_metadata_transaction_protocol,
 )
 from tests.semantic.support.codex_gateway_broker import (
-    MetadataBoundJsonArgument,
+    DraftActionJsonArgument,
     project_required_metadata_tokens,
 )
 from tests.semantic.support.codex_import_assets_v3 import (
@@ -132,8 +132,8 @@ def test_localized_use_existing_manifest_is_row_sensitive(tmp_path: Path) -> Non
     )
     assert all("notes" in row and "originals_subfolder" in row for row in creation_rows)
     assert {row["originals_subfolder"] for row in creation_rows} == {
-        "Voices/Chapter06/English",
-        "Voices/Chapter06/Japanese",
+        r"Voices\Chapter06\English",
+        r"Voices\Chapter06\Japanese",
     }
 
 
@@ -382,15 +382,34 @@ def test_compound_direct_import_binds_defaults_row_overrides_and_inline_wav(
     assert tuple(step.name for step in protocol.steps[:3]) == (
         "metadata.discover",
         "tx01.operation-schema",
-        "tx01.preview",
+        "tx01.draft-start",
     )
-    preview_argument = protocol.steps[2].arguments[2]
-    assert protocol.turn_prefix_counts == (3, 7)
-    assert isinstance(preview_argument, MetadataBoundJsonArgument)
-    assert preview_argument.expected == request
-    assert preview_argument.object_type == "Sound"
-    assert preview_argument.equivalence == "audio_import_v1"
-    assert preview_argument.expected_required_token_projection is not None
+    assert next(step for step in protocol.steps if step.name == "tx01.preview").subcommand == (
+        "preview-from-draft"
+    )
+    preview_index = next(
+        index
+        for index, step in enumerate(protocol.steps, start=1)
+        if step.subcommand == "preview-from-draft"
+    )
+    assert protocol.turn_prefix_counts == (preview_index, len(protocol.steps))
+    action_arguments = [
+        step.arguments[-1]
+        for step in protocol.steps
+        if step.subcommand == "draft-apply"
+    ]
+    assert action_arguments
+    assert all(isinstance(item, DraftActionJsonArgument) for item in action_arguments)
+    metadata_arguments = [
+        item for item in action_arguments if item.metadata_binding is not None
+    ]
+    assert metadata_arguments
+    assert all(item.operation == "audio.import" for item in metadata_arguments)
+    assert all(
+        item.metadata_binding.object_type == "Sound"
+        and item.metadata_binding.expected_projection is not None
+        for item in metadata_arguments
+    )
 
     mission = _compound_unit("CMP22-O22-AUDIO-IMPORT-03")
     mission_staged = materialize_import_case(

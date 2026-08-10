@@ -3437,7 +3437,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
 _OPERATION_INPUT_MODE_DECLARATIONS: tuple[
     tuple[str, tuple[str, ...], str], ...
 ] = (
-    ("audio.import", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("audio.import", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
     ("audio.importTabDelimited", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
     ("debug.restartWaapiServers", ("2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
     ("debug.setAsserts", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),

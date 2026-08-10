@@ -80,7 +80,9 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
     )
     for name, spec in specs.items():
         expected_mode = (
-            COMPOSER_INPUT_MODE if name == "object.set" else LEGACY_JSON_INPUT_MODE
+            COMPOSER_INPUT_MODE
+            if name in {"audio.import", "object.set"}
+            else LEGACY_JSON_INPUT_MODE
         )
         assert operation_input_modes_by_version(name) == {
             version: expected_mode
@@ -207,6 +209,18 @@ def test_operation_request_schema_digest_owns_only_versioned_machine_contract() 
     assert operation_request_schema_digest("object.set", "2025.1") != (
         operation_request_schema_digest("object.set", "2022.1")
     )
+    assert operation_request_schema_digest("audio.import", "2022.1") == (
+        "d355b7ce0dcaf2f5f567c6deac58e89ce6c0eae16bf40bed131f3ece624feb0f"
+    )
+    assert operation_request_schema_digest("audio.import", "2025.1") == (
+        "b188bbd19665e0b9f32d475e6834377ccef82c799a5e876d7003bf4c6b189104"
+    )
+    assert operation_request_schema_digest(
+        "audio.importTabDelimited", "2022.1"
+    ) == "14234fe9fcef44e9517fe3abe53f288458e1097c7c58d9bf8cc1387563d1f228"
+    assert operation_request_schema_digest(
+        "audio.importTabDelimited", "2025.1"
+    ) == "f4fb22490f85becff9b7ae079a6f8f5ccef2cf5d7764b903b9651c1d83e346d7"
     assert contract_2025["argument_contract"] != {}
 
     with pytest.raises(OperationContractError, match="Unknown closed operation"):

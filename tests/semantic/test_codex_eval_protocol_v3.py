@@ -79,9 +79,12 @@ def _audio_import_request() -> dict[str, object]:
             },
             "imports": [
                 {
-                    "audio_file": r"C:\\音频\\rain.wav",
+                    "audio_file": "/owned/音频/rain.wav",
                     "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
-                    "event": "Play_Rain",
+                    "event": {
+                        "path": r"\Events\Default Work Unit\Play_Rain",
+                        "action": "Play",
+                    },
                     "references": [
                         {
                             "name": "OutputBus",
@@ -502,7 +505,9 @@ def test_metadata_transaction_protocol_selects_closed_audio_import_equivalence()
         "arguments": {
             "imports": [
                 {
-                    "object_path": r"\Actor-Mixer Hierarchy\Target",
+                    "object_path": (
+                        r"\Actor-Mixer Hierarchy\Default Work Unit\Target"
+                    ),
                     "audio_file": "/owned/source.wav",
                 }
             ],
@@ -521,11 +526,39 @@ def test_metadata_transaction_protocol_selects_closed_audio_import_equivalence()
         required_tokens=("IsLoopingEnabled",),
         equivalence="audio_import_v1",
     )
-    argument = protocol.steps[2].arguments[2]
+    action_arguments = [
+        step.arguments[-1]
+        for step in protocol.steps
+        if step.subcommand == "draft-apply"
+    ]
 
-    assert isinstance(argument, MetadataBoundJsonArgument)
-    assert argument.expected == request
-    assert argument.equivalence == "audio_import_v1"
+    assert protocol.turn_prefix_counts == (7, 11)
+    assert tuple(step.subcommand for step in protocol.steps[:3]) == (
+        "metadata",
+        "operation-schema",
+        "draft-start",
+    )
+    assert [argument.expected["action"] for argument in action_arguments] == [
+        "set_import_default",
+        "add_import_row",
+    ]
+    assert all(
+        isinstance(argument, DraftActionJsonArgument)
+        and argument.operation == "audio.import"
+        for argument in action_arguments
+    )
+    assert action_arguments[0].metadata_binding is not None
+    assert action_arguments[0].metadata_binding.step == "metadata.discover"
+    assert action_arguments[0].metadata_binding.required_tokens == (
+        "IsLoopingEnabled",
+    )
+    assert action_arguments[1].metadata_binding is None
+    assert "preview" not in {
+        step.subcommand for step in protocol.steps
+    }
+    assert "preview-from-draft" in {
+        step.subcommand for step in protocol.steps
+    }
 
 
 def test_metadata_transaction_protocol_selects_closed_tab_import_equivalence() -> None:
@@ -708,7 +741,9 @@ def test_audio_import_metadata_equivalence_rejects_duplicate_expected_names() ->
         "arguments": {
             "imports": [
                 {
-                    "object_path": r"\Actor-Mixer Hierarchy\Target",
+                    "object_path": (
+                        r"\Actor-Mixer Hierarchy\Default Work Unit\Target"
+                    ),
                     "audio_file": "/owned/source.wav",
                     "properties": [
                         {"name": "Volume", "value": -1},
