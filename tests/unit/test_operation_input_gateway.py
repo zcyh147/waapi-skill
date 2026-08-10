@@ -332,8 +332,9 @@ def test_normal_object_set_schema_and_detail_expose_only_composer_input(
         "<task_authority>",
         "--expected-revision",
         "<revision>",
+        "--apply",
     ]
-    assert schema["composer"]["seal"]["optional_apply_flag"] == "--apply"
+    assert "optional_apply_flag" not in schema["composer"]["seal"]
     assert schema["composer"]["cancel"]["gateway_argv"] == [
         "draft-cancel",
         "<draft_id>",
@@ -432,6 +433,20 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             "follow_up_row_actions": "corrections_only",
             "metadata_dependency_activation": "gateway_owned_do_not_submit",
         },
+        "user_fact_checklist": {
+            "copy_every_explicit_fact_for_this_row": True,
+            "batch_facts_apply_to_each_affected_row": True,
+            "mixed_structure_and_media_defaults_are_not_safe": True,
+            "media_row_examples": [
+                "import_language",
+                "object_type",
+                "event",
+                "properties",
+                "references",
+                "switch_assignment",
+            ],
+            "distinct_metadata_tokens_are_independent_facts": True,
+        },
     }
     assert schema["composer"]["planning_discipline"][
         "dynamic_metadata"
@@ -451,6 +466,22 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
     assert schema["composer"]["action_shapes"]["add_import_row"][
         "construction_discipline"
     ] == schema["composer"]["flat_import_row_discipline"]
+    assert schema["composer"]["action_shapes"]["add_import_row"][
+        "user_fact_checklist"
+    ] == {
+        "copy_every_explicit_fact_for_this_row": True,
+        "batch_facts_apply_to_each_affected_row": True,
+        "mixed_structure_and_media_defaults_are_not_safe": True,
+        "media_row_examples": [
+            "import_language",
+            "object_type",
+            "event",
+            "properties",
+            "references",
+            "switch_assignment",
+        ],
+        "distinct_metadata_tokens_are_independent_facts": True,
+    }
     assert schema["composer"]["flat_import_row_discipline"][
         "metadata_dependency_activation"
     ] == "gateway_owned_do_not_submit"

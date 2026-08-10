@@ -305,6 +305,20 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
                     "gateway_owned_do_not_submit"
                 ),
             },
+            "user_fact_checklist": {
+                "copy_every_explicit_fact_for_this_row": True,
+                "batch_facts_apply_to_each_affected_row": True,
+                "mixed_structure_and_media_defaults_are_not_safe": True,
+                "media_row_examples": [
+                    "import_language",
+                    "object_type",
+                    "event",
+                    "properties",
+                    "references",
+                    "switch_assignment",
+                ],
+                "distinct_metadata_tokens_are_independent_facts": True,
+            },
         },
         "set_import_row_field": {
             "fixed_fields": {

@@ -719,16 +719,21 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "without that token, start with the named schema" in skill_compact
     assert "A known native URI without a named route" in OPERATE
     assert "`describe <uri>`" in OPERATE
-    assert "There is deliberately no unconditional schema-to-preview shortcut" in compact
+    assert "No schema-to-preview shortcut" in compact
     assert "gateway.py operation-schema <operation-name>" not in OPERATE
     assert "Follow the schema's sole `input_mode`; never seek another" in OPERATE
     assert "For `composer`, run `composer.start.gateway_argv`" in OPERATE
     assert "returned actions/handles" in OPERATE
-    assert "Start each flat row once" in OPERATE
+    assert "Flat rows start once" in OPERATE
     assert "`object.set` uses `add_target`" in OPERATE
     assert "`audio.import` uses `add_import_row`" in OPERATE
     assert "Later actions only correct or nest" in OPERATE
-    assert "`draft-check`, then `preview-from-draft`" in OPERATE
+    assert (
+        "After `draft-check`, run the selected `preview-from-draft` continuation"
+        in OPERATE
+    )
+    assert "`--apply` marks a mutation preview; it does not execute it" in OPERATE
+    assert "continuation unchanged" in OPERATE
     assert "For `legacy_json`, copy `request_envelope`" in OPERATE
     assert "Hide Legacy from normal use" in OPERATE
     assert "Unknown fields fail" in OPERATE
@@ -769,11 +774,14 @@ def test_operate_business_selection_and_execution_domains_remain_explicit() -> N
         assert phrase in OPERATE
     assert "Batch size alone never establishes file-workflow intent" in compact
     assert "When media import is primary" in compact
+    assert "replace media on existing Sounds" in compact
+    assert "create a Sound in the same batch" in compact
+    assert "`object.set` cannot author media import" in compact
     assert (
         "directly described rows include a new target-container hierarchy or "
         "a same-row Event/Switch Assignation"
     ) in compact
-    assert "select one `audio.import`" in compact
+    assert "use one `audio.import`" in compact
     assert "typed structure-only row" in compact
     assert (
         "never probe `object.create` or a separate assignment first"

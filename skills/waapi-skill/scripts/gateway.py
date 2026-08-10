@@ -3076,8 +3076,8 @@ def operation_composer_input_contract(
                 "<task_authority>",
                 "--expected-revision",
                 "<revision>",
+                "--apply",
             ],
-            "optional_apply_flag": "--apply",
         },
         "cancel": {
             "subcommand": "draft-cancel",

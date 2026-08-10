@@ -174,6 +174,20 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             "follow_up_row_actions": "corrections_only",
             "metadata_dependency_activation": "gateway_owned_do_not_submit",
         }
+        import_row_user_fact_checklist = {
+            "copy_every_explicit_fact_for_this_row": True,
+            "batch_facts_apply_to_each_affected_row": True,
+            "mixed_structure_and_media_defaults_are_not_safe": True,
+            "media_row_examples": [
+                "import_language",
+                "object_type",
+                "event",
+                "properties",
+                "references",
+                "switch_assignment",
+            ],
+            "distinct_metadata_tokens_are_independent_facts": True,
+        }
         action_shapes = {
             action_name: {
                 "fixed_fields": {
@@ -186,6 +200,15 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                     {
                         "construction_discipline": dict(
                             flat_import_row_discipline
+                        )
+                    }
+                    if action_name == "add_import_row"
+                    else {}
+                ),
+                **(
+                    {
+                        "user_fact_checklist": dict(
+                            import_row_user_fact_checklist
                         )
                     }
                     if action_name == "add_import_row"
