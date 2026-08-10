@@ -33,6 +33,7 @@ COMPOSER_ADAPTER_OPERATIONS = frozenset(
     {OBJECT_SET_COMPOSER_OPERATION, AUDIO_IMPORT_COMPOSER_OPERATION}
 )
 MAX_COMPOSER_ACTION_BYTES = 32 * 1024
+MAX_AUDIO_IMPORT_COMPOSER_ACTION_BYTES = 384 * 1024
 _TARGET_HANDLE_PATTERN = re.compile(r"^odh1-[0-9a-f]{24}$")
 _BASE_ACTION_FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "set_request_option": (("name", "value"), ()),
@@ -89,9 +90,26 @@ _AUDIO_IMPORT_ACTION_FIELDS: dict[
 ] = {
     "set_import_option": (("name", "value"), ()),
     "clear_import_option": (("name",), ()),
+    "set_import_default": (("name", "value"), ()),
+    "clear_import_default": (("name",), ()),
     "add_import_row": (
-        ("object_path",),
-        ("audio_file", "object_type", "import_language"),
+        (),
+        (
+            "audio_file",
+            "audio_file_base64",
+            "audio_source_notes",
+            "dialogue_event",
+            "event",
+            "import_language",
+            "import_location",
+            "notes",
+            "object_path",
+            "object_type",
+            "originals_subfolder",
+            "properties",
+            "references",
+            "switch_assignment",
+        ),
     ),
     "set_import_row_field": (("import_handle", "name", "value"), ()),
     "clear_import_row_field": (("import_handle", "name"), ()),
@@ -133,7 +151,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             "contract": OPERATION_COMPOSER_CONTRACT,
             "operation": operation,
             "version": version,
-            "phase": "additive_base_adapter",
+            "phase": "complete_additive_adapter",
             "action_contract": OPERATION_DRAFT_ACTION_CONTRACT,
             "action_construction": {
                 "fixed_fields_are_required": True,
@@ -158,7 +176,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             "actions": list(_AUDIO_IMPORT_ACTION_FIELDS),
             "limits": {
                 "imports": fragments["limits"]["imports"],
-                "action_bytes": MAX_COMPOSER_ACTION_BYTES,
+                "action_bytes": MAX_AUDIO_IMPORT_COMPOSER_ACTION_BYTES,
             },
             "registry_fragments": fragments,
             "complete_request_is_never_an_action": True,
@@ -259,6 +277,7 @@ def new_composition(operation: str, version: str) -> dict[str, Any]:
         return {
             "contract": OPERATION_COMPOSITION_CONTRACT,
             "request_options": {},
+            "defaults": {},
             "imports": [],
         }
     return {
@@ -285,12 +304,15 @@ def apply_composer_action(
         action_size = len(canonical_json_bytes(dict(action)))
     except (RecursionError, TypeError, UnicodeError, ValueError) as exc:
         raise OperationComposerError("Operation Draft action must be strict JSON.") from exc
-    if action_size > MAX_COMPOSER_ACTION_BYTES:
+    action_limit = operation_composer_contract(operation, version)["limits"][
+        "action_bytes"
+    ]
+    if action_size > action_limit:
         raise OperationComposerError(
             "Operation Draft action exceeds its fixed byte ceiling.",
             details={
                 "size_bytes": action_size,
-                "limit_bytes": MAX_COMPOSER_ACTION_BYTES,
+                "limit_bytes": action_limit,
             },
         )
     if action.get("contract") != OPERATION_DRAFT_ACTION_CONTRACT:
@@ -1368,11 +1390,42 @@ def _apply_audio_import_action(
             del options[name]
         _materialize_if_complete(AUDIO_IMPORT_COMPOSER_OPERATION, version, composition)
         return composition, str(action_name)
+    if action_name in {"set_import_default", "clear_import_default"}:
+        required = (
+            ("contract", "action", "name", "value")
+            if action_name == "set_import_default"
+            else ("contract", "action", "name")
+        )
+        _require_exact_keys(action, required=required, label=f"{action_name} action")
+        defaults = composition["defaults"]
+        assert isinstance(defaults, dict)
+        name = action.get("name")
+        if action_name == "set_import_default":
+            descriptor = _validate_audio_import_fragment(
+                version,
+                fragment="row_field",
+                payload={"name": name, "value": action.get("value")},
+            )
+            defaults[descriptor["name"]] = descriptor["value"]
+        else:
+            if not isinstance(name, str) or name not in defaults:
+                raise OperationComposerError(
+                    "The requested audio.import default does not exist.",
+                    details={"name": name},
+                )
+            del defaults[name]
+        _materialize_if_complete(AUDIO_IMPORT_COMPOSER_OPERATION, version, composition)
+        return composition, str(action_name)
     if action_name == "add_import_row":
+        row_field_names = tuple(
+            operation_composer_contract(
+                AUDIO_IMPORT_COMPOSER_OPERATION, version
+            )["registry_fragments"]["supported_row_fields"]
+        )
         _require_allowed_keys(
             action,
-            required=("contract", "action", "object_path"),
-            optional=("audio_file", "object_type", "import_language"),
+            required=("contract", "action"),
+            optional=row_field_names,
             label="add_import_row action",
         )
         rows = composition["imports"]
@@ -1384,7 +1437,7 @@ def _apply_audio_import_action(
                 details={"limit": limit},
             )
         fields: dict[str, Any] = {}
-        for name in ("object_path", "audio_file", "object_type", "import_language"):
+        for name in row_field_names:
             if name not in action:
                 continue
             descriptor = _validate_audio_import_fragment(
@@ -1393,8 +1446,10 @@ def _apply_audio_import_action(
                 payload={"name": name, "value": action[name]},
             )
             fields[descriptor["name"]] = descriptor["value"]
-        object_path = fields["object_path"]
-        if any(row["fields"].get("object_path") == object_path for row in rows):
+        object_path = fields.get("object_path")
+        if isinstance(object_path, str) and any(
+            row["fields"].get("object_path") == object_path for row in rows
+        ):
             raise OperationComposerError(
                 "Operation Draft import object paths must be unique.",
                 details={"object_path": object_path},
@@ -1470,7 +1525,7 @@ def _normalize_audio_import_composition(
 ) -> dict[str, Any]:
     _require_json_object(composition, label="composition")
     required = {"contract", "imports"}
-    optional = {"request_options"}
+    optional = {"request_options", "defaults"}
     actual = set(composition)
     if not required.issubset(actual) or actual - required - optional:
         raise OperationComposerError(
@@ -1493,6 +1548,17 @@ def _normalize_audio_import_composition(
             payload={"name": name, "value": value},
         )
         options[descriptor["name"]] = descriptor["value"]
+    raw_defaults = composition.get("defaults", {})
+    if not isinstance(raw_defaults, Mapping):
+        raise OperationComposerError("audio.import defaults are invalid.")
+    defaults: dict[str, Any] = {}
+    for name, value in raw_defaults.items():
+        descriptor = _validate_audio_import_fragment(
+            version,
+            fragment="row_field",
+            payload={"name": name, "value": value},
+        )
+        defaults[descriptor["name"]] = descriptor["value"]
     raw_rows = composition.get("imports")
     limit = _audio_import_limit(version)
     if not isinstance(raw_rows, list) or len(raw_rows) > limit:
@@ -1537,6 +1603,7 @@ def _normalize_audio_import_composition(
     return {
         "contract": OPERATION_COMPOSITION_CONTRACT,
         "request_options": options,
+        "defaults": defaults,
         "imports": rows,
     }
 
@@ -1552,12 +1619,17 @@ def _materialize_audio_import_request(
             error_code="OPERATION_DRAFT_INCOMPLETE",
             details={"import_count": 0, "minimum": 1},
         )
+    defaults = composition["defaults"]
     missing: list[str] = []
     for row in rows:
         fields = row["fields"]
-        if "object_path" not in fields:
+        effective = {**defaults, **fields}
+        if "object_path" not in effective:
             missing.append(f"imports[{row['handle']}].object_path")
-        if "audio_file" not in fields and "object_type" not in fields:
+        if not any(
+            name in effective
+            for name in ("audio_file", "audio_file_base64", "object_type")
+        ):
             missing.append(f"imports[{row['handle']}].source_or_structure_type")
     if missing:
         raise OperationComposerError(
@@ -1571,6 +1643,7 @@ def _materialize_audio_import_request(
         "operation": AUDIO_IMPORT_COMPOSER_OPERATION,
         "arguments": {
             "imports": [dict(row["fields"]) for row in rows],
+            **({"defaults": dict(defaults)} if defaults else {}),
             **dict(composition["request_options"]),
         },
     }
@@ -1589,17 +1662,22 @@ def _audio_import_composition_projection(
     composition: Mapping[str, Any],
 ) -> dict[str, Any]:
     del version
+    defaults = composition["defaults"]
     facts = [
-        {"handle": row["handle"], **dict(row["fields"])}
+        {"handle": row["handle"], **_audio_import_public_fields(row["fields"])}
         for row in composition["imports"]
     ]
     missing: list[str] = []
     if not facts:
         missing.append("import_row")
-    for row in facts:
-        if "object_path" not in row:
+    for raw_row, row in zip(composition["imports"], facts):
+        effective = {**defaults, **raw_row["fields"]}
+        if "object_path" not in effective:
             missing.append(f"imports[{row['handle']}].object_path")
-        if "audio_file" not in row and "object_type" not in row:
+        if not any(
+            name in effective
+            for name in ("audio_file", "audio_file_base64", "object_type")
+        ):
             missing.append(f"imports[{row['handle']}].source_or_structure_type")
     allowed = list(_AUDIO_IMPORT_ACTION_FIELDS)
     if not missing:
@@ -1607,11 +1685,26 @@ def _audio_import_composition_projection(
     allowed.extend(("inspect", "cancel"))
     return {
         "request_options": dict(composition["request_options"]),
+        "defaults": _audio_import_public_fields(defaults),
         "current_facts": facts,
         "missing_fields": missing,
         "missing_fields_status": "complete" if not missing else "incomplete",
         "allowed_actions": allowed,
     }
+
+
+def _audio_import_public_fields(fields: Mapping[str, Any]) -> dict[str, Any]:
+    """Project import facts without echoing opaque inline media."""
+
+    projected = dict(fields)
+    inline_media = projected.get("audio_file_base64")
+    if isinstance(inline_media, str):
+        projected["audio_file_base64"] = {
+            "redacted": True,
+            "utf8_bytes": len(inline_media.encode("utf-8")),
+            "canonical_sha256": canonical_sha256(inline_media),
+        }
+    return projected
 
 
 def _audio_import_row_for_handle(

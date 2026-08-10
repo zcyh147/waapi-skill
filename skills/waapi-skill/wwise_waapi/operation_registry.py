@@ -3793,12 +3793,7 @@ def object_set_composer_fragment_contract(version: str) -> dict[str, Any]:
 
 
 def audio_import_composer_fragment_contract(version: str) -> dict[str, Any]:
-    """Project the reviewed base audio.import Adapter from Registry truth.
-
-    The projection is intentionally incomplete.  It covers the first vertical
-    slice only; the follow-up full Adapter must expand ``supported_row_fields``
-    before normal input-mode cutover.
-    """
+    """Project the complete additive audio.import Adapter from Registry truth."""
 
     machine = operation_request_machine_contract("audio.import", version)
     try:
@@ -3808,29 +3803,27 @@ def audio_import_composer_fragment_contract(version: str) -> dict[str, Any]:
         raise RuntimeError(
             "audio.import Registry schema no longer exposes the reviewed Composer fragments"
         ) from exc
-    supported_row_fields = (
-        "audio_file",
-        "import_language",
-        "object_path",
-        "object_type",
-    )
-    if any(name not in row_properties for name in supported_row_fields):
+    supported_row_fields = tuple(sorted(IMPORT_ITEM_OPTIONAL_FIELDS))
+    if set(row_properties) != set(supported_row_fields):
         raise RuntimeError(
-            "audio.import Registry fields changed without the base Composer Adapter mapping"
+            "audio.import Registry fields changed without a complete Composer Adapter mapping"
         )
     return {
         "contract": "waapi-skill.audio-import-composer-fragments/v1",
         "operation": "audio.import",
         "version": version,
-        "phase": "additive_base_adapter",
+        "phase": "complete_additive_adapter",
         "supported_row_fields": list(supported_row_fields),
         "row_fields": {
             name: _json_mapping(row_properties[name])
             for name in supported_row_fields
         },
         "request_options": {
-            "import_operation": _json_mapping(
-                argument_properties["import_operation"]
+            name: _json_mapping(argument_properties[name])
+            for name in (
+                "import_operation",
+                "auto_add_to_source_control",
+                "auto_check_out_to_source_control",
             )
         },
         "limits": {
@@ -3849,7 +3842,7 @@ def validate_audio_import_composer_fragment(
     fragment: str,
     payload: Any,
 ) -> dict[str, Any]:
-    """Validate one base audio.import fact through Registry-owned contracts."""
+    """Validate one audio.import Composer fact through Registry-owned contracts."""
 
     contract = audio_import_composer_fragment_contract(version)
     if fragment == "request_option":
@@ -3863,14 +3856,26 @@ def validate_audio_import_composer_fragment(
         if not isinstance(name, str) or name not in option_contracts:
             raise OperationContractError(
                 "INVALID_ARGUMENT",
-                "audio.import Composer request option is not reviewed in the base Adapter.",
+                "audio.import Composer request option is not reviewed by the Adapter.",
                 details={"name": name, "allowed": sorted(option_contracts)},
+            )
+        option_contract = option_contracts[name]
+        supported_versions = option_contract.get("supported_versions")
+        if isinstance(supported_versions, list) and version not in supported_versions:
+            raise OperationContractError(
+                "UNSUPPORTED_VERSION",
+                f"audio.import {name} is not supported in Wwise {version}.",
+                details={
+                    "name": name,
+                    "version": version,
+                    "supported_versions": list(supported_versions),
+                },
             )
         return {
             "name": name,
             "value": _normalize_composer_scalar(
                 payload.get("value"),
-                schema=option_contracts[name],
+                schema=option_contract,
                 field=f"audio.import.{name}",
             ),
         }
@@ -3885,14 +3890,73 @@ def validate_audio_import_composer_fragment(
         if not isinstance(name, str) or name not in row_contracts:
             raise OperationContractError(
                 "INVALID_ARGUMENT",
-                "audio.import Composer row field is not reviewed in the base Adapter.",
+                "audio.import Composer row field is not reviewed by the Adapter.",
                 details={"name": name, "allowed": sorted(row_contracts)},
             )
-        value = _normalize_composer_scalar(
-            payload.get("value"),
-            schema=row_contracts[name],
-            field=f"audio.import.imports[].{name}",
-        )
+        raw_value = payload.get("value")
+        if name == "import_location":
+            try:
+                descriptors = normalize_reference_descriptors(
+                    [{"name": "ImportLocation", "target": raw_value}],
+                    request_path="$.arguments.imports[0].import_location_probe",
+                )
+            except ObjectOperationContractError as exc:
+                raise OperationContractError(
+                    exc.error_code, str(exc), details=exc.details
+                ) from exc
+            value = descriptors[0].target.as_dict()
+        elif name == "properties":
+            try:
+                value = [
+                    descriptor.as_dict()
+                    for descriptor in normalize_property_descriptors(
+                        raw_value,
+                        request_path="$.arguments.imports[0].properties",
+                    )
+                ]
+            except ObjectOperationContractError as exc:
+                raise OperationContractError(
+                    exc.error_code, str(exc), details=exc.details
+                ) from exc
+        elif name == "references":
+            try:
+                value = [
+                    descriptor.as_dict()
+                    for descriptor in normalize_reference_descriptors(
+                        raw_value,
+                        request_path="$.arguments.imports[0].references",
+                    )
+                ]
+            except ObjectOperationContractError as exc:
+                raise OperationContractError(
+                    exc.error_code, str(exc), details=exc.details
+                ) from exc
+        elif name == "event":
+            if not isinstance(raw_value, Mapping):
+                raise OperationContractError(
+                    "INVALID_ARGUMENT", "audio.import event must be an object."
+                )
+            _require_exact_keys(
+                raw_value,
+                required=("path",),
+                optional=("action",),
+                context="audio.import Composer event",
+            )
+            event_contract = row_contracts[name]["properties"]
+            value = {
+                key: _normalize_composer_scalar(
+                    item,
+                    schema=event_contract[key],
+                    field=f"audio.import.event.{key}",
+                )
+                for key, item in raw_value.items()
+            }
+        else:
+            value = _normalize_composer_scalar(
+                raw_value,
+                schema=row_contracts[name],
+                field=f"audio.import.imports[].{name}",
+            )
         if name == "object_path":
             assert isinstance(value, str)
             _canonical_import_target_paths(value, version=version)
@@ -3904,10 +3968,20 @@ def validate_audio_import_composer_fragment(
                     "audio.import Composer audio_file must be an absolute host path.",
                     details={"path": value},
                 )
+        elif name == "originals_subfolder":
+            try:
+                value = normalize_originals_subfolder(
+                    value,
+                    field="audio.import.imports[].originals_subfolder",
+                )
+            except ImportContractError as exc:
+                raise OperationContractError(
+                    exc.error_code, str(exc), details=exc.details
+                ) from exc
         return {"name": name, "value": value}
     raise OperationContractError(
         "INVALID_ARGUMENT",
-        "audio.import Composer fragment is not reviewed in the base Adapter.",
+        "audio.import Composer fragment is not reviewed by the Adapter.",
         details={"fragment": fragment},
     )
 
@@ -4131,6 +4205,12 @@ def _normalize_composer_scalar(
             raise OperationContractError(
                 "INVALID_ARGUMENT",
                 f"{field} exceeds the Registry maximum.",
+            )
+        pattern = schema.get("pattern")
+        if isinstance(pattern, str) and re.search(pattern, value) is None:
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                f"{field} does not match the Registry pattern.",
             )
     else:  # pragma: no cover - guarded by the reviewed Registry projection
         raise RuntimeError(f"Unsupported Composer scalar schema for {field}")

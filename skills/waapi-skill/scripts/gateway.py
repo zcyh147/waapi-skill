@@ -2933,7 +2933,7 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
                 f"wait-topic --event-count must be between 1 and {MAX_WAIT_EVENT_COUNT}"
             )
     elif args.command == "draft-apply":
-        parse_json_object(args.action_json, "--action-json")
+        parse_operation_draft_action_object(args.action_json)
     elif args.command in {"preview", "legacy-preview"}:
         request_payload = parse_preview_request_object(args.request_json)
         if args.command == "preview":
@@ -3127,7 +3127,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             inspected.operation,
             inspected.version,
         )
-        parsed_action = parse_json_object(args.action_json, "--action-json")
+        parsed_action = parse_operation_draft_action_object(args.action_json)
         record = store.apply_action(
             args.draft_id,
             task_authority=args.task_authority,
@@ -11655,6 +11655,21 @@ def parse_preview_request_object(text: str) -> dict[str, Any]:
     return parse_json_object(
         text,
         "--request-json",
+        max_document_bytes=MAX_PREVIEW_JSON_INPUT_BYTES,
+        max_string_bytes=MAX_PREVIEW_JSON_STRING_BYTES,
+    )
+
+
+def parse_operation_draft_action_object(text: str) -> dict[str, Any]:
+    """Parse a bounded Draft action that may carry reviewed inline media.
+
+    The Adapter applies its narrower operation-specific action ceiling after
+    this syntax-only parse, so object.set retains its existing 32 KiB limit.
+    """
+
+    return parse_json_object(
+        text,
+        "--action-json",
         max_document_bytes=MAX_PREVIEW_JSON_INPUT_BYTES,
         max_string_bytes=MAX_PREVIEW_JSON_STRING_BYTES,
     )

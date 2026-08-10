@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import importlib.util
 import json
 import re
@@ -232,7 +233,7 @@ def test_base_audio_import_adapter_is_registry_derived_but_not_normal_cutover(
     contract = operation_composer_contract("audio.import", version)
 
     assert contract["operation"] == "audio.import"
-    assert contract["phase"] == "additive_base_adapter"
+    assert contract["phase"] == "complete_additive_adapter"
     assert contract["action_shapes"] == {
         "set_import_option": {
             "fixed_fields": {
@@ -250,16 +251,43 @@ def test_base_audio_import_adapter_is_registry_derived_but_not_normal_cutover(
             "required_fields": ["name"],
             "optional_fields": [],
         },
+        "set_import_default": {
+            "fixed_fields": {
+                "contract": ACTION_CONTRACT,
+                "action": "set_import_default",
+            },
+            "required_fields": ["name", "value"],
+            "optional_fields": [],
+        },
+        "clear_import_default": {
+            "fixed_fields": {
+                "contract": ACTION_CONTRACT,
+                "action": "clear_import_default",
+            },
+            "required_fields": ["name"],
+            "optional_fields": [],
+        },
         "add_import_row": {
             "fixed_fields": {
                 "contract": ACTION_CONTRACT,
                 "action": "add_import_row",
             },
-            "required_fields": ["object_path"],
+            "required_fields": [],
             "optional_fields": [
                 "audio_file",
-                "object_type",
+                "audio_file_base64",
+                "audio_source_notes",
+                "dialogue_event",
+                "event",
                 "import_language",
+                "import_location",
+                "notes",
+                "object_path",
+                "object_type",
+                "originals_subfolder",
+                "properties",
+                "references",
+                "switch_assignment",
             ],
         },
         "set_import_row_field": {
@@ -289,10 +317,25 @@ def test_base_audio_import_adapter_is_registry_derived_but_not_normal_cutover(
     }
     assert contract["registry_fragments"]["supported_row_fields"] == [
         "audio_file",
+        "audio_file_base64",
+        "audio_source_notes",
+        "dialogue_event",
+        "event",
         "import_language",
+        "import_location",
+        "notes",
         "object_path",
         "object_type",
+        "originals_subfolder",
+        "properties",
+        "references",
+        "switch_assignment",
     ]
+    assert set(contract["registry_fragments"]["request_options"]) == {
+        "auto_add_to_source_control",
+        "auto_check_out_to_source_control",
+        "import_operation",
+    }
     assert contract["registry_fragments"]["source_schema_digest"] == (
         operation_request_schema_digest("audio.import", version)
     )
@@ -452,6 +495,340 @@ def test_base_audio_import_structure_row_is_correctable_by_stable_handle(
     ]
 
 
+def test_complete_audio_import_adapter_materializes_every_registry_field(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "full.wav"
+    source.write_bytes(b"RIFF\x04\x00\x00\x00WAVE")
+    composition = new_composition("audio.import", "2023.1")
+    from wwise_waapi.operation_composer import apply_composer_action
+
+    def apply(action_name: str, **fields: Any) -> None:
+        nonlocal composition
+        composition, _ = apply_composer_action(
+            "audio.import",
+            "2023.1",
+            composition,
+            {
+                "contract": ACTION_CONTRACT,
+                "action": action_name,
+                **fields,
+            },
+        )
+
+    apply("set_import_option", name="import_operation", value="useExisting")
+    apply("set_import_option", name="auto_add_to_source_control", value=True)
+    apply("set_import_option", name="auto_check_out_to_source_control", value=True)
+    apply("set_import_default", name="import_language", value="SFX")
+    apply(
+        "set_import_default",
+        name="properties",
+        value=[{"name": "Volume", "value": -6.0}],
+    )
+    apply(
+        "set_import_default",
+        name="references",
+        value=[
+            {
+                "name": "OutputBus",
+                "target": {
+                    "kind": "id",
+                    "value": "{33333333-3333-3333-3333-333333333333}",
+                },
+            }
+        ],
+    )
+    apply(
+        "add_import_row",
+        object_path=(
+            r"\Actor-Mixer Hierarchy\Default Work Unit\Composer\Full"
+        ),
+        object_type="Sound SFX",
+        audio_file=str(source),
+        import_location={
+            "kind": "path",
+            "value": r"\Actor-Mixer Hierarchy\Default Work Unit\Composer",
+        },
+        originals_subfolder="Composer/雨",
+        notes="target notes",
+        audio_source_notes="source notes",
+        event={"path": r"\Events\Default Work Unit\Play_Full", "action": "Play"},
+        dialogue_event="DialogueEvent:Full",
+        switch_assignment="Mud",
+        properties=[{"name": "Pitch", "value": 2.0}],
+        references=[
+            {
+                "name": "OutputBus",
+                "target": {
+                    "kind": "path",
+                    "value": r"\Master-Mixer Hierarchy\Default Work Unit\Bus",
+                },
+            }
+        ],
+    )
+
+    request = materialize_operation_request("audio.import", "2023.1", composition)
+    assert request == {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2023.1",
+        "operation": "audio.import",
+        "arguments": {
+            "imports": [
+                {
+                    "object_path": (
+                        r"\Actor-Mixer Hierarchy\Default Work Unit\Composer\Full"
+                    ),
+                    "object_type": "Sound SFX",
+                    "audio_file": str(source),
+                    "import_location": {
+                        "kind": "path",
+                        "value": (
+                            r"\Actor-Mixer Hierarchy\Default Work Unit\Composer"
+                        ),
+                    },
+                    "originals_subfolder": r"Composer\雨",
+                    "notes": "target notes",
+                    "audio_source_notes": "source notes",
+                    "event": {
+                        "path": r"\Events\Default Work Unit\Play_Full",
+                        "action": "Play",
+                    },
+                    "dialogue_event": "DialogueEvent:Full",
+                    "switch_assignment": "Mud",
+                    "properties": [{"name": "Pitch", "value": 2.0}],
+                    "references": [
+                        {
+                            "name": "OutputBus",
+                            "target": {
+                                "kind": "path",
+                                "value": (
+                                    r"\Master-Mixer Hierarchy\Default Work Unit\Bus"
+                                ),
+                            },
+                        }
+                    ],
+                }
+            ],
+            "defaults": {
+                "import_language": "SFX",
+                "properties": [{"name": "Volume", "value": -6.0}],
+                "references": [
+                    {
+                        "name": "OutputBus",
+                        "target": {
+                            "kind": "id",
+                            "value": "{33333333-3333-3333-3333-333333333333}",
+                        },
+                    }
+                ],
+            },
+            "import_operation": "useExisting",
+            "auto_add_to_source_control": True,
+            "auto_check_out_to_source_control": True,
+        },
+    }
+
+
+def test_complete_audio_import_inline_media_is_bounded_and_not_echoed(
+    tmp_path: Path,
+) -> None:
+    wave = b"RIFF" + (96 * 1024 - 8).to_bytes(4, "little") + b"WAVE" + (
+        b"\x00" * (96 * 1024 - 12)
+    )
+    encoded = "Inline.wav|" + base64.b64encode(wave).decode("ascii")
+    start_code, started = _execute(
+        tmp_path,
+        "draft-start",
+        "audio.import",
+    )
+    assert start_code == 0
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    apply_code, applied = _execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--compact",
+        "--action-json",
+        _action(
+            "add_import_row",
+            object_path=(
+                r"\Actor-Mixer Hierarchy\Default Work Unit\Composer\Inline"
+            ),
+            object_type="Sound SFX",
+            audio_file_base64=encoded,
+            import_language="SFX",
+        ),
+    )
+
+    assert apply_code == 0, applied
+    output = json.dumps(applied)
+    assert encoded not in output
+    materialized = OperationDraftStore(tmp_path / "state").materialize_request(
+        draft_id,
+        task_authority=authority,
+        expected_revision=2,
+        schema_digest=operation_request_schema_digest("audio.import", "2022.1"),
+        composer_digest=operation_composer_digest("audio.import", "2022.1"),
+    )
+    assert materialized.request["arguments"]["imports"][0][
+        "audio_file_base64"
+    ] == encoded
+    check_code, checked = _live_execute(
+        tmp_path,
+        _audio_import_client(tmp_path),
+        "draft-check",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "2",
+    )
+    assert check_code == 0, checked
+    assert encoded not in json.dumps(checked)
+
+
+@pytest.mark.parametrize(
+    "import_operation", ("createNew", "useExisting", "replaceExisting")
+)
+def test_complete_audio_import_adapter_accepts_every_import_operation(
+    import_operation: str,
+) -> None:
+    from wwise_waapi.operation_composer import apply_composer_action
+
+    composition, _ = apply_composer_action(
+        "audio.import",
+        "2025.1",
+        new_composition("audio.import", "2025.1"),
+        {
+            "contract": ACTION_CONTRACT,
+            "action": "set_import_option",
+            "name": "import_operation",
+            "value": import_operation,
+        },
+    )
+    assert composition["request_options"] == {
+        "import_operation": import_operation
+    }
+
+
+def test_complete_audio_import_default_can_be_corrected_and_removed() -> None:
+    from wwise_waapi.operation_composer import apply_composer_action
+
+    composition = new_composition("audio.import", "2025.1")
+    composition, _ = apply_composer_action(
+        "audio.import",
+        "2025.1",
+        composition,
+        {
+            "contract": ACTION_CONTRACT,
+            "action": "set_import_default",
+            "name": "notes",
+            "value": "before",
+        },
+    )
+    composition, _ = apply_composer_action(
+        "audio.import",
+        "2025.1",
+        composition,
+        {
+            "contract": ACTION_CONTRACT,
+            "action": "set_import_default",
+            "name": "notes",
+            "value": "after",
+        },
+    )
+    assert composition["defaults"] == {"notes": "after"}
+    composition, _ = apply_composer_action(
+        "audio.import",
+        "2025.1",
+        composition,
+        {
+            "contract": ACTION_CONTRACT,
+            "action": "clear_import_default",
+            "name": "notes",
+        },
+    )
+    assert composition["defaults"] == {}
+
+
+def test_audio_import_auto_checkout_is_version_bound_and_atomic(tmp_path: Path) -> None:
+    _code, started = _execute(tmp_path, "draft-start", "audio.import")
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    record_path = (
+        tmp_path
+        / "state"
+        / "operation-drafts-v1"
+        / "records"
+        / f"{draft_id}.json"
+    )
+    before = record_path.read_bytes()
+
+    exit_code, rejected = _execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--action-json",
+        _action(
+            "set_import_option",
+            name="auto_check_out_to_source_control",
+            value=True,
+        ),
+    )
+
+    assert exit_code == 2
+    assert rejected["error_code"] == OperationComposerError.error_code
+    assert record_path.read_bytes() == before
+
+
+def test_larger_audio_action_parser_does_not_expand_object_set_action_limit(
+    tmp_path: Path,
+) -> None:
+    _code, started = _execute(tmp_path, "draft-start", "object.set")
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    record_path = (
+        tmp_path
+        / "state"
+        / "operation-drafts-v1"
+        / "records"
+        / f"{draft_id}.json"
+    )
+    before = record_path.read_bytes()
+
+    exit_code, rejected = _execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--action-json",
+        _action(
+            "add_target",
+            selector={
+                "kind": "id",
+                "value": "{11111111-1111-1111-1111-111111111111}",
+            },
+            notes="N" * (64 * 1024),
+        ),
+    )
+
+    assert exit_code == 2
+    assert rejected["error_code"] == OperationComposerError.error_code
+    assert record_path.read_bytes() == before
+
+
 @pytest.mark.parametrize(
     "invalid_action",
     (
@@ -465,6 +842,16 @@ def test_base_audio_import_structure_row_is_correctable_by_stable_handle(
             "add_import_row",
             object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
             import_language="",
+        ),
+        _action(
+            "add_import_row",
+            object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+            event={"path": r"\Not Events\Play_Rain"},
+        ),
+        _action(
+            "add_import_row",
+            object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+            properties=[{"name": "@Volume", "value": -3.0}],
         ),
         _action(
             "add_import_row",
