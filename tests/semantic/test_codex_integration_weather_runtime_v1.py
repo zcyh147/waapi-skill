@@ -11,7 +11,6 @@ import pytest
 
 from tests.semantic.support.codex_gateway_broker import (
     DraftActionJsonArgument,
-    GatewayDerivedReferenceActivationAllowance,
     MetadataBoundJsonArgument,
     MetadataTokenProjection,
     gateway_step_sequence_matches,
@@ -178,9 +177,6 @@ def test_weather_requests_close_five_sound_action_and_rtpc_requirements(
         targets=targets,
         weather_root=r"\Actor-Mixer Hierarchy\Default Work Unit\IntegrationLab",
         weather_bus=bus,
-        dependency_properties=(
-            {"name": "OverrideOutput_Live", "value": True},
-        ),
     )
     rows = import_request["arguments"]["imports"]
     assert rows[:4] == [
@@ -229,8 +225,8 @@ def test_weather_requests_close_five_sound_action_and_rtpc_requirements(
             "UseMaxSoundPerInstance": True,
             "MaxSoundPerInstance": target.instance_limit,
             "Volume": target.volume,
-            "OverrideOutput_Live": True,
         }
+        assert row["object_type"] == "Sound SFX"
         assert row["references"] == [
             {
                 "name": "OutputBus",
@@ -321,23 +317,11 @@ def test_weather_dependency_closure_uses_only_exact_live_names_and_values() -> N
         weather_bus=(
             r"\Master-Mixer Hierarchy\Default Work Unit\Weather_Bus"
         ),
-        dependency_properties=(
-            {"name": "LiveOutputOverride", "value": True},
-        ),
     )
-    allowances = _gateway_derived_reference_activation_allowances(
-        result,
-        selected_tokens=("Volume", "OutputBus"),
-        expected_request=request,
-    )
-    assert tuple(item.as_dict() for item in allowances) == tuple(
-        {
-            "row_index": row_index,
-            "property_name": "LiveOutputOverride",
-            "property_value": True,
-            "reference_name": "OutputBus",
-        }
-        for row_index in range(4, 9)
+    assert all(
+        "LiveOutputOverride"
+        not in {item["name"] for item in row.get("properties", [])}
+        for row in request["arguments"]["imports"]
     )
 
     result["candidates"][0]["dependency_requirements"][0]["action"] = "Disable"
@@ -362,15 +346,6 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
     tmp_path: Path,
 ) -> None:
     targets = _targets(tmp_path)
-    activation_allowances = tuple(
-        GatewayDerivedReferenceActivationAllowance(
-            row_index=row_index,
-            property_name="LiveOutputOverride",
-            property_value=True,
-            reference_name="OutputBus",
-        )
-        for row_index in range(4, 9)
-    )
     sound_tokens = (*SOUND_TOKENS, "LiveOutputOverride")
     sound_projection = (
         *_projection(SOUND_TOKENS),
@@ -388,9 +363,6 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
                 r"\Actor-Mixer Hierarchy\Default Work Unit\IntegrationLab"
             ),
             weather_bus=r"\Master-Mixer Hierarchy\Default Work Unit\Weather_Bus",
-            dependency_properties=(
-                {"name": "LiveOutputOverride", "value": True},
-            ),
         ),
         _weather_action_request("2022.1", targets=targets),
         _weather_rtpc_request(
@@ -419,7 +391,7 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
             None,
         ),
         gateway_derived_reference_activations=(
-            activation_allowances,
+            (),
             (),
             (),
         ),

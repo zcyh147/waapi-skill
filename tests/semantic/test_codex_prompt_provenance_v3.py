@@ -2008,8 +2008,15 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
     ]
     assert len(serialized_metadata_rows) == 2
     assert deserialize_protocol(serialized) == protocol
+    gateway_authored_request = {
+        **request,
+        "arguments": {
+            **request["arguments"],
+            "import_operation": "createNew",
+        },
+    }
     assert _protocol_requests(serialized, version="2022.1") == (
-        ("/composer/tx01.preview", request),
+        ("/composer/tx01.preview", gateway_authored_request),
     )
 
     scenario = _scenario(

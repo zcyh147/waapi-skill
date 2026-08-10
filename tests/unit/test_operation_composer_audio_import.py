@@ -290,6 +290,21 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
                 "references",
                 "switch_assignment",
             ],
+            "construction_discipline": {
+                "initial_action": "add_import_row",
+                "include_every_known_field": True,
+                "same_action_fields": [
+                    "switch_assignment",
+                    "event",
+                    "properties",
+                    "references",
+                ],
+                "split_initial_row_across_follow_up_actions": False,
+                "follow_up_row_actions": "corrections_only",
+                "metadata_dependency_activation": (
+                    "gateway_owned_do_not_submit"
+                ),
+            },
         },
         "set_import_row_field": {
             "fixed_fields": {
@@ -343,12 +358,13 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
             "complete_before": "draft-start",
             "schema_and_metadata_may_swap": True,
         },
-        "explicit_import_operation": {
+        "import_operation": {
             "source": "registry_fragments.request_options.import_operation",
             "action": "set_import_option",
-            "complete_before": "first_add_import_row",
-            "required_when_user_intent_is_explicit": True,
-            "omission_allowed_only_when": "user_intent_unstated",
+            "gateway_default": "createNew",
+            "default_is_materialized_at": "draft-start",
+            "action_required_only_for": ["useExisting", "replaceExisting"],
+            "do_not_submit_redundant_default": True,
         },
     }
     assert contract["flat_import_row_discipline"] == {
@@ -364,6 +380,9 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
         "follow_up_row_actions": "corrections_only",
         "metadata_dependency_activation": "gateway_owned_do_not_submit",
     }
+    assert contract["action_shapes"]["add_import_row"][
+        "construction_discipline"
+    ] == contract["flat_import_row_discipline"]
     dependency = contract["registry_fragments"]["metadata_dependency_closure"]
     assert dependency["metadata_source"]["same_result_required"] is True
     assert dependency["materialization"]["ordinary_dependencies"]["owner"] == (
@@ -389,20 +408,6 @@ def test_base_audio_import_media_row_materializes_existing_canonical_request(
     draft_id = started["draft"]["draft_id"]
     authority = started["task_authority"]
 
-    option_code, optioned = _execute(
-        tmp_path,
-        "draft-apply",
-        draft_id,
-        "--task-authority",
-        authority,
-        "--expected-revision",
-        "1",
-        "--action-json",
-        _action("set_import_option", name="import_operation", value="createNew"),
-    )
-    assert option_code == 0
-    assert optioned["draft"]["revision"] == 2
-
     row_code, rowed = _execute(
         tmp_path,
         "draft-apply",
@@ -410,7 +415,7 @@ def test_base_audio_import_media_row_materializes_existing_canonical_request(
         "--task-authority",
         authority,
         "--expected-revision",
-        "2",
+        "1",
         "--action-json",
         _action(
             "add_import_row",
@@ -438,7 +443,7 @@ def test_base_audio_import_media_row_materializes_existing_canonical_request(
     materialized = OperationDraftStore(tmp_path / "state").materialize_request(
         draft_id,
         task_authority=authority,
-        expected_revision=3,
+        expected_revision=2,
         schema_digest=operation_request_schema_digest("audio.import", "2022.1"),
         composer_digest=operation_composer_digest("audio.import", "2022.1"),
     )

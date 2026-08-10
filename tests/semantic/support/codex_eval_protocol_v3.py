@@ -301,12 +301,19 @@ def build_audio_import_composer_transaction_steps(
         raise V3ProtocolError("audio.import Composer request fields are not supported")
 
     action_specs: list[tuple[dict[str, Any], DraftActionMetadataBinding | None]] = []
+    initial_composition = new_composition(
+        "audio.import",
+        normalized["version"],
+    )
+    gateway_owned_options = initial_composition["request_options"]
     for option_name in (
         "import_operation",
         "auto_add_to_source_control",
         "auto_check_out_to_source_control",
     ):
         if option_name in arguments:
+            if arguments[option_name] == gateway_owned_options.get(option_name):
+                continue
             action_specs.append(
                 (
                     {
@@ -371,6 +378,13 @@ def build_audio_import_composer_transaction_steps(
         raise V3ProtocolError(
             "Composer transaction builder requires one valid audio.import request"
         ) from exc
+    canonical_arguments = dict(canonical_request["arguments"])
+    for name, value in gateway_owned_options.items():
+        canonical_arguments.setdefault(name, value)
+    canonical_request = {
+        **canonical_request,
+        "arguments": canonical_arguments,
+    }
     if materialized != canonical_request:
         raise V3ProtocolError(
             "audio.import typed actions do not reproduce the sealed request"

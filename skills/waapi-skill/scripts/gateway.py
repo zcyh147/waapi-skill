@@ -3007,6 +3007,22 @@ def operation_composer_input_contract(
         "start": {
             "subcommand": "draft-start",
             "gateway_argv": ["draft-start", operation],
+            **(
+                {
+                    "preconditions": {
+                        "dynamic_metadata": dict(
+                            contract["planning_discipline"][
+                                "dynamic_metadata"
+                            ]
+                        ),
+                        "failure_policy": (
+                            "do_not_start_then_backfill_metadata"
+                        ),
+                    }
+                }
+                if operation == "audio.import"
+                else {}
+            ),
         },
         "apply": {
             "subcommand": "draft-apply",

@@ -369,14 +369,6 @@ def prepare_weather_workflow(
         targets=targets,
         weather_root=weather_root,
         weather_bus=weather_bus,
-        dependency_properties=sound_dependency_properties,
-    )
-    sound_activation_allowances = (
-        _gateway_derived_reference_activation_allowances(
-            sound_metadata,
-            selected_tokens=SOUND_TOKENS,
-            expected_request=import_request,
-        )
     )
     action_request = _weather_action_request(version, targets=targets)
     rtpc_request = _weather_rtpc_request(
@@ -404,7 +396,7 @@ def prepare_weather_workflow(
             None,
         ),
         gateway_derived_reference_activations=(
-            sound_activation_allowances,
+            (),
             (),
             (),
         ),
@@ -983,7 +975,6 @@ def _weather_import_request(
     targets: Sequence[WeatherTarget],
     weather_root: str,
     weather_bus: str,
-    dependency_properties: Sequence[Mapping[str, Any]] = (),
 ) -> Mapping[str, Any]:
     imports: list[dict[str, Any]] = [
         {"object_path": path, "object_type": object_type}
@@ -1004,15 +995,10 @@ def _weather_import_request(
             },
             {"name": "Volume", "value": target.volume},
         ]
-        _merge_required_properties(
-            properties,
-            dependency_properties,
-            owner=target.name,
-        )
         imports.append(
             {
                 "object_path": target.logical_path,
-                "object_type": "Sound",
+                "object_type": "Sound SFX",
                 "audio_file": str(target.source_path),
                 "import_language": "SFX",
                 "event": {"path": target.event_path, "action": "Play"},
@@ -1789,39 +1775,6 @@ def _gateway_derived_reference_activation_allowances(
                     )
                 )
     return tuple(allowances)
-
-
-def _merge_required_properties(
-    properties: list[dict[str, Any]],
-    dependencies: Sequence[Mapping[str, Any]],
-    *,
-    owner: str,
-) -> None:
-    """Merge live-proven dependencies without overriding user values."""
-
-    by_name = {
-        str(item.get("name")).casefold(): item
-        for item in properties
-        if isinstance(item.get("name"), str)
-    }
-    for dependency in dependencies:
-        name = dependency.get("name")
-        if not isinstance(name, str) or set(dependency) != {"name", "value"}:
-            raise IntegrationWeatherRuntimeError(
-                f"{owner} has a malformed live metadata dependency"
-            )
-        current = by_name.get(name.casefold())
-        if current is None:
-            item = {"name": name, "value": dependency.get("value")}
-            properties.append(item)
-            by_name[name.casefold()] = item
-            continue
-        if current.get("name") != name or current.get("value") != dependency.get(
-            "value"
-        ):
-            raise IntegrationWeatherRuntimeError(
-                f"{owner} conflicts with live dependency {name!r}"
-            )
 
 
 def _create_object(

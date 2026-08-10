@@ -389,6 +389,14 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         "draft-start",
         "audio.import",
     ]
+    assert schema["composer"]["start"]["preconditions"] == {
+        "dynamic_metadata": {
+            "fields": ["properties", "references"],
+            "complete_before": "draft-start",
+            "schema_and_metadata_may_swap": True,
+        },
+        "failure_policy": "do_not_start_then_backfill_metadata",
+    }
     assert schema["composer"]["action_shapes"]["add_import_row"] == {
         "fixed_fields": {
             "contract": "waapi-skill.operation-draft-action/v1",
@@ -411,6 +419,19 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             "references",
             "switch_assignment",
         ],
+        "construction_discipline": {
+            "initial_action": "add_import_row",
+            "include_every_known_field": True,
+            "same_action_fields": [
+                "switch_assignment",
+                "event",
+                "properties",
+                "references",
+            ],
+            "split_initial_row_across_follow_up_actions": False,
+            "follow_up_row_actions": "corrections_only",
+            "metadata_dependency_activation": "gateway_owned_do_not_submit",
+        },
     }
     assert schema["composer"]["planning_discipline"][
         "dynamic_metadata"
@@ -419,9 +440,17 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         "complete_before": "draft-start",
         "schema_and_metadata_may_swap": True,
     }
-    assert schema["composer"]["planning_discipline"][
-        "explicit_import_operation"
-    ]["complete_before"] == "first_add_import_row"
+    assert schema["composer"]["planning_discipline"]["import_operation"] == {
+        "source": "registry_fragments.request_options.import_operation",
+        "action": "set_import_option",
+        "gateway_default": "createNew",
+        "default_is_materialized_at": "draft-start",
+        "action_required_only_for": ["useExisting", "replaceExisting"],
+        "do_not_submit_redundant_default": True,
+    }
+    assert schema["composer"]["action_shapes"]["add_import_row"][
+        "construction_discipline"
+    ] == schema["composer"]["flat_import_row_discipline"]
     assert schema["composer"]["flat_import_row_discipline"][
         "metadata_dependency_activation"
     ] == "gateway_owned_do_not_submit"

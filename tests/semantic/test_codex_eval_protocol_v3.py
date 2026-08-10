@@ -118,17 +118,16 @@ def test_audio_import_composer_emits_ordered_typed_actions_without_full_json() -
     ]
 
     assert all(isinstance(value, DraftActionJsonArgument) for value in action_arguments)
-    assert [value.operation for value in action_arguments] == ["audio.import"] * 6
+    assert [value.operation for value in action_arguments] == ["audio.import"] * 5
     assert [value.expected["action"] for value in action_arguments] == [
-        "set_import_option",
         "set_import_option",
         "set_import_default",
         "set_import_default",
         "set_import_default",
         "add_import_row",
     ]
+    assert action_arguments[3].metadata_binding == metadata
     assert action_arguments[4].metadata_binding == metadata
-    assert action_arguments[5].metadata_binding == metadata
     assert next(step for step in steps if step.name == "tx01.preview").subcommand == (
         "preview-from-draft"
     )

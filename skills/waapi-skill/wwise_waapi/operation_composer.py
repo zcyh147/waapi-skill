@@ -147,6 +147,55 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
 
     if operation == AUDIO_IMPORT_COMPOSER_OPERATION:
         fragments = audio_import_composer_fragment_contract(version)
+        import_operation_contract = fragments["request_options"][
+            "import_operation"
+        ]
+        gateway_default = import_operation_contract.get("default")
+        import_operation_values = import_operation_contract.get("enum")
+        if (
+            gateway_default != "createNew"
+            or not isinstance(import_operation_values, list)
+            or import_operation_values
+            != ["createNew", "useExisting", "replaceExisting"]
+        ):
+            raise RuntimeError(
+                "Registry returned an invalid audio.import operation default"
+            )
+        flat_import_row_discipline = {
+            "initial_action": "add_import_row",
+            "include_every_known_field": True,
+            "same_action_fields": [
+                "switch_assignment",
+                "event",
+                "properties",
+                "references",
+            ],
+            "split_initial_row_across_follow_up_actions": False,
+            "follow_up_row_actions": "corrections_only",
+            "metadata_dependency_activation": "gateway_owned_do_not_submit",
+        }
+        action_shapes = {
+            action_name: {
+                "fixed_fields": {
+                    "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+                    "action": action_name,
+                },
+                "required_fields": list(required_fields),
+                "optional_fields": list(optional_fields),
+                **(
+                    {
+                        "construction_discipline": dict(
+                            flat_import_row_discipline
+                        )
+                    }
+                    if action_name == "add_import_row"
+                    else {}
+                ),
+            }
+            for action_name, (required_fields, optional_fields) in (
+                _AUDIO_IMPORT_ACTION_FIELDS.items()
+            )
+        }
         return {
             "contract": OPERATION_COMPOSER_CONTRACT,
             "operation": operation,
@@ -159,19 +208,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "include_only_selected_optional_fields": True,
                 "additional_fields": False,
             },
-            "action_shapes": {
-                action_name: {
-                    "fixed_fields": {
-                        "contract": OPERATION_DRAFT_ACTION_CONTRACT,
-                        "action": action_name,
-                    },
-                    "required_fields": list(required_fields),
-                    "optional_fields": list(optional_fields),
-                }
-                for action_name, (required_fields, optional_fields) in (
-                    _AUDIO_IMPORT_ACTION_FIELDS.items()
-                )
-            },
+            "action_shapes": action_shapes,
             "composition_contract": OPERATION_COMPOSITION_CONTRACT,
             "actions": list(_AUDIO_IMPORT_ACTION_FIELDS),
             "planning_discipline": {
@@ -180,31 +217,22 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                     "complete_before": "draft-start",
                     "schema_and_metadata_may_swap": True,
                 },
-                "explicit_import_operation": {
+                "import_operation": {
                     "source": (
                         "registry_fragments.request_options.import_operation"
                     ),
                     "action": "set_import_option",
-                    "complete_before": "first_add_import_row",
-                    "required_when_user_intent_is_explicit": True,
-                    "omission_allowed_only_when": "user_intent_unstated",
+                    "gateway_default": gateway_default,
+                    "default_is_materialized_at": "draft-start",
+                    "action_required_only_for": [
+                        value
+                        for value in import_operation_values
+                        if value != gateway_default
+                    ],
+                    "do_not_submit_redundant_default": True,
                 },
             },
-            "flat_import_row_discipline": {
-                "initial_action": "add_import_row",
-                "include_every_known_field": True,
-                "same_action_fields": [
-                    "switch_assignment",
-                    "event",
-                    "properties",
-                    "references",
-                ],
-                "split_initial_row_across_follow_up_actions": False,
-                "follow_up_row_actions": "corrections_only",
-                "metadata_dependency_activation": (
-                    "gateway_owned_do_not_submit"
-                ),
-            },
+            "flat_import_row_discipline": flat_import_row_discipline,
             "limits": {
                 "imports": fragments["limits"]["imports"],
                 "action_bytes": MAX_AUDIO_IMPORT_COMPOSER_ACTION_BYTES,
@@ -303,11 +331,14 @@ def operation_composer_digest(operation: str, version: str) -> str:
 
 
 def new_composition(operation: str, version: str) -> dict[str, Any]:
-    operation_composer_contract(operation, version)
+    contract = operation_composer_contract(operation, version)
     if operation == AUDIO_IMPORT_COMPOSER_OPERATION:
+        gateway_default = contract["planning_discipline"]["import_operation"][
+            "gateway_default"
+        ]
         return {
             "contract": OPERATION_COMPOSITION_CONTRACT,
-            "request_options": {},
+            "request_options": {"import_operation": gateway_default},
             "defaults": {},
             "imports": [],
         }
