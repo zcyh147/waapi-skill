@@ -1079,12 +1079,12 @@ _IMPORT_DEFAULT_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     ),
 }
 _IMPORT_OPERATION_DESCRIPTION = (
-    "Batch-level import mode at $.arguments.import_operation. Map the user's "
-    "meaning rather than requiring literal tokens: create/new/createNew/新建/创建 "
-    "requires createNew; reuse/useExisting/使用现有/复用 requires useExisting; "
-    "replace/replaceExisting/替换/覆盖现有 requires replaceExisting. Omit it only "
-    "when the user leaves the mode unstated, where omission means createNew. "
-    "Never place it inside an imports[] row or TSV content."
+    "Batch mode at $.arguments.import_operation. Map meaning rather than "
+    "requiring literal tokens: createNew creates objects; useExisting must "
+    "preserve the existing object's identity while updating its media and may "
+    "also create missing rows. Use replaceExisting only when the user authorizes "
+    "replacing the object, not merely its media. When mode is unstated, omission "
+    "means createNew. Never place it inside an imports[] row or TSV."
 )
 _IMPORT_OPERATION_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     "type": "string",

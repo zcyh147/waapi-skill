@@ -211,7 +211,7 @@ def test_object_set_composer_does_not_change_other_operation_schema_digests() ->
 
     assert len(non_object_set_digests) == 139
     assert canonical_sha256(non_object_set_digests) == (
-        "bd518ac0d8b29b40b6f6ee82002212f57d2a67d0d89d15e1de4a7ff8a01072c3"
+        "b90e10a9528dfc250453a1958043034d4fdbcde6e52f628e340f9dbacc7499b1"
     )
     assert {
         version: operation_input_mode("object.set", version)

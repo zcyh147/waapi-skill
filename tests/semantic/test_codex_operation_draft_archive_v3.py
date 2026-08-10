@@ -23,7 +23,12 @@ from tests.semantic.support.codex_operation_draft_archive_v3 import (
 from tests.semantic.support import codex_operation_draft_archive_v3 as archive_module
 from wwise_waapi.canonical import canonical_sha256
 from wwise_waapi.operation_composer import composition_projection
-from wwise_waapi.operation_drafts import OperationDraftRecord, OperationDraftStore
+from wwise_waapi.operation_drafts import (
+    OperationDraftRecord,
+    OperationDraftStorageCorruption,
+    OperationDraftStore,
+    load_operation_draft_archive_records,
+)
 from wwise_waapi.transaction_cleanup import transaction_cleanup_payload
 from wwise_waapi.transactions import (
     TransactionState,
@@ -491,10 +496,14 @@ def test_composer_archive_reconstructs_actions_request_preview_and_cleanup(
 def test_composer_archive_replays_multiple_prefixed_flows_independently(
     tmp_path: Path,
 ) -> None:
-    state_dir, steps, records = _sealed_archive(tmp_path)
+    state_dir, first_steps, first_records = _sealed_archive(tmp_path)
+    second_state_dir, second_steps, second_records = _sealed_archive(tmp_path)
+    assert second_state_dir == state_dir
 
     def prefixed(
         prefix: str,
+        steps: tuple[ExpectedGatewayStep, ...],
+        records: list[dict[str, Any]],
     ) -> tuple[tuple[ExpectedGatewayStep, ...], list[dict[str, Any]]]:
         action_index = 0
         names: list[str] = []
@@ -520,8 +529,8 @@ def test_composer_archive_replays_multiple_prefixed_flows_independently(
             record["step_name"] = name
         return renamed_steps, renamed_records
 
-    first_steps, first_records = prefixed("tx01")
-    second_steps, second_records = prefixed("tx02")
+    first_steps, first_records = prefixed("tx01", first_steps, first_records)
+    second_steps, second_records = prefixed("tx02", second_steps, second_records)
     evidence = validate_operation_draft_archive(
         state_directory=state_dir,
         steps=(*first_steps, *second_steps),
@@ -534,7 +543,44 @@ def test_composer_archive_replays_multiple_prefixed_flows_independently(
         "object.set",
         "object.set",
     ]
+    assert [flow["draft_id"] for flow in evidence["flows"]] == [
+        first_records[0]["payload"]["draft"]["draft_id"],
+        second_records[0]["payload"]["draft"]["draft_id"],
+    ]
     assert evidence["flows_sha256"] == canonical_sha256(evidence["flows"])
+
+
+@pytest.mark.parametrize("tamper", ("extra", "missing"))
+def test_multi_draft_archive_requires_the_exact_bound_record_set(
+    tmp_path: Path,
+    tamper: str,
+) -> None:
+    state_dir, _first_steps, first_records = _sealed_archive(tmp_path)
+    _state_dir, _second_steps, second_records = _sealed_archive(tmp_path)
+    draft_ids = (
+        first_records[0]["payload"]["draft"]["draft_id"],
+        second_records[0]["payload"]["draft"]["draft_id"],
+    )
+    if tamper == "extra":
+        OperationDraftStore(state_dir).start(
+            operation="object.set",
+            version="2022.1",
+            schema_digest="a" * 64,
+            composer_digest="b" * 64,
+        )
+    else:
+        (
+            state_dir
+            / "operation-drafts-v1"
+            / "records"
+            / f"{draft_ids[1]}.json"
+        ).unlink()
+
+    with pytest.raises(
+        OperationDraftStorageCorruption,
+        match="exactly its bound records",
+    ):
+        load_operation_draft_archive_records(state_dir, draft_ids)
 
 
 def test_composer_archive_accepts_canonical_key_sorted_payload_records(

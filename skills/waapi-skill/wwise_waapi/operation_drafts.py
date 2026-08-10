@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Iterator, Mapping
+from typing import Any, Callable, Collection, Iterator, Mapping
 
 from .canonical import canonical_json_bytes, canonical_sha256
 from .filesystem_security import path_is_link_or_reparse
@@ -2160,10 +2160,36 @@ def load_operation_draft_archive_record(
 ) -> OperationDraftRecord:
     """Read one frozen Draft record without creating, locking, or repairing state."""
 
+    return load_operation_draft_archive_records(
+        state_dir,
+        (draft_id,),
+    )[draft_id]
+
+
+def load_operation_draft_archive_records(
+    state_dir: Path,
+    draft_ids: Collection[str],
+) -> dict[str, OperationDraftRecord]:
+    """Read exactly the frozen Draft records bound by one semantic protocol."""
+
     if not isinstance(state_dir, Path) or not state_dir.is_absolute():
         raise ValueError("state_dir must be one absolute pathlib.Path")
-    if not isinstance(draft_id, str) or not _DRAFT_ID_PATTERN.fullmatch(draft_id):
-        raise ValueError("draft_id is invalid")
+    if isinstance(draft_ids, (str, bytes)) or not isinstance(
+        draft_ids,
+        Collection,
+    ):
+        raise TypeError("draft_ids must be one collection of Draft ids")
+    requested = tuple(draft_ids)
+    if (
+        not requested
+        or len(set(requested)) != len(requested)
+        or any(
+            not isinstance(draft_id, str)
+            or not _DRAFT_ID_PATTERN.fullmatch(draft_id)
+            for draft_id in requested
+        )
+    ):
+        raise ValueError("draft_ids must contain unique valid Draft ids")
     store_dir = state_dir / "operation-drafts-v1"
     records_dir = store_dir / "records"
     locks_dir = store_dir / "locks"
@@ -2185,20 +2211,28 @@ def load_operation_draft_archive_record(
         raise OperationDraftStorageCorruption(
             "Operation Draft archive records cannot be enumerated."
         ) from exc
-    expected_path = records_dir / f"{draft_id}.json"
-    if entries != [expected_path]:
+    expected_paths = {
+        records_dir / f"{draft_id}.json"
+        for draft_id in requested
+    }
+    if set(entries) != expected_paths or len(entries) != len(expected_paths):
         raise OperationDraftStorageCorruption(
-            "Operation Draft archive must contain exactly its bound record."
+            "Operation Draft archive must contain exactly its bound records."
         )
-    snapshot = _read_bounded_record_snapshot(
-        expected_path,
-        attest_directories=lambda: _attest_managed_directory_identities(identities),
-    )
-    _attest_managed_directory_identities(identities)
-    return parse_operation_draft_archive_bytes(
-        snapshot.data,
-        expected_draft_id=draft_id,
-    )
+    records: dict[str, OperationDraftRecord] = {}
+    for draft_id in requested:
+        snapshot = _read_bounded_record_snapshot(
+            records_dir / f"{draft_id}.json",
+            attest_directories=lambda: _attest_managed_directory_identities(
+                identities
+            ),
+        )
+        _attest_managed_directory_identities(identities)
+        records[draft_id] = parse_operation_draft_archive_bytes(
+            snapshot.data,
+            expected_draft_id=draft_id,
+        )
+    return records
 
 
 def _record_from_mapping(

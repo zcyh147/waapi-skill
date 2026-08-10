@@ -989,6 +989,7 @@ def test_operate_cli_and_authoring_fast_routes_keep_unstructured_materialization
 
 def test_operate_policy_and_gateway_owned_continuation_are_closed() -> None:
     compact = " ".join(OPERATE.split())
+    skill_compact = " ".join(SKILL.split())
     for policy in ("`read_only`", "`ask_before_changes`", "`allow_changes`"):
         assert policy in OPERATE
     assert "omit `--state-dir`" in OPERATE
@@ -1006,6 +1007,10 @@ def test_operate_policy_and_gateway_owned_continuation_are_closed() -> None:
     assert "a verify-only request never executes" in compact
     assert "after the prior item reaches terminal verification" in compact
     assert "Never infer, add, combine, or reorder an item" in compact
+    assert (
+        "Even when the same request names later independent changes, run no more "
+        "Gateway commands in that turn"
+    ) in skill_compact
 
 
 def test_operate_terminal_states_migration_and_cleanup_are_fail_closed() -> None:

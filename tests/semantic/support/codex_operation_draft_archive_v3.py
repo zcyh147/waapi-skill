@@ -22,8 +22,9 @@ from wwise_waapi.operation_composer import (
 )
 from wwise_waapi.operation_drafts import (
     OperationDraftError,
+    OperationDraftRecord,
     OperationDraftState,
-    load_operation_draft_archive_record,
+    load_operation_draft_archive_records,
     operation_draft_authority_digest,
 )
 from wwise_waapi.transaction_cleanup import transaction_cleanup_payload
@@ -360,10 +361,32 @@ def validate_operation_draft_archive(
     if not draft_steps:
         return None
     try:
+        if len(steps) != len(broker_records):
+            _fail("Composer Broker record count does not match the sealed protocol")
+        draft_ids: list[str] = []
+        for index, (step, raw_record) in enumerate(
+            zip(steps, broker_records, strict=False),
+            start=1,
+        ):
+            if step.subcommand != "draft-start":
+                continue
+            record = _mapping(raw_record, label=f"Composer Broker record {index}")
+            payload = _record_payload(record, index=index)
+            draft = _draft_projection(payload, command="draft-start")
+            draft_id = draft.get("draft_id")
+            if not isinstance(draft_id, str) or not draft_id:
+                _fail("draft-start evidence is missing its issued Draft id")
+            draft_ids.append(draft_id)
+        durable_records = (
+            load_operation_draft_archive_records(state_directory, draft_ids)
+            if draft_ids
+            else {}
+        )
         return _validate_operation_draft_archive(
             state_directory=state_directory,
             steps=steps,
             broker_records=broker_records,
+            durable_records=durable_records,
         )
     except ComposerArchiveError:
         raise
@@ -383,6 +406,7 @@ def _validate_operation_draft_archive(
     state_directory: Path,
     steps: Sequence[Any],
     broker_records: Sequence[Mapping[str, Any]],
+    durable_records: Mapping[str, OperationDraftRecord],
 ) -> Mapping[str, Any]:
     if len(steps) != len(broker_records):
         _fail("Composer Broker record count does not match the sealed protocol")
@@ -411,6 +435,7 @@ def _validate_operation_draft_archive(
                     state_directory=state_directory,
                     steps=tuple(steps[index] for index in indexes),
                     broker_records=tuple(broker_records[index] for index in indexes),
+                    durable_records=durable_records,
                 )
             )
         evidence = {
@@ -459,7 +484,9 @@ def _validate_operation_draft_archive(
     )):
         _fail("draft-start evidence is missing its issued binding")
 
-    durable = load_operation_draft_archive_record(state_directory, draft_id)
+    durable = durable_records.get(draft_id)
+    if durable is None:
+        _fail("Composer Draft archive is missing its bound record")
     if (
         durable.operation != operation
         or durable.version != version

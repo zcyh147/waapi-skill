@@ -210,17 +210,17 @@ def test_operation_request_schema_digest_owns_only_versioned_machine_contract() 
         operation_request_schema_digest("object.set", "2022.1")
     )
     assert operation_request_schema_digest("audio.import", "2022.1") == (
-        "d355b7ce0dcaf2f5f567c6deac58e89ce6c0eae16bf40bed131f3ece624feb0f"
+        "b84f8a7a23a1b5944a45d4889eaf996b96beefa346671917550f71fdc90f8d8a"
     )
     assert operation_request_schema_digest("audio.import", "2025.1") == (
-        "b188bbd19665e0b9f32d475e6834377ccef82c799a5e876d7003bf4c6b189104"
+        "f1f5d15fb16db06a6a3d5bf1d3749a7f0cf7b8a0a3efcbfbbf09515b2b72967d"
     )
     assert operation_request_schema_digest(
         "audio.importTabDelimited", "2022.1"
-    ) == "14234fe9fcef44e9517fe3abe53f288458e1097c7c58d9bf8cc1387563d1f228"
+    ) == "3380aa555705e7432d3cce8626e99a1de7e17155f1d552a34031d6f51f0c418d"
     assert operation_request_schema_digest(
         "audio.importTabDelimited", "2025.1"
-    ) == "f4fb22490f85becff9b7ae079a6f8f5ccef2cf5d7764b903b9651c1d83e346d7"
+    ) == "231a06eaa5f85cbd1b842af68e7ec93eb096dad57f918b85140a2a04642530c3"
     assert contract_2025["argument_contract"] != {}
 
     with pytest.raises(OperationContractError, match="Unknown closed operation"):
@@ -1049,10 +1049,10 @@ def test_import_operation_schemas_share_explicit_import_mode_mapping() -> None:
     assert "meaning rather than requiring literal tokens" in (
         import_operation["description"]
     )
-    assert "create/new/createNew/新建/创建 requires createNew" in import_operation[
-        "description"
-    ]
-    assert "Omit it only when the user leaves the mode unstated" in (
+    assert "preserve the existing object's identity while updating its media" in (
+        import_operation["description"]
+    )
+    assert "When mode is unstated, omission means createNew" in (
         import_operation["description"]
     )
     assert intent_contract["matching"] == (

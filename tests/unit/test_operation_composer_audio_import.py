@@ -381,6 +381,17 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
             "do_not_submit_redundant_default": True,
         },
     }
+    import_operation = contract["registry_fragments"]["request_options"][
+        "import_operation"
+    ]
+    assert (
+        "preserve the existing object's identity while updating its media"
+        in import_operation["description"]
+    )
+    assert (
+        "replaceExisting only when the user authorizes replacing the object"
+        in import_operation["description"]
+    )
     assert contract["flat_import_row_discipline"] == {
         "initial_action": "add_import_row",
         "include_every_known_field": True,
