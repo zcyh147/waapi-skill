@@ -169,6 +169,25 @@ def test_object_set_composer_discloses_every_exact_typed_action_shape(
         "include_only_selected_optional_fields": True,
         "additional_fields": False,
     }
+    assert contract["flat_target_row_discipline"] == {
+        "initial_action": "add_target",
+        "include_every_known_field": [
+            "name",
+            "notes",
+            "platform",
+            "list_mode",
+            "on_name_conflict",
+            "properties",
+            "references",
+        ],
+        "split_initial_row_across_follow_up_actions": False,
+        "follow_up_flat_actions": "corrections_only",
+        "selector_only_allowed_for": [
+            "nested_children",
+            "closed_lists",
+            "embedded_import",
+        ],
+    }
     for action_name, (required_fields, optional_fields) in expected.items():
         assert contract["action_shapes"][action_name] == {
             "fixed_fields": {

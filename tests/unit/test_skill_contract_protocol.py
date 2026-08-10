@@ -724,8 +724,9 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "Follow the schema's single `input_mode`" in OPERATE
     assert "For `composer`, run its exact `composer.start.gateway_argv`" in OPERATE
     assert "Gateway-generated handles" in OPERATE
-    assert "`add_target` carries a known row" in OPERATE
-    assert "later actions correct/add nesting" in OPERATE
+    assert "Put every known flat row field in its `add_target`" in OPERATE
+    assert "never split that row" in OPERATE
+    assert "Later actions only correct/add nesting" in OPERATE
     assert "`draft-check`, then `preview-from-draft`" in OPERATE
     assert "For `legacy_json`, copy `request_envelope` exactly" in OPERATE
     assert "Never choose between two normal inputs" in OPERATE

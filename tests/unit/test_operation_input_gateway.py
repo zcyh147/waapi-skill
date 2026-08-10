@@ -260,6 +260,25 @@ def test_normal_object_set_schema_and_detail_expose_only_composer_input(
             "references",
         ],
     }
+    assert schema["composer"]["flat_target_row_discipline"] == {
+        "initial_action": "add_target",
+        "include_every_known_field": [
+            "name",
+            "notes",
+            "platform",
+            "list_mode",
+            "on_name_conflict",
+            "properties",
+            "references",
+        ],
+        "split_initial_row_across_follow_up_actions": False,
+        "follow_up_flat_actions": "corrections_only",
+        "selector_only_allowed_for": [
+            "nested_children",
+            "closed_lists",
+            "embedded_import",
+        ],
+    }
     assert schema["composer"]["start"] == {
         "subcommand": "draft-start",
         "gateway_argv": ["draft-start", "object.set"],

@@ -130,6 +130,25 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             "include_only_selected_optional_fields": True,
             "additional_fields": False,
         },
+        "flat_target_row_discipline": {
+            "initial_action": "add_target",
+            "include_every_known_field": [
+                "name",
+                "notes",
+                "platform",
+                "list_mode",
+                "on_name_conflict",
+                "properties",
+                "references",
+            ],
+            "split_initial_row_across_follow_up_actions": False,
+            "follow_up_flat_actions": "corrections_only",
+            "selector_only_allowed_for": [
+                "nested_children",
+                "closed_lists",
+                "embedded_import",
+            ],
+        },
         "action_shapes": {
             action_name: {
                 "fixed_fields": {
