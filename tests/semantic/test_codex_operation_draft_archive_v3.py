@@ -527,6 +527,22 @@ def test_composer_archive_replays_compact_action_evidence(
             }
         )
 
+    check_index = next(
+        index
+        for index, step in enumerate(compact_steps)
+        if step.subcommand == "draft-check"
+    )
+    checked_draft = compact_records[check_index]["payload"]["draft"]
+    checked_draft["check"] = {"status": "passed"}
+    checked_draft["allowed_actions"] = [
+        action
+        for action in checked_draft["allowed_actions"]
+        if action != "check"
+    ]
+    checked_draft["allowed_actions"].extend(
+        ["check", "preview-from-draft"]
+    )
+
     evidence = validate_operation_draft_archive(
         state_directory=state_dir,
         steps=compact_steps,

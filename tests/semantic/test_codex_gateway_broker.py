@@ -48,6 +48,7 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
     TrustedSubscriptionAckSpec,
     WINDOWS_COMMAND_SHIM_NAMES,
     WINDOWS_SHIM_SCRIPT_NAME,
+    gateway_step_sequence_matches,
     reconcile_gateway_command_prefix,
     reconcile_gateway_commands,
     project_required_metadata_tokens,
@@ -1292,6 +1293,202 @@ def test_broker_executes_typed_draft_actions_with_gateway_response_bindings(
                 steps[-1],
                 drifted_preview,
             )
+
+
+def test_numbered_draft_actions_follow_handle_dependencies_not_fixture_order(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    contract = "waapi-skill.operation-draft-action/v1"
+    start = ExpectedGatewayStep(
+        "tx01.draft-start",
+        "draft-start",
+        ("object.set",),
+    )
+    first_target = ExpectedGatewayStep(
+        "tx01.action.001",
+        "draft-apply",
+        (
+            ResponseBinding(start.name, "/draft/draft_id"),
+            "--task-authority",
+            ResponseBinding(start.name, "/task_authority"),
+            "--expected-revision",
+            ResponseBinding(start.name, "/draft/revision"),
+            "--compact",
+            "--action-json",
+            DraftActionJsonArgument(
+                {
+                    "contract": contract,
+                    "action": "add_target",
+                    "selector": {
+                        "kind": "id",
+                        "value": "{11111111-1111-1111-1111-111111111111}",
+                    },
+                }
+            ),
+        ),
+    )
+    first_notes = ExpectedGatewayStep(
+        "tx01.action.002",
+        "draft-apply",
+        (
+            ResponseBinding(start.name, "/draft/draft_id"),
+            "--task-authority",
+            ResponseBinding(start.name, "/task_authority"),
+            "--expected-revision",
+            ResponseBinding(first_target.name, "/draft/revision"),
+            "--compact",
+            "--action-json",
+            DraftActionJsonArgument(
+                {
+                    "contract": contract,
+                    "action": "set_target_field",
+                    "name": "notes",
+                    "value": "first",
+                },
+                response_bindings=(
+                    DraftActionResponseBinding(
+                        "/target_handle",
+                        first_target.name,
+                        "/draft/action_result/created_handles/0",
+                    ),
+                ),
+            ),
+        ),
+    )
+    second_target = ExpectedGatewayStep(
+        "tx01.action.003",
+        "draft-apply",
+        (
+            ResponseBinding(start.name, "/draft/draft_id"),
+            "--task-authority",
+            ResponseBinding(start.name, "/task_authority"),
+            "--expected-revision",
+            ResponseBinding(first_notes.name, "/draft/revision"),
+            "--compact",
+            "--action-json",
+            DraftActionJsonArgument(
+                {
+                    "contract": contract,
+                    "action": "add_target",
+                    "selector": {
+                        "kind": "id",
+                        "value": "{22222222-2222-2222-2222-222222222222}",
+                    },
+                }
+            ),
+        ),
+    )
+    second_notes = ExpectedGatewayStep(
+        "tx01.action.004",
+        "draft-apply",
+        (
+            ResponseBinding(start.name, "/draft/draft_id"),
+            "--task-authority",
+            ResponseBinding(start.name, "/task_authority"),
+            "--expected-revision",
+            ResponseBinding(second_target.name, "/draft/revision"),
+            "--compact",
+            "--action-json",
+            DraftActionJsonArgument(
+                {
+                    "contract": contract,
+                    "action": "set_target_field",
+                    "name": "notes",
+                    "value": "second",
+                },
+                response_bindings=(
+                    DraftActionResponseBinding(
+                        "/target_handle",
+                        second_target.name,
+                        "/draft/action_result/created_handles/0",
+                    ),
+                ),
+            ),
+        ),
+    )
+    broker = CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(start, first_target, first_notes, second_target, second_notes),
+        expected_wwise_version="2022.1",
+    )
+    draft_id = "od1-" + "1" * 32
+    authority = "da1-" + "2" * 40
+    first_handle = "odh1-" + "3" * 24
+    broker._payloads_by_step[start.name] = {  # noqa: SLF001
+        "task_authority": authority,
+        "draft": {"draft_id": draft_id, "revision": 1},
+    }
+    broker._payloads_by_step[first_target.name] = {  # noqa: SLF001
+        "draft": {
+            "draft_id": draft_id,
+            "revision": 2,
+            "action_result": {"created_handles": [first_handle]},
+        }
+    }
+    broker._next_step = 2  # noqa: SLF001
+
+    def argv(action: dict[str, object]) -> tuple[str, ...]:
+        return (
+            "draft-apply",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "2",
+            "--compact",
+            "--action-json",
+            json.dumps(action, separators=(",", ":")),
+        )
+
+    second_notes_action = {
+        **dict(second_notes.arguments[-1].expected),
+        "target_handle": "odh1-" + "4" * 24,
+    }
+    assert broker._match_dependency_ready_draft_action(  # noqa: SLF001
+        argv(second_notes_action)
+    ) is None
+
+    selected = broker._match_dependency_ready_draft_action(  # noqa: SLF001
+        argv(dict(second_target.arguments[-1].expected))
+    )
+    assert selected is not None
+    assert selected[0].name == second_target.name
+    assert [step.name for step in broker._execution_steps[2:]] == [  # noqa: SLF001
+        second_target.name,
+        first_notes.name,
+        second_notes.name,
+    ]
+
+
+def test_numbered_draft_action_sequence_matches_any_exact_permutation() -> None:
+    expected = (
+        "tx01.draft-start",
+        "tx01.action.001",
+        "tx01.action.002",
+        "tx01.action.003",
+        "tx01.draft-check",
+    )
+    assert gateway_step_sequence_matches(
+        expected,
+        (
+            "tx01.draft-start",
+            "tx01.action.003",
+            "tx01.action.001",
+            "tx01.action.002",
+            "tx01.draft-check",
+        ),
+    )
+    assert not gateway_step_sequence_matches(
+        expected,
+        (
+            "tx01.draft-start",
+            "tx01.action.003",
+            "tx01.action.003",
+            "tx01.action.002",
+            "tx01.draft-check",
+        ),
+    )
 
 
 def test_broker_rejects_stale_draft_revision_before_runner_dispatch(

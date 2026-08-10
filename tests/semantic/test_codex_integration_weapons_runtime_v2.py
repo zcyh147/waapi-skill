@@ -962,9 +962,28 @@ def test_compact_draft_replay_accepts_only_the_exact_queried_bus_guid(
     handle_by_step: dict[str, str] = {}
     handle_index = 0
     revision = 1
-    for action_step in (
+    canonical_action_steps = [
         step for step in prepared.protocol.steps if step.subcommand == "draft-apply"
-    ):
+    ]
+    action_steps = [
+        *(
+            step
+            for step in canonical_action_steps
+            if step.arguments[-1].expected.get("action") == "add_target"
+        ),
+        *(
+            step
+            for step in canonical_action_steps
+            if step.arguments[-1].expected.get("action") != "add_target"
+        ),
+    ]
+    first_action_index = broker._execution_steps.index(  # noqa: SLF001
+        canonical_action_steps[0]
+    )
+    broker._execution_steps[  # noqa: SLF001
+        first_action_index : first_action_index + len(action_steps)
+    ] = action_steps
+    for action_step in action_steps:
         argument = action_step.arguments[-1]
         assert isinstance(argument, DraftActionJsonArgument)
         actual_action = copy.deepcopy(dict(argument.expected))

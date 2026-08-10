@@ -423,6 +423,20 @@ def _validate_operation_draft_archive(
         elif step.subcommand == "draft-check":
             revision += 1
             response_draft = _draft_projection(payload, command="draft-check")
+            checked_projection = composition_projection(
+                operation,
+                version,
+                composition,
+            )
+            if isinstance(response_draft.get("check"), Mapping):
+                checked_projection["allowed_actions"] = [
+                    action
+                    for action in checked_projection["allowed_actions"]
+                    if action != "check"
+                ]
+                checked_projection["allowed_actions"].extend(
+                    ["check", "preview-from-draft"]
+                )
             _require_projection(
                 response_draft,
                 draft_id=draft_id,
@@ -431,7 +445,7 @@ def _validate_operation_draft_archive(
                 operation=operation,
                 version=version,
                 schema_digest=schema_digest,
-                projection=composition_projection(operation, version, composition),
+                projection=checked_projection,
             )
             expected_audit_types.append("checked")
             checked_payload = response_draft

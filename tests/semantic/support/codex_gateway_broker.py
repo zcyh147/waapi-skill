@@ -1279,6 +1279,7 @@ _DRAFT_SUBCOMMANDS = frozenset(
 _DRAFT_ID_RE = re.compile(r"^od1-[0-9a-f]{32}$")
 _DRAFT_AUTHORITY_RE = re.compile(r"^da1-[0-9a-f]{40}$")
 _DRAFT_HANDLE_RE = re.compile(r"^odh1-[0-9a-f]{24}$")
+_NUMBERED_DRAFT_ACTION_STEP_RE = re.compile(r"^(?P<prefix>.+\.action\.)\d{3}$")
 
 
 def _draft_projection_handles(value: Any) -> set[str]:
@@ -1546,7 +1547,7 @@ def gateway_step_sequence_matches(
     actual: Sequence[str],
     groups: Sequence[Sequence[str]] = (),
 ) -> bool:
-    """Match a canonical sequence while allowing only declared pair swaps."""
+    """Match declared pair swaps and exact numbered Draft-action permutations."""
 
     expected_names = tuple(expected)
     actual_names = tuple(actual)
@@ -1559,6 +1560,31 @@ def gateway_step_sequence_matches(
     }
     index = 0
     while index < len(expected_names):
+        numbered = _NUMBERED_DRAFT_ACTION_STEP_RE.fullmatch(
+            expected_names[index]
+        )
+        if numbered is not None:
+            prefix = numbered.group("prefix")
+            end = index
+            while (
+                end < len(expected_names)
+                and (candidate := _NUMBERED_DRAFT_ACTION_STEP_RE.fullmatch(
+                    expected_names[end]
+                ))
+                is not None
+                and candidate.group("prefix") == prefix
+            ):
+                end += 1
+            expected_group = expected_names[index:end]
+            supplied_group = actual_names[index:end]
+            if (
+                len(supplied_group) != len(expected_group)
+                or len(set(supplied_group)) != len(supplied_group)
+                or set(supplied_group) != set(expected_group)
+            ):
+                return False
+            index = end
+            continue
         group = group_by_first.get(expected_names[index])
         if (
             group is not None
@@ -5768,29 +5794,42 @@ class CodexGatewayBroker:
                     resolved.gateway_arguments,
                 )
             except GatewayInvocationError as first_error:
-                if self._next_step not in self._commutative_group_start_indexes:
+                try:
+                    reordered = self._match_dependency_ready_draft_action(
+                        resolved.gateway_arguments,
+                    )
+                except GatewayInvocationError as reorder_error:
+                    return self._reject_locked(
+                        resolved,
+                        str(reorder_error),
+                        authenticated=True,
+                    )
+                if reordered is not None:
+                    step, semantic_hash, execution_arguments = reordered
+                elif self._next_step not in self._commutative_group_start_indexes:
                     return self._reject_locked(
                         resolved,
                         str(first_error),
                         authenticated=True,
                     )
-                alternate = self._execution_steps[self._next_step + 1]
-                try:
-                    semantic_hash, execution_arguments = self._validate_step(
-                        alternate,
-                        resolved.gateway_arguments,
-                    )
-                except GatewayInvocationError as second_error:
-                    return self._reject_locked(
-                        resolved,
-                        "command matches neither declared commutative read-only "
-                        f"step: {first_error}; {second_error}",
-                        authenticated=True,
-                    )
-                self._execution_steps[
-                    self._next_step : self._next_step + 2
-                ] = (alternate, step)
-                step = alternate
+                else:
+                    alternate = self._execution_steps[self._next_step + 1]
+                    try:
+                        semantic_hash, execution_arguments = self._validate_step(
+                            alternate,
+                            resolved.gateway_arguments,
+                        )
+                    except GatewayInvocationError as second_error:
+                        return self._reject_locked(
+                            resolved,
+                            "command matches neither declared commutative read-only "
+                            f"step: {first_error}; {second_error}",
+                            authenticated=True,
+                        )
+                    self._execution_steps[
+                        self._next_step : self._next_step + 2
+                    ] = (alternate, step)
+                    step = alternate
             except Exception as exc:  # noqa: BLE001 - authenticated failures are terminal and recorded
                 return self._reject_locked(
                     resolved,
@@ -5806,6 +5845,54 @@ class CodexGatewayBroker:
             semantic_hash,
             execution_arguments=execution_arguments,
         )
+
+    def _match_dependency_ready_draft_action(
+        self,
+        actual: Sequence[str],
+    ) -> tuple[ExpectedGatewayStep, str, tuple[str, ...]] | None:
+        """Select one equivalent typed action without fixing its linearization."""
+
+        current = self._execution_steps[self._next_step]
+        current_match = _NUMBERED_DRAFT_ACTION_STEP_RE.fullmatch(current.name)
+        if current.subcommand != "draft-apply" or current_match is None:
+            return None
+        prefix = current_match.group("prefix")
+        matches: list[
+            tuple[int, ExpectedGatewayStep, str, tuple[str, ...]]
+        ] = []
+        for index in range(self._next_step + 1, len(self._execution_steps)):
+            candidate = self._execution_steps[index]
+            candidate_match = _NUMBERED_DRAFT_ACTION_STEP_RE.fullmatch(
+                candidate.name
+            )
+            if (
+                candidate.subcommand != "draft-apply"
+                or candidate_match is None
+                or candidate_match.group("prefix") != prefix
+            ):
+                break
+            try:
+                semantic_hash, execution_arguments = self._validate_step(
+                    candidate,
+                    actual,
+                )
+            except GatewayInvocationError:
+                continue
+            matches.append(
+                (index, candidate, semantic_hash, execution_arguments)
+            )
+        if not matches:
+            return None
+        if len(matches) != 1:
+            raise GatewayInvocationError(
+                "typed Draft action matches multiple dependency-ready business facts"
+            )
+        index, candidate, semantic_hash, execution_arguments = matches[0]
+        self._execution_steps.insert(
+            self._next_step,
+            self._execution_steps.pop(index),
+        )
+        return candidate, semantic_hash, execution_arguments
 
     def _validate_step(
         self,
@@ -6184,6 +6271,32 @@ class CodexGatewayBroker:
                     )
                 elif isinstance(expected, ResponseBinding):
                     source = self._payloads_by_step.get(expected.step)
+                    if (
+                        step.subcommand in _DRAFT_SUBCOMMANDS
+                        and expected.pointer == "/draft/revision"
+                        and index > 0
+                        and validation_arguments[index - 1]
+                        == "--expected-revision"
+                    ):
+                        latest_source = next(
+                            (
+                                self._payloads_by_step.get(prior.name)
+                                for prior in reversed(
+                                    self._execution_steps[: self._next_step]
+                                )
+                                if isinstance(
+                                    self._payloads_by_step.get(prior.name),
+                                    Mapping,
+                                )
+                                and isinstance(
+                                    self._payloads_by_step[prior.name].get("draft"),
+                                    Mapping,
+                                )
+                            ),
+                            None,
+                        )
+                        if latest_source is not None:
+                            source = latest_source
                     if source is None:
                         raise GatewayInvocationError(
                             f"step {step.name!r} binding source {expected.step!r} is unavailable"
@@ -6550,9 +6663,9 @@ class CodexGatewayBroker:
                 "Draft response ID does not match draft-start"
             )
 
-        step_index = self.expected_steps.index(step)
+        step_index = self._execution_steps.index(step)
         previous_draft: Mapping[str, Any] | None = None
-        for prior in reversed(self.expected_steps[:step_index]):
+        for prior in reversed(self._execution_steps[:step_index]):
             prior_payload = self._payloads_by_step.get(prior.name)
             if not isinstance(prior_payload, Mapping):
                 continue
@@ -6585,9 +6698,9 @@ class CodexGatewayBroker:
     ) -> Any:
         """Normalize only exact pre-Draft Bus GUIDs to their reviewed paths."""
 
-        preview_index = self.expected_steps.index(preview_step)
+        preview_index = self._execution_steps.index(preview_step)
         identities: dict[str, str] = {}
-        for action_step in self.expected_steps[:preview_index]:
+        for action_step in self._execution_steps[:preview_index]:
             if action_step.subcommand != "draft-apply":
                 continue
             argument = action_step.arguments[-1]
@@ -6666,8 +6779,8 @@ class CodexGatewayBroker:
             )
         composition = new_composition(operation, version)
         actual_composition = new_composition(operation, version)
-        preview_index = self.expected_steps.index(preview_step)
-        for action_step in self.expected_steps[:preview_index]:
+        preview_index = self._execution_steps.index(preview_step)
+        for action_step in self._execution_steps[:preview_index]:
             if action_step.subcommand != "draft-apply":
                 continue
             argument = action_step.arguments[-1]
