@@ -263,6 +263,41 @@ def _compact_action_projection(
     return str(result["action"]), set(created), set(affected), summary
 
 
+def _compact_checked_projection(
+    draft: Mapping[str, Any],
+    *,
+    current_facts: list[Any],
+) -> tuple[Mapping[str, Any], Mapping[str, Any]]:
+    summary = _mapping(
+        draft.get("current_facts_summary"),
+        label="checked Composer facts summary",
+    )
+    integrity = _mapping(
+        draft.get("response_integrity"),
+        label="checked Composer response integrity",
+    )
+    expected_summary = {
+        "contract": "waapi-skill.operation-draft-facts-summary/v1",
+        "target_count": len(current_facts),
+        "handle_count": len(_handles(current_facts)),
+        "canonical_sha256": canonical_sha256(current_facts),
+    }
+    expected_integrity = {
+        "complete": True,
+        "truncated": False,
+        "projection": "checked_draft_receipt",
+        "compact_projection_is_not_truncation": True,
+        "draft_inspect_required_before_preview": False,
+    }
+    if (
+        "current_facts" in draft
+        or summary != expected_summary
+        or integrity != expected_integrity
+    ):
+        _fail("Compact Composer check receipt does not replay")
+    return expected_summary, expected_integrity
+
+
 def _draft_projection(payload: Mapping[str, Any], *, command: str) -> Mapping[str, Any]:
     if payload.get("command") != command:
         _fail(f"Composer payload command does not match {command!r}")
@@ -499,6 +534,16 @@ def _validate_operation_draft_archive(
                 checked_projection["allowed_actions"].extend(
                     ["check", "preview-from-draft"]
                 )
+            if "current_facts" not in response_draft:
+                current_facts = checked_projection.pop("current_facts")
+                if not isinstance(current_facts, list):
+                    _fail("Checked Composer replay lacks bounded current facts")
+                summary, integrity = _compact_checked_projection(
+                    response_draft,
+                    current_facts=current_facts,
+                )
+                checked_projection["current_facts_summary"] = summary
+                checked_projection["response_integrity"] = integrity
             _require_projection(
                 response_draft,
                 draft_id=draft_id,

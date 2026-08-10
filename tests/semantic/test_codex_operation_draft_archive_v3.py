@@ -452,6 +452,7 @@ def test_composer_archive_reconstructs_actions_request_preview_and_cleanup(
         "add_target",
         "set_property",
     ]
+
     assert evidence["final_revision"] == 6
     assert evidence["canonical_request"]["operation"] == "object.set"
     assert evidence["canonical_request_sha256"] == canonical_sha256(
@@ -628,6 +629,20 @@ def test_composer_archive_replays_compact_action_evidence(
     checked_draft["allowed_actions"].extend(
         ["check", "preview-from-draft"]
     )
+    checked_facts = checked_draft.pop("current_facts")
+    checked_draft["current_facts_summary"] = {
+        "contract": "waapi-skill.operation-draft-facts-summary/v1",
+        "target_count": len(checked_facts),
+        "handle_count": len({row["handle"] for row in checked_facts}),
+        "canonical_sha256": canonical_sha256(checked_facts),
+    }
+    checked_draft["response_integrity"] = {
+        "complete": True,
+        "truncated": False,
+        "projection": "checked_draft_receipt",
+        "compact_projection_is_not_truncation": True,
+        "draft_inspect_required_before_preview": False,
+    }
 
     evidence = validate_operation_draft_archive(
         state_directory=state_dir,
@@ -640,6 +655,24 @@ def test_composer_archive_replays_compact_action_evidence(
         "add_target",
         "set_property",
     ]
+
+    for section, field, value in (
+        ("current_facts_summary", "canonical_sha256", "0" * 64),
+        ("current_facts_summary", "target_count", 2),
+        ("response_integrity", "truncated", True),
+        ("response_integrity", "unexpected", True),
+    ):
+        tampered = copy.deepcopy(compact_records)
+        tampered[check_index]["payload"]["draft"][section][field] = value
+        with pytest.raises(
+            ComposerArchiveError,
+            match="Compact Composer check receipt does not replay",
+        ):
+            validate_operation_draft_archive(
+                state_directory=state_dir,
+                steps=compact_steps,
+                broker_records=tampered,
+            )
 
 
 def test_composer_archive_ignores_other_legacy_transaction_payloads(
