@@ -3034,15 +3034,25 @@ def _same_regular_file_snapshot(
     left: os.stat_result,
     right: os.stat_result,
 ) -> bool:
+    # Native Windows may settle st_ctime_ns after a new file is first closed;
+    # identity, size, mtime, link count, and canonical bytes remain enforced.
+    stable_change_time = (
+        _record_snapshot_platform_name() == "nt"
+        or left.st_ctime_ns == right.st_ctime_ns
+    )
     return (
         stat.S_ISREG(left.st_mode)
         and stat.S_ISREG(right.st_mode)
         and os.path.samestat(left, right)
         and left.st_size == right.st_size
         and left.st_mtime_ns == right.st_mtime_ns
-        and left.st_ctime_ns == right.st_ctime_ns
+        and stable_change_time
         and left.st_nlink == right.st_nlink == 1
     )
+
+
+def _record_snapshot_platform_name() -> str:
+    return os.name
 
 
 def _bounded_managed_entries(

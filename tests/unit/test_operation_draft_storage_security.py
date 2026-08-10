@@ -45,6 +45,15 @@ def _tree_regular_bytes(root: Path) -> dict[str, bytes]:
     }
 
 
+class _StatWithChangedCtime:
+    def __init__(self, metadata: os.stat_result) -> None:
+        self._metadata = metadata
+        self.st_ctime_ns = metadata.st_ctime_ns + 7_845_600
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._metadata, name)
+
+
 def _race_cancel(
     state_dir: str,
     draft_id: str,
@@ -91,6 +100,64 @@ def _race_start(
         results.put(("unexpected", type(exc).__name__, str(exc)))
     else:
         results.put(("started", started.record.revision))
+
+
+def test_windows_ctime_drift_does_not_reject_an_unchanged_new_record(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_fstat = draft_module.os.fstat
+
+    monkeypatch.setattr(
+        draft_module,
+        "_record_snapshot_platform_name",
+        lambda: "nt",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        draft_module.os,
+        "fstat",
+        lambda descriptor: _StatWithChangedCtime(real_fstat(descriptor)),
+    )
+
+    store = OperationDraftStore(tmp_path)
+    started = store.start(
+        operation="object.set",
+        version="2022.1",
+        schema_digest="a" * 64,
+    )
+    reopened = OperationDraftStore(tmp_path).inspect(
+        started.draft_id,
+        task_authority=started.task_authority,
+    )
+
+    assert reopened == started.record
+
+
+def test_posix_ctime_drift_still_rejects_a_changed_record_snapshot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_fstat = draft_module.os.fstat
+
+    monkeypatch.setattr(
+        draft_module,
+        "_record_snapshot_platform_name",
+        lambda: "posix",
+    )
+    monkeypatch.setattr(
+        draft_module.os,
+        "fstat",
+        lambda descriptor: _StatWithChangedCtime(real_fstat(descriptor)),
+    )
+
+    store = OperationDraftStore(tmp_path)
+    with pytest.raises(OperationDraftStorageCorruption, match="changed while"):
+        store.start(
+            operation="object.set",
+            version="2022.1",
+            schema_digest="a" * 64,
+        )
 
 
 @pytest.mark.skipif(os.name != "posix", reason="POSIX mode contract")
