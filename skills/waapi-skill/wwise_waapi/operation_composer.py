@@ -146,8 +146,9 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "structural_preview_readiness_only"
             ),
             "user_intent_coverage": (
-                "agent_must_compare_all_planned_actions_before_check"
+                "compare_planned_actions_before_draft-check"
             ),
+            "draft_inspect_required_before_next_planned_action": False,
         },
     }
 

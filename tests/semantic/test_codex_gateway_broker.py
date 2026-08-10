@@ -1661,7 +1661,6 @@ def test_draft_replay_uses_the_validated_submitted_numeric_spelling(
                     "canonical_sha256": broker_module._sha256_bytes(  # noqa: SLF001
                         broker_module._canonical_json_bytes(facts)  # noqa: SLF001
                     ),
-                    "complete_projection_command": "draft-inspect",
                 },
                 "action_result": {
                     "contract": (

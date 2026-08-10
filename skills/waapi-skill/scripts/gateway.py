@@ -10359,7 +10359,6 @@ def _operation_draft_compact_action_projection(
             "target_count": len(current_facts),
             "handle_count": len(current_handles),
             "canonical_sha256": canonical_sha256(current_facts),
-            "complete_projection_command": "draft-inspect",
         },
         "action_result": {
             "contract": "waapi-skill.operation-draft-action-result/v1",
@@ -10450,7 +10449,11 @@ def operation_draft_payload(
                 "complete": True,
                 "truncated": False,
                 "projection": "action_delta_and_draft_receipt",
-                "user_intent_coverage": "not_evaluated",
+                "compact_projection_is_not_truncation": True,
+                "user_intent_coverage": (
+                    "compare_planned_actions_before_draft-check"
+                ),
+                "draft_inspect_required_before_next_planned_action": False,
             }
             projection = {
                 key: projection[key]

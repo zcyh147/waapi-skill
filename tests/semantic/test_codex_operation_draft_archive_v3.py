@@ -603,7 +603,6 @@ def test_composer_archive_replays_compact_action_evidence(
                     "target_count": len(facts),
                     "handle_count": len({row["handle"] for row in facts}),
                     "canonical_sha256": canonical_sha256(facts),
-                    "complete_projection_command": "draft-inspect",
                 },
                 "action_result": {
                     "contract": "waapi-skill.operation-draft-action-result/v1",

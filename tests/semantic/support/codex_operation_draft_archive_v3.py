@@ -248,7 +248,6 @@ def _compact_action_projection(
             "target_count",
             "handle_count",
             "canonical_sha256",
-            "complete_projection_command",
         }
         or summary.get("contract")
         != "waapi-skill.operation-draft-facts-summary/v1"
@@ -258,7 +257,6 @@ def _compact_action_projection(
         or summary["handle_count"] < 0
         or not isinstance(summary.get("canonical_sha256"), str)
         or len(summary["canonical_sha256"]) != 64
-        or summary.get("complete_projection_command") != "draft-inspect"
         or "current_facts" in draft
     ):
         _fail("Compact Composer action projection is invalid")

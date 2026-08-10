@@ -1072,7 +1072,6 @@ def test_compact_draft_replay_accepts_only_the_exact_queried_bus_guid(
                         }
                     ),
                     "canonical_sha256": canonical_sha256(facts),
-                    "complete_projection_command": "draft-inspect",
                 },
             }
         }

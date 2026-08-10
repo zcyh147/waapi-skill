@@ -517,7 +517,6 @@ def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
         "target_count": 1,
         "handle_count": 1,
         "canonical_sha256": summary["canonical_sha256"],
-        "complete_projection_command": "draft-inspect",
     }
     assert draft["schema_required_fields_status"] == "incomplete"
     assert "missing_fields_status" not in draft
@@ -525,8 +524,11 @@ def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
         "complete": True,
         "truncated": False,
         "projection": "action_delta_and_draft_receipt",
-        "user_intent_coverage": "not_evaluated",
+        "compact_projection_is_not_truncation": True,
+        "user_intent_coverage": "compare_planned_actions_before_draft-check",
+        "draft_inspect_required_before_next_planned_action": False,
     }
+    assert "draft-inspect" not in json.dumps(targeted)
     handle = draft["action_result"]["created_handles"][0]
     assert TARGET_HANDLE_RE.fullmatch(handle)
     assert draft["action_result"] == {
@@ -662,7 +664,19 @@ def test_compact_weather_shaped_action_responses_remain_constant_size(
             assert changed["draft"]["response_integrity"]["truncated"] is False
             assert (
                 changed["draft"]["response_integrity"]["user_intent_coverage"]
-                == "not_evaluated"
+                == "compare_planned_actions_before_draft-check"
+            )
+            assert (
+                changed["draft"]["response_integrity"][
+                    "compact_projection_is_not_truncation"
+                ]
+                is True
+            )
+            assert (
+                changed["draft"]["response_integrity"][
+                    "draft_inspect_required_before_next_planned_action"
+                ]
+                is False
             )
             revision += 1
             response_sizes.append(len(json.dumps(changed).encode("utf-8")))
