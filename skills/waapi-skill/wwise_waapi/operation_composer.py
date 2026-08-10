@@ -92,8 +92,8 @@ _AUDIO_IMPORT_ACTION_FIELDS: dict[
     "clear_import_option": (("name",), ()),
     "set_import_default": (("name", "value"), ()),
     "clear_import_default": (("name",), ()),
-    "add_import_row": (
-        (),
+    "add_switch_assigned_import_row": (
+        ("switch_assignment",),
         (
             "audio_file",
             "audio_file_base64",
@@ -110,8 +110,8 @@ _AUDIO_IMPORT_ACTION_FIELDS: dict[
             "references",
         ),
     ),
-    "add_switch_assigned_import_row": (
-        ("switch_assignment",),
+    "add_import_row": (
+        (),
         (
             "audio_file",
             "audio_file_base64",
@@ -180,11 +180,12 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             )
         flat_import_row_discipline = {
             "initial_action_by_intent": {
-                "ordinary_row": "add_import_row",
                 "row_with_switch_assignment": (
                     "add_switch_assigned_import_row"
                 ),
+                "ordinary_row": "add_import_row",
             },
+            "select_initial_action_before_action_shape": True,
             "include_every_known_field": True,
             "same_action_fields": [
                 "switch_assignment",
@@ -211,6 +212,37 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             ],
             "distinct_metadata_tokens_are_independent_facts": True,
             "requested_switch_assignment_is_not_a_later_action": True,
+        }
+        planning_discipline = {
+            "dynamic_metadata": {
+                "fields": ["properties", "references"],
+                "query_granularity": (
+                    "one_successful_command_per_object_type"
+                ),
+                "all_required_tokens_share_that_result": True,
+                "split_required_tokens_across_queries": False,
+                "complete_before": (
+                    "first-draft-apply-using-properties-or-references"
+                ),
+                "schema_and_metadata_may_swap": True,
+                "draft_start_may_precede": True,
+                "successful_result_survives_metadata_independent_actions": True,
+                "repeat_successful_query": False,
+            },
+            "import_operation": {
+                "source": (
+                    "registry_fragments.request_options.import_operation"
+                ),
+                "action": "set_import_option",
+                "gateway_default": gateway_default,
+                "default_is_materialized_at": "draft-start",
+                "action_required_only_for": [
+                    value
+                    for value in import_operation_values
+                    if value != gateway_default
+                ],
+                "do_not_submit_redundant_default": True,
+            },
         }
         action_shapes = {
             action_name: {
@@ -257,36 +289,11 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "include_only_selected_optional_fields": True,
                 "additional_fields": False,
             },
+            "planning_discipline": planning_discipline,
+            "flat_import_row_discipline": flat_import_row_discipline,
             "action_shapes": action_shapes,
             "composition_contract": OPERATION_COMPOSITION_CONTRACT,
             "actions": list(_AUDIO_IMPORT_ACTION_FIELDS),
-            "planning_discipline": {
-                "dynamic_metadata": {
-                    "fields": ["properties", "references"],
-                    "complete_before": (
-                        "first-draft-apply-using-properties-or-references"
-                    ),
-                    "schema_and_metadata_may_swap": True,
-                    "draft_start_may_precede": True,
-                    "successful_result_survives_metadata_independent_actions": True,
-                    "repeat_successful_query": False,
-                },
-                "import_operation": {
-                    "source": (
-                        "registry_fragments.request_options.import_operation"
-                    ),
-                    "action": "set_import_option",
-                    "gateway_default": gateway_default,
-                    "default_is_materialized_at": "draft-start",
-                    "action_required_only_for": [
-                        value
-                        for value in import_operation_values
-                        if value != gateway_default
-                    ],
-                    "do_not_submit_redundant_default": True,
-                },
-            },
-            "flat_import_row_discipline": flat_import_row_discipline,
             "limits": {
                 "imports": fragments["limits"]["imports"],
                 "action_bytes": MAX_AUDIO_IMPORT_COMPOSER_ACTION_BYTES,

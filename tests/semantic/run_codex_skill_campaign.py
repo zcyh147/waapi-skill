@@ -3630,6 +3630,73 @@ def _steps_in_consumed_order(
     return tuple(rebound)
 
 
+def _build_heavy_v3_broker_replay(
+    *,
+    skill_source: Path,
+    invocation_skill_source: Path,
+    canonical_steps: Sequence[Any],
+    execution_steps: Sequence[Any],
+    commutative_read_only_step_groups: Sequence[Sequence[str]],
+    commutative_composer_setup_step_groups: Sequence[Sequence[str]],
+    expected_wwise_version: str,
+    project_modification_policy: str,
+) -> CodexGatewayBroker:
+    """Build an offline replay from canonical policy and observed order.
+
+    The Broker validates protocol topology from the canonical order.  Archived
+    payload and response bindings must instead replay in the one declared
+    linearization that actually ran.  Keeping these two orders separate avoids
+    treating dependency-safe Composer setup as an arbitrary Gateway
+    interruption.
+    """
+
+    canonical = tuple(canonical_steps)
+    execution = tuple(execution_steps)
+    canonical_names = tuple(step.name for step in canonical)
+    execution_names = tuple(step.name for step in execution)
+    if not gateway_step_sequence_matches(
+        canonical_names,
+        execution_names,
+        commutative_read_only_step_groups,
+        commutative_composer_setup_step_groups,
+    ):
+        raise CampaignEvidenceError(
+            "archived broker uses an undeclared protocol linearization"
+        )
+
+    present_names = set(canonical_names)
+    replay_read_only_groups = tuple(
+        tuple(group)
+        for group in commutative_read_only_step_groups
+        if all(name in present_names for name in group)
+    )
+    replay_setup_groups: list[tuple[str, ...]] = []
+    for raw_group in commutative_composer_setup_step_groups:
+        group = tuple(raw_group)
+        present_prefix = tuple(name for name in group if name in present_names)
+        if present_prefix != group[: len(present_prefix)]:
+            raise CampaignEvidenceError(
+                "archived broker Composer setup prefix is malformed"
+            )
+        if len(present_prefix) >= 2:
+            replay_setup_groups.append(present_prefix)
+
+    replay = CodexGatewayBroker(
+        skill_source=skill_source,
+        invocation_skill_source=invocation_skill_source,
+        expected_steps=canonical,
+        commutative_read_only_step_groups=replay_read_only_groups,
+        commutative_composer_setup_step_groups=tuple(replay_setup_groups),
+        expected_wwise_version=expected_wwise_version,
+        project_modification_policy=project_modification_policy,
+        runner_environment={},
+    )
+    # Offline replay never starts the Broker.  Its Draft payload validator must
+    # follow the archived dependency-valid order and its rebound revision chain.
+    replay._execution_steps = list(execution)  # noqa: SLF001
+    return replay
+
+
 def _validate_heavy_v3_retryable_partial_broker(
     value: Any,
     *,
@@ -3717,9 +3784,20 @@ def _validate_heavy_v3_retryable_partial_broker(
     _validate_heavy_v3_broker_records(
         records,
         task_root=task_root,
+        canonical_steps=protocol.steps[:previous_prefix],
         steps=_steps_in_consumed_order(
             protocol.steps[:previous_prefix],
             consumed_names,
+        ),
+        commutative_read_only_step_groups=getattr(
+            protocol,
+            "commutative_read_only_step_groups",
+            (),
+        ),
+        commutative_composer_setup_step_groups=getattr(
+            protocol,
+            "commutative_composer_setup_step_groups",
+            (),
         ),
         command_records=command_records,
         options=options,
@@ -4833,9 +4911,20 @@ def _validate_heavy_v3_broker_result(
     _validate_heavy_v3_broker_records(
         records,
         task_root=task_root,
+        canonical_steps=protocol.steps[:consumed_count],
         steps=_steps_in_consumed_order(
             protocol.steps[:consumed_count],
             consumed_names,
+        ),
+        commutative_read_only_step_groups=getattr(
+            protocol,
+            "commutative_read_only_step_groups",
+            (),
+        ),
+        commutative_composer_setup_step_groups=getattr(
+            protocol,
+            "commutative_composer_setup_step_groups",
+            (),
         ),
         command_records=command_records,
         options=options,
@@ -4936,6 +5025,9 @@ def _validate_heavy_v3_broker_records(
     options: CampaignOptions,
     version: str,
     label: str,
+    canonical_steps: Sequence[Any] | None = None,
+    commutative_read_only_step_groups: Sequence[Sequence[str]] = (),
+    commutative_composer_setup_step_groups: Sequence[Sequence[str]] = (),
     expected_project_modification_policy: str | None = None,
 ) -> None:
     """Replay one exact broker prefix and bind it to Codex JSONL commands."""
@@ -4967,15 +5059,21 @@ def _validate_heavy_v3_broker_records(
     invocation_skill_source = workspace_skill_install_path(
         task_root / "agent-workspace"
     )
-    replay = CodexGatewayBroker(
+    replay = _build_heavy_v3_broker_replay(
         skill_source=options.skill_source,
         invocation_skill_source=invocation_skill_source,
-        expected_steps=steps,
+        canonical_steps=(steps if canonical_steps is None else canonical_steps),
+        execution_steps=steps,
+        commutative_read_only_step_groups=(
+            commutative_read_only_step_groups
+        ),
+        commutative_composer_setup_step_groups=(
+            commutative_composer_setup_step_groups
+        ),
         expected_wwise_version=version,
         project_modification_policy=(
             expected_project_modification_policy or "ask_before_changes"
         ),
-        runner_environment={},
     )
     record_keys = {
         "sequence",

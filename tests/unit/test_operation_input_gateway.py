@@ -393,6 +393,9 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
     assert schema["composer"]["start"]["preconditions"] == {
         "dynamic_metadata": {
             "fields": ["properties", "references"],
+            "query_granularity": "one_successful_command_per_object_type",
+            "all_required_tokens_share_that_result": True,
+            "split_required_tokens_across_queries": False,
             "complete_before": (
                 "first-draft-apply-using-properties-or-references"
             ),
@@ -433,11 +436,12 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         ],
         "construction_discipline": {
             "initial_action_by_intent": {
-                "ordinary_row": "add_import_row",
                 "row_with_switch_assignment": (
                     "add_switch_assigned_import_row"
                 ),
+                "ordinary_row": "add_import_row",
             },
+            "select_initial_action_before_action_shape": True,
             "include_every_known_field": True,
             "same_action_fields": [
                 "switch_assignment",
@@ -500,6 +504,9 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         "dynamic_metadata"
     ] == {
         "fields": ["properties", "references"],
+        "query_granularity": "one_successful_command_per_object_type",
+        "all_required_tokens_share_that_result": True,
+        "split_required_tokens_across_queries": False,
         "complete_before": (
             "first-draft-apply-using-properties-or-references"
         ),
@@ -519,6 +526,12 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
     assert schema["composer"]["action_shapes"]["add_import_row"][
         "construction_discipline"
     ] == schema["composer"]["flat_import_row_discipline"]
+    assert list(schema["composer"]).index(
+        "flat_import_row_discipline"
+    ) < list(schema["composer"]).index("action_shapes")
+    assert schema["composer"]["actions"].index(
+        "add_switch_assigned_import_row"
+    ) < schema["composer"]["actions"].index("add_import_row")
     assert schema["composer"]["action_shapes"]["add_import_row"][
         "user_fact_checklist"
     ] == {

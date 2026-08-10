@@ -289,14 +289,15 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
                 "properties",
                 "references",
             ],
-            "construction_discipline": {
-                "initial_action_by_intent": {
-                    "ordinary_row": "add_import_row",
-                    "row_with_switch_assignment": (
-                        "add_switch_assigned_import_row"
-                    ),
-                },
-                "include_every_known_field": True,
+                "construction_discipline": {
+                    "initial_action_by_intent": {
+                        "row_with_switch_assignment": (
+                            "add_switch_assigned_import_row"
+                        ),
+                        "ordinary_row": "add_import_row",
+                    },
+                    "select_initial_action_before_action_shape": True,
+                    "include_every_known_field": True,
                 "same_action_fields": [
                     "switch_assignment",
                     "event",
@@ -347,14 +348,15 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
                 "properties",
                 "references",
             ],
-            "construction_discipline": {
-                "initial_action_by_intent": {
-                    "ordinary_row": "add_import_row",
-                    "row_with_switch_assignment": (
-                        "add_switch_assigned_import_row"
-                    ),
-                },
-                "include_every_known_field": True,
+                "construction_discipline": {
+                    "initial_action_by_intent": {
+                        "row_with_switch_assignment": (
+                            "add_switch_assigned_import_row"
+                        ),
+                        "ordinary_row": "add_import_row",
+                    },
+                    "select_initial_action_before_action_shape": True,
+                    "include_every_known_field": True,
                 "same_action_fields": [
                     "switch_assignment",
                     "event",
@@ -433,6 +435,9 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
     assert contract["planning_discipline"] == {
         "dynamic_metadata": {
             "fields": ["properties", "references"],
+            "query_granularity": "one_successful_command_per_object_type",
+            "all_required_tokens_share_that_result": True,
+            "split_required_tokens_across_queries": False,
             "complete_before": (
                 "first-draft-apply-using-properties-or-references"
             ),
@@ -463,9 +468,10 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
     )
     assert contract["flat_import_row_discipline"] == {
         "initial_action_by_intent": {
-            "ordinary_row": "add_import_row",
             "row_with_switch_assignment": "add_switch_assigned_import_row",
+            "ordinary_row": "add_import_row",
         },
+        "select_initial_action_before_action_shape": True,
         "include_every_known_field": True,
         "same_action_fields": [
             "switch_assignment",
@@ -484,6 +490,18 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
     assert contract["action_shapes"]["add_switch_assigned_import_row"][
         "construction_discipline"
     ] == contract["flat_import_row_discipline"]
+    assert list(contract).index("flat_import_row_discipline") < list(contract).index(
+        "action_shapes"
+    )
+    assert list(contract).index("planning_discipline") < list(contract).index(
+        "action_shapes"
+    )
+    assert contract["actions"].index(
+        "add_switch_assigned_import_row"
+    ) < contract["actions"].index("add_import_row")
+    assert list(contract["action_shapes"]).index(
+        "add_switch_assigned_import_row"
+    ) < list(contract["action_shapes"]).index("add_import_row")
     dependency = contract["registry_fragments"]["metadata_dependency_closure"]
     assert dependency["metadata_source"]["same_result_required"] is True
     assert dependency["materialization"]["ordinary_dependencies"]["owner"] == (

@@ -62,7 +62,9 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     CodexGatewayBroker,
+    DraftActionJsonArgument,
     ExpectedGatewayStep,
+    MetadataQueryArgument,
     ResponseBinding,
     SemanticJsonArgument,
     resolve_gateway_invocation,
@@ -202,6 +204,112 @@ def test_consumed_composer_order_rebinds_each_revision_to_its_actual_predecessor
         expected_steps=linearized,
         expected_wwise_version="2022.1",
     )
+
+
+def test_archived_broker_replay_preserves_declared_composer_setup_order() -> None:
+    schema = ExpectedGatewayStep(
+        "tx01.operation-schema",
+        "operation-schema",
+        ("audio.import",),
+    )
+    metadata = ExpectedGatewayStep(
+        "tx01.metadata",
+        "metadata",
+        (
+            "discover",
+            "--object-type",
+            "Sound",
+            "--query",
+            MetadataQueryArgument("volume"),
+            "--limit",
+            "8",
+        ),
+    )
+    start = ExpectedGatewayStep(
+        "tx01.draft-start",
+        "draft-start",
+        ("audio.import",),
+    )
+    action = ExpectedGatewayStep(
+        "tx01.action.001",
+        "draft-apply",
+        (
+            ResponseBinding(start.name, "/draft/draft_id"),
+            "--task-authority",
+            ResponseBinding(start.name, "/task_authority"),
+            "--expected-revision",
+            ResponseBinding(start.name, "/draft/revision"),
+            "--compact",
+            "--action-json",
+            DraftActionJsonArgument(
+                {
+                    "contract": "waapi-skill.operation-draft-action/v1",
+                    "action": "set_import_option",
+                    "name": "import_operation",
+                    "value": "useExisting",
+                },
+                operation="audio.import",
+            ),
+        ),
+    )
+    canonical = (schema, metadata, start, action)
+    setup_groups = ((metadata.name, start.name, action.name),)
+    consumed_names = (schema.name, start.name, action.name, metadata.name)
+    consumed = campaign._steps_in_consumed_order(canonical, consumed_names)
+
+    replay = campaign._build_heavy_v3_broker_replay(
+        skill_source=Path("skills/waapi-skill"),
+        invocation_skill_source=Path("skills/waapi-skill"),
+        canonical_steps=canonical,
+        execution_steps=consumed,
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=setup_groups,
+        expected_wwise_version="2022.1",
+        project_modification_policy="ask_before_changes",
+    )
+
+    assert tuple(step.name for step in replay.expected_steps) == tuple(
+        step.name for step in canonical
+    )
+    assert tuple(step.name for step in replay._execution_steps) == consumed_names
+
+
+def test_archived_broker_replay_rejects_undeclared_composer_interruption() -> None:
+    schema = ExpectedGatewayStep(
+        "tx01.operation-schema",
+        "operation-schema",
+        ("audio.import",),
+    )
+    metadata = ExpectedGatewayStep(
+        "tx01.metadata",
+        "metadata",
+        ("discover", "--object-type", "Sound", "--limit", "8"),
+    )
+    start = ExpectedGatewayStep(
+        "tx01.draft-start",
+        "draft-start",
+        ("audio.import",),
+    )
+    canonical = (schema, metadata, start)
+    consumed = campaign._steps_in_consumed_order(
+        canonical,
+        (schema.name, start.name, metadata.name),
+    )
+
+    with pytest.raises(
+        CampaignEvidenceError,
+        match="undeclared protocol linearization",
+    ):
+        campaign._build_heavy_v3_broker_replay(
+            skill_source=Path("skills/waapi-skill"),
+            invocation_skill_source=Path("skills/waapi-skill"),
+            canonical_steps=canonical,
+            execution_steps=consumed,
+            commutative_read_only_step_groups=(),
+            commutative_composer_setup_step_groups=(),
+            expected_wwise_version="2022.1",
+            project_modification_policy="ask_before_changes",
+        )
 
 
 def test_archived_draft_action_preserves_submitted_json_spelling() -> None:
