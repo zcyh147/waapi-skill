@@ -633,7 +633,7 @@ class V3GatewayProtocol:
     allowed_turn_prefix_counts: tuple[tuple[int, ...], ...] = ()
     terminal_prefix_counts: tuple[int, ...] = ()
     commutative_read_only_step_groups: tuple[tuple[str, str], ...] = ()
-    commutative_composer_setup_step_groups: tuple[tuple[str, str], ...] = ()
+    commutative_composer_setup_step_groups: tuple[tuple[str, ...], ...] = ()
 
     def __post_init__(self) -> None:
         if not self.steps:
@@ -721,8 +721,11 @@ class V3GatewayProtocol:
                 raise ValueError(
                     "a commutative read-only group cannot cross a turn prefix"
                 )
-        for first, _second in setup_groups:
-            if indexes[first] + 1 in checkpoint_counts:
+        for group in setup_groups:
+            if any(
+                indexes[group[0]] + offset in checkpoint_counts
+                for offset in range(1, len(group))
+            ):
                 raise ValueError(
                     "a commutative Composer setup group cannot cross a turn prefix"
                 )

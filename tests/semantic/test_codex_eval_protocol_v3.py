@@ -31,6 +31,7 @@ from tests.semantic.support.codex_gateway_broker import (
     MetadataTokenProjection,
     ResponseBinding,
     SemanticJsonArgument,
+    validate_commutative_composer_setup_step_groups,
     resolve_gateway_invocation,
 )
 
@@ -350,13 +351,59 @@ def test_commutative_composer_setup_groups_are_narrow_and_cannot_cross_turns() -
                 ("tx01.metadata", "tx01.draft-start"),
             ),
         )
-    with pytest.raises(ValueError, match="limited to one metadata/draft-start"):
+    with pytest.raises(ValueError, match="limited to metadata"):
         V3GatewayProtocol(
             (schema, metadata, draft_start),
             (3,),
             commutative_composer_setup_step_groups=(
                 ("tx01.operation-schema", "tx01.metadata"),
             ),
+        )
+
+    static_action = ExpectedGatewayStep(
+        "tx01.action.001",
+        "draft-apply",
+        (
+            DraftActionJsonArgument(
+                {
+                    "contract": "waapi-skill.operation-draft-action/v1",
+                    "action": "set_import_option",
+                    "name": "import_operation",
+                    "value": "useExisting",
+                },
+                operation="audio.import",
+            ),
+        ),
+    )
+    assert validate_commutative_composer_setup_step_groups(
+        (metadata, draft_start, static_action),
+        (("tx01.metadata", "tx01.draft-start", "tx01.action.001"),),
+    ) == (("tx01.metadata", "tx01.draft-start", "tx01.action.001"),)
+
+    metadata_bound_action = ExpectedGatewayStep(
+        "tx01.action.002",
+        "draft-apply",
+        (
+            DraftActionJsonArgument(
+                {
+                    "contract": "waapi-skill.operation-draft-action/v1",
+                    "action": "set_import_default",
+                    "name": "properties",
+                    "value": [{"name": "Volume", "value": -3.0}],
+                },
+                operation="audio.import",
+                metadata_binding=DraftActionMetadataBinding(
+                    step="tx01.metadata",
+                    object_type="Sound",
+                    required_tokens=("Volume",),
+                ),
+            ),
+        ),
+    )
+    with pytest.raises(ValueError, match="metadata-free typed actions"):
+        validate_commutative_composer_setup_step_groups(
+            (metadata, draft_start, metadata_bound_action),
+            (("tx01.metadata", "tx01.draft-start", "tx01.action.002"),),
         )
 
 

@@ -1339,7 +1339,7 @@ class GatewayBrokerRecord:
 
 
 CommutativeReadOnlyStepGroups = tuple[tuple[str, str], ...]
-CommutativeComposerSetupStepGroups = tuple[tuple[str, str], ...]
+CommutativeComposerSetupStepGroups = tuple[tuple[str, ...], ...]
 
 
 def _is_closed_exact_id_query_step(step: ExpectedGatewayStep) -> bool:
@@ -1413,44 +1413,76 @@ def validate_commutative_composer_setup_step_groups(
     expected_steps: Sequence[ExpectedGatewayStep],
     groups: Sequence[Sequence[str]],
 ) -> CommutativeComposerSetupStepGroups:
-    """Validate adjacent metadata/Draft-start setup permutations.
+    """Validate one metadata step moving across local, metadata-free setup.
 
-    Starting one empty local Draft has no Wwise side effect.  It may therefore
-    precede its dynamic metadata discovery, while every typed action remains
-    ordered after both setup steps.
+    Starting an empty Draft and applying typed actions that carry no dynamic
+    property/reference facts have no Wwise side effect and do not consume the
+    metadata result.  Metadata may move across that exact contiguous setup
+    prefix, but it must remain before the first metadata-bound action.
     """
 
     steps = tuple(expected_steps)
     names = tuple(step.name for step in steps)
     indexes = {name: index for index, name in enumerate(names)}
-    normalized: list[tuple[str, str]] = []
+    normalized: list[tuple[str, ...]] = []
     claimed: set[str] = set()
     for raw_group in groups:
         group = tuple(raw_group)
         if (
-            len(group) != 2
+            len(group) < 2
             or any(not isinstance(name, str) or not name for name in group)
-            or group[0] == group[1]
+            or len(set(group)) != len(group)
             or any(name not in indexes for name in group)
-            or indexes[group[1]] != indexes[group[0]] + 1
+            or tuple(indexes[name] for name in group)
+            != tuple(range(indexes[group[0]], indexes[group[0]] + len(group)))
             or any(name in claimed for name in group)
         ):
             raise ValueError(
-                "commutative Composer setup groups must name disjoint adjacent "
+                "commutative Composer setup groups must name disjoint contiguous "
                 "expected steps in canonical order"
             )
-        grouped_steps = (steps[indexes[group[0]]], steps[indexes[group[1]]])
-        if tuple(step.subcommand for step in grouped_steps) != (
-            "metadata",
-            "draft-start",
+        grouped_steps = tuple(steps[indexes[name]] for name in group)
+        metadata_free_actions = grouped_steps[2:]
+        if (
+            grouped_steps[0].subcommand != "metadata"
+            or grouped_steps[1].subcommand != "draft-start"
+            or grouped_steps[1].arguments != ("audio.import",)
+            or any(
+                step.subcommand != "draft-apply"
+                for step in metadata_free_actions
+            )
+            or any(
+                not any(
+                    isinstance(argument, DraftActionJsonArgument)
+                    and argument.operation == "audio.import"
+                    and argument.metadata_binding is None
+                    for argument in step.arguments
+                )
+                for step in metadata_free_actions
+            )
         ):
             raise ValueError(
-                "commutative Composer setup groups are limited to one "
-                "metadata/draft-start pair"
+                "commutative Composer setup groups are limited to metadata, "
+                "audio.import draft-start, then metadata-free typed actions"
             )
         claimed.update(group)
-        normalized.append((group[0], group[1]))
+        normalized.append(group)
     return tuple(normalized)
+
+
+def _commutative_composer_setup_pairs(
+    groups: Sequence[Sequence[str]],
+) -> set[frozenset[str]]:
+    """Return only the adjacent swaps reachable by moving metadata right."""
+
+    pairs: set[frozenset[str]] = set()
+    for raw_group in groups:
+        group = tuple(raw_group)
+        if len(group) >= 2:
+            pairs.update(
+                frozenset((group[0], name)) for name in group[1:]
+            )
+    return pairs
 
 
 _DRAFT_SUBCOMMANDS = frozenset(
@@ -1794,9 +1826,9 @@ def gateway_step_prefix_matches(
         return False
     permitted_pairs = {
         frozenset(tuple(group))
-        for group in (*tuple(groups), *tuple(composer_setup_groups))
+        for group in tuple(groups)
         if len(tuple(group)) == 2
-    }
+    } | _commutative_composer_setup_pairs(composer_setup_groups)
     reachable = {expected_names}
     pending = [expected_names]
     while pending:
@@ -5258,11 +5290,10 @@ class CodexGatewayBroker:
         self._execution_steps = list(self.expected_steps)
         self._commutative_step_pairs = {
             frozenset(group)
-            for group in (
-                *self.commutative_read_only_step_groups,
-                *self.commutative_composer_setup_step_groups,
-            )
-        }
+            for group in self.commutative_read_only_step_groups
+        } | _commutative_composer_setup_pairs(
+            self.commutative_composer_setup_step_groups
+        )
         self.gateway_global_arguments = tuple(str(value) for value in gateway_global_arguments)
         self.expected_wwise_version = str(expected_wwise_version)
         self.project_modification_policy = str(project_modification_policy)

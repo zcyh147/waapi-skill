@@ -663,6 +663,8 @@ def _observe_successful_protocol(
         steps[:2] = reversed(steps[:2])
     elif preamble_order == "draft-before-metadata":
         steps[1:3] = reversed(steps[1:3])
+    elif preamble_order == "static-action-before-metadata":
+        steps[:4] = (steps[0], steps[2], steps[3], steps[1])
     elif preamble_order != "canonical":
         raise ValueError("unsupported Rifle preamble order")
     for step in steps:
@@ -872,7 +874,7 @@ def test_rifle_preamble_accepts_only_declared_dependency_safe_orders(
     version: str,
 ) -> None:
     prepared, _fake, _runtime = _prepared(tmp_path, version=version)
-    canonical = tuple(step.name for step in prepared.protocol.steps[:3])
+    canonical = tuple(step.name for step in prepared.protocol.steps[:4])
     groups = prepared.protocol.commutative_read_only_step_groups
     setup_groups = prepared.protocol.commutative_composer_setup_step_groups
 
@@ -880,6 +882,7 @@ def test_rifle_preamble_accepts_only_declared_dependency_safe_orders(
         "tx01.operation-schema",
         "metadata.discover",
         "tx01.draft-start",
+        "tx01.action.001",
     )
     assert gateway_step_sequence_matches(
         canonical, canonical, groups, setup_groups
@@ -890,6 +893,7 @@ def test_rifle_preamble_accepts_only_declared_dependency_safe_orders(
             "metadata.discover",
             "tx01.operation-schema",
             "tx01.draft-start",
+            "tx01.action.001",
         ),
         groups,
         setup_groups,
@@ -900,21 +904,41 @@ def test_rifle_preamble_accepts_only_declared_dependency_safe_orders(
             "tx01.operation-schema",
             "tx01.draft-start",
             "metadata.discover",
+            "tx01.action.001",
+        ),
+        groups,
+        setup_groups,
+    )
+    assert gateway_step_sequence_matches(
+        canonical,
+        (
+            "tx01.operation-schema",
+            "tx01.draft-start",
+            "tx01.action.001",
+            "metadata.discover",
         ),
         groups,
         setup_groups,
     )
 
-    # Schema and metadata both remain mandatory before the first typed action.
+    # Schema and metadata remain mandatory before the first metadata-bound action.
     assert not gateway_step_sequence_matches(
         canonical,
-        ("metadata.discover", "tx01.draft-start"),
+        (
+            "metadata.discover",
+            "tx01.draft-start",
+            "tx01.action.001",
+        ),
         groups,
         setup_groups,
     )
     assert not gateway_step_sequence_matches(
         canonical,
-        ("tx01.operation-schema", "tx01.draft-start"),
+        (
+            "tx01.operation-schema",
+            "tx01.draft-start",
+            "tx01.action.001",
+        ),
         groups,
         setup_groups,
     )
@@ -924,6 +948,7 @@ def test_rifle_preamble_accepts_only_declared_dependency_safe_orders(
             "metadata.discover",
             "tx01.draft-start",
             "tx01.operation-schema",
+            "tx01.action.001",
         ),
         groups,
         setup_groups,
@@ -934,6 +959,7 @@ def test_rifle_preamble_accepts_only_declared_dependency_safe_orders(
             "tx01.draft-start",
             "tx01.operation-schema",
             "metadata.discover",
+            "tx01.action.001",
         ),
         groups,
         setup_groups,
@@ -943,7 +969,12 @@ def test_rifle_preamble_accepts_only_declared_dependency_safe_orders(
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
 @pytest.mark.parametrize(
     "preamble_order",
-    ("canonical", "metadata-first", "draft-before-metadata"),
+    (
+        "canonical",
+        "metadata-first",
+        "draft-before-metadata",
+        "static-action-before-metadata",
+    ),
 )
 def test_rifle_observer_and_final_oracle_accept_declared_preamble_orders(
     tmp_path: Path,
@@ -991,6 +1022,7 @@ def test_rifle_observer_rejects_duplicate_or_incomplete_read_pair(
     operation_schema = incomplete.protocol.steps[0]
     draft_start = incomplete.protocol.steps[2]
     first_action = incomplete.protocol.steps[3]
+    first_metadata_bound_action = incomplete.protocol.steps[4]
     incomplete.observe_payload(
         operation_schema,
         {"ok": True, "command": operation_schema.subcommand},
@@ -999,13 +1031,17 @@ def test_rifle_observer_rejects_duplicate_or_incomplete_read_pair(
         draft_start,
         {"ok": True, "command": draft_start.subcommand},
     )
+    incomplete.observe_payload(
+        first_action,
+        {"ok": True, "command": first_action.subcommand},
+    )
     with pytest.raises(
         RifleIntegrationRuntimeError,
         match="duplicated or observed out of order",
     ):
         incomplete.observe_payload(
-            first_action,
-            {"ok": True, "command": first_action.subcommand},
+            first_metadata_bound_action,
+            {"ok": True, "command": first_metadata_bound_action.subcommand},
         )
     incomplete.cleanup().assert_passed()
 

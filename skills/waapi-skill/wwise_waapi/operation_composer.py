@@ -170,6 +170,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "properties",
                 "references",
             ],
+            "requested_switch_assignment_stays_on_initial_row": True,
             "split_initial_row_across_follow_up_actions": False,
             "follow_up_row_actions": "corrections_only",
             "metadata_dependency_activation": "gateway_owned_do_not_submit",
@@ -187,6 +188,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "switch_assignment",
             ],
             "distinct_metadata_tokens_are_independent_facts": True,
+            "requested_switch_assignment_is_not_a_later_action": True,
         }
         action_shapes = {
             action_name: {

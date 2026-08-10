@@ -3016,7 +3016,10 @@ def operation_composer_input_contract(
                             ]
                         ),
                         "draft_start_may_precede": True,
-                        "typed_actions_wait_for": ["dynamic_metadata"],
+                        "metadata_independent_actions_may_precede": True,
+                        "actions_using_properties_or_references_wait_for": [
+                            "dynamic_metadata"
+                        ],
                         "failure_policy": (
                             "do_not_apply_dynamic_fields_then_backfill_metadata"
                         ),

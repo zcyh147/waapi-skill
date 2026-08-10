@@ -400,7 +400,10 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             "draft_start_may_precede": True,
         },
         "draft_start_may_precede": True,
-        "typed_actions_wait_for": ["dynamic_metadata"],
+        "metadata_independent_actions_may_precede": True,
+        "actions_using_properties_or_references_wait_for": [
+            "dynamic_metadata"
+        ],
         "failure_policy": "do_not_apply_dynamic_fields_then_backfill_metadata",
     }
     assert schema["composer"]["action_shapes"]["add_import_row"] == {
@@ -428,13 +431,14 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         "construction_discipline": {
             "initial_action": "add_import_row",
             "include_every_known_field": True,
-            "same_action_fields": [
-                "switch_assignment",
-                "event",
-                "properties",
-                "references",
-            ],
-            "split_initial_row_across_follow_up_actions": False,
+                "same_action_fields": [
+                    "switch_assignment",
+                    "event",
+                    "properties",
+                    "references",
+                ],
+                "requested_switch_assignment_stays_on_initial_row": True,
+                "split_initial_row_across_follow_up_actions": False,
             "follow_up_row_actions": "corrections_only",
             "metadata_dependency_activation": "gateway_owned_do_not_submit",
         },
@@ -449,9 +453,10 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
                 "properties",
                 "references",
                 "switch_assignment",
-            ],
-            "distinct_metadata_tokens_are_independent_facts": True,
-        },
+                ],
+                "distinct_metadata_tokens_are_independent_facts": True,
+                "requested_switch_assignment_is_not_a_later_action": True,
+            },
     }
     assert schema["composer"]["planning_discipline"][
         "dynamic_metadata"
@@ -489,6 +494,7 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             "switch_assignment",
         ],
         "distinct_metadata_tokens_are_independent_facts": True,
+        "requested_switch_assignment_is_not_a_later_action": True,
     }
     assert schema["composer"]["flat_import_row_discipline"][
         "metadata_dependency_activation"

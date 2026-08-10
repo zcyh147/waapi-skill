@@ -293,13 +293,14 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
             "construction_discipline": {
                 "initial_action": "add_import_row",
                 "include_every_known_field": True,
-                "same_action_fields": [
-                    "switch_assignment",
-                    "event",
-                    "properties",
-                    "references",
-                ],
-                "split_initial_row_across_follow_up_actions": False,
+                    "same_action_fields": [
+                        "switch_assignment",
+                        "event",
+                        "properties",
+                        "references",
+                    ],
+                    "requested_switch_assignment_stays_on_initial_row": True,
+                    "split_initial_row_across_follow_up_actions": False,
                 "follow_up_row_actions": "corrections_only",
                 "metadata_dependency_activation": (
                     "gateway_owned_do_not_submit"
@@ -316,9 +317,10 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
                     "properties",
                     "references",
                     "switch_assignment",
-                ],
-                "distinct_metadata_tokens_are_independent_facts": True,
-            },
+                    ],
+                    "distinct_metadata_tokens_are_independent_facts": True,
+                    "requested_switch_assignment_is_not_a_later_action": True,
+                },
         },
         "set_import_row_field": {
             "fixed_fields": {
@@ -404,6 +406,7 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
             "properties",
             "references",
         ],
+        "requested_switch_assignment_stays_on_initial_row": True,
         "split_initial_row_across_follow_up_actions": False,
         "follow_up_row_actions": "corrections_only",
         "metadata_dependency_activation": "gateway_owned_do_not_submit",

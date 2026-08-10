@@ -75,7 +75,11 @@ RIFLE_COMMUTATIVE_READ_ONLY_STEP_GROUPS = (
     ("tx01.operation-schema", "metadata.discover"),
 )
 RIFLE_COMMUTATIVE_COMPOSER_SETUP_STEP_GROUPS = (
-    ("metadata.discover", "tx01.draft-start"),
+    (
+        "metadata.discover",
+        "tx01.draft-start",
+        "tx01.action.001",
+    ),
 )
 
 _GUID_RE = re.compile(
