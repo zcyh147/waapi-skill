@@ -10350,6 +10350,15 @@ def _operation_draft_projection_handles(value: Any) -> set[str]:
     return handles
 
 
+def _operation_draft_facts_summary(current_facts: list[Any]) -> dict[str, Any]:
+    return {
+        "contract": "waapi-skill.operation-draft-facts-summary/v1",
+        "target_count": len(current_facts),
+        "handle_count": len(_operation_draft_projection_handles(current_facts)),
+        "canonical_sha256": canonical_sha256(current_facts),
+    }
+
+
 def _operation_draft_compact_action_projection(
     *,
     action: Mapping[str, Any],
@@ -10384,12 +10393,7 @@ def _operation_draft_compact_action_projection(
         }
     )
     return {
-        "current_facts_summary": {
-            "contract": "waapi-skill.operation-draft-facts-summary/v1",
-            "target_count": len(current_facts),
-            "handle_count": len(current_handles),
-            "canonical_sha256": canonical_sha256(current_facts),
-        },
+        "current_facts_summary": _operation_draft_facts_summary(current_facts),
         "action_result": {
             "contract": "waapi-skill.operation-draft-action-result/v1",
             "action": action_name,
@@ -10441,6 +10445,22 @@ def operation_draft_payload(
                 projection["allowed_actions"].extend(
                     ["check", "preview-from-draft"]
                 )
+            if command == "draft-check":
+                current_facts = projection.pop("current_facts")
+                if not isinstance(current_facts, list):
+                    raise GatewayInputError(
+                        "Checked Draft projection requires bounded current facts."
+                    )
+                projection["current_facts_summary"] = (
+                    _operation_draft_facts_summary(current_facts)
+                )
+                projection["response_integrity"] = {
+                    "complete": True,
+                    "truncated": False,
+                    "projection": "checked_draft_receipt",
+                    "compact_projection_is_not_truncation": True,
+                    "draft_inspect_required_before_preview": False,
+                }
         if record.seal is None:
             projection["seal"] = None
         else:
@@ -10540,28 +10560,47 @@ def operation_draft_payload(
                     "precompute_or_increment_revision": False,
                 }
             )
-        next_action_binding.update(
-            {
-                "fixed_full_argv_template": [
-                    "python",
-                    str(GATEWAY_RUNNER_PATH),
-                    "gateway.py",
-                    "draft-apply",
-                    record.draft_id,
-                    "--task-authority",
-                    "<task-authority-from-draft-start>",
-                    "--expected-revision",
-                    str(record.revision),
-                    "--compact",
-                    "--action-json",
-                    "<typed-action-json>",
-                ],
-                "replace_only": [
-                    "<task-authority-from-draft-start>",
-                    "<typed-action-json>",
-                ],
-            }
-        )
+        if record.check is not None:
+            next_action_binding.update(
+                {
+                    "fixed_full_argv_template": [
+                        "python",
+                        str(GATEWAY_RUNNER_PATH),
+                        "gateway.py",
+                        "preview-from-draft",
+                        record.draft_id,
+                        "--task-authority",
+                        "<task-authority-from-draft-start>",
+                        "--expected-revision",
+                        str(record.revision),
+                        "--apply",
+                    ],
+                    "replace_only": ["<task-authority-from-draft-start>"],
+                }
+            )
+        else:
+            next_action_binding.update(
+                {
+                    "fixed_full_argv_template": [
+                        "python",
+                        str(GATEWAY_RUNNER_PATH),
+                        "gateway.py",
+                        "draft-apply",
+                        record.draft_id,
+                        "--task-authority",
+                        "<task-authority-from-draft-start>",
+                        "--expected-revision",
+                        str(record.revision),
+                        "--compact",
+                        "--action-json",
+                        "<typed-action-json>",
+                    ],
+                    "replace_only": [
+                        "<task-authority-from-draft-start>",
+                        "<typed-action-json>",
+                    ],
+                }
+            )
         if compact_action is None:
             next_action_binding["copy_all_other_values_exactly"] = True
         draft["next_action_binding"] = next_action_binding

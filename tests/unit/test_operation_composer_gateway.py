@@ -1051,6 +1051,43 @@ def test_live_check_is_bounded_durable_and_any_edit_invalidates_it(
     assert checked["draft"]["check"]["source_revision"] == 3
     assert checked["draft"]["check"]["request_digest"]
     assert "preview-from-draft" in checked["draft"]["allowed_actions"]
+    assert "current_facts" not in checked["draft"]
+    facts_summary = checked["draft"]["current_facts_summary"]
+    assert facts_summary == {
+        "contract": "waapi-skill.operation-draft-facts-summary/v1",
+        "target_count": 1,
+        "handle_count": 1,
+        "canonical_sha256": facts_summary["canonical_sha256"],
+    }
+    assert checked["draft"]["response_integrity"] == {
+        "complete": True,
+        "truncated": False,
+        "projection": "checked_draft_receipt",
+        "compact_projection_is_not_truncation": True,
+        "draft_inspect_required_before_preview": False,
+    }
+    assert checked["draft"]["next_action_binding"] == {
+        "contract": "waapi-skill.operation-draft-next-action/v1",
+        "draft_id": draft_id,
+        "expected_revision": 4,
+        "one_action_only": True,
+        "then_read_next_response": True,
+        "precompute_or_increment_revision": False,
+        "fixed_full_argv_template": [
+            "python",
+            str(waapi_gateway.GATEWAY_RUNNER_PATH),
+            "gateway.py",
+            "preview-from-draft",
+            draft_id,
+            "--task-authority",
+            "<task-authority-from-draft-start>",
+            "--expected-revision",
+            "4",
+            "--apply",
+        ],
+        "replace_only": ["<task-authority-from-draft-start>"],
+        "copy_all_other_values_exactly": True,
+    }
     assert [call[0] for call in client.calls] == [
         "ak.wwise.core.getInfo",
         "ak.wwise.core.getProjectInfo",
