@@ -412,6 +412,24 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             "switch_assignment",
         ],
     }
+    assert schema["composer"]["planning_discipline"][
+        "dynamic_metadata"
+    ] == {
+        "fields": ["properties", "references"],
+        "complete_before": "draft-start",
+        "schema_and_metadata_may_swap": True,
+    }
+    assert schema["composer"]["planning_discipline"][
+        "explicit_import_operation"
+    ]["complete_before"] == "first_add_import_row"
+    assert schema["composer"]["flat_import_row_discipline"][
+        "metadata_dependency_activation"
+    ] == "gateway_owned_do_not_submit"
+    assert schema["composer"]["registry_fragments"][
+        "metadata_dependency_closure"
+    ]["materialization"]["supported_reference_activation"]["owner"] == (
+        "gateway"
+    )
     assert "request_contract" not in schema["operation"]
     assert "argument_contract" not in schema["operation"]
 

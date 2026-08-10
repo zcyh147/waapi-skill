@@ -3799,6 +3799,9 @@ def audio_import_composer_fragment_contract(version: str) -> dict[str, Any]:
     try:
         argument_properties = machine["argument_contract"]["properties"]
         row_properties = argument_properties["imports"]["items"]["properties"]
+        metadata_dependency_closure = machine["argument_contract"][
+            "request_composition_contract"
+        ]["metadata_dependency_closure"]
     except (KeyError, TypeError) as exc:  # pragma: no cover - registry invariant
         raise RuntimeError(
             "audio.import Registry schema no longer exposes the reviewed Composer fragments"
@@ -3826,6 +3829,9 @@ def audio_import_composer_fragment_contract(version: str) -> dict[str, Any]:
                 "auto_check_out_to_source_control",
             )
         },
+        "metadata_dependency_closure": _json_mapping(
+            metadata_dependency_closure
+        ),
         "limits": {
             "imports": MAX_IMPORT_ITEMS,
             "canonical_request_bytes": machine["argument_contract"].get(

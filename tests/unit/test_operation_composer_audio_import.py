@@ -337,6 +337,41 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
         "auto_check_out_to_source_control",
         "import_operation",
     }
+    assert contract["planning_discipline"] == {
+        "dynamic_metadata": {
+            "fields": ["properties", "references"],
+            "complete_before": "draft-start",
+            "schema_and_metadata_may_swap": True,
+        },
+        "explicit_import_operation": {
+            "source": "registry_fragments.request_options.import_operation",
+            "action": "set_import_option",
+            "complete_before": "first_add_import_row",
+            "required_when_user_intent_is_explicit": True,
+            "omission_allowed_only_when": "user_intent_unstated",
+        },
+    }
+    assert contract["flat_import_row_discipline"] == {
+        "initial_action": "add_import_row",
+        "include_every_known_field": True,
+        "same_action_fields": [
+            "switch_assignment",
+            "event",
+            "properties",
+            "references",
+        ],
+        "split_initial_row_across_follow_up_actions": False,
+        "follow_up_row_actions": "corrections_only",
+        "metadata_dependency_activation": "gateway_owned_do_not_submit",
+    }
+    dependency = contract["registry_fragments"]["metadata_dependency_closure"]
+    assert dependency["metadata_source"]["same_result_required"] is True
+    assert dependency["materialization"]["ordinary_dependencies"]["owner"] == (
+        "request"
+    )
+    assert dependency["materialization"]["supported_reference_activation"][
+        "owner"
+    ] == "gateway"
     assert contract["registry_fragments"]["source_schema_digest"] == (
         operation_request_schema_digest("audio.import", version)
     )

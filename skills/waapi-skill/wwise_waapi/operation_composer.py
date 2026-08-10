@@ -174,6 +174,37 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             },
             "composition_contract": OPERATION_COMPOSITION_CONTRACT,
             "actions": list(_AUDIO_IMPORT_ACTION_FIELDS),
+            "planning_discipline": {
+                "dynamic_metadata": {
+                    "fields": ["properties", "references"],
+                    "complete_before": "draft-start",
+                    "schema_and_metadata_may_swap": True,
+                },
+                "explicit_import_operation": {
+                    "source": (
+                        "registry_fragments.request_options.import_operation"
+                    ),
+                    "action": "set_import_option",
+                    "complete_before": "first_add_import_row",
+                    "required_when_user_intent_is_explicit": True,
+                    "omission_allowed_only_when": "user_intent_unstated",
+                },
+            },
+            "flat_import_row_discipline": {
+                "initial_action": "add_import_row",
+                "include_every_known_field": True,
+                "same_action_fields": [
+                    "switch_assignment",
+                    "event",
+                    "properties",
+                    "references",
+                ],
+                "split_initial_row_across_follow_up_actions": False,
+                "follow_up_row_actions": "corrections_only",
+                "metadata_dependency_activation": (
+                    "gateway_owned_do_not_submit"
+                ),
+            },
             "limits": {
                 "imports": fragments["limits"]["imports"],
                 "action_bytes": MAX_AUDIO_IMPORT_COMPOSER_ACTION_BYTES,
