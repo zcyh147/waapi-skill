@@ -724,9 +724,8 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "Follow the schema's sole `input_mode`; never seek another" in OPERATE
     assert "For `composer`, run `composer.start.gateway_argv`" in OPERATE
     assert "returned actions/handles" in OPERATE
-    assert "Flat rows start once" in OPERATE
-    assert "`object.set` uses `add_target`" in OPERATE
-    assert "`audio.import` uses `add_import_row`" in OPERATE
+    assert "`object.set` starts rows with `add_target`" in OPERATE
+    assert "`audio.import` uses its selected row action" in OPERATE
     assert "Later actions only correct or nest" in OPERATE
     assert (
         "After `draft-check`, run the selected `preview-from-draft` continuation"
@@ -944,7 +943,7 @@ def test_operate_metadata_and_import_prose_only_rules_are_preserved() -> None:
 def test_operate_maps_only_live_query_accessors_to_mutation_tokens() -> None:
     compact = " ".join(OPERATE.split())
 
-    assert "exact property/reference accessor visible in a successful live query" in compact
+    assert "Reuse exact live property/reference accessors" in compact
     assert "`@Foo` becomes `Foo`" in compact
     assert "removing exactly one leading `@`" in compact
     assert "`OutputBus` remains `OutputBus`" in compact

@@ -3017,6 +3017,8 @@ def operation_composer_input_contract(
                         ),
                         "draft_start_may_precede": True,
                         "metadata_independent_actions_may_precede": True,
+                        "successful_metadata_survives_metadata_independent_actions": True,
+                        "repeat_successful_metadata": False,
                         "actions_using_properties_or_references_wait_for": [
                             "dynamic_metadata"
                         ],

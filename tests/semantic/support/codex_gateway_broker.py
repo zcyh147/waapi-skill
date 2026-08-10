@@ -809,6 +809,7 @@ _DRAFT_ACTION_HANDLE_FIELDS_BY_OPERATION = {
         "set_import_default": None,
         "clear_import_default": None,
         "add_import_row": None,
+        "add_switch_assigned_import_row": None,
         "set_import_row_field": "import_handle",
         "clear_import_row_field": "import_handle",
         "remove_import_row": "import_handle",
@@ -1027,7 +1028,10 @@ class DraftActionJsonArgument:
                     "Draft action metadata binding is valid only for audio.import"
                 )
             dynamic_tokens: set[str] = set()
-            if normalized["action"] == "add_import_row":
+            if normalized["action"] in {
+                "add_import_row",
+                "add_switch_assigned_import_row",
+            }:
                 for field in ("properties", "references"):
                     rows = normalized.get(field, [])
                     if isinstance(rows, list):

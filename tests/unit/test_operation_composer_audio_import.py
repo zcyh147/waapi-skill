@@ -288,19 +288,23 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
                 "originals_subfolder",
                 "properties",
                 "references",
-                "switch_assignment",
             ],
             "construction_discipline": {
-                "initial_action": "add_import_row",
+                "initial_action_by_intent": {
+                    "ordinary_row": "add_import_row",
+                    "row_with_switch_assignment": (
+                        "add_switch_assigned_import_row"
+                    ),
+                },
                 "include_every_known_field": True,
-                    "same_action_fields": [
-                        "switch_assignment",
-                        "event",
-                        "properties",
-                        "references",
-                    ],
-                    "requested_switch_assignment_stays_on_initial_row": True,
-                    "split_initial_row_across_follow_up_actions": False,
+                "same_action_fields": [
+                    "switch_assignment",
+                    "event",
+                    "properties",
+                    "references",
+                ],
+                "requested_switch_assignment_stays_on_initial_row": True,
+                "split_initial_row_across_follow_up_actions": False,
                 "follow_up_row_actions": "corrections_only",
                 "metadata_dependency_activation": (
                     "gateway_owned_do_not_submit"
@@ -317,10 +321,68 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
                     "properties",
                     "references",
                     "switch_assignment",
-                    ],
-                    "distinct_metadata_tokens_are_independent_facts": True,
-                    "requested_switch_assignment_is_not_a_later_action": True,
+                ],
+                "distinct_metadata_tokens_are_independent_facts": True,
+                "requested_switch_assignment_is_not_a_later_action": True,
+            },
+        },
+        "add_switch_assigned_import_row": {
+            "fixed_fields": {
+                "contract": ACTION_CONTRACT,
+                "action": "add_switch_assigned_import_row",
+            },
+            "required_fields": ["switch_assignment"],
+            "optional_fields": [
+                "audio_file",
+                "audio_file_base64",
+                "audio_source_notes",
+                "dialogue_event",
+                "event",
+                "import_language",
+                "import_location",
+                "notes",
+                "object_path",
+                "object_type",
+                "originals_subfolder",
+                "properties",
+                "references",
+            ],
+            "construction_discipline": {
+                "initial_action_by_intent": {
+                    "ordinary_row": "add_import_row",
+                    "row_with_switch_assignment": (
+                        "add_switch_assigned_import_row"
+                    ),
                 },
+                "include_every_known_field": True,
+                "same_action_fields": [
+                    "switch_assignment",
+                    "event",
+                    "properties",
+                    "references",
+                ],
+                "requested_switch_assignment_stays_on_initial_row": True,
+                "split_initial_row_across_follow_up_actions": False,
+                "follow_up_row_actions": "corrections_only",
+                "metadata_dependency_activation": (
+                    "gateway_owned_do_not_submit"
+                ),
+            },
+            "user_fact_checklist": {
+                "copy_every_explicit_fact_for_this_row": True,
+                "batch_facts_apply_to_each_affected_row": True,
+                "mixed_structure_and_media_defaults_are_not_safe": True,
+                "media_row_examples": [
+                    "import_language",
+                    "object_type",
+                    "event",
+                    "properties",
+                    "references",
+                    "switch_assignment",
+                ],
+                "distinct_metadata_tokens_are_independent_facts": True,
+                "requested_switch_assignment_is_not_a_later_action": True,
+            },
         },
         "set_import_row_field": {
             "fixed_fields": {
@@ -376,6 +438,8 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
             ),
             "schema_and_metadata_may_swap": True,
             "draft_start_may_precede": True,
+            "successful_result_survives_metadata_independent_actions": True,
+            "repeat_successful_query": False,
         },
         "import_operation": {
             "source": "registry_fragments.request_options.import_operation",
@@ -398,7 +462,10 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
         in import_operation["description"]
     )
     assert contract["flat_import_row_discipline"] == {
-        "initial_action": "add_import_row",
+        "initial_action_by_intent": {
+            "ordinary_row": "add_import_row",
+            "row_with_switch_assignment": "add_switch_assigned_import_row",
+        },
         "include_every_known_field": True,
         "same_action_fields": [
             "switch_assignment",
@@ -412,6 +479,9 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
         "metadata_dependency_activation": "gateway_owned_do_not_submit",
     }
     assert contract["action_shapes"]["add_import_row"][
+        "construction_discipline"
+    ] == contract["flat_import_row_discipline"]
+    assert contract["action_shapes"]["add_switch_assigned_import_row"][
         "construction_discipline"
     ] == contract["flat_import_row_discipline"]
     dependency = contract["registry_fragments"]["metadata_dependency_closure"]
@@ -496,6 +566,52 @@ def test_base_audio_import_media_row_materializes_existing_canonical_request(
             "import_operation": "createNew",
         },
     }
+
+
+def test_switch_assignment_requires_the_dedicated_initial_row_action(
+    tmp_path: Path,
+) -> None:
+    _code, started = _execute(tmp_path, "draft-start", "audio.import")
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+
+    row_code, rowed = _execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--action-json",
+        _action(
+            "add_switch_assigned_import_row",
+            object_path=(
+                r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps\Snow"
+            ),
+            object_type="RandomSequenceContainer",
+            switch_assignment="Snow",
+        ),
+    )
+
+    assert row_code == 0
+    assert rowed["draft"]["current_facts"][0]["switch_assignment"] == "Snow"
+    materialized = OperationDraftStore(tmp_path / "state").materialize_request(
+        draft_id,
+        task_authority=authority,
+        expected_revision=2,
+        schema_digest=operation_request_schema_digest("audio.import", "2022.1"),
+        composer_digest=operation_composer_digest("audio.import", "2022.1"),
+    )
+    assert materialized.request["arguments"]["imports"] == [
+        {
+            "object_path": (
+                r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps\Snow"
+            ),
+            "object_type": "RandomSequenceContainer",
+            "switch_assignment": "Snow",
+        }
+    ]
 
 
 def test_base_audio_import_structure_row_is_correctable_by_stable_handle(
@@ -611,7 +727,7 @@ def test_complete_audio_import_adapter_materializes_every_registry_field(
         ],
     )
     apply(
-        "add_import_row",
+        "add_switch_assigned_import_row",
         object_path=(
             r"\Actor-Mixer Hierarchy\Default Work Unit\Composer\Full"
         ),
@@ -929,6 +1045,15 @@ def test_larger_audio_action_parser_does_not_expand_object_set_action_limit(
             "add_import_row",
             object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
             native_args={"@Volume": -3},
+        ),
+        _action(
+            "add_import_row",
+            object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+            switch_assignment="Rain",
+        ),
+        _action(
+            "add_switch_assigned_import_row",
+            object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
         ),
     ),
 )

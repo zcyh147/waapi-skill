@@ -108,7 +108,24 @@ _AUDIO_IMPORT_ACTION_FIELDS: dict[
             "originals_subfolder",
             "properties",
             "references",
-            "switch_assignment",
+        ),
+    ),
+    "add_switch_assigned_import_row": (
+        ("switch_assignment",),
+        (
+            "audio_file",
+            "audio_file_base64",
+            "audio_source_notes",
+            "dialogue_event",
+            "event",
+            "import_language",
+            "import_location",
+            "notes",
+            "object_path",
+            "object_type",
+            "originals_subfolder",
+            "properties",
+            "references",
         ),
     ),
     "set_import_row_field": (("import_handle", "name", "value"), ()),
@@ -162,7 +179,12 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "Registry returned an invalid audio.import operation default"
             )
         flat_import_row_discipline = {
-            "initial_action": "add_import_row",
+            "initial_action_by_intent": {
+                "ordinary_row": "add_import_row",
+                "row_with_switch_assignment": (
+                    "add_switch_assigned_import_row"
+                ),
+            },
             "include_every_known_field": True,
             "same_action_fields": [
                 "switch_assignment",
@@ -204,7 +226,8 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                             flat_import_row_discipline
                         )
                     }
-                    if action_name == "add_import_row"
+                    if action_name
+                    in {"add_import_row", "add_switch_assigned_import_row"}
                     else {}
                 ),
                 **(
@@ -213,7 +236,8 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                             import_row_user_fact_checklist
                         )
                     }
-                    if action_name == "add_import_row"
+                    if action_name
+                    in {"add_import_row", "add_switch_assigned_import_row"}
                     else {}
                 ),
             }
@@ -244,6 +268,8 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                     ),
                     "schema_and_metadata_may_swap": True,
                     "draft_start_may_precede": True,
+                    "successful_result_survives_metadata_independent_actions": True,
+                    "repeat_successful_query": False,
                 },
                 "import_operation": {
                     "source": (
@@ -1506,17 +1532,24 @@ def _apply_audio_import_action(
             del defaults[name]
         _materialize_if_complete(AUDIO_IMPORT_COMPOSER_OPERATION, version, composition)
         return composition, str(action_name)
-    if action_name == "add_import_row":
+    if action_name in {"add_import_row", "add_switch_assigned_import_row"}:
         row_field_names = tuple(
             operation_composer_contract(
                 AUDIO_IMPORT_COMPOSER_OPERATION, version
             )["registry_fragments"]["supported_row_fields"]
         )
+        switch_assigned = action_name == "add_switch_assigned_import_row"
         _require_allowed_keys(
             action,
-            required=("contract", "action"),
-            optional=row_field_names,
-            label="add_import_row action",
+            required=(
+                "contract",
+                "action",
+                *(("switch_assignment",) if switch_assigned else ()),
+            ),
+            optional=tuple(
+                name for name in row_field_names if name != "switch_assignment"
+            ),
+            label=f"{action_name} action",
         )
         rows = composition["imports"]
         assert isinstance(rows, list)

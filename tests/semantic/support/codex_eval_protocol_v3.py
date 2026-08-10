@@ -349,7 +349,11 @@ def build_audio_import_composer_transaction_steps(
             raise V3ProtocolError("audio.import Composer row must be an object")
         action = {
             "contract": OPERATION_DRAFT_ACTION_CONTRACT,
-            "action": "add_import_row",
+            "action": (
+                "add_switch_assigned_import_row"
+                if "switch_assignment" in raw_row
+                else "add_import_row"
+            ),
             **dict(raw_row),
         }
         action_specs.append(

@@ -398,9 +398,13 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             ),
             "schema_and_metadata_may_swap": True,
             "draft_start_may_precede": True,
+            "successful_result_survives_metadata_independent_actions": True,
+            "repeat_successful_query": False,
         },
         "draft_start_may_precede": True,
         "metadata_independent_actions_may_precede": True,
+        "successful_metadata_survives_metadata_independent_actions": True,
+        "repeat_successful_metadata": False,
         "actions_using_properties_or_references_wait_for": [
             "dynamic_metadata"
         ],
@@ -426,19 +430,23 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             "originals_subfolder",
             "properties",
             "references",
-            "switch_assignment",
         ],
         "construction_discipline": {
-            "initial_action": "add_import_row",
+            "initial_action_by_intent": {
+                "ordinary_row": "add_import_row",
+                "row_with_switch_assignment": (
+                    "add_switch_assigned_import_row"
+                ),
+            },
             "include_every_known_field": True,
-                "same_action_fields": [
-                    "switch_assignment",
-                    "event",
-                    "properties",
-                    "references",
-                ],
-                "requested_switch_assignment_stays_on_initial_row": True,
-                "split_initial_row_across_follow_up_actions": False,
+            "same_action_fields": [
+                "switch_assignment",
+                "event",
+                "properties",
+                "references",
+            ],
+            "requested_switch_assignment_stays_on_initial_row": True,
+            "split_initial_row_across_follow_up_actions": False,
             "follow_up_row_actions": "corrections_only",
             "metadata_dependency_activation": "gateway_owned_do_not_submit",
         },
@@ -453,10 +461,40 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
                 "properties",
                 "references",
                 "switch_assignment",
-                ],
-                "distinct_metadata_tokens_are_independent_facts": True,
-                "requested_switch_assignment_is_not_a_later_action": True,
-            },
+            ],
+            "distinct_metadata_tokens_are_independent_facts": True,
+            "requested_switch_assignment_is_not_a_later_action": True,
+        },
+    }
+    assert schema["composer"]["action_shapes"][
+        "add_switch_assigned_import_row"
+    ] == {
+        "fixed_fields": {
+            "contract": "waapi-skill.operation-draft-action/v1",
+            "action": "add_switch_assigned_import_row",
+        },
+        "required_fields": ["switch_assignment"],
+        "optional_fields": [
+            "audio_file",
+            "audio_file_base64",
+            "audio_source_notes",
+            "dialogue_event",
+            "event",
+            "import_language",
+            "import_location",
+            "notes",
+            "object_path",
+            "object_type",
+            "originals_subfolder",
+            "properties",
+            "references",
+        ],
+        "construction_discipline": schema["composer"][
+            "flat_import_row_discipline"
+        ],
+        "user_fact_checklist": schema["composer"]["action_shapes"][
+            "add_import_row"
+        ]["user_fact_checklist"],
     }
     assert schema["composer"]["planning_discipline"][
         "dynamic_metadata"
@@ -467,6 +505,8 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         ),
         "schema_and_metadata_may_swap": True,
         "draft_start_may_precede": True,
+        "successful_result_survives_metadata_independent_actions": True,
+        "repeat_successful_query": False,
     }
     assert schema["composer"]["planning_discipline"]["import_operation"] == {
         "source": "registry_fragments.request_options.import_operation",

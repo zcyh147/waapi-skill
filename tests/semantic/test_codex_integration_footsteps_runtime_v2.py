@@ -669,7 +669,11 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
     assert [argument.expected for argument in import_actions] == [
         {
             "contract": "waapi-skill.operation-draft-action/v1",
-            "action": "add_import_row",
+            "action": (
+                "add_switch_assigned_import_row"
+                if "switch_assignment" in row
+                else "add_import_row"
+            ),
             **row,
         }
         for row in imports

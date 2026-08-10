@@ -1915,7 +1915,8 @@ def _audio_import_composer_row_origins(
                 isinstance(action, Mapping)
                 and action.get("contract")
                 == "waapi-skill.operation-draft-action/v1"
-                and action.get("action") == "add_import_row"
+                and action.get("action")
+                in {"add_import_row", "add_switch_assigned_import_row"}
             ):
                 action_rows.append((step_index, argument_index, action))
     if len(action_rows) != len(rows):
