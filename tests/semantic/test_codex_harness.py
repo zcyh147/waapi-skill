@@ -1660,7 +1660,11 @@ def test_native_windows_broker_overlay_rejects_cmd_or_ambiguous_pathext(
         )
 
 
-def test_windows_workspace_skill_copy_is_filtered_detached_and_attested(tmp_path: Path) -> None:
+@pytest.mark.parametrize("platform_name", ("posix", "nt"))
+def test_workspace_skill_copy_is_filtered_detached_and_attested(
+    tmp_path: Path,
+    platform_name: str,
+) -> None:
     source = tmp_path / "waapi-skill"
     (source / "references").mkdir(parents=True)
     (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
@@ -1672,7 +1676,7 @@ def test_windows_workspace_skill_copy_is_filtered_detached_and_attested(tmp_path
     install = prepare_workspace_skill_install(
         workspace,
         source,
-        platform_name="nt",
+        platform_name=platform_name,
     )
 
     assert install == workspace_skill_install_path(workspace)
@@ -1682,7 +1686,7 @@ def test_windows_workspace_skill_copy_is_filtered_detached_and_attested(tmp_path
     assert verify_workspace_skill_install(
         workspace,
         source,
-        platform_name="nt",
+        platform_name=platform_name,
     ) == install
 
     (install / "SKILL.md").write_text("drift\n", encoding="utf-8")
@@ -1690,7 +1694,7 @@ def test_windows_workspace_skill_copy_is_filtered_detached_and_attested(tmp_path
         verify_workspace_skill_install(
             workspace,
             source,
-            platform_name="nt",
+            platform_name=platform_name,
         )
 
 
@@ -2457,7 +2461,7 @@ def test_windows_powershell_recording_unwraps_skill_coverage_and_gateway(
     (True, False),
     ids=("workspace-relative", "absolute-install-path"),
 )
-def test_task_classifier_replays_removed_windows_install_from_candidate_bytes(
+def test_task_classifier_replays_removed_workspace_install_from_candidate_bytes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     relative_skill_read: bool,
@@ -2592,7 +2596,6 @@ def test_task_classifier_replays_removed_windows_install_from_candidate_bytes(
         ),
         workspace=workspace,
         skill_source=candidate,
-        use_windows_workspace_skill_install=True,
         expected_gateway_subcommands=("capabilities",),
     )
 
@@ -2616,7 +2619,7 @@ def test_task_classifier_replays_removed_windows_install_from_candidate_bytes(
         other_gateway.command,
     )
 
-    posix_facts = classify_task_commands(
+    mixed_host_facts = classify_task_commands(
         (
             canonical_read,
             workspace_read,
@@ -2629,17 +2632,19 @@ def test_task_classifier_replays_removed_windows_install_from_candidate_bytes(
         workspace=workspace,
         skill_source=candidate,
     )
-    assert posix_facts.gateway_commands == (canonical_gateway.command,)
-    assert posix_facts.allowed_read_commands == (
+    assert mixed_host_facts.gateway_commands == (
+        installed_gateway.command,
+        canonical_gateway.command,
+    )
+    assert mixed_host_facts.allowed_read_commands == (
         canonical_read.command,
         workspace_read.command,
     )
-    assert posix_facts.skill_read_files == ("SKILL.md", "SKILL.md")
-    assert posix_facts.non_gateway_unexpected_commands == (
+    assert mixed_host_facts.skill_read_files == ("SKILL.md", "SKILL.md")
+    assert mixed_host_facts.non_gateway_unexpected_commands == (
         third_read.command,
         traversal_read.command,
         tilde_read.command,
-        installed_gateway.command,
     )
 
     drifted_read = CodexCommandRecord(
@@ -2656,11 +2661,59 @@ def test_task_classifier_replays_removed_windows_install_from_candidate_bytes(
         (drifted_read,),
         workspace=workspace,
         skill_source=candidate,
-        use_windows_workspace_skill_install=True,
     )
     assert drifted.skill_read is False
     assert drifted.allowed_read_commands == ()
     assert drifted.non_gateway_unexpected_commands == (drifted_read.command,)
+
+
+def test_task_classifier_accepts_only_exact_detached_posix_install_or_candidate(
+    tmp_path: Path,
+) -> None:
+    candidate = tmp_path / "waapi-skills" / "skills" / "waapi-skill"
+    candidate_runner = candidate / "scripts" / "run.py"
+    candidate_runner.parent.mkdir(parents=True)
+    candidate_runner.write_text("# candidate runner\n", encoding="utf-8")
+    workspace = tmp_path / "agent-workspace"
+    install_runner = workspace_skill_install_path(workspace) / "scripts" / "run.py"
+    payload = {
+        "contract": "waapi-skill.gateway-result/v1",
+        "command": "capabilities",
+        "ok": True,
+    }
+    installed = completed_record(
+        f"python {shlex.quote(str(install_runner))} gateway.py capabilities",
+        payload,
+    )
+    canonical = completed_record(
+        f"python {shlex.quote(str(candidate_runner))} gateway.py capabilities",
+        payload,
+    )
+    typo = completed_record(
+        "python "
+        + shlex.quote(
+            str(
+                tmp_path
+                / "waapi-skill"
+                / "skills"
+                / "waapi-skill"
+                / "scripts"
+                / "run.py"
+            )
+        )
+        + " gateway.py capabilities",
+        payload,
+    )
+
+    facts = classify_task_commands(
+        (installed, canonical, typo),
+        workspace=workspace,
+        skill_source=candidate,
+        expected_gateway_subcommands=("capabilities",),
+    )
+
+    assert facts.gateway_commands == (installed.command, canonical.command)
+    assert facts.non_gateway_unexpected_commands == (typo.command,)
 
 
 def test_windows_powershell_recording_preserves_literal_metacharacters(

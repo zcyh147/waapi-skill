@@ -371,6 +371,60 @@ def test_response_bound_windows_continuation_keeps_the_named_legacy_fallback(
     assert tuple(next_command)[-2:] == ("copy_instruction", "shell_command")
 
 
+@pytest.mark.parametrize("platform_name", ("posix", "nt"))
+def test_broker_projects_only_exact_candidate_continuation_to_task_install(
+    tmp_path: Path,
+    platform_name: str,
+) -> None:
+    candidate_runner = (
+        tmp_path
+        / "waapi-skills"
+        / "skills"
+        / "waapi-skill"
+        / "scripts"
+        / "run.py"
+    )
+    candidate_runner.parent.mkdir(parents=True)
+    candidate_runner.write_text("# candidate\n", encoding="utf-8")
+    invocation_runner = (
+        tmp_path
+        / "agent workspace"
+        / ".agents"
+        / "skills"
+        / "waapi-skill"
+        / "scripts"
+        / "run.py"
+    )
+    original = expected_fake_confirmation_next_command(
+        candidate_runner,
+        "tx-projected",
+        platform_name=platform_name,
+    )
+
+    projected = broker_module._project_next_command_runner(  # noqa: SLF001
+        original,
+        candidate_runner=candidate_runner,
+        invocation_runner=invocation_runner,
+        platform_name=platform_name,
+    )
+
+    assert projected == expected_fake_confirmation_next_command(
+        invocation_runner,
+        "tx-projected",
+        platform_name=platform_name,
+    )
+
+    tampered = dict(original)
+    tampered["shell_command"] = str(original["shell_command"]) + " --extra"
+    with pytest.raises(GatewayInvocationError, match="representation is not exact"):
+        broker_module._project_next_command_runner(  # noqa: SLF001
+            tampered,
+            candidate_runner=candidate_runner,
+            invocation_runner=invocation_runner,
+            platform_name=platform_name,
+        )
+
+
 FAKE_RUNNER = r'''from __future__ import annotations
 import base64
 import hashlib
@@ -994,6 +1048,13 @@ def test_broker_executes_exact_order_with_semantic_json_and_response_bindings(
     transport: str,
 ) -> None:
     skill = make_fake_skill(tmp_path)
+    invocation = tmp_path / "agent-workspace" / ".agents" / "skills" / "waapi-skill"
+    invocation_runner = invocation / "scripts" / "run.py"
+    invocation_runner.parent.mkdir(parents=True)
+    invocation_runner.write_text(
+        'raise RuntimeError("model-facing Skill copy must never execute")\n',
+        encoding="utf-8",
+    )
     request = {
         "operation": "ak.wwise.core.object.setNotes",
         "target": {"path": r"\Actor-Mixer Hierarchy\Default Work Unit\Sound"},
@@ -1027,6 +1088,7 @@ def test_broker_executes_exact_order_with_semantic_json_and_response_bindings(
 
     with CodexGatewayBroker(
         skill_source=skill,
+        invocation_skill_source=invocation,
         expected_steps=steps,
         transport=transport,
         runner_environment={
@@ -1036,10 +1098,10 @@ def test_broker_executes_exact_order_with_semantic_json_and_response_bindings(
         },
     ) as broker:
         observed = [
-            ["python", str(broker.runner_path), "gateway.py", "operation-schema", "ak.wwise.core.object.setNotes"],
+            ["python", str(broker.invocation_runner_path), "gateway.py", "operation-schema", "ak.wwise.core.object.setNotes"],
             [
                 "python",
-                str(broker.runner_path),
+                str(broker.invocation_runner_path),
                 "gateway.py",
                 "preview",
                 "--request-json",
@@ -1047,7 +1109,7 @@ def test_broker_executes_exact_order_with_semantic_json_and_response_bindings(
             ],
             [
                 "python",
-                str(broker.runner_path),
+                str(broker.invocation_runner_path),
                 "gateway.py",
                 "transaction-show",
                 "tx-dynamic-123",
@@ -1055,7 +1117,7 @@ def test_broker_executes_exact_order_with_semantic_json_and_response_bindings(
             ],
             [
                 "python",
-                str(broker.runner_path),
+                str(broker.invocation_runner_path),
                 "gateway.py",
                 "confirm",
                 "tx-dynamic-123",
@@ -1088,7 +1150,7 @@ def test_broker_executes_exact_order_with_semantic_json_and_response_bindings(
             },
         }
         assert shown["next_command"] == expected_fake_confirmation_next_command(
-            skill / "scripts" / "run.py",
+            invocation_runner,
             "tx-dynamic-123",
         )
         assert results[3].stderr == ""

@@ -160,11 +160,7 @@ def _campaign_prompt_asset_read_fixture(
         task_root=task_root,
         protocol=protocol,
         version=unit.version,
-        invocation_skill_source=(
-            skill_install
-            if options.windows_powershell_core_host is not None
-            else None
-        ),
+        invocation_skill_source=skill_install,
     )
     prompt = f"请使用输入表 {asset} 完成这个任务。"
     events_text = fixture._synthetic_events(

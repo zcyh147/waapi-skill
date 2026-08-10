@@ -45,9 +45,28 @@ from wwise_waapi.operation_composer import (
     materialize_operation_request,
     new_composition,
 )
+from wwise_waapi.platform_commands import (
+    PlatformCommandError,
+    WINDOWS_MODEL_COMMAND_FAMILY,
+    WINDOWS_POWERSHELL_ENCODED_FAMILY,
+    encode_windows_model_argv,
+    encode_windows_powershell_argv,
+)
 
 
 GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
+TRANSACTION_NEXT_COMMAND_CONTRACT = "waapi-skill.gateway-next-command/v2"
+TRANSACTION_COPY_INSTRUCTION_CONTRACT = (
+    "waapi-skill.gateway-command-copy-instruction/v2"
+)
+TRANSACTION_COPY_ACTION = "execute_verbatim_as_one_shell_tool_call"
+TRANSACTION_FORBIDDEN_TRANSFORMATIONS = (
+    "reconstruct",
+    "shorten",
+    "normalize",
+    "substitute_path_segments",
+    "select_another_field",
+)
 TRANSACTION_CONFIRMATION_BINDING_CONTRACT = (
     "waapi-skill.confirmation-binding/v1"
 )
@@ -4035,7 +4054,7 @@ def resolve_gateway_invocation(
     ``python3`` is also accepted.  When ``shim_directory`` is supplied, an
     absolute interpreter path must point to its ``python`` or ``python3`` shim.
     The skill runner is compared lexically to the configured absolute locator.
-    A distinct ``invocation_skill_source`` allows a native-Windows workspace
+    A distinct ``invocation_skill_source`` allows a detached task-workspace
     copy to be model-visible while the broker still executes the immutable
     candidate under ``skill_source``.  The candidate locator remains accepted
     because a packaged transaction response can legitimately return its exact
@@ -4434,15 +4453,20 @@ def _decode_json_argument(
         raise GatewayInvocationError(f"argument is not strict JSON: {exc}") from exc
 
 
-def _extract_payload(stdout: str, *, required_contract: str | None = None) -> Mapping[str, Any]:
+def _extract_payload_span(
+    stdout: str,
+    *,
+    required_contract: str | None = None,
+) -> tuple[Mapping[str, Any], int, int]:
     stripped = stdout.strip()
     if not stripped:
         raise GatewayInvocationError("packaged runner emitted no JSON payload")
+    leading_bytes = len(stdout) - len(stdout.lstrip())
     def reject_constant(constant: str) -> Any:
         raise ValueError(f"non-finite JSON constant {constant!r}")
 
     decoder = json.JSONDecoder(parse_constant=reject_constant)
-    candidates: list[tuple[int, int, Mapping[str, Any]]] = []
+    candidates: list[tuple[int, int, Mapping[str, Any], int, int]] = []
     for position, character in enumerate(stripped):
         if character != "{":
             continue
@@ -4451,20 +4475,231 @@ def _extract_payload(stdout: str, *, required_contract: str | None = None) -> Ma
         except (json.JSONDecodeError, ValueError):
             continue
         if isinstance(value, Mapping):
-            candidates.append((end - position, -position, value))
+            candidates.append(
+                (
+                    end - position,
+                    -position,
+                    value,
+                    leading_bytes + position,
+                    leading_bytes + end,
+                )
+            )
     if not candidates:
         raise GatewayInvocationError("packaged runner output contains no JSON object")
     if required_contract is not None:
         contract_candidates = [
-            candidate for candidate in candidates if candidate[2].get("contract") == required_contract
+            candidate
+            for candidate in candidates
+            if candidate[2].get("contract") == required_contract
         ]
         if contract_candidates:
             candidates = contract_candidates
     # Pretty-printed gateway results contain nested JSON objects.  Choosing the
     # last decodable object would therefore select an inner field.  The outer
     # gateway envelope is the widest decodable object in the output.
-    _, _, payload = max(candidates, key=lambda candidate: (candidate[0], candidate[1]))
-    return dict(payload)
+    _, _, payload, start, end = max(
+        candidates,
+        key=lambda candidate: (candidate[0], candidate[1]),
+    )
+    return dict(payload), start, end
+
+
+def _extract_payload(stdout: str, *, required_contract: str | None = None) -> Mapping[str, Any]:
+    payload, _, _ = _extract_payload_span(
+        stdout,
+        required_contract=required_contract,
+    )
+    return payload
+
+
+def _project_next_command_runner(
+    value: Mapping[str, Any],
+    *,
+    candidate_runner: Path,
+    invocation_runner: Path,
+    platform_name: str,
+) -> dict[str, Any]:
+    """Project one trusted continuation onto the model-facing Skill locator."""
+
+    optional_keys = {
+        "requires_explicit_user_confirmation",
+        "requires_later_user_message",
+    }
+    common_keys = {
+        "contract",
+        "command",
+        "gateway_argv",
+        "full_argv",
+        "copy_exactly",
+        "shell_family",
+        "copy_instruction",
+    }
+    representation_keys = {
+        "shell_command",
+        "model_shell_family",
+        "model_command",
+    }
+    if not set(value).issubset(common_keys | optional_keys | representation_keys):
+        raise GatewayInvocationError(
+            "Gateway continuation contains an unexpected field"
+        )
+    gateway_argv = value.get("gateway_argv")
+    full_argv = value.get("full_argv")
+    instruction = value.get("copy_instruction")
+    expected_candidate = str(candidate_runner.resolve(strict=True))
+    if (
+        value.get("contract") != TRANSACTION_NEXT_COMMAND_CONTRACT
+        or value.get("copy_exactly") is not True
+        or not isinstance(value.get("command"), str)
+        or not value.get("command")
+        or not isinstance(gateway_argv, list)
+        or not gateway_argv
+        or any(not isinstance(item, str) for item in gateway_argv)
+        or gateway_argv[0] != value.get("command")
+        or not isinstance(full_argv, list)
+        or full_argv
+        != ["python", expected_candidate, "gateway.py", *gateway_argv]
+        or any(value.get(key) is not True for key in optional_keys & set(value))
+        or not isinstance(instruction, Mapping)
+        or set(instruction)
+        != {"contract", "source_field", "action", "forbidden_transformations"}
+        or instruction.get("contract") != TRANSACTION_COPY_INSTRUCTION_CONTRACT
+        or instruction.get("action") != TRANSACTION_COPY_ACTION
+        or instruction.get("forbidden_transformations")
+        != list(TRANSACTION_FORBIDDEN_TRANSFORMATIONS)
+    ):
+        raise GatewayInvocationError(
+            "Gateway continuation is not bound to the sealed candidate runner"
+        )
+
+    expected_keys = common_keys | (optional_keys & set(value))
+    if platform_name == "nt":
+        expected_shell_family = WINDOWS_POWERSHELL_ENCODED_FAMILY
+        expected_shell_command = encode_windows_powershell_argv(full_argv)
+        try:
+            expected_model_command = encode_windows_model_argv(full_argv)
+        except PlatformCommandError:
+            expected_model_command = None
+        if expected_model_command is not None:
+            expected_keys |= {
+                "shell_command",
+                "model_shell_family",
+                "model_command",
+            }
+            representation_is_exact = (
+                value.get("model_shell_family") == WINDOWS_MODEL_COMMAND_FAMILY
+                and value.get("model_command") == expected_model_command
+                and instruction.get("source_field") == "model_command"
+            )
+        else:
+            expected_keys.add("shell_command")
+            representation_is_exact = (
+                "model_shell_family" not in value
+                and "model_command" not in value
+                and instruction.get("source_field") == "shell_command"
+            )
+    elif platform_name == "posix":
+        expected_shell_family = "posix-sh"
+        expected_shell_command = shlex.join(full_argv)
+        expected_keys.add("shell_command")
+        representation_is_exact = (
+            "model_shell_family" not in value
+            and "model_command" not in value
+            and instruction.get("source_field") == "shell_command"
+        )
+    else:
+        raise GatewayInvocationError(
+            f"unsupported Gateway continuation platform {platform_name!r}"
+        )
+    if (
+        set(value) != expected_keys
+        or value.get("shell_family") != expected_shell_family
+        or value.get("shell_command") != expected_shell_command
+        or not representation_is_exact
+    ):
+        raise GatewayInvocationError(
+            "Gateway continuation command representation is not exact"
+        )
+
+    projected_argv = [
+        "python",
+        str(invocation_runner),
+        "gateway.py",
+        *gateway_argv,
+    ]
+    result: dict[str, Any] = {
+        "contract": TRANSACTION_NEXT_COMMAND_CONTRACT,
+        "command": value["command"],
+        "gateway_argv": list(gateway_argv),
+        "full_argv": projected_argv,
+        "copy_exactly": True,
+    }
+    for key in ("requires_explicit_user_confirmation", "requires_later_user_message"):
+        if key in value:
+            result[key] = True
+
+    model_command: str | None = None
+    if platform_name == "nt":
+        result["shell_family"] = WINDOWS_POWERSHELL_ENCODED_FAMILY
+        shell_command = encode_windows_powershell_argv(projected_argv)
+        try:
+            model_command = encode_windows_model_argv(projected_argv)
+        except PlatformCommandError:
+            model_command = None
+    elif platform_name == "posix":
+        result["shell_family"] = "posix-sh"
+        shell_command = shlex.join(projected_argv)
+    if model_command is not None:
+        result["shell_command"] = shell_command
+        result["model_shell_family"] = WINDOWS_MODEL_COMMAND_FAMILY
+    source_field = "model_command" if model_command is not None else "shell_command"
+    result["copy_instruction"] = {
+        "contract": TRANSACTION_COPY_INSTRUCTION_CONTRACT,
+        "source_field": source_field,
+        "action": TRANSACTION_COPY_ACTION,
+        "forbidden_transformations": list(TRANSACTION_FORBIDDEN_TRANSFORMATIONS),
+    }
+    result[source_field] = model_command if model_command is not None else shell_command
+    return result
+
+
+def _project_model_visible_runner(
+    value: Any,
+    *,
+    candidate_runner: Path,
+    invocation_runner: Path,
+    platform_name: str,
+) -> Any:
+    """Rewrite only closed continuations; preserve every other payload value."""
+
+    if isinstance(value, Mapping):
+        if value.get("contract") == TRANSACTION_NEXT_COMMAND_CONTRACT:
+            return _project_next_command_runner(
+                value,
+                candidate_runner=candidate_runner,
+                invocation_runner=invocation_runner,
+                platform_name=platform_name,
+            )
+        return {
+            key: _project_model_visible_runner(
+                nested,
+                candidate_runner=candidate_runner,
+                invocation_runner=invocation_runner,
+                platform_name=platform_name,
+            )
+            for key, nested in value.items()
+        }
+    if isinstance(value, list):
+        return [
+            _project_model_visible_runner(
+                nested,
+                candidate_runner=candidate_runner,
+                invocation_runner=invocation_runner,
+                platform_name=platform_name,
+            )
+            for nested in value
+        ]
+    return value
 
 
 def _validate_terminal_execute_payload(
@@ -6460,13 +6695,18 @@ class CodexGatewayBroker:
             failures.append(f"packaged gateway runner failed: {type(exc).__name__}: {exc}")
 
         payload: Mapping[str, Any] | None = None
+        payload_start = 0
+        payload_end = 0
         if exit_code not in step.allowed_exit_codes:
             failures.append(
                 f"packaged gateway runner exit {exit_code!r} is not allowed; "
                 f"expected one of {step.allowed_exit_codes!r}"
             )
         try:
-            payload = _extract_payload(stdout, required_contract=self.required_contract)
+            payload, payload_start, payload_end = _extract_payload_span(
+                stdout,
+                required_contract=self.required_contract,
+            )
             if payload.get("contract") != self.required_contract:
                 raise GatewayInvocationError(
                     f"gateway payload contract must be {self.required_contract!r}"
@@ -6522,6 +6762,35 @@ class CodexGatewayBroker:
             failures.append(str(exc))
         except Exception as exc:  # noqa: BLE001 - malformed payload evidence must fail closed
             failures.append(f"unexpected gateway payload failure: {type(exc).__name__}: {exc}")
+
+        if not failures and payload is not None:
+            try:
+                projected_payload = _project_model_visible_runner(
+                    payload,
+                    candidate_runner=self.runner_path,
+                    invocation_runner=self.invocation_runner_path,
+                    platform_name=self.platform_name,
+                )
+                if projected_payload != payload:
+                    projected_json = json.dumps(
+                        projected_payload,
+                        ensure_ascii=False,
+                        allow_nan=False,
+                        indent=2,
+                    )
+                    stdout = (
+                        stdout[:payload_start]
+                        + projected_json
+                        + stdout[payload_end:]
+                    )
+                    payload = projected_payload
+            except GatewayInvocationError as exc:
+                failures.append(str(exc))
+            except Exception as exc:  # noqa: BLE001 - projection is evidence-critical
+                failures.append(
+                    "unexpected Gateway continuation projection failure: "
+                    f"{type(exc).__name__}: {exc}"
+                )
 
         payload_hash = ""
         if payload is not None:

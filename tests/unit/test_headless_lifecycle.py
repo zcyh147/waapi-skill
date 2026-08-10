@@ -778,7 +778,7 @@ def test_shutdown_detached_port_fallback_terminates_only_matching_ps_rows(monkey
     if headless_module.os.name == "nt":
         pytest.skip("detached ps/killpg fallback is POSIX-only")
     executable = make_executable(tmp_path)
-    port = 57645
+    port = find_free_port("127.0.0.1")
     fake_process = FakeProcess(returncode=0)
     ps_output = f"""
       200 /Applications/WwiseConsole.sh waapi-server /tmp/SampleProject.wproj --wamp-port {port} --http-port 0

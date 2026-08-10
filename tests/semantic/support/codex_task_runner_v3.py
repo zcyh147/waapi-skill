@@ -320,7 +320,7 @@ def run_v3_codex_task(
     )
     broker = CodexGatewayBroker(
         skill_source=skill_source,
-        invocation_skill_source=(skill_install if os.name == "nt" else None),
+        invocation_skill_source=skill_install,
         expected_steps=protocol.steps,
         commutative_read_only_step_groups=(
             protocol.commutative_read_only_step_groups

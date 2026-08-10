@@ -1063,12 +1063,12 @@ def prepare_workspace_skill_install(
     *,
     platform_name: str | None = None,
 ) -> Path:
-    """Install one Skill without requiring Windows symlink privilege.
+    """Install one detached, campaign-hash-equivalent Skill copy.
 
-    POSIX retains the read-only alias created by a directory symlink.  Native
-    Windows receives an independently copied, campaign-hash-equivalent tree;
-    runtime/cache directories are excluded and the copy is proven not to share
-    file identities with the frozen candidate.
+    Runtime/cache directories are excluded and every host proves that the
+    task-local copy shares no regular-file identities with the frozen
+    candidate.  The copy is the model-facing locator only; the authenticated
+    Broker continues to execute the sealed candidate runner.
     """
 
     source_path = Path(skill_source)
@@ -1080,30 +1080,27 @@ def prepare_workspace_skill_install(
     _prepare_workspace_repository_boundary(Path(workspace))
     install = workspace_skill_install_path(workspace)
     install.parent.mkdir(parents=True, exist_ok=False)
-    if _is_windows(platform_name):
-        source_sha256 = workspace_skill_tree_sha256(
+    source_sha256 = workspace_skill_tree_sha256(
+        source,
+        exclude_names=WORKSPACE_SKILL_EXCLUDED_NAMES,
+    )
+    try:
+        shutil.copytree(
             source,
-            exclude_names=WORKSPACE_SKILL_EXCLUDED_NAMES,
+            install,
+            copy_function=shutil.copy2,
+            ignore=shutil.ignore_patterns(*sorted(WORKSPACE_SKILL_EXCLUDED_NAMES)),
+            symlinks=True,
         )
-        try:
-            shutil.copytree(
-                source,
-                install,
-                copy_function=shutil.copy2,
-                ignore=shutil.ignore_patterns(*sorted(WORKSPACE_SKILL_EXCLUDED_NAMES)),
-                symlinks=True,
-            )
-        except OSError as exc:
-            raise CodexHarnessError(f"cannot copy Skill into Windows workspace: {exc}") from exc
-        installed_sha256 = workspace_skill_tree_sha256(install)
-        if installed_sha256 != source_sha256:
-            raise CodexHarnessError(
-                "Windows workspace Skill copy does not match the candidate tree: "
-                f"expected={source_sha256} actual={installed_sha256}"
-            )
-        assert_detached_workspace_skill_copy(source, install)
-    else:
-        install.symlink_to(source, target_is_directory=True)
+    except OSError as exc:
+        raise CodexHarnessError(f"cannot copy Skill into task workspace: {exc}") from exc
+    installed_sha256 = workspace_skill_tree_sha256(install)
+    if installed_sha256 != source_sha256:
+        raise CodexHarnessError(
+            "workspace Skill copy does not match the candidate tree: "
+            f"expected={source_sha256} actual={installed_sha256}"
+        )
+    assert_detached_workspace_skill_copy(source, install)
     return install
 
 
@@ -1113,34 +1110,26 @@ def verify_workspace_skill_install(
     *,
     platform_name: str | None = None,
 ) -> Path:
-    """Verify the platform-specific install without accepting a weaker shape."""
+    """Verify the detached install without accepting a weaker host shape."""
 
     source = Path(skill_source).expanduser().resolve(strict=True)
     _verify_workspace_repository_boundary(Path(workspace))
     install = workspace_skill_install_path(workspace)
-    if _is_windows(platform_name):
-        if is_link_or_junction(install) or not install.is_dir():
-            raise CodexHarnessError(
-                f"WAAPI skill install must be an independent Windows directory copy: {install}"
-            )
-        expected = workspace_skill_tree_sha256(
-            source,
-            exclude_names=WORKSPACE_SKILL_EXCLUDED_NAMES,
+    if is_link_or_junction(install) or not install.is_dir():
+        raise CodexHarnessError(
+            f"WAAPI skill install must be an independent directory copy: {install}"
         )
-        observed = workspace_skill_tree_sha256(install)
-        if observed != expected:
-            raise CodexHarnessError(
-                "WAAPI skill Windows copy differs from the candidate tree: "
-                f"expected={expected} actual={observed}"
-            )
-        assert_detached_workspace_skill_copy(source, install)
-    else:
-        if not install.is_symlink():
-            raise CodexHarnessError(f"WAAPI skill install must be a symlink: {install}")
-        if install.resolve(strict=True) != source:
-            raise CodexHarnessError(
-                f"WAAPI skill symlink resolves to {install.resolve(strict=True)}, expected {source}"
-            )
+    expected = workspace_skill_tree_sha256(
+        source,
+        exclude_names=WORKSPACE_SKILL_EXCLUDED_NAMES,
+    )
+    observed = workspace_skill_tree_sha256(install)
+    if observed != expected:
+        raise CodexHarnessError(
+            "WAAPI skill copy differs from the candidate tree: "
+            f"expected={expected} actual={observed}"
+        )
+    assert_detached_workspace_skill_copy(source, install)
     return install
 
 
@@ -1808,9 +1797,6 @@ def _finalize_codex_run(
         command_records,
         workspace=config.workspace,
         skill_source=config.skill_source,
-        use_windows_workspace_skill_install=(
-            windows_powershell_core_host is not None
-        ),
         expected_gateway_subcommands=config.expected_gateway_subcommands,
         expected_gateway_errors=config.expected_gateway_errors,
         expected_wwise_version=config.expected_wwise_version,
@@ -3649,39 +3635,26 @@ def classify_task_commands(
     *,
     workspace: Path,
     skill_source: Path,
-    use_windows_workspace_skill_install: bool = False,
     expected_gateway_subcommands: Sequence[str] = (),
     expected_gateway_errors: Sequence[CodexGatewayErrorExpectation] = (),
     expected_wwise_version: str = "",
 ) -> CodexCommandFacts:
     """Classify one task against its fixed install and sealed candidate.
 
-    Native Windows tasks execute the Skill from a detached workspace copy, but
-    campaign archiving may replace that copy with a regular attestation before
-    replaying the command facts.  Keep the immutable workspace install as the
-    read locator while using the sealed candidate as the content authority.
-    POSIX preserves both the canonical and injected-symlink read spellings but
-    accepts only the canonical Gateway runner.  A caller with the sealed native-
-    Windows host instead accepts the detached install read spelling and both
-    the install and canonical Gateway runners.
+    Every host exposes a detached task-local Skill locator to the model while
+    retaining the sealed candidate as the content and execution authority.
+    Campaign archiving may replace the copy with a regular attestation before
+    replay, so classification is lexical and reads candidate bytes.  Both the
+    exact task-local and exact candidate runner spellings remain auditable;
+    near paths are rejected.
     """
 
     workspace_install = workspace_skill_install_path(workspace)
-    if not use_windows_workspace_skill_install:
-        return classify_commands(
-            commands,
-            skill_source=skill_source,
-            skill_read_content_source=skill_source,
-            alternate_skill_read_sources=(workspace_install,),
-            expected_gateway_subcommands=expected_gateway_subcommands,
-            expected_gateway_errors=expected_gateway_errors,
-            expected_wwise_version=expected_wwise_version,
-        )
-
     return classify_commands(
         commands,
         skill_source=workspace_install,
         skill_read_content_source=skill_source,
+        alternate_skill_read_sources=(skill_source,),
         alternate_gateway_skill_sources=(skill_source,),
         expected_gateway_subcommands=expected_gateway_subcommands,
         expected_gateway_errors=expected_gateway_errors,

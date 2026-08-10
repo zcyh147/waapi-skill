@@ -770,11 +770,7 @@ def _mark_codex_infrastructure_block(
         task_root=task_root,
         protocol=protocol,
         version=unit.version,
-        invocation_skill_source=(
-            skill_install
-            if options.windows_powershell_core_host is not None
-            else None
-        ),
+        invocation_skill_source=skill_install,
     )
     if not 1 <= failed_turn_index <= unit.user_turn_count:
         raise AssertionError("synthetic failed turn must be inside the unit topology")
@@ -2642,7 +2638,7 @@ def test_campaign_broker_seal_accepts_expected_exit2_failed_command_status(
     )
 
 
-def test_campaign_broker_replay_gates_task_install_to_windows_and_accepts_candidate(
+def test_campaign_broker_replay_accepts_exact_task_install_and_candidate(
     tmp_path: Path,
 ) -> None:
     options = _options(tmp_path)
@@ -2689,30 +2685,15 @@ def test_campaign_broker_replay_gates_task_install_to_windows_and_accepts_candid
         ]
 
     installed_commands = archived_commands(installed_records)
-    if options.windows_powershell_core_host is not None:
-        campaign._validate_heavy_v3_broker_records(
-            installed_records,
-            task_root=task_root,
-            steps=protocol.steps,
-            command_records=installed_commands,
-            options=options,
-            version=unit.version,
-            label="installed Windows runner replay",
-        )
-    else:
-        with pytest.raises(
-            CampaignEvidenceError,
-            match="broker argv cannot replay protocol step",
-        ):
-            campaign._validate_heavy_v3_broker_records(
-                installed_records,
-                task_root=task_root,
-                steps=protocol.steps,
-                command_records=installed_commands,
-                options=options,
-                version=unit.version,
-                label="installed POSIX runner replay",
-            )
+    campaign._validate_heavy_v3_broker_records(
+        installed_records,
+        task_root=task_root,
+        steps=protocol.steps,
+        command_records=installed_commands,
+        options=options,
+        version=unit.version,
+        label="installed runner replay",
+    )
 
     canonical_commands = archived_commands(canonical_records)
     campaign._validate_heavy_v3_broker_records(
@@ -3034,9 +3015,6 @@ def _synthetic_codex_facts(
         command_records,
         workspace=task_root / "agent-workspace",
         skill_source=options.skill_source,
-        use_windows_workspace_skill_install=(
-            options.windows_powershell_core_host is not None
-        ),
         expected_gateway_subcommands=tuple(step.subcommand for step in protocol.steps),
         expected_wwise_version=version,
     )
@@ -4627,11 +4605,7 @@ def _write_passing_project_outcome(
         task_root=task_root,
         protocol=protocol,
         version=unit.version,
-        invocation_skill_source=(
-            skill_install
-            if options.windows_powershell_core_host is not None
-            else None
-        ),
+        invocation_skill_source=skill_install,
     )
     if unit.scenario.api == "ak.wwise.core.object.get":
         _populate_synthetic_object_query_payload(

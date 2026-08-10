@@ -4938,10 +4938,8 @@ def _validate_heavy_v3_broker_records(
     expected_runner = Path(
         os.path.abspath(os.fspath(options.skill_source / "scripts" / "run.py"))
     )
-    invocation_skill_source = (
-        workspace_skill_install_path(task_root / "agent-workspace")
-        if options.windows_powershell_core_host is not None
-        else None
+    invocation_skill_source = workspace_skill_install_path(
+        task_root / "agent-workspace"
     )
     replay = CodexGatewayBroker(
         skill_source=options.skill_source,
@@ -5608,9 +5606,6 @@ def _validate_heavy_v3_codex_facts(
         command_records,
         workspace=task_root / "agent-workspace",
         skill_source=options.skill_source,
-        use_windows_workspace_skill_install=(
-            options.windows_powershell_core_host is not None
-        ),
         expected_gateway_subcommands=tuple(
             dict.fromkeys(step.subcommand for step in expected_steps)
         ),

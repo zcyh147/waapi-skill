@@ -1101,26 +1101,38 @@ def test_near_heavy_skill_symlink_layout_is_rejected(tmp_path: Path) -> None:
         )
 
 
-def test_windows_skill_copy_attestation_rejects_drift_and_posix_directory_install(
+def test_skill_copy_attestation_accepts_posix_and_rejects_drift(
     tmp_path: Path,
 ) -> None:
     skill_source, _suite, _live = _inputs(tmp_path)
-    attempt = tmp_path / "attempt"
+    candidate_sha256 = workspace_skill_tree_sha256(skill_source)
+    posix_attempt = tmp_path / "posix-attempt"
+    posix_workspace = (
+        posix_attempt / "matrix" / "sessions" / "session" / "agent-workspace"
+    )
+    posix_copy = prepare_workspace_skill_install(
+        posix_workspace,
+        skill_source,
+        platform_name="posix",
+    )
+
+    replaced = replace_expected_skill_symlinks(
+        posix_attempt,
+        skill_source=skill_source,
+        candidate_sha256=candidate_sha256,
+        platform_name="posix",
+    )
+
+    assert replaced == (posix_copy.relative_to(posix_attempt).as_posix(),)
+    assert posix_copy.is_file() and not posix_copy.is_symlink()
+
+    attempt = tmp_path / "drift-attempt"
     workspace = attempt / "matrix" / "sessions" / "session" / "agent-workspace"
     copied = prepare_workspace_skill_install(
         workspace,
         skill_source,
         platform_name="nt",
     )
-    candidate_sha256 = workspace_skill_tree_sha256(skill_source)
-
-    with pytest.raises(CampaignEvidenceError, match="only for native Windows"):
-        replace_expected_skill_symlinks(
-            attempt,
-            skill_source=skill_source,
-            candidate_sha256=candidate_sha256,
-            platform_name="posix",
-        )
 
     (copied / "SKILL.md").write_text("drift\n", encoding="utf-8")
     with pytest.raises(CampaignEvidenceError, match="differs from the frozen candidate"):

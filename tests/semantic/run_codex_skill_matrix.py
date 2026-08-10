@@ -1982,7 +1982,7 @@ def run_fresh_phase(
         write_text(output_dir / "prompt.txt", prompt + "\n")
         stage = "prepare-agent-workspace"
         skill_install = prepare_agent_workspace(workspace, options.skill_source)
-        invocation_skill_source = skill_install if os.name == "nt" else None
+        invocation_skill_source = skill_install
         stage = "build-gateway-protocol"
         expected_steps = build_expected_gateway_steps(session, values)
         stage = "broker-initialize"

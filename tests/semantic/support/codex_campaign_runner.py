@@ -162,10 +162,10 @@ def replace_expected_skill_symlinks(
     """Replace only exact runner Skill installs with sealed regular attestations.
 
     This must run before any child-controlled evidence is interpreted.  Every
-    other symlink is a hard evidence failure.  POSIX installs remain exact
-    links to the frozen candidate.  A native-Windows directory install is
-    accepted only when its filtered tree hash equals the frozen candidate and
-    no copied file is a hardlink alias to that candidate.
+    other symlink is a hard evidence failure.  Legacy POSIX installs may remain
+    exact links to the frozen candidate.  A detached directory install on any
+    host is accepted only when its filtered tree hash equals the frozen
+    candidate and no copied file is a hardlink alias to that candidate.
     """
 
     root_path = Path(root)
@@ -240,10 +240,6 @@ def replace_expected_skill_symlinks(
                 raise CampaignEvidenceError(f"unsupported child evidence entry: {path}")
 
     walk(tree)
-    if copies and active_platform != "nt":
-        raise CampaignEvidenceError(
-            "runner-created Skill directories are allowed only for native Windows campaigns"
-        )
     installed_paths = frozenset((*links, *copies))
     for workspace in agent_workspaces:
         expected_install = workspace / ".agents" / "skills" / "waapi-skill"
@@ -273,7 +269,7 @@ def replace_expected_skill_symlinks(
     )
     if copies and expected_copy_sha256 != candidate_sha256:
         raise CampaignEvidenceError(
-            "Windows Skill-copy exclusions do not match the frozen campaign candidate: "
+            "Skill-copy exclusions do not match the frozen campaign candidate: "
             f"candidate={candidate_sha256} copy_source={expected_copy_sha256}"
         )
     for copied in copies:
@@ -283,18 +279,18 @@ def replace_expected_skill_symlinks(
             assert_detached_workspace_skill_copy(expected_target, copied)
         except (CampaignEvidenceError, OSError, RuntimeError) as exc:
             raise CampaignEvidenceError(
-                f"cannot attest independent Windows Skill copy {copied}: {exc}"
+                f"cannot attest independent workspace Skill copy {copied}: {exc}"
             ) from exc
         if observed_sha256 != candidate_sha256:
             raise CampaignEvidenceError(
-                "Windows Skill copy differs from the frozen candidate: "
+                "workspace Skill copy differs from the frozen candidate: "
                 f"expected={candidate_sha256} actual={observed_sha256}: {copied}"
             )
         try:
             shutil.rmtree(copied)
         except OSError as exc:
             raise CampaignEvidenceError(
-                f"cannot remove attested Windows Skill copy {copied}: {exc}"
+                f"cannot remove attested workspace Skill copy {copied}: {exc}"
             ) from exc
         _exclusive_write(
             copied,
