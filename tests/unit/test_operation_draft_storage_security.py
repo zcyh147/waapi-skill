@@ -1107,7 +1107,8 @@ def test_write_error_after_directory_swap_does_not_cleanup_the_substitute_tree(
 
     monkeypatch.setattr(draft_module.os, "fsync", swap_then_fail_fsync)
 
-    with pytest.raises(OperationDraftStorageCorruption):
+    expected_error = OSError if os.name == "nt" else OperationDraftStorageCorruption
+    with pytest.raises(expected_error):
         store.start(
             operation="object.set",
             version="2022.1",
