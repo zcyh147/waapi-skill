@@ -187,6 +187,7 @@ from wwise_waapi.operation_drafts import (  # noqa: E402  # pyright: ignore[repo
     OperationDraftStore,
 )
 from wwise_waapi.operation_composer import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    COMPOSER_ADAPTER_OPERATIONS,
     OBJECT_SET_COMPOSER_OPERATION,
     composition_projection,
     operation_composer_contract,
@@ -3095,7 +3096,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         )
         composer_digest = (
             operation_composer_digest(args.operation, request_version)
-            if args.operation == OBJECT_SET_COMPOSER_OPERATION
+            if args.operation in COMPOSER_ADAPTER_OPERATIONS
             else None
         )
         store = OperationDraftStore(

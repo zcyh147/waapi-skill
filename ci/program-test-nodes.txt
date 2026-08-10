@@ -33,6 +33,7 @@ tests/unit/test_platform_commands.py
 tests/unit/test_platform_process.py
 tests/unit/test_operation_draft_store.py
 tests/unit/test_operation_draft_gateway.py
+tests/unit/test_operation_composer_audio_import.py
 tests/unit/test_operation_composer_gateway.py
 tests/unit/test_operation_draft_seal.py
 tests/unit/test_operation_draft_storage_security.py

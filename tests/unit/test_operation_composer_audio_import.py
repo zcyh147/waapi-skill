@@ -1,0 +1,870 @@
+from __future__ import annotations
+
+import importlib.util
+import json
+import re
+import sys
+from collections import deque
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Mapping, Sequence
+
+import pytest
+
+from wwise_waapi.operation_composer import (  # pyright: ignore[reportMissingImports]
+    OperationComposerError,
+    materialize_operation_request,
+    new_composition,
+    operation_composer_contract,
+    operation_composer_digest,
+)
+from wwise_waapi.operation_drafts import (  # pyright: ignore[reportMissingImports]
+    OperationDraftStore,
+)
+from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
+    LEGACY_JSON_INPUT_MODE,
+    operation_input_mode,
+    operation_request_schema_digest,
+)
+from wwise_waapi.transactions import TransactionStore  # pyright: ignore[reportMissingImports]
+
+
+SCRIPT_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "skills"
+    / "waapi-skill"
+    / "scripts"
+    / "gateway.py"
+)
+SPEC = importlib.util.spec_from_file_location(
+    "waapi_audio_import_composer_gateway_script",
+    SCRIPT_PATH,
+)
+assert SPEC is not None and SPEC.loader is not None
+waapi_gateway = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = waapi_gateway
+SPEC.loader.exec_module(waapi_gateway)
+
+
+ACTION_CONTRACT = "waapi-skill.operation-draft-action/v1"
+IMPORT_HANDLE_RE = re.compile(r"^odh1-[0-9a-f]{24}$")
+
+
+def _env(tmp_path: Path, *, version: str = "2022.1") -> dict[str, str]:
+    config_path = tmp_path / "config" / "config.json"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        json.dumps(
+            {
+                "wwise_version": None,
+                "waapi_host": "127.0.0.1",
+                "waapi_port": None,
+                "project_modification_policy": "ask_before_changes",
+            }
+        ),
+        encoding="utf-8",
+    )
+    return {
+        "WAAPI_SKILL_CONFIG_PATH": str(config_path),
+        "WWISE_WAAPI_HOST": "127.0.0.1",
+        "WWISE_WAAPI_PORT": "31337",
+        "WWISE_VERSION": version,
+    }
+
+
+def _execute(tmp_path: Path, *arguments: str) -> tuple[int, dict[str, Any]]:
+    def fail_if_connected(url: str) -> None:
+        raise AssertionError(f"offline Composer command connected to {url}")
+
+    return waapi_gateway.execute_gateway(
+        ["--state-dir", str(tmp_path / "state"), *arguments],
+        env=_env(tmp_path),
+        client_factory=fail_if_connected,
+    )
+
+
+class FakeClient:
+    def __init__(self, responses: Mapping[str, Sequence[Any]]) -> None:
+        self.responses = {uri: deque(values) for uri, values in responses.items()}
+        self.calls: list[
+            tuple[str, Mapping[str, Any] | None, Mapping[str, Any] | None]
+        ] = []
+        self.disconnected = False
+
+    def call(
+        self,
+        uri: str,
+        args: Mapping[str, Any] | None = None,
+        options: Mapping[str, Any] | None = None,
+    ) -> Any:
+        self.calls.append((uri, args, options))
+        values = self.responses.get(uri)
+        if not values:
+            raise AssertionError(
+                f"Unexpected or exhausted WAAPI call: {uri} {args!r} {options!r}"
+            )
+        return values.popleft()
+
+    def disconnect(self) -> None:
+        self.disconnected = True
+
+
+def _live_info() -> dict[str, Any]:
+    return {
+        "displayName": "Wwise",
+        "isCommandLine": True,
+        "sessionId": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+        "processId": 4242,
+        "processPath": "/Applications/Wwise/WwiseConsole",
+        "apiVersion": 1,
+        "platform": "macosx",
+        "configuration": "release",
+        "version": {
+            "year": 2022,
+            "major": 1,
+            "minor": 0,
+            "build": 1,
+            "displayName": "v2022.1.0",
+        },
+    }
+
+
+def _project_info(tmp_path: Path) -> dict[str, Any]:
+    root = tmp_path / "project" / "SampleProject"
+    originals = root / "Originals"
+    originals.mkdir(parents=True, exist_ok=True)
+    project_file = root / "SampleProject.wproj"
+    project_file.write_text("<WwiseDocument/>", encoding="utf-8")
+    return {
+        "id": "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}",
+        "name": "SampleProject",
+        "displayTitle": "SampleProject",
+        "path": str(project_file),
+        "isDirty": False,
+        "currentLanguageId": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}",
+        "referenceLanguageId": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}",
+        "currentPlatformId": "{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}",
+        "directories": {
+            "root": str(root),
+            "cache": str(root / ".cache"),
+            "originals": str(originals),
+            "soundBankOutputRoot": str(root / "GeneratedSoundBanks"),
+            "commands": str(root / "Commands"),
+            "properties": str(root / "Properties"),
+        },
+        "platforms": [
+            {
+                "id": "{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}",
+                "name": "Mac",
+                "baseName": "Mac",
+                "baseDisplayName": "Mac",
+                "soundBankPath": str(root / "GeneratedSoundBanks/Mac"),
+                "copiedMediaPath": str(root / "GeneratedSoundBanks/Mac/Media"),
+            }
+        ],
+        "languages": [
+            {
+                "id": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}",
+                "name": "SFX",
+                "shortId": 1,
+            }
+        ],
+        "defaultConversion": {
+            "id": "{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}",
+            "name": "Default",
+        },
+    }
+
+
+def _audio_import_client(tmp_path: Path) -> FakeClient:
+    parent_path = r"\Actor-Mixer Hierarchy\Default Work Unit\Composer"
+    parent = {
+        "id": "{11111111-1111-1111-1111-111111111111}",
+        "name": "Composer",
+        "type": "ActorMixer",
+        "path": parent_path,
+        "parent": {"id": "{22222222-2222-2222-2222-222222222222}"},
+        "notes": "",
+    }
+    project = _project_info(tmp_path)
+    return FakeClient(
+        {
+            "ak.wwise.core.getInfo": [_live_info()],
+            "ak.wwise.core.getProjectInfo": [project, project],
+            "ak.wwise.core.object.get": [
+                {"return": [parent]},
+                {"return": []},
+            ],
+            "ak.wwise.core.object.getTypes": [
+                {
+                    "return": [
+                        {"classId": 65552, "name": "Sound", "type": "WObject"}
+                    ]
+                }
+            ],
+        }
+    )
+
+
+def _live_execute(
+    tmp_path: Path,
+    client: FakeClient,
+    *arguments: str,
+) -> tuple[int, dict[str, Any]]:
+    return waapi_gateway.execute_gateway(
+        ["--state-dir", str(tmp_path / "state"), *arguments],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+
+def _action(action_name: str, **fields: Any) -> str:
+    return json.dumps(
+        {"contract": ACTION_CONTRACT, "action": action_name, **fields},
+        ensure_ascii=False,
+    )
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_base_audio_import_adapter_is_registry_derived_but_not_normal_cutover(
+    version: str,
+) -> None:
+    contract = operation_composer_contract("audio.import", version)
+
+    assert contract["operation"] == "audio.import"
+    assert contract["phase"] == "additive_base_adapter"
+    assert contract["action_shapes"] == {
+        "set_import_option": {
+            "fixed_fields": {
+                "contract": ACTION_CONTRACT,
+                "action": "set_import_option",
+            },
+            "required_fields": ["name", "value"],
+            "optional_fields": [],
+        },
+        "clear_import_option": {
+            "fixed_fields": {
+                "contract": ACTION_CONTRACT,
+                "action": "clear_import_option",
+            },
+            "required_fields": ["name"],
+            "optional_fields": [],
+        },
+        "add_import_row": {
+            "fixed_fields": {
+                "contract": ACTION_CONTRACT,
+                "action": "add_import_row",
+            },
+            "required_fields": ["object_path"],
+            "optional_fields": [
+                "audio_file",
+                "object_type",
+                "import_language",
+            ],
+        },
+        "set_import_row_field": {
+            "fixed_fields": {
+                "contract": ACTION_CONTRACT,
+                "action": "set_import_row_field",
+            },
+            "required_fields": ["import_handle", "name", "value"],
+            "optional_fields": [],
+        },
+        "clear_import_row_field": {
+            "fixed_fields": {
+                "contract": ACTION_CONTRACT,
+                "action": "clear_import_row_field",
+            },
+            "required_fields": ["import_handle", "name"],
+            "optional_fields": [],
+        },
+        "remove_import_row": {
+            "fixed_fields": {
+                "contract": ACTION_CONTRACT,
+                "action": "remove_import_row",
+            },
+            "required_fields": ["import_handle"],
+            "optional_fields": [],
+        },
+    }
+    assert contract["registry_fragments"]["supported_row_fields"] == [
+        "audio_file",
+        "import_language",
+        "object_path",
+        "object_type",
+    ]
+    assert contract["registry_fragments"]["source_schema_digest"] == (
+        operation_request_schema_digest("audio.import", version)
+    )
+    assert operation_input_mode("audio.import", version) == LEGACY_JSON_INPUT_MODE
+    assert operation_input_mode("audio.importTabDelimited", version) == LEGACY_JSON_INPUT_MODE
+
+
+def test_base_audio_import_media_row_materializes_existing_canonical_request(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "雨 source.wav"
+    source.write_bytes(b"RIFF\x04\x00\x00\x00WAVE")
+    start_code, started = _execute(tmp_path, "draft-start", "audio.import")
+    assert start_code == 0
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+
+    option_code, optioned = _execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--action-json",
+        _action("set_import_option", name="import_operation", value="createNew"),
+    )
+    assert option_code == 0
+    assert optioned["draft"]["revision"] == 2
+
+    row_code, rowed = _execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "2",
+        "--action-json",
+        _action(
+            "add_import_row",
+            object_path=(
+                r"\Actor-Mixer Hierarchy\Default Work Unit\Composer\Rain"
+            ),
+            audio_file=str(source),
+            object_type="Sound SFX",
+            import_language="SFX",
+        ),
+    )
+
+    assert row_code == 0
+    fact = rowed["draft"]["current_facts"][0]
+    assert IMPORT_HANDLE_RE.fullmatch(fact["handle"])
+    assert fact == {
+        "handle": fact["handle"],
+        "audio_file": str(source),
+        "import_language": "SFX",
+        "object_path": (
+            r"\Actor-Mixer Hierarchy\Default Work Unit\Composer\Rain"
+        ),
+        "object_type": "Sound SFX",
+    }
+    materialized = OperationDraftStore(tmp_path / "state").materialize_request(
+        draft_id,
+        task_authority=authority,
+        expected_revision=3,
+        schema_digest=operation_request_schema_digest("audio.import", "2022.1"),
+        composer_digest=operation_composer_digest("audio.import", "2022.1"),
+    )
+    assert materialized.request == {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "imports": [
+                {
+                    "object_path": (
+                        r"\Actor-Mixer Hierarchy\Default Work Unit\Composer\Rain"
+                    ),
+                    "audio_file": str(source),
+                    "object_type": "Sound SFX",
+                    "import_language": "SFX",
+                }
+            ],
+            "import_operation": "createNew",
+        },
+    }
+
+
+def test_base_audio_import_structure_row_is_correctable_by_stable_handle(
+    tmp_path: Path,
+) -> None:
+    _code, started = _execute(tmp_path, "draft-start", "audio.import")
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    added_code, added = _execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--action-json",
+        _action(
+            "add_import_row",
+            object_path=(
+                r"\Actor-Mixer Hierarchy\Default Work Unit\Composer\Container"
+            ),
+            object_type="RandomSequenceContainer",
+        ),
+    )
+    assert added_code == 0
+    handle = added["draft"]["current_facts"][0]["handle"]
+
+    corrected_code, corrected = _execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "2",
+        "--action-json",
+        _action(
+            "set_import_row_field",
+            import_handle=handle,
+            name="object_type",
+            value="SwitchContainer",
+        ),
+    )
+    assert corrected_code == 0
+    assert corrected["draft"]["current_facts"] == [
+        {
+            "handle": handle,
+            "object_path": (
+                r"\Actor-Mixer Hierarchy\Default Work Unit\Composer\Container"
+            ),
+            "object_type": "SwitchContainer",
+        }
+    ]
+    request = OperationDraftStore(tmp_path / "state").materialize_request(
+        draft_id,
+        task_authority=authority,
+        expected_revision=3,
+        schema_digest=operation_request_schema_digest("audio.import", "2022.1"),
+        composer_digest=operation_composer_digest("audio.import", "2022.1"),
+    ).request
+    assert request["arguments"]["imports"] == [
+        {
+            "object_path": (
+                r"\Actor-Mixer Hierarchy\Default Work Unit\Composer\Container"
+            ),
+            "object_type": "SwitchContainer",
+        }
+    ]
+
+
+@pytest.mark.parametrize(
+    "invalid_action",
+    (
+        _action("add_import_row", object_path="relative\\Rain", object_type="Sound SFX"),
+        _action(
+            "add_import_row",
+            object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+            audio_file=7,
+        ),
+        _action(
+            "add_import_row",
+            object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+            import_language="",
+        ),
+        _action(
+            "add_import_row",
+            object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+            native_args={"@Volume": -3},
+        ),
+    ),
+)
+def test_invalid_base_audio_import_action_is_atomic(
+    tmp_path: Path,
+    invalid_action: str,
+) -> None:
+    _code, started = _execute(tmp_path, "draft-start", "audio.import")
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    record_path = (
+        tmp_path
+        / "state"
+        / "operation-drafts-v1"
+        / "records"
+        / f"{draft_id}.json"
+    )
+    before = record_path.read_bytes()
+
+    exit_code, rejected = _execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--action-json",
+        invalid_action,
+    )
+
+    assert exit_code == 2
+    assert rejected["error_code"] == OperationComposerError.error_code
+    assert record_path.read_bytes() == before
+
+
+def test_new_audio_import_composition_does_not_enable_tab_delimited_adapter() -> None:
+    with pytest.raises(OperationComposerError) as exc_info:
+        new_composition("audio.importTabDelimited", "2022.1")
+
+    assert exc_info.value.error_code == "OPERATION_DRAFT_ADAPTER_UNAVAILABLE"
+
+
+def test_base_audio_import_adapter_is_not_disclosed_as_normal_input_before_cutover(
+    tmp_path: Path,
+) -> None:
+    schema_code, schema = _execute(
+        tmp_path,
+        "--version",
+        "2022.1",
+        "operation-schema",
+        "audio.import",
+    )
+
+    assert schema_code == 0
+    assert schema["operation"]["input_mode"] == LEGACY_JSON_INPUT_MODE
+    assert schema["request_envelope"]["operation"] == "audio.import"
+    assert "composer" not in schema
+    assert "add_import_row" not in json.dumps(schema)
+
+
+def test_audio_import_materializer_rejects_incomplete_empty_composition() -> None:
+    with pytest.raises(OperationComposerError) as exc_info:
+        materialize_operation_request(
+            "audio.import",
+            "2022.1",
+            new_composition("audio.import", "2022.1"),
+        )
+
+    assert exc_info.value.error_code == "OPERATION_DRAFT_INCOMPLETE"
+
+
+def _complete_media_draft(
+    root: Path,
+    *,
+    source: Path,
+) -> tuple[str, str, dict[str, Any]]:
+    _code, started = _execute(root, "draft-start", "audio.import")
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    _code, configured = _execute(
+        root,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--action-json",
+        _action("set_import_option", name="import_operation", value="createNew"),
+    )
+    assert configured["draft"]["revision"] == 2
+    _code, completed = _execute(
+        root,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "2",
+        "--action-json",
+        _action(
+            "add_import_row",
+            object_path=(
+                r"\Actor-Mixer Hierarchy\Default Work Unit\Composer\Rain"
+            ),
+            audio_file=str(source),
+            object_type="Sound SFX",
+            import_language="SFX",
+        ),
+    )
+    request = OperationDraftStore(root / "state").materialize_request(
+        draft_id,
+        task_authority=authority,
+        expected_revision=3,
+        schema_digest=operation_request_schema_digest("audio.import", "2022.1"),
+        composer_digest=operation_composer_digest("audio.import", "2022.1"),
+    ).request
+    assert completed["draft"]["revision"] == 3
+    return draft_id, authority, request
+
+
+def test_base_audio_import_public_draft_check_and_seal_reuse_existing_preview(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.wav"
+    source.write_bytes(b"RIFF\x04\x00\x00\x00WAVE")
+    draft_id, authority, request = _complete_media_draft(
+        tmp_path,
+        source=source,
+    )
+    check_client = _audio_import_client(tmp_path)
+
+    check_code, checked = _live_execute(
+        tmp_path,
+        check_client,
+        "draft-check",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "3",
+    )
+
+    assert check_code == 0, checked
+    assert checked["draft"]["revision"] == 4
+    assert checked["draft"]["check"]["source_revision"] == 3
+    assert all(call[0] != "ak.wwise.core.audio.import" for call in check_client.calls)
+    assert not (tmp_path / "state" / "transactions").exists()
+
+    preview_client = _audio_import_client(tmp_path)
+    preview_code, previewed = _live_execute(
+        tmp_path,
+        preview_client,
+        "preview-from-draft",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "4",
+        "--apply",
+        "--ttl",
+        "300",
+    )
+
+    assert preview_code == 0, previewed
+    assert previewed["command"] == "preview-from-draft"
+    assert previewed["state"] == "awaiting_confirmation"
+    assert previewed["agent_result"]["request"] == request
+    assert list(previewed)[-1] == "agent_result"
+    assert all(call[0] != "ak.wwise.core.audio.import" for call in preview_client.calls)
+    artifact = TransactionStore(tmp_path / "state").load_preview(
+        previewed["transaction_id"]
+    ).artifact
+    assert artifact["request"] == request
+    assert artifact["prepared_operation"]["dispatch"]["uri"] == (
+        "ak.wwise.core.audio.import"
+    )
+    assert artifact["prepared_operation"]["pre_state"]["closed_import_plan"][
+        "file_proofs"
+    ][0]["sha256"]
+    assert check_client.disconnected is preview_client.disconnected is True
+
+
+def test_base_audio_import_composer_matches_legacy_preview_artifact_exactly(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_builder = waapi_gateway.build_transaction_preview_artifact
+    fixed_now = datetime(2026, 8, 10, 12, 0, tzinfo=timezone.utc)
+
+    def deterministic_builder(*args: Any, **kwargs: Any) -> Any:
+        kwargs["now"] = fixed_now
+        return original_builder(*args, **kwargs)
+
+    monkeypatch.setattr(
+        waapi_gateway,
+        "build_transaction_preview_artifact",
+        deterministic_builder,
+    )
+    source = tmp_path / "source.wav"
+    source.write_bytes(b"RIFF\x04\x00\x00\x00WAVE")
+    composer_root = tmp_path / "composer"
+    draft_id, authority, request = _complete_media_draft(
+        composer_root,
+        source=source,
+    )
+    check_client = _audio_import_client(tmp_path)
+    check_code, checked = _live_execute(
+        composer_root,
+        check_client,
+        "draft-check",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "3",
+    )
+    assert check_code == 0, checked
+    composer_client = _audio_import_client(tmp_path)
+    composer_code, composer_payload = _live_execute(
+        composer_root,
+        composer_client,
+        "preview-from-draft",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "4",
+        "--apply",
+        "--ttl",
+        "300",
+    )
+    assert composer_code == 0, composer_payload
+    composer_artifact = TransactionStore(composer_root / "state").load_preview(
+        composer_payload["transaction_id"]
+    ).artifact
+
+    legacy_root = tmp_path / "legacy"
+    legacy_client = _audio_import_client(tmp_path)
+    legacy_code, legacy_payload = _live_execute(
+        legacy_root,
+        legacy_client,
+        "legacy-preview",
+        "--request-json",
+        json.dumps(request),
+        "--apply",
+        "--ttl",
+        "300",
+    )
+    assert legacy_code == 0, legacy_payload
+    legacy_artifact = TransactionStore(legacy_root / "state").load_preview(
+        legacy_payload["transaction_id"]
+    ).artifact
+
+    assert composer_artifact == legacy_artifact
+    assert composer_payload["artifact_hash"] == legacy_payload["artifact_hash"]
+    assert composer_payload["preview_summary"] == legacy_payload["preview_summary"]
+    assert composer_payload["authorization"] == legacy_payload["authorization"]
+    assert composer_payload["cleanup"] == legacy_payload["cleanup"]
+    assert composer_client.calls == legacy_client.calls
+    assert list(composer_payload)[-1] == list(legacy_payload)[-1] == "agent_result"
+
+
+def test_base_audio_import_missing_file_fails_check_without_changing_draft(
+    tmp_path: Path,
+) -> None:
+    missing_source = tmp_path / "missing.wav"
+    draft_id, authority, _request = _complete_media_draft(
+        tmp_path,
+        source=missing_source,
+    )
+    record_path = (
+        tmp_path
+        / "state"
+        / "operation-drafts-v1"
+        / "records"
+        / f"{draft_id}.json"
+    )
+    before = record_path.read_bytes()
+    client = _audio_import_client(tmp_path)
+
+    exit_code, rejected = _live_execute(
+        tmp_path,
+        client,
+        "draft-check",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "3",
+    )
+
+    assert exit_code == 2
+    assert rejected["error_code"] == "INPUT_FILE_NOT_FOUND"
+    assert record_path.read_bytes() == before
+    assert not (tmp_path / "state" / "transactions").exists()
+
+
+def test_base_audio_import_preview_repeats_file_proof_after_successful_check(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.wav"
+    source.write_bytes(b"RIFF\x04\x00\x00\x00WAVE")
+    draft_id, authority, _request = _complete_media_draft(
+        tmp_path,
+        source=source,
+    )
+    check_code, checked = _live_execute(
+        tmp_path,
+        _audio_import_client(tmp_path),
+        "draft-check",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "3",
+    )
+    assert check_code == 0, checked
+    record_path = (
+        tmp_path
+        / "state"
+        / "operation-drafts-v1"
+        / "records"
+        / f"{draft_id}.json"
+    )
+    before = record_path.read_bytes()
+    source.write_bytes(b"RIFF\x08\x00\x00\x00WAVEchanged")
+
+    exit_code, rejected = _live_execute(
+        tmp_path,
+        _audio_import_client(tmp_path),
+        "preview-from-draft",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "4",
+        "--apply",
+        "--ttl",
+        "300",
+    )
+
+    assert exit_code == 2
+    assert rejected["error_code"] == "OPERATION_DRAFT_BINDING_DRIFT"
+    assert record_path.read_bytes() == before
+    transactions = tmp_path / "state" / "transactions"
+    assert not transactions.exists() or list(transactions.iterdir()) == []
+
+
+def test_base_audio_import_unknown_structure_type_fails_check_atomically(
+    tmp_path: Path,
+) -> None:
+    _code, started = _execute(tmp_path, "draft-start", "audio.import")
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    apply_code, applied = _execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--action-json",
+        _action(
+            "add_import_row",
+            object_path=(
+                r"\Actor-Mixer Hierarchy\Default Work Unit\Composer\Unknown"
+            ),
+            object_type="UnreviewedContainer",
+        ),
+    )
+    assert apply_code == 0, applied
+    record_path = (
+        tmp_path
+        / "state"
+        / "operation-drafts-v1"
+        / "records"
+        / f"{draft_id}.json"
+    )
+    before = record_path.read_bytes()
+
+    exit_code, rejected = _live_execute(
+        tmp_path,
+        _audio_import_client(tmp_path),
+        "draft-check",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "2",
+    )
+
+    assert exit_code == 2
+    assert rejected["error_code"] == "INVALID_OBJECT_TYPE"
+    assert record_path.read_bytes() == before
+    assert not (tmp_path / "state" / "transactions").exists()

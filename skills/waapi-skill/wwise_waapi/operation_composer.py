@@ -16,8 +16,10 @@ from typing import Any, Callable, Mapping
 from .canonical import canonical_json_bytes, canonical_sha256
 from .operation_registry import (
     OperationContractError,
+    audio_import_composer_fragment_contract,
     object_set_composer_fragment_contract,
     parse_operation_request,
+    validate_audio_import_composer_fragment,
     validate_object_set_composer_fragment,
 )
 
@@ -26,6 +28,10 @@ OPERATION_DRAFT_ACTION_CONTRACT = "waapi-skill.operation-draft-action/v1"
 OPERATION_COMPOSITION_CONTRACT = "waapi-skill.operation-composition/v1"
 OPERATION_COMPOSER_CONTRACT = "waapi-skill.operation-composer/v1"
 OBJECT_SET_COMPOSER_OPERATION = "object.set"
+AUDIO_IMPORT_COMPOSER_OPERATION = "audio.import"
+COMPOSER_ADAPTER_OPERATIONS = frozenset(
+    {OBJECT_SET_COMPOSER_OPERATION, AUDIO_IMPORT_COMPOSER_OPERATION}
+)
 MAX_COMPOSER_ACTION_BYTES = 32 * 1024
 _TARGET_HANDLE_PATTERN = re.compile(r"^odh1-[0-9a-f]{24}$")
 _BASE_ACTION_FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
@@ -78,6 +84,19 @@ _IMPORT_ACTION_FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "clear_import_option": (("owner_handle", "name"), ()),
     "remove_import": (("owner_handle",), ()),
 }
+_AUDIO_IMPORT_ACTION_FIELDS: dict[
+    str, tuple[tuple[str, ...], tuple[str, ...]]
+] = {
+    "set_import_option": (("name", "value"), ()),
+    "clear_import_option": (("name",), ()),
+    "add_import_row": (
+        ("object_path",),
+        ("audio_file", "object_type", "import_language"),
+    ),
+    "set_import_row_field": (("import_handle", "name", "value"), ()),
+    "clear_import_row_field": (("import_handle", "name"), ()),
+    "remove_import_row": (("import_handle",), ()),
+}
 
 
 class OperationComposerError(ValueError):
@@ -106,8 +125,55 @@ class OperationComposerError(ValueError):
 
 
 def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
-    """Return the one additive Adapter contract, derived from the Registry."""
+    """Return one reviewed Adapter contract, derived from the Registry."""
 
+    if operation == AUDIO_IMPORT_COMPOSER_OPERATION:
+        fragments = audio_import_composer_fragment_contract(version)
+        return {
+            "contract": OPERATION_COMPOSER_CONTRACT,
+            "operation": operation,
+            "version": version,
+            "phase": "additive_base_adapter",
+            "action_contract": OPERATION_DRAFT_ACTION_CONTRACT,
+            "action_construction": {
+                "fixed_fields_are_required": True,
+                "include_every_required_field": True,
+                "include_only_selected_optional_fields": True,
+                "additional_fields": False,
+            },
+            "action_shapes": {
+                action_name: {
+                    "fixed_fields": {
+                        "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+                        "action": action_name,
+                    },
+                    "required_fields": list(required_fields),
+                    "optional_fields": list(optional_fields),
+                }
+                for action_name, (required_fields, optional_fields) in (
+                    _AUDIO_IMPORT_ACTION_FIELDS.items()
+                )
+            },
+            "composition_contract": OPERATION_COMPOSITION_CONTRACT,
+            "actions": list(_AUDIO_IMPORT_ACTION_FIELDS),
+            "limits": {
+                "imports": fragments["limits"]["imports"],
+                "action_bytes": MAX_COMPOSER_ACTION_BYTES,
+            },
+            "registry_fragments": fragments,
+            "complete_request_is_never_an_action": True,
+            "completion_discipline": {
+                "successful_action_response_is_complete": True,
+                "compact_projection_is_not_truncation": True,
+                "schema_required_fields_status_scope": (
+                    "structural_preview_readiness_only"
+                ),
+                "user_intent_coverage": (
+                    "compare_planned_actions_before_draft-check"
+                ),
+                "draft_inspect_required_before_next_planned_action": False,
+            },
+        }
     if operation != OBJECT_SET_COMPOSER_OPERATION:
         raise OperationComposerError(
             f"No Operation Composer Adapter is available for {operation!r}.",
@@ -189,6 +255,12 @@ def operation_composer_digest(operation: str, version: str) -> str:
 
 def new_composition(operation: str, version: str) -> dict[str, Any]:
     operation_composer_contract(operation, version)
+    if operation == AUDIO_IMPORT_COMPOSER_OPERATION:
+        return {
+            "contract": OPERATION_COMPOSITION_CONTRACT,
+            "request_options": {},
+            "imports": [],
+        }
     return {
         "contract": OPERATION_COMPOSITION_CONTRACT,
         "request_options": {},
@@ -226,6 +298,14 @@ def apply_composer_action(
             f"action contract must be {OPERATION_DRAFT_ACTION_CONTRACT!r}."
         )
     action_name = action.get("action")
+    if operation == AUDIO_IMPORT_COMPOSER_OPERATION:
+        return _apply_audio_import_action(
+            version,
+            normalized,
+            action,
+            action_name=action_name,
+            handle_factory=handle_factory,
+        )
     if action_name == "set_request_option":
         _require_exact_keys(
             action,
@@ -852,6 +932,8 @@ def materialize_operation_request(
     """Build and canonically reparse the complete operation request."""
 
     normalized = _normalize_composition(composition, operation=operation, version=version)
+    if operation == AUDIO_IMPORT_COMPOSER_OPERATION:
+        return _materialize_audio_import_request(version, normalized)
     targets = normalized["targets"]
     if not targets or len(targets) > _target_limit(version):
         raise OperationComposerError(
@@ -937,6 +1019,8 @@ def composition_projection(
     composition: Mapping[str, Any],
 ) -> dict[str, Any]:
     normalized = _normalize_composition(composition, operation=operation, version=version)
+    if operation == AUDIO_IMPORT_COMPOSER_OPERATION:
+        return _audio_import_composition_projection(version, normalized)
     facts = [
         {
             "handle": target["handle"],
@@ -1071,6 +1155,8 @@ def _normalize_composition(
     version: str,
 ) -> dict[str, Any]:
     operation_composer_contract(operation, version)
+    if operation == AUDIO_IMPORT_COMPOSER_OPERATION:
+        return _normalize_audio_import_composition(composition, version=version)
     _require_json_object(composition, label="composition")
     actual_keys = set(composition)
     required_keys = {"contract", "targets"}
@@ -1246,6 +1332,328 @@ def _materialize_if_complete(
     projection = composition_projection(operation, version, composition)
     if not projection["missing_fields"]:
         materialize_operation_request(operation, version, composition)
+
+
+def _apply_audio_import_action(
+    version: str,
+    composition: dict[str, Any],
+    action: Mapping[str, Any],
+    *,
+    action_name: Any,
+    handle_factory: Callable[[], str] | None,
+) -> tuple[dict[str, Any], str]:
+    if action_name in {"set_import_option", "clear_import_option"}:
+        required = (
+            ("contract", "action", "name", "value")
+            if action_name == "set_import_option"
+            else ("contract", "action", "name")
+        )
+        _require_exact_keys(action, required=required, label=f"{action_name} action")
+        options = composition["request_options"]
+        assert isinstance(options, dict)
+        if action_name == "set_import_option":
+            descriptor = _validate_audio_import_fragment(
+                version,
+                fragment="request_option",
+                payload={"name": action.get("name"), "value": action.get("value")},
+            )
+            options[descriptor["name"]] = descriptor["value"]
+        else:
+            name = action.get("name")
+            if not isinstance(name, str) or name not in options:
+                raise OperationComposerError(
+                    "The requested audio.import option does not exist.",
+                    details={"name": name},
+                )
+            del options[name]
+        _materialize_if_complete(AUDIO_IMPORT_COMPOSER_OPERATION, version, composition)
+        return composition, str(action_name)
+    if action_name == "add_import_row":
+        _require_allowed_keys(
+            action,
+            required=("contract", "action", "object_path"),
+            optional=("audio_file", "object_type", "import_language"),
+            label="add_import_row action",
+        )
+        rows = composition["imports"]
+        assert isinstance(rows, list)
+        limit = _audio_import_limit(version)
+        if len(rows) >= limit:
+            raise OperationComposerError(
+                "Operation Draft import-row ceiling has been reached.",
+                details={"limit": limit},
+            )
+        fields: dict[str, Any] = {}
+        for name in ("object_path", "audio_file", "object_type", "import_language"):
+            if name not in action:
+                continue
+            descriptor = _validate_audio_import_fragment(
+                version,
+                fragment="row_field",
+                payload={"name": name, "value": action[name]},
+            )
+            fields[descriptor["name"]] = descriptor["value"]
+        object_path = fields["object_path"]
+        if any(row["fields"].get("object_path") == object_path for row in rows):
+            raise OperationComposerError(
+                "Operation Draft import object paths must be unique.",
+                details={"object_path": object_path},
+            )
+        handle = (handle_factory or _new_target_handle)()
+        if not isinstance(handle, str) or _TARGET_HANDLE_PATTERN.fullmatch(handle) is None:
+            raise OperationComposerError(
+                "Gateway import-row handle generation returned an invalid handle."
+            )
+        rows.append({"handle": handle, "fields": fields})
+        _materialize_if_complete(AUDIO_IMPORT_COMPOSER_OPERATION, version, composition)
+        return composition, str(action_name)
+    if action_name in {"set_import_row_field", "clear_import_row_field"}:
+        required = (
+            ("contract", "action", "import_handle", "name", "value")
+            if action_name == "set_import_row_field"
+            else ("contract", "action", "import_handle", "name")
+        )
+        _require_exact_keys(action, required=required, label=f"{action_name} action")
+        row = _audio_import_row_for_handle(composition, action.get("import_handle"))
+        fields = row["fields"]
+        assert isinstance(fields, dict)
+        name = action.get("name")
+        if action_name == "set_import_row_field":
+            descriptor = _validate_audio_import_fragment(
+                version,
+                fragment="row_field",
+                payload={"name": name, "value": action.get("value")},
+            )
+            if descriptor["name"] == "object_path" and any(
+                other is not row
+                and other["fields"].get("object_path") == descriptor["value"]
+                for other in composition["imports"]
+            ):
+                raise OperationComposerError(
+                    "Operation Draft import object paths must be unique.",
+                    details={"object_path": descriptor["value"]},
+                )
+            fields[descriptor["name"]] = descriptor["value"]
+        else:
+            if not isinstance(name, str) or name not in fields:
+                raise OperationComposerError(
+                    "The requested audio.import row field does not exist.",
+                    details={"name": name},
+                )
+            del fields[name]
+        _materialize_if_complete(AUDIO_IMPORT_COMPOSER_OPERATION, version, composition)
+        return composition, str(action_name)
+    if action_name == "remove_import_row":
+        _require_exact_keys(
+            action,
+            required=("contract", "action", "import_handle"),
+            label="remove_import_row action",
+        )
+        row = _audio_import_row_for_handle(composition, action.get("import_handle"))
+        composition["imports"].remove(row)
+        return composition, action_name
+    raise OperationComposerError(
+        "Operation Draft action is not supported by this Adapter.",
+        details={
+            "action": action_name,
+            "allowed": operation_composer_contract(
+                AUDIO_IMPORT_COMPOSER_OPERATION, version
+            )["actions"],
+        },
+    )
+
+
+def _normalize_audio_import_composition(
+    composition: Mapping[str, Any],
+    *,
+    version: str,
+) -> dict[str, Any]:
+    _require_json_object(composition, label="composition")
+    required = {"contract", "imports"}
+    optional = {"request_options"}
+    actual = set(composition)
+    if not required.issubset(actual) or actual - required - optional:
+        raise OperationComposerError(
+            "audio.import composition fields are invalid.",
+            details={
+                "missing": sorted(required - actual),
+                "unexpected": sorted(actual - required - optional),
+            },
+        )
+    if composition.get("contract") != OPERATION_COMPOSITION_CONTRACT:
+        raise OperationComposerError("Operation Draft composition contract is invalid.")
+    raw_options = composition.get("request_options", {})
+    if not isinstance(raw_options, Mapping):
+        raise OperationComposerError("audio.import request options are invalid.")
+    options: dict[str, Any] = {}
+    for name, value in raw_options.items():
+        descriptor = _validate_audio_import_fragment(
+            version,
+            fragment="request_option",
+            payload={"name": name, "value": value},
+        )
+        options[descriptor["name"]] = descriptor["value"]
+    raw_rows = composition.get("imports")
+    limit = _audio_import_limit(version)
+    if not isinstance(raw_rows, list) or len(raw_rows) > limit:
+        raise OperationComposerError(
+            "audio.import composition rows are invalid or exceed their ceiling.",
+            details={"limit": limit},
+        )
+    rows: list[dict[str, Any]] = []
+    handles: set[str] = set()
+    object_paths: set[str] = set()
+    for raw_row in raw_rows:
+        _require_json_object(raw_row, label="audio.import composition row")
+        if set(raw_row) != {"handle", "fields"}:
+            raise OperationComposerError("audio.import composition row fields are invalid.")
+        handle = raw_row.get("handle")
+        if (
+            not isinstance(handle, str)
+            or _TARGET_HANDLE_PATTERN.fullmatch(handle) is None
+            or handle in handles
+        ):
+            raise OperationComposerError("Operation Draft import-row handle is invalid.")
+        handles.add(handle)
+        raw_fields = raw_row.get("fields")
+        if not isinstance(raw_fields, Mapping):
+            raise OperationComposerError("audio.import row facts are invalid.")
+        fields: dict[str, Any] = {}
+        for name, value in raw_fields.items():
+            descriptor = _validate_audio_import_fragment(
+                version,
+                fragment="row_field",
+                payload={"name": name, "value": value},
+            )
+            fields[descriptor["name"]] = descriptor["value"]
+        object_path = fields.get("object_path")
+        if isinstance(object_path, str):
+            if object_path in object_paths:
+                raise OperationComposerError(
+                    "Operation Draft import object paths must be unique."
+                )
+            object_paths.add(object_path)
+        rows.append({"handle": handle, "fields": fields})
+    return {
+        "contract": OPERATION_COMPOSITION_CONTRACT,
+        "request_options": options,
+        "imports": rows,
+    }
+
+
+def _materialize_audio_import_request(
+    version: str,
+    composition: Mapping[str, Any],
+) -> dict[str, Any]:
+    rows = composition["imports"]
+    if not rows:
+        raise OperationComposerError(
+            "Operation Draft needs at least one import row before it can be checked.",
+            error_code="OPERATION_DRAFT_INCOMPLETE",
+            details={"import_count": 0, "minimum": 1},
+        )
+    missing: list[str] = []
+    for row in rows:
+        fields = row["fields"]
+        if "object_path" not in fields:
+            missing.append(f"imports[{row['handle']}].object_path")
+        if "audio_file" not in fields and "object_type" not in fields:
+            missing.append(f"imports[{row['handle']}].source_or_structure_type")
+    if missing:
+        raise OperationComposerError(
+            "Operation Draft import rows are incomplete.",
+            error_code="OPERATION_DRAFT_INCOMPLETE",
+            details={"missing_fields": missing},
+        )
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": version,
+        "operation": AUDIO_IMPORT_COMPOSER_OPERATION,
+        "arguments": {
+            "imports": [dict(row["fields"]) for row in rows],
+            **dict(composition["request_options"]),
+        },
+    }
+    try:
+        return parse_operation_request(request, expected_version=version).as_dict()
+    except OperationContractError as exc:
+        raise OperationComposerError(
+            str(exc),
+            details=exc.details,
+            error_code=exc.error_code,
+        ) from exc
+
+
+def _audio_import_composition_projection(
+    version: str,
+    composition: Mapping[str, Any],
+) -> dict[str, Any]:
+    del version
+    facts = [
+        {"handle": row["handle"], **dict(row["fields"])}
+        for row in composition["imports"]
+    ]
+    missing: list[str] = []
+    if not facts:
+        missing.append("import_row")
+    for row in facts:
+        if "object_path" not in row:
+            missing.append(f"imports[{row['handle']}].object_path")
+        if "audio_file" not in row and "object_type" not in row:
+            missing.append(f"imports[{row['handle']}].source_or_structure_type")
+    allowed = list(_AUDIO_IMPORT_ACTION_FIELDS)
+    if not missing:
+        allowed.append("check")
+    allowed.extend(("inspect", "cancel"))
+    return {
+        "request_options": dict(composition["request_options"]),
+        "current_facts": facts,
+        "missing_fields": missing,
+        "missing_fields_status": "complete" if not missing else "incomplete",
+        "allowed_actions": allowed,
+    }
+
+
+def _audio_import_row_for_handle(
+    composition: Mapping[str, Any],
+    handle: Any,
+) -> dict[str, Any]:
+    if not isinstance(handle, str) or _TARGET_HANDLE_PATTERN.fullmatch(handle) is None:
+        raise OperationComposerError("import_handle is invalid.")
+    rows = composition.get("imports")
+    assert isinstance(rows, list)
+    for row in rows:
+        if row["handle"] == handle:
+            return row
+    raise OperationComposerError(
+        "import_handle does not name a fact in this Operation Draft."
+    )
+
+
+def _validate_audio_import_fragment(
+    version: str,
+    *,
+    fragment: str,
+    payload: Any,
+) -> dict[str, Any]:
+    try:
+        return validate_audio_import_composer_fragment(
+            version,
+            fragment=fragment,
+            payload=payload,
+        )
+    except OperationContractError as exc:
+        raise OperationComposerError(
+            str(exc),
+            details={"cause_error_code": exc.error_code, **exc.details},
+        ) from exc
+
+
+def _audio_import_limit(version: str) -> int:
+    value = audio_import_composer_fragment_contract(version)["limits"]["imports"]
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise RuntimeError("Registry returned an invalid audio.import row limit")
+    return value
 
 
 def _validate_fragment(
@@ -1711,6 +2119,8 @@ def _require_allowed_keys(
 
 
 __all__ = [
+    "AUDIO_IMPORT_COMPOSER_OPERATION",
+    "COMPOSER_ADAPTER_OPERATIONS",
     "MAX_COMPOSER_ACTION_BYTES",
     "OBJECT_SET_COMPOSER_OPERATION",
     "OPERATION_COMPOSER_CONTRACT",
