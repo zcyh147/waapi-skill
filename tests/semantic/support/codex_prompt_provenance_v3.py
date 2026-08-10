@@ -533,7 +533,7 @@ def deserialize_protocol(value: Mapping[str, Any]) -> V3GatewayProtocol:
             not isinstance(raw_groups, list)
             or any(
                 not isinstance(group, list)
-                or len(group) < 2
+                or len(group) != 2
                 or any(not isinstance(item, str) for item in group)
                 for group in raw_groups
             )
@@ -550,7 +550,7 @@ def deserialize_protocol(value: Mapping[str, Any]) -> V3GatewayProtocol:
             not isinstance(raw_groups, list)
             or any(
                 not isinstance(group, list)
-                or len(group) != 2
+                or len(group) < 2
                 or any(not isinstance(item, str) for item in group)
                 for group in raw_groups
             )

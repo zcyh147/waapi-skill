@@ -37,6 +37,11 @@ from tests.semantic.support.codex_integration_workflows_v2 import (
     BaselineManifest,
     load_integration_workflows_v2_profile,
 )
+from tests.semantic.support.codex_prompt_provenance_v3 import (
+    PromptProvenanceError,
+    deserialize_protocol,
+    serialize_protocol,
+)
 from wwise_waapi.builders.metadata import (
     GET_PROPERTY_AND_REFERENCE_NAMES_URI,
     GET_PROPERTY_INFO_URI,
@@ -964,6 +969,31 @@ def test_rifle_preamble_accepts_only_declared_dependency_safe_orders(
         groups,
         setup_groups,
     )
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2025.1"])
+def test_rifle_three_step_setup_group_round_trips_prompt_provenance(
+    tmp_path: Path,
+    version: str,
+) -> None:
+    prepared, _fake, _runtime = _prepared(tmp_path, version=version)
+
+    serialized = serialize_protocol(prepared.protocol)
+
+    assert serialized["commutative_composer_setup_step_groups"] == [
+        list(RIFLE_COMMUTATIVE_COMPOSER_SETUP_STEP_GROUPS[0])
+    ]
+    assert deserialize_protocol(serialized) == prepared.protocol
+
+    tampered = copy.deepcopy(serialized)
+    tampered["commutative_read_only_step_groups"][0].append(
+        "tx01.draft-start"
+    )
+    with pytest.raises(
+        PromptProvenanceError,
+        match="commutative read-only protocol groups",
+    ):
+        deserialize_protocol(tampered)
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
