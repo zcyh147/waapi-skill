@@ -14,6 +14,7 @@ import sys
 import threading
 import time
 import uuid
+from concurrent.futures import InvalidStateError
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -9133,12 +9134,41 @@ def _structured_contains_object_not_found(value: Any) -> bool:
     return isinstance(message, str) and "object not found" in message.casefold()
 
 
+def _stabilize_waapi_client_shutdown(client: Any) -> Any:
+    """Suppress only waapi-client's duplicate completion during disconnect."""
+
+    decoupler = getattr(client, "_decoupler", None)
+    original = getattr(decoupler, "unblock_caller", None)
+    marker = "_waapi_skill_shutdown_stabilized"
+    if not callable(original) or bool(getattr(decoupler, marker, False)):
+        return client
+
+    def safe_unblock_caller() -> Any:
+        future = getattr(decoupler, "_future", None)
+        done = getattr(future, "done", None)
+        if callable(done) and done():
+            return None
+        try:
+            return original()
+        except InvalidStateError:
+            current = getattr(decoupler, "_future", None)
+            current_done = getattr(current, "done", None)
+            if current is future and callable(current_done) and current_done():
+                return None
+            raise
+
+    setattr(decoupler, "unblock_caller", safe_unblock_caller)
+    setattr(decoupler, marker, True)
+    return client
+
+
 def default_client_factory(url: str) -> Any:
     from waapi import WaapiClient  # type: ignore[import-not-found]  # noqa: PLC0415
 
     # Structured dispatcher errors are more reliable than waapi-client's default
     # behavior of logging failures to stderr and returning ``None`` as success data.
-    return WaapiClient(url=url, allow_exception=True)
+    client = WaapiClient(url=url, allow_exception=True)
+    return _stabilize_waapi_client_shutdown(client)
 
 
 def selected_ui_boundary(result: Mapping[str, Any], *, live_info: Mapping[str, Any]) -> bool:

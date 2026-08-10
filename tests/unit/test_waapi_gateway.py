@@ -8,7 +8,9 @@ import shlex
 import sys
 import threading
 import time
+from concurrent.futures import Future, InvalidStateError
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Mapping
 
 import pytest  # pyright: ignore[reportMissingImports]
@@ -7043,6 +7045,64 @@ def test_gateway_transport_close_unsubscribes_residual_handlers_on_owner_thread(
     assert client.handlers[0].unsubscribe_thread_ident == client.handlers[0].subscribe_thread_ident
     assert client.handlers[0].unsubscribe_thread_ident != threading.get_ident()
     assert client.disconnected is True
+
+
+def test_default_client_factory_stabilizes_finished_waapi_shutdown_future(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class RaceDecoupler:
+        def __init__(self) -> None:
+            self._future: Future[None] = Future()
+            self._future.set_result(None)
+
+        def unblock_caller(self) -> None:
+            self._future.set_result(None)
+
+    client = SimpleNamespace(_decoupler=RaceDecoupler())
+    fake_waapi = SimpleNamespace(WaapiClient=lambda **_kwargs: client)
+    monkeypatch.setitem(sys.modules, "waapi", fake_waapi)
+
+    returned = waapi_gateway.default_client_factory("ws://127.0.0.1:31337/waapi")
+
+    assert returned is client
+    returned._decoupler.unblock_caller()
+
+
+def test_waapi_shutdown_stabilizer_does_not_hide_unrelated_invalid_state() -> None:
+    class BrokenDecoupler:
+        def __init__(self) -> None:
+            self._future: Future[None] = Future()
+
+        def unblock_caller(self) -> None:
+            raise InvalidStateError("unrelated pending future failure")
+
+    client = SimpleNamespace(_decoupler=BrokenDecoupler())
+    waapi_gateway._stabilize_waapi_client_shutdown(client)
+
+    with pytest.raises(InvalidStateError, match="unrelated pending future failure"):
+        client._decoupler.unblock_caller()
+
+
+def test_waapi_shutdown_stabilizer_handles_completion_racing_with_unblock() -> None:
+    class RacingFuture:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def done(self) -> bool:
+            self.calls += 1
+            return self.calls > 1
+
+    class RacingDecoupler:
+        def __init__(self) -> None:
+            self._future = RacingFuture()
+
+        def unblock_caller(self) -> None:
+            raise InvalidStateError("future completed between check and unblock")
+
+    client = SimpleNamespace(_decoupler=RacingDecoupler())
+    waapi_gateway._stabilize_waapi_client_shutdown(client)
+
+    client._decoupler.unblock_caller()
 
 
 def test_transport_connect_timeout_returns_within_wall_budget_and_late_factory_cleans_up() -> None:
