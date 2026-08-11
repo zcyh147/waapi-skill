@@ -18,6 +18,8 @@ from wwise_waapi.operation_composer import (  # pyright: ignore[reportMissingImp
     new_composition,
     operation_composer_contract,
     operation_composer_digest,
+    parse_typed_action_cli_arguments,
+    typed_action_cli_arguments,
 )
 from wwise_waapi.operation_drafts import (  # pyright: ignore[reportMissingImports]
     OperationDraftStore,
@@ -245,6 +247,7 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
     assert "phase" not in contract["registry_fragments"]
     shapes = contract["action_shapes"]
     simple_required = {
+        "set_import_operation": ["mode"],
         "set_import_option": ["name", "value"],
         "clear_import_option": ["name"],
         "set_import_default": ["name", "value"],
@@ -256,9 +259,10 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
     assert set(shapes) == {
         *simple_required,
         "add_import_row",
+        "assign_import_row_switch",
     }
     for action_name, required_fields in simple_required.items():
-        assert shapes[action_name] == {
+        expected_shape = {
             "fixed_fields": {
                 "contract": ACTION_CONTRACT,
                 "action": action_name,
@@ -266,6 +270,22 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
             "required_fields": required_fields,
             "optional_fields": [],
         }
+        if action_name in {"set_import_option", "clear_import_option"}:
+            expected_shape.update(
+                {
+                    "allowed_names": [
+                        "auto_add_to_source_control",
+                        *(
+                            ["auto_check_out_to_source_control"]
+                            if version in {"2023.1", "2024.1", "2025.1"}
+                            else []
+                        ),
+                    ],
+                    "value_type": "boolean",
+                    "import_operation_uses": "set_import_operation",
+                }
+            )
+        assert shapes[action_name] == expected_shape
     row_optional = [
         "audio_file",
         "audio_file_base64",
@@ -293,19 +313,20 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
             "contract": ACTION_CONTRACT,
             "action": "add_import_row",
         },
-        "required_fields": ["object_path", "assignment"],
+        "required_fields": ["object_path"],
         **row_extra,
-        "assignment_contract": {
-            "required": True,
-            "normal_forms": [
-                {"mode": "none", "additional_fields": False},
-                {
-                    "mode": "switch",
-                    "required_fields": ["value"],
-                    "additional_fields": False,
-                },
-            ],
-            "one_intent_per_row": True,
+    }
+    assert shapes["assign_import_row_switch"] == {
+        "fixed_fields": {
+            "contract": ACTION_CONTRACT,
+            "action": "assign_import_row_switch",
+        },
+        "required_fields": ["import_handle", "switch"],
+        "optional_fields": [],
+        "switch_assignment_contract": {
+            "bind_handle_from": "prior add_import_row action response",
+            "requires_exact_user_value": True,
+            "additional_fields": False,
         },
     }
     assert "add_import_row_without_switch_assignment" not in shapes
@@ -313,14 +334,16 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
     assert contract["flat_import_row_discipline"] == {
         "initial_row_action": "add_import_row",
         "one_initial_action_per_row": True,
-        "assignment_intent": {
-            "required_on_every_row": True,
-            "ordinary_row": {"mode": "none"},
-            "switch_assigned_row": {"mode": "switch", "value": "<exact-value>"},
+        "switch_assignment": {
+            "ordinary_row_action": None,
+            "when_user_requested": "assign_import_row_switch",
+            "requires_gateway_import_handle": True,
         },
         "never_guess_assignment_intent": True,
         "include_every_known_field_in_one_action": True,
-        "metadata_dependency_activation": "gateway_owned_do_not_submit",
+        "metadata_dependency_activation": (
+            "agent_selects_exact_token_gateway_validates_dependencies"
+        ),
     }
     assert contract["registry_fragments"]["supported_row_fields"] == [
         "audio_file",
@@ -346,24 +369,21 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
     assert contract["planning_discipline"] == {
         "dynamic_metadata": {
             "fields": ["properties", "references"],
-            "query_granularity": "one_successful_command_per_object_type",
-            "all_required_tokens_share_that_result": True,
-            "split_required_tokens_across_queries": False,
-            "action_fields_source": "explicit_user_request_only",
+            "discovery_owner": "agent_metadata_discover",
+            "validation_owner": "gateway_draft_check",
+            "agent_metadata_command_required": (
+                "when_token_is_not_already_exact_live_evidence"
+            ),
+            "action_fields_source": "explicit_user_intent_plus_exact_live_tokens",
             "unrequested_dependency_candidates": (
                 "validation_only_do_not_copy_into_action"
             ),
-            "complete_before": (
-                "first-draft-apply-using-properties-or-references"
-            ),
-            "schema_and_metadata_may_swap": True,
-            "draft_start_may_precede": True,
-            "successful_result_survives_metadata_independent_actions": True,
-            "repeat_successful_query": False,
+            "validated_at": "draft-check_and_preview",
+            "preview_revalidates": True,
         },
         "import_operation": {
             "source": "registry_fragments.request_options.import_operation",
-            "action": "set_import_option",
+            "action": "set_import_operation",
             "gateway_default": "createNew",
             "default_is_materialized_at": "draft-start",
             "action_required_only_for": ["useExisting", "replaceExisting"],
@@ -408,10 +428,10 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
 
 
 @pytest.mark.parametrize("version", ("2022.1", "2025.1"))
-def test_audio_import_exposes_one_row_action_with_explicit_assignment_intent(
+def test_audio_import_exposes_one_row_action_and_one_handle_bound_assignment_action(
     version: str,
 ) -> None:
-    """Every row carries one explicit assignment intent in its initial action."""
+    """Only explicit Switch assignment needs a second handle-bound action."""
 
     contract = operation_composer_contract("audio.import", version)
 
@@ -423,26 +443,26 @@ def test_audio_import_exposes_one_row_action_with_explicit_assignment_intent(
     ]
     assert row_actions == ["add_import_row"]
     row = contract["action_shapes"]["add_import_row"]
-    assert row["required_fields"] == ["object_path", "assignment"]
+    assert row["required_fields"] == ["object_path"]
     assert "assignment" not in row["optional_fields"]
     assert "switch_assignment" not in row["optional_fields"]
     assert "add_switch_assigned_import_row" not in contract["action_shapes"]
-    assert contract["action_shapes"]["set_import_row_field"]["required_fields"] == [
-        "import_handle",
-        "name",
-        "value",
+    assert contract["action_shapes"]["assign_import_row_switch"]["required_fields"] == [
+        "import_handle", "switch"
     ]
     assert contract["flat_import_row_discipline"] == {
         "initial_row_action": "add_import_row",
         "one_initial_action_per_row": True,
-        "assignment_intent": {
-            "required_on_every_row": True,
-            "ordinary_row": {"mode": "none"},
-            "switch_assigned_row": {"mode": "switch", "value": "<exact-value>"},
+        "switch_assignment": {
+            "ordinary_row_action": None,
+            "when_user_requested": "assign_import_row_switch",
+            "requires_gateway_import_handle": True,
         },
         "never_guess_assignment_intent": True,
         "include_every_known_field_in_one_action": True,
-        "metadata_dependency_activation": "gateway_owned_do_not_submit",
+        "metadata_dependency_activation": (
+            "agent_selects_exact_token_gateway_validates_dependencies"
+        ),
     }
 
 
@@ -453,10 +473,12 @@ def test_audio_import_draft_start_places_assignment_rule_on_the_row_action(
 
     assert code == 0
     assert started["draft"]["action_guidance"]["switch_assignment"] == {
-        "action": "add_import_row",
-        "required_on_every_row": True,
-        "ordinary_row": ["--assignment", "none"],
-        "when_user_requested": ["--assignment", "switch", "<exact-value>"],
+        "action": "assign_import_row_switch",
+        "ordinary_row": "no_assignment_action",
+        "when_user_requested": [
+            "--import-handle", "<created-import-handle>", "--switch", "<exact-value>"
+        ],
+        "handle_source": "/draft/action_result/created_handles/0",
         "guessing_allowed": False,
     }
 
@@ -568,7 +590,7 @@ def test_import_row_rejects_invalid_assignment_intent_atomically(
     assignment: dict[str, Any] | None,
 ) -> None:
     contract = operation_composer_contract("audio.import", "2022.1")
-    assert "assignment" in contract["action_shapes"]["add_import_row"]["required_fields"]
+    assert "assignment" not in contract["action_shapes"]["add_import_row"]["required_fields"]
     assert "add_switch_assigned_import_row" not in contract["action_shapes"]
     _code, started = _execute(tmp_path, "draft-start", "audio.import")
     store = OperationDraftStore(tmp_path / "state")
@@ -646,7 +668,7 @@ def test_removed_assigned_row_action_is_not_a_hidden_normal_entry(
     assert record_path.read_bytes() == before
 
 
-def test_audio_import_normal_typed_argv_preserves_host_paths_and_assignment(
+def test_audio_import_normal_typed_argv_preserves_host_paths_and_explicit_assignment(
     tmp_path: Path,
 ) -> None:
     source_path = tmp_path / "音频 Source" / "Weather" / "Snow One.wav"
@@ -672,33 +694,39 @@ def test_audio_import_normal_typed_argv_preserves_host_paths_and_assignment(
         "--facts",
         "--action",
         "add_import_row",
-        "--value",
-        "object_path",
-        "string",
+        "--object-path",
         object_path,
-        "--value",
-        "audio_file",
-        "string",
+        "--audio-file",
         source,
-        "--value",
-        "object_type",
-        "string",
+        "--object-type",
         "Sound SFX",
-        "--value",
-        "import_language",
-        "string",
+        "--import-language",
         "SFX",
         "--event",
-        "event",
         "Play",
         event_path,
-        "--assignment",
-        "switch",
-        "Snow",
     )
 
     assert code == 0
     fact = result["draft"]["current_facts"][0]
+    assign_code, assigned = _execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "2",
+        "--facts",
+        "--action",
+        "assign_import_row_switch",
+        "--import-handle",
+        fact["handle"],
+        "--switch",
+        "Snow",
+    )
+    assert assign_code == 0
+    fact = assigned["draft"]["current_facts"][0]
     assert fact == {
         "handle": fact["handle"],
         "audio_file": source,
@@ -710,7 +738,93 @@ def test_audio_import_normal_typed_argv_preserves_host_paths_and_assignment(
     }
 
 
-def test_audio_import_assignment_flag_accepts_one_explicit_switch_intent(
+def test_audio_import_row_uses_direct_flags_without_negative_assignment(
+    tmp_path: Path,
+) -> None:
+    source_path = tmp_path / "音频 Source" / "Rifle.wav"
+    source_path.parent.mkdir(parents=True)
+    source_path.write_bytes(b"RIFF\x04\x00\x00\x00WAVE")
+    object_path = r"\Actor-Mixer Hierarchy\Default Work Unit\Rifle"
+    _code, started = _execute(tmp_path, "draft-start", "audio.import")
+
+    code, result = _execute(
+        tmp_path,
+        "draft-apply",
+        started["draft"]["draft_id"],
+        "--task-authority",
+        started["task_authority"],
+        "--expected-revision",
+        "1",
+        "--facts",
+        "--action",
+        "add_import_row",
+        "--object-path",
+        object_path,
+        "--audio-file",
+        str(source_path),
+        "--object-type",
+        "Sound SFX",
+        "--import-language",
+        "SFX",
+    )
+
+    assert code == 0
+    fact = result["draft"]["current_facts"][0]
+    assert fact == {
+        "handle": fact["handle"],
+        "audio_file": str(source_path),
+        "import_language": "SFX",
+        "object_path": object_path,
+        "object_type": "Sound SFX",
+    }
+
+
+def test_audio_import_switch_assignment_is_a_handle_bound_follow_up_action(
+    tmp_path: Path,
+) -> None:
+    object_path = r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps\Snow"
+    _code, started = _execute(tmp_path, "draft-start", "audio.import")
+    row_code, rowed = _execute(
+        tmp_path,
+        "draft-apply",
+        started["draft"]["draft_id"],
+        "--task-authority",
+        started["task_authority"],
+        "--expected-revision",
+        "1",
+        "--facts",
+        "--action",
+        "add_import_row",
+        "--object-path",
+        object_path,
+        "--object-type",
+        "RandomSequenceContainer",
+    )
+    assert row_code == 0
+    import_handle = rowed["draft"]["current_facts"][0]["handle"]
+
+    assignment_code, assigned = _execute(
+        tmp_path,
+        "draft-apply",
+        started["draft"]["draft_id"],
+        "--task-authority",
+        started["task_authority"],
+        "--expected-revision",
+        "2",
+        "--facts",
+        "--action",
+        "assign_import_row_switch",
+        "--import-handle",
+        import_handle,
+        "--switch",
+        "Snow",
+    )
+
+    assert assignment_code == 0
+    assert assigned["draft"]["current_facts"][0]["switch_assignment"] == "Snow"
+
+
+def test_audio_import_operation_uses_one_mode_flag_instead_of_name_value_meta_fields(
     tmp_path: Path,
 ) -> None:
     _code, started = _execute(tmp_path, "draft-start", "audio.import")
@@ -725,17 +839,273 @@ def test_audio_import_assignment_flag_accepts_one_explicit_switch_intent(
         "1",
         "--facts",
         "--action",
+        "set_import_operation",
+        "--mode",
+        "useExisting",
+    )
+
+    assert code == 0
+    assert result["draft"]["revision"] == 2
+
+
+def test_audio_import_normal_schema_discloses_operation_specific_action_flags(
+    tmp_path: Path,
+) -> None:
+    code, payload = _execute(
+        tmp_path,
+        "--version",
+        "2022.1",
+        "operation-schema",
+        "audio.import",
+    )
+
+    assert code == 0
+    apply = payload["composer"]["apply"]
+    encoded = json.dumps(apply, ensure_ascii=False)
+    assert "--value" not in encoded
+    assert '"FIELD"' not in encoded
+    assert "--assignment" not in encoded
+    assert apply["action_argv"]["set_import_operation"] == ["--mode", "MODE"]
+    assert payload["composer"]["action_shapes"]["set_import_option"][
+        "allowed_names"
+    ] == ["auto_add_to_source_control"]
+    assert payload["composer"]["action_shapes"]["set_import_option"][
+        "import_operation_uses"
+    ] == "set_import_operation"
+    assert apply["action_argv"]["assign_import_row_switch"] == [
+        "--import-handle", "HANDLE", "--switch", "VALUE"
+    ]
+    assert apply["action_argv"]["add_import_row"][0:4] == [
+        "--object-path", "PATH", "--object-type", "TYPE"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("arguments", "expected"),
+    [
+        (
+            ("--action", "set_import_default", "--default", "import_language", "string", "SFX"),
+            {
+                "contract": ACTION_CONTRACT,
+                "action": "set_import_default",
+                "name": "import_language",
+                "value": "SFX",
+            },
+        ),
+        (
+            (
+                "--action", "set_import_row_field", "--import-handle",
+                "odh1-111111111111111111111111", "--field", "notes", "string", "Ready",
+            ),
+            {
+                "contract": ACTION_CONTRACT,
+                "action": "set_import_row_field",
+                "import_handle": "odh1-111111111111111111111111",
+                "name": "notes",
+                "value": "Ready",
+            },
+        ),
+    ],
+)
+def test_audio_import_action_specific_argv_avoids_name_value_meta_fields(
+    arguments: tuple[str, ...],
+    expected: Mapping[str, Any],
+) -> None:
+    assert parse_typed_action_cli_arguments(arguments) == expected
+
+
+@pytest.mark.parametrize(
+    "action",
+    (
+        {
+            "contract": ACTION_CONTRACT,
+            "action": "add_import_row",
+            "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+            "object_type": "Sound SFX",
+            "import_location": {"kind": "id", "value": 42},
+            "event": {"path": r"\Events\Default Work Unit\Play_Rain"},
+            "properties": [],
+            "references": [],
+        },
+        {
+            "contract": ACTION_CONTRACT,
+            "action": "set_import_default",
+            "name": "event",
+            "value": {"path": r"\Events\Default Work Unit\Play_Rain"},
+        },
+        {
+            "contract": ACTION_CONTRACT,
+            "action": "set_import_default",
+            "name": "properties",
+            "value": [],
+        },
+        {
+            "contract": ACTION_CONTRACT,
+            "action": "set_import_default",
+            "name": "references",
+            "value": [],
+        },
+        {
+            "contract": ACTION_CONTRACT,
+            "action": "set_import_default",
+            "name": "properties",
+            "value": [
+                {"name": "Volume", "value": -3.0},
+                {"name": "IsLoopingEnabled", "value": True},
+            ],
+        },
+        {
+            "contract": ACTION_CONTRACT,
+            "action": "set_import_default",
+            "name": "references",
+            "value": [
+                {
+                    "name": "OutputBus",
+                    "target": {
+                        "kind": "scoped-name",
+                        "type": "AudioDevice",
+                        "name": "Device",
+                        "parent": {"kind": "id", "value": 7},
+                    },
+                }
+            ],
+        },
+        {
+            "contract": ACTION_CONTRACT,
+            "action": "set_import_row_field",
+            "import_handle": "odh1-" + "1" * 24,
+            "name": "import_location",
+            "value": {
+                "kind": "direct-child",
+                "type": "ActorMixer",
+                "parent": {"kind": "id", "value": 12},
+            },
+        },
+        {
+            "contract": ACTION_CONTRACT,
+            "action": "set_import_row_field",
+            "import_handle": "odh1-" + "1" * 24,
+            "name": "event",
+            "value": {"path": r"\Events\Default Work Unit\Play_Rain"},
+        },
+        {
+            "contract": ACTION_CONTRACT,
+            "action": "set_import_row_field",
+            "import_handle": "odh1-" + "1" * 24,
+            "name": "properties",
+            "value": [],
+        },
+        {
+            "contract": ACTION_CONTRACT,
+            "action": "set_import_row_field",
+            "import_handle": "odh1-" + "1" * 24,
+            "name": "references",
+            "value": [],
+        },
+    ),
+)
+def test_audio_import_structured_registry_values_round_trip_without_json(
+    action: Mapping[str, Any],
+) -> None:
+    argv = typed_action_cli_arguments(action)
+
+    assert "--value" not in argv
+    assert "--null" not in argv
+    assert parse_typed_action_cli_arguments(argv) == action
+
+
+@pytest.mark.parametrize(
+    "legacy_argv",
+    (
+        ("--action", "add_import_row", "--value", "object_path", "string", "x"),
+        ("--action", "add_import_row", "--null", "notes"),
+        ("--action", "add_import_row", "--assignment", "none"),
+        ("--action", "add_import_row", "--selector", "import_location", "path", r"\A"),
+        ("--action", "add_import_row", "--property", "properties", "Volume", "number", "-3"),
+        ("--action", "add_import_row", "--reference", "references", "OutputBus", "path", r"\B"),
+        ("--action", "add_import_row", "--event", "event", "Play", r"\Events\Play"),
+    ),
+)
+def test_normal_parser_rejects_frozen_generic_fact_grammar(
+    legacy_argv: tuple[str, ...],
+) -> None:
+    with pytest.raises(OperationComposerError):
+        parse_typed_action_cli_arguments(legacy_argv)
+
+
+@pytest.mark.parametrize(
+    "selector",
+    (
+        {"kind": "id", "value": "{11111111-1111-1111-1111-111111111111}"},
+        {"kind": "id", "value": 42},
+        {"kind": "path", "value": r"\Actor-Mixer Hierarchy\Default Work Unit"},
+        {"kind": "exact-type-name", "type": "ActorMixer", "name": "Rain"},
+        {
+            "kind": "direct-child",
+            "type": "ActorMixer",
+            "parent": {"kind": "id", "value": 7},
+        },
+        {
+            "kind": "scoped-name",
+            "type": "ActorMixer",
+            "name": "Rain",
+            "parent": {"kind": "id", "value": "{22222222-2222-2222-2222-222222222222}"},
+        },
+    ),
+)
+def test_audio_import_selector_kinds_preserve_string_and_integer_ids(
+    selector: Mapping[str, Any],
+) -> None:
+    action = {
+        "contract": ACTION_CONTRACT,
+        "action": "set_import_default",
+        "name": "import_location",
+        "value": selector,
+    }
+
+    argv = typed_action_cli_arguments(action)
+
+    assert parse_typed_action_cli_arguments(argv) == action
+
+
+def test_audio_import_switch_assignment_uses_the_created_row_handle(
+    tmp_path: Path,
+) -> None:
+    _code, started = _execute(tmp_path, "draft-start", "audio.import")
+
+    code, added = _execute(
+        tmp_path,
+        "draft-apply",
+        started["draft"]["draft_id"],
+        "--task-authority",
+        started["task_authority"],
+        "--expected-revision",
+        "1",
+        "--facts",
+        "--action",
         "add_import_row",
-        "--value",
-        "object_path",
-        "string",
+        "--object-path",
         r"\Actor-Mixer Hierarchy\Default Work Unit\Snow",
-        "--value",
-        "object_type",
-        "string",
+        "--object-type",
         "RandomSequenceContainer",
-        "--assignment",
-        "switch",
+    )
+    assert code == 0
+    handle = added["draft"]["current_facts"][0]["handle"]
+
+    code, result = _execute(
+        tmp_path,
+        "draft-apply",
+        started["draft"]["draft_id"],
+        "--task-authority",
+        started["task_authority"],
+        "--expected-revision",
+        "2",
+        "--facts",
+        "--action",
+        "assign_import_row_switch",
+        "--import-handle",
+        handle,
+        "--switch",
         "Snow",
     )
 
@@ -750,7 +1120,7 @@ def test_audio_import_row_actions_disclose_complete_structure_and_media_facts(
     contract = operation_composer_contract("audio.import", version)
 
     row = contract["action_shapes"]["add_import_row"]
-    assert row["required_fields"] == ["object_path", "assignment"]
+    assert row["required_fields"] == ["object_path"]
     assert "assignment" not in row["optional_fields"]
     assert "switch_assignment" not in row["optional_fields"]
     assert row["conditional_required_fields"] == [

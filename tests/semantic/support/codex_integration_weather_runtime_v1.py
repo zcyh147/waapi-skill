@@ -353,16 +353,19 @@ def prepare_weather_workflow(
             required_tokens=sound_required_tokens,
         )
     )
-    action_metadata, action_projection = _discover(
+    _action_metadata, action_projection = _discover(
         direct,
         object_type="Action",
         queries=ACTION_METADATA_QUERIES,
         required_tokens=ACTION_TOKENS,
     )
-    # The first transaction's live Sound discovery already proves the exact
-    # Volume token.  Reuse that evidence for the hidden plan record instead of
-    # teaching the evaluated Agent to repeat the same discovery before RTPC.
-    rtpc_metadata = sound_metadata
+    rtpc_projection = tuple(
+        project_required_metadata_tokens(
+            sound_metadata,
+            object_type="Sound",
+            required_tokens=("Volume",),
+        )
+    )
 
     import_request = _weather_import_request(
         version,
@@ -393,7 +396,13 @@ def prepare_weather_workflow(
                 action_projection,
                 "object_set_v1",
             ),
-            None,
+            (
+                "Sound",
+                RTPC_METADATA_QUERIES,
+                ("Volume",),
+                rtpc_projection,
+                "object_set_rtpc_v1",
+            ),
         ),
         gateway_derived_reference_activations=(
             (),
@@ -1134,95 +1143,38 @@ def _build_metadata_workflow_protocol(
         raise IntegrationWeatherRuntimeError(
             "weather derived-activation/request transaction count differs"
         )
-    metadata_reuse_by_tx: dict[
-        str,
-        tuple[
-            str,
-            str,
-            tuple[str, ...],
-            tuple[MetadataTokenProjection, ...],
-            str,
-        ],
-    ] = {}
-    for index, row in enumerate(metadata):
-        if row is not None:
-            continue
-        request = requests[index]
-        arguments = request.get("arguments")
-        property_token = (
-            arguments.get("property")
-            if isinstance(arguments, Mapping)
-            else None
-        )
-        prior_sources = tuple(
-            (source_index, prior)
-            for source_index, prior in enumerate(metadata[:index])
-            if prior is not None
-            and isinstance(property_token, str)
-            and property_token.casefold()
-            in {str(token).casefold() for token in prior[2]}
-        )
-        if (
-            index != 2
-            or request.get("operation") != "object.setRTPC"
-            or not isinstance(property_token, str)
-            or len(prior_sources) != 1
-        ):
-            raise IntegrationWeatherRuntimeError(
-                "weather may omit discovery only for tx03 object.setRTPC "
-                "when its exact property token was proved by prior live metadata"
-            )
-        if gateway_derived_reference_activations[index]:
-            raise IntegrationWeatherRuntimeError(
-                "weather metadata-reuse transaction cannot carry "
-                "gateway-derived reference activations"
-            )
-        source_index, source = prior_sources[0]
-        source_object_type, _queries, _tokens, source_projection, _equivalence = (
-            source
-        )
-        reused_projection = tuple(
-            item
-            for item in source_projection
-            if item.name.casefold() == property_token.casefold()
-        )
-        if len(reused_projection) != 1:
-            raise IntegrationWeatherRuntimeError(
-                "weather RTPC property lacks one exact prior live metadata projection"
-            )
-        metadata_reuse_by_tx[f"tx{index + 1:02d}"] = (
-            f"tx{source_index + 1:02d}.metadata",
-            source_object_type,
-            (property_token,),
-            reused_projection,
-            "object_set_rtpc_v1",
+    if (
+        any(row is None for row in metadata)
+        or requests[0].get("operation") != "audio.import"
+        or requests[1].get("operation") != "object.set"
+    ):
+        raise IntegrationWeatherRuntimeError(
+            "weather transactions require schema-first token discovery and "
+            "Gateway-owned draft-check validation"
         )
     tx01_metadata = metadata[0]
-    if tx01_metadata is None or requests[0].get("operation") != "audio.import":
-        raise IntegrationWeatherRuntimeError(
-            "weather tx01 must be one metadata-bound audio.import transaction"
-        )
-    (
-        tx01_object_type,
-        _tx01_queries,
-        tx01_tokens,
-        tx01_projection,
-        _tx01_equivalence,
-    ) = tx01_metadata
+    tx02_metadata = metadata[1]
+    assert tx01_metadata is not None and tx02_metadata is not None
     composer_tx01 = build_audio_import_composer_transaction_steps(
         requests[0],
         label="tx01",
         metadata_binding=DraftActionMetadataBinding(
             step="tx01.metadata",
-            object_type=tx01_object_type,
-            required_tokens=tuple(tx01_tokens),
-            expected_projection=tuple(tx01_projection),
+            object_type=tx01_metadata[0],
+            required_tokens=tuple(tx01_metadata[2]),
+            expected_projection=tuple(tx01_metadata[3]),
         ),
     )
     legacy_base = build_transaction_protocol(requests)
     composer_tx02 = build_object_set_composer_transaction_steps(
         requests[1],
         label="tx02",
+        metadata_binding=DraftActionMetadataBinding(
+            step="tx02.metadata",
+            object_type=tx02_metadata[0],
+            required_tokens=tuple(tx02_metadata[2]),
+            expected_projection=tuple(tx02_metadata[3]),
+        ),
     )
     composer_by_tx = {
         "tx01": composer_tx01,
@@ -1282,7 +1234,7 @@ def _build_metadata_workflow_protocol(
             )
             transaction_index = int(prefix[2:]) - 1
             operation = requests[transaction_index].get("operation")
-            if operation in {"object.create", "object.set"}:
+            if operation in {"object.create", "object.set", "audio.import"}:
                 steps.extend((step, metadata_step))
             else:
                 steps.extend((metadata_step, step))
@@ -1326,27 +1278,8 @@ def _build_metadata_workflow_protocol(
                     ),
                 )
             else:
-                (
-                    metadata_step,
-                    object_type,
-                    tokens,
-                    projection,
-                    equivalence,
-                ) = metadata_reuse_by_tx[prefix]
-                step = replace(
-                    step,
-                    arguments=(
-                        "--apply",
-                        "--request-json",
-                        MetadataBoundJsonArgument(
-                            expected=step.arguments[2].expected,
-                            metadata_step=metadata_step,
-                            object_type=object_type,
-                            required_tokens=tokens,
-                            expected_required_token_projection=projection,
-                            equivalence=equivalence,
-                        ),
-                    ),
+                raise IntegrationWeatherRuntimeError(
+                    "weather legacy preview is missing its explicit metadata step"
                 )
         steps.append(step)
     prefixes = tuple(
@@ -1366,7 +1299,7 @@ def _build_metadata_workflow_protocol(
         tuple(steps),
         prefixes,
         commutative_read_only_step_groups=(
-            ("tx01.metadata", "tx01.operation-schema"),
+            ("tx01.operation-schema", "tx01.metadata"),
             ("tx02.operation-schema", "tx02.metadata"),
         ),
     )

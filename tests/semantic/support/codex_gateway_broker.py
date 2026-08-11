@@ -863,6 +863,7 @@ _DRAFT_ACTION_HANDLE_FIELDS_BY_OPERATION = {
         "remove_import": "owner_handle",
     },
     "audio.import": {
+        "set_import_operation": None,
         "set_import_option": None,
         "clear_import_option": None,
         "set_import_default": None,
@@ -870,6 +871,7 @@ _DRAFT_ACTION_HANDLE_FIELDS_BY_OPERATION = {
         "add_import_row": None,
         "add_import_row_without_switch_assignment": None,
         "add_switch_assigned_import_row": None,
+        "assign_import_row_switch": "import_handle",
         "set_import_row_field": "import_handle",
         "clear_import_row_field": "import_handle",
         "remove_import_row": "import_handle",
@@ -1081,14 +1083,24 @@ class DraftActionJsonArgument:
                 "DraftActionJsonArgument must bind exactly the handle required by its action"
             )
         if self.metadata_binding is not None:
-            if self.operation != "audio.import" or not isinstance(
+            if self.operation not in {"audio.import", "object.set"} or not isinstance(
                 self.metadata_binding, DraftActionMetadataBinding
             ):
                 raise ValueError(
-                    "Draft action metadata binding is valid only for audio.import"
+                    "Draft action metadata binding requires a reviewed Composer operation"
                 )
             dynamic_tokens: set[str] = set()
-            if normalized["action"] in {
+            if self.operation == "object.set" and normalized["action"] == "add_target":
+                for field in ("properties", "references"):
+                    rows = normalized.get(field, [])
+                    if isinstance(rows, list):
+                        dynamic_tokens.update(
+                            str(row.get("name"))
+                            for row in rows
+                            if isinstance(row, Mapping)
+                            and isinstance(row.get("name"), str)
+                        )
+            elif normalized["action"] in {
                 "add_import_row",
                 "add_import_row_without_switch_assignment",
                 "add_switch_assigned_import_row",

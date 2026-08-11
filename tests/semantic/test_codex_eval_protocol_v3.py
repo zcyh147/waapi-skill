@@ -132,7 +132,7 @@ def test_audio_import_composer_emits_ordered_typed_actions_without_full_json() -
     ]
     assert action_arguments[3].metadata_binding == metadata
     assert action_arguments[4].metadata_binding == metadata
-    assert action_arguments[4].expected["assignment"] == {"mode": "none"}
+    assert "assignment" not in action_arguments[4].expected
     assert next(step for step in steps if step.name == "tx01.preview").subcommand == (
         "preview-from-draft"
     )
@@ -142,7 +142,7 @@ def test_audio_import_composer_emits_ordered_typed_actions_without_full_json() -
     )
 
 
-def test_audio_import_each_row_carries_one_explicit_assignment_intent() -> None:
+def test_audio_import_switch_assignment_is_a_handle_bound_follow_up_action() -> None:
     request = _audio_import_request()
     switch_assignment = "Snow"
     request["arguments"]["imports"][0]["switch_assignment"] = switch_assignment  # type: ignore[index]
@@ -156,13 +156,22 @@ def test_audio_import_each_row_carries_one_explicit_assignment_intent() -> None:
         if step.subcommand == "draft-apply"
     ]
 
-    row = action_arguments[-1]
+    row = action_arguments[-2]
     assert row.expected["action"] == "add_import_row"
-    assert row.expected["assignment"] == {
-        "mode": "switch",
-        "value": switch_assignment,
-    }
     assert row.response_bindings == ()
+    assignment = action_arguments[-1]
+    assert assignment.expected == {
+        "contract": "waapi-skill.operation-draft-action/v1",
+        "action": "assign_import_row_switch",
+        "switch": switch_assignment,
+    }
+    assert assignment.response_bindings == (
+        DraftActionResponseBinding(
+            pointer="/import_handle",
+            step=f"tx01.action.{len(action_arguments) - 1:03d}",
+            response_pointer="/draft/action_result/created_handles/0",
+        ),
+    )
 
     request["arguments"]["imports"][0].pop("switch_assignment")  # type: ignore[index]
     ordinary_row = [
@@ -174,7 +183,7 @@ def test_audio_import_each_row_carries_one_explicit_assignment_intent() -> None:
         if step.subcommand == "draft-apply"
     ][-1]
     assert ordinary_row.expected["action"] == "add_import_row"
-    assert ordinary_row.expected["assignment"] == {"mode": "none"}
+    assert "assignment" not in ordinary_row.expected
     assert ordinary_row.response_bindings == ()
 
 
@@ -705,10 +714,9 @@ def test_metadata_transaction_protocol_selects_closed_audio_import_equivalence()
     ]
 
     assert protocol.turn_prefix_counts == (7, 11)
-    assert tuple(step.subcommand for step in protocol.steps[:3]) == (
-        "metadata",
+    assert tuple(step.subcommand for step in protocol.steps[:2]) == (
         "operation-schema",
-        "draft-start",
+        "metadata",
     )
     assert [argument.expected["action"] for argument in action_arguments] == [
         "set_import_default",
@@ -720,11 +728,11 @@ def test_metadata_transaction_protocol_selects_closed_audio_import_equivalence()
         for argument in action_arguments
     )
     assert action_arguments[0].metadata_binding is not None
-    assert action_arguments[0].metadata_binding.step == "metadata.discover"
-    assert action_arguments[0].metadata_binding.required_tokens == (
-        "IsLoopingEnabled",
-    )
     assert action_arguments[1].metadata_binding is None
+    assert sum(step.subcommand == "metadata" for step in protocol.steps) == 1
+    assert protocol.commutative_read_only_step_groups == (
+        ("tx01.operation-schema", "metadata.discover"),
+    )
     assert "preview" not in {
         step.subcommand for step in protocol.steps
     }

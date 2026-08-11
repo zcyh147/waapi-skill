@@ -1992,11 +1992,6 @@ def test_audio_import_typed_action_treats_named_field_order_as_semantic(
         "draft": {"draft_id": draft_id, "revision": 1},
     }
 
-    assignment_arguments = (
-        ("--assignment", "switch", "Rain")
-        if switch_assigned
-        else ("--assignment", "none")
-    )
     fixed = (
         "draft-apply",
         draft_id,
@@ -2008,43 +2003,30 @@ def test_audio_import_typed_action_treats_named_field_order_as_semantic(
         "--facts",
         "--action",
         "add_import_row",
-        "--value",
-        "object_path",
-        "string",
+        "--object-path",
         r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\Rain",
-        "--value",
-        "object_type",
-        "string",
+        "--object-type",
         "Sound SFX",
-        "--value",
-        "audio_file",
-        "string",
+        "--audio-file",
         native_absolute_test_path("inputs", "rain.wav"),
-        "--value",
-        "import_language",
-        "string",
+        "--import-language",
         "SFX",
-        *assignment_arguments,
     )
     reordered_named_fields = (
         *fixed,
         "--property",
-        "properties",
         "Volume",
         "number",
         "-4",
         "--property",
-        "properties",
         "IsLoopingEnabled",
         "boolean",
         "true",
         "--reference",
-        "references",
         "UserAuxSend0",
         "path",
         r"\Master-Mixer Hierarchy\Default Work Unit\Weather Aux",
         "--reference",
-        "references",
         "OutputBus",
         "path",
         r"\Master-Mixer Hierarchy\Default Work Unit\Weather",
@@ -6906,7 +6888,7 @@ def test_metadata_query_slots_reject_a_noncanonical_configured_limit(
         )
 
 
-def test_weather_limit_two_metadata_step_crosses_broker_validation(
+def test_weather_agent_metadata_step_crosses_broker_validation(
     tmp_path: Path,
 ) -> None:
     from .support.codex_integration_weather_runtime_v1 import (  # noqa: PLC0415
@@ -6992,9 +6974,13 @@ def test_weather_limit_two_metadata_step_crosses_broker_validation(
             ),
         ),
     )
-    metadata_step = protocol.steps[0]
-    assert metadata_step.name == "tx01.metadata"
-    assert metadata_step.arguments[-2:] == ("--limit", "2")
+    assert [
+        step.name for step in protocol.steps if step.subcommand == "metadata"
+    ] == ["tx01.metadata", "tx02.metadata", "tx03.metadata"]
+    metadata_step = next(
+        step for step in protocol.steps if step.name == "tx02.metadata"
+    )
+    assert metadata_step.arguments[-2:] == ("--limit", "8")
     broker = CodexGatewayBroker(
         skill_source=tmp_path / "waapi-skill",
         expected_steps=protocol.steps,
@@ -7003,14 +6989,14 @@ def test_weather_limit_two_metadata_step_crosses_broker_validation(
         "metadata",
         "discover",
         "--object-type",
-        "Sound",
+        "Action",
         *tuple(
             item
-            for query in SOUND_METADATA_QUERIES
+            for query in ACTION_METADATA_QUERIES
             for item in ("--query", query)
         ),
         "--limit",
-        "2",
+        "8",
     )
 
     semantic_hash, execution_arguments = broker._validate_step(  # noqa: SLF001

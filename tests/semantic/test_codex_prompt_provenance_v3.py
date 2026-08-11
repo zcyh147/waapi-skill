@@ -2025,12 +2025,11 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
         and step.arguments[-1].metadata_binding is not None
     ]
     assert len(metadata_arguments) == 2
-    assert all(item.operation == "audio.import" for item in metadata_arguments)
     assert all(
-        item.metadata_binding.required_tokens
-        == ("IsLoopingEnabled", "OverrideOutput", "OutputBus")
-        for item in metadata_arguments
+        argument.metadata_binding.step == "metadata.discover"
+        for argument in metadata_arguments
     )
+    assert sum(step.subcommand == "metadata" for step in protocol.steps) == 1
     serialized = serialize_protocol(protocol)
     serialized_metadata_rows = [
         step["arguments"][-1]
@@ -2039,6 +2038,10 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
         and step["arguments"][-1].get("metadata_binding") is not None
     ]
     assert len(serialized_metadata_rows) == 2
+    assert all(
+        row["metadata_binding"]["step"] == "metadata.discover"
+        for row in serialized_metadata_rows
+    )
     serialized_row_step = next(
         step
         for step in serialized["steps"]
@@ -2049,8 +2052,24 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
     )
     serialized_row = serialized_row_step["arguments"][-1]["value"]
     assert "switch_assignment" not in serialized_row
-    assert serialized_row["assignment"] == {"mode": "switch", "value": "Rain"}
+    assert "assignment" not in serialized_row
     assert serialized_row_step["arguments"][-1]["response_bindings"] == []
+    assignment_step = next(
+        step
+        for step in serialized["steps"]
+        if step["subcommand"] == "draft-apply"
+        and step["arguments"][-1].get("kind") == "draft_action_json"
+        and step["arguments"][-1]["value"].get("action")
+        == "assign_import_row_switch"
+    )
+    assert assignment_step["arguments"][-1]["value"]["switch"] == "Rain"
+    assert assignment_step["arguments"][-1]["response_bindings"] == [
+        {
+            "pointer": "/import_handle",
+            "step": serialized_row_step["name"],
+            "response_pointer": "/draft/action_result/created_handles/0",
+        }
+    ]
     assert deserialize_protocol(serialized) == protocol
     gateway_authored_request = {
         **request,
@@ -2063,7 +2082,7 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
         serialized,
         gateway_authored_request["arguments"]["imports"],
     )
-    assert origins["/0/switch_assignment"].endswith("/assignment/value")
+    assert origins["/0/switch_assignment"].endswith("/value/switch")
     assert _protocol_requests(serialized, version="2022.1") == (
         ("/composer/tx01.preview", gateway_authored_request),
     )
@@ -2079,15 +2098,15 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
         protocol=protocol,
     )
     payload = json.loads(evidence.path.read_text(encoding="utf-8"))
-    metadata_row = next(
+    assignment_row = next(
         step["arguments"][-1]
         for step in payload["protocol"]["value"]["steps"]
         if step["subcommand"] == "draft-apply"
-        and step["arguments"][-1].get("metadata_binding") is not None
+        and step["arguments"][-1].get("kind") == "draft_action_json"
+        and step["arguments"][-1]["value"].get("action")
+        == "assign_import_row_switch"
     )
-    metadata_row["metadata_binding"]["expected_projection"][0]["name"] = (
-        "Tampered"
-    )
+    assignment_row["response_bindings"][0]["pointer"] = "/wrong-handle"
     payload["protocol"]["sha256"] = hashlib.sha256(
         json.dumps(
             payload["protocol"]["value"],

@@ -211,7 +211,8 @@ def _strict_action(
         try:
             facts_index = arguments.index("--facts")
             action = parse_typed_action_cli_arguments(
-                arguments[facts_index + 1 :]
+                arguments[facts_index + 1 :],
+                legacy_compatibility=True,
             )
         except (OperationComposerError, ValueError) as exc:
             raise ComposerArchiveError(
@@ -339,6 +340,107 @@ def _draft_projection(payload: Mapping[str, Any], *, command: str) -> Mapping[st
     return _mapping(payload.get("draft"), label=f"{command} Draft projection")
 
 
+def _legacy_audio_import_projections(
+    projection: Mapping[str, Any],
+) -> tuple[Mapping[str, Any], ...]:
+    """Rebuild the exact pre-operation-specific audio.import projection.
+
+    Frozen archives keep the response contract they actually received.  This
+    adapter is deliberately local to offline replay; the production Gateway
+    continues to emit only the current single normal Composer projection.
+    """
+
+    legacy_actions = [
+        "set_import_option",
+        "clear_import_option",
+        "set_import_default",
+        "clear_import_default",
+        "add_import_row",
+        "set_import_row_field",
+        "clear_import_row_field",
+        "remove_import_row",
+    ]
+    current_actions = {
+        "set_import_operation",
+        "set_import_option",
+        "clear_import_option",
+        "set_import_default",
+        "clear_import_default",
+        "add_import_row",
+        "assign_import_row_switch",
+        "set_import_row_field",
+        "clear_import_row_field",
+        "remove_import_row",
+    }
+    allowed = projection.get("allowed_actions")
+    if not isinstance(allowed, list):
+        _fail("audio.import Composer projection lacks allowed actions")
+    lifecycle = [value for value in allowed if value not in current_actions]
+    f506 = dict(projection)
+    f506["action_guidance"] = {
+        "switch_assignment": {
+            "action": "add_import_row",
+            "required_on_every_row": True,
+            "ordinary_row": ["--assignment", "none"],
+            "when_user_requested": [
+                "--assignment",
+                "switch",
+                "<exact-value>",
+            ],
+            "guessing_allowed": False,
+        }
+    }
+    f506["allowed_actions"] = [*legacy_actions, *lifecycle]
+    pre_f506 = dict(projection)
+    pre_f506["action_guidance"] = {
+        "switch_assignment": {
+            "follow_up_assignment_action_exists": False,
+            "guessing_allowed": False,
+            "omission_means": "no_switch_assignment",
+            "typed_argv_suffix": [
+                "--assignment",
+                "switch",
+                "<exact-value>",
+            ],
+            "when_user_requested": "use_add_switch_assigned_import_row",
+        }
+    }
+    pre_f506["allowed_actions"] = [
+        "set_import_option",
+        "clear_import_option",
+        "set_import_default",
+        "clear_import_default",
+        "add_switch_assigned_import_row",
+        "add_import_row_without_switch_assignment",
+        "set_import_row_field",
+        "clear_import_row_field",
+        "remove_import_row",
+        *lifecycle,
+    ]
+    return f506, pre_f506
+
+
+def _canonical_archive_action(
+    action: Mapping[str, Any],
+) -> tuple[Mapping[str, Any], str]:
+    submitted_name = action.get("action")
+    if not isinstance(submitted_name, str) or not submitted_name:
+        _fail("Composer archive action name is invalid")
+    if submitted_name not in {
+        "add_switch_assigned_import_row",
+        "add_import_row_without_switch_assignment",
+    }:
+        return action, submitted_name
+    canonical = dict(action)
+    canonical["action"] = "add_import_row"
+    if (
+        submitted_name == "add_import_row_without_switch_assignment"
+        and "assignment" not in canonical
+    ):
+        canonical["assignment"] = {"mode": "none"}
+    return canonical, submitted_name
+
+
 def _require_projection(
     draft: Mapping[str, Any],
     *,
@@ -362,9 +464,24 @@ def _require_projection(
         }
     ):
         _fail("Composer Draft response does not match its immutable binding")
-    for key, value in projection.items():
-        if draft.get(key) != value:
-            _fail(f"Composer Draft response {key!r} does not replay from its actions")
+    candidates = [projection]
+    if operation == "audio.import":
+        candidates.extend(_legacy_audio_import_projections(projection))
+    if not any(
+        all(draft.get(key) == value for key, value in candidate.items())
+        for candidate in candidates
+    ):
+        mismatched = next(
+            (
+                key
+                for key, value in projection.items()
+                if draft.get(key) != value
+            ),
+            "projection",
+        )
+        _fail(
+            f"Composer Draft response {mismatched!r} does not replay from its actions"
+        )
 
 
 def validate_operation_draft_archive(
@@ -585,11 +702,12 @@ def _validate_operation_draft_archive(
                 compact = _compact_action_projection(response_draft)
                 new_handles = compact[1]
             factory, unused_handles = _handle_factory(new_handles)
+            replay_action, submitted_action_name = _canonical_archive_action(action)
             composition, action_name = apply_composer_action(
                 operation,
                 version,
                 composition,
-                action,
+                replay_action,
                 handle_factory=factory,
             )
             if unused_handles:
@@ -616,7 +734,7 @@ def _validate_operation_draft_archive(
                 }
                 facts = projection["current_facts"]
                 if (
-                    compact_action != action_name
+                    compact_action not in {action_name, submitted_action_name}
                     or affected != expected_affected
                     or summary["target_count"] != len(facts)
                     or summary["handle_count"] != len(_handles(facts))
@@ -627,12 +745,12 @@ def _validate_operation_draft_archive(
                 {
                     "step_name": step.name,
                     "revision": revision,
-                    "action": action_name,
+                    "action": submitted_action_name,
                     "action_sha256": canonical_sha256(action),
                     "action_request": action,
                 }
             )
-            expected_audit_types.append(f"action.{action_name}")
+            expected_audit_types.append(f"action.{submitted_action_name}")
         elif step.subcommand == "draft-inspect":
             response_draft = _draft_projection(payload, command="draft-inspect")
             _require_projection(

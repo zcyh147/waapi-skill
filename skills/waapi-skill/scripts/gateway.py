@@ -3011,6 +3011,121 @@ def operation_composer_input_contract(
             "registry_source_schema_digest": fragments["source_schema_digest"],
             "inspect_with": f"operation-schema {operation}",
         }
+    audio_import_option_names = (
+        contract.get("action_shapes", {})
+        .get("set_import_option", {})
+        .get("allowed_names", [])
+    )
+    if operation == "audio.import" and (
+        not isinstance(audio_import_option_names, list)
+        or not audio_import_option_names
+        or not all(isinstance(name, str) and name for name in audio_import_option_names)
+    ):
+        raise RuntimeError("audio.import source-control option projection is invalid")
+    audio_import_option_choice = "(" + "|".join(audio_import_option_names) + ")"
+    action_argv_by_operation = {
+        "object.set": {
+            "set_request_option": ["--option", "NAME", "TYPE", "VALUE"],
+            "clear_request_option": ["--option", "NAME"],
+            "add_target": [
+                "--target", "SELECTOR_KIND", "SELECTOR_VALUES...",
+                "[--name VALUE]", "[--notes VALUE]", "[--platform VALUE]",
+                "[--list-mode VALUE]", "[--on-name-conflict VALUE]",
+                "[--property NAME TYPE VALUE]...",
+                "[--reference NAME SELECTOR_KIND SELECTOR_VALUES...]...",
+            ],
+            "set_target_field": [
+                "--target-handle", "HANDLE", "--field", "NAME", "TYPE", "VALUE"
+            ],
+            "clear_target_field": ["--target-handle", "HANDLE", "--field", "NAME"],
+            "set_property": [
+                "--target-handle", "HANDLE", "--property", "NAME", "TYPE", "VALUE"
+            ],
+            "remove_property": ["--target-handle", "HANDLE", "--property", "NAME"],
+            "set_reference": [
+                "--owner-handle", "HANDLE", "--reference", "NAME",
+                "SELECTOR_KIND", "SELECTOR_VALUES...",
+            ],
+            "remove_reference": ["--owner-handle", "HANDLE", "--reference", "NAME"],
+            "add_child": [
+                "--parent-handle", "HANDLE", "--type", "TYPE", "--name", "NAME"
+            ],
+            "set_node_field": [
+                "--node-handle", "HANDLE", "--field", "NAME", "TYPE", "VALUE"
+            ],
+            "clear_node_field": ["--node-handle", "HANDLE", "--field", "NAME"],
+            "set_node_property": [
+                "--node-handle", "HANDLE", "--property", "NAME", "TYPE", "VALUE"
+            ],
+            "remove_node_property": ["--node-handle", "HANDLE", "--property", "NAME"],
+            "remove_node": ["--node-handle", "HANDLE"],
+            "add_list": ["--target-handle", "HANDLE", "--list", "NAME"],
+            "remove_list": ["--list-handle", "HANDLE"],
+            "add_list_member": [
+                "--list-handle", "HANDLE", "--type", "TYPE", "--name", "NAME"
+            ],
+            "remove_target": ["--target-handle", "HANDLE"],
+            "add_import_file": [
+                "--owner-handle", "HANDLE", "(--audio-file PATH | --audio-file-base64 DATA)",
+                "[--originals-subfolder VALUE]", "[--language VALUE]", "[--object-type VALUE]",
+            ],
+            "set_import_file_field": [
+                "--file-handle", "HANDLE", "--field", "NAME", "TYPE", "VALUE"
+            ],
+            "clear_import_file_field": ["--file-handle", "HANDLE", "--field", "NAME"],
+            "remove_import_file": ["--file-handle", "HANDLE"],
+            "set_import_option": [
+                "--owner-handle", "HANDLE", "--option", "NAME", "TYPE", "VALUE"
+            ],
+            "clear_import_option": ["--owner-handle", "HANDLE", "--option", "NAME"],
+            "remove_import": ["--owner-handle", "HANDLE"],
+        },
+        "audio.import": {
+            "set_import_operation": ["--mode", "MODE"],
+            "set_import_option": [
+                "--option",
+                audio_import_option_choice,
+                "boolean",
+                "VALUE",
+            ],
+            "clear_import_option": [
+                "--option",
+                audio_import_option_choice,
+            ],
+            "set_import_default": [
+                "(--default NAME TYPE VALUE | --import-location SELECTOR_KIND SELECTOR_VALUES... | --event ACTION PATH | --event-path PATH | --property NAME TYPE VALUE... | --empty-properties | --reference NAME SELECTOR_KIND SELECTOR_VALUES... | --empty-references)"
+            ],
+            "clear_import_default": ["--default", "NAME"],
+            "add_import_row": [
+                "--object-path", "PATH", "--object-type", "TYPE",
+                "[--audio-file PATH]", "[--audio-file-base64 DATA]",
+                "[--audio-source-notes VALUE]", "[--dialogue-event VALUE]",
+                "[(--event ACTION PATH | --event-path PATH)]", "[--import-language VALUE]",
+                "[--import-location SELECTOR_KIND SELECTOR_VALUES...]", "[--notes VALUE]",
+                "[--originals-subfolder VALUE]",
+                "[--property NAME TYPE VALUE]...",
+                "[--empty-properties]",
+                "[--reference NAME SELECTOR_KIND SELECTOR_VALUES...]...",
+                "[--empty-references]",
+            ],
+            "assign_import_row_switch": [
+                "--import-handle", "HANDLE", "--switch", "VALUE"
+            ],
+            "set_import_row_field": [
+                "--import-handle", "HANDLE",
+                "(--field NAME TYPE VALUE | --import-location SELECTOR_KIND SELECTOR_VALUES... | --event ACTION PATH | --event-path PATH | --property NAME TYPE VALUE... | --empty-properties | --reference NAME SELECTOR_KIND SELECTOR_VALUES... | --empty-references)",
+            ],
+            "clear_import_row_field": ["--import-handle", "HANDLE", "--field", "NAME"],
+            "remove_import_row": ["--import-handle", "HANDLE"],
+        },
+    }
+    operation_argv = action_argv_by_operation[operation]
+    if not set(contract["actions"]).issubset(operation_argv):
+        raise RuntimeError("Operation Composer CLI vocabulary is incomplete")
+    action_argv = {
+        action_name: operation_argv[action_name]
+        for action_name in contract["actions"]
+    }
     return {
         **contract,
         "start": {
@@ -3038,23 +3153,11 @@ def operation_composer_input_contract(
                 "<action-name>",
                 "<typed-fact-arguments>",
             ],
-            "typed_fact_flags": {
-                "--value": ["FIELD", "TYPE", "VALUE"],
-                "--null": ["FIELD"],
-                "--selector": ["FIELD", "SELECTOR_KIND", "SELECTOR_VALUES..."],
-                "--property": ["FIELD", "NAME", "TYPE", "VALUE"],
-                "--reference": [
-                    "FIELD",
-                    "NAME",
-                    "SELECTOR_KIND",
-                    "SELECTOR_VALUES...",
-                ],
-                "--event": ["FIELD", "ACTION", "PATH"],
-                "--assignment": ["none", "|", "switch", "VALUE"],
-            },
+            "action_argv": action_argv,
             "scalar_types": ["string", "number", "integer", "boolean"],
             "selector_kinds": [
-                "id VALUE",
+                "id-string VALUE",
+                "id-integer VALUE",
                 "path VALUE",
                 "exact-type-name TYPE NAME",
                 "direct-child TYPE PARENT_SELECTOR...",

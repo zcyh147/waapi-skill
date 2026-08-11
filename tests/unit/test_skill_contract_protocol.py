@@ -710,8 +710,9 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "An existing transaction continuation always outranks operation selection" in OPERATE
     assert "transaction-show <transaction-id> --summary-only" in OPERATE
     assert "Do not call `operations`, `operation-schema`, or `preview` first" in OPERATE
-    assert "`object.create` or `object.set`" in OPERATE
-    assert "`operation-schema <name>` first" in OPERATE
+    assert "`object.set` or `audio.import`" in OPERATE
+    assert "run one metadata discovery next, then Composer actions" in OPERATE
+    assert "`operation-schema object.create` first" in OPERATE
     assert "selected-subset identity gate" in OPERATE
     assert "exact-ID read back every selected" in OPERATE
     assert "These bounded read-only checks precede the transaction contract" in OPERATE
@@ -721,42 +722,27 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "A named operation using only closed schema fields and side effects" in OPERATE
     assert "its named `operation-schema` directly" in OPERATE
     assert "including both import operations" not in OPERATE
-    assert "its schema owns fixed fields and same-row Event/Switch Assignation" in OPERATE
-    assert "Without dynamic `properties[]`/`references[]`" in OPERATE
-    assert "start `operation-schema audio.import`" in OPERATE
-    assert "For dynamic tokens on media Sound rows, `Sound` fixes scope" in OPERATE
-    assert "metadata/schema are independent and may swap" in OPERATE
-    assert "both precede preview and neither repeats" in OPERATE
-    assert "Fixed-column table import also starts `operation-schema audio.importTabDelimited`" in OPERATE
-    assert "unknown dynamic `Property[...]`/`Reference[...]`/`@...` columns stay metadata-first" in OPERATE
+    assert "schema owns fixed fields and Event/Switch Assignation" in OPERATE
+    assert "metadata selects dynamic tokens and `draft-check` revalidates them" in OPERATE
+    assert "Table imports start `operation-schema audio.importTabDelimited`" in OPERATE
+    assert "dynamic columns stay metadata-first" in OPERATE
     skill_compact = " ".join(SKILL.split())
-    assert (
-        "only an explicit unknown dynamic property/reference token needs metadata"
-    ) in skill_compact
-    assert (
-        "operate reference says whether it precedes or commutes with schema"
-        in skill_compact
-    )
-    assert "Closed fields and side effects are not metadata" in skill_compact
-    assert "without that token, start with the named schema" in skill_compact
+    assert "Composer `draft-check` revalidates them and dependencies" in skill_compact
+    assert "only an explicit unknown dynamic property/reference token needs" in skill_compact
     assert "A known native URI without a named route" in OPERATE
     assert "`describe <uri>`" in OPERATE
     assert "No schema-to-preview shortcut" in compact
     assert "gateway.py operation-schema <operation-name>" not in OPERATE
-    assert "Follow the schema's sole `input_mode`; never seek another" in OPERATE
+    assert "Follow the schema's sole `input_mode`" in OPERATE
     assert "For `composer`, run `composer.start.gateway_argv`" in OPERATE
-    assert "returned typed fact flags/handles; Gateway serializes" in OPERATE
-    assert "`object.set` starts rows with `add_target`" in OPERATE
-    assert "`audio.import` uses its selected row action" in OPERATE
-    assert "Later actions only correct or nest" in OPERATE
-    assert (
-        "After `draft-check`, run the selected `preview-from-draft` continuation"
-        in OPERATE
-    )
-    assert "`--apply` marks a mutation preview; it does not execute it" in OPERATE
-    assert "continuation unchanged" in OPERATE
-    assert "For `legacy_json`, copy `request_envelope`" in OPERATE
-    assert "Hide Legacy from normal use" in OPERATE
+    assert "then only the selected `action_argv`" in OPERATE
+    assert "Start `object.set` rows with `add_target --target ...`" in OPERATE
+    assert "`audio.import` rows with `add_import_row --object-path ...`" in OPERATE
+    assert "Only explicit Switch Assignation adds `assign_import_row_switch" in OPERATE
+    assert "run its `preview-from-draft` unchanged" in OPERATE
+    assert "`--apply` marks a preview, not execution" in OPERATE
+    assert "For `legacy_json`, replace only its envelope's `arguments`" in OPERATE
+    assert "hide Legacy from normal use" in OPERATE
     assert "Unknown fields fail" in OPERATE
     assert "serialize every JSON string exactly once" in OPERATE
     assert "Operation requests use only closed selectors, never raw WAQL" in OPERATE
@@ -845,7 +831,10 @@ def test_operate_business_selection_and_execution_domains_remain_explicit() -> N
         "follow the selected operation's returned versioned target contract"
     ) in compact
     assert "`object.create` same-name-root merge goes directly" in compact
-    assert "`object.set` uses its returned target base and dynamic metadata scope" in compact
+    assert (
+        "`object.set` uses its returned target base, live token discovery, "
+        "and Composer validation"
+    ) in compact
     assert "Do not insert `project-default-work-units`" in compact
 
 
@@ -926,10 +915,9 @@ def test_operate_metadata_and_import_prose_only_rules_are_preserved() -> None:
         "independent enable switches and numeric values as separate queries",
         "`fallback_detail_scan.status` is `partial`",
         "A `complete` scan with no match is terminal",
-        "For direct imports, discover only extra dynamic `properties[]`/`references[]`",
         "for table imports, only dynamic `Property[...]`, `Reference[...]`, or `@...` columns",
         "Fixed fields and side effects never trigger discovery",
-        "Event, Dialogue Event, and `switch_assignment` are schema-owned too",
+        "Event, Dialogue Event, and Switch Assignation are schema-owned too",
         "`Notes` and `Audio Source Notes` are fixed import columns",
         "not Sound metadata queries",
         "ordinary `audio.importTabDelimited` import",
@@ -965,11 +953,11 @@ def test_operate_metadata_and_import_prose_only_rules_are_preserved() -> None:
 def test_operate_maps_only_live_query_accessors_to_mutation_tokens() -> None:
     compact = " ".join(OPERATE.split())
 
-    assert "Reuse exact live property/reference accessors" in compact
+    assert "Reuse evidence-bound live property/reference accessors" in compact
     assert "`@Foo` becomes `Foo`" in compact
-    assert "removing exactly one leading `@`" in compact
+    assert "remove one leading `@`" in compact
     assert "`OutputBus` remains `OutputBus`" in compact
-    assert "This mapping is evidence-bound" in compact
+    assert "evidence-bound" in compact
     assert "never infer a token" in compact
 
 

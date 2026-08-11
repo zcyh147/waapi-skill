@@ -111,7 +111,6 @@ from wwise_waapi.platform_commands import (
     encode_windows_model_argv,
     encode_windows_powershell_argv,
 )
-from wwise_waapi.operation_composer import typed_action_cli_arguments
 from tests.semantic.support.codex_object_runtime_v3 import ObjectRuntimeSnapshot
 from tests.semantic.support.codex_soundbank_business_plan_v3 import (
     compile_soundbank_business_plan,
@@ -329,7 +328,7 @@ def test_archived_draft_action_preserves_submitted_json_spelling() -> None:
     assert type(action["value"]) is int
 
 
-def test_archived_draft_action_reconstructs_normal_typed_argv() -> None:
+def test_archived_draft_action_reconstructs_legacy_typed_argv() -> None:
     expected = {
         "contract": "waapi-skill.operation-draft-action/v1",
         "action": "add_import_row",
@@ -344,7 +343,18 @@ def test_archived_draft_action_reconstructs_normal_typed_argv() -> None:
             "od1-draft",
             "--compact",
             "--facts",
-            *typed_action_cli_arguments(expected),
+            "--action",
+            "add_import_row",
+            "--value",
+            "object_path",
+            "string",
+            expected["object_path"],
+            "--value",
+            "audio_file",
+            "string",
+            expected["audio_file"],
+            "--assignment",
+            "none",
         ),
         label="synthetic typed action",
     )

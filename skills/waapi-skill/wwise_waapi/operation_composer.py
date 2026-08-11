@@ -102,14 +102,16 @@ _AUDIO_IMPORT_ROW_OPTIONAL_FIELDS = (
 _AUDIO_IMPORT_ACTION_FIELDS: dict[
     str, tuple[tuple[str, ...], tuple[str, ...]]
 ] = {
+    "set_import_operation": (("mode",), ()),
     "set_import_option": (("name", "value"), ()),
     "clear_import_option": (("name",), ()),
     "set_import_default": (("name", "value"), ()),
     "clear_import_default": (("name",), ()),
     "add_import_row": (
-        ("object_path", "assignment"),
+        ("object_path",),
         _AUDIO_IMPORT_ROW_OPTIONAL_FIELDS,
     ),
+    "assign_import_row_switch": (("import_handle", "switch"), ()),
     "set_import_row_field": (("import_handle", "name", "value"), ()),
     "clear_import_row_field": (("import_handle", "name"), ()),
     "remove_import_row": (("import_handle",), ()),
@@ -151,6 +153,7 @@ def build_typed_action_from_cli(
     references: Sequence[Sequence[str]] = (),
     events: Sequence[Sequence[str]] = (),
     assignments: Sequence[Sequence[str]] = (),
+    empty_lists: Sequence[str] = (),
 ) -> dict[str, Any]:
     """Build one closed action from typed argv facts, never from JSON text."""
 
@@ -191,10 +194,16 @@ def build_typed_action_from_cli(
             raise OperationComposerError("--selector contains extra values.")
         set_once(field, selector)
     for row in events:
-        if len(row) != 3:
-            raise OperationComposerError("--event requires FIELD ACTION PATH.")
-        field, event_action, path = row
-        set_once(field, {"action": event_action, "path": path})
+        if len(row) not in {2, 3}:
+            raise OperationComposerError(
+                "--event requires FIELD ACTION PATH or --event-path requires FIELD PATH."
+            )
+        field, *event_values = row
+        if len(event_values) == 1:
+            set_once(field, {"path": event_values[0]})
+        else:
+            event_action, path = event_values
+            set_once(field, {"action": event_action, "path": path})
     for row in assignments:
         if len(row) not in {1, 2}:
             raise OperationComposerError(
@@ -212,6 +221,8 @@ def build_typed_action_from_cli(
             raise OperationComposerError(
                 "--assignment accepts only none or switch with one value."
             )
+    for field in empty_lists:
+        set_once(field, [])
 
     grouped_properties: dict[str, list[dict[str, Any]]] = {}
     for row in properties:
@@ -244,8 +255,17 @@ def build_typed_action_from_cli(
     return action
 
 
-def parse_typed_action_cli_arguments(arguments: Sequence[str]) -> dict[str, Any]:
-    """Parse the closed variable-length ``draft-apply`` typed argv suffix."""
+def parse_typed_action_cli_arguments(
+    arguments: Sequence[str],
+    *,
+    legacy_compatibility: bool = False,
+) -> dict[str, Any]:
+    """Parse the closed variable-length ``draft-apply`` typed argv suffix.
+
+    ``legacy_compatibility`` exists only for offline replay of already sealed
+    evidence.  The public Gateway leaves it disabled so the old generic fact
+    grammar cannot become a second normal model-facing input surface.
+    """
 
     values: list[tuple[str, ...]] = []
     nulls: list[str] = []
@@ -254,6 +274,7 @@ def parse_typed_action_cli_arguments(arguments: Sequence[str]) -> dict[str, Any]
     references: list[tuple[str, ...]] = []
     events: list[tuple[str, ...]] = []
     assignments: list[tuple[str, ...]] = []
+    empty_lists: list[str] = []
     if len(arguments) < 2 or arguments[0] != "--action":
         raise OperationComposerError(
             "Typed action argv must start with --action ACTION."
@@ -262,23 +283,289 @@ def parse_typed_action_cli_arguments(arguments: Sequence[str]) -> dict[str, Any]
     index = 2
     while index < len(arguments):
         flag = arguments[index]
-        if flag == "--value":
+        direct_import_row_fields = {
+            "--object-path": "object_path",
+            "--audio-file": "audio_file",
+            "--audio-file-base64": "audio_file_base64",
+            "--audio-source-notes": "audio_source_notes",
+            "--dialogue-event": "dialogue_event",
+            "--import-language": "import_language",
+            "--notes": "notes",
+            "--object-type": "object_type",
+            "--originals-subfolder": "originals_subfolder",
+        }
+        direct_action_fields = {
+            ("add_target", "--name"): "name",
+            ("add_target", "--notes"): "notes",
+            ("add_target", "--platform"): "platform",
+            ("add_target", "--list-mode"): "list_mode",
+            ("add_target", "--on-name-conflict"): "on_name_conflict",
+            ("assign_import_row_switch", "--import-handle"): "import_handle",
+            ("assign_import_row_switch", "--switch"): "switch",
+            ("set_import_operation", "--mode"): "mode",
+            ("set_property", "--target-handle"): "target_handle",
+            ("remove_property", "--target-handle"): "target_handle",
+            ("set_target_field", "--target-handle"): "target_handle",
+            ("clear_target_field", "--target-handle"): "target_handle",
+            ("remove_target", "--target-handle"): "target_handle",
+            ("set_reference", "--owner-handle"): "owner_handle",
+            ("remove_reference", "--owner-handle"): "owner_handle",
+            ("add_child", "--parent-handle"): "parent_handle",
+            ("add_child", "--type"): "type",
+            ("add_child", "--name"): "name",
+            ("add_list", "--target-handle"): "target_handle",
+            ("set_node_field", "--node-handle"): "node_handle",
+            ("clear_node_field", "--node-handle"): "node_handle",
+            ("set_node_property", "--node-handle"): "node_handle",
+            ("remove_node_property", "--node-handle"): "node_handle",
+            ("remove_node", "--node-handle"): "node_handle",
+            ("remove_list", "--list-handle"): "list_handle",
+            ("add_list_member", "--list-handle"): "list_handle",
+            ("add_list_member", "--type"): "type",
+            ("add_list_member", "--name"): "name",
+            ("add_import_file", "--owner-handle"): "owner_handle",
+            ("add_import_file", "--audio-file"): "audio_file",
+            ("add_import_file", "--audio-file-base64"): "audio_file_base64",
+            ("add_import_file", "--originals-subfolder"): "originals_subfolder",
+            ("add_import_file", "--language"): "language",
+            ("add_import_file", "--object-type"): "object_type",
+            ("set_import_file_field", "--file-handle"): "file_handle",
+            ("clear_import_file_field", "--file-handle"): "file_handle",
+            ("remove_import_file", "--file-handle"): "file_handle",
+            ("set_import_option", "--owner-handle"): "owner_handle",
+            ("clear_import_option", "--owner-handle"): "owner_handle",
+            ("remove_import", "--owner-handle"): "owner_handle",
+            ("set_import_row_field", "--import-handle"): "import_handle",
+            ("clear_import_row_field", "--import-handle"): "import_handle",
+            ("remove_import_row", "--import-handle"): "import_handle",
+        }
+        direct_action_field = direct_action_fields.get((action_name, flag))
+        if direct_action_field is not None:
+            row = _require_cli_argv_row(arguments, index, 2, flag)
+            values.append((direct_action_field, "string", row[1]))
+            index += 2
+        elif flag in direct_import_row_fields:
+            import_file_fields = {
+                "--audio-file": "audio_file",
+                "--audio-file-base64": "audio_file_base64",
+                "--originals-subfolder": "originals_subfolder",
+                "--object-type": "object_type",
+                "--import-language": "language",
+            }
+            if action_name == "add_import_row":
+                field_name = direct_import_row_fields[flag]
+            elif action_name == "add_import_file" and flag in import_file_fields:
+                field_name = import_file_fields[flag]
+            else:
+                raise OperationComposerError(
+                    f"{flag} is not valid for this typed action."
+                )
+            row = _require_cli_argv_row(arguments, index, 2, flag)
+            values.append((field_name, "string", row[1]))
+            index += 2
+        elif flag == "--import-location":
+            if action_name == "add_import_row":
+                selector_field = "import_location"
+            elif action_name in {"set_import_default", "set_import_row_field"}:
+                selector_field = "value"
+                values.append(("name", "string", "import_location"))
+            else:
+                raise OperationComposerError(
+                    "--import-location is not valid for this typed action."
+                )
+            if index + 2 > len(arguments):
+                raise OperationComposerError("--import-location is incomplete.")
+            _selector, consumed = _parse_cli_selector(arguments[index + 1 :])
+            end = index + 1 + consumed
+            selectors.append((selector_field, *arguments[index + 1 : end]))
+            index = end
+        elif flag == "--option":
+            if action_name in {"set_request_option", "set_import_option"}:
+                row = _require_cli_argv_row(arguments, index, 4, flag)
+                values.extend((("name", "string", row[1]), ("value", row[2], row[3])))
+                index += 4
+            elif action_name in {"clear_request_option", "clear_import_option"}:
+                row = _require_cli_argv_row(arguments, index, 2, flag)
+                values.append(("name", "string", row[1]))
+                index += 2
+            else:
+                raise OperationComposerError("--option is not valid for this typed action.")
+        elif flag == "--list":
+            if action_name != "add_list":
+                raise OperationComposerError("--list is not valid for this typed action.")
+            row = _require_cli_argv_row(arguments, index, 2, flag)
+            values.append(("name", "string", row[1]))
+            index += 2
+        elif flag == "--default":
+            if action_name == "set_import_default":
+                row = _require_cli_argv_row(arguments, index, 4, flag)
+                values.extend(
+                    (("name", "string", row[1]), ("value", row[2], row[3]))
+                )
+                index += 4
+            elif action_name == "clear_import_default":
+                row = _require_cli_argv_row(arguments, index, 2, flag)
+                values.append(("name", "string", row[1]))
+                index += 2
+            else:
+                raise OperationComposerError(
+                    "--default is not valid for this typed action."
+                )
+        elif flag == "--field":
+            if action_name in {
+                "set_target_field",
+                "set_node_field",
+                "set_import_file_field",
+                "set_import_row_field",
+            }:
+                row = _require_cli_argv_row(arguments, index, 4, flag)
+                values.extend(
+                    (("name", "string", row[1]), ("value", row[2], row[3]))
+                )
+                index += 4
+            elif action_name in {
+                "clear_target_field",
+                "clear_node_field",
+                "clear_import_file_field",
+                "clear_import_row_field",
+            }:
+                row = _require_cli_argv_row(arguments, index, 2, flag)
+                values.append(("name", "string", row[1]))
+                index += 2
+            else:
+                raise OperationComposerError(
+                    "--field is not valid for this typed action."
+                )
+        elif flag == "--value":
+            if not legacy_compatibility:
+                raise OperationComposerError(
+                    "--value is available only for sealed archive replay."
+                )
             row = _require_cli_argv_row(arguments, index, 4, flag)
             values.append(row[1:])
             index += 4
         elif flag == "--null":
+            if not legacy_compatibility:
+                raise OperationComposerError(
+                    "--null is available only for sealed archive replay."
+                )
             row = _require_cli_argv_row(arguments, index, 2, flag)
             nulls.append(row[1])
             index += 2
         elif flag == "--property":
-            row = _require_cli_argv_row(arguments, index, 5, flag)
-            properties.append(row[1:])
-            index += 5
+            property_field = {
+                "add_target": "properties",
+                "add_import_row": "properties",
+            }.get(action_name)
+            if property_field is not None:
+                legacy_field = (
+                    legacy_compatibility
+                    and index + 1 < len(arguments)
+                    and arguments[index + 1] == property_field
+                )
+                row = _require_cli_argv_row(
+                    arguments, index, 5 if legacy_field else 4, flag
+                )
+                properties.append(
+                    tuple(row[1:])
+                    if legacy_field
+                    else (property_field, *row[1:])
+                )
+                index += len(row)
+            elif action_name in {"set_import_default", "set_import_row_field"}:
+                row = _require_cli_argv_row(arguments, index, 4, flag)
+                if not any(value_row[0] == "name" for value_row in values):
+                    values.append(("name", "string", "properties"))
+                properties.append(("value", *row[1:]))
+                index += 4
+            elif action_name in {"set_property", "set_node_property"}:
+                row = _require_cli_argv_row(arguments, index, 4, flag)
+                values.extend((("name", "string", row[1]), ("value", row[2], row[3])))
+                index += 4
+            elif action_name in {"remove_property", "remove_node_property"}:
+                row = _require_cli_argv_row(arguments, index, 2, flag)
+                values.append(("name", "string", row[1]))
+                index += 2
+            else:
+                raise OperationComposerError(
+                    "--property is not valid for this typed action."
+                )
+        elif flag in {"--empty-properties", "--empty-references"}:
+            field_name = flag.removeprefix("--empty-")
+            if action_name == "add_import_row":
+                empty_lists.append(field_name)
+            elif action_name in {"set_import_default", "set_import_row_field"}:
+                values.append(("name", "string", field_name))
+                empty_lists.append("value")
+            else:
+                raise OperationComposerError(
+                    f"{flag} is not valid for this typed action."
+                )
+            index += 1
         elif flag == "--event":
-            row = _require_cli_argv_row(arguments, index, 4, flag)
-            events.append(row[1:])
-            index += 4
-        elif flag == "--selector":
+            if action_name == "add_import_row":
+                legacy_field = (
+                    legacy_compatibility
+                    and index + 1 < len(arguments)
+                    and arguments[index + 1] == "event"
+                )
+                row = _require_cli_argv_row(
+                    arguments, index, 4 if legacy_field else 3, flag
+                )
+                events.append(
+                    tuple(row[1:]) if legacy_field else ("event", *row[1:])
+                )
+                index += len(row)
+            elif action_name == "set_import_default":
+                row = _require_cli_argv_row(arguments, index, 3, flag)
+                values.append(("name", "string", "event"))
+                events.append(("value", *row[1:]))
+                index += 3
+            elif action_name == "set_import_row_field":
+                legacy_field = (
+                    legacy_compatibility
+                    and index + 1 < len(arguments)
+                    and arguments[index + 1] == "event"
+                )
+                row = _require_cli_argv_row(
+                    arguments, index, 4 if legacy_field else 3, flag
+                )
+                values.append(("name", "string", "event"))
+                offset = 2 if legacy_field else 1
+                events.append(("value", row[offset], row[offset + 1]))
+                index += len(row)
+            else:
+                raise OperationComposerError(
+                    "--event is not valid for this typed action."
+                )
+        elif flag == "--event-path":
+            row = _require_cli_argv_row(arguments, index, 2, flag)
+            if action_name == "add_import_row":
+                events.append(("event", row[1]))
+            elif action_name in {"set_import_default", "set_import_row_field"}:
+                values.append(("name", "string", "event"))
+                events.append(("value", row[1]))
+            else:
+                raise OperationComposerError(
+                    "--event-path is not valid for this typed action."
+                )
+            index += 2
+        elif flag == "--target":
+            if index + 2 > len(arguments):
+                raise OperationComposerError("--target is incomplete.")
+            target_field = {
+                "add_target": "selector",
+                "set_reference": "target",
+            }.get(action_name)
+            if target_field is None:
+                raise OperationComposerError(
+                    "--target is not valid for this typed action."
+                )
+            _selector, consumed = _parse_cli_selector(arguments[index + 1 :])
+            end = index + 1 + consumed
+            selectors.append((target_field, *arguments[index + 1 : end]))
+            index = end
+        elif flag == "--selector" and legacy_compatibility:
             if index + 3 > len(arguments):
                 raise OperationComposerError("--selector is incomplete.")
             field = arguments[index + 1]
@@ -287,15 +574,64 @@ def parse_typed_action_cli_arguments(arguments: Sequence[str]) -> dict[str, Any]
             selectors.append((field, *arguments[index + 2 : end]))
             index = end
         elif flag == "--reference":
-            if index + 4 > len(arguments):
-                raise OperationComposerError("--reference is incomplete.")
-            field = arguments[index + 1]
-            name = arguments[index + 2]
-            _selector, consumed = _parse_cli_selector(arguments[index + 3 :])
-            end = index + 3 + consumed
-            references.append((field, name, *arguments[index + 3 : end]))
-            index = end
+            reference_field = {
+                "add_target": "references",
+                "add_import_row": "references",
+            }.get(action_name)
+            if reference_field is not None:
+                legacy_field = (
+                    legacy_compatibility
+                    and index + 1 < len(arguments)
+                    and arguments[index + 1] == reference_field
+                )
+                offset = 2 if legacy_field else 1
+                if index + offset + 2 > len(arguments):
+                    raise OperationComposerError("--reference is incomplete.")
+                name = arguments[index + offset]
+                _selector, consumed = _parse_cli_selector(
+                    arguments[index + offset + 1 :]
+                )
+                end = index + offset + 1 + consumed
+                references.append(
+                    (
+                        reference_field,
+                        name,
+                        *arguments[index + offset + 1 : end],
+                    )
+                )
+                index = end
+            elif action_name in {"set_import_default", "set_import_row_field"}:
+                if index + 3 > len(arguments):
+                    raise OperationComposerError("--reference is incomplete.")
+                name = arguments[index + 1]
+                _selector, consumed = _parse_cli_selector(arguments[index + 2 :])
+                end = index + 2 + consumed
+                if not any(value_row[0] == "name" for value_row in values):
+                    values.append(("name", "string", "references"))
+                references.append(("value", name, *arguments[index + 2 : end]))
+                index = end
+            elif action_name == "set_reference":
+                if index + 3 > len(arguments):
+                    raise OperationComposerError("--reference is incomplete.")
+                name = arguments[index + 1]
+                _selector, consumed = _parse_cli_selector(arguments[index + 2 :])
+                end = index + 2 + consumed
+                values.append(("name", "string", name))
+                selectors.append(("target", *arguments[index + 2 : end]))
+                index = end
+            elif action_name == "remove_reference":
+                row = _require_cli_argv_row(arguments, index, 2, flag)
+                values.append(("name", "string", row[1]))
+                index += 2
+            else:
+                raise OperationComposerError(
+                    "--reference is not valid for this typed action."
+                )
         elif flag == "--assignment":
+            if not legacy_compatibility:
+                raise OperationComposerError(
+                    "--assignment is available only for sealed archive replay."
+                )
             if index + 2 > len(arguments):
                 raise OperationComposerError("--assignment is incomplete.")
             mode = arguments[index + 1]
@@ -312,7 +648,7 @@ def parse_typed_action_cli_arguments(arguments: Sequence[str]) -> dict[str, Any]
                 "Typed action argv contains an unknown fact flag.",
                 details={"flag": flag},
             )
-    return build_typed_action_from_cli(
+    action = build_typed_action_from_cli(
         action_name,
         values=values,
         nulls=nulls,
@@ -321,7 +657,23 @@ def parse_typed_action_cli_arguments(arguments: Sequence[str]) -> dict[str, Any]
         references=references,
         events=events,
         assignments=assignments,
+        empty_lists=empty_lists,
     )
+    if (
+        action_name in {"set_import_option", "clear_import_option"}
+        and "owner_handle" not in action
+        and action.get("name")
+        not in {
+            "auto_add_to_source_control",
+            "auto_check_out_to_source_control",
+        }
+        and not legacy_compatibility
+    ):
+        raise OperationComposerError(
+            "audio.import source-control option is not public.",
+            details={"name": action.get("name")},
+        )
+    return action
 
 
 def _require_cli_argv_row(
@@ -345,6 +697,13 @@ def typed_action_cli_arguments(action: Mapping[str, Any]) -> tuple[str, ...]:
     action_name = action.get("action")
     if not isinstance(action_name, str) or not action_name:
         raise OperationComposerError("Typed action has an invalid action name.")
+    if action_name == "add_import_row" and "assignment" in action:
+        raise OperationComposerError(
+            "Inline import assignment is available only for sealed archive replay."
+        )
+    specialized = _specialized_typed_action_cli_arguments(action_name, action)
+    if specialized is not None:
+        return ("--action", action_name, *specialized)
     arguments: list[str] = ["--action", action_name]
     for field, value in action.items():
         if field in {"contract", "action"}:
@@ -352,15 +711,47 @@ def typed_action_cli_arguments(action: Mapping[str, Any]) -> tuple[str, ...]:
         if value is None:
             arguments.extend(("--null", field))
         elif isinstance(value, Mapping) and "kind" in value:
-            arguments.extend(("--selector", field, *_selector_cli_tokens(value)))
+            if action_name == "add_import_row" and field == "import_location":
+                arguments.extend(
+                    ("--import-location", *_selector_cli_tokens(value))
+                )
+                continue
+            target_field = {
+                "add_target": "selector",
+                "set_reference": "target",
+            }.get(action_name)
+            if target_field != field:
+                raise OperationComposerError(
+                    "Typed selector is not valid for this action field."
+                )
+            arguments.extend(("--target", *_selector_cli_tokens(value)))
         elif (
             isinstance(value, Mapping)
             and set(value).issubset({"action", "path"})
-            and set(value) == {"action", "path"}
+            and "path" in value
         ):
-            arguments.extend(
-                ("--event", field, str(value["action"]), str(value["path"]))
+            event_tokens = (
+                ("--event", str(value["action"]), str(value["path"]))
+                if "action" in value
+                else ("--event-path", str(value["path"]))
             )
+            if action_name == "add_import_row" and field == "event":
+                arguments.extend(
+                    event_tokens
+                )
+            elif action_name == "set_import_row_field" and field == "value":
+                arguments.extend(
+                    (
+                        "--event",
+                        field,
+                        str(value["action"]),
+                        str(value["path"]),
+                    )
+                )
+            else:
+                raise OperationComposerError(
+                    "Typed event is not valid for this action field."
+                )
         elif isinstance(value, Mapping) and "mode" in value:
             mode = value.get("mode")
             if mode == "none" and set(value) == {"mode"}:
@@ -372,15 +763,24 @@ def typed_action_cli_arguments(action: Mapping[str, Any]) -> tuple[str, ...]:
             else:
                 raise OperationComposerError("Typed assignment is invalid.")
         elif isinstance(value, list):
+            if not value and action_name == "add_import_row" and field in {
+                "properties",
+                "references",
+            }:
+                arguments.append(f"--empty-{field}")
+                continue
             for descriptor in value:
                 if not isinstance(descriptor, Mapping):
                     raise OperationComposerError("Typed descriptor list is invalid.")
                 if set(descriptor) == {"name", "value"}:
+                    if action_name not in {"add_target", "add_import_row"} or field != "properties":
+                        raise OperationComposerError(
+                            "Typed property is not valid for this action field."
+                        )
                     value_type, raw_value = _scalar_cli_tokens(descriptor["value"])
                     arguments.extend(
                         (
                             "--property",
-                            field,
                             str(descriptor["name"]),
                             value_type,
                             raw_value,
@@ -389,10 +789,13 @@ def typed_action_cli_arguments(action: Mapping[str, Any]) -> tuple[str, ...]:
                 elif set(descriptor) == {"name", "target"} and isinstance(
                     descriptor["target"], Mapping
                 ):
+                    if action_name not in {"add_target", "add_import_row"} or field != "references":
+                        raise OperationComposerError(
+                            "Typed reference is not valid for this action field."
+                        )
                     arguments.extend(
                         (
                             "--reference",
-                            field,
                             str(descriptor["name"]),
                             *_selector_cli_tokens(descriptor["target"]),
                         )
@@ -401,8 +804,251 @@ def typed_action_cli_arguments(action: Mapping[str, Any]) -> tuple[str, ...]:
                     raise OperationComposerError("Typed descriptor is invalid.")
         else:
             value_type, raw_value = _scalar_cli_tokens(value)
-            arguments.extend(("--value", field, value_type, raw_value))
+            direct_action_flag = {
+                ("add_target", "name"): "--name",
+                ("add_target", "notes"): "--notes",
+                ("add_target", "platform"): "--platform",
+                ("add_target", "list_mode"): "--list-mode",
+                ("add_target", "on_name_conflict"): "--on-name-conflict",
+                ("assign_import_row_switch", "import_handle"): "--import-handle",
+                ("assign_import_row_switch", "switch"): "--switch",
+                ("set_import_operation", "mode"): "--mode",
+            }.get((action_name, field))
+            direct_import_flag = {
+                "object_path": "--object-path",
+                "audio_file": "--audio-file",
+                "audio_file_base64": "--audio-file-base64",
+                "audio_source_notes": "--audio-source-notes",
+                "dialogue_event": "--dialogue-event",
+                "import_language": "--import-language",
+                "import_location": "--import-location",
+                "notes": "--notes",
+                "object_type": "--object-type",
+                "originals_subfolder": "--originals-subfolder",
+            }.get(field)
+            if direct_action_flag is not None:
+                if value_type != "string":
+                    raise OperationComposerError(
+                        "Typed action text fields must be strings."
+                    )
+                arguments.extend((direct_action_flag, raw_value))
+            elif action_name == "add_import_row" and direct_import_flag is not None:
+                if value_type != "string":
+                    raise OperationComposerError(
+                        "Typed import-row text fields must be strings."
+                    )
+                arguments.extend((direct_import_flag, raw_value))
+            else:
+                arguments.extend(("--value", field, value_type, raw_value))
     return tuple(arguments)
+
+
+def _specialized_typed_action_cli_arguments(
+    action_name: str,
+    action: Mapping[str, Any],
+) -> tuple[str, ...] | None:
+    """Serialize normal action-specific flags; generic facts stay archive-only."""
+
+    def text(field: str) -> str:
+        value = action.get(field)
+        if not isinstance(value, str):
+            raise OperationComposerError(
+                f"Typed action field {field!r} must be a string."
+            )
+        return value
+
+    def scalar(field: str) -> tuple[str, str]:
+        return _scalar_cli_tokens(action.get(field))
+
+    compound = {
+        "set_request_option": (None, "--option"),
+        "set_import_option": (
+            "--owner-handle" if "owner_handle" in action else None,
+            "--option",
+        ),
+        "set_target_field": ("--target-handle", "--field"),
+        "set_node_field": ("--node-handle", "--field"),
+        "set_import_file_field": ("--file-handle", "--field"),
+        "set_import_row_field": ("--import-handle", "--field"),
+        "set_property": ("--target-handle", "--property"),
+        "set_node_property": ("--node-handle", "--property"),
+        "set_import_default": (None, "--default"),
+    }
+    if action_name in compound:
+        handle_flag, fact_flag = compound[action_name]
+        result: list[str] = []
+        if handle_flag is not None:
+            handle_field = {
+                "--owner-handle": "owner_handle",
+                "--target-handle": "target_handle",
+                "--node-handle": "node_handle",
+                "--file-handle": "file_handle",
+                "--import-handle": "import_handle",
+            }[handle_flag]
+            result.extend((handle_flag, text(handle_field)))
+        value = action.get("value")
+        if action_name in {"set_import_default", "set_import_row_field"}:
+            name = text("name")
+            if name == "import_location" and isinstance(value, Mapping):
+                result.extend(
+                    ("--import-location", *_selector_cli_tokens(value))
+                )
+                return tuple(result)
+            if name == "event" and isinstance(value, Mapping) and (
+                set(value) == {"path"} or set(value) == {"action", "path"}
+            ):
+                result.extend(
+                    (
+                        ("--event", str(value["action"]), str(value["path"]))
+                        if "action" in value
+                        else ("--event-path", str(value["path"]))
+                    )
+                )
+                return tuple(result)
+            if name in {"properties", "references"} and isinstance(value, list):
+                if not value:
+                    result.append(f"--empty-{name}")
+                    return tuple(result)
+                for descriptor in value:
+                    if not isinstance(descriptor, Mapping):
+                        raise OperationComposerError(
+                            f"Typed import {name} descriptor is invalid."
+                        )
+                    if name == "properties" and set(descriptor) == {"name", "value"}:
+                        value_type, raw_value = _scalar_cli_tokens(
+                            descriptor["value"]
+                        )
+                        result.extend(
+                            (
+                                "--property",
+                                str(descriptor["name"]),
+                                value_type,
+                                raw_value,
+                            )
+                        )
+                    elif (
+                        name == "references"
+                        and set(descriptor) == {"name", "target"}
+                        and isinstance(descriptor["target"], Mapping)
+                    ):
+                        result.extend(
+                            (
+                                "--reference",
+                                str(descriptor["name"]),
+                                *_selector_cli_tokens(descriptor["target"]),
+                            )
+                        )
+                    else:
+                        raise OperationComposerError(
+                            f"Typed import {name} descriptor is invalid."
+                        )
+                return tuple(result)
+        if (
+            action_name == "set_import_row_field"
+            and action.get("name") == "event"
+            and isinstance(value, Mapping)
+            and set(value) == {"action", "path"}
+        ):
+            result.extend(
+                (
+                    "--event",
+                    "event",
+                    str(value["action"]),
+                    str(value["path"]),
+                )
+            )
+            return tuple(result)
+        value_type, raw_value = scalar("value")
+        result.extend((fact_flag, text("name"), value_type, raw_value))
+        return tuple(result)
+
+    clearing = {
+        "clear_request_option": (None, "--option"),
+        "clear_import_option": (
+            "--owner-handle" if "owner_handle" in action else None,
+            "--option",
+        ),
+        "clear_target_field": ("--target-handle", "--field"),
+        "clear_node_field": ("--node-handle", "--field"),
+        "clear_import_file_field": ("--file-handle", "--field"),
+        "clear_import_row_field": ("--import-handle", "--field"),
+        "remove_property": ("--target-handle", "--property"),
+        "remove_node_property": ("--node-handle", "--property"),
+        "remove_reference": ("--owner-handle", "--reference"),
+        "clear_import_default": (None, "--default"),
+    }
+    if action_name in clearing:
+        handle_flag, fact_flag = clearing[action_name]
+        result = []
+        if handle_flag is not None:
+            handle_field = {
+                "--owner-handle": "owner_handle",
+                "--target-handle": "target_handle",
+                "--node-handle": "node_handle",
+                "--file-handle": "file_handle",
+                "--import-handle": "import_handle",
+            }[handle_flag]
+            result.extend((handle_flag, text(handle_field)))
+        result.extend((fact_flag, text("name")))
+        return tuple(result)
+
+    if action_name == "set_reference":
+        return (
+            "--owner-handle",
+            text("owner_handle"),
+            "--reference",
+            text("name"),
+            *_selector_cli_tokens(action.get("target")),
+        )
+
+    simple_fields = {
+        "add_child": (
+            ("--parent-handle", "parent_handle"),
+            ("--type", "type"),
+            ("--name", "name"),
+        ),
+        "add_list": (
+            ("--target-handle", "target_handle"),
+            ("--list", "name"),
+        ),
+        "add_list_member": (
+            ("--list-handle", "list_handle"),
+            ("--type", "type"),
+            ("--name", "name"),
+        ),
+        "remove_target": (("--target-handle", "target_handle"),),
+        "remove_node": (("--node-handle", "node_handle"),),
+        "remove_list": (("--list-handle", "list_handle"),),
+        "remove_import_file": (("--file-handle", "file_handle"),),
+        "remove_import": (("--owner-handle", "owner_handle"),),
+        "remove_import_row": (("--import-handle", "import_handle"),),
+        "assign_import_row_switch": (
+            ("--import-handle", "import_handle"),
+            ("--switch", "switch"),
+        ),
+        "set_import_operation": (("--mode", "mode"),),
+    }
+    if action_name in simple_fields:
+        return tuple(
+            token
+            for flag, field in simple_fields[action_name]
+            for token in (flag, text(field))
+        )
+
+    if action_name == "add_import_file":
+        flag_by_field = {
+            "audio_file": "--audio-file",
+            "audio_file_base64": "--audio-file-base64",
+            "originals_subfolder": "--originals-subfolder",
+            "language": "--language",
+            "object_type": "--object-type",
+        }
+        result = ["--owner-handle", text("owner_handle")]
+        for field, flag in flag_by_field.items():
+            if field in action:
+                result.extend((flag, text(field)))
+        return tuple(result)
+    return None
 
 
 def _parse_cli_scalar(value_type: str, raw_value: str) -> Any:
@@ -454,9 +1100,18 @@ def _parse_cli_selector(
     if depth > 8 or not tokens:
         raise OperationComposerError("Typed selector is missing or too deeply nested.")
     kind = tokens[0]
-    if kind in {"id", "path"}:
+    if kind in {"id", "id-string", "id-integer", "path"}:
         if len(tokens) < 2:
             raise OperationComposerError(f"{kind} selector requires VALUE.")
+        if kind == "id-integer":
+            raw_value = tokens[1]
+            if not re.fullmatch(r"-?(?:0|[1-9][0-9]*)", raw_value):
+                raise OperationComposerError(
+                    "id-integer selector values must use canonical decimal syntax."
+                )
+            return {"kind": "id", "value": int(raw_value)}, 2
+        if kind == "id-string":
+            return {"kind": "id", "value": tokens[1]}, 2
         return {"kind": kind, "value": tokens[1]}, 2
     if kind == "exact-type-name":
         if len(tokens) < 3:
@@ -490,8 +1145,16 @@ def _selector_cli_tokens(selector: Mapping[str, Any], *, depth: int = 0) -> tupl
     if depth > 8:
         raise OperationComposerError("Typed selector is too deeply nested.")
     kind = selector.get("kind")
-    if kind in {"id", "path"} and set(selector) == {"kind", "value"}:
-        return str(kind), str(selector["value"])
+    if kind == "id" and set(selector) == {"kind", "value"}:
+        value = selector["value"]
+        if isinstance(value, bool) or not isinstance(value, (str, int)):
+            raise OperationComposerError("Typed id selector value is invalid.")
+        return (
+            "id-integer" if isinstance(value, int) else "id-string",
+            str(value),
+        )
+    if kind == "path" and set(selector) == {"kind", "value"}:
+        return "path", str(selector["value"])
     if kind == "exact-type-name" and set(selector) == {"kind", "type", "name"}:
         return kind, str(selector["type"]), str(selector["name"])
     if kind == "direct-child" and set(selector) == {"kind", "type", "parent"}:
@@ -551,20 +1214,32 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             raise RuntimeError(
                 "Registry returned an invalid audio.import operation default"
             )
+        source_control_option_names = [
+            name
+            for name in (
+                "auto_add_to_source_control",
+                "auto_check_out_to_source_control",
+            )
+            if not isinstance(
+                fragments["request_options"][name].get("supported_versions"),
+                list,
+            )
+            or version
+            in fragments["request_options"][name]["supported_versions"]
+        ]
         flat_import_row_discipline = {
             "initial_row_action": "add_import_row",
             "one_initial_action_per_row": True,
-            "assignment_intent": {
-                "required_on_every_row": True,
-                "ordinary_row": {"mode": "none"},
-                "switch_assigned_row": {
-                    "mode": "switch",
-                    "value": "<exact-value>",
-                },
+            "switch_assignment": {
+                "ordinary_row_action": None,
+                "when_user_requested": "assign_import_row_switch",
+                "requires_gateway_import_handle": True,
             },
             "never_guess_assignment_intent": True,
             "include_every_known_field_in_one_action": True,
-            "metadata_dependency_activation": "gateway_owned_do_not_submit",
+            "metadata_dependency_activation": (
+                "agent_selects_exact_token_gateway_validates_dependencies"
+            ),
         }
         import_row_user_fact_checklist = {
             "copy_every_explicit_fact_for_this_row": True,
@@ -581,33 +1256,30 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "switch_assignment",
             ],
             "distinct_metadata_tokens_are_independent_facts": True,
-            "assignment_intent_is_required_on_every_row": True,
+            "switch_assignment_action_only_when_explicit": True,
         }
         planning_discipline = {
             "dynamic_metadata": {
                 "fields": ["properties", "references"],
-                "query_granularity": (
-                    "one_successful_command_per_object_type"
+                "discovery_owner": "agent_metadata_discover",
+                "validation_owner": "gateway_draft_check",
+                "agent_metadata_command_required": (
+                    "when_token_is_not_already_exact_live_evidence"
                 ),
-                "all_required_tokens_share_that_result": True,
-                "split_required_tokens_across_queries": False,
-                "action_fields_source": "explicit_user_request_only",
+                "action_fields_source": (
+                    "explicit_user_intent_plus_exact_live_tokens"
+                ),
                 "unrequested_dependency_candidates": (
                     "validation_only_do_not_copy_into_action"
                 ),
-                "complete_before": (
-                    "first-draft-apply-using-properties-or-references"
-                ),
-                "schema_and_metadata_may_swap": True,
-                "draft_start_may_precede": True,
-                "successful_result_survives_metadata_independent_actions": True,
-                "repeat_successful_query": False,
+                "validated_at": "draft-check_and_preview",
+                "preview_revalidates": True,
             },
             "import_operation": {
                 "source": (
                     "registry_fragments.request_options.import_operation"
                 ),
-                "action": "set_import_option",
+                "action": "set_import_operation",
                 "gateway_default": gateway_default,
                 "default_is_materialized_at": "draft-start",
                 "action_required_only_for": [
@@ -679,23 +1351,25 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 ),
                 **(
                     {
-                        "assignment_contract": {
-                            "required": True,
-                            "normal_forms": [
-                                {
-                                    "mode": "none",
-                                    "additional_fields": False,
-                                },
-                                {
-                                    "mode": "switch",
-                                    "required_fields": ["value"],
-                                    "additional_fields": False,
-                                },
-                            ],
-                            "one_intent_per_row": True,
+                        "switch_assignment_contract": {
+                            "bind_handle_from": (
+                                "prior add_import_row action response"
+                            ),
+                            "requires_exact_user_value": True,
+                            "additional_fields": False,
                         }
                     }
-                    if action_name == "add_import_row"
+                    if action_name == "assign_import_row_switch"
+                    else {}
+                ),
+                **(
+                    {
+                        "allowed_names": list(source_control_option_names),
+                        "value_type": "boolean",
+                        "import_operation_uses": "set_import_operation",
+                    }
+                    if action_name
+                    in {"set_import_option", "clear_import_option"}
                     else {}
                 ),
             }
@@ -716,19 +1390,11 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             },
             "planning_discipline": planning_discipline,
             "start_preconditions": {
-                "dynamic_metadata": dict(
-                    planning_discipline["dynamic_metadata"]
+                "agent_metadata_command_required": (
+                    "when_dynamic_token_is_not_already_exact_live_evidence"
                 ),
-                "draft_start_may_precede": True,
-                "metadata_independent_actions_may_precede": True,
-                "successful_metadata_survives_metadata_independent_actions": True,
-                "repeat_successful_metadata": False,
-                "actions_using_properties_or_references_wait_for": [
-                    "dynamic_metadata"
-                ],
-                "failure_policy": (
-                    "do_not_apply_dynamic_fields_then_backfill_metadata"
-                ),
+                "submit_only_explicit_user_facts": True,
+                "draft_check_revalidates_dynamic_metadata": True,
             },
             "flat_import_row_discipline": flat_import_row_discipline,
             "action_shapes": action_shapes,
@@ -1925,6 +2591,22 @@ def _apply_audio_import_action(
     action_name: Any,
     handle_factory: Callable[[], str] | None,
 ) -> tuple[dict[str, Any], str]:
+    if action_name == "set_import_operation":
+        _require_exact_keys(
+            action,
+            required=("contract", "action", "mode"),
+            label="set_import_operation action",
+        )
+        descriptor = _validate_audio_import_fragment(
+            version,
+            fragment="request_option",
+            payload={"name": "import_operation", "value": action.get("mode")},
+        )
+        options = composition["request_options"]
+        assert isinstance(options, dict)
+        options[descriptor["name"]] = descriptor["value"]
+        _materialize_if_complete(AUDIO_IMPORT_COMPOSER_OPERATION, version, composition)
+        return composition, str(action_name)
     if action_name in {"set_import_option", "clear_import_option"}:
         required = (
             ("contract", "action", "name", "value")
@@ -1993,16 +2675,15 @@ def _apply_audio_import_action(
                 "action",
                 *required_action_fields,
             ),
-            optional=optional_action_fields,
+            optional=(*optional_action_fields, "assignment"),
             label=f"{action_name} action",
         )
+        has_assignment = "assignment" in action
         assignment = action.get("assignment")
-        if not isinstance(assignment, Mapping):
-            raise OperationComposerError(
-                "add_import_row requires one assignment intent."
-            )
-        assignment_mode = assignment.get("mode")
-        if assignment_mode == "none":
+        assignment_mode = assignment.get("mode") if isinstance(assignment, Mapping) else None
+        if not has_assignment:
+            switch_assignment = None
+        elif assignment_mode == "none":
             _require_exact_keys(
                 assignment,
                 required=("mode",),
@@ -2117,6 +2798,29 @@ def _apply_audio_import_action(
                     details={"name": name},
                 )
             del fields[name]
+        _materialize_if_complete(AUDIO_IMPORT_COMPOSER_OPERATION, version, composition)
+        return composition, str(action_name)
+    if action_name == "assign_import_row_switch":
+        _require_exact_keys(
+            action,
+            required=("contract", "action", "import_handle", "switch"),
+            label="assign_import_row_switch action",
+        )
+        row = _audio_import_row_for_handle(
+            composition,
+            action.get("import_handle"),
+        )
+        descriptor = _validate_audio_import_fragment(
+            version,
+            fragment="row_field",
+            payload={
+                "name": "switch_assignment",
+                "value": action.get("switch"),
+            },
+        )
+        fields = row["fields"]
+        assert isinstance(fields, dict)
+        fields[descriptor["name"]] = descriptor["value"]
         _materialize_if_complete(AUDIO_IMPORT_COMPOSER_OPERATION, version, composition)
         return composition, str(action_name)
     if action_name == "remove_import_row":
@@ -2309,14 +3013,15 @@ def _audio_import_composition_projection(
         "defaults": _audio_import_public_fields(defaults),
         "action_guidance": {
             "switch_assignment": {
-                "action": "add_import_row",
-                "required_on_every_row": True,
-                "ordinary_row": ["--assignment", "none"],
+                "action": "assign_import_row_switch",
+                "ordinary_row": "no_assignment_action",
                 "when_user_requested": [
-                    "--assignment",
-                    "switch",
+                    "--import-handle",
+                    "<created-import-handle>",
+                    "--switch",
                     "<exact-value>",
                 ],
+                "handle_source": "/draft/action_result/created_handles/0",
                 "guessing_allowed": False,
             }
         },

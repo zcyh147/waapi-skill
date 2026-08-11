@@ -38,7 +38,6 @@ from tests.semantic.support.codex_integration_workflows_v2 import (
     load_integration_workflows_v2_profile,
 )
 from tests.semantic.support.codex_prompt_provenance_v3 import (
-    PromptProvenanceError,
     deserialize_protocol,
     serialize_protocol,
 )
@@ -661,18 +660,8 @@ def _observe_successful_protocol(
     fake: FakeRifleWaapi,
     *,
     preserve_existing_source_guids: bool = False,
-    preamble_order: str = "canonical",
 ) -> None:
-    steps = list(prepared.protocol.steps)
-    if preamble_order == "metadata-first":
-        steps[:2] = reversed(steps[:2])
-    elif preamble_order == "draft-before-metadata":
-        steps[1:3] = reversed(steps[1:3])
-    elif preamble_order == "static-action-before-metadata":
-        steps[:4] = (steps[0], steps[2], steps[3], steps[1])
-    elif preamble_order != "canonical":
-        raise ValueError("unsupported Rifle preamble order")
-    for step in steps:
+    for step in prepared.protocol.steps:
         if step.name == "tx01.execute":
             fake.apply_import(
                 prepared.operation_request,
@@ -683,7 +672,7 @@ def _observe_successful_protocol(
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-def test_prepares_exact_metadata_bound_use_existing_batch(
+def test_prepares_exact_gateway_checked_use_existing_batch(
     tmp_path: Path,
     version: str,
 ) -> None:
@@ -741,14 +730,21 @@ def test_prepares_exact_metadata_bound_use_existing_batch(
     )
     assert prepared.protocol.turn_prefix_counts == (10, 14)
     assert prepared.protocol.commutative_read_only_step_groups == (
-        RIFLE_COMMUTATIVE_READ_ONLY_STEP_GROUPS
+        ("tx01.operation-schema", "metadata.discover"),
     )
     assert prepared.protocol.commutative_composer_setup_step_groups == (
-        RIFLE_COMMUTATIVE_COMPOSER_SETUP_STEP_GROUPS
+        (
+            "metadata.discover",
+            "tx01.draft-start",
+            "tx01.action.001",
+            "tx01.action.002",
+            "tx01.action.003",
+            "tx01.action.004",
+        ),
     )
     assert METADATA_QUERIES == ("volume", "output bus")
     assert METADATA_TOKENS == ("Volume", "OutputBus")
-    assert prepared.protocol.steps[1].arguments[-2:] == ("--limit", "8")
+    assert sum(step.subcommand == "metadata" for step in prepared.protocol.steps) == 1
     assert prepared.expected_dispatches[0].api == IMPORT_API
     assert prepared.expected_dispatches[0].count == 1
     assert len(prepared.before_snapshot.objects) == 10
@@ -758,7 +754,7 @@ def test_prepares_exact_metadata_bound_use_existing_batch(
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-def test_rifle_composer_preserves_every_exact_import_row_and_metadata_binding(
+def test_rifle_composer_preserves_every_exact_import_row(
     tmp_path: Path,
     version: str,
 ) -> None:
@@ -776,23 +772,23 @@ def test_rifle_composer_preserves_every_exact_import_row_and_metadata_binding(
     )
     assert action_arguments[0].expected == {
         "contract": "waapi-skill.operation-draft-action/v1",
-        "action": "set_import_option",
-        "name": "import_operation",
-        "value": "useExisting",
+        "action": "set_import_operation",
+        "mode": "useExisting",
     }
     rows = _plain(prepared.operation_request)["arguments"]["imports"]
     assert [argument.expected for argument in action_arguments[1:]] == [
         {
             "contract": "waapi-skill.operation-draft-action/v1",
             "action": "add_import_row",
-            "assignment": {"mode": "none"},
             **row,
         }
         for row in rows
     ]
+    assert all(
+        argument.metadata_binding is None for argument in action_arguments[:-1]
+    )
     assert action_arguments[-1].metadata_binding is not None
     assert action_arguments[-1].metadata_binding.step == "metadata.discover"
-    assert action_arguments[-1].metadata_binding.required_tokens == METADATA_TOKENS
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
@@ -875,7 +871,7 @@ def test_campaign_archive_rejects_other_empty_name_shapes(
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-def test_rifle_preamble_accepts_only_declared_dependency_safe_orders(
+def test_rifle_setup_accepts_only_dependency_valid_action_orders(
     tmp_path: Path,
     version: str,
 ) -> None:
@@ -897,35 +893,14 @@ def test_rifle_preamble_accepts_only_declared_dependency_safe_orders(
     assert gateway_step_sequence_matches(
         canonical, canonical, groups, setup_groups
     )
-    assert gateway_step_sequence_matches(
+    assert not gateway_step_sequence_matches(
         canonical,
-        (
-            "metadata.discover",
-            "tx01.operation-schema",
-            "tx01.draft-start",
-            "tx01.action.001",
-            "tx01.action.002",
-            "tx01.action.003",
-            "tx01.action.004",
-            "tx01.action.005",
-        ),
+        ("tx01.draft-start", "metadata.discover", "tx01.operation-schema", *canonical[3:]),
         groups,
         setup_groups,
     )
-    assert gateway_step_sequence_matches(
-        canonical,
-        (
-            "tx01.operation-schema",
-            "tx01.draft-start",
-            "metadata.discover",
-            "tx01.action.001",
-            "tx01.action.002",
-            "tx01.action.003",
-            "tx01.action.004",
-            "tx01.action.005",
-        ),
-        groups,
-        setup_groups,
+    assert not gateway_step_sequence_matches(
+        canonical, canonical[:-1], groups, setup_groups
     )
     assert gateway_step_sequence_matches(
         canonical,
@@ -934,92 +909,7 @@ def test_rifle_preamble_accepts_only_declared_dependency_safe_orders(
             "tx01.draft-start",
             "tx01.action.001",
             "tx01.action.002",
-            "tx01.action.003",
             "metadata.discover",
-            "tx01.action.004",
-            "tx01.action.005",
-        ),
-        groups,
-        setup_groups,
-    )
-    assert gateway_step_sequence_matches(
-        canonical,
-        (
-            "tx01.operation-schema",
-            "tx01.draft-start",
-            "tx01.action.001",
-            "tx01.action.002",
-            "tx01.action.003",
-            "tx01.action.004",
-            "metadata.discover",
-            "tx01.action.005",
-        ),
-        groups,
-        setup_groups,
-    )
-
-    # The fifth action adds the new row carrying Volume and OutputBus, so
-    # metadata may not move beyond that first metadata-bound action.
-    assert not gateway_step_sequence_matches(
-        canonical,
-        (
-            "tx01.operation-schema",
-            "tx01.draft-start",
-            "tx01.action.001",
-            "tx01.action.002",
-            "tx01.action.003",
-            "tx01.action.004",
-            "tx01.action.005",
-            "metadata.discover",
-        ),
-        groups,
-        setup_groups,
-    )
-
-    # Schema and metadata remain mandatory before the first metadata-bound action.
-    assert not gateway_step_sequence_matches(
-        canonical,
-        (
-            "metadata.discover",
-            "tx01.draft-start",
-            "tx01.action.001",
-        ),
-        groups,
-        setup_groups,
-    )
-    assert not gateway_step_sequence_matches(
-        canonical,
-        (
-            "tx01.operation-schema",
-            "tx01.draft-start",
-            "tx01.action.001",
-        ),
-        groups,
-        setup_groups,
-    )
-    assert not gateway_step_sequence_matches(
-        canonical,
-        (
-            "metadata.discover",
-            "tx01.draft-start",
-            "tx01.operation-schema",
-            "tx01.action.001",
-            "tx01.action.002",
-            "tx01.action.003",
-            "tx01.action.004",
-            "tx01.action.005",
-        ),
-        groups,
-        setup_groups,
-    )
-    assert not gateway_step_sequence_matches(
-        canonical,
-        (
-            "tx01.draft-start",
-            "tx01.operation-schema",
-            "metadata.discover",
-            "tx01.action.001",
-            "tx01.action.002",
             "tx01.action.003",
             "tx01.action.004",
             "tx01.action.005",
@@ -1030,52 +920,35 @@ def test_rifle_preamble_accepts_only_declared_dependency_safe_orders(
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-def test_rifle_metadata_free_setup_group_round_trips_prompt_provenance(
+def test_rifle_canonical_setup_round_trips_prompt_provenance(
     tmp_path: Path,
     version: str,
 ) -> None:
     prepared, _fake, _runtime = _prepared(tmp_path, version=version)
-
     serialized = serialize_protocol(prepared.protocol)
 
+    assert serialized["commutative_read_only_step_groups"] == [
+        ["tx01.operation-schema", "metadata.discover"]
+    ]
     assert serialized["commutative_composer_setup_step_groups"] == [
-        list(RIFLE_COMMUTATIVE_COMPOSER_SETUP_STEP_GROUPS[0])
+        [
+            "metadata.discover",
+            "tx01.draft-start",
+            "tx01.action.001",
+            "tx01.action.002",
+            "tx01.action.003",
+            "tx01.action.004",
+        ]
     ]
     assert deserialize_protocol(serialized) == prepared.protocol
 
-    tampered = copy.deepcopy(serialized)
-    tampered["commutative_read_only_step_groups"][0].append(
-        "tx01.draft-start"
-    )
-    with pytest.raises(
-        PromptProvenanceError,
-        match="commutative read-only protocol groups",
-    ):
-        deserialize_protocol(tampered)
-
-
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-@pytest.mark.parametrize(
-    "preamble_order",
-    (
-        "canonical",
-        "metadata-first",
-        "draft-before-metadata",
-        "static-action-before-metadata",
-    ),
-)
-def test_rifle_observer_and_final_oracle_accept_declared_preamble_orders(
+def test_rifle_observer_and_final_oracle_accept_canonical_setup(
     tmp_path: Path,
     version: str,
-    preamble_order: str,
 ) -> None:
     prepared, fake, _runtime = _prepared(tmp_path, version=version)
-
-    _observe_successful_protocol(
-        prepared,
-        fake,
-        preamble_order=preamble_order,
-    )
+    _observe_successful_protocol(prepared, fake)
     verification = prepared.verify_final()
 
     verification.assert_passed()
@@ -1083,7 +956,7 @@ def test_rifle_observer_and_final_oracle_accept_declared_preamble_orders(
     prepared.cleanup().assert_passed()
 
 
-def test_rifle_observer_rejects_duplicate_or_incomplete_read_pair(
+def test_rifle_observer_rejects_duplicate_or_incomplete_setup(
     tmp_path: Path,
 ) -> None:
     duplicate_root = tmp_path / "duplicate"
@@ -1108,9 +981,11 @@ def test_rifle_observer_rejects_duplicate_or_incomplete_read_pair(
     incomplete_root.mkdir()
     incomplete, _fake, _runtime = _prepared(incomplete_root)
     operation_schema = incomplete.protocol.steps[0]
-    draft_start = incomplete.protocol.steps[2]
-    metadata_free_actions = incomplete.protocol.steps[3:7]
-    first_metadata_bound_action = incomplete.protocol.steps[7]
+    draft_start = incomplete.protocol.steps[1]
+    incomplete_actions = incomplete.protocol.steps[2:6]
+    preview = next(
+        step for step in incomplete.protocol.steps if step.name == "tx01.preview"
+    )
     incomplete.observe_payload(
         operation_schema,
         {"ok": True, "command": operation_schema.subcommand},
@@ -1119,7 +994,7 @@ def test_rifle_observer_rejects_duplicate_or_incomplete_read_pair(
         draft_start,
         {"ok": True, "command": draft_start.subcommand},
     )
-    for action in metadata_free_actions:
+    for action in incomplete_actions:
         incomplete.observe_payload(
             action,
             {"ok": True, "command": action.subcommand},
@@ -1129,8 +1004,8 @@ def test_rifle_observer_rejects_duplicate_or_incomplete_read_pair(
         match="duplicated or observed out of order",
     ):
         incomplete.observe_payload(
-            first_metadata_bound_action,
-            {"ok": True, "command": first_metadata_bound_action.subcommand},
+            preview,
+            {"ok": True, "command": preview.subcommand},
         )
     incomplete.cleanup().assert_passed()
 

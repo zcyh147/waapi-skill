@@ -13,12 +13,12 @@ from tests.semantic.support.codex_gateway_broker import (
     DraftActionJsonArgument,
     MetadataBoundJsonArgument,
     MetadataTokenProjection,
-    gateway_step_sequence_matches,
 )
 from tests.semantic.support.codex_integration_weather_runtime_v1 import (
     ACTION_METADATA_QUERIES,
     ACTION_TOKENS,
     RAIN_PARAMETER_PATH,
+    RTPC_METADATA_QUERIES,
     RTPC_POINTS,
     SOUND_METADATA_QUERIES,
     SOUND_TOKENS,
@@ -388,7 +388,13 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
                 _projection(ACTION_TOKENS),
                 "object_set_v1",
             ),
-            None,
+            (
+                "Sound",
+                RTPC_METADATA_QUERIES,
+                ("Volume",),
+                _projection(("Volume",)),
+                "object_set_rtpc_v1",
+            ),
         ),
         gateway_derived_reference_activations=(
             (),
@@ -403,13 +409,15 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
     assert [step.name for step in metadata_steps] == [
         "tx01.metadata",
         "tx02.metadata",
+        "tx03.metadata",
     ]
     assert [step.arguments[-2:] for step in metadata_steps] == [
         ("--limit", "2"),
         ("--limit", "8"),
+        ("--limit", "8"),
     ]
     assert protocol.commutative_read_only_step_groups == (
-        ("tx01.metadata", "tx01.operation-schema"),
+        ("tx01.operation-schema", "tx01.metadata"),
         ("tx02.operation-schema", "tx02.metadata"),
     )
     assert [
@@ -417,10 +425,11 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         for step in protocol.steps
         if step.subcommand in {"metadata", "operation-schema"}
     ] == [
-        ("tx01.metadata", "metadata"),
         ("tx01.operation-schema", "operation-schema"),
+        ("tx01.metadata", "metadata"),
         ("tx02.operation-schema", "operation-schema"),
         ("tx02.metadata", "metadata"),
+        ("tx03.metadata", "metadata"),
         ("tx03.operation-schema", "operation-schema"),
     ]
     assert [step.name for step in protocol.steps if step.subcommand == "execute"] == [
@@ -428,42 +437,6 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         "tx02.execute",
         "tx03.execute",
     ]
-    groups = protocol.commutative_read_only_step_groups
-    for canonical in (
-        ("tx01.metadata", "tx01.operation-schema", "tx01.preview"),
-    ):
-        first, second, preview_name = canonical
-        assert gateway_step_sequence_matches(canonical, canonical, groups)
-        assert gateway_step_sequence_matches(
-            canonical,
-            (second, first, preview_name),
-            groups,
-        )
-        assert not gateway_step_sequence_matches(
-            canonical,
-            (first, first, preview_name),
-            groups,
-        )
-        assert not gateway_step_sequence_matches(
-            canonical,
-            (second, second, preview_name),
-            groups,
-        )
-        assert not gateway_step_sequence_matches(
-            canonical,
-            (first, preview_name),
-            groups,
-        )
-        assert not gateway_step_sequence_matches(
-            canonical,
-            (second, preview_name),
-            groups,
-        )
-        assert not gateway_step_sequence_matches(
-            canonical,
-            (first, preview_name, second),
-            groups,
-        )
     import_preview = next(
         step for step in protocol.steps if step.name == "tx01.preview"
     )
@@ -480,17 +453,13 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         and argument.operation == "audio.import"
         for argument in import_actions
     )
-    metadata_bound_actions = [
-        argument
-        for argument in import_actions
-        if argument.metadata_binding is not None
+    bound_import_actions = [
+        argument for argument in import_actions if argument.metadata_binding is not None
     ]
-    assert metadata_bound_actions
+    assert bound_import_actions
     assert all(
         argument.metadata_binding.step == "tx01.metadata"
-        and argument.metadata_binding.required_tokens == sound_tokens
-        and argument.metadata_binding.expected_projection == sound_projection
-        for argument in metadata_bound_actions
+        for argument in bound_import_actions
     )
     action_preview = next(
         step for step in protocol.steps if step.name == "tx02.preview"
@@ -506,6 +475,11 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
     assert all(step.subcommand == "draft-apply" for step in action_steps)
     assert all(
         isinstance(step.arguments[-1], DraftActionJsonArgument)
+        for step in action_steps
+    )
+    assert all(
+        step.arguments[-1].metadata_binding is not None
+        and step.arguments[-1].metadata_binding.step == "tx02.metadata"
         for step in action_steps
     )
     assert action_steps[0].arguments[-1].expected == {
@@ -561,7 +535,7 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
     assert protocol.steps[rtpc_schema_index + 1].name == "tx03.preview"
     rtpc_preview = protocol.steps[rtpc_schema_index + 1]
     assert isinstance(rtpc_preview.arguments[2], MetadataBoundJsonArgument)
-    assert rtpc_preview.arguments[2].metadata_step == "tx01.metadata"
+    assert rtpc_preview.arguments[2].metadata_step == "tx03.metadata"
     assert rtpc_preview.arguments[2].object_type == "Sound"
     assert rtpc_preview.arguments[2].required_tokens == ("Volume",)
     assert tuple(

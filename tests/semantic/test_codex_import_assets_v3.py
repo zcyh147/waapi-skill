@@ -380,8 +380,8 @@ def test_compound_direct_import_binds_defaults_row_overrides_and_inline_wav(
         equivalence="audio_import_v1",
     )
     assert tuple(step.name for step in protocol.steps[:3]) == (
-        "metadata.discover",
         "tx01.operation-schema",
+        "metadata.discover",
         "tx01.draft-start",
     )
     assert next(step for step in protocol.steps if step.name == "tx01.preview").subcommand == (
@@ -404,12 +404,11 @@ def test_compound_direct_import_binds_defaults_row_overrides_and_inline_wav(
         item for item in action_arguments if item.metadata_binding is not None
     ]
     assert metadata_arguments
-    assert all(item.operation == "audio.import" for item in metadata_arguments)
     assert all(
-        item.metadata_binding.object_type == "Sound"
-        and item.metadata_binding.expected_projection is not None
+        item.metadata_binding.step == "metadata.discover"
         for item in metadata_arguments
     )
+    assert sum(step.subcommand == "metadata" for step in protocol.steps) == 1
 
     mission = _compound_unit("CMP22-O22-AUDIO-IMPORT-03")
     mission_staged = materialize_import_case(

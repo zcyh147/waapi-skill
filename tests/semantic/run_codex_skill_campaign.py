@@ -4996,7 +4996,8 @@ def _archived_draft_action(
     if len(typed_indexes) == 1:
         try:
             return parse_typed_action_cli_arguments(
-                gateway_arguments[typed_indexes[0] + 1 :]
+                gateway_arguments[typed_indexes[0] + 1 :],
+                legacy_compatibility=True,
             )
         except OperationComposerError as exc:
             raise CampaignEvidenceError(

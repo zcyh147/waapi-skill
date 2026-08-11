@@ -2002,13 +2002,19 @@ def _audio_import_composer_row_origins(
                 action_rows.append(
                     (step_index, argument_index, step_name, action)
                 )
-            elif (
+            elif action_name == "assign_import_row_switch" or (
                 action_name == "set_import_row_field"
                 and action.get("name") == "switch_assignment"
             ):
                 bindings = argument.get("response_bindings")
                 if (
-                    set(action) != {"contract", "action", "name", "value"}
+                    frozenset(action)
+                    not in {
+                        frozenset(
+                            {"contract", "action", "name", "value"}
+                        ),
+                        frozenset({"contract", "action", "switch"}),
+                    }
                     or not isinstance(bindings, list)
                     or len(bindings) != 1
                     or not isinstance(bindings[0], Mapping)
@@ -2057,7 +2063,10 @@ def _audio_import_composer_row_origins(
             edit = assignment_edits.get(step_name)
             if edit is not None:
                 edit_step_index, edit_argument_index, edit_action = edit
-                action_fields["switch_assignment"] = edit_action.get("value")
+                action_fields["switch_assignment"] = edit_action.get(
+                    "switch",
+                    edit_action.get("value"),
+                )
                 used_assignment_edits.add(step_name)
         elif assignment.get("mode") == "switch":
             if set(assignment) != {"mode", "value"}:
@@ -2080,7 +2089,11 @@ def _audio_import_composer_row_origins(
                 )
                 origins[f"/{row_index}{pointer}"] = (
                     f"/steps/{edit_step_index}/arguments/{edit_argument_index}"
-                    "/value/value"
+                    + (
+                        "/value/switch"
+                        if "switch" in _edit_action
+                        else "/value/value"
+                    )
                 )
             else:
                 action_pointer = (

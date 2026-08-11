@@ -156,12 +156,13 @@ Conditional read for a query not fully covered by the fixed commands, exact-iden
 
 Use operate for project-changing work: create, move, copy, delete, property/reference edits, imports, soundbanks, switch assignments, and design previews.
 
-For `object.create`/`object.set`, finish any required selected-subset exact-ID
-readback, then run schema before metadata; its adapter version selects scope.
-Otherwise, only an explicit unknown dynamic property/reference token needs
-metadata; the operate reference says whether it precedes or commutes with
-schema. Closed fields and side effects are not metadata; without that token,
-start with the named schema. Never infer a token or scope.
+Finish any required selected-subset exact-ID readback first. `object.create`
+runs schema before metadata. `object.set` and `audio.import` run their schema,
+then discover naturally described dynamic tokens; Composer `draft-check`
+revalidates them and dependencies. For other
+operations, only an explicit unknown dynamic property/reference token needs
+metadata in the order stated by the operate reference. Never infer a token or
+scope.
 
 Apply the canonical policy from the latest gateway `session_context`:
 

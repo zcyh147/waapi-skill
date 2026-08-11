@@ -3,7 +3,7 @@
 The workflow starts from a version-pinned SampleProject graph.  This adapter
 therefore performs no project setup and owns no Wwise object cleanup.  It
 validates the copied live graph against the sealed baseline manifest, writes
-only the four case-owned incoming WAV files, builds one metadata-bound
+only the four case-owned incoming WAV files, builds one Gateway-checked
 ``audio.import`` transaction, and evaluates the final business state through a
 private direct-WAAPI readback.
 

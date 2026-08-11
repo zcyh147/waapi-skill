@@ -89,6 +89,111 @@ def test_archive_reconstructs_typed_action_argv_without_json_text() -> None:
     ) == action
 
 
+def test_archive_replays_frozen_generic_audio_import_typed_argv() -> None:
+    arguments = (
+        "--compact",
+        "--facts",
+        "--action",
+        "add_import_row",
+        "--value",
+        "object_path",
+        "string",
+        r"\Actor-Mixer Hierarchy\Default Work Unit\Storm",
+        "--selector",
+        "import_location",
+        "path",
+        r"\Actor-Mixer Hierarchy\Default Work Unit",
+        "--property",
+        "properties",
+        "Volume",
+        "number",
+        "-3.0",
+        "--reference",
+        "references",
+        "OutputBus",
+        "path",
+        r"\Master-Mixer Hierarchy\Default Work Unit\Storm",
+        "--event",
+        "event",
+        "Play",
+        r"\Events\Default Work Unit\Play_Storm",
+        "--assignment",
+        "none",
+    )
+
+    action = archive_module._strict_action(  # noqa: SLF001
+        arguments,
+        operation="audio.import",
+        version="2022.1",
+    )
+
+    assert action == {
+        "contract": ACTION_CONTRACT,
+        "action": "add_import_row",
+        "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\Storm",
+        "import_location": {
+            "kind": "path",
+            "value": r"\Actor-Mixer Hierarchy\Default Work Unit",
+        },
+        "assignment": {"mode": "none"},
+        "event": {
+            "action": "Play",
+            "path": r"\Events\Default Work Unit\Play_Storm",
+        },
+        "properties": [{"name": "Volume", "value": -3.0}],
+        "references": [
+            {
+                "name": "OutputBus",
+                "target": {
+                    "kind": "path",
+                    "value": r"\Master-Mixer Hierarchy\Default Work Unit\Storm",
+                },
+            }
+        ],
+    }
+
+
+@pytest.mark.parametrize("legacy_index", (0, 1))
+def test_archive_accepts_both_frozen_audio_import_projection_contracts(
+    legacy_index: int,
+) -> None:
+    projection = composition_projection(
+        "audio.import",
+        "2022.1",
+        {
+            "contract": "waapi-skill.operation-composition/v1",
+            "request_options": {"import_operation": "createNew"},
+            "defaults": {},
+            "imports": [],
+        },
+    )
+    legacy = archive_module._legacy_audio_import_projections(projection)[  # noqa: SLF001
+        legacy_index
+    ]
+    draft = {
+        "draft_id": "od1-" + "1" * 32,
+        "revision": 1,
+        "lifecycle_state": "editable",
+        "binding": {
+            "operation": "audio.import",
+            "version": "2022.1",
+            "schema_digest": "a" * 64,
+        },
+        **legacy,
+    }
+
+    archive_module._require_projection(  # noqa: SLF001
+        draft,
+        draft_id="od1-" + "1" * 32,
+        revision=1,
+        lifecycle_state="editable",
+        operation="audio.import",
+        version="2022.1",
+        schema_digest="a" * 64,
+        projection=projection,
+    )
+
+
 def _draft_payload(
     command: str,
     record: OperationDraftRecord,

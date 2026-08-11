@@ -54,6 +54,7 @@ def build_object_set_composer_transaction_steps(
     *,
     label: str,
     reference_identity_sources: Mapping[str, str] | None = None,
+    metadata_binding: DraftActionMetadataBinding | None = None,
 ) -> tuple[ExpectedGatewayStep, ...]:
     """Translate one reviewed flat object.set request into one typed Draft flow."""
 
@@ -210,6 +211,15 @@ def build_object_set_composer_transaction_steps(
                     DraftActionJsonArgument(
                         expected=action,
                         query_identity_bindings=identity_bindings,
+                        metadata_binding=(
+                            metadata_binding
+                            if action.get("action") == "add_target"
+                            and any(
+                                name in action
+                                for name in ("properties", "references")
+                            )
+                            else None
+                        ),
                     ),
                 ),
             )
@@ -326,9 +336,18 @@ def build_audio_import_composer_transaction_steps(
                 (
                     {
                         "contract": OPERATION_DRAFT_ACTION_CONTRACT,
-                        "action": "set_import_option",
-                        "name": option_name,
-                        "value": arguments[option_name],
+                        **(
+                            {
+                                "action": "set_import_operation",
+                                "mode": arguments[option_name],
+                            }
+                            if option_name == "import_operation"
+                            else {
+                                "action": "set_import_option",
+                                "name": option_name,
+                                "value": arguments[option_name],
+                            }
+                        ),
                     },
                     None,
                     (),
@@ -362,13 +381,9 @@ def build_audio_import_composer_transaction_steps(
         action = {
             "contract": OPERATION_DRAFT_ACTION_CONTRACT,
             "action": "add_import_row",
-            "assignment": (
-                {"mode": "switch", "value": switch_assignment}
-                if has_switch_assignment
-                else {"mode": "none"}
-            ),
             **row_fields,
         }
+        row_action_name = f"{label}.action.{len(action_specs) + 1:03d}"
         action_specs.append(
             (
                 action,
@@ -378,6 +393,26 @@ def build_audio_import_composer_transaction_steps(
                 (),
             )
         )
+        if has_switch_assignment:
+            action_specs.append(
+                (
+                    {
+                        "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+                        "action": "assign_import_row_switch",
+                        "switch": switch_assignment,
+                    },
+                    None,
+                    (
+                        DraftActionResponseBinding(
+                            pointer="/import_handle",
+                            step=row_action_name,
+                            response_pointer=(
+                                "/draft/action_result/created_handles/0"
+                            ),
+                        ),
+                    ),
+                )
+            )
 
     try:
         materialized = _materialize_audio_import_composer_action_entries(
@@ -571,11 +606,6 @@ def _materialize_audio_import_composer_action_entries(
             "add_switch_assigned_import_row",
         }:
             resolved_action["action"] = "add_import_row"
-        if (
-            resolved_action.get("action") == "add_import_row"
-            and "assignment" not in resolved_action
-        ):
-            resolved_action["assignment"] = {"mode": "none"}
         generated_handle = next(handles)
         composition, _action_name = apply_composer_action(
             "audio.import",
@@ -1192,7 +1222,7 @@ def build_metadata_transaction_protocol(
                 expected_projection=projection,
             ),
             metadata_step=metadata_step,
-            schema_first=schema_first,
+            schema_first=True,
         )
     base = build_transaction_protocol(requests)
     if schema_first:

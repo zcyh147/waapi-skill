@@ -549,23 +549,18 @@ def test_object_set_normal_typed_argv_preserves_wire_paths_and_scalar_facts(
         "--facts",
         "--action",
         "add_target",
-        "--selector",
-        "selector",
+        "--target",
         "direct-child",
         "Action",
         "path",
         action_path,
-        "--value",
-        "notes",
-        "string",
+        "--notes",
         hostile_notes,
         "--property",
-        "properties",
         "FadeTime",
         "number",
         "0.0",
         "--property",
-        "properties",
         "Delay",
         "number",
         "1.25",
@@ -593,6 +588,41 @@ def test_object_set_normal_typed_argv_preserves_wire_paths_and_scalar_facts(
     ]
 
 
+def test_object_set_add_target_uses_direct_reference_flag_without_field_name(
+    tmp_path: Path,
+) -> None:
+    _code, started = execute(tmp_path, "draft-start", "object.set")
+    bus_path = r"\Master-Mixer Hierarchy\Default Work Unit\Weapons"
+
+    code, result = execute(
+        tmp_path,
+        "draft-apply",
+        started["draft"]["draft_id"],
+        "--task-authority",
+        started["task_authority"],
+        "--expected-revision",
+        "1",
+        "--facts",
+        "--action",
+        "add_target",
+        "--target",
+        "id",
+        TARGET_ID,
+        "--reference",
+        "OutputBus",
+        "path",
+        bus_path,
+    )
+
+    assert code == 0
+    assert result["draft"]["current_facts"][0]["references"] == [
+        {
+            "name": "OutputBus",
+            "target": {"kind": "path", "value": bus_path},
+        }
+    ]
+
+
 def test_normal_composer_schema_discloses_typed_argv_not_action_json(
     tmp_path: Path,
 ) -> None:
@@ -608,8 +638,17 @@ def test_normal_composer_schema_discloses_typed_argv_not_action_json(
     apply = payload["composer"]["apply"]
     encoded = json.dumps(payload, ensure_ascii=False)
     assert "--action" in encoded
-    assert "--selector" in encoded
+    assert "--target" in encoded
     assert "--property" in encoded
+    assert "--value" not in encoded
+    assert '"FIELD"' not in encoded
+    assert apply["action_argv"]["add_target"] == [
+        "--target", "SELECTOR_KIND", "SELECTOR_VALUES...",
+        "[--name VALUE]", "[--notes VALUE]", "[--platform VALUE]",
+        "[--list-mode VALUE]", "[--on-name-conflict VALUE]",
+        "[--property NAME TYPE VALUE]...",
+        "[--reference NAME SELECTOR_KIND SELECTOR_VALUES...]...",
+    ]
     assert "--action-json" not in encoded
     assert "typed-action-json" not in encoded
 
@@ -716,9 +755,13 @@ def test_invalid_or_mixed_typed_action_argv_is_atomic(
         action_mapping(
             "add_import_row",
             object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\One",
-            assignment={"mode": "switch", "value": "Snow"},
             object_type="Sound SFX",
             properties=[{"name": "Volume", "value": -6.25}],
+        ),
+        action_mapping(
+            "assign_import_row_switch",
+            import_handle="odh1-333333333333333333333333",
+            switch="Snow",
         ),
     ],
 )
@@ -729,6 +772,161 @@ def test_typed_action_argv_round_trips_closed_business_facts(
 
     assert "--action-json" not in argv
     assert parse_typed_action_cli_arguments(argv) == typed_action
+
+
+@pytest.mark.parametrize(
+    "typed_action",
+    [
+        action_mapping("set_target_field", target_handle="t", name="notes", value="x"),
+        action_mapping("clear_target_field", target_handle="t", name="notes"),
+        action_mapping("set_property", target_handle="t", name="Volume", value=-3.0),
+        action_mapping("remove_property", target_handle="t", name="Volume"),
+        action_mapping(
+            "set_reference",
+            owner_handle="o",
+            name="OutputBus",
+            target={"kind": "path", "value": r"\Master-Mixer Hierarchy\Bus"},
+        ),
+        action_mapping("remove_reference", owner_handle="o", name="OutputBus"),
+        action_mapping("add_child", parent_handle="p", type="Sound", name="Child"),
+        action_mapping("set_node_field", node_handle="n", name="notes", value="x"),
+        action_mapping("clear_node_field", node_handle="n", name="notes"),
+        action_mapping("set_node_property", node_handle="n", name="Volume", value=-1),
+        action_mapping("remove_node_property", node_handle="n", name="Volume"),
+        action_mapping("remove_node", node_handle="n"),
+        action_mapping("add_list", target_handle="t", name="children"),
+        action_mapping("remove_list", list_handle="l"),
+        action_mapping("add_list_member", list_handle="l", type="Sound", name="One"),
+        action_mapping("remove_target", target_handle="t"),
+        action_mapping(
+            "add_import_file",
+            owner_handle="o",
+            audio_file="/tmp/one.wav",
+            originals_subfolder="incoming",
+            language="SFX",
+            object_type="Sound SFX",
+        ),
+        action_mapping("set_import_file_field", file_handle="f", name="language", value="SFX"),
+        action_mapping("clear_import_file_field", file_handle="f", name="language"),
+        action_mapping("remove_import_file", file_handle="f"),
+        action_mapping("set_import_option", owner_handle="o", name="auto_add", value=False),
+        action_mapping("clear_import_option", owner_handle="o", name="auto_add"),
+        action_mapping("remove_import", owner_handle="o"),
+    ],
+)
+def test_every_object_set_normal_action_round_trips_specific_flags(
+    typed_action: Mapping[str, Any],
+) -> None:
+    argv = typed_action_cli_arguments(typed_action)
+
+    assert "--value" not in argv
+    assert "--null" not in argv
+    assert "--assignment" not in argv
+    assert parse_typed_action_cli_arguments(argv) == typed_action
+
+
+@pytest.mark.parametrize(
+    "typed_action",
+    [
+        action_mapping(
+            "set_import_option",
+            name="auto_add_to_source_control",
+            value=True,
+        ),
+        action_mapping(
+            "clear_import_option",
+            name="auto_check_out_to_source_control",
+        ),
+    ],
+)
+def test_audio_import_source_control_actions_need_no_object_owner_handle(
+    typed_action: Mapping[str, Any],
+) -> None:
+    argv = typed_action_cli_arguments(typed_action)
+
+    assert "--owner-handle" not in argv
+    assert parse_typed_action_cli_arguments(argv) == typed_action
+
+
+def test_audio_import_generic_option_cannot_replace_dedicated_operation_action() -> None:
+    with pytest.raises(OperationComposerError, match="not public"):
+        parse_typed_action_cli_arguments(
+            (
+                "--action",
+                "set_import_option",
+                "--option",
+                "import_operation",
+                "string",
+                "useExisting",
+            )
+        )
+
+
+@pytest.mark.parametrize(
+    ("arguments", "expected"),
+    [
+        (
+            ("--action", "set_request_option", "--option", "list_mode", "string", "append"),
+            action_mapping("set_request_option", name="list_mode", value="append"),
+        ),
+        (
+            (
+                "--action", "set_property", "--target-handle",
+                "odh1-111111111111111111111111", "--property", "Volume", "number", "-3.0",
+            ),
+            action_mapping(
+                "set_property",
+                target_handle="odh1-111111111111111111111111",
+                name="Volume",
+                value=-3.0,
+            ),
+        ),
+        (
+            (
+                "--action", "set_reference", "--owner-handle",
+                "odh1-111111111111111111111111", "--reference", "OutputBus",
+                "path", r"\Master-Mixer Hierarchy\Default Work Unit\Weapons",
+            ),
+            action_mapping(
+                "set_reference",
+                owner_handle="odh1-111111111111111111111111",
+                name="OutputBus",
+                target={
+                    "kind": "path",
+                    "value": r"\Master-Mixer Hierarchy\Default Work Unit\Weapons",
+                },
+            ),
+        ),
+        (
+            (
+                "--action", "add_child", "--parent-handle",
+                "odh1-111111111111111111111111", "--type", "Sound", "--name", "Child",
+            ),
+            action_mapping(
+                "add_child",
+                parent_handle="odh1-111111111111111111111111",
+                type="Sound",
+                name="Child",
+            ),
+        ),
+        (
+            (
+                "--action", "add_list", "--target-handle",
+                "odh1-111111111111111111111111", "--list", "children",
+            ),
+            action_mapping(
+                "add_list",
+                target_handle="odh1-111111111111111111111111",
+                name="children",
+            ),
+        ),
+    ],
+)
+def test_object_set_action_specific_argv_never_requires_internal_field_names(
+    arguments: tuple[str, ...],
+    expected: Mapping[str, Any],
+) -> None:
+    assert parse_typed_action_cli_arguments(arguments) == expected
 
 
 def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(

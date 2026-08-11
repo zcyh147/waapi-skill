@@ -400,179 +400,65 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         "draft-start",
         "audio.import",
     ]
-    assert schema["composer"]["apply"]["typed_fact_flags"]["--assignment"] == [
-        "none",
-        "|",
-        "switch",
-        "VALUE",
-    ]
-    assert schema["composer"]["apply"]["typed_fact_flags"]["--value"] == [
-        "FIELD",
+    action_argv = schema["composer"]["apply"]["action_argv"]
+    assert "typed_fact_flags" not in schema["composer"]["apply"]
+    assert action_argv["add_import_row"][:4] == [
+        "--object-path",
+        "PATH",
+        "--object-type",
         "TYPE",
+    ]
+    assert action_argv["assign_import_row_switch"] == [
+        "--import-handle",
+        "HANDLE",
+        "--switch",
         "VALUE",
     ]
     assert schema["composer"]["start"]["preconditions"] == {
-        "dynamic_metadata": {
-            "fields": ["properties", "references"],
-            "query_granularity": "one_successful_command_per_object_type",
-            "all_required_tokens_share_that_result": True,
-            "split_required_tokens_across_queries": False,
-            "action_fields_source": "explicit_user_request_only",
-            "unrequested_dependency_candidates": (
-                "validation_only_do_not_copy_into_action"
-            ),
-            "complete_before": (
-                "first-draft-apply-using-properties-or-references"
-            ),
-            "schema_and_metadata_may_swap": True,
-            "draft_start_may_precede": True,
-            "successful_result_survives_metadata_independent_actions": True,
-            "repeat_successful_query": False,
-        },
-        "draft_start_may_precede": True,
-        "metadata_independent_actions_may_precede": True,
-        "successful_metadata_survives_metadata_independent_actions": True,
-        "repeat_successful_metadata": False,
-        "actions_using_properties_or_references_wait_for": [
-            "dynamic_metadata"
-        ],
-        "failure_policy": "do_not_apply_dynamic_fields_then_backfill_metadata",
+        "agent_metadata_command_required": (
+            "when_dynamic_token_is_not_already_exact_live_evidence"
+        ),
+        "submit_only_explicit_user_facts": True,
+        "draft_check_revalidates_dynamic_metadata": True,
     }
-    assert schema["composer"]["action_shapes"]["add_import_row"] == {
-        "fixed_fields": {
-            "contract": "waapi-skill.operation-draft-action/v1",
-            "action": "add_import_row",
-        },
-        "required_fields": ["object_path", "assignment"],
-        "optional_fields": [
-            "audio_file",
-            "audio_file_base64",
-            "audio_source_notes",
-            "dialogue_event",
-            "event",
-            "import_language",
-            "import_location",
-            "notes",
-            "object_type",
-            "originals_subfolder",
-            "properties",
-            "references",
-        ],
-        "construction_discipline": {
-            "initial_row_action": "add_import_row",
-            "one_initial_action_per_row": True,
-            "assignment_intent": {
-                "required_on_every_row": True,
-                "ordinary_row": {"mode": "none"},
-                "switch_assigned_row": {
-                    "mode": "switch",
-                    "value": "<exact-value>",
-                },
-            },
-            "never_guess_assignment_intent": True,
-            "include_every_known_field_in_one_action": True,
-            "metadata_dependency_activation": "gateway_owned_do_not_submit",
-        },
-        "user_fact_checklist": {
-            "copy_every_explicit_fact_for_this_row": True,
-            "copy_only_explicit_user_facts": True,
-            "unrequested_dependency_candidates_are_not_action_fields": True,
-            "batch_facts_apply_to_each_affected_row": True,
-            "mixed_structure_and_media_defaults_are_not_safe": True,
-            "media_row_examples": [
-                "import_language",
-                "object_type",
-                "event",
-                "properties",
-                "references",
-                "switch_assignment",
-            ],
-            "distinct_metadata_tokens_are_independent_facts": True,
-            "assignment_intent_is_required_on_every_row": True,
-        },
-        "conditional_required_fields": [
-            {
-                "when": "every_row",
-                "require_effective": ["object_type"],
-                "effective_sources": ["row", "explicit_defaults"],
-                "reason": "every row requires an explicit object type",
-            },
-            {
-                "when_any_present": ["audio_file", "audio_file_base64"],
-                "require_effective": ["import_language"],
-                "effective_sources": ["row", "explicit_defaults"],
-                "reason": "media rows require an explicit import language",
-            },
-        ],
-        "assignment_contract": {
-            "required": True,
-            "normal_forms": [
-                {"mode": "none", "additional_fields": False},
-                {
-                    "mode": "switch",
-                    "required_fields": ["value"],
-                    "additional_fields": False,
-                },
-            ],
-            "one_intent_per_row": True,
-        },
+    row_shape = schema["composer"]["action_shapes"]["add_import_row"]
+    assert row_shape["required_fields"] == ["object_path"]
+    assert "assignment" not in row_shape["optional_fields"]
+    assert row_shape["construction_discipline"] == schema["composer"][
+        "flat_import_row_discipline"
+    ]
+    assert row_shape["construction_discipline"]["switch_assignment"] == {
+        "ordinary_row_action": None,
+        "when_user_requested": "assign_import_row_switch",
+        "requires_gateway_import_handle": True,
     }
+    assert row_shape["user_fact_checklist"][
+        "switch_assignment_action_only_when_explicit"
+    ] is True
+    assert schema["composer"]["action_shapes"][
+        "assign_import_row_switch"
+    ]["required_fields"] == ["import_handle", "switch"]
     assert "add_switch_assigned_import_row" not in schema["composer"]["action_shapes"]
-    assert schema["composer"]["planning_discipline"][
-        "dynamic_metadata"
-    ] == {
-        "fields": ["properties", "references"],
-        "query_granularity": "one_successful_command_per_object_type",
-        "all_required_tokens_share_that_result": True,
-        "split_required_tokens_across_queries": False,
-        "action_fields_source": "explicit_user_request_only",
-        "unrequested_dependency_candidates": (
-            "validation_only_do_not_copy_into_action"
-        ),
-        "complete_before": (
-            "first-draft-apply-using-properties-or-references"
-        ),
-        "schema_and_metadata_may_swap": True,
-        "draft_start_may_precede": True,
-        "successful_result_survives_metadata_independent_actions": True,
-        "repeat_successful_query": False,
-    }
+    assert schema["composer"]["planning_discipline"]["dynamic_metadata"][
+        "discovery_owner"
+    ] == "agent_metadata_discover"
+    assert schema["composer"]["planning_discipline"]["dynamic_metadata"][
+        "validation_owner"
+    ] == "gateway_draft_check"
     assert schema["composer"]["planning_discipline"]["import_operation"] == {
         "source": "registry_fragments.request_options.import_operation",
-        "action": "set_import_option",
+        "action": "set_import_operation",
         "gateway_default": "createNew",
         "default_is_materialized_at": "draft-start",
         "action_required_only_for": ["useExisting", "replaceExisting"],
         "do_not_submit_redundant_default": True,
     }
-    assert schema["composer"]["action_shapes"]["add_import_row"][
-        "construction_discipline"
-    ] == schema["composer"]["flat_import_row_discipline"]
     assert list(schema["composer"]).index(
         "flat_import_row_discipline"
     ) < list(schema["composer"]).index("action_shapes")
-    assert schema["composer"]["action_shapes"]["add_import_row"][
-        "user_fact_checklist"
-    ] == {
-        "copy_every_explicit_fact_for_this_row": True,
-        "copy_only_explicit_user_facts": True,
-        "unrequested_dependency_candidates_are_not_action_fields": True,
-        "batch_facts_apply_to_each_affected_row": True,
-        "mixed_structure_and_media_defaults_are_not_safe": True,
-        "media_row_examples": [
-            "import_language",
-            "object_type",
-            "event",
-            "properties",
-            "references",
-            "switch_assignment",
-        ],
-        "distinct_metadata_tokens_are_independent_facts": True,
-        "assignment_intent_is_required_on_every_row": True,
-    }
     assert schema["composer"]["flat_import_row_discipline"][
         "metadata_dependency_activation"
-    ] == "gateway_owned_do_not_submit"
+    ] == "agent_selects_exact_token_gateway_validates_dependencies"
     assert schema["composer"]["registry_fragments"][
         "metadata_dependency_closure"
     ]["materialization"]["supported_reference_activation"]["owner"] == (
@@ -626,7 +512,6 @@ def test_structurally_distinct_adapters_share_one_public_lifecycle(
         "composition_contract",
         "complete_request_is_never_an_action",
         "completion_discipline",
-        "apply",
         "check",
         "seal",
         "cancel",
@@ -640,6 +525,17 @@ def test_structurally_distinct_adapters_share_one_public_lifecycle(
     assert {key: object_set[key] for key in shared_keys} == {
         key: audio_import[key] for key in shared_keys
     }
+    for composer in (object_set, audio_import):
+        assert composer["apply"]["subcommand"] == "draft-apply"
+        assert composer["apply"]["action_flag"] == "--action"
+        assert composer["apply"]["scalar_types"] == [
+            "string",
+            "number",
+            "integer",
+            "boolean",
+        ]
+        assert "action_argv" in composer["apply"]
+        assert "typed_fact_flags" not in composer["apply"]
     assert object_set["start"]["subcommand"] == "draft-start"
     assert audio_import["start"]["subcommand"] == "draft-start"
     assert object_set["start"]["gateway_argv"] == [
