@@ -39,3 +39,11 @@ def create_symlink_or_skip(
         if is_windows_symlink_privilege_error(exc):
             pytest.skip("Windows token does not grant symlink privilege for this safety test")
         raise
+
+
+def native_absolute_test_path(*parts: str) -> str:
+    """Return a host-native absolute spelling for a non-materialized test path."""
+
+    if not parts or any(type(part) is not str or not part for part in parts):
+        raise ValueError("test path parts must be non-empty strings")
+    return str(Path.cwd().joinpath(".test-fixtures", *parts).absolute())

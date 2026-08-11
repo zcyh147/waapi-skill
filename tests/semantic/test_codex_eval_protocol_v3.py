@@ -6,6 +6,7 @@ from types import MappingProxyType
 
 import pytest
 
+from tests.support.platform_filesystem import native_absolute_test_path
 from tests.semantic.support.codex_eval_protocol_v3 import (
     StructuredRefusal,
     V3GatewayProtocol,
@@ -80,7 +81,7 @@ def _audio_import_request() -> dict[str, object]:
             },
             "imports": [
                 {
-                    "audio_file": "/owned/音频/rain.wav",
+                    "audio_file": native_absolute_test_path("音频", "rain.wav"),
                     "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
                     "event": {
                         "path": r"\Events\Default Work Unit\Play_Rain",
@@ -611,7 +612,7 @@ def test_metadata_transaction_protocol_selects_closed_audio_import_equivalence()
                     "object_path": (
                         r"\Actor-Mixer Hierarchy\Default Work Unit\Target"
                     ),
-                    "audio_file": "/owned/source.wav",
+                    "audio_file": native_absolute_test_path("audio", "source.wav"),
                     "object_type": "Sound SFX",
                     "import_language": "SFX",
                 }
@@ -849,7 +850,7 @@ def test_audio_import_metadata_equivalence_rejects_duplicate_expected_names() ->
                     "object_path": (
                         r"\Actor-Mixer Hierarchy\Default Work Unit\Target"
                     ),
-                    "audio_file": "/owned/source.wav",
+                    "audio_file": native_absolute_test_path("audio", "source.wav"),
                     "properties": [
                         {"name": "Volume", "value": -1},
                         {"name": "Volume", "value": -2},

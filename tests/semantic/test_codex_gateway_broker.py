@@ -14,7 +14,10 @@ from pathlib import Path
 
 import pytest
 
-from tests.support.platform_filesystem import create_symlink_or_skip
+from tests.support.platform_filesystem import (
+    create_symlink_or_skip,
+    native_absolute_test_path,
+)
 from tests.support.platform_process import run_model_argv
 from .support import codex_gateway_broker as broker_module  # pyright: ignore[reportMissingImports]
 from .support.codex_harness import (  # pyright: ignore[reportMissingImports]
@@ -1543,13 +1546,13 @@ def test_audio_import_numbered_actions_remain_strictly_ordered(tmp_path: Path) -
             "import_operation": "createNew",
             "imports": [
                 {
-                    "audio_file": "/owned/inputs/a.wav",
+                    "audio_file": native_absolute_test_path("inputs", "a.wav"),
                     "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\A",
                     "object_type": "Sound SFX",
                     "import_language": "SFX",
                 },
                 {
-                    "audio_file": "/owned/inputs/b.wav",
+                    "audio_file": native_absolute_test_path("inputs", "b.wav"),
                     "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\B",
                     "object_type": "Sound SFX",
                     "import_language": "SFX",
@@ -6340,7 +6343,7 @@ def test_weather_limit_two_metadata_step_crosses_broker_validation(
                 "import_operation": "createNew",
                 "imports": [
                     {
-                        "audio_file": "/owned/inputs/rain.wav",
+                        "audio_file": native_absolute_test_path("inputs", "rain.wav"),
                         "object_path": (
                             r"\Actor-Mixer Hierarchy\Default Work Unit\Rain"
                         ),

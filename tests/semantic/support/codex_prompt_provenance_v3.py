@@ -21,7 +21,11 @@ from tests.semantic.support.codex_business_oracle_plan_v3 import (
     BUSINESS_ORACLE_PLAN_FILE,
     BusinessOraclePlanEvidence,
 )
-from tests.semantic.support.codex_filesystem_security import binary_file_open_flags
+from tests.semantic.support.codex_filesystem_security import (
+    CodexFileSecurityError,
+    binary_file_open_flags,
+    read_bounded_exclusive_regular_file,
+)
 from tests.semantic.support.codex_eval_bundle_v3 import OnlineScenario
 from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
@@ -3119,22 +3123,13 @@ def _strict_json_text(value: str) -> Any:
 
 
 def _read_one_json(path: Path) -> tuple[bytes, Any]:
-    flags = binary_file_open_flags(os.O_RDONLY)
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
     try:
-        descriptor = os.open(path, flags)
-    except OSError as exc:
+        raw = read_bounded_exclusive_regular_file(
+            path,
+            max_bytes=MAX_PROVENANCE_BYTES,
+        ).raw
+    except CodexFileSecurityError as exc:
         raise PromptProvenanceError(f"cannot open prompt provenance: {exc}") from exc
-    try:
-        metadata = os.fstat(descriptor)
-        if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > MAX_PROVENANCE_BYTES:
-            raise PromptProvenanceError("prompt provenance is not one bounded regular file")
-        raw = os.read(descriptor, MAX_PROVENANCE_BYTES + 1)
-        if len(raw) != metadata.st_size:
-            raise PromptProvenanceError("prompt provenance changed during its single read")
-    finally:
-        os.close(descriptor)
     try:
         value = json.loads(
             raw.decode("utf-8"),

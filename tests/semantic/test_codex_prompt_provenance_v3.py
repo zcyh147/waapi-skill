@@ -9,7 +9,10 @@ from typing import Any, Callable
 
 import pytest
 
-from tests.support.platform_filesystem import create_symlink_or_skip
+from tests.support.platform_filesystem import (
+    create_symlink_or_skip,
+    native_absolute_test_path,
+)
 from tests.semantic.support.codex_business_oracle_plan_v3 import (
     business_family_for_api,
     write_business_oracle_plan,
@@ -1939,7 +1942,7 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
                     "object_path": (
                         r"\Actor-Mixer Hierarchy\Default Work Unit\Target"
                     ),
-                    "audio_file": "/owned/source.wav",
+                    "audio_file": native_absolute_test_path("audio", "source.wav"),
                     "object_type": "Sound SFX",
                     "import_language": "SFX",
                     "properties": [
