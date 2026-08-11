@@ -401,7 +401,6 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         "audio.import",
     ]
     assert schema["composer"]["apply"]["typed_fact_flags"]["--assignment"] == [
-        "FIELD",
         "switch",
         "VALUE",
     ]

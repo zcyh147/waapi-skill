@@ -619,7 +619,6 @@ def test_audio_import_normal_typed_argv_preserves_host_paths_and_assignment(
         "Play",
         event_path,
         "--assignment",
-        "assignment",
         "switch",
         "Snow",
     )
@@ -635,6 +634,40 @@ def test_audio_import_normal_typed_argv_preserves_host_paths_and_assignment(
         "object_type": "Sound SFX",
         "switch_assignment": "Snow",
     }
+
+
+def test_audio_import_assignment_flag_rejects_redundant_field_name(
+    tmp_path: Path,
+) -> None:
+    _code, started = _execute(tmp_path, "draft-start", "audio.import")
+
+    code, result = _execute(
+        tmp_path,
+        "draft-apply",
+        started["draft"]["draft_id"],
+        "--task-authority",
+        started["task_authority"],
+        "--expected-revision",
+        "1",
+        "--facts",
+        "--action",
+        "add_import_row",
+        "--value",
+        "object_path",
+        "string",
+        r"\Containers\Default Work Unit\Snow",
+        "--value",
+        "object_type",
+        "string",
+        "RandomSequenceContainer",
+        "--assignment",
+        "assignment",
+        "switch",
+        "Snow",
+    )
+
+    assert code != 0
+    assert result["error_code"] == "GatewayInputError"
 
 
 @pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))

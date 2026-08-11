@@ -196,15 +196,18 @@ def build_typed_action_from_cli(
         field, event_action, path = row
         set_once(field, {"action": event_action, "path": path})
     for row in assignments:
-        if len(row) not in {2, 3}:
+        if len(row) not in {1, 2}:
             raise OperationComposerError(
-                "--assignment requires FIELD none or FIELD switch VALUE."
+                "--assignment requires none or switch VALUE."
             )
-        field, mode, *assignment_value = row
+        mode, *assignment_value = row
         if mode == "none" and not assignment_value:
-            set_once(field, {"mode": "none"})
+            set_once("assignment", {"mode": "none"})
         elif mode == "switch" and len(assignment_value) == 1:
-            set_once(field, {"mode": "switch", "value": assignment_value[0]})
+            set_once(
+                "assignment",
+                {"mode": "switch", "value": assignment_value[0]},
+            )
         else:
             raise OperationComposerError(
                 "--assignment accepts only none or switch with one value."
@@ -293,16 +296,15 @@ def parse_typed_action_cli_arguments(arguments: Sequence[str]) -> dict[str, Any]
             references.append((field, name, *arguments[index + 3 : end]))
             index = end
         elif flag == "--assignment":
-            if index + 3 > len(arguments):
+            if index + 2 > len(arguments):
                 raise OperationComposerError("--assignment is incomplete.")
-            field = arguments[index + 1]
-            mode = arguments[index + 2]
+            mode = arguments[index + 1]
             if mode == "none":
-                assignments.append((field, mode))
+                assignments.append((mode,))
+                index += 2
+            elif mode == "switch" and index + 3 <= len(arguments):
+                assignments.append((mode, arguments[index + 2]))
                 index += 3
-            elif mode == "switch" and index + 4 <= len(arguments):
-                assignments.append((field, mode, arguments[index + 3]))
-                index += 4
             else:
                 raise OperationComposerError("--assignment is invalid.")
         else:
@@ -362,10 +364,10 @@ def typed_action_cli_arguments(action: Mapping[str, Any]) -> tuple[str, ...]:
         elif isinstance(value, Mapping) and "mode" in value:
             mode = value.get("mode")
             if mode == "none" and set(value) == {"mode"}:
-                arguments.extend(("--assignment", field, "none"))
+                arguments.extend(("--assignment", "none"))
             elif mode == "switch" and set(value) == {"mode", "value"}:
                 arguments.extend(
-                    ("--assignment", field, "switch", str(value["value"]))
+                    ("--assignment", "switch", str(value["value"]))
                 )
             else:
                 raise OperationComposerError("Typed assignment is invalid.")
