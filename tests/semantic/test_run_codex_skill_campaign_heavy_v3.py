@@ -111,6 +111,7 @@ from wwise_waapi.platform_commands import (
     encode_windows_model_argv,
     encode_windows_powershell_argv,
 )
+from wwise_waapi.operation_composer import typed_action_cli_arguments
 from tests.semantic.support.codex_object_runtime_v3 import ObjectRuntimeSnapshot
 from tests.semantic.support.codex_soundbank_business_plan_v3 import (
     compile_soundbank_business_plan,
@@ -326,6 +327,29 @@ def test_archived_draft_action_preserves_submitted_json_spelling() -> None:
 
     assert action["value"] == 0
     assert type(action["value"]) is int
+
+
+def test_archived_draft_action_reconstructs_normal_typed_argv() -> None:
+    expected = {
+        "contract": "waapi-skill.operation-draft-action/v1",
+        "action": "add_import_row",
+        "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\雪",
+        "audio_file": "/tmp/source with spaces.wav",
+        "assignment": {"mode": "none"},
+    }
+
+    action = campaign._archived_draft_action(
+        (
+            "draft-apply",
+            "od1-draft",
+            "--compact",
+            "--facts",
+            *typed_action_cli_arguments(expected),
+        ),
+        label="synthetic typed action",
+    )
+
+    assert action == expected
 
 
 def test_archived_draft_action_rejects_duplicate_json_keys() -> None:

@@ -48,6 +48,10 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from tests.semantic import run_codex_skill_matrix as matrix  # noqa: E402
+from wwise_waapi.operation_composer import (  # noqa: E402
+    OperationComposerError,
+    parse_typed_action_cli_arguments,
+)
 from tests.destructive.support.live_environment import (  # noqa: E402
     LiveEnvironmentError,
     require_live_environment,
@@ -4983,6 +4987,25 @@ def _archived_draft_action(
     label: str,
 ) -> Mapping[str, Any]:
     """Recover the exact submitted Draft action for deterministic replay."""
+
+    typed_indexes = [
+        index
+        for index, value in enumerate(gateway_arguments[:-1])
+        if value == "--facts" and gateway_arguments[index + 1] == "--action"
+    ]
+    if len(typed_indexes) == 1:
+        try:
+            return parse_typed_action_cli_arguments(
+                gateway_arguments[typed_indexes[0] + 1 :]
+            )
+        except OperationComposerError as exc:
+            raise CampaignEvidenceError(
+                f"{label} Draft typed action argv is invalid"
+            ) from exc
+    if typed_indexes:
+        raise CampaignEvidenceError(
+            f"{label} Draft action argv contains multiple typed action prefixes"
+        )
 
     indexes = [
         index
