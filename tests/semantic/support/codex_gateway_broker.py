@@ -809,7 +809,6 @@ _DRAFT_ACTION_HANDLE_FIELDS_BY_OPERATION = {
         "set_import_default": None,
         "clear_import_default": None,
         "add_import_row": None,
-        "add_switch_assigned_import_row": None,
         "set_import_row_field": "import_handle",
         "clear_import_row_field": "import_handle",
         "remove_import_row": "import_handle",
@@ -1030,7 +1029,6 @@ class DraftActionJsonArgument:
             dynamic_tokens: set[str] = set()
             if normalized["action"] in {
                 "add_import_row",
-                "add_switch_assigned_import_row",
             }:
                 for field in ("properties", "references"):
                     rows = normalized.get(field, [])
@@ -3996,6 +3994,211 @@ def project_required_metadata_tokens(
     return tuple(available[token] for token in tokens)
 
 
+def _metadata_reference_activation_rules(
+    payload: Mapping[str, Any],
+    *,
+    object_type: str,
+    required_tokens: Sequence[str],
+) -> dict[str, tuple[tuple[str, bool], ...]]:
+    """Project only live-proven Boolean activators for selected references."""
+
+    available = _metadata_discovery_live_projection(
+        payload,
+        object_type=object_type,
+    )
+    selected = set(required_tokens)
+    agent_result = payload.get("agent_result", payload)
+    candidates = (
+        agent_result.get("candidates")
+        if isinstance(agent_result, Mapping)
+        else None
+    )
+    if not isinstance(candidates, list):
+        raise GatewayInvocationError(
+            "metadata discovery candidates evidence is malformed"
+        )
+    rules: dict[str, tuple[tuple[str, bool], ...]] = {}
+    for row in candidates:
+        if not isinstance(row, Mapping):
+            raise GatewayInvocationError(
+                "metadata discovery candidate evidence is malformed"
+            )
+        reference_name = row.get("name")
+        if reference_name not in selected or row.get("kind") != "reference":
+            continue
+        requirements = row.get("dependency_requirements")
+        if not isinstance(requirements, list):
+            raise GatewayInvocationError(
+                "metadata reference dependency requirements are malformed"
+            )
+        projected: list[tuple[str, bool]] = []
+        for requirement in requirements:
+            if (
+                not isinstance(requirement, Mapping)
+                or set(requirement)
+                != {
+                    "action",
+                    "context",
+                    "property",
+                    "required_values",
+                    "type",
+                }
+                or requirement.get("action") != "Enable"
+                or requirement.get("context") != "Self"
+                or requirement.get("type") != "override"
+                or requirement.get("required_values") != [True]
+            ):
+                continue
+            property_name = requirement.get("property")
+            projection = available.get(property_name)
+            if (
+                not isinstance(property_name, str)
+                or projection is None
+                or projection.kind != "property"
+                or projection.metadata_type.casefold() not in {"bool", "boolean"}
+            ):
+                raise GatewayInvocationError(
+                    "metadata reference activation dependency is not one exact "
+                    "Boolean property"
+                )
+            projected.append((property_name, True))
+        if projected:
+            if len({name.casefold() for name, _value in projected}) != len(projected):
+                raise GatewayInvocationError(
+                    "metadata reference activation dependencies repeat a property"
+                )
+            rules[str(reference_name)] = tuple(projected)
+    return rules
+
+
+def _normalize_audio_import_activation_properties(
+    actual: Any,
+    expected: Any,
+    *,
+    rules: Mapping[str, Sequence[tuple[str, bool]]],
+) -> tuple[Any, tuple[dict[str, Any], ...]]:
+    """Strip only explicit values the Gateway may derive for row references."""
+
+    if not isinstance(actual, Mapping) or not isinstance(expected, Mapping):
+        return actual, ()
+    if actual.get("action") != "add_import_row" or expected.get("action") != "add_import_row":
+        return actual, ()
+    actual_references = actual.get("references", [])
+    expected_references = expected.get("references", [])
+    if actual_references != expected_references or not isinstance(expected_references, list):
+        return actual, ()
+    reference_names = {
+        item.get("name")
+        for item in expected_references
+        if isinstance(item, Mapping) and isinstance(item.get("name"), str)
+    }
+    allowed = {
+        pair
+        for reference_name in reference_names
+        for pair in rules.get(str(reference_name), ())
+    }
+    actual_properties = actual.get("properties", [])
+    expected_properties = expected.get("properties", [])
+    if not isinstance(actual_properties, list) or not isinstance(expected_properties, list):
+        return actual, ()
+    expected_names = {
+        item.get("name")
+        for item in expected_properties
+        if isinstance(item, Mapping) and isinstance(item.get("name"), str)
+    }
+    retained: list[Any] = []
+    evidence: list[dict[str, Any]] = []
+    for item in actual_properties:
+        if not isinstance(item, Mapping):
+            return actual, ()
+        name = item.get("name")
+        value = item.get("value")
+        is_allowed_activation = any(
+            name == allowed_name
+            and type(value) is bool
+            and value is allowed_value
+            for allowed_name, allowed_value in allowed
+        )
+        if name not in expected_names and is_allowed_activation:
+            if set(item) != {"name", "value"}:
+                return actual, ()
+            evidence.append({"property": name, "value": value})
+            continue
+        retained.append(item)
+    if not evidence:
+        return actual, ()
+    normalized = dict(actual)
+    if "properties" in expected:
+        normalized["properties"] = retained
+    elif retained:
+        normalized["properties"] = retained
+    else:
+        normalized.pop("properties", None)
+    return normalized, tuple(evidence)
+
+
+def _normalize_audio_import_request_activation_properties(
+    actual: Any,
+    expected: Any,
+    *,
+    rules: Mapping[str, Sequence[tuple[str, bool]]],
+) -> Any:
+    if (
+        not isinstance(actual, Mapping)
+        or not isinstance(expected, Mapping)
+        or actual.get("operation") != "audio.import"
+        or expected.get("operation") != "audio.import"
+    ):
+        return actual
+    actual_arguments = actual.get("arguments")
+    expected_arguments = expected.get("arguments")
+    actual_rows = (
+        actual_arguments.get("imports")
+        if isinstance(actual_arguments, Mapping)
+        else None
+    )
+    expected_rows = (
+        expected_arguments.get("imports")
+        if isinstance(expected_arguments, Mapping)
+        else None
+    )
+    if (
+        not isinstance(actual_rows, list)
+        or not isinstance(expected_rows, list)
+        or len(actual_rows) != len(expected_rows)
+    ):
+        return actual
+    normalized_rows: list[Any] = []
+    for actual_row, expected_row in zip(actual_rows, expected_rows, strict=True):
+        actual_action = {
+            "contract": "waapi-skill.operation-draft-action/v1",
+            "action": "add_import_row",
+            **dict(actual_row),
+        } if isinstance(actual_row, Mapping) else actual_row
+        expected_action = {
+            "contract": "waapi-skill.operation-draft-action/v1",
+            "action": "add_import_row",
+            **dict(expected_row),
+        } if isinstance(expected_row, Mapping) else expected_row
+        normalized_action, _evidence = _normalize_audio_import_activation_properties(
+            actual_action,
+            expected_action,
+            rules=rules,
+        )
+        if isinstance(normalized_action, Mapping):
+            normalized_row = dict(normalized_action)
+            normalized_row.pop("contract", None)
+            normalized_row.pop("action", None)
+            normalized_rows.append(normalized_row)
+        else:
+            normalized_rows.append(actual_row)
+    normalized_arguments = dict(actual_arguments)
+    normalized_arguments["imports"] = normalized_rows
+    normalized = dict(actual)
+    normalized["arguments"] = normalized_arguments
+    return normalized
+
+
 def _object_operation_json_equal(actual: Any, expected: Any) -> bool:
     """Compare one operation request with closed public-schema equivalences.
 
@@ -6911,6 +7114,19 @@ class CodexGatewayBroker:
                                 item.as_dict() for item in actual_projection
                             ],
                         }
+                        if expected.operation == "audio.import":
+                            activation_rules = _metadata_reference_activation_rules(
+                                source,
+                                object_type=metadata_binding.object_type,
+                                required_tokens=metadata_binding.required_tokens,
+                            )
+                            normalized_actual, _activation_evidence = (
+                                _normalize_audio_import_activation_properties(
+                                    normalized_actual,
+                                    bound_expected,
+                                    rules=activation_rules,
+                                )
+                            )
                     if normalized_actual != bound_expected:
                         raise GatewayInvocationError(
                             f"step {step.name!r} typed Draft action is not exactly equal "
@@ -7296,6 +7512,11 @@ class CodexGatewayBroker:
                 agent_result.get("request"),
                 preview_step=step,
             )
+            actual_request = self._normalize_operation_draft_reference_activations(
+                actual_request,
+                expected_request=expected_request,
+                preview_step=step,
+            )
             if actual_request != expected_request:
                 raise GatewayInvocationError(
                     "preview-from-draft canonical request does not replay from "
@@ -7460,6 +7681,53 @@ class CodexGatewayBroker:
             return item
 
         return normalize(value)
+
+    def _normalize_operation_draft_reference_activations(
+        self,
+        value: Any,
+        *,
+        expected_request: Mapping[str, Any],
+        preview_step: ExpectedGatewayStep,
+    ) -> Any:
+        """Normalize only live-proven Gateway-owned audio.import activators."""
+
+        if expected_request.get("operation") != "audio.import":
+            return value
+        preview_index = self._execution_steps.index(preview_step)
+        rules: dict[str, tuple[tuple[str, bool], ...]] = {}
+        for action_step in self._execution_steps[:preview_index]:
+            if action_step.subcommand != "draft-apply":
+                continue
+            argument = action_step.arguments[-1]
+            if (
+                not isinstance(argument, DraftActionJsonArgument)
+                or argument.operation != "audio.import"
+                or argument.metadata_binding is None
+            ):
+                continue
+            binding = argument.metadata_binding
+            source = self._payloads_by_step.get(binding.step)
+            if not isinstance(source, Mapping):
+                raise GatewayInvocationError(
+                    "Draft reference activation normalization lacks live metadata"
+                )
+            projected = _metadata_reference_activation_rules(
+                source,
+                object_type=binding.object_type,
+                required_tokens=binding.required_tokens,
+            )
+            for reference_name, activations in projected.items():
+                prior = rules.get(reference_name)
+                if prior is not None and prior != activations:
+                    raise GatewayInvocationError(
+                        "Draft reference activation metadata is inconsistent"
+                    )
+                rules[reference_name] = activations
+        return _normalize_audio_import_request_activation_properties(
+            value,
+            expected_request,
+            rules=rules,
+        )
 
     def _replay_expected_operation_draft_request(
         self,

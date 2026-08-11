@@ -139,6 +139,26 @@ def test_audio_import_composer_emits_ordered_typed_actions_without_full_json() -
     )
 
 
+def test_audio_import_switch_assignment_uses_the_same_row_action() -> None:
+    request = _audio_import_request()
+    switch_assignment = "Snow"
+    request["arguments"]["imports"][0]["switch_assignment"] = switch_assignment  # type: ignore[index]
+
+    actions = [
+        step.arguments[-1].expected
+        for step in build_audio_import_composer_transaction_steps(
+            request,
+            label="tx01",
+        )
+        if step.subcommand == "draft-apply"
+    ]
+
+    row = actions[-1]
+    assert row["action"] == "add_import_row"
+    assert row["switch_assignment"] == switch_assignment
+    assert all(action["action"] != "add_switch_assigned_import_row" for action in actions)
+
+
 def test_audio_import_composer_rejects_unreviewed_request_fields() -> None:
     request = _audio_import_request()
     request["arguments"]["native_args"] = {}  # type: ignore[index]

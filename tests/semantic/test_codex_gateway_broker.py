@@ -90,12 +90,27 @@ def _metadata_discovery_payload(
     dependency_names: tuple[str, ...] = ("OverrideOutput",),
 ) -> dict[str, object]:
     def row(name: str) -> dict[str, object]:
+        output_bus_activation = (
+            [
+                {
+                    "action": "Enable",
+                    "context": "Self",
+                    "property": "OverrideOutput",
+                    "required_values": [True],
+                    "type": "override",
+                }
+            ]
+            if name == "OutputBus" and "OverrideOutput" in dependency_names
+            else []
+        )
         return {
             "name": name,
             "kind": "reference" if name == "OutputBus" else "property",
             "matched_queries": ["requested field"],
-            "same_object_dependencies": [],
-            "dependency_requirements": [],
+            "same_object_dependencies": (
+                ["OverrideOutput"] if output_bus_activation else []
+            ),
+            "dependency_requirements": output_bus_activation,
             "metadata": {
                 "name": name,
                 "type": (
@@ -1787,6 +1802,198 @@ def test_audio_import_action_binds_dynamic_tokens_to_live_metadata(
     broker._payloads_by_step[metadata.name] = wrong  # noqa: SLF001
     with pytest.raises(GatewayInvocationError, match="metadata projection differs"):
         broker._validate_step(action, actual)  # noqa: SLF001
+
+
+def test_audio_import_draft_action_accepts_explicit_gateway_owned_activation(
+    tmp_path: Path,
+) -> None:
+    metadata = ExpectedGatewayStep(
+        "metadata.discover",
+        "metadata",
+        (
+            "discover",
+            "--object-type",
+            "Sound",
+            "--query",
+            "output bus",
+            "--limit",
+            "8",
+        ),
+    )
+    start = ExpectedGatewayStep(
+        "tx01.draft-start",
+        "draft-start",
+        ("audio.import",),
+    )
+    expected_action = {
+        "contract": "waapi-skill.operation-draft-action/v1",
+        "action": "add_import_row",
+        "audio_file": r"C:\inputs\rifle.wav",
+        "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rifle",
+        "properties": [{"name": "Volume", "value": -12.0}],
+        "references": [
+            {
+                "name": "OutputBus",
+                "target": {
+                    "kind": "path",
+                    "value": r"\Master-Mixer Hierarchy\Default Work Unit\Weapons",
+                },
+            }
+        ],
+    }
+    action = ExpectedGatewayStep(
+        "tx01.action.001",
+        "draft-apply",
+        (
+            ResponseBinding(start.name, "/draft/draft_id"),
+            "--task-authority",
+            ResponseBinding(start.name, "/task_authority"),
+            "--expected-revision",
+            ResponseBinding(start.name, "/draft/revision"),
+            "--compact",
+            "--action-json",
+            DraftActionJsonArgument(
+                expected_action,
+                operation="audio.import",
+                metadata_binding=DraftActionMetadataBinding(
+                    step=metadata.name,
+                    object_type="Sound",
+                    required_tokens=("Volume", "OutputBus"),
+                    expected_projection=(
+                        MetadataTokenProjection("Volume", "property", "Real32"),
+                        MetadataTokenProjection("OutputBus", "reference", ""),
+                    ),
+                ),
+            ),
+        ),
+    )
+    broker = CodexGatewayBroker(
+        skill_source=make_fake_skill(tmp_path),
+        expected_steps=(metadata, start, action),
+        expected_wwise_version="2022.1",
+    )
+    broker._payloads_by_step[metadata.name] = _metadata_discovery_payload(  # noqa: SLF001
+        object_type="Sound",
+        candidate_names=("Volume", "OutputBus"),
+        dependency_names=("OverrideOutput",),
+    )
+    broker._payloads_by_step[start.name] = {  # noqa: SLF001
+        "task_authority": "da1-" + "2" * 40,
+        "draft": {"draft_id": "od1-" + "1" * 32, "revision": 1},
+    }
+    submitted = json.loads(json.dumps(expected_action))
+    submitted["properties"].append(
+        {"name": "OverrideOutput", "value": True}
+    )
+    argv = (
+        "draft-apply",
+        "od1-" + "1" * 32,
+        "--task-authority",
+        "da1-" + "2" * 40,
+        "--expected-revision",
+        "1",
+        "--compact",
+        "--action-json",
+        json.dumps(submitted, separators=(",", ":")),
+    )
+
+    explicit_hash, _ = broker._validate_step(action, argv)  # noqa: SLF001
+    omitted_argv = (*argv[:-1], json.dumps(expected_action, separators=(",", ":")))
+    omitted_hash, _ = broker._validate_step(action, omitted_argv)  # noqa: SLF001
+    assert explicit_hash == omitted_hash
+
+    for property_item in (
+        {"name": "OverrideOutput", "value": False},
+        {"name": "OverrideOutput", "value": [True]},
+        {"name": "OverrideOutput", "value": True, "source": "model"},
+        {"name": "OtherActivation", "value": True},
+    ):
+        rejected = json.loads(json.dumps(expected_action))
+        rejected["properties"].append(property_item)
+        with pytest.raises(GatewayInvocationError, match="typed Draft action"):
+            broker._validate_step(  # noqa: SLF001
+                action,
+                (*argv[:-1], json.dumps(rejected, separators=(",", ":"))),
+            )
+
+    broker._payloads_by_step[metadata.name] = _metadata_discovery_payload(  # noqa: SLF001
+        object_type="Sound",
+        candidate_names=("Volume", "OutputBus"),
+        dependency_names=(),
+    )
+    with pytest.raises(GatewayInvocationError, match="typed Draft action"):
+        broker._validate_step(action, argv)  # noqa: SLF001
+
+
+def test_audio_import_preview_replay_normalizes_explicit_gateway_owned_activation(
+    tmp_path: Path,
+) -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "imports": [
+                {
+                    "audio_file": native_absolute_test_path("inputs", "rifle.wav"),
+                    "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rifle",
+                    "object_type": "Sound SFX",
+                    "import_language": "SFX",
+                    "properties": [{"name": "Volume", "value": -12.0}],
+                    "references": [
+                        {
+                            "name": "OutputBus",
+                            "target": {
+                                "kind": "path",
+                                "value": r"\Master-Mixer Hierarchy\Default Work Unit\Weapons",
+                            },
+                        }
+                    ],
+                }
+            ],
+            "import_operation": "createNew",
+        },
+    }
+    metadata_binding = DraftActionMetadataBinding(
+        step="metadata.discover",
+        object_type="Sound",
+        required_tokens=("Volume", "OutputBus"),
+        expected_projection=(
+            MetadataTokenProjection("Volume", "property", "Real32"),
+            MetadataTokenProjection("OutputBus", "reference", ""),
+        ),
+    )
+    steps = build_audio_import_composer_transaction_steps(
+        request,
+        label="tx01",
+        metadata_binding=metadata_binding,
+    )
+    metadata = ExpectedGatewayStep(
+        metadata_binding.step,
+        "metadata",
+        ("discover", "--object-type", "Sound", "--query", "output bus", "--limit", "8"),
+    )
+    preview = next(step for step in steps if step.subcommand == "preview-from-draft")
+    broker = CodexGatewayBroker(
+        skill_source=make_fake_skill(tmp_path),
+        expected_steps=(metadata, *steps),
+        expected_wwise_version="2022.1",
+    )
+    broker._payloads_by_step[metadata.name] = _metadata_discovery_payload(  # noqa: SLF001
+        object_type="Sound",
+        candidate_names=("Volume", "OutputBus"),
+        dependency_names=("OverrideOutput",),
+    )
+    actual = json.loads(json.dumps(request))
+    actual["arguments"]["imports"][0]["properties"].append(
+        {"name": "OverrideOutput", "value": True}
+    )
+
+    assert broker._normalize_operation_draft_reference_activations(  # noqa: SLF001
+        actual,
+        expected_request=request,
+        preview_step=preview,
+    ) == request
 
 
 def test_numbered_draft_action_sequence_matches_any_exact_permutation() -> None:
