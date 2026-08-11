@@ -1153,6 +1153,9 @@ def _alarm_protocol(
     diagnostic_count = len(diagnostic_steps)
     return V3GatewayProtocol(
         steps=steps,
+        commutative_read_only_step_groups=(
+            ("diag.source", "diag.dead_bus", "diag.target_bus"),
+        ),
         turn_prefix_counts=(
             diagnostic_count,
             diagnostic_count + transaction.turn_prefix_counts[0],

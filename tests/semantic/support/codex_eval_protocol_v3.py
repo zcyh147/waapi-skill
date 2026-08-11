@@ -717,8 +717,11 @@ class V3GatewayProtocol:
         for allowed in self.allowed_turn_prefix_counts:
             checkpoint_counts.update(allowed)
         indexes = {name: index for index, name in enumerate(names)}
-        for first, _second in groups:
-            if indexes[first] + 1 in checkpoint_counts:
+        for group in groups:
+            if any(
+                indexes[group[0]] + offset in checkpoint_counts
+                for offset in range(1, len(group))
+            ):
                 raise ValueError(
                     "a commutative read-only group cannot cross a turn prefix"
                 )

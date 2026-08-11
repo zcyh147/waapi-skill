@@ -1400,31 +1400,39 @@ class GatewayBrokerRecord:
         )
 
 
-CommutativeReadOnlyStepGroups = tuple[tuple[str, str], ...]
+CommutativeReadOnlyStepGroups = tuple[tuple[str, ...], ...]
 CommutativeComposerSetupStepGroups = tuple[tuple[str, ...], ...]
+_MAX_COMMUTATIVE_READ_ONLY_GROUP_SIZE = 4
 
 
-def _is_closed_exact_id_query_step(step: ExpectedGatewayStep) -> bool:
-    """Return whether one step is the fixed identity-only object read shape."""
+def _is_closed_exact_identity_query_step(
+    step: ExpectedGatewayStep,
+    *,
+    group_start_index: int,
+    indexes: Mapping[str, int],
+) -> bool:
+    """Return whether one read is exact, bounded, and group-independent."""
 
     arguments = step.arguments
-    return (
-        step.subcommand == "query-object"
-        and len(arguments) == 10
-        and arguments[0] == "--object-id"
-        and isinstance(arguments[1], str)
-        and bool(arguments[1])
-        and arguments[2:]
-        == (
-            "--return-field",
-            "id",
-            "--return-field",
-            "name",
-            "--return-field",
-            "type",
-            "--return-field",
-            "path",
-        )
+    if (
+        step.subcommand != "query-object"
+        or len(arguments) < 4
+        or len(arguments) % 2 != 0
+        or arguments[0] not in {"--object-id", "--path"}
+    ):
+        return False
+    identity = arguments[1]
+    if isinstance(identity, ResponseBinding):
+        source_index = indexes.get(identity.step)
+        if source_index is None or source_index >= group_start_index:
+            return False
+    elif not isinstance(identity, str) or not identity:
+        return False
+    return all(
+        arguments[index] == "--return-field"
+        and isinstance(arguments[index + 1], str)
+        and bool(arguments[index + 1])
+        for index in range(2, len(arguments), 2)
     )
 
 
@@ -1432,42 +1440,48 @@ def validate_commutative_read_only_step_groups(
     expected_steps: Sequence[ExpectedGatewayStep],
     groups: Sequence[Sequence[str]],
 ) -> CommutativeReadOnlyStepGroups:
-    """Validate explicitly declared adjacent read-only step permutations."""
+    """Validate explicitly declared contiguous read-only permutations."""
 
     steps = tuple(expected_steps)
     names = tuple(step.name for step in steps)
     indexes = {name: index for index, name in enumerate(names)}
-    normalized: list[tuple[str, str]] = []
+    normalized: list[tuple[str, ...]] = []
     claimed: set[str] = set()
     for raw_group in groups:
         group = tuple(raw_group)
         if (
-            len(group) != 2
+            not 2 <= len(group) <= _MAX_COMMUTATIVE_READ_ONLY_GROUP_SIZE
             or any(not isinstance(name, str) or not name for name in group)
-            or group[0] == group[1]
+            or len(set(group)) != len(group)
             or any(name not in indexes for name in group)
-            or indexes[group[1]] != indexes[group[0]] + 1
+            or tuple(indexes[name] for name in group)
+            != tuple(range(indexes[group[0]], indexes[group[0]] + len(group)))
             or any(name in claimed for name in group)
         ):
             raise ValueError(
-                "commutative read-only groups must name disjoint adjacent "
-                "expected steps in canonical order"
+                "commutative read-only groups must name between 2 and 4 "
+                "disjoint contiguous expected steps in canonical order"
             )
-        grouped_steps = (steps[indexes[group[0]]], steps[indexes[group[1]]])
+        grouped_steps = tuple(steps[indexes[name]] for name in group)
         schema_metadata_pair = {
             step.subcommand for step in grouped_steps
-        } == {"operation-schema", "metadata"}
-        exact_id_query_pair = all(
-            _is_closed_exact_id_query_step(step) for step in grouped_steps
+        } == {"operation-schema", "metadata"} and len(grouped_steps) == 2
+        exact_identity_query_group = all(
+            _is_closed_exact_identity_query_step(
+                step,
+                group_start_index=indexes[group[0]],
+                indexes=indexes,
+            )
+            for step in grouped_steps
         )
-        if not schema_metadata_pair and not exact_id_query_pair:
+        if not schema_metadata_pair and not exact_identity_query_group:
             raise ValueError(
                 "commutative read-only groups are limited to one "
-                "operation-schema/metadata pair or two closed exact-ID "
-                "query-object steps"
+                "operation-schema/metadata pair or contiguous closed exact-ID/path "
+                "query-object steps whose bindings precede the group"
             )
         claimed.update(group)
-        normalized.append((group[0], group[1]))
+        normalized.append(group)
     return tuple(normalized)
 
 
@@ -1887,9 +1901,11 @@ def gateway_step_prefix_matches(
     if len(actual_names) > len(expected_names):
         return False
     permitted_pairs = {
-        frozenset(tuple(group))
+        frozenset((first, second))
         for group in tuple(groups)
-        if len(tuple(group)) == 2
+        for first in tuple(group)
+        for second in tuple(group)
+        if first != second
     } | _commutative_composer_setup_pairs(composer_setup_groups)
     reachable = {expected_names}
     pending = [expected_names]
@@ -1958,7 +1974,7 @@ def gateway_step_sequence_matches(
     groups: Sequence[Sequence[str]] = (),
     composer_setup_groups: Sequence[Sequence[str]] = (),
 ) -> bool:
-    """Match declared pair swaps and exact numbered Draft-action permutations."""
+    """Match declared read groups and exact numbered Draft-action permutations."""
 
     return len(tuple(expected)) == len(tuple(actual)) and gateway_step_prefix_matches(
         expected,
@@ -5555,9 +5571,16 @@ class CodexGatewayBroker:
             )
         )
         self._execution_steps = list(self.expected_steps)
-        self._commutative_step_pairs = {
+        self._commutative_read_only_step_sets = tuple(
             frozenset(group)
             for group in self.commutative_read_only_step_groups
+        )
+        self._commutative_step_pairs = {
+            frozenset((first, second))
+            for group in self.commutative_read_only_step_groups
+            for first in group
+            for second in group
+            if first != second
         } | _commutative_composer_setup_pairs(
             self.commutative_composer_setup_step_groups
         )
@@ -6635,6 +6658,12 @@ class CodexGatewayBroker:
                     )
                 if reordered is not None:
                     step, semantic_hash, execution_arguments = reordered
+                elif (
+                    read_only_reordered := self._match_commutative_read_only_step(
+                        resolved.gateway_arguments,
+                    )
+                ) is not None:
+                    step, semantic_hash, execution_arguments = read_only_reordered
                 elif self._next_step + 1 >= len(self._execution_steps):
                     return self._reject_locked(
                         resolved,
@@ -6758,6 +6787,53 @@ class CodexGatewayBroker:
         if len(matches) != 1:
             raise GatewayInvocationError(
                 "typed Draft action matches multiple dependency-ready business facts"
+            )
+        index, candidate, semantic_hash, execution_arguments = matches[0]
+        self._execution_steps.insert(
+            self._next_step,
+            self._execution_steps.pop(index),
+        )
+        return candidate, semantic_hash, execution_arguments
+
+    def _match_commutative_read_only_step(
+        self,
+        actual: Sequence[str],
+    ) -> tuple[ExpectedGatewayStep, str, tuple[str, ...]] | None:
+        """Select one remaining member of a declared read-only group."""
+
+        current = self._execution_steps[self._next_step]
+        group = next(
+            (
+                candidate
+                for candidate in self._commutative_read_only_step_sets
+                if current.name in candidate
+            ),
+            None,
+        )
+        if group is None:
+            return None
+        matches: list[
+            tuple[int, ExpectedGatewayStep, str, tuple[str, ...]]
+        ] = []
+        for index in range(self._next_step + 1, len(self._execution_steps)):
+            candidate = self._execution_steps[index]
+            if candidate.name not in group:
+                break
+            try:
+                semantic_hash, execution_arguments = self._validate_step(
+                    candidate,
+                    actual,
+                )
+            except GatewayInvocationError:
+                continue
+            matches.append(
+                (index, candidate, semantic_hash, execution_arguments)
+            )
+        if not matches:
+            return None
+        if len(matches) != 1:
+            raise GatewayInvocationError(
+                "command matches multiple declared commutative read-only steps"
             )
         index, candidate, semantic_hash, execution_arguments = matches[0]
         self._execution_steps.insert(

@@ -1100,28 +1100,22 @@ def test_live_check_is_bounded_durable_and_any_edit_invalidates_it(
         "compact_projection_is_not_truncation": True,
         "draft_inspect_required_before_preview": False,
     }
-    assert checked["draft"]["next_action_binding"] == {
-        "contract": "waapi-skill.operation-draft-next-action/v1",
-        "draft_id": draft_id,
-        "expected_revision": 4,
-        "one_action_only": True,
-        "then_read_next_response": True,
-        "precompute_or_increment_revision": False,
-        "fixed_full_argv_template": [
-            "python",
-            str(waapi_gateway.GATEWAY_RUNNER_PATH),
-            "gateway.py",
-            "preview-from-draft",
-            draft_id,
-            "--task-authority",
-            "<task-authority-from-draft-start>",
-            "--expected-revision",
-            "4",
-            "--apply",
-        ],
-        "replace_only": ["<task-authority-from-draft-start>"],
-        "copy_all_other_values_exactly": True,
-    }
+    assert "next_action_binding" not in checked["draft"]
+    next_command = checked["next_command"]
+    assert next_command["command"] == "preview-from-draft"
+    assert next_command["gateway_argv"] == [
+        "preview-from-draft",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "4",
+        "--apply",
+    ]
+    assert next_command["copy_exactly"] is True
+    source_field = next_command["copy_instruction"]["source_field"]
+    assert source_field in {"shell_command", "model_command"}
+    assert "--apply" in next_command[source_field]
     assert [call[0] for call in client.calls] == [
         "ak.wwise.core.getInfo",
         "ak.wwise.core.getProjectInfo",

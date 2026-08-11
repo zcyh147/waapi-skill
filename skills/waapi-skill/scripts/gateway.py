@@ -6227,6 +6227,18 @@ def dispatch_operation_draft_check(
             "project_call": dispatch_call_summary(project_call),
         }
     )
+    payload["next_command"] = transaction_next_command(
+        "preview-from-draft",
+        [
+            "preview-from-draft",
+            record.draft_id,
+            "--task-authority",
+            args.task_authority,
+            "--expected-revision",
+            str(record.revision),
+            "--apply",
+        ],
+    )
     return payload
 
 
@@ -10607,7 +10619,8 @@ def operation_draft_payload(
             )
         if compact_action is None:
             next_action_binding["copy_all_other_values_exactly"] = True
-        draft["next_action_binding"] = next_action_binding
+        if not (command == "draft-check" and record.check is not None):
+            draft["next_action_binding"] = next_action_binding
     return {
         "contract": GATEWAY_RESULT_CONTRACT,
         "ok": True,

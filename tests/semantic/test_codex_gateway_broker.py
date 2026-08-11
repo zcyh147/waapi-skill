@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import itertools
 import json
 import os
 import shlex
@@ -6450,6 +6451,124 @@ def test_broker_accepts_declared_closed_exact_id_query_pair_linearizations(
         evidence = broker.evidence()
         assert evidence.consumed_step_names == runtime_order
         assert evidence.passed is True
+
+
+@pytest.mark.parametrize(
+    "runtime_order",
+    tuple(itertools.permutations(("source", "dead_bus", "target_bus"))),
+)
+def test_broker_accepts_declared_closed_exact_identity_query_group_linearizations(
+    tmp_path: Path,
+    runtime_order: tuple[str, str, str],
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    selectors = {
+        "source": ("--object-id", "{11111111-1111-1111-1111-111111111111}"),
+        "dead_bus": ("--object-id", "{22222222-2222-2222-2222-222222222222}"),
+        "target_bus": ("--path", r"\Busses\Default Work Unit\Main Audio Bus"),
+    }
+
+    def arguments(name: str) -> tuple[str, ...]:
+        return (
+            *selectors[name],
+            "--return-field",
+            "id",
+            "--return-field",
+            "name",
+            "--return-field",
+            "type",
+            "--return-field",
+            "path",
+        )
+
+    canonical = tuple(selectors)
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=tuple(
+            ExpectedGatewayStep(name, "query-object", arguments(name))
+            for name in canonical
+        ),
+        commutative_read_only_step_groups=(canonical,),
+        transport="tcp",
+    ) as broker:
+        completed = [
+            run_model_command(broker, ["query-object", *arguments(name)])
+            for name in runtime_order
+        ]
+
+        assert [result.returncode for result in completed] == [0, 0, 0]
+        evidence = broker.evidence()
+        assert evidence.consumed_step_names == runtime_order
+        assert evidence.passed is True
+        assert broker.reconcile([result.args for result in completed]).passed
+
+
+def test_broker_rejects_commutative_identity_group_with_an_internal_binding(
+    tmp_path: Path,
+) -> None:
+    seed = ExpectedGatewayStep(
+        "seed",
+        "query-object",
+        (
+            "--object-id",
+            "{11111111-1111-1111-1111-111111111111}",
+            "--return-field",
+            "id",
+        ),
+    )
+    first = ExpectedGatewayStep(
+        "first",
+        "query-object",
+        (
+            "--object-id",
+            ResponseBinding("seed", "/objects/0/id"),
+            "--return-field",
+            "id",
+        ),
+    )
+    dependent = ExpectedGatewayStep(
+        "dependent",
+        "query-object",
+        (
+            "--object-id",
+            ResponseBinding("first", "/objects/0/id"),
+            "--return-field",
+            "id",
+        ),
+    )
+
+    with pytest.raises(ValueError, match="bindings precede the group"):
+        CodexGatewayBroker(
+            skill_source=tmp_path / "waapi-skill",
+            expected_steps=(seed, first, dependent),
+            commutative_read_only_step_groups=(("first", "dependent"),),
+        )
+
+
+def test_broker_rejects_an_unbounded_commutative_read_only_group(
+    tmp_path: Path,
+) -> None:
+    names = tuple(f"read.{index}" for index in range(5))
+    steps = tuple(
+        ExpectedGatewayStep(
+            name,
+            "query-object",
+            (
+                "--object-id",
+                f"{{11111111-1111-1111-1111-{index:012d}}}",
+                "--return-field",
+                "id",
+            ),
+        )
+        for index, name in enumerate(names, start=1)
+    )
+
+    with pytest.raises(ValueError, match="between 2 and 4"):
+        CodexGatewayBroker(
+            skill_source=tmp_path / "waapi-skill",
+            expected_steps=steps,
+            commutative_read_only_step_groups=(names,),
+        )
 
 
 def test_broker_rejects_commutative_query_pair_outside_closed_identity_shape(

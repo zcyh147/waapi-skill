@@ -295,6 +295,11 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
                     "decision_field_required": True,
                     "assigned": "exact_user_requested_string",
                     "unassigned": "null",
+                    "requested_assignment": (
+                        "exact_nonempty_user_requested_string"
+                    ),
+                    "explicit_no_assignment": "null",
+                    "null_does_not_assign": True,
                     "null_materializes_as": "omitted_canonical_field",
                     "never_guess": True,
                 },
@@ -427,6 +432,9 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
             "decision_field_required": True,
             "assigned": "exact_user_requested_string",
             "unassigned": "null",
+            "requested_assignment": "exact_nonempty_user_requested_string",
+            "explicit_no_assignment": "null",
+            "null_does_not_assign": True,
             "null_materializes_as": "omitted_canonical_field",
             "never_guess": True,
         },
@@ -474,12 +482,21 @@ def test_audio_import_exposes_one_row_action_for_assigned_and_unassigned_rows(
     row = contract["action_shapes"]["add_import_row"]
     assert row["required_fields"] == ["object_path", "switch_assignment"]
     assert "switch_assignment" not in row["optional_fields"]
+    decision = row["construction_discipline"]["switch_assignment"]
+    assert decision["requested_assignment"] == (
+        "exact_nonempty_user_requested_string"
+    )
+    assert decision["explicit_no_assignment"] == "null"
+    assert decision["null_does_not_assign"] is True
     assert contract["flat_import_row_discipline"] == {
         "initial_action": "add_import_row",
         "switch_assignment": {
             "decision_field_required": True,
             "assigned": "exact_user_requested_string",
             "unassigned": "null",
+            "requested_assignment": "exact_nonempty_user_requested_string",
+            "explicit_no_assignment": "null",
+            "null_does_not_assign": True,
             "null_materializes_as": "omitted_canonical_field",
             "never_guess": True,
         },

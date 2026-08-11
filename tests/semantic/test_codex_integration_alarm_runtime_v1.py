@@ -453,6 +453,9 @@ def test_protocol_exposes_six_exact_chain_reads_then_one_standard_transaction(
         "diag.dead_bus",
         "diag.target_bus",
     )
+    assert protocol.commutative_read_only_step_groups == (
+        ("diag.source", "diag.dead_bus", "diag.target_bus"),
+    )
     assert {step.subcommand for step in protocol.steps[:6]} == {"query-object"}
     assert "--take" not in protocol.steps[0].arguments
     assert "--take" in protocol.steps[1].arguments

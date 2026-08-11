@@ -450,6 +450,11 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
                 "decision_field_required": True,
                 "assigned": "exact_user_requested_string",
                 "unassigned": "null",
+                "requested_assignment": (
+                    "exact_nonempty_user_requested_string"
+                ),
+                "explicit_no_assignment": "null",
+                "null_does_not_assign": True,
                 "null_materializes_as": "omitted_canonical_field",
                 "never_guess": True,
             },

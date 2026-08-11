@@ -513,7 +513,7 @@ def deserialize_protocol(value: Mapping[str, Any]) -> V3GatewayProtocol:
         raise PromptProvenanceError("protocol manifest topology is invalid")
     allowed: tuple[tuple[int, ...], ...] = ()
     terminal: tuple[int, ...] = ()
-    commutative_groups: tuple[tuple[str, str], ...] = ()
+    commutative_groups: tuple[tuple[str, ...], ...] = ()
     composer_setup_groups: tuple[tuple[str, ...], ...] = ()
     if "allowed_turn_prefix_counts" in value:
         raw_allowed = value.get("allowed_turn_prefix_counts")
@@ -539,7 +539,7 @@ def deserialize_protocol(value: Mapping[str, Any]) -> V3GatewayProtocol:
             not isinstance(raw_groups, list)
             or any(
                 not isinstance(group, list)
-                or len(group) != 2
+                or len(group) < 2
                 or any(not isinstance(item, str) for item in group)
                 for group in raw_groups
             )
@@ -547,9 +547,7 @@ def deserialize_protocol(value: Mapping[str, Any]) -> V3GatewayProtocol:
             raise PromptProvenanceError(
                 "commutative read-only protocol groups are invalid"
             )
-        commutative_groups = tuple(
-            (group[0], group[1]) for group in raw_groups
-        )
+        commutative_groups = tuple(tuple(group) for group in raw_groups)
     if "commutative_composer_setup_step_groups" in value:
         raw_groups = value.get("commutative_composer_setup_step_groups")
         if (
@@ -575,6 +573,10 @@ def deserialize_protocol(value: Mapping[str, Any]) -> V3GatewayProtocol:
             composer_setup_groups,
         )
     except (TypeError, ValueError) as exc:
+        if "commutative read-only groups" in str(exc):
+            raise PromptProvenanceError(
+                f"commutative read-only protocol groups are invalid: {exc}"
+            ) from exc
         raise PromptProvenanceError(
             f"protocol manifest topology is invalid: {exc}"
         ) from exc
