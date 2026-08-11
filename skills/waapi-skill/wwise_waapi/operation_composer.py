@@ -106,10 +106,6 @@ _AUDIO_IMPORT_ACTION_FIELDS: dict[
     "clear_import_option": (("name",), ()),
     "set_import_default": (("name", "value"), ()),
     "clear_import_default": (("name",), ()),
-    "add_switch_assigned_import_row": (
-        ("object_path", "assignment"),
-        _AUDIO_IMPORT_ROW_OPTIONAL_FIELDS,
-    ),
     "add_import_row_without_switch_assignment": (
         ("object_path",),
         _AUDIO_IMPORT_ROW_OPTIONAL_FIELDS,
@@ -556,20 +552,16 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "Registry returned an invalid audio.import operation default"
             )
         flat_import_row_discipline = {
-            "initial_row_action_by_intent": {
-                "without_switch_assignment": (
-                    "add_import_row_without_switch_assignment"
-                ),
-                "with_requested_switch_assignment": (
-                    "add_switch_assigned_import_row"
-                ),
-            },
+            "initial_row_action": "add_import_row_without_switch_assignment",
             "one_initial_action_per_row": True,
-            "assignment_intent_is_explicit_in_action_name": True,
+            "include_every_known_non_assignment_field": True,
+            "requested_switch_assignment_follow_up": {
+                "action": "set_import_row_field",
+                "name": "switch_assignment",
+                "handle_source": "created_row_handle",
+                "before_check": True,
+            },
             "never_guess_assignment_intent": True,
-            "include_every_known_field": True,
-            "split_initial_row_across_follow_up_actions": False,
-            "follow_up_row_actions": "corrections_only",
             "metadata_dependency_activation": "gateway_owned_do_not_submit",
         }
         import_row_user_fact_checklist = {
@@ -587,7 +579,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "switch_assignment",
             ],
             "distinct_metadata_tokens_are_independent_facts": True,
-            "requested_switch_assignment_is_not_a_later_action": True,
+            "requested_switch_assignment_uses_created_row_handle": True,
         }
         planning_discipline = {
             "dynamic_metadata": {
@@ -638,10 +630,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                             flat_import_row_discipline
                         )
                     }
-                    if action_name in {
-                        "add_import_row_without_switch_assignment",
-                        "add_switch_assigned_import_row",
-                    }
+                    if action_name == "add_import_row_without_switch_assignment"
                     else {}
                 ),
                 **(
@@ -650,10 +639,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                             import_row_user_fact_checklist
                         )
                     }
-                    if action_name in {
-                        "add_import_row_without_switch_assignment",
-                        "add_switch_assigned_import_row",
-                    }
+                    if action_name == "add_import_row_without_switch_assignment"
                     else {}
                 ),
                 **(
@@ -686,26 +672,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                             }
                         ]
                     }
-                    if action_name in {
-                        "add_import_row_without_switch_assignment",
-                        "add_switch_assigned_import_row",
-                    }
-                    else {}
-                ),
-                **(
-                    {
-                        "assignment_contract": {
-                            "required": True,
-                            "normal_form": {
-                                "mode": "switch",
-                                "required_fields": ["mode", "value"],
-                                "additional_fields": False,
-                            },
-                            "requested_switch_assignment_must_use_mode": "switch",
-                            "switch_assignment_is_not_a_later_action": True,
-                        }
-                    }
-                    if action_name == "add_switch_assigned_import_row"
+                    if action_name == "add_import_row_without_switch_assignment"
                     else {}
                 ),
             }
@@ -1987,10 +1954,7 @@ def _apply_audio_import_action(
             del defaults[name]
         _materialize_if_complete(AUDIO_IMPORT_COMPOSER_OPERATION, version, composition)
         return composition, str(action_name)
-    if action_name in {
-        "add_import_row_without_switch_assignment",
-        "add_switch_assigned_import_row",
-    }:
+    if action_name == "add_import_row_without_switch_assignment":
         row_field_names = tuple(
             operation_composer_contract(
                 AUDIO_IMPORT_COMPOSER_OPERATION, version
@@ -2009,38 +1973,6 @@ def _apply_audio_import_action(
             optional=optional_action_fields,
             label=f"{action_name} action",
         )
-        has_assignment = "assignment" in action
-        assignment = action.get("assignment")
-        if has_assignment and not isinstance(assignment, Mapping):
-            raise OperationComposerError(
-                f"{action_name} assignment must be an object."
-            )
-        mode = assignment.get("mode") if isinstance(assignment, Mapping) else None
-        if action_name == "add_switch_assigned_import_row" and not has_assignment:
-            raise OperationComposerError(
-                "add_switch_assigned_import_row requires a switch assignment."
-            )
-        if not has_assignment:
-            switch_assignment = None
-        elif mode == "switch":
-            _require_exact_keys(
-                assignment,
-                required=("mode", "value"),
-                label="add_switch_assigned_import_row assignment",
-            )
-            switch_assignment = _validate_audio_import_fragment(
-                version,
-                fragment="row_field",
-                payload={
-                    "name": "switch_assignment",
-                    "value": assignment.get("value"),
-                },
-            )
-        else:
-            raise OperationComposerError(
-                "add_switch_assigned_import_row assignment mode must be 'switch'.",
-                details={"mode": mode},
-            )
         rows = composition["imports"]
         assert isinstance(rows, list)
         limit = _audio_import_limit(version)
@@ -2059,8 +1991,6 @@ def _apply_audio_import_action(
                 payload={"name": name, "value": action[name]},
             )
             fields[descriptor["name"]] = descriptor["value"]
-        if switch_assignment is not None:
-            fields[switch_assignment["name"]] = switch_assignment["value"]
         defaults = composition["defaults"]
         assert isinstance(defaults, dict)
         if "object_type" not in fields and "object_type" not in defaults:
@@ -2322,14 +2252,11 @@ def _audio_import_composition_projection(
         "defaults": _audio_import_public_fields(defaults),
         "action_guidance": {
             "switch_assignment": {
-                "when_user_requested": "use_add_switch_assigned_import_row",
-                "typed_argv_suffix": [
-                    "--assignment",
-                    "switch",
-                    "<exact-value>",
-                ],
-                "omission_means": "no_switch_assignment",
-                "follow_up_assignment_action_exists": False,
+                "when_user_requested": "set_after_row_creation",
+                "action": "set_import_row_field",
+                "name": "switch_assignment",
+                "import_handle": "use_created_row_handle",
+                "complete_before": "draft-check",
                 "guessing_allowed": False,
             }
         },

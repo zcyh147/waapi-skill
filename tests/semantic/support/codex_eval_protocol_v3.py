@@ -17,6 +17,7 @@ from tests.semantic.support.codex_gateway_broker import (
     DraftActionJsonArgument,
     DraftActionMetadataBinding,
     DraftActionQueryIdentityBinding,
+    DraftActionResponseBinding,
     ExpectedGatewayStep,
     MetadataBoundJsonArgument,
     MetadataQueryArgument,
@@ -301,7 +302,13 @@ def build_audio_import_composer_transaction_steps(
     if set(arguments) - allowed_request_fields:
         raise V3ProtocolError("audio.import Composer request fields are not supported")
 
-    action_specs: list[tuple[dict[str, Any], DraftActionMetadataBinding | None]] = []
+    action_specs: list[
+        tuple[
+            dict[str, Any],
+            DraftActionMetadataBinding | None,
+            tuple[DraftActionResponseBinding, ...],
+        ]
+    ] = []
     initial_composition = new_composition(
         "audio.import",
         normalized["version"],
@@ -324,6 +331,7 @@ def build_audio_import_composer_transaction_steps(
                         "value": arguments[option_name],
                     },
                     None,
+                    (),
                 )
             )
     defaults = arguments.get("defaults", {})
@@ -342,40 +350,64 @@ def build_audio_import_composer_transaction_steps(
                 metadata_binding
                 if name in {"properties", "references"}
                 else None,
+                (),
             )
         )
     for raw_row in imports:
         if not isinstance(raw_row, Mapping):
             raise V3ProtocolError("audio.import Composer row must be an object")
         row_fields = dict(raw_row)
-        has_switch_assignment = "switch_assignment" in row_fields
         switch_assignment = row_fields.pop("switch_assignment", None)
         action = {
             "contract": OPERATION_DRAFT_ACTION_CONTRACT,
-            "action": (
-                "add_switch_assigned_import_row"
-                if has_switch_assignment
-                else "add_import_row_without_switch_assignment"
-            ),
+            "action": "add_import_row_without_switch_assignment",
             **row_fields,
         }
-        if has_switch_assignment:
-            action["assignment"] = {
-                "mode": "switch",
-                "value": switch_assignment,
-            }
+        row_action_name = f"{label}.action.{len(action_specs) + 1:03d}"
         action_specs.append(
             (
                 action,
                 metadata_binding
                 if any(name in raw_row for name in ("properties", "references"))
                 else None,
+                (),
             )
         )
+        if "switch_assignment" in raw_row:
+            action_specs.append(
+                (
+                    {
+                        "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+                        "action": "set_import_row_field",
+                        "name": "switch_assignment",
+                        "value": switch_assignment,
+                    },
+                    None,
+                    (
+                        DraftActionResponseBinding(
+                            pointer="/import_handle",
+                            step=row_action_name,
+                            response_pointer=(
+                                "/draft/action_result/created_handles/0"
+                            ),
+                        ),
+                    ),
+                )
+            )
 
     try:
-        materialized = _materialize_audio_import_composer_actions(
-            tuple(action for action, _metadata in action_specs),
+        materialized = _materialize_audio_import_composer_action_entries(
+            tuple(
+                (
+                    f"{label}.action.{index:03d}",
+                    action,
+                    response_bindings,
+                )
+                for index, (action, _metadata, response_bindings) in enumerate(
+                    action_specs,
+                    start=1,
+                )
+            ),
             version=normalized["version"],
         )
     except (OperationComposerError, StopIteration) as exc:
@@ -416,7 +448,11 @@ def build_audio_import_composer_transaction_steps(
         ),
     ]
     latest_revision_step = f"{label}.draft-start"
-    for index, (action, action_metadata) in enumerate(action_specs, start=1):
+    for index, (
+        action,
+        action_metadata,
+        response_bindings,
+    ) in enumerate(action_specs, start=1):
         action_name = f"{label}.action.{index:03d}"
         steps.append(
             ExpectedGatewayStep(
@@ -432,6 +468,7 @@ def build_audio_import_composer_transaction_steps(
                     "--facts",
                     DraftActionJsonArgument(
                         expected=action,
+                        response_bindings=response_bindings,
                         operation="audio.import",
                         metadata_binding=action_metadata,
                     ),
@@ -505,18 +542,91 @@ def _materialize_audio_import_composer_actions(
     *,
     version: str,
 ) -> dict[str, Any]:
-    composition = new_composition("audio.import", version)
-    handles = iter(
-        f"odh1-{index:024x}" for index in range(1, len(actions) + 1)
+    return _materialize_audio_import_composer_action_entries(
+        tuple(
+            (f"action.{index:03d}", action, ())
+            for index, action in enumerate(actions, start=1)
+        ),
+        version=version,
     )
-    for action in actions:
+
+
+def _materialize_audio_import_composer_action_entries(
+    entries: Sequence[
+        tuple[
+            str,
+            Mapping[str, Any],
+            tuple[DraftActionResponseBinding, ...],
+        ]
+    ],
+    *,
+    version: str,
+) -> dict[str, Any]:
+    composition = new_composition("audio.import", version)
+    created_handles: dict[str, str] = {}
+    handles = iter(f"odh1-{index:024x}" for index in range(1, len(entries) + 1))
+    for step_name, action, response_bindings in entries:
+        resolved_action = dict(action)
+        for binding in response_bindings:
+            if (
+                binding.pointer != "/import_handle"
+                or binding.response_pointer
+                != "/draft/action_result/created_handles/0"
+            ):
+                raise OperationComposerError(
+                    "audio.import protocol contains an unsupported dynamic handle"
+                )
+            try:
+                resolved_action["import_handle"] = created_handles[binding.step]
+            except KeyError as exc:
+                raise OperationComposerError(
+                    "audio.import protocol handle is not available"
+                ) from exc
+        legacy_assignment: Any = None
+        if resolved_action.get("action") in {
+            "add_import_row",
+            "add_switch_assigned_import_row",
+        }:
+            legacy_assignment = resolved_action.pop("assignment", None)
+            resolved_action["action"] = (
+                "add_import_row_without_switch_assignment"
+            )
+            if legacy_assignment not in (
+                None,
+                {"mode": "none"},
+            ) and not (
+                isinstance(legacy_assignment, Mapping)
+                and set(legacy_assignment) == {"mode", "value"}
+                and legacy_assignment.get("mode") == "switch"
+            ):
+                raise OperationComposerError(
+                    "historical audio.import assignment is invalid"
+                )
+        generated_handle = next(handles)
         composition, _action_name = apply_composer_action(
             "audio.import",
             version,
             composition,
-            action,
-            handle_factory=lambda: next(handles),
+            resolved_action,
+            handle_factory=lambda: generated_handle,
         )
+        if resolved_action.get("action") == "add_import_row_without_switch_assignment":
+            created_handles[step_name] = generated_handle
+            if isinstance(legacy_assignment, Mapping) and (
+                legacy_assignment.get("mode") == "switch"
+            ):
+                composition, _action_name = apply_composer_action(
+                    "audio.import",
+                    version,
+                    composition,
+                    {
+                        "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+                        "action": "set_import_row_field",
+                        "import_handle": generated_handle,
+                        "name": "switch_assignment",
+                        "value": legacy_assignment["value"],
+                    },
+                )
     return materialize_operation_request("audio.import", version, composition)
 
 
@@ -544,7 +654,13 @@ def materialize_audio_import_composer_protocol_request(
         )
     start_index = starts[0][0]
     preview_index = previews[0][0]
-    actions: list[Mapping[str, Any]] = []
+    action_entries: list[
+        tuple[
+            str,
+            Mapping[str, Any],
+            tuple[DraftActionResponseBinding, ...],
+        ]
+    ] = []
     for step in protocol.steps[start_index + 1 : preview_index]:
         if step.subcommand != "draft-apply":
             continue
@@ -552,16 +668,17 @@ def materialize_audio_import_composer_protocol_request(
         if (
             not isinstance(argument, DraftActionJsonArgument)
             or argument.operation != "audio.import"
-            or argument.response_bindings
             or argument.query_identity_bindings
         ):
             raise V3ProtocolError(
                 "audio.import Composer protocol contains a dynamic action"
             )
-        actions.append(argument.expected)
+        action_entries.append(
+            (step.name, argument.expected, argument.response_bindings)
+        )
     try:
-        return _materialize_audio_import_composer_actions(
-            tuple(actions),
+        return _materialize_audio_import_composer_action_entries(
+            tuple(action_entries),
             version=version,
         )
     except (OperationComposerError, StopIteration) as exc:

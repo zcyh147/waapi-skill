@@ -8,6 +8,7 @@ import pytest
 
 from tests.support.platform_filesystem import native_absolute_test_path
 from tests.semantic.support.codex_eval_protocol_v3 import (
+    _materialize_audio_import_composer_actions,
     StructuredRefusal,
     V3GatewayProtocol,
     V3ProtocolError,
@@ -26,6 +27,7 @@ from tests.semantic.support.codex_gateway_broker import (
     CodexGatewayBroker,
     DraftActionJsonArgument,
     DraftActionMetadataBinding,
+    DraftActionResponseBinding,
     ExpectedGatewayStep,
     MetadataBoundJsonArgument,
     MetadataQueryArgument,
@@ -140,13 +142,13 @@ def test_audio_import_composer_emits_ordered_typed_actions_without_full_json() -
     )
 
 
-def test_audio_import_switch_assignment_is_explicit_on_the_single_row_action() -> None:
+def test_audio_import_switch_assignment_uses_the_created_row_handle() -> None:
     request = _audio_import_request()
     switch_assignment = "Snow"
     request["arguments"]["imports"][0]["switch_assignment"] = switch_assignment  # type: ignore[index]
 
-    actions = [
-        step.arguments[-1].expected
+    action_arguments = [
+        step.arguments[-1]
         for step in build_audio_import_composer_transaction_steps(
             request,
             label="tx01",
@@ -154,17 +156,53 @@ def test_audio_import_switch_assignment_is_explicit_on_the_single_row_action() -
         if step.subcommand == "draft-apply"
     ]
 
-    row = actions[-1]
-    assert row["action"] == "add_switch_assigned_import_row"
-    assert row["assignment"] == {"mode": "switch", "value": switch_assignment}
-    assert "switch_assignment" not in row
+    row, assignment = action_arguments[-2:]
+    assert row.expected["action"] == "add_import_row_without_switch_assignment"
+    assert "assignment" not in row.expected
+    assert assignment.expected == {
+        "contract": "waapi-skill.operation-draft-action/v1",
+        "action": "set_import_row_field",
+        "name": "switch_assignment",
+        "value": switch_assignment,
+    }
+    assert assignment.response_bindings == (
+        DraftActionResponseBinding(
+            pointer="/import_handle",
+            step="tx01.action.005",
+            response_pointer="/draft/action_result/created_handles/0",
+        ),
+    )
     assert sum(
-        action["action"] in {
-            "add_import_row_without_switch_assignment",
-            "add_switch_assigned_import_row",
-        }
-        for action in actions
+        argument.expected["action"] == "add_import_row_without_switch_assignment"
+        for argument in action_arguments
     ) == 1
+
+
+def test_audio_import_archive_replay_preserves_the_removed_assigned_row_action() -> None:
+    materialized = _materialize_audio_import_composer_actions(
+        (
+            {
+                "contract": "waapi-skill.operation-draft-action/v1",
+                "action": "add_switch_assigned_import_row",
+                "object_path": (
+                    r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps\Snow"
+                ),
+                "object_type": "RandomSequenceContainer",
+                "assignment": {"mode": "switch", "value": "Snow"},
+            },
+        ),
+        version="2022.1",
+    )
+
+    assert materialized["arguments"]["imports"] == [
+        {
+            "object_path": (
+                r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps\Snow"
+            ),
+            "object_type": "RandomSequenceContainer",
+            "switch_assignment": "Snow",
+        }
+    ]
 
 
 def test_audio_import_composer_rejects_unreviewed_request_fields() -> None:

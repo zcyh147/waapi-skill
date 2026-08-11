@@ -2000,11 +2000,7 @@ def test_audio_import_typed_action_treats_named_field_order_as_semantic(
         "--compact",
         "--facts",
         "--action",
-        (
-            "add_switch_assigned_import_row"
-            if switch_assigned
-            else "add_import_row_without_switch_assignment"
-        ),
+        "add_import_row_without_switch_assignment",
         "--value",
         "object_path",
         "string",
@@ -2021,11 +2017,6 @@ def test_audio_import_typed_action_treats_named_field_order_as_semantic(
         "import_language",
         "string",
         "SFX",
-        *(
-            ("--assignment", "switch", "Rain")
-            if switch_assigned
-            else ()
-        ),
     )
     reordered_named_fields = (
         *fixed,

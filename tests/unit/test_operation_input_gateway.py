@@ -400,8 +400,10 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         "draft-start",
         "audio.import",
     ]
-    assert schema["composer"]["apply"]["typed_fact_flags"]["--assignment"] == [
-        "switch",
+    assert "--assignment" not in schema["composer"]["apply"]["typed_fact_flags"]
+    assert schema["composer"]["apply"]["typed_fact_flags"]["--value"] == [
+        "FIELD",
+        "TYPE",
         "VALUE",
     ]
     assert schema["composer"]["start"]["preconditions"] == {
@@ -452,18 +454,16 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             "references",
         ],
         "construction_discipline": {
-            "initial_row_action_by_intent": {
-                "without_switch_assignment": "add_import_row_without_switch_assignment",
-                "with_requested_switch_assignment": (
-                    "add_switch_assigned_import_row"
-                ),
-            },
+            "initial_row_action": "add_import_row_without_switch_assignment",
             "one_initial_action_per_row": True,
-            "assignment_intent_is_explicit_in_action_name": True,
+            "include_every_known_non_assignment_field": True,
+            "requested_switch_assignment_follow_up": {
+                "action": "set_import_row_field",
+                "name": "switch_assignment",
+                "handle_source": "created_row_handle",
+                "before_check": True,
+            },
             "never_guess_assignment_intent": True,
-            "include_every_known_field": True,
-            "split_initial_row_across_follow_up_actions": False,
-            "follow_up_row_actions": "corrections_only",
             "metadata_dependency_activation": "gateway_owned_do_not_submit",
         },
         "user_fact_checklist": {
@@ -481,7 +481,7 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
                 "switch_assignment",
             ],
             "distinct_metadata_tokens_are_independent_facts": True,
-            "requested_switch_assignment_is_not_a_later_action": True,
+            "requested_switch_assignment_uses_created_row_handle": True,
         },
         "conditional_required_fields": [
             {
@@ -498,23 +498,7 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             },
         ],
     }
-    assigned_row = schema["composer"]["action_shapes"][
-        "add_switch_assigned_import_row"
-    ]
-    assert assigned_row["required_fields"] == ["object_path", "assignment"]
-    assert assigned_row["optional_fields"] == schema["composer"][
-        "action_shapes"
-    ]["add_import_row_without_switch_assignment"]["optional_fields"]
-    assert assigned_row["assignment_contract"] == {
-        "required": True,
-        "normal_form": {
-            "mode": "switch",
-            "required_fields": ["mode", "value"],
-            "additional_fields": False,
-        },
-        "requested_switch_assignment_must_use_mode": "switch",
-        "switch_assignment_is_not_a_later_action": True,
-    }
+    assert "add_switch_assigned_import_row" not in schema["composer"]["action_shapes"]
     assert schema["composer"]["planning_discipline"][
         "dynamic_metadata"
     ] == {
@@ -565,7 +549,7 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             "switch_assignment",
         ],
         "distinct_metadata_tokens_are_independent_facts": True,
-        "requested_switch_assignment_is_not_a_later_action": True,
+        "requested_switch_assignment_uses_created_row_handle": True,
     }
     assert schema["composer"]["flat_import_row_discipline"][
         "metadata_dependency_activation"
