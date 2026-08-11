@@ -597,10 +597,60 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         "audio.importTabDelimited"
     )
     assert "composer" not in tab_schema
-
     normal_surfaces = json.dumps({"schema": schema, "detail": detail})
     assert "legacy-preview" not in normal_surfaces
     assert "legacy-operation-schema" not in normal_surfaces
+
+
+def test_structurally_distinct_adapters_share_one_public_lifecycle(
+    tmp_path: Path,
+) -> None:
+    projections: dict[str, dict[str, Any]] = {}
+    for operation in ("object.set", "audio.import"):
+        code, payload = offline_execute(
+            tmp_path / operation.replace(".", "-"),
+            "--version",
+            "2022.1",
+            "operation-schema",
+            operation,
+        )
+        assert code == 0
+        projections[operation] = payload["composer"]
+
+    shared_keys = {
+        "contract",
+        "action_contract",
+        "action_construction",
+        "composition_contract",
+        "complete_request_is_never_an_action",
+        "completion_discipline",
+        "apply",
+        "check",
+        "seal",
+        "cancel",
+        "check_subcommand",
+        "seal_subcommand",
+        "cancel_subcommand",
+        "complete_request_authored_by_gateway",
+    }
+    object_set = projections["object.set"]
+    audio_import = projections["audio.import"]
+    assert {key: object_set[key] for key in shared_keys} == {
+        key: audio_import[key] for key in shared_keys
+    }
+    assert object_set["start"]["subcommand"] == "draft-start"
+    assert audio_import["start"]["subcommand"] == "draft-start"
+    assert object_set["start"]["gateway_argv"] == [
+        "draft-start",
+        "object.set",
+    ]
+    assert audio_import["start"]["gateway_argv"] == [
+        "draft-start",
+        "audio.import",
+    ]
+    assert "preconditions" not in object_set["start"]
+    assert "preconditions" in audio_import["start"]
+    assert set(object_set["actions"]) != set(audio_import["actions"])
 
 
 def test_legacy_schema_is_explicit_deprecated_and_uses_the_same_registry_contract(

@@ -228,6 +228,26 @@ credit. On both hosts every source-project full hash and mtime remained
 unchanged, passing sandboxes were removed, failed sandboxes were sealed and
 quarantined, and no scoped residual process remained.
 
+Composer migration evidence is focused Adapter evidence, not public
+`integration` acceptance. For `object.set`, candidate
+`68697244063e02304eea79da54da502270be3704` passed Weather and Weapons on
+Wwise 2022.1/2025.1 in both macOS root `imac-flatrow-6869724-r1` and
+native-Windows root `i15-6869724-r1`; both four-unit roots also passed
+identical `--resume --verify-only` audits. For `audio.import`, macOS root
+`imac-import-6479595-r13-final6` at
+`6479595ea4b9a53c3351a4d1595c988e94ee5967` passed all six selected
+Weather/Rifle/Footsteps version units fresh and verify-only. Native-Windows
+root `iwin-import-f87b800-r2-interactive` passed four and failed two;
+`iwin-import-0be8266-r3-rifle-footsteps` then passed Footsteps and failed
+Rifle, and final fresh root `iwin-import-0be8266-r4-rifle` passed Rifle and
+its identical verify-only audit. The commits after `6479595` changed only
+program/semantic tests and harness support, not the packaged Skill tree. Thus
+all six Windows audio-import units have passing evidence cumulatively across
+three frozen roots, not one root or one Git candidate with a 6/6 result. Every
+recorded source hash/mtime stayed unchanged; PASS sandboxes were removed, FAIL
+sandboxes were sealed/quarantined, and scoped residual-process checks were
+empty.
+
 Historical macOS evidence is split across three frozen 2026-07-31 roots. Initial
 `a12` passed the four Alarm/Harbor version units and failed both Weather units;
 fresh `a20-int22-weather` and `a24-int25-weather` roots passed the repaired

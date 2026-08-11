@@ -5,12 +5,34 @@ import re
 from pathlib import Path
 
 
-SKILL_ROOT = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SKILL_ROOT = REPO_ROOT / "skills" / "waapi-skill"
 SKILL = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
 QUERY = (SKILL_ROOT / "references" / "waapi-query.md").read_text(encoding="utf-8")
 SETUP = (SKILL_ROOT / "references" / "waapi-setup.md").read_text(encoding="utf-8")
 OPERATE = (SKILL_ROOT / "references" / "waapi-operate.md").read_text(encoding="utf-8")
 COVERAGE = (SKILL_ROOT / "references" / "waapi-coverage.md").read_text(encoding="utf-8")
+DOMAIN_CONTEXT = (REPO_ROOT / "CONTEXT.md").read_text(encoding="utf-8")
+COMPOSER_ADR = (
+    REPO_ROOT / "docs" / "adr" / "0001-gateway-owned-operation-composition.md"
+).read_text(encoding="utf-8")
+
+
+def test_composer_domain_terms_and_architecture_decision_are_frozen() -> None:
+    for term in (
+        "Business Orchestration",
+        "Operation Composer",
+        "Operation Draft",
+        "Canonical OperationRequest",
+        "Legacy JSON Adapter",
+        "Change Preview",
+    ):
+        assert term in DOMAIN_CONTEXT
+        assert term in COMPOSER_ADR
+    assert "Status: Accepted" in COMPOSER_ADR
+    assert "a Legacy lane cannot start a new Operation Draft" in COMPOSER_ADR
+    assert "no planner model is embedded" in COMPOSER_ADR
+    assert "Normal user-facing prose describes objects" in COMPOSER_ADR
 
 
 def _structured_query_example_request() -> dict[str, object]:
@@ -992,7 +1014,8 @@ def test_operate_policy_and_gateway_owned_continuation_are_closed() -> None:
     for policy in ("`read_only`", "`ask_before_changes`", "`allow_changes`"):
         assert policy in OPERATE
     assert "omit `--state-dir`" in OPERATE
-    assert "Gateway owns the external transaction store" in OPERATE
+    assert "Gateway owns the external runtime state root" in OPERATE
+    assert "Gateway owns a deterministic external runtime-state default" in SKILL
     assert "A rejected or incomplete preview is a hard same-turn boundary" in OPERATE
     assert "On `LOCAL_WAAPI_HOST_REQUIRED`, report and stop" in OPERATE
     assert "execute only the field named by `next_command.copy_instruction.source_field`" in compact

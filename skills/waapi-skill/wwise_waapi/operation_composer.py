@@ -15,9 +15,11 @@ from typing import Any, Callable, Mapping
 
 from .canonical import canonical_json_bytes, canonical_sha256
 from .operation_registry import (
+    COMPOSER_INPUT_MODE,
     OperationContractError,
     audio_import_composer_fragment_contract,
     object_set_composer_fragment_contract,
+    operation_input_mode,
     parse_operation_request,
     validate_audio_import_composer_fragment,
     validate_object_set_composer_fragment,
@@ -29,9 +31,6 @@ OPERATION_COMPOSITION_CONTRACT = "waapi-skill.operation-composition/v1"
 OPERATION_COMPOSER_CONTRACT = "waapi-skill.operation-composer/v1"
 OBJECT_SET_COMPOSER_OPERATION = "object.set"
 AUDIO_IMPORT_COMPOSER_OPERATION = "audio.import"
-COMPOSER_ADAPTER_OPERATIONS = frozenset(
-    {OBJECT_SET_COMPOSER_OPERATION, AUDIO_IMPORT_COMPOSER_OPERATION}
-)
 MAX_COMPOSER_ACTION_BYTES = 32 * 1024
 MAX_AUDIO_IMPORT_COMPOSER_ACTION_BYTES = 384 * 1024
 _TARGET_HANDLE_PATTERN = re.compile(r"^odh1-[0-9a-f]{24}$")
@@ -162,6 +161,21 @@ class OperationComposerError(ValueError):
 def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
     """Return one reviewed Adapter contract, derived from the Registry."""
 
+    try:
+        input_mode = operation_input_mode(operation, version)
+    except OperationContractError as exc:
+        raise OperationComposerError(
+            f"No Operation Composer Adapter is available for {operation!r}.",
+            error_code="OPERATION_DRAFT_ADAPTER_UNAVAILABLE",
+            details={"operation": operation, "version": version},
+        ) from exc
+    if input_mode != COMPOSER_INPUT_MODE:
+        raise OperationComposerError(
+            f"No Operation Composer Adapter is available for {operation!r}.",
+            error_code="OPERATION_DRAFT_ADAPTER_UNAVAILABLE",
+            details={"operation": operation, "version": version},
+        )
+
     if operation == AUDIO_IMPORT_COMPOSER_OPERATION:
         fragments = audio_import_composer_fragment_contract(version)
         import_operation_contract = fragments["request_options"][
@@ -287,7 +301,6 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             "contract": OPERATION_COMPOSER_CONTRACT,
             "operation": operation,
             "version": version,
-            "phase": "complete_additive_adapter",
             "action_contract": OPERATION_DRAFT_ACTION_CONTRACT,
             "action_construction": {
                 "fixed_fields_are_required": True,
@@ -296,6 +309,21 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "additional_fields": False,
             },
             "planning_discipline": planning_discipline,
+            "start_preconditions": {
+                "dynamic_metadata": dict(
+                    planning_discipline["dynamic_metadata"]
+                ),
+                "draft_start_may_precede": True,
+                "metadata_independent_actions_may_precede": True,
+                "successful_metadata_survives_metadata_independent_actions": True,
+                "repeat_successful_metadata": False,
+                "actions_using_properties_or_references_wait_for": [
+                    "dynamic_metadata"
+                ],
+                "failure_policy": (
+                    "do_not_apply_dynamic_fields_then_backfill_metadata"
+                ),
+            },
             "flat_import_row_discipline": flat_import_row_discipline,
             "action_shapes": action_shapes,
             "composition_contract": OPERATION_COMPOSITION_CONTRACT,
@@ -318,11 +346,9 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "draft_inspect_required_before_next_planned_action": False,
             },
         }
-    if operation != OBJECT_SET_COMPOSER_OPERATION:
-        raise OperationComposerError(
-            f"No Operation Composer Adapter is available for {operation!r}.",
-            error_code="OPERATION_DRAFT_ADAPTER_UNAVAILABLE",
-            details={"operation": operation, "version": version},
+    if operation != OBJECT_SET_COMPOSER_OPERATION:  # registry invariant
+        raise RuntimeError(
+            f"Composer lane {operation!r} lacks a local Adapter implementation"
         )
     fragments = object_set_composer_fragment_contract(version)
     action_fields = dict(_BASE_ACTION_FIELDS)
@@ -2349,7 +2375,6 @@ def _require_allowed_keys(
 
 __all__ = [
     "AUDIO_IMPORT_COMPOSER_OPERATION",
-    "COMPOSER_ADAPTER_OPERATIONS",
     "MAX_COMPOSER_ACTION_BYTES",
     "OBJECT_SET_COMPOSER_OPERATION",
     "OPERATION_COMPOSER_CONTRACT",

@@ -3815,7 +3815,6 @@ def audio_import_composer_fragment_contract(version: str) -> dict[str, Any]:
         "contract": "waapi-skill.audio-import-composer-fragments/v1",
         "operation": "audio.import",
         "version": version,
-        "phase": "complete_additive_adapter",
         "supported_row_fields": list(supported_row_fields),
         "row_fields": {
             name: _json_mapping(row_properties[name])

@@ -187,7 +187,6 @@ from wwise_waapi.operation_drafts import (  # noqa: E402  # pyright: ignore[repo
     OperationDraftStore,
 )
 from wwise_waapi.operation_composer import (  # noqa: E402  # pyright: ignore[reportMissingImports]
-    COMPOSER_ADAPTER_OPERATIONS,
     OBJECT_SET_COMPOSER_OPERATION,
     composition_projection,
     operation_composer_contract,
@@ -3008,26 +3007,8 @@ def operation_composer_input_contract(
             "subcommand": "draft-start",
             "gateway_argv": ["draft-start", operation],
             **(
-                {
-                    "preconditions": {
-                        "dynamic_metadata": dict(
-                            contract["planning_discipline"][
-                                "dynamic_metadata"
-                            ]
-                        ),
-                        "draft_start_may_precede": True,
-                        "metadata_independent_actions_may_precede": True,
-                        "successful_metadata_survives_metadata_independent_actions": True,
-                        "repeat_successful_metadata": False,
-                        "actions_using_properties_or_references_wait_for": [
-                            "dynamic_metadata"
-                        ],
-                        "failure_policy": (
-                            "do_not_apply_dynamic_fields_then_backfill_metadata"
-                        ),
-                    }
-                }
-                if operation == "audio.import"
+                {"preconditions": dict(contract["start_preconditions"])}
+                if "start_preconditions" in contract
                 else {}
             ),
         },
@@ -3117,10 +3098,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             args.operation,
             request_version,
         )
-        composer_digest = (
-            operation_composer_digest(args.operation, request_version)
-            if args.operation in COMPOSER_ADAPTER_OPERATIONS
-            else None
+        composer_digest = operation_composer_digest(
+            args.operation,
+            request_version,
         )
         store = OperationDraftStore(
             resolve_transaction_state_directory(args, env=env)

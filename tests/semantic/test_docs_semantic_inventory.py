@@ -20,6 +20,14 @@ PUBLIC_INTEGRATION_WINDOWS_ROOTS = (
     "iwin-int-7f54506-r1",
     "iwin-int-7f54506-r2-retry3",
 )
+COMPOSER_EVIDENCE_ROOTS = (
+    "imac-flatrow-6869724-r1",
+    "i15-6869724-r1",
+    "imac-import-6479595-r13-final6",
+    "iwin-import-f87b800-r2-interactive",
+    "iwin-import-0be8266-r3-rifle-footsteps",
+    "iwin-import-0be8266-r4-rifle",
+)
 
 CODEX_PROFILE_COMMANDS = (
     "skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py "
@@ -82,6 +90,30 @@ def test_inventory_count_matches_latest_nonlive_result_without_collect_only_over
     assert len(recorded_results) >= 2
     assert len(set(recorded_results)) == 1
     assert "not a fresh full `--collect-only` recount" in inventory
+
+
+def test_composer_evidence_is_exact_and_never_promoted_to_integration() -> None:
+    documents = (
+        ROOT_AGENTS.read_text(encoding="utf-8"),
+        TESTS_AGENTS.read_text(encoding="utf-8"),
+        SEMANTIC_README.read_text(encoding="utf-8"),
+        TEST_INVENTORY.read_text(encoding="utf-8"),
+    )
+    for document in documents:
+        compact = " ".join(document.split())
+        for root in COMPOSER_EVIDENCE_ROOTS:
+            assert root in document
+        assert "focused Adapter evidence" in compact
+        assert "not public `integration` acceptance" in compact
+        assert "not one root or one Git candidate with a 6/6 result" in compact or (
+            "not a single-root or single-Git-candidate 6/6" in compact
+        )
+    for false_claim in (
+        "iwin-import-f87b800-r2-interactive passed 6/6",
+        "iwin-import-0be8266-r3-rifle-footsteps passed 2/2",
+        "Composer evidence proves public integration 12/12",
+    ):
+        assert all(false_claim not in document for document in documents)
 
 
 def test_fresh_codex_docs_keep_isolation_broker_and_infrastructure_semantics() -> None:

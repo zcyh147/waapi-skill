@@ -234,7 +234,8 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
     contract = operation_composer_contract("audio.import", version)
 
     assert contract["operation"] == "audio.import"
-    assert contract["phase"] == "complete_additive_adapter"
+    assert "phase" not in contract
+    assert "phase" not in contract["registry_fragments"]
     assert contract["action_shapes"] == {
         "set_import_option": {
             "fixed_fields": {

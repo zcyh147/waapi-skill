@@ -187,7 +187,7 @@ For a new change request with no existing transaction, use the named semantic op
 
 Except for `ak.wwise.cli.migrate`'s terminal `execute`, `verify` is the terminal authority for the selected contract: dedicated operations return their live readback, while generic `waapi.call` returns reflected result-schema evidence. After `verify` returns `verified` or another terminal verification state, stop the gateway sequence and report exactly that evidence. Do not add `query-object`, `call`, or another gateway command to double-check the same mutation. For an original request that already closed and ordered multiple independent transactions, apply the same configured policy independently to each item; never infer, reorder, or add a transaction.
 
-In ordinary agent use, omit `--state-dir`: the Gateway owns a deterministic external transaction-store default. Never run `env`, `printenv`, shell expansion, or another probe to discover `WAAPI_SKILL_STATE_DIR`; never ask a normal user for this implementation path. Pass `--state-dir` only when the user or trusted caller explicitly supplied a trusted absolute override, and reuse it unchanged.
+In ordinary agent use, omit `--state-dir`: the Gateway owns a deterministic external runtime-state default. Never run `env`, `printenv`, shell expansion, or another probe to discover `WAAPI_SKILL_STATE_DIR`; never ask a normal user for this implementation path. Pass `--state-dir` only when the user or trusted caller explicitly supplied a trusted absolute override, and reuse it unchanged.
 
 Fast route from this entry file:
 

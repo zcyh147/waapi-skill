@@ -186,7 +186,7 @@ python /absolute/path/to/waapi-skill/scripts/run.py gateway.py preview --apply -
 Single-quote its compact request and serialize every JSON string exactly once. Raw JSON spells each Wwise separator `\\`; decoding yields `\`. A raw `\` is invalid or escape-changing; never paste a decoded/displayed Wwise path. Operation requests use only closed selectors, never raw WAQL. Invalid JSON stops before preview; do not repair or retry that turn.
 
 Under `ask_before_changes`, a user asking to see the preview before confirming an intended change still uses `preview --apply`: that flag creates the durable confirmation-bound preview and does not execute the change. Omit `--apply` only for a hypothetical, design-only, or explicitly non-executable preview.
-In ordinary use omit `--state-dir`: the Gateway owns the external transaction store. Pass it only when a trusted caller explicitly supplied an absolute override, then reuse that path unchanged.
+In ordinary use omit `--state-dir`: the Gateway owns the external runtime state root. Pass it only when a trusted caller explicitly supplied an absolute override, then reuse that path unchanged.
 
 A rejected or incomplete preview is a hard same-turn boundary. Do not repair JSON, change an operation, or retry preview in that turn. A changed target/value requires a new preview.
 

@@ -1024,32 +1024,36 @@ def test_composer_is_exactly_isolated_from_shared_uri_operations(
 ) -> None:
     assert operation_input_mode("object.set", "2022.1") == COMPOSER_INPUT_MODE
     assert operation_input_mode("object.setRTPC", "2022.1") == LEGACY_JSON_INPUT_MODE
-    _code, started = execute(tmp_path, "draft-start", "object.setRTPC")
-    draft_id = started["draft"]["draft_id"]
-    record_path = (
-        tmp_path
-        / "state"
-        / "operation-drafts-v1"
-        / "records"
-        / f"{draft_id}.json"
-    )
-    before = record_path.read_bytes()
-
-    exit_code, rejected = execute(
-        tmp_path,
-        "draft-apply",
-        draft_id,
-        "--task-authority",
-        started["task_authority"],
-        "--expected-revision",
-        "1",
-        "--action-json",
-        action("add_target", selector={"kind": "id", "value": TARGET_ID}),
-    )
+    exit_code, rejected = execute(tmp_path, "draft-start", "object.setRTPC")
 
     assert exit_code == 2
     assert rejected["error_code"] == "OPERATION_DRAFT_ADAPTER_UNAVAILABLE"
-    assert record_path.read_bytes() == before
+    assert not (tmp_path / "state" / "operation-drafts-v1").exists()
+
+
+def test_registry_composer_lanes_and_real_adapters_are_one_to_one() -> None:
+    composer_lanes: set[tuple[str, str]] = set()
+    adapter_lanes: set[tuple[str, str]] = set()
+
+    for spec in list_operation_specs():
+        for version in spec.supported_versions:
+            lane = (spec.name, version)
+            if operation_input_mode(*lane) == COMPOSER_INPUT_MODE:
+                composer_lanes.add(lane)
+            try:
+                contract = operation_composer_contract(*lane)
+            except OperationComposerError as exc:
+                assert exc.error_code == "OPERATION_DRAFT_ADAPTER_UNAVAILABLE"
+            else:
+                assert contract["operation"] == spec.name
+                assert contract["version"] == version
+                adapter_lanes.add(lane)
+
+    assert adapter_lanes == composer_lanes
+    assert {operation for operation, _version in composer_lanes} == {
+        "audio.import",
+        "object.set",
+    }
 
 
 def test_live_check_is_bounded_durable_and_any_edit_invalidates_it(
