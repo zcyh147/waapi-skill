@@ -2045,28 +2045,12 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
         if step["subcommand"] == "draft-apply"
         and step["arguments"][-1].get("kind") == "draft_action_json"
         and step["arguments"][-1]["value"].get("action")
-        == "add_import_row_without_switch_assignment"
+        == "add_import_row"
     )
     serialized_row = serialized_row_step["arguments"][-1]["value"]
     assert "switch_assignment" not in serialized_row
-    serialized_assignment = next(
-        step["arguments"][-1]
-        for step in serialized["steps"]
-        if step["subcommand"] == "draft-apply"
-        and step["arguments"][-1].get("kind") == "draft_action_json"
-        and step["arguments"][-1]["value"].get("action")
-        == "set_import_row_field"
-        and step["arguments"][-1]["value"].get("name")
-        == "switch_assignment"
-    )
-    assert serialized_assignment["value"]["value"] == "Rain"
-    assert serialized_assignment["response_bindings"] == [
-        {
-            "pointer": "/import_handle",
-            "step": serialized_row_step["name"],
-            "response_pointer": "/draft/action_result/created_handles/0",
-        }
-    ]
+    assert serialized_row["assignment"] == {"mode": "switch", "value": "Rain"}
+    assert serialized_row_step["arguments"][-1]["response_bindings"] == []
     assert deserialize_protocol(serialized) == protocol
     gateway_authored_request = {
         **request,
@@ -2079,7 +2063,7 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
         serialized,
         gateway_authored_request["arguments"]["imports"],
     )
-    assert origins["/0/switch_assignment"].endswith("/value/value")
+    assert origins["/0/switch_assignment"].endswith("/assignment/value")
     assert _protocol_requests(serialized, version="2022.1") == (
         ("/composer/tx01.preview", gateway_authored_request),
     )

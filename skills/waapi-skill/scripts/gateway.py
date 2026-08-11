@@ -3050,6 +3050,7 @@ def operation_composer_input_contract(
                     "SELECTOR_VALUES...",
                 ],
                 "--event": ["FIELD", "ACTION", "PATH"],
+                "--assignment": ["none", "|", "switch", "VALUE"],
             },
             "scalar_types": ["string", "number", "integer", "boolean"],
             "selector_kinds": [

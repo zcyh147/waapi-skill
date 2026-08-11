@@ -21,7 +21,6 @@ from tests.semantic.support.codex_integration_fixture_tree_v2 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     DraftActionJsonArgument,
-    DraftActionResponseBinding,
     CodexGatewayBroker,
     GatewayInvocationError,
     SemanticJsonArgument,
@@ -582,8 +581,8 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
         "surface_group_path": case.fake._path("surface_group"),
         "footsteps_event_path": case.fake._path("play_footsteps_event"),
     }
-    assert prepared.protocol.turn_prefix_counts == (10, 16, 20)
-    assert len(prepared.protocol.steps) == 20
+    assert prepared.protocol.turn_prefix_counts == (9, 15, 19)
+    assert len(prepared.protocol.steps) == 19
     assert [
         (step.name, step.subcommand)
         for step in prepared.protocol.steps[:2]
@@ -627,7 +626,7 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
         for step in prepared.protocol.steps
         if step.name.startswith("tx01.action.")
     ]
-    assert len(import_actions) == 6
+    assert len(import_actions) == 5
     assert all(
         isinstance(argument, DraftActionJsonArgument)
         and argument.operation == "audio.import"
@@ -672,7 +671,12 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
         expected_actions.append(
             {
                 "contract": "waapi-skill.operation-draft-action/v1",
-                "action": "add_import_row_without_switch_assignment",
+                "action": "add_import_row",
+                "assignment": (
+                    {"mode": "switch", "value": row["switch_assignment"]}
+                    if "switch_assignment" in row
+                    else {"mode": "none"}
+                ),
                 **{
                     key: value
                     for key, value in row.items()
@@ -680,24 +684,8 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
                 },
             }
         )
-        if "switch_assignment" in row:
-            expected_actions.append(
-                {
-                    "contract": "waapi-skill.operation-draft-action/v1",
-                    "action": "set_import_row_field",
-                    "name": "switch_assignment",
-                    "value": row["switch_assignment"],
-                }
-            )
     assert [argument.expected for argument in import_actions] == expected_actions
-    assignment_argument = import_actions[1]
-    assert assignment_argument.response_bindings == (
-        DraftActionResponseBinding(
-            pointer="/import_handle",
-            step="tx01.action.001",
-            response_pointer="/draft/action_result/created_handles/0",
-        ),
-    )
+    assert all(argument.response_bindings == () for argument in import_actions)
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
@@ -852,7 +840,7 @@ def test_observer_preserves_exact_terminal_indeterminate_execute(
         },
     )
 
-    assert case.prepared.protocol.turn_prefix_counts == (10, 16, 20)
+    assert case.prepared.protocol.turn_prefix_counts == (9, 15, 19)
     assert case.prepared.operation_requests[0]["arguments"]["imports"][0][
         "switch_assignment"
     ] == "Snow"

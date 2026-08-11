@@ -357,13 +357,18 @@ def build_audio_import_composer_transaction_steps(
         if not isinstance(raw_row, Mapping):
             raise V3ProtocolError("audio.import Composer row must be an object")
         row_fields = dict(raw_row)
+        has_switch_assignment = "switch_assignment" in row_fields
         switch_assignment = row_fields.pop("switch_assignment", None)
         action = {
             "contract": OPERATION_DRAFT_ACTION_CONTRACT,
-            "action": "add_import_row_without_switch_assignment",
+            "action": "add_import_row",
+            "assignment": (
+                {"mode": "switch", "value": switch_assignment}
+                if has_switch_assignment
+                else {"mode": "none"}
+            ),
             **row_fields,
         }
-        row_action_name = f"{label}.action.{len(action_specs) + 1:03d}"
         action_specs.append(
             (
                 action,
@@ -373,27 +378,6 @@ def build_audio_import_composer_transaction_steps(
                 (),
             )
         )
-        if "switch_assignment" in raw_row:
-            action_specs.append(
-                (
-                    {
-                        "contract": OPERATION_DRAFT_ACTION_CONTRACT,
-                        "action": "set_import_row_field",
-                        "name": "switch_assignment",
-                        "value": switch_assignment,
-                    },
-                    None,
-                    (
-                        DraftActionResponseBinding(
-                            pointer="/import_handle",
-                            step=row_action_name,
-                            response_pointer=(
-                                "/draft/action_result/created_handles/0"
-                            ),
-                        ),
-                    ),
-                )
-            )
 
     try:
         materialized = _materialize_audio_import_composer_action_entries(
@@ -582,26 +566,16 @@ def _materialize_audio_import_composer_action_entries(
                 raise OperationComposerError(
                     "audio.import protocol handle is not available"
                 ) from exc
-        legacy_assignment: Any = None
         if resolved_action.get("action") in {
-            "add_import_row",
+            "add_import_row_without_switch_assignment",
             "add_switch_assigned_import_row",
         }:
-            legacy_assignment = resolved_action.pop("assignment", None)
-            resolved_action["action"] = (
-                "add_import_row_without_switch_assignment"
-            )
-            if legacy_assignment not in (
-                None,
-                {"mode": "none"},
-            ) and not (
-                isinstance(legacy_assignment, Mapping)
-                and set(legacy_assignment) == {"mode", "value"}
-                and legacy_assignment.get("mode") == "switch"
-            ):
-                raise OperationComposerError(
-                    "historical audio.import assignment is invalid"
-                )
+            resolved_action["action"] = "add_import_row"
+        if (
+            resolved_action.get("action") == "add_import_row"
+            and "assignment" not in resolved_action
+        ):
+            resolved_action["assignment"] = {"mode": "none"}
         generated_handle = next(handles)
         composition, _action_name = apply_composer_action(
             "audio.import",
@@ -610,23 +584,8 @@ def _materialize_audio_import_composer_action_entries(
             resolved_action,
             handle_factory=lambda: generated_handle,
         )
-        if resolved_action.get("action") == "add_import_row_without_switch_assignment":
+        if resolved_action.get("action") == "add_import_row":
             created_handles[step_name] = generated_handle
-            if isinstance(legacy_assignment, Mapping) and (
-                legacy_assignment.get("mode") == "switch"
-            ):
-                composition, _action_name = apply_composer_action(
-                    "audio.import",
-                    version,
-                    composition,
-                    {
-                        "contract": OPERATION_DRAFT_ACTION_CONTRACT,
-                        "action": "set_import_row_field",
-                        "import_handle": generated_handle,
-                        "name": "switch_assignment",
-                        "value": legacy_assignment["value"],
-                    },
-                )
     return materialize_operation_request("audio.import", version, composition)
 
 

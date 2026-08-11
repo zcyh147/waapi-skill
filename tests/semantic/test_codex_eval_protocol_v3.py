@@ -128,11 +128,11 @@ def test_audio_import_composer_emits_ordered_typed_actions_without_full_json() -
         "set_import_default",
         "set_import_default",
         "set_import_default",
-        "add_import_row_without_switch_assignment",
+        "add_import_row",
     ]
     assert action_arguments[3].metadata_binding == metadata
     assert action_arguments[4].metadata_binding == metadata
-    assert "assignment" not in action_arguments[4].expected
+    assert action_arguments[4].expected["assignment"] == {"mode": "none"}
     assert next(step for step in steps if step.name == "tx01.preview").subcommand == (
         "preview-from-draft"
     )
@@ -142,7 +142,7 @@ def test_audio_import_composer_emits_ordered_typed_actions_without_full_json() -
     )
 
 
-def test_audio_import_switch_assignment_uses_the_created_row_handle() -> None:
+def test_audio_import_each_row_carries_one_explicit_assignment_intent() -> None:
     request = _audio_import_request()
     switch_assignment = "Snow"
     request["arguments"]["imports"][0]["switch_assignment"] = switch_assignment  # type: ignore[index]
@@ -156,26 +156,26 @@ def test_audio_import_switch_assignment_uses_the_created_row_handle() -> None:
         if step.subcommand == "draft-apply"
     ]
 
-    row, assignment = action_arguments[-2:]
-    assert row.expected["action"] == "add_import_row_without_switch_assignment"
-    assert "assignment" not in row.expected
-    assert assignment.expected == {
-        "contract": "waapi-skill.operation-draft-action/v1",
-        "action": "set_import_row_field",
-        "name": "switch_assignment",
+    row = action_arguments[-1]
+    assert row.expected["action"] == "add_import_row"
+    assert row.expected["assignment"] == {
+        "mode": "switch",
         "value": switch_assignment,
     }
-    assert assignment.response_bindings == (
-        DraftActionResponseBinding(
-            pointer="/import_handle",
-            step="tx01.action.005",
-            response_pointer="/draft/action_result/created_handles/0",
-        ),
-    )
-    assert sum(
-        argument.expected["action"] == "add_import_row_without_switch_assignment"
-        for argument in action_arguments
-    ) == 1
+    assert row.response_bindings == ()
+
+    request["arguments"]["imports"][0].pop("switch_assignment")  # type: ignore[index]
+    ordinary_row = [
+        step.arguments[-1]
+        for step in build_audio_import_composer_transaction_steps(
+            request,
+            label="tx01",
+        )
+        if step.subcommand == "draft-apply"
+    ][-1]
+    assert ordinary_row.expected["action"] == "add_import_row"
+    assert ordinary_row.expected["assignment"] == {"mode": "none"}
+    assert ordinary_row.response_bindings == ()
 
 
 def test_audio_import_archive_replay_preserves_the_removed_assigned_row_action() -> None:
@@ -712,7 +712,7 @@ def test_metadata_transaction_protocol_selects_closed_audio_import_equivalence()
     )
     assert [argument.expected["action"] for argument in action_arguments] == [
         "set_import_default",
-        "add_import_row_without_switch_assignment",
+        "add_import_row",
     ]
     assert all(
         isinstance(argument, DraftActionJsonArgument)
