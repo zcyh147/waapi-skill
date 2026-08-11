@@ -126,7 +126,7 @@ def test_audio_import_composer_emits_ordered_typed_actions_without_full_json() -
         "set_import_default",
         "set_import_default",
         "set_import_default",
-        "add_import_row_without_switch_assignment",
+        "add_import_row",
     ]
     assert action_arguments[3].metadata_binding == metadata
     assert action_arguments[4].metadata_binding == metadata
@@ -139,7 +139,7 @@ def test_audio_import_composer_emits_ordered_typed_actions_without_full_json() -
     )
 
 
-def test_audio_import_switch_assignment_uses_the_assigned_row_action() -> None:
+def test_audio_import_switch_assignment_is_explicit_on_the_single_row_action() -> None:
     request = _audio_import_request()
     switch_assignment = "Snow"
     request["arguments"]["imports"][0]["switch_assignment"] = switch_assignment  # type: ignore[index]
@@ -154,10 +154,11 @@ def test_audio_import_switch_assignment_uses_the_assigned_row_action() -> None:
     ]
 
     row = actions[-1]
-    assert row["action"] == "add_switch_assigned_import_row"
-    assert row["switch_assignment"] == switch_assignment
+    assert row["action"] == "add_import_row"
+    assert row["assignment"] == {"mode": "switch", "value": switch_assignment}
+    assert "switch_assignment" not in row
     assert sum(
-        action["action"] == "add_switch_assigned_import_row"
+        action["action"] == "add_import_row"
         for action in actions
     ) == 1
 
@@ -669,7 +670,7 @@ def test_metadata_transaction_protocol_selects_closed_audio_import_equivalence()
     )
     assert [argument.expected["action"] for argument in action_arguments] == [
         "set_import_default",
-        "add_import_row_without_switch_assignment",
+        "add_import_row",
     ]
     assert all(
         isinstance(argument, DraftActionJsonArgument)

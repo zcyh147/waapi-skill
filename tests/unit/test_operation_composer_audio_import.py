@@ -221,11 +221,17 @@ def _live_execute(
 
 
 def _action(action_name: str, **fields: Any) -> str:
-    if action_name == "add_import_row_without_switch_assignment" and "switch_assignment" in fields:
-        assignment = fields.pop("switch_assignment")
-        if assignment is not None:
-            action_name = "add_switch_assigned_import_row"
-            fields["switch_assignment"] = assignment
+    if action_name in {
+        "add_import_row_without_switch_assignment",
+        "add_switch_assigned_import_row",
+    }:
+        assignment = fields.pop("switch_assignment", None)
+        action_name = "add_import_row"
+        fields["assignment"] = (
+            {"mode": "switch", "value": assignment}
+            if assignment is not None
+            else {"mode": "none"}
+        )
     return json.dumps(
         {"contract": ACTION_CONTRACT, "action": action_name, **fields},
         ensure_ascii=False,
@@ -253,8 +259,7 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
     }
     assert set(shapes) == {
         *simple_required,
-        "add_import_row_without_switch_assignment",
-        "add_switch_assigned_import_row",
+        "add_import_row",
     }
     for action_name, required_fields in simple_required.items():
         assert shapes[action_name] == {
@@ -282,25 +287,18 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
     row_extra = {
         "optional_fields": row_optional,
         "construction_discipline": contract["flat_import_row_discipline"],
-        "user_fact_checklist": shapes["add_import_row_without_switch_assignment"]["user_fact_checklist"],
-        "conditional_required_fields": shapes["add_import_row_without_switch_assignment"][
+        "user_fact_checklist": shapes["add_import_row"]["user_fact_checklist"],
+        "conditional_required_fields": shapes["add_import_row"][
             "conditional_required_fields"
         ],
+        "assignment_contract": shapes["add_import_row"]["assignment_contract"],
     }
-    assert shapes["add_import_row_without_switch_assignment"] == {
+    assert shapes["add_import_row"] == {
         "fixed_fields": {
             "contract": ACTION_CONTRACT,
-            "action": "add_import_row_without_switch_assignment",
+            "action": "add_import_row",
         },
-        "required_fields": ["object_path"],
-        **row_extra,
-    }
-    assert shapes["add_switch_assigned_import_row"] == {
-        "fixed_fields": {
-            "contract": ACTION_CONTRACT,
-            "action": "add_switch_assigned_import_row",
-        },
-        "required_fields": ["object_path", "switch_assignment"],
+        "required_fields": ["object_path", "assignment"],
         **row_extra,
     }
     assert contract["registry_fragments"]["supported_row_fields"] == [
@@ -363,24 +361,15 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
         in import_operation["description"]
     )
     assert contract["flat_import_row_discipline"] == {
-        "initial_action_by_assignment_intent": {
-            "assignment_explicitly_requested": (
-                "add_switch_assigned_import_row"
-            ),
-            "no_assignment_requested": "add_import_row_without_switch_assignment",
-        },
-        "semantic_variants_are_actions_not_operation_entries": True,
-        "switch_assignment_value": "exact_nonempty_user_requested_string",
+        "single_initial_row_action": "add_import_row",
+        "assignment_is_explicit_data_not_action_routing": True,
         "never_guess_assignment_intent": True,
         "include_every_known_field": True,
         "split_initial_row_across_follow_up_actions": False,
         "follow_up_row_actions": "corrections_only",
         "metadata_dependency_activation": "gateway_owned_do_not_submit",
     }
-    assert contract["action_shapes"]["add_import_row_without_switch_assignment"][
-        "construction_discipline"
-    ] == contract["flat_import_row_discipline"]
-    assert contract["action_shapes"]["add_switch_assigned_import_row"][
+    assert contract["action_shapes"]["add_import_row"][
         "construction_discipline"
     ] == contract["flat_import_row_discipline"]
     assert list(contract).index("flat_import_row_discipline") < list(contract).index(
@@ -389,8 +378,8 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
     assert list(contract).index("planning_discipline") < list(contract).index(
         "action_shapes"
     )
-    assert "add_switch_assigned_import_row" in contract["actions"]
-    assert "add_switch_assigned_import_row" in contract["action_shapes"]
+    assert "add_import_row" in contract["actions"]
+    assert "add_import_row" in contract["action_shapes"]
     dependency = contract["registry_fragments"]["metadata_dependency_closure"]
     assert dependency["metadata_source"]["same_result_required"] is True
     assert dependency["materialization"]["ordinary_dependencies"]["owner"] == (
@@ -407,50 +396,45 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
 
 
 @pytest.mark.parametrize("version", ("2022.1", "2025.1"))
-def test_audio_import_exposes_distinct_typed_row_actions_under_one_composer(
+def test_audio_import_exposes_one_row_action_with_explicit_assignment_intent(
     version: str,
 ) -> None:
-    """Different business semantics remain inside one operation entrypoint."""
+    """One row entrypoint makes assignment intent explicit data, not routing."""
 
     contract = operation_composer_contract("audio.import", version)
 
     assert contract["operation"] == "audio.import"
-    assert "add_import_row" not in contract["actions"]
-    assert (
-        contract["actions"].count(
-            "add_import_row_without_switch_assignment"
-        )
-        == 1
-    )
-    assert contract["actions"].count("add_switch_assigned_import_row") == 1
-    assert contract["actions"].index(
-        "add_switch_assigned_import_row"
-    ) < contract["actions"].index(
-        "add_import_row_without_switch_assignment"
-    )
-    ordinary = contract["action_shapes"][
-        "add_import_row_without_switch_assignment"
+    row_actions = [
+        action
+        for action in contract["actions"]
+        if action.startswith("add_") and "import_row" in action
     ]
-    assigned = contract["action_shapes"]["add_switch_assigned_import_row"]
-    assert ordinary["required_fields"] == ["object_path"]
-    assert "switch_assignment" not in ordinary["required_fields"]
-    assert "switch_assignment" not in ordinary["optional_fields"]
-    assert assigned["required_fields"] == [
+    assert row_actions == ["add_import_row"]
+    row = contract["action_shapes"]["add_import_row"]
+    assert row["required_fields"] == [
         "object_path",
-        "switch_assignment",
+        "assignment",
     ]
-    assert "switch_assignment" not in assigned["optional_fields"]
+    assert "switch_assignment" not in row["optional_fields"]
+    assert row["assignment_contract"] == {
+        "one_of": [
+            {
+                "mode": "switch",
+                "required_fields": ["mode", "value"],
+                "additional_fields": False,
+            },
+            {
+                "mode": "none",
+                "required_fields": ["mode"],
+                "additional_fields": False,
+            },
+        ],
+        "requested_switch_assignment_must_use_mode": "switch",
+        "switch_assignment_is_not_a_later_action": True,
+    }
     assert contract["flat_import_row_discipline"] == {
-        "initial_action_by_assignment_intent": {
-            "assignment_explicitly_requested": (
-                "add_switch_assigned_import_row"
-            ),
-            "no_assignment_requested": (
-                "add_import_row_without_switch_assignment"
-            ),
-        },
-        "semantic_variants_are_actions_not_operation_entries": True,
-        "switch_assignment_value": "exact_nonempty_user_requested_string",
+        "single_initial_row_action": "add_import_row",
+        "assignment_is_explicit_data_not_action_routing": True,
         "never_guess_assignment_intent": True,
         "include_every_known_field": True,
         "split_initial_row_across_follow_up_actions": False,
@@ -563,16 +547,10 @@ def test_audio_import_row_actions_disclose_complete_structure_and_media_facts(
 ) -> None:
     contract = operation_composer_contract("audio.import", version)
 
-    ordinary = contract["action_shapes"]["add_import_row_without_switch_assignment"]
-    assigned = contract["action_shapes"]["add_switch_assigned_import_row"]
-    assert ordinary["required_fields"] == ["object_path"]
-    assert assigned["required_fields"] == [
-        "object_path",
-        "switch_assignment",
-    ]
-    assert "switch_assignment" not in ordinary["optional_fields"]
-    assert "switch_assignment" not in assigned["optional_fields"]
-    assert ordinary["conditional_required_fields"] == [
+    row = contract["action_shapes"]["add_import_row"]
+    assert row["required_fields"] == ["object_path", "assignment"]
+    assert "switch_assignment" not in row["optional_fields"]
+    assert row["conditional_required_fields"] == [
         {
             "when": "every_row",
             "require_effective": ["object_type"],
@@ -585,9 +563,6 @@ def test_audio_import_row_actions_disclose_complete_structure_and_media_facts(
             "effective_sources": ["row", "explicit_defaults"],
             "reason": "media rows require an explicit import language",
         }
-    ]
-    assert assigned["conditional_required_fields"] == ordinary[
-        "conditional_required_fields"
     ]
 
 
@@ -797,10 +772,11 @@ def test_complete_audio_import_adapter_materializes_every_registry_field(
         ],
     )
     apply(
-        "add_switch_assigned_import_row",
+        "add_import_row",
         object_path=(
             r"\Actor-Mixer Hierarchy\Default Work Unit\Composer\Full"
         ),
+        assignment={"mode": "switch", "value": "Mud"},
         object_type="Sound SFX",
         audio_file=str(source),
         import_location={
@@ -812,7 +788,6 @@ def test_complete_audio_import_adapter_materializes_every_registry_field(
         audio_source_notes="source notes",
         event={"path": r"\Events\Default Work Unit\Play_Full", "action": "Play"},
         dialogue_event="DialogueEvent:Full",
-        switch_assignment="Mud",
         properties=[{"name": "Pitch", "value": 2.0}],
         references=[
             {
@@ -1094,6 +1069,42 @@ def test_larger_audio_action_parser_does_not_expand_object_set_action_limit(
         json.dumps(
             {
                 "contract": ACTION_CONTRACT,
+                "action": "add_import_row",
+                "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+                "object_type": "Sound SFX",
+                "assignment": None,
+            }
+        ),
+        json.dumps(
+            {
+                "contract": ACTION_CONTRACT,
+                "action": "add_import_row",
+                "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+                "object_type": "Sound SFX",
+                "assignment": {"mode": "switch"},
+            }
+        ),
+        json.dumps(
+            {
+                "contract": ACTION_CONTRACT,
+                "action": "add_import_row",
+                "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+                "object_type": "Sound SFX",
+                "assignment": {"mode": "none", "value": "Snow"},
+            }
+        ),
+        json.dumps(
+            {
+                "contract": ACTION_CONTRACT,
+                "action": "add_import_row",
+                "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+                "object_type": "Sound SFX",
+                "assignment": {"mode": "later"},
+            }
+        ),
+        json.dumps(
+            {
+                "contract": ACTION_CONTRACT,
                 "action": "add_import_row_without_switch_assignment",
                 "object_path": (
                     r"\Actor-Mixer Hierarchy\Default Work Unit\Rain"
@@ -1213,7 +1224,7 @@ def test_base_audio_import_adapter_is_the_only_disclosed_normal_input_after_cuto
         "draft-start",
         "audio.import",
     ]
-    assert "add_import_row_without_switch_assignment" in schema["composer"]["action_shapes"]
+    assert "add_import_row" in schema["composer"]["action_shapes"]
     assert "legacy-preview" not in json.dumps(schema)
 
 

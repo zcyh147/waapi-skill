@@ -1987,8 +1987,7 @@ def _audio_import_composer_row_origins(
                 isinstance(action, Mapping)
                 and action.get("contract")
                 == "waapi-skill.operation-draft-action/v1"
-                and action.get("action")
-                in {"add_import_row_without_switch_assignment", "add_switch_assigned_import_row"}
+                and action.get("action") == "add_import_row"
             ):
                 action_rows.append((step_index, argument_index, action))
     if len(action_rows) != len(rows):
@@ -2004,16 +2003,36 @@ def _audio_import_composer_row_origins(
         action_fields = {
             key: value
             for key, value in action.items()
-            if key not in {"contract", "action"}
+            if key not in {"contract", "action", "assignment"}
         }
+        assignment = action.get("assignment")
+        if not isinstance(assignment, Mapping):
+            raise PromptProvenanceError(
+                "audio.import typed row assignment intent is invalid"
+            )
+        if assignment.get("mode") == "switch":
+            if set(assignment) != {"mode", "value"}:
+                raise PromptProvenanceError(
+                    "audio.import switch assignment intent is invalid"
+                )
+            action_fields["switch_assignment"] = assignment.get("value")
+        elif assignment != {"mode": "none"}:
+            raise PromptProvenanceError(
+                "audio.import no-assignment intent is invalid"
+            )
         if not _json_equal(action_fields, row):
             raise PromptProvenanceError(
                 "audio.import visible row differs from its typed action"
             )
         for pointer, _leaf in _walk_leaves(row):
+            action_pointer = (
+                "/assignment/value"
+                if pointer == "/switch_assignment"
+                else pointer
+            )
             origins[f"/{row_index}{pointer}"] = (
                 f"/steps/{step_index}/arguments/{argument_index}/value"
-                f"{pointer}"
+                f"{action_pointer}"
             )
     return origins
 

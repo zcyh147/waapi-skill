@@ -105,12 +105,8 @@ _AUDIO_IMPORT_ACTION_FIELDS: dict[
     "clear_import_option": (("name",), ()),
     "set_import_default": (("name", "value"), ()),
     "clear_import_default": (("name",), ()),
-    "add_switch_assigned_import_row": (
-        ("object_path", "switch_assignment"),
-        _AUDIO_IMPORT_ROW_OPTIONAL_FIELDS,
-    ),
-    "add_import_row_without_switch_assignment": (
-        ("object_path",),
+    "add_import_row": (
+        ("object_path", "assignment"),
         _AUDIO_IMPORT_ROW_OPTIONAL_FIELDS,
     ),
     "set_import_row_field": (("import_handle", "name", "value"), ()),
@@ -179,16 +175,8 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "Registry returned an invalid audio.import operation default"
             )
         flat_import_row_discipline = {
-            "initial_action_by_assignment_intent": {
-                "assignment_explicitly_requested": (
-                    "add_switch_assigned_import_row"
-                ),
-                "no_assignment_requested": "add_import_row_without_switch_assignment",
-            },
-            "semantic_variants_are_actions_not_operation_entries": True,
-            "switch_assignment_value": (
-                "exact_nonempty_user_requested_string"
-            ),
+            "single_initial_row_action": "add_import_row",
+            "assignment_is_explicit_data_not_action_routing": True,
             "never_guess_assignment_intent": True,
             "include_every_known_field": True,
             "split_initial_row_across_follow_up_actions": False,
@@ -261,10 +249,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                             flat_import_row_discipline
                         )
                     }
-                    if action_name in {
-                        "add_import_row_without_switch_assignment",
-                        "add_switch_assigned_import_row",
-                    }
+                    if action_name == "add_import_row"
                     else {}
                 ),
                 **(
@@ -273,10 +258,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                             import_row_user_fact_checklist
                         )
                     }
-                    if action_name in {
-                        "add_import_row_without_switch_assignment",
-                        "add_switch_assigned_import_row",
-                    }
+                    if action_name == "add_import_row"
                     else {}
                 ),
                 **(
@@ -309,10 +291,29 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                             }
                         ]
                     }
-                    if action_name in {
-                        "add_import_row_without_switch_assignment",
-                        "add_switch_assigned_import_row",
+                    if action_name == "add_import_row"
+                    else {}
+                ),
+                **(
+                    {
+                        "assignment_contract": {
+                            "one_of": [
+                                {
+                                    "mode": "switch",
+                                    "required_fields": ["mode", "value"],
+                                    "additional_fields": False,
+                                },
+                                {
+                                    "mode": "none",
+                                    "required_fields": ["mode"],
+                                    "additional_fields": False,
+                                },
+                            ],
+                            "requested_switch_assignment_must_use_mode": "switch",
+                            "switch_assignment_is_not_a_later_action": True,
+                        }
                     }
+                    if action_name == "add_import_row"
                     else {}
                 ),
             }
@@ -1594,10 +1595,7 @@ def _apply_audio_import_action(
             del defaults[name]
         _materialize_if_complete(AUDIO_IMPORT_COMPOSER_OPERATION, version, composition)
         return composition, str(action_name)
-    if action_name in {
-        "add_switch_assigned_import_row",
-        "add_import_row_without_switch_assignment",
-    }:
+    if action_name == "add_import_row":
         row_field_names = tuple(
             operation_composer_contract(
                 AUDIO_IMPORT_COMPOSER_OPERATION, version
@@ -1616,6 +1614,38 @@ def _apply_audio_import_action(
             optional=optional_action_fields,
             label=f"{action_name} action",
         )
+        assignment = action.get("assignment")
+        if not isinstance(assignment, Mapping):
+            raise OperationComposerError(
+                "add_import_row assignment must be an object."
+            )
+        mode = assignment.get("mode")
+        if mode == "switch":
+            _require_exact_keys(
+                assignment,
+                required=("mode", "value"),
+                label="add_import_row switch assignment",
+            )
+            switch_assignment = _validate_audio_import_fragment(
+                version,
+                fragment="row_field",
+                payload={
+                    "name": "switch_assignment",
+                    "value": assignment.get("value"),
+                },
+            )
+        elif mode == "none":
+            _require_exact_keys(
+                assignment,
+                required=("mode",),
+                label="add_import_row no-assignment intent",
+            )
+            switch_assignment = None
+        else:
+            raise OperationComposerError(
+                "add_import_row assignment mode must be 'switch' or 'none'.",
+                details={"mode": mode},
+            )
         rows = composition["imports"]
         assert isinstance(rows, list)
         limit = _audio_import_limit(version)
@@ -1634,6 +1664,8 @@ def _apply_audio_import_action(
                 payload={"name": name, "value": action[name]},
             )
             fields[descriptor["name"]] = descriptor["value"]
+        if switch_assignment is not None:
+            fields[switch_assignment["name"]] = switch_assignment["value"]
         defaults = composition["defaults"]
         assert isinstance(defaults, dict)
         if "object_type" not in fields and "object_type" not in defaults:

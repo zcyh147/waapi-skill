@@ -424,12 +424,12 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         ],
         "failure_policy": "do_not_apply_dynamic_fields_then_backfill_metadata",
     }
-    assert schema["composer"]["action_shapes"]["add_import_row_without_switch_assignment"] == {
+    assert schema["composer"]["action_shapes"]["add_import_row"] == {
         "fixed_fields": {
             "contract": "waapi-skill.operation-draft-action/v1",
-            "action": "add_import_row_without_switch_assignment",
+            "action": "add_import_row",
         },
-        "required_fields": ["object_path"],
+        "required_fields": ["object_path", "assignment"],
         "optional_fields": [
             "audio_file",
             "audio_file_base64",
@@ -445,16 +445,8 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             "references",
         ],
         "construction_discipline": {
-            "initial_action_by_assignment_intent": {
-                "assignment_explicitly_requested": (
-                    "add_switch_assigned_import_row"
-                ),
-                "no_assignment_requested": "add_import_row_without_switch_assignment",
-            },
-            "semantic_variants_are_actions_not_operation_entries": True,
-            "switch_assignment_value": (
-                "exact_nonempty_user_requested_string"
-            ),
+            "single_initial_row_action": "add_import_row",
+            "assignment_is_explicit_data_not_action_routing": True,
             "never_guess_assignment_intent": True,
             "include_every_known_field": True,
             "split_initial_row_across_follow_up_actions": False,
@@ -492,6 +484,22 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
                 "reason": "media rows require an explicit import language",
             },
         ],
+        "assignment_contract": {
+            "one_of": [
+                {
+                    "mode": "switch",
+                    "required_fields": ["mode", "value"],
+                    "additional_fields": False,
+                },
+                {
+                    "mode": "none",
+                    "required_fields": ["mode"],
+                    "additional_fields": False,
+                },
+            ],
+            "requested_switch_assignment_must_use_mode": "switch",
+            "switch_assignment_is_not_a_later_action": True,
+        },
     }
     assert schema["composer"]["planning_discipline"][
         "dynamic_metadata"
@@ -520,24 +528,13 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         "action_required_only_for": ["useExisting", "replaceExisting"],
         "do_not_submit_redundant_default": True,
     }
-    assert schema["composer"]["action_shapes"]["add_import_row_without_switch_assignment"][
+    assert schema["composer"]["action_shapes"]["add_import_row"][
         "construction_discipline"
     ] == schema["composer"]["flat_import_row_discipline"]
     assert list(schema["composer"]).index(
         "flat_import_row_discipline"
     ) < list(schema["composer"]).index("action_shapes")
-    assigned_shape = schema["composer"]["action_shapes"][
-        "add_switch_assigned_import_row"
-    ]
-    assert assigned_shape == {
-        **schema["composer"]["action_shapes"]["add_import_row_without_switch_assignment"],
-        "fixed_fields": {
-            "contract": "waapi-skill.operation-draft-action/v1",
-            "action": "add_switch_assigned_import_row",
-        },
-        "required_fields": ["object_path", "switch_assignment"],
-    }
-    assert schema["composer"]["action_shapes"]["add_import_row_without_switch_assignment"][
+    assert schema["composer"]["action_shapes"]["add_import_row"][
         "user_fact_checklist"
     ] == {
         "copy_every_explicit_fact_for_this_row": True,

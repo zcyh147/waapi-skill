@@ -866,8 +866,7 @@ _DRAFT_ACTION_HANDLE_FIELDS_BY_OPERATION = {
         "clear_import_option": None,
         "set_import_default": None,
         "clear_import_default": None,
-        "add_import_row_without_switch_assignment": None,
-        "add_switch_assigned_import_row": None,
+        "add_import_row": None,
         "set_import_row_field": "import_handle",
         "clear_import_row_field": "import_handle",
         "remove_import_row": "import_handle",
@@ -1086,10 +1085,7 @@ class DraftActionJsonArgument:
                     "Draft action metadata binding is valid only for audio.import"
                 )
             dynamic_tokens: set[str] = set()
-            if normalized["action"] in {
-                "add_import_row_without_switch_assignment",
-                "add_switch_assigned_import_row",
-            }:
+            if normalized["action"] == "add_import_row":
                 for field in ("properties", "references"):
                     rows = normalized.get(field, [])
                     if isinstance(rows, list):
@@ -4162,7 +4158,7 @@ def _normalize_audio_import_activation_properties(
     if (
         actual.get("action") != expected.get("action")
         or actual.get("action")
-        not in {"add_import_row_without_switch_assignment", "add_switch_assigned_import_row"}
+        != "add_import_row"
     ):
         return actual, ()
     actual_references = actual.get("references", [])
@@ -4254,12 +4250,14 @@ def _normalize_audio_import_request_activation_properties(
     for actual_row, expected_row in zip(actual_rows, expected_rows, strict=True):
         actual_action = {
             "contract": "waapi-skill.operation-draft-action/v1",
-            "action": "add_import_row_without_switch_assignment",
+            "action": "add_import_row",
+            "assignment": {"mode": "none"},
             **dict(actual_row),
         } if isinstance(actual_row, Mapping) else actual_row
         expected_action = {
             "contract": "waapi-skill.operation-draft-action/v1",
-            "action": "add_import_row_without_switch_assignment",
+            "action": "add_import_row",
+            "assignment": {"mode": "none"},
             **dict(expected_row),
         } if isinstance(expected_row, Mapping) else expected_row
         normalized_action, _evidence = _normalize_audio_import_activation_properties(
@@ -4271,6 +4269,7 @@ def _normalize_audio_import_request_activation_properties(
             normalized_row = dict(normalized_action)
             normalized_row.pop("contract", None)
             normalized_row.pop("action", None)
+            normalized_row.pop("assignment", None)
             normalized_rows.append(normalized_row)
         else:
             normalized_rows.append(actual_row)

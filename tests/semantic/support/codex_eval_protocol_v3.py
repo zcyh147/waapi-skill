@@ -348,12 +348,15 @@ def build_audio_import_composer_transaction_steps(
         if not isinstance(raw_row, Mapping):
             raise V3ProtocolError("audio.import Composer row must be an object")
         row_fields = dict(raw_row)
+        has_switch_assignment = "switch_assignment" in row_fields
+        switch_assignment = row_fields.pop("switch_assignment", None)
         action = {
             "contract": OPERATION_DRAFT_ACTION_CONTRACT,
-            "action": (
-                "add_import_row_without_switch_assignment"
-                if "switch_assignment" not in row_fields
-                else "add_switch_assigned_import_row"
+            "action": "add_import_row",
+            "assignment": (
+                {"mode": "switch", "value": switch_assignment}
+                if has_switch_assignment
+                else {"mode": "none"}
             ),
             **row_fields,
         }

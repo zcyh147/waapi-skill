@@ -1574,7 +1574,8 @@ def test_audio_import_draft_action_protocol_round_trips_metadata_authority() -> 
     action = DraftActionJsonArgument(
         {
             "contract": "waapi-skill.operation-draft-action/v1",
-            "action": "add_import_row_without_switch_assignment",
+            "action": "add_import_row",
+            "assignment": {"mode": "none"},
             "audio_file": r"C:\\音频\\rifle.wav",
             "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rifle",
             "properties": [{"name": "Volume", "value": -3.0}],
@@ -2043,10 +2044,13 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
         if step["subcommand"] == "draft-apply"
         and step["arguments"][-1].get("kind") == "draft_action_json"
         and step["arguments"][-1]["value"].get("action")
-        == "add_switch_assigned_import_row"
+        == "add_import_row"
+        and step["arguments"][-1]["value"].get("assignment", {}).get("mode")
+        == "switch"
     )
-    assert serialized_row["action"] == "add_switch_assigned_import_row"
-    assert serialized_row["switch_assignment"] == "Rain"
+    assert serialized_row["action"] == "add_import_row"
+    assert serialized_row["assignment"] == {"mode": "switch", "value": "Rain"}
+    assert "switch_assignment" not in serialized_row
     assert deserialize_protocol(serialized) == protocol
     gateway_authored_request = {
         **request,
