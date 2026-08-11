@@ -2014,6 +2014,8 @@ def test_audio_import_typed_action_treats_named_field_order_as_semantic(
     )
     reordered_named_fields = (
         *fixed,
+        "--assignment",
+        *(("switch", "Rain") if switch_assigned else ("none",)),
         "--property",
         "Volume",
         "number",
@@ -6973,10 +6975,11 @@ def test_weather_agent_metadata_step_crosses_broker_validation(
                 "wire_exact",
             ),
         ),
+        reused_metadata_steps={"tx03": "tx01"},
     )
     assert [
         step.name for step in protocol.steps if step.subcommand == "metadata"
-    ] == ["tx01.metadata", "tx02.metadata", "tx03.metadata"]
+    ] == ["tx01.metadata", "tx02.metadata"]
     metadata_step = next(
         step for step in protocol.steps if step.name == "tx02.metadata"
     )

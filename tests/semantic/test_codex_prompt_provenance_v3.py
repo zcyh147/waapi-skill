@@ -2052,24 +2052,8 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
     )
     serialized_row = serialized_row_step["arguments"][-1]["value"]
     assert "switch_assignment" not in serialized_row
-    assert "assignment" not in serialized_row
+    assert serialized_row["assignment"] == {"mode": "switch", "value": "Rain"}
     assert serialized_row_step["arguments"][-1]["response_bindings"] == []
-    assignment_step = next(
-        step
-        for step in serialized["steps"]
-        if step["subcommand"] == "draft-apply"
-        and step["arguments"][-1].get("kind") == "draft_action_json"
-        and step["arguments"][-1]["value"].get("action")
-        == "assign_import_row_switch"
-    )
-    assert assignment_step["arguments"][-1]["value"]["switch"] == "Rain"
-    assert assignment_step["arguments"][-1]["response_bindings"] == [
-        {
-            "pointer": "/import_handle",
-            "step": serialized_row_step["name"],
-            "response_pointer": "/draft/action_result/created_handles/0",
-        }
-    ]
     assert deserialize_protocol(serialized) == protocol
     gateway_authored_request = {
         **request,
@@ -2082,7 +2066,7 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
         serialized,
         gateway_authored_request["arguments"]["imports"],
     )
-    assert origins["/0/switch_assignment"].endswith("/value/switch")
+    assert origins["/0/switch_assignment"].endswith("/value/assignment/value")
     assert _protocol_requests(serialized, version="2022.1") == (
         ("/composer/tx01.preview", gateway_authored_request),
     )
@@ -2103,10 +2087,9 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
         for step in payload["protocol"]["value"]["steps"]
         if step["subcommand"] == "draft-apply"
         and step["arguments"][-1].get("kind") == "draft_action_json"
-        and step["arguments"][-1]["value"].get("action")
-        == "assign_import_row_switch"
+        and step["arguments"][-1]["value"].get("action") == "add_import_row"
     )
-    assignment_row["response_bindings"][0]["pointer"] = "/wrong-handle"
+    assignment_row["value"]["assignment"] = {"mode": "switch"}
     payload["protocol"]["sha256"] = hashlib.sha256(
         json.dumps(
             payload["protocol"]["value"],

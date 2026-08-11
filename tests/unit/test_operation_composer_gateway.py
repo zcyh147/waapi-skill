@@ -757,11 +757,7 @@ def test_invalid_or_mixed_typed_action_argv_is_atomic(
             object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\One",
             object_type="Sound SFX",
             properties=[{"name": "Volume", "value": -6.25}],
-        ),
-        action_mapping(
-            "assign_import_row_switch",
-            import_handle="odh1-333333333333333333333333",
-            switch="Snow",
+            assignment={"mode": "switch", "value": "Snow"},
         ),
     ],
 )

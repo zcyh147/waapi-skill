@@ -737,8 +737,9 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "For `composer`, run `composer.start.gateway_argv`" in OPERATE
     assert "then only the selected `action_argv`" in OPERATE
     assert "Start `object.set` rows with `add_target --target ...`" in OPERATE
-    assert "`audio.import` rows with `add_import_row --object-path ...`" in OPERATE
-    assert "Only explicit Switch Assignation adds `assign_import_row_switch" in OPERATE
+    assert "Start every `audio.import` row with one `add_import_row`" in OPERATE
+    assert "include `--assignment none`" in OPERATE
+    assert "`--assignment switch VALUE` only when requested" in OPERATE
     assert "run its `preview-from-draft` unchanged" in OPERATE
     assert "`--apply` marks a preview, not execution" in OPERATE
     assert "For `legacy_json`, replace only its envelope's `arguments`" in OPERATE

@@ -408,12 +408,7 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         "--object-type",
         "TYPE",
     ]
-    assert action_argv["assign_import_row_switch"] == [
-        "--import-handle",
-        "HANDLE",
-        "--switch",
-        "VALUE",
-    ]
+    assert "assign_import_row_switch" not in action_argv
     assert schema["composer"]["start"]["preconditions"] == {
         "agent_metadata_command_required": (
             "when_dynamic_token_is_not_already_exact_live_evidence"
@@ -422,22 +417,20 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         "draft_check_revalidates_dynamic_metadata": True,
     }
     row_shape = schema["composer"]["action_shapes"]["add_import_row"]
-    assert row_shape["required_fields"] == ["object_path"]
+    assert row_shape["required_fields"] == ["object_path", "assignment"]
     assert "assignment" not in row_shape["optional_fields"]
     assert row_shape["construction_discipline"] == schema["composer"][
         "flat_import_row_discipline"
     ]
     assert row_shape["construction_discipline"]["switch_assignment"] == {
-        "ordinary_row_action": None,
-        "when_user_requested": "assign_import_row_switch",
-        "requires_gateway_import_handle": True,
+        "required_in_initial_row_action": True,
+        "ordinary_row": {"mode": "none"},
+        "when_user_requested": {"mode": "switch", "value": "VALUE"},
     }
     assert row_shape["user_fact_checklist"][
-        "switch_assignment_action_only_when_explicit"
+        "switch_assignment_value_only_when_explicit"
     ] is True
-    assert schema["composer"]["action_shapes"][
-        "assign_import_row_switch"
-    ]["required_fields"] == ["import_handle", "switch"]
+    assert "assign_import_row_switch" not in schema["composer"]["action_shapes"]
     assert "add_switch_assigned_import_row" not in schema["composer"]["action_shapes"]
     assert schema["composer"]["planning_discipline"]["dynamic_metadata"][
         "discovery_owner"

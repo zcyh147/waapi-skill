@@ -108,10 +108,9 @@ _AUDIO_IMPORT_ACTION_FIELDS: dict[
     "set_import_default": (("name", "value"), ()),
     "clear_import_default": (("name",), ()),
     "add_import_row": (
-        ("object_path",),
+        ("object_path", "assignment"),
         _AUDIO_IMPORT_ROW_OPTIONAL_FIELDS,
     ),
-    "assign_import_row_switch": (("import_handle", "switch"), ()),
     "set_import_row_field": (("import_handle", "name", "value"), ()),
     "clear_import_row_field": (("import_handle", "name"), ()),
     "remove_import_row": (("import_handle",), ()),
@@ -628,7 +627,7 @@ def parse_typed_action_cli_arguments(
                     "--reference is not valid for this typed action."
                 )
         elif flag == "--assignment":
-            if not legacy_compatibility:
+            if action_name != "add_import_row" and not legacy_compatibility:
                 raise OperationComposerError(
                     "--assignment is available only for sealed archive replay."
                 )
@@ -659,6 +658,11 @@ def parse_typed_action_cli_arguments(
         assignments=assignments,
         empty_lists=empty_lists,
     )
+    if action_name == "assign_import_row_switch" and not legacy_compatibility:
+        raise OperationComposerError(
+            "The handle-bound Switch assignment action is available only for "
+            "sealed archive replay."
+        )
     if (
         action_name in {"set_import_option", "clear_import_option"}
         and "owner_handle" not in action
@@ -697,9 +701,10 @@ def typed_action_cli_arguments(action: Mapping[str, Any]) -> tuple[str, ...]:
     action_name = action.get("action")
     if not isinstance(action_name, str) or not action_name:
         raise OperationComposerError("Typed action has an invalid action name.")
-    if action_name == "add_import_row" and "assignment" in action:
+    if action_name == "assign_import_row_switch":
         raise OperationComposerError(
-            "Inline import assignment is available only for sealed archive replay."
+            "The handle-bound Switch assignment action is available only for "
+            "sealed archive replay."
         )
     specialized = _specialized_typed_action_cli_arguments(action_name, action)
     if specialized is not None:
@@ -1231,9 +1236,12 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             "initial_row_action": "add_import_row",
             "one_initial_action_per_row": True,
             "switch_assignment": {
-                "ordinary_row_action": None,
-                "when_user_requested": "assign_import_row_switch",
-                "requires_gateway_import_handle": True,
+                "required_in_initial_row_action": True,
+                "ordinary_row": {"mode": "none"},
+                "when_user_requested": {
+                    "mode": "switch",
+                    "value": "VALUE",
+                },
             },
             "never_guess_assignment_intent": True,
             "include_every_known_field_in_one_action": True,
@@ -1256,7 +1264,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "switch_assignment",
             ],
             "distinct_metadata_tokens_are_independent_facts": True,
-            "switch_assignment_action_only_when_explicit": True,
+            "switch_assignment_value_only_when_explicit": True,
         }
         planning_discipline = {
             "dynamic_metadata": {
@@ -1351,15 +1359,17 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 ),
                 **(
                     {
-                        "switch_assignment_contract": {
-                            "bind_handle_from": (
-                                "prior add_import_row action response"
-                            ),
+                        "assignment_contract": {
+                            "required_on_every_row": True,
+                            "modes": {
+                                "none": {"fields": ["mode"]},
+                                "switch": {"fields": ["mode", "value"]},
+                            },
                             "requires_exact_user_value": True,
                             "additional_fields": False,
                         }
                     }
-                    if action_name == "assign_import_row_switch"
+                    if action_name == "add_import_row"
                     else {}
                 ),
                 **(
@@ -2675,15 +2685,12 @@ def _apply_audio_import_action(
                 "action",
                 *required_action_fields,
             ),
-            optional=(*optional_action_fields, "assignment"),
+            optional=optional_action_fields,
             label=f"{action_name} action",
         )
-        has_assignment = "assignment" in action
         assignment = action.get("assignment")
         assignment_mode = assignment.get("mode") if isinstance(assignment, Mapping) else None
-        if not has_assignment:
-            switch_assignment = None
-        elif assignment_mode == "none":
+        if assignment_mode == "none":
             _require_exact_keys(
                 assignment,
                 required=("mode",),
@@ -3013,15 +3020,14 @@ def _audio_import_composition_projection(
         "defaults": _audio_import_public_fields(defaults),
         "action_guidance": {
             "switch_assignment": {
-                "action": "assign_import_row_switch",
-                "ordinary_row": "no_assignment_action",
+                "action": "add_import_row",
+                "required_on_every_row": True,
+                "ordinary_row": ["--assignment", "none"],
                 "when_user_requested": [
-                    "--import-handle",
-                    "<created-import-handle>",
-                    "--switch",
+                    "--assignment",
+                    "switch",
                     "<exact-value>",
                 ],
-                "handle_source": "/draft/action_result/created_handles/0",
                 "guessing_allowed": False,
             }
         },

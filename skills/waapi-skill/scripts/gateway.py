@@ -3107,9 +3107,7 @@ def operation_composer_input_contract(
                 "[--empty-properties]",
                 "[--reference NAME SELECTOR_KIND SELECTOR_VALUES...]...",
                 "[--empty-references]",
-            ],
-            "assign_import_row_switch": [
-                "--import-handle", "HANDLE", "--switch", "VALUE"
+                "(--assignment none | --assignment switch VALUE)",
             ],
             "set_import_row_field": [
                 "--import-handle", "HANDLE",

@@ -410,6 +410,7 @@ def prepare_weather_workflow(
             (),
             (),
         ),
+        reused_metadata_steps={"tx03": "tx01"},
     )
     visible_values = MappingProxyType(
         {
@@ -1131,6 +1132,7 @@ def _build_metadata_workflow_protocol(
         Sequence[GatewayDerivedReferenceActivationAllowance]
     ]
     | None = None,
+    reused_metadata_steps: Mapping[str, str] | None = None,
 ) -> V3GatewayProtocol:
     if len(requests) != len(metadata):
         raise IntegrationWeatherRuntimeError(
@@ -1199,12 +1201,37 @@ def _build_metadata_workflow_protocol(
         f"tx{index:02d}": row
         for index, row in enumerate(metadata, start=1)
     }
+    reused_metadata_steps = dict(reused_metadata_steps or {})
+    for target_prefix, source_prefix in reused_metadata_steps.items():
+        if (
+            target_prefix not in metadata_by_tx
+            or source_prefix not in metadata_by_tx
+            or int(source_prefix[2:]) >= int(target_prefix[2:])
+        ):
+            raise IntegrationWeatherRuntimeError(
+                "weather metadata reuse must reference an earlier transaction"
+            )
+        target_row = metadata_by_tx[target_prefix]
+        source_row = metadata_by_tx[source_prefix]
+        if target_row is None or source_row is None:
+            raise IntegrationWeatherRuntimeError(
+                "weather metadata reuse requires two explicit metadata contracts"
+            )
+        if target_row[0] != source_row[0] or not set(target_row[2]).issubset(
+            source_row[2]
+        ):
+            raise IntegrationWeatherRuntimeError(
+                "weather metadata reuse must preserve object type and token evidence"
+            )
     steps: list[ExpectedGatewayStep] = []
     for step in base_steps:
         prefix = step.name.split(".", 1)[0]
         if step.subcommand == "operation-schema":
             metadata_row = metadata_by_tx[prefix]
             if metadata_row is None:
+                steps.append(step)
+                continue
+            if prefix in reused_metadata_steps:
                 steps.append(step)
                 continue
             (
@@ -1265,7 +1292,11 @@ def _build_metadata_workflow_protocol(
                         "--request-json",
                         MetadataBoundJsonArgument(
                             expected=step.arguments[2].expected,
-                            metadata_step=f"{prefix}.metadata",
+                            metadata_step=(
+                                f"{reused_metadata_steps[prefix]}.metadata"
+                                if prefix in reused_metadata_steps
+                                else f"{prefix}.metadata"
+                            ),
                             object_type=object_type,
                             required_tokens=tuple(tokens),
                             expected_required_token_projection=tuple(projection),

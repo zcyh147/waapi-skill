@@ -376,14 +376,17 @@ def build_audio_import_composer_transaction_steps(
         if not isinstance(raw_row, Mapping):
             raise V3ProtocolError("audio.import Composer row must be an object")
         row_fields = dict(raw_row)
-        has_switch_assignment = "switch_assignment" in row_fields
         switch_assignment = row_fields.pop("switch_assignment", None)
         action = {
             "contract": OPERATION_DRAFT_ACTION_CONTRACT,
             "action": "add_import_row",
+            "assignment": (
+                {"mode": "none"}
+                if switch_assignment is None
+                else {"mode": "switch", "value": switch_assignment}
+            ),
             **row_fields,
         }
-        row_action_name = f"{label}.action.{len(action_specs) + 1:03d}"
         action_specs.append(
             (
                 action,
@@ -393,26 +396,6 @@ def build_audio_import_composer_transaction_steps(
                 (),
             )
         )
-        if has_switch_assignment:
-            action_specs.append(
-                (
-                    {
-                        "contract": OPERATION_DRAFT_ACTION_CONTRACT,
-                        "action": "assign_import_row_switch",
-                        "switch": switch_assignment,
-                    },
-                    None,
-                    (
-                        DraftActionResponseBinding(
-                            pointer="/import_handle",
-                            step=row_action_name,
-                            response_pointer=(
-                                "/draft/action_result/created_handles/0"
-                            ),
-                        ),
-                    ),
-                )
-            )
 
     try:
         materialized = _materialize_audio_import_composer_action_entries(

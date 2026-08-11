@@ -401,6 +401,7 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
             (),
             (),
         ),
+        reused_metadata_steps={"tx03": "tx01"},
     )
     assert len(protocol.turn_prefix_counts) == 4
     metadata_steps = [
@@ -409,11 +410,9 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
     assert [step.name for step in metadata_steps] == [
         "tx01.metadata",
         "tx02.metadata",
-        "tx03.metadata",
     ]
     assert [step.arguments[-2:] for step in metadata_steps] == [
         ("--limit", "2"),
-        ("--limit", "8"),
         ("--limit", "8"),
     ]
     assert protocol.commutative_read_only_step_groups == (
@@ -429,7 +428,6 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         ("tx01.metadata", "metadata"),
         ("tx02.operation-schema", "operation-schema"),
         ("tx02.metadata", "metadata"),
-        ("tx03.metadata", "metadata"),
         ("tx03.operation-schema", "operation-schema"),
     ]
     assert [step.name for step in protocol.steps if step.subcommand == "execute"] == [
@@ -535,7 +533,7 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
     assert protocol.steps[rtpc_schema_index + 1].name == "tx03.preview"
     rtpc_preview = protocol.steps[rtpc_schema_index + 1]
     assert isinstance(rtpc_preview.arguments[2], MetadataBoundJsonArgument)
-    assert rtpc_preview.arguments[2].metadata_step == "tx03.metadata"
+    assert rtpc_preview.arguments[2].metadata_step == "tx01.metadata"
     assert rtpc_preview.arguments[2].object_type == "Sound"
     assert rtpc_preview.arguments[2].required_tokens == ("Volume",)
     assert tuple(
