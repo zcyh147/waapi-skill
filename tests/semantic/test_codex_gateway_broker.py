@@ -1927,6 +1927,131 @@ def test_audio_import_action_binds_dynamic_tokens_to_live_metadata(
         broker._validate_step(action, actual)  # noqa: SLF001
 
 
+def test_audio_import_typed_action_treats_named_field_order_as_semantic(
+    tmp_path: Path,
+) -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "imports": [
+                {
+                    "object_path": (
+                        r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\Rain"
+                    ),
+                    "object_type": "Sound SFX",
+                    "audio_file": native_absolute_test_path("inputs", "rain.wav"),
+                    "import_language": "SFX",
+                    "properties": [
+                        {"name": "IsLoopingEnabled", "value": True},
+                        {"name": "Volume", "value": -4.0},
+                    ],
+                    "references": [
+                        {
+                            "name": "OutputBus",
+                            "target": {
+                                "kind": "path",
+                                "value": (
+                                    r"\Master-Mixer Hierarchy\Default Work Unit"
+                                    r"\Weather"
+                                ),
+                            },
+                        },
+                        {
+                            "name": "UserAuxSend0",
+                            "target": {
+                                "kind": "path",
+                                "value": (
+                                    r"\Master-Mixer Hierarchy\Default Work Unit"
+                                    r"\Weather Aux"
+                                ),
+                            },
+                        },
+                    ],
+                }
+            ],
+            "import_operation": "createNew",
+        },
+    }
+    steps = build_audio_import_composer_transaction_steps(request, label="tx01")
+    start = next(step for step in steps if step.name == "tx01.draft-start")
+    action = next(step for step in steps if step.name == "tx01.action.001")
+    broker = CodexGatewayBroker(
+        skill_source=make_fake_skill(tmp_path),
+        expected_steps=steps,
+        expected_wwise_version="2022.1",
+    )
+    draft_id = "od1-" + "1" * 32
+    authority = "da1-" + "2" * 40
+    broker._payloads_by_step[start.name] = {  # noqa: SLF001
+        "task_authority": authority,
+        "draft": {"draft_id": draft_id, "revision": 1},
+    }
+
+    fixed = (
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--compact",
+        "--facts",
+        "--action",
+        "add_import_row",
+        "--value",
+        "object_path",
+        "string",
+        r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\Rain",
+        "--assignment",
+        "assignment",
+        "none",
+        "--value",
+        "object_type",
+        "string",
+        "Sound SFX",
+        "--value",
+        "audio_file",
+        "string",
+        native_absolute_test_path("inputs", "rain.wav"),
+        "--value",
+        "import_language",
+        "string",
+        "SFX",
+    )
+    reordered_named_fields = (
+        *fixed,
+        "--property",
+        "properties",
+        "Volume",
+        "number",
+        "-4",
+        "--property",
+        "properties",
+        "IsLoopingEnabled",
+        "boolean",
+        "true",
+        "--reference",
+        "references",
+        "UserAuxSend0",
+        "path",
+        r"\Master-Mixer Hierarchy\Default Work Unit\Weather Aux",
+        "--reference",
+        "references",
+        "OutputBus",
+        "path",
+        r"\Master-Mixer Hierarchy\Default Work Unit\Weather",
+    )
+
+    broker._validate_step(action, reordered_named_fields)  # noqa: SLF001
+
+    wrong_value = list(reordered_named_fields)
+    wrong_value[wrong_value.index("-4")] = "-5"
+    with pytest.raises(GatewayInvocationError, match="typed Draft action"):
+        broker._validate_step(action, tuple(wrong_value))  # noqa: SLF001
+
+
 def test_audio_import_draft_action_accepts_explicit_gateway_owned_activation(
     tmp_path: Path,
 ) -> None:

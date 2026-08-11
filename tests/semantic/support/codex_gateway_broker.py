@@ -4220,6 +4220,33 @@ def _normalize_audio_import_activation_properties(
     return normalized, tuple(evidence)
 
 
+def _normalize_audio_import_draft_action_named_fields(value: Any) -> Any:
+    """Canonicalize name-keyed row fields using audio.import semantics."""
+
+    if (
+        not isinstance(value, Mapping)
+        or value.get("action") != "add_import_row"
+    ):
+        return value
+    normalized = dict(value)
+    for field, kind in (
+        ("properties", "property"),
+        ("references", "reference"),
+    ):
+        if field not in normalized:
+            continue
+        try:
+            named = _named_audio_import_fields(
+                normalized[field],
+                path=f"Draft action {field}",
+                kind=kind,
+            )
+        except (TypeError, ValueError):
+            return value
+        normalized[field] = [named[name] for name in sorted(named)]
+    return normalized
+
+
 def _normalize_audio_import_request_activation_properties(
     actual: Any,
     expected: Any,
@@ -7266,6 +7293,17 @@ class CodexGatewayBroker:
                         )
                     metadata_evidence: dict[str, Any] | None = None
                     metadata_binding = expected.metadata_binding
+                    if expected.operation == "audio.import":
+                        normalized_actual = (
+                            _normalize_audio_import_draft_action_named_fields(
+                                normalized_actual
+                            )
+                        )
+                        bound_expected = (
+                            _normalize_audio_import_draft_action_named_fields(
+                                bound_expected
+                            )
+                        )
                     if metadata_binding is not None:
                         source = self._payloads_by_step.get(metadata_binding.step)
                         source_steps = tuple(
