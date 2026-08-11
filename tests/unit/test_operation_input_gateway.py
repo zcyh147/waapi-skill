@@ -431,10 +431,10 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         ],
         "failure_policy": "do_not_apply_dynamic_fields_then_backfill_metadata",
     }
-    assert schema["composer"]["action_shapes"]["add_import_row"] == {
+    assert schema["composer"]["action_shapes"]["add_import_row_without_switch_assignment"] == {
         "fixed_fields": {
             "contract": "waapi-skill.operation-draft-action/v1",
-            "action": "add_import_row",
+            "action": "add_import_row_without_switch_assignment",
         },
         "required_fields": ["object_path"],
         "optional_fields": [
@@ -453,7 +453,7 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         ],
         "construction_discipline": {
             "initial_row_action_by_intent": {
-                "without_switch_assignment": "add_import_row",
+                "without_switch_assignment": "add_import_row_without_switch_assignment",
                 "with_requested_switch_assignment": (
                     "add_switch_assigned_import_row"
                 ),
@@ -504,7 +504,7 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
     assert assigned_row["required_fields"] == ["object_path", "assignment"]
     assert assigned_row["optional_fields"] == schema["composer"][
         "action_shapes"
-    ]["add_import_row"]["optional_fields"]
+    ]["add_import_row_without_switch_assignment"]["optional_fields"]
     assert assigned_row["assignment_contract"] == {
         "required": True,
         "normal_form": {
@@ -542,13 +542,13 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         "action_required_only_for": ["useExisting", "replaceExisting"],
         "do_not_submit_redundant_default": True,
     }
-    assert schema["composer"]["action_shapes"]["add_import_row"][
+    assert schema["composer"]["action_shapes"]["add_import_row_without_switch_assignment"][
         "construction_discipline"
     ] == schema["composer"]["flat_import_row_discipline"]
     assert list(schema["composer"]).index(
         "flat_import_row_discipline"
     ) < list(schema["composer"]).index("action_shapes")
-    assert schema["composer"]["action_shapes"]["add_import_row"][
+    assert schema["composer"]["action_shapes"]["add_import_row_without_switch_assignment"][
         "user_fact_checklist"
     ] == {
         "copy_every_explicit_fact_for_this_row": True,

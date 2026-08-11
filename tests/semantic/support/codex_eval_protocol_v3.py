@@ -355,7 +355,7 @@ def build_audio_import_composer_transaction_steps(
             "action": (
                 "add_switch_assigned_import_row"
                 if has_switch_assignment
-                else "add_import_row"
+                else "add_import_row_without_switch_assignment"
             ),
             **row_fields,
         }

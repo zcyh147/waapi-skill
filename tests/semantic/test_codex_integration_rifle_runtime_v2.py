@@ -784,7 +784,7 @@ def test_rifle_composer_preserves_every_exact_import_row_and_metadata_binding(
     assert [argument.expected for argument in action_arguments[1:]] == [
         {
             "contract": "waapi-skill.operation-draft-action/v1",
-            "action": "add_import_row",
+            "action": "add_import_row_without_switch_assignment",
             **row,
         }
         for row in rows

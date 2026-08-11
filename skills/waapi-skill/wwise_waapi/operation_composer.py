@@ -106,12 +106,12 @@ _AUDIO_IMPORT_ACTION_FIELDS: dict[
     "clear_import_option": (("name",), ()),
     "set_import_default": (("name", "value"), ()),
     "clear_import_default": (("name",), ()),
-    "add_import_row": (
-        ("object_path",),
-        _AUDIO_IMPORT_ROW_OPTIONAL_FIELDS,
-    ),
     "add_switch_assigned_import_row": (
         ("object_path", "assignment"),
+        _AUDIO_IMPORT_ROW_OPTIONAL_FIELDS,
+    ),
+    "add_import_row_without_switch_assignment": (
+        ("object_path",),
         _AUDIO_IMPORT_ROW_OPTIONAL_FIELDS,
     ),
     "set_import_row_field": (("import_handle", "name", "value"), ()),
@@ -557,7 +557,9 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             )
         flat_import_row_discipline = {
             "initial_row_action_by_intent": {
-                "without_switch_assignment": "add_import_row",
+                "without_switch_assignment": (
+                    "add_import_row_without_switch_assignment"
+                ),
                 "with_requested_switch_assignment": (
                     "add_switch_assigned_import_row"
                 ),
@@ -637,7 +639,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                         )
                     }
                     if action_name in {
-                        "add_import_row",
+                        "add_import_row_without_switch_assignment",
                         "add_switch_assigned_import_row",
                     }
                     else {}
@@ -649,7 +651,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                         )
                     }
                     if action_name in {
-                        "add_import_row",
+                        "add_import_row_without_switch_assignment",
                         "add_switch_assigned_import_row",
                     }
                     else {}
@@ -685,7 +687,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                         ]
                     }
                     if action_name in {
-                        "add_import_row",
+                        "add_import_row_without_switch_assignment",
                         "add_switch_assigned_import_row",
                     }
                     else {}
@@ -1986,7 +1988,7 @@ def _apply_audio_import_action(
         _materialize_if_complete(AUDIO_IMPORT_COMPOSER_OPERATION, version, composition)
         return composition, str(action_name)
     if action_name in {
-        "add_import_row",
+        "add_import_row_without_switch_assignment",
         "add_switch_assigned_import_row",
     }:
         row_field_names = tuple(
@@ -1997,9 +1999,6 @@ def _apply_audio_import_action(
         required_action_fields, optional_action_fields = (
             _AUDIO_IMPORT_ACTION_FIELDS[action_name]
         )
-        compatibility_optional_fields = (
-            ("assignment",) if action_name == "add_import_row" else ()
-        )
         _require_allowed_keys(
             action,
             required=(
@@ -2007,14 +2006,14 @@ def _apply_audio_import_action(
                 "action",
                 *required_action_fields,
             ),
-            optional=(*optional_action_fields, *compatibility_optional_fields),
+            optional=optional_action_fields,
             label=f"{action_name} action",
         )
         has_assignment = "assignment" in action
         assignment = action.get("assignment")
         if has_assignment and not isinstance(assignment, Mapping):
             raise OperationComposerError(
-                "add_import_row assignment must be an object."
+                f"{action_name} assignment must be an object."
             )
         mode = assignment.get("mode") if isinstance(assignment, Mapping) else None
         if action_name == "add_switch_assigned_import_row" and not has_assignment:
@@ -2027,7 +2026,7 @@ def _apply_audio_import_action(
             _require_exact_keys(
                 assignment,
                 required=("mode", "value"),
-                label="add_import_row switch assignment",
+                label="add_switch_assigned_import_row assignment",
             )
             switch_assignment = _validate_audio_import_fragment(
                 version,
@@ -2037,16 +2036,9 @@ def _apply_audio_import_action(
                     "value": assignment.get("value"),
                 },
             )
-        elif mode == "none":
-            _require_exact_keys(
-                assignment,
-                required=("mode",),
-                label="legacy add_import_row no-assignment intent",
-            )
-            switch_assignment = None
         else:
             raise OperationComposerError(
-                "add_import_row assignment mode must be 'switch' or 'none'.",
+                "add_switch_assigned_import_row assignment mode must be 'switch'.",
                 details={"mode": mode},
             )
         rows = composition["imports"]
