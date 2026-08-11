@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import shutil
 import sys
 from collections import deque
@@ -411,8 +412,14 @@ def project_row() -> dict[str, Any]:
     return {
         "id": PROJECT_GUID,
         "name": "SampleProject",
-        "path": "/project/SampleProject.wproj",
+        "path": _native_project_path("SampleProject.wproj"),
     }
+
+
+def _native_project_path(filename: str) -> str:
+    if os.name == "nt":
+        return rf"C:\project\{filename}"
+    return f"/project/{filename}"
 
 
 def object_row(*, volume: float | None = None) -> dict[str, Any]:
@@ -947,7 +954,7 @@ def test_guard_drift_fails_before_reservation_or_transaction_store(
     if drift == "session":
         changed_info["sessionId"] = "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}"
     else:
-        changed_project["path"] = "/project/OtherProject.wproj"
+        changed_project["path"] = _native_project_path("OtherProject.wproj")
     client = preview_client(info=changed_info, project=changed_project)
 
     code, payload, _client = seal_checked_draft(

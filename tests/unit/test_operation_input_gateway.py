@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
+import os
 import sys
 from collections import deque
 from datetime import datetime, timezone
@@ -121,8 +122,14 @@ def project_row() -> dict[str, Any]:
     return {
         "id": PROJECT_GUID,
         "name": "SampleProject",
-        "path": "/project/SampleProject.wproj",
+        "path": _native_project_path("SampleProject.wproj"),
     }
+
+
+def _native_project_path(filename: str) -> str:
+    if os.name == "nt":
+        return rf"C:\project\{filename}"
+    return f"/project/{filename}"
 
 
 def object_row() -> dict[str, Any]:
