@@ -672,7 +672,7 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
             "action": (
                 "add_switch_assigned_import_row"
                 if "switch_assignment" in row
-                else "add_import_row"
+                else "add_import_row_without_switch_assignment"
             ),
             **row,
         }

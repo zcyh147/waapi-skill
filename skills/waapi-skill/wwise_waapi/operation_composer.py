@@ -105,12 +105,12 @@ _AUDIO_IMPORT_ACTION_FIELDS: dict[
     "clear_import_option": (("name",), ()),
     "set_import_default": (("name", "value"), ()),
     "clear_import_default": (("name",), ()),
-    "add_import_row": (
-        ("object_path",),
-        _AUDIO_IMPORT_ROW_OPTIONAL_FIELDS,
-    ),
     "add_switch_assigned_import_row": (
         ("object_path", "switch_assignment"),
+        _AUDIO_IMPORT_ROW_OPTIONAL_FIELDS,
+    ),
+    "add_import_row_without_switch_assignment": (
+        ("object_path",),
         _AUDIO_IMPORT_ROW_OPTIONAL_FIELDS,
     ),
     "set_import_row_field": (("import_handle", "name", "value"), ()),
@@ -183,7 +183,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "assignment_explicitly_requested": (
                     "add_switch_assigned_import_row"
                 ),
-                "no_assignment_requested": "add_import_row",
+                "no_assignment_requested": "add_import_row_without_switch_assignment",
             },
             "semantic_variants_are_actions_not_operation_entries": True,
             "switch_assignment_value": (
@@ -262,7 +262,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                         )
                     }
                     if action_name in {
-                        "add_import_row",
+                        "add_import_row_without_switch_assignment",
                         "add_switch_assigned_import_row",
                     }
                     else {}
@@ -274,7 +274,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                         )
                     }
                     if action_name in {
-                        "add_import_row",
+                        "add_import_row_without_switch_assignment",
                         "add_switch_assigned_import_row",
                     }
                     else {}
@@ -310,7 +310,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                         ]
                     }
                     if action_name in {
-                        "add_import_row",
+                        "add_import_row_without_switch_assignment",
                         "add_switch_assigned_import_row",
                     }
                     else {}
@@ -1594,7 +1594,10 @@ def _apply_audio_import_action(
             del defaults[name]
         _materialize_if_complete(AUDIO_IMPORT_COMPOSER_OPERATION, version, composition)
         return composition, str(action_name)
-    if action_name in {"add_import_row", "add_switch_assigned_import_row"}:
+    if action_name in {
+        "add_switch_assigned_import_row",
+        "add_import_row_without_switch_assignment",
+    }:
         row_field_names = tuple(
             operation_composer_contract(
                 AUDIO_IMPORT_COMPOSER_OPERATION, version

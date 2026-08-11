@@ -351,7 +351,7 @@ def build_audio_import_composer_transaction_steps(
         action = {
             "contract": OPERATION_DRAFT_ACTION_CONTRACT,
             "action": (
-                "add_import_row"
+                "add_import_row_without_switch_assignment"
                 if "switch_assignment" not in row_fields
                 else "add_switch_assigned_import_row"
             ),

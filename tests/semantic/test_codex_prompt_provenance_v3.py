@@ -1574,7 +1574,7 @@ def test_audio_import_draft_action_protocol_round_trips_metadata_authority() -> 
     action = DraftActionJsonArgument(
         {
             "contract": "waapi-skill.operation-draft-action/v1",
-            "action": "add_import_row",
+            "action": "add_import_row_without_switch_assignment",
             "audio_file": r"C:\\音频\\rifle.wav",
             "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rifle",
             "properties": [{"name": "Volume", "value": -3.0}],

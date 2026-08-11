@@ -126,7 +126,7 @@ def test_audio_import_composer_emits_ordered_typed_actions_without_full_json() -
         "set_import_default",
         "set_import_default",
         "set_import_default",
-        "add_import_row",
+        "add_import_row_without_switch_assignment",
     ]
     assert action_arguments[3].metadata_binding == metadata
     assert action_arguments[4].metadata_binding == metadata
@@ -669,7 +669,7 @@ def test_metadata_transaction_protocol_selects_closed_audio_import_equivalence()
     )
     assert [argument.expected["action"] for argument in action_arguments] == [
         "set_import_default",
-        "add_import_row",
+        "add_import_row_without_switch_assignment",
     ]
     assert all(
         isinstance(argument, DraftActionJsonArgument)

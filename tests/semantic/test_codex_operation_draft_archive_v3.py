@@ -45,7 +45,7 @@ OBJECT_ID = "{11111111-1111-1111-1111-111111111111}"
 def test_archive_uses_each_operation_composer_action_byte_ceiling() -> None:
     inline_audio = {
         "contract": ACTION_CONTRACT,
-        "action": "add_import_row",
+        "action": "add_import_row_without_switch_assignment",
         "audio_file_base64": "A" * (40 * 1024),
         "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\Inline",
         "object_type": "Sound SFX",

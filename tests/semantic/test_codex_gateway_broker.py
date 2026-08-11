@@ -1759,7 +1759,7 @@ def test_audio_import_action_handle_binding_rejects_cross_row_or_stale_handle(
                 DraftActionJsonArgument(
                     {
                         "contract": contract,
-                        "action": "add_import_row",
+                        "action": "add_import_row_without_switch_assignment",
                         "audio_file": rf"C:\\inputs\\{name}.wav",
                         "object_path": (
                             "\\Actor-Mixer Hierarchy\\Default Work Unit\\"
@@ -1859,7 +1859,7 @@ def test_audio_import_action_binds_dynamic_tokens_to_live_metadata(
     )
     action_value = {
         "contract": "waapi-skill.operation-draft-action/v1",
-        "action": "add_import_row",
+        "action": "add_import_row_without_switch_assignment",
         "audio_file": r"C:\\inputs\\雪.wav",
         "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\雪",
         "properties": [{"name": "Volume", "value": -3.0}],
@@ -1948,7 +1948,7 @@ def test_audio_import_draft_action_accepts_explicit_gateway_owned_activation(
     )
     expected_action = {
         "contract": "waapi-skill.operation-draft-action/v1",
-        "action": "add_import_row",
+        "action": "add_import_row_without_switch_assignment",
         "audio_file": r"C:\inputs\rifle.wav",
         "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rifle",
         "properties": [{"name": "Volume", "value": -12.0}],
