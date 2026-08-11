@@ -1988,7 +1988,7 @@ def _audio_import_composer_row_origins(
                 and action.get("contract")
                 == "waapi-skill.operation-draft-action/v1"
                 and action.get("action")
-                == "add_import_row"
+                in {"add_import_row", "add_switch_assigned_import_row"}
             ):
                 action_rows.append((step_index, argument_index, action))
     if len(action_rows) != len(rows):
@@ -2006,35 +2006,14 @@ def _audio_import_composer_row_origins(
             for key, value in action.items()
             if key not in {"contract", "action"}
         }
-        assignment = action_fields.pop("switch_assignment", None)
-        if (
-            isinstance(assignment, Mapping)
-            and set(assignment) == {"mode", "value"}
-            and assignment.get("mode") == "assign_requested_value"
-            and isinstance(assignment.get("value"), str)
-        ):
-            action_fields["switch_assignment"] = assignment["value"]
-        elif not (
-            isinstance(assignment, Mapping)
-            and set(assignment) == {"mode"}
-            and assignment.get("mode") == "no_assignment_requested"
-        ):
-            raise PromptProvenanceError(
-                "audio.import switch-assignment decision is invalid"
-            )
         if not _json_equal(action_fields, row):
             raise PromptProvenanceError(
                 "audio.import visible row differs from its typed action"
             )
         for pointer, _leaf in _walk_leaves(row):
-            action_pointer = (
-                "/switch_assignment/value"
-                if pointer == "/switch_assignment"
-                else pointer
-            )
             origins[f"/{row_index}{pointer}"] = (
                 f"/steps/{step_index}/arguments/{argument_index}/value"
-                f"{action_pointer}"
+                f"{pointer}"
             )
     return origins
 

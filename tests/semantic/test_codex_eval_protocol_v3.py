@@ -139,7 +139,7 @@ def test_audio_import_composer_emits_ordered_typed_actions_without_full_json() -
     )
 
 
-def test_audio_import_switch_assignment_uses_the_same_row_action() -> None:
+def test_audio_import_switch_assignment_uses_the_assigned_row_action() -> None:
     request = _audio_import_request()
     switch_assignment = "Snow"
     request["arguments"]["imports"][0]["switch_assignment"] = switch_assignment  # type: ignore[index]
@@ -154,12 +154,12 @@ def test_audio_import_switch_assignment_uses_the_same_row_action() -> None:
     ]
 
     row = actions[-1]
-    assert row["action"] == "add_import_row"
-    assert row["switch_assignment"] == {
-        "mode": "assign_requested_value",
-        "value": switch_assignment,
-    }
-    assert all(action["action"] != "add_switch_assigned_import_row" for action in actions)
+    assert row["action"] == "add_switch_assigned_import_row"
+    assert row["switch_assignment"] == switch_assignment
+    assert sum(
+        action["action"] == "add_switch_assigned_import_row"
+        for action in actions
+    ) == 1
 
 
 def test_audio_import_composer_rejects_unreviewed_request_fields() -> None:

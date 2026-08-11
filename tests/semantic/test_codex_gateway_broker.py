@@ -1696,13 +1696,11 @@ def test_audio_import_numbered_actions_remain_strictly_ordered(tmp_path: Path) -
     }
     first_action = steps[first_action_index]
     assert isinstance(first_action.arguments[-1], DraftActionJsonArgument)
-    assert first_action.arguments[-1].expected["switch_assignment"] == {
-        "mode": "no_assignment_requested"
-    }
+    assert "switch_assignment" not in first_action.arguments[-1].expected
 
-    omitted_decision = dict(first_action.arguments[-1].expected)
-    omitted_decision.pop("switch_assignment")
-    omitted_argv = (
+    unexpected_assignment = dict(first_action.arguments[-1].expected)
+    unexpected_assignment["switch_assignment"] = None
+    unexpected_argv = (
         "draft-apply",
         draft_id,
         "--task-authority",
@@ -1711,10 +1709,10 @@ def test_audio_import_numbered_actions_remain_strictly_ordered(tmp_path: Path) -
         "1",
         "--compact",
         "--action-json",
-        json.dumps(omitted_decision, separators=(",", ":")),
+        json.dumps(unexpected_assignment, separators=(",", ":")),
     )
     with pytest.raises(GatewayInvocationError, match="typed Draft action"):
-        broker._validate_step(first_action, omitted_argv)  # noqa: SLF001
+        broker._validate_step(first_action, unexpected_argv)  # noqa: SLF001
 
     second_action = steps[first_action_index + 1]
     out_of_order = (

@@ -429,7 +429,7 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             "contract": "waapi-skill.operation-draft-action/v1",
             "action": "add_import_row",
         },
-        "required_fields": ["object_path", "switch_assignment"],
+        "required_fields": ["object_path"],
         "optional_fields": [
             "audio_file",
             "audio_file_base64",
@@ -445,18 +445,17 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             "references",
         ],
         "construction_discipline": {
-            "initial_action": "add_import_row",
-            "switch_assignment": {
-                "decision_field_required": True,
-                "assigned": {
-                    "mode": "assign_requested_value",
-                    "value": "exact_nonempty_user_requested_string",
-                },
-                "unassigned": {"mode": "no_assignment_requested"},
-                "raw_string_or_null_invalid": True,
-                "none_materializes_as": "omitted_canonical_field",
-                "never_guess": True,
+            "initial_action_by_assignment_intent": {
+                "assignment_explicitly_requested": (
+                    "add_switch_assigned_import_row"
+                ),
+                "no_assignment_requested": "add_import_row",
             },
+            "semantic_variants_are_actions_not_operation_entries": True,
+            "switch_assignment_value": (
+                "exact_nonempty_user_requested_string"
+            ),
+            "never_guess_assignment_intent": True,
             "include_every_known_field": True,
             "split_initial_row_across_follow_up_actions": False,
             "follow_up_row_actions": "corrections_only",
@@ -527,7 +526,17 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
     assert list(schema["composer"]).index(
         "flat_import_row_discipline"
     ) < list(schema["composer"]).index("action_shapes")
-    assert "add_switch_assigned_import_row" not in schema["composer"]["actions"]
+    assigned_shape = schema["composer"]["action_shapes"][
+        "add_switch_assigned_import_row"
+    ]
+    assert assigned_shape == {
+        **schema["composer"]["action_shapes"]["add_import_row"],
+        "fixed_fields": {
+            "contract": "waapi-skill.operation-draft-action/v1",
+            "action": "add_switch_assigned_import_row",
+        },
+        "required_fields": ["object_path", "switch_assignment"],
+    }
     assert schema["composer"]["action_shapes"]["add_import_row"][
         "user_fact_checklist"
     ] == {

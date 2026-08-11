@@ -84,6 +84,20 @@ _IMPORT_ACTION_FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "clear_import_option": (("owner_handle", "name"), ()),
     "remove_import": (("owner_handle",), ()),
 }
+_AUDIO_IMPORT_ROW_OPTIONAL_FIELDS = (
+    "audio_file",
+    "audio_file_base64",
+    "audio_source_notes",
+    "dialogue_event",
+    "event",
+    "import_language",
+    "import_location",
+    "notes",
+    "object_type",
+    "originals_subfolder",
+    "properties",
+    "references",
+)
 _AUDIO_IMPORT_ACTION_FIELDS: dict[
     str, tuple[tuple[str, ...], tuple[str, ...]]
 ] = {
@@ -92,21 +106,12 @@ _AUDIO_IMPORT_ACTION_FIELDS: dict[
     "set_import_default": (("name", "value"), ()),
     "clear_import_default": (("name",), ()),
     "add_import_row": (
+        ("object_path",),
+        _AUDIO_IMPORT_ROW_OPTIONAL_FIELDS,
+    ),
+    "add_switch_assigned_import_row": (
         ("object_path", "switch_assignment"),
-        (
-            "audio_file",
-            "audio_file_base64",
-            "audio_source_notes",
-            "dialogue_event",
-            "event",
-            "import_language",
-            "import_location",
-            "notes",
-            "object_type",
-            "originals_subfolder",
-            "properties",
-            "references",
-        ),
+        _AUDIO_IMPORT_ROW_OPTIONAL_FIELDS,
     ),
     "set_import_row_field": (("import_handle", "name", "value"), ()),
     "clear_import_row_field": (("import_handle", "name"), ()),
@@ -174,18 +179,17 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "Registry returned an invalid audio.import operation default"
             )
         flat_import_row_discipline = {
-            "initial_action": "add_import_row",
-            "switch_assignment": {
-                "decision_field_required": True,
-                "assigned": {
-                    "mode": "assign_requested_value",
-                    "value": "exact_nonempty_user_requested_string",
-                },
-                "unassigned": {"mode": "no_assignment_requested"},
-                "raw_string_or_null_invalid": True,
-                "none_materializes_as": "omitted_canonical_field",
-                "never_guess": True,
+            "initial_action_by_assignment_intent": {
+                "assignment_explicitly_requested": (
+                    "add_switch_assigned_import_row"
+                ),
+                "no_assignment_requested": "add_import_row",
             },
+            "semantic_variants_are_actions_not_operation_entries": True,
+            "switch_assignment_value": (
+                "exact_nonempty_user_requested_string"
+            ),
+            "never_guess_assignment_intent": True,
             "include_every_known_field": True,
             "split_initial_row_across_follow_up_actions": False,
             "follow_up_row_actions": "corrections_only",
@@ -257,7 +261,10 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                             flat_import_row_discipline
                         )
                     }
-                    if action_name == "add_import_row"
+                    if action_name in {
+                        "add_import_row",
+                        "add_switch_assigned_import_row",
+                    }
                     else {}
                 ),
                 **(
@@ -266,7 +273,10 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                             import_row_user_fact_checklist
                         )
                     }
-                    if action_name == "add_import_row"
+                    if action_name in {
+                        "add_import_row",
+                        "add_switch_assigned_import_row",
+                    }
                     else {}
                 ),
                 **(
@@ -299,7 +309,10 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                             }
                         ]
                     }
-                    if action_name == "add_import_row"
+                    if action_name in {
+                        "add_import_row",
+                        "add_switch_assigned_import_row",
+                    }
                     else {}
                 ),
             }
@@ -1581,7 +1594,7 @@ def _apply_audio_import_action(
             del defaults[name]
         _materialize_if_complete(AUDIO_IMPORT_COMPOSER_OPERATION, version, composition)
         return composition, str(action_name)
-    if action_name == "add_import_row":
+    if action_name in {"add_import_row", "add_switch_assigned_import_row"}:
         row_field_names = tuple(
             operation_composer_contract(
                 AUDIO_IMPORT_COMPOSER_OPERATION, version
@@ -1612,15 +1625,10 @@ def _apply_audio_import_action(
         for name in row_field_names:
             if name not in action:
                 continue
-            value = action[name]
-            if name == "switch_assignment":
-                value = _audio_import_switch_assignment_value(value)
-                if value is None:
-                    continue
             descriptor = _validate_audio_import_fragment(
                 version,
                 fragment="row_field",
-                payload={"name": name, "value": value},
+                payload={"name": name, "value": action[name]},
             )
             fields[descriptor["name"]] = descriptor["value"]
         defaults = composition["defaults"]
@@ -1711,36 +1719,6 @@ def _apply_audio_import_action(
                 AUDIO_IMPORT_COMPOSER_OPERATION, version
             )["actions"],
         },
-    )
-
-
-def _audio_import_switch_assignment_value(value: Any) -> str | None:
-    """Resolve one explicit assign/none decision without guessing intent."""
-
-    _require_json_object(value, label="switch_assignment decision")
-    mode = value.get("mode")
-    if mode == "assign_requested_value":
-        _require_exact_keys(
-            value,
-            required=("mode", "value"),
-            label="switch_assignment assign decision",
-        )
-        assigned = value.get("value")
-        if not isinstance(assigned, str) or not assigned or assigned != assigned.strip():
-            raise OperationComposerError(
-                "A switch_assignment assign decision requires one exact non-empty value."
-            )
-        return assigned
-    if mode == "no_assignment_requested":
-        _require_exact_keys(
-            value,
-            required=("mode",),
-            label="switch_assignment none decision",
-        )
-        return None
-    raise OperationComposerError(
-        "switch_assignment must explicitly choose mode "
-        "'assign_requested_value' or 'no_assignment_requested'."
     )
 
 
