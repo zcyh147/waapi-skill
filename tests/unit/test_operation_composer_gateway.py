@@ -18,6 +18,8 @@ from wwise_waapi.operation_composer import (  # pyright: ignore[reportMissingImp
     OperationComposerError,
     operation_composer_contract,
     operation_composer_digest,
+    parse_typed_action_cli_arguments,
+    typed_action_cli_arguments,
 )
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     COMPOSER_INPUT_MODE,
@@ -300,14 +302,16 @@ def execute(tmp_path: Path, *arguments: str) -> tuple[int, dict[str, Any]]:
     )
 
 
+def action_mapping(action_name: str, **fields: Any) -> dict[str, Any]:
+    return {
+        "contract": "waapi-skill.operation-draft-action/v1",
+        "action": action_name,
+        **fields,
+    }
+
+
 def action(action_name: str, **fields: Any) -> str:
-    return json.dumps(
-        {
-            "contract": "waapi-skill.operation-draft-action/v1",
-            "action": action_name,
-            **fields,
-        }
-    )
+    return json.dumps(action_mapping(action_name, **fields))
 
 
 def live_info() -> dict[str, Any]:
@@ -450,7 +454,7 @@ def test_object_set_typed_actions_build_one_target_scalar_fact_offline(
         "one_action_only": True,
         "then_read_next_response": True,
         "precompute_or_increment_revision": False,
-        "fixed_full_argv_template": [
+        "fixed_argv_prefix": [
             "python",
             str(waapi_gateway.GATEWAY_RUNNER_PATH),
             "gateway.py",
@@ -461,12 +465,17 @@ def test_object_set_typed_actions_build_one_target_scalar_fact_offline(
             "--expected-revision",
             "2",
             "--compact",
-            "--action-json",
-            "<typed-action-json>",
+            "--facts",
+        ],
+        "append_exactly_one_typed_action": [
+            "--action",
+            "<action-name>",
+            "<typed-fact-arguments>",
         ],
         "replace_only": [
             "<task-authority-from-draft-start>",
-            "<typed-action-json>",
+            "<action-name>",
+            "<typed-fact-arguments>",
         ],
         "copy_all_other_values_exactly": True,
     }
@@ -515,6 +524,211 @@ def test_object_set_typed_actions_build_one_target_scalar_fact_offline(
     assert property_result["draft"]["missing_fields_status"] == "complete"
     assert "check" in property_result["draft"]["allowed_actions"]
     assert not (tmp_path / "state" / "transactions").exists()
+
+
+def test_object_set_normal_typed_argv_preserves_wire_paths_and_scalar_facts(
+    tmp_path: Path,
+) -> None:
+    start_code, started = execute(tmp_path, "draft-start", "object.set")
+    assert start_code == 0
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    action_path = (
+        r"\Events\Default Work Unit\天气 与 雷声\Play_Rain"
+    )
+    hostile_notes = '--apply stays data; quotes " & $(no-shell) C:\\Temp\\雪'
+
+    code, result = execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--facts",
+        "--action",
+        "add_target",
+        "--selector",
+        "selector",
+        "direct-child",
+        "Action",
+        "path",
+        action_path,
+        "--value",
+        "notes",
+        "string",
+        hostile_notes,
+        "--property",
+        "properties",
+        "FadeTime",
+        "number",
+        "0.0",
+        "--property",
+        "properties",
+        "Delay",
+        "number",
+        "1.25",
+    )
+
+    assert code == 0
+    assert result["draft"]["current_facts"] == [
+        {
+            "handle": result["draft"]["current_facts"][0]["handle"],
+            "selector": {
+                "kind": "direct-child",
+                "parent": {"kind": "path", "value": action_path},
+                "type": "Action",
+            },
+            "notes": hostile_notes,
+            "properties": [
+                {"name": "FadeTime", "value": 0.0},
+                {"name": "Delay", "value": 1.25},
+            ],
+            "references": [],
+            "children": [],
+            "lists": [],
+            "import": None,
+        }
+    ]
+
+
+def test_normal_composer_schema_discloses_typed_argv_not_action_json(
+    tmp_path: Path,
+) -> None:
+    code, payload = execute(
+        tmp_path,
+        "--version",
+        "2022.1",
+        "operation-schema",
+        "object.set",
+    )
+
+    assert code == 0
+    apply = payload["composer"]["apply"]
+    encoded = json.dumps(payload, ensure_ascii=False)
+    assert "--action" in encoded
+    assert "--selector" in encoded
+    assert "--property" in encoded
+    assert "--action-json" not in encoded
+    assert "typed-action-json" not in encoded
+
+
+def test_invalid_or_mixed_typed_action_argv_is_atomic(
+    tmp_path: Path,
+) -> None:
+    _code, started = execute(tmp_path, "draft-start", "object.set")
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    record_path = (
+        tmp_path
+        / "state"
+        / "operation-drafts-v1"
+        / "records"
+        / f"{draft_id}.json"
+    )
+    original = record_path.read_bytes()
+
+    duplicate_code, duplicate = execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--facts",
+        "--action",
+        "set_request_option",
+        "--value",
+        "name",
+        "string",
+        "list_mode",
+        "--value",
+        "name",
+        "string",
+        "platform",
+    )
+    mixed_code, mixed = execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--facts",
+        "--action",
+        "clear_request_option",
+        "--action-json",
+        action("clear_request_option", name="platform"),
+    )
+
+    assert duplicate_code == mixed_code == 2
+    assert duplicate["error_code"] == mixed["error_code"] == "GatewayInputError"
+    assert record_path.read_bytes() == original
+
+
+@pytest.mark.parametrize(
+    "typed_action",
+    [
+        action_mapping("set_request_option", name="list_mode", value="append"),
+        action_mapping("clear_request_option", name="platform"),
+        action_mapping(
+            "add_target",
+            selector={
+                "kind": "scoped-name",
+                "type": "Action",
+                "name": "Play 雨",
+                "parent": {
+                    "kind": "path",
+                    "value": r"\Events\Default Work Unit\天气",
+                },
+            },
+            name="Renamed Target",
+            notes='quotes " and $() stay data',
+            properties=[{"name": "Volume", "value": -3.0}],
+            references=[
+                {
+                    "name": "OutputBus",
+                    "target": {
+                        "kind": "path",
+                        "value": r"\Master-Mixer Hierarchy\Default Work Unit\总线",
+                    },
+                }
+            ],
+        ),
+        action_mapping(
+            "set_reference",
+            owner_handle="odh1-111111111111111111111111",
+            name="OutputBus",
+            target={"kind": "id", "value": TARGET_ID},
+        ),
+        action_mapping(
+            "set_import_row_field",
+            import_handle="odh1-222222222222222222222222",
+            name="event",
+            value={
+                "action": "Play",
+                "path": r"\Events\Default Work Unit\Play_One",
+            },
+        ),
+        action_mapping(
+            "add_import_row",
+            object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\One",
+            assignment={"mode": "switch", "value": "Snow"},
+            object_type="Sound SFX",
+            properties=[{"name": "Volume", "value": -6.25}],
+        ),
+    ],
+)
+def test_typed_action_argv_round_trips_closed_business_facts(
+    typed_action: Mapping[str, Any],
+) -> None:
+    argv = typed_action_cli_arguments(typed_action)
+
+    assert "--action-json" not in argv
+    assert parse_typed_action_cli_arguments(argv) == typed_action
 
 
 def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
@@ -567,7 +781,7 @@ def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
         "created_handles": [handle],
         "affected_handles": [],
     }
-    assert draft["next_action_binding"]["fixed_full_argv_template"] == [
+    assert draft["next_action_binding"]["fixed_argv_prefix"] == [
         "python",
         str(waapi_gateway.GATEWAY_RUNNER_PATH),
         "gateway.py",
@@ -578,12 +792,17 @@ def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
         "--expected-revision",
         "2",
         "--compact",
-        "--action-json",
-        "<typed-action-json>",
+        "--facts",
+    ]
+    assert draft["next_action_binding"]["append_exactly_one_typed_action"] == [
+        "--action",
+        "<action-name>",
+        "<typed-fact-arguments>",
     ]
     assert set(draft["next_action_binding"]) == {
         "contract",
-        "fixed_full_argv_template",
+        "fixed_argv_prefix",
+        "append_exactly_one_typed_action",
         "replace_only",
     }
 

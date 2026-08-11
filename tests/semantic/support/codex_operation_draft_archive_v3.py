@@ -19,6 +19,7 @@ from wwise_waapi.operation_composer import (
     composition_projection,
     new_composition,
     operation_composer_contract,
+    parse_typed_action_cli_arguments,
 )
 from wwise_waapi.operation_drafts import (
     OperationDraftError,
@@ -193,18 +194,35 @@ def _strict_action(
     operation: str,
     version: str,
 ) -> Mapping[str, Any]:
-    raw = _option(arguments, "--action-json")
     contract = operation_composer_contract(operation, version)
     limits = _mapping(contract.get("limits"), label="Composer contract limits")
     action_bytes = limits.get("action_bytes")
     if type(action_bytes) is not int or action_bytes <= 0:
         _fail("Composer contract is missing its action byte ceiling")
-    if len(raw.encode("utf-8")) > action_bytes:
-        _fail("Composer action exceeds its archive byte ceiling")
+    if "--action-json" in arguments:
+        raw = _option(arguments, "--action-json")
+        if len(raw.encode("utf-8")) > action_bytes:
+            _fail("Composer action exceeds its archive byte ceiling")
+        try:
+            action = json.loads(raw)
+        except (json.JSONDecodeError, RecursionError, UnicodeError) as exc:
+            raise ComposerArchiveError("Composer action is not strict JSON") from exc
+    else:
+        try:
+            facts_index = arguments.index("--facts")
+            action = parse_typed_action_cli_arguments(
+                arguments[facts_index + 1 :]
+            )
+        except (OperationComposerError, ValueError) as exc:
+            raise ComposerArchiveError(
+                "Composer typed action argv is invalid"
+            ) from exc
     try:
-        action = json.loads(raw)
-    except (json.JSONDecodeError, RecursionError, UnicodeError) as exc:
+        canonical_action_size = len(canonical_json_bytes(action))
+    except (RecursionError, TypeError, UnicodeError, ValueError) as exc:
         raise ComposerArchiveError("Composer action is not strict JSON") from exc
+    if canonical_action_size > action_bytes:
+        _fail("Composer action exceeds its archive byte ceiling")
     if not isinstance(action, Mapping):
         _fail("Composer action must be a JSON object")
     return dict(action)

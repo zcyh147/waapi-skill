@@ -44,6 +44,7 @@ from wwise_waapi.operation_composer import (
     composition_projection,
     materialize_operation_request,
     new_composition,
+    parse_typed_action_cli_arguments,
 )
 from wwise_waapi.platform_commands import (
     PlatformCommandError,
@@ -1008,7 +1009,7 @@ class DraftActionMetadataBinding:
 
 @dataclass(frozen=True, slots=True)
 class DraftActionJsonArgument:
-    """One fixed business action with only Gateway response handles left dynamic."""
+    """One fixed business action carried by the typed argv Interface."""
 
     expected: Mapping[str, Any]
     response_bindings: tuple[DraftActionResponseBinding, ...] = ()
@@ -1812,15 +1813,19 @@ def validate_operation_draft_protocol_steps(
         if step.subcommand == "draft-apply":
             compact_action = (
                 len(arguments) == 8
-                and arguments[5:7] == ("--compact", "--action-json")
+                and arguments[5:7] == ("--compact", "--facts")
                 and isinstance(arguments[7], DraftActionJsonArgument)
             )
-            legacy_full_action = (
+            hidden_compatibility_action = (
+                len(arguments) == 8
+                and arguments[5:7] == ("--compact", "--action-json")
+                and isinstance(arguments[7], DraftActionJsonArgument)
+            ) or (
                 len(arguments) == 7
                 and arguments[5] == "--action-json"
                 and isinstance(arguments[6], DraftActionJsonArgument)
             )
-            if not compact_action and not legacy_full_action:
+            if not compact_action and not hidden_compatibility_action:
                 raise ValueError(
                     "draft-apply must carry exactly one typed Draft action"
                 )
@@ -6712,15 +6717,26 @@ class CodexGatewayBroker:
 
         submitted_draft_action: Mapping[str, Any] | None = None
         if step.subcommand == "draft-apply":
-            action_index = resolved.gateway_arguments.index("--action-json") + 1
-            decoded_action = _decode_json_argument(
-                resolved.gateway_arguments[action_index],
-                reject_duplicate_keys=True,
-            )
-            if not isinstance(decoded_action, Mapping):
+            try:
+                if "--action-json" in resolved.gateway_arguments:
+                    action_index = (
+                        resolved.gateway_arguments.index("--action-json") + 1
+                    )
+                    decoded_action = _decode_json_argument(
+                        resolved.gateway_arguments[action_index],
+                        reject_duplicate_keys=True,
+                    )
+                else:
+                    action_index = (
+                        resolved.gateway_arguments.index("--facts") + 1
+                    )
+                    decoded_action = parse_typed_action_cli_arguments(
+                        resolved.gateway_arguments[action_index:]
+                    )
+            except (OperationComposerError, ValueError) as exc:
                 return self._reject(
                     resolved.raw_model_argv,
-                    "validated typed Draft action did not decode to an object",
+                    f"validated typed Draft action argv is invalid: {exc}",
                     authenticated=True,
                 )
             submitted_draft_action = json.loads(
@@ -6918,6 +6934,33 @@ class CodexGatewayBroker:
             step,
             validation_arguments,
         )
+        if (
+            metadata_discovery is None
+            and step.subcommand == "draft-apply"
+            and step.arguments
+            and isinstance(step.arguments[-1], DraftActionJsonArgument)
+            and (
+                len(step.arguments) < 2
+                or step.arguments[-2] != "--action-json"
+            )
+        ):
+            fixed_count = len(step.arguments) - 1
+            if len(validation_arguments) <= fixed_count:
+                raise GatewayInvocationError(
+                    f"step {step.name!r} typed Draft action argv is missing"
+                )
+            try:
+                typed_action = parse_typed_action_cli_arguments(
+                    validation_arguments[fixed_count:]
+                )
+            except OperationComposerError as exc:
+                raise GatewayInvocationError(
+                    f"step {step.name!r} typed Draft action argv is invalid: {exc}"
+                ) from exc
+            validation_arguments = (
+                *validation_arguments[:fixed_count],
+                _canonical_json_bytes(typed_action).decode("utf-8"),
+            )
         if (
             metadata_discovery is None
             and len(validation_arguments) != len(step.arguments)
@@ -7288,7 +7331,7 @@ class CodexGatewayBroker:
                     semantic_values.extend(
                         (
                             dict(expected.expected),
-                            "draft-action-json/v1",
+                            "draft-typed-action-argv/v1",
                             binding_evidence,
                             identity_evidence,
                         )

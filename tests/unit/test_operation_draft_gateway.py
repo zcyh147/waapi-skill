@@ -95,7 +95,7 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
             "one_action_only": True,
             "then_read_next_response": True,
             "precompute_or_increment_revision": False,
-            "fixed_full_argv_template": [
+            "fixed_argv_prefix": [
                 "python",
                 str(waapi_gateway.GATEWAY_RUNNER_PATH),
                 "gateway.py",
@@ -106,12 +106,17 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
                 "--expected-revision",
                 "1",
                 "--compact",
-                "--action-json",
-                "<typed-action-json>",
+                "--facts",
+            ],
+            "append_exactly_one_typed_action": [
+                "--action",
+                "<action-name>",
+                "<typed-fact-arguments>",
             ],
             "replace_only": [
                 "<task-authority-from-draft-start>",
-                "<typed-action-json>",
+                "<action-name>",
+                "<typed-fact-arguments>",
             ],
             "copy_all_other_values_exactly": True,
         },

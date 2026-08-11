@@ -22,7 +22,10 @@ from tests.semantic.support.codex_operation_draft_archive_v3 import (
 )
 from tests.semantic.support import codex_operation_draft_archive_v3 as archive_module
 from wwise_waapi.canonical import canonical_sha256
-from wwise_waapi.operation_composer import composition_projection
+from wwise_waapi.operation_composer import (
+    composition_projection,
+    typed_action_cli_arguments,
+)
 from wwise_waapi.operation_drafts import (
     OperationDraftRecord,
     OperationDraftStorageCorruption,
@@ -65,6 +68,25 @@ def test_archive_uses_each_operation_composer_action_byte_ceiling() -> None:
             operation="object.set",
             version="2023.1",
         )
+
+
+def test_archive_reconstructs_typed_action_argv_without_json_text() -> None:
+    action = {
+        "contract": ACTION_CONTRACT,
+        "action": "add_target",
+        "selector": {
+            "kind": "path",
+            "value": r"\Actor-Mixer Hierarchy\Default Work Unit\雪 与 雷",
+        },
+        "properties": [{"name": "Volume", "value": -3.0}],
+    }
+    arguments = ("--compact", "--facts", *typed_action_cli_arguments(action))
+
+    assert archive_module._strict_action(  # noqa: SLF001
+        arguments,
+        operation="object.set",
+        version="2022.1",
+    ) == action
 
 
 def _draft_payload(

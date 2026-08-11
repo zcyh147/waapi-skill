@@ -188,9 +188,11 @@ from wwise_waapi.operation_drafts import (  # noqa: E402  # pyright: ignore[repo
 )
 from wwise_waapi.operation_composer import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     OBJECT_SET_COMPOSER_OPERATION,
+    OperationComposerError,
     composition_projection,
     operation_composer_contract,
     operation_composer_digest,
+    parse_typed_action_cli_arguments,
 )
 from wwise_waapi.platform_paths import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     WWISE_WIRE_PATH_INPUT_AUDIT_CONTRACT,
@@ -1451,7 +1453,15 @@ def build_parser() -> argparse.ArgumentParser:
             "use draft-inspect for the complete current facts"
         ),
     )
-    draft_apply.add_argument("--action-json", required=True)
+    draft_apply.add_argument(
+        "--facts",
+        nargs=argparse.REMAINDER,
+        help=(
+            "Treat every remaining argv item as one typed action; this keeps "
+            "option-looking strings as data"
+        ),
+    )
+    draft_apply.add_argument("--action-json", help=argparse.SUPPRESS)
 
     draft_check = subparsers.add_parser(
         "draft-check",
@@ -2932,7 +2942,7 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
                 f"wait-topic --event-count must be between 1 and {MAX_WAIT_EVENT_COUNT}"
             )
     elif args.command == "draft-apply":
-        parse_operation_draft_action_object(args.action_json)
+        parse_operation_draft_cli_action(args)
     elif args.command in {"preview", "legacy-preview"}:
         request_payload = parse_preview_request_object(args.request_json)
         if args.command == "preview":
@@ -3014,7 +3024,7 @@ def operation_composer_input_contract(
         },
         "apply": {
             "subcommand": "draft-apply",
-            "action_flag": "--action-json",
+            "action_flag": "--action",
             "gateway_argv": [
                 "draft-apply",
                 "<draft_id>",
@@ -3023,8 +3033,32 @@ def operation_composer_input_contract(
                 "--expected-revision",
                 "<revision>",
                 "--compact",
-                "--action-json",
-                "<typed-action-json>",
+                "--facts",
+                "--action",
+                "<action-name>",
+                "<typed-fact-arguments>",
+            ],
+            "typed_fact_flags": {
+                "--value": ["FIELD", "TYPE", "VALUE"],
+                "--null": ["FIELD"],
+                "--selector": ["FIELD", "SELECTOR_KIND", "SELECTOR_VALUES..."],
+                "--property": ["FIELD", "NAME", "TYPE", "VALUE"],
+                "--reference": [
+                    "FIELD",
+                    "NAME",
+                    "SELECTOR_KIND",
+                    "SELECTOR_VALUES...",
+                ],
+                "--event": ["FIELD", "ACTION", "PATH"],
+                "--assignment": ["FIELD", "none|switch", "VALUE_IF_SWITCH"],
+            },
+            "scalar_types": ["string", "number", "integer", "boolean"],
+            "selector_kinds": [
+                "id VALUE",
+                "path VALUE",
+                "exact-type-name TYPE NAME",
+                "direct-child TYPE PARENT_SELECTOR...",
+                "scoped-name TYPE NAME PARENT_SELECTOR...",
             ],
             "bind_from_prior_response": [
                 "draft_id",
@@ -3035,11 +3069,12 @@ def operation_composer_input_contract(
                 "mode": "one_action_then_read_next_response",
                 "expected_revision_source": "/draft/revision",
                 "next_action_template_source": (
-                    "/draft/next_action_binding/fixed_full_argv_template"
+                    "/draft/next_action_binding/fixed_argv_prefix"
                 ),
                 "replace_only": [
                     "<task-authority-from-draft-start>",
-                    "<typed-action-json>",
+                    "<action-name>",
+                    "<typed-fact-arguments>",
                 ],
                 "precompute_or_increment_revision": False,
             },
@@ -3130,7 +3165,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             inspected.operation,
             inspected.version,
         )
-        parsed_action = parse_operation_draft_action_object(args.action_json)
+        parsed_action = parse_operation_draft_cli_action(args)
         record = store.apply_action(
             args.draft_id,
             task_authority=args.task_authority,
@@ -10597,7 +10632,7 @@ def operation_draft_payload(
         else:
             next_action_binding.update(
                 {
-                    "fixed_full_argv_template": [
+                    "fixed_argv_prefix": [
                         "python",
                         str(GATEWAY_RUNNER_PATH),
                         "gateway.py",
@@ -10608,12 +10643,17 @@ def operation_draft_payload(
                         "--expected-revision",
                         str(record.revision),
                         "--compact",
-                        "--action-json",
-                        "<typed-action-json>",
+                        "--facts",
+                    ],
+                    "append_exactly_one_typed_action": [
+                        "--action",
+                        "<action-name>",
+                        "<typed-fact-arguments>",
                     ],
                     "replace_only": [
                         "<task-authority-from-draft-start>",
-                        "<typed-action-json>",
+                        "<action-name>",
+                        "<typed-fact-arguments>",
                     ],
                 }
             )
@@ -11689,6 +11729,24 @@ def parse_operation_draft_action_object(text: str) -> dict[str, Any]:
         max_document_bytes=MAX_PREVIEW_JSON_INPUT_BYTES,
         max_string_bytes=MAX_PREVIEW_JSON_STRING_BYTES,
     )
+
+
+def parse_operation_draft_cli_action(args: argparse.Namespace) -> dict[str, Any]:
+    """Build the normal typed action or parse the hidden compatibility form."""
+
+    typed_rows_present = bool(args.facts)
+    if args.action_json is not None:
+        if typed_rows_present:
+            raise GatewayInputError(
+                "draft-apply cannot combine typed fact flags with --action-json"
+            )
+        return parse_operation_draft_action_object(args.action_json)
+    if not args.facts:
+        raise GatewayInputError("draft-apply requires --facts --action and typed facts")
+    try:
+        return parse_typed_action_cli_arguments(args.facts)
+    except OperationComposerError as exc:
+        raise GatewayInputError(str(exc)) from exc
 
 
 def require_normal_legacy_preview_input_mode(

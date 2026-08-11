@@ -541,6 +541,71 @@ def test_ordinary_import_row_has_no_switch_assignment_fact(
     assert "switch_assignment" not in result["draft"]["current_facts"][0]
 
 
+def test_audio_import_normal_typed_argv_preserves_host_paths_and_assignment(
+    tmp_path: Path,
+) -> None:
+    source_path = tmp_path / "音频 Source" / "Weather" / "Snow One.wav"
+    source_path.parent.mkdir(parents=True)
+    source_path.write_bytes(b"RIFF\x04\x00\x00\x00WAVE")
+    source = str(source_path)
+    object_path = (
+        r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\Snow One"
+    )
+    event_path = r"\Events\Default Work Unit\Weather\Play_Snow"
+    _code, started = _execute(tmp_path, "draft-start", "audio.import")
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+
+    code, result = _execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--facts",
+        "--action",
+        "add_import_row",
+        "--value",
+        "object_path",
+        "string",
+        object_path,
+        "--value",
+        "audio_file",
+        "string",
+        source,
+        "--value",
+        "object_type",
+        "string",
+        "Sound SFX",
+        "--value",
+        "import_language",
+        "string",
+        "SFX",
+        "--event",
+        "event",
+        "Play",
+        event_path,
+        "--assignment",
+        "assignment",
+        "switch",
+        "Snow",
+    )
+
+    assert code == 0
+    fact = result["draft"]["current_facts"][0]
+    assert fact == {
+        "handle": fact["handle"],
+        "audio_file": source,
+        "event": {"action": "Play", "path": event_path},
+        "import_language": "SFX",
+        "object_path": object_path,
+        "object_type": "Sound SFX",
+        "switch_assignment": "Snow",
+    }
+
+
 @pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
 def test_audio_import_row_actions_disclose_complete_structure_and_media_facts(
     version: str,

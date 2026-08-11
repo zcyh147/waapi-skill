@@ -205,7 +205,7 @@ def build_object_set_composer_transaction_steps(
                     "--expected-revision",
                     ResponseBinding(latest_revision_step, "/draft/revision"),
                     "--compact",
-                    "--action-json",
+                    "--facts",
                     DraftActionJsonArgument(
                         expected=action,
                         query_identity_bindings=identity_bindings,
@@ -425,7 +425,7 @@ def build_audio_import_composer_transaction_steps(
                     "--expected-revision",
                     ResponseBinding(latest_revision_step, "/draft/revision"),
                     "--compact",
-                    "--action-json",
+                    "--facts",
                     DraftActionJsonArgument(
                         expected=action,
                         operation="audio.import",

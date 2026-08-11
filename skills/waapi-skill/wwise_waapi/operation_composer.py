@@ -9,9 +9,10 @@ remain downstream responsibilities of the normal transaction ingress.
 from __future__ import annotations
 
 import json
+import math
 import re
 import secrets
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, Sequence
 
 from .canonical import canonical_json_bytes, canonical_sha256
 from .operation_registry import (
@@ -138,6 +139,380 @@ class OperationComposerError(ValueError):
             "message": str(self),
             "details": dict(self.details),
         }
+
+
+def build_typed_action_from_cli(
+    action_name: str,
+    *,
+    values: Sequence[Sequence[str]] = (),
+    nulls: Sequence[str] = (),
+    selectors: Sequence[Sequence[str]] = (),
+    properties: Sequence[Sequence[str]] = (),
+    references: Sequence[Sequence[str]] = (),
+    events: Sequence[Sequence[str]] = (),
+    assignments: Sequence[Sequence[str]] = (),
+) -> dict[str, Any]:
+    """Build one closed action from typed argv facts, never from JSON text."""
+
+    if not isinstance(action_name, str) or not action_name:
+        raise OperationComposerError("--action must name one typed action.")
+    action: dict[str, Any] = {
+        "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+        "action": action_name,
+    }
+
+    def set_once(name: str, value: Any) -> None:
+        if not isinstance(name, str) or not name:
+            raise OperationComposerError("Typed action field names must be non-empty.")
+        if name in {"contract", "action"} or name in action:
+            raise OperationComposerError(
+                "Typed action fields must be unique and cannot replace fixed fields.",
+                details={"field": name},
+            )
+        action[name] = value
+
+    for row in values:
+        if len(row) != 3:
+            raise OperationComposerError(
+                "--value requires FIELD TYPE VALUE."
+            )
+        field, value_type, raw_value = row
+        set_once(field, _parse_cli_scalar(value_type, raw_value))
+    for field in nulls:
+        set_once(field, None)
+    for row in selectors:
+        if len(row) < 3:
+            raise OperationComposerError(
+                "--selector requires FIELD KIND and the kind's typed values."
+            )
+        field, *tokens = row
+        selector, consumed = _parse_cli_selector(tokens)
+        if consumed != len(tokens):
+            raise OperationComposerError("--selector contains extra values.")
+        set_once(field, selector)
+    for row in events:
+        if len(row) != 3:
+            raise OperationComposerError("--event requires FIELD ACTION PATH.")
+        field, event_action, path = row
+        set_once(field, {"action": event_action, "path": path})
+    for row in assignments:
+        if len(row) not in {2, 3}:
+            raise OperationComposerError(
+                "--assignment requires FIELD none or FIELD switch VALUE."
+            )
+        field, mode, *assignment_value = row
+        if mode == "none" and not assignment_value:
+            set_once(field, {"mode": "none"})
+        elif mode == "switch" and len(assignment_value) == 1:
+            set_once(field, {"mode": "switch", "value": assignment_value[0]})
+        else:
+            raise OperationComposerError(
+                "--assignment accepts only none or switch with one value."
+            )
+
+    grouped_properties: dict[str, list[dict[str, Any]]] = {}
+    for row in properties:
+        if len(row) != 4:
+            raise OperationComposerError(
+                "--property requires FIELD NAME TYPE VALUE."
+            )
+        field, name, value_type, raw_value = row
+        grouped_properties.setdefault(field, []).append(
+            {"name": name, "value": _parse_cli_scalar(value_type, raw_value)}
+        )
+    for field, descriptors in grouped_properties.items():
+        set_once(field, descriptors)
+
+    grouped_references: dict[str, list[dict[str, Any]]] = {}
+    for row in references:
+        if len(row) < 4:
+            raise OperationComposerError(
+                "--reference requires FIELD NAME KIND and the kind's typed values."
+            )
+        field, name, *tokens = row
+        target, consumed = _parse_cli_selector(tokens)
+        if consumed != len(tokens):
+            raise OperationComposerError("--reference contains extra values.")
+        grouped_references.setdefault(field, []).append(
+            {"name": name, "target": target}
+        )
+    for field, descriptors in grouped_references.items():
+        set_once(field, descriptors)
+    return action
+
+
+def parse_typed_action_cli_arguments(arguments: Sequence[str]) -> dict[str, Any]:
+    """Parse the closed variable-length ``draft-apply`` typed argv suffix."""
+
+    values: list[tuple[str, ...]] = []
+    nulls: list[str] = []
+    selectors: list[tuple[str, ...]] = []
+    properties: list[tuple[str, ...]] = []
+    references: list[tuple[str, ...]] = []
+    events: list[tuple[str, ...]] = []
+    assignments: list[tuple[str, ...]] = []
+    if len(arguments) < 2 or arguments[0] != "--action":
+        raise OperationComposerError(
+            "Typed action argv must start with --action ACTION."
+        )
+    action_name = arguments[1]
+    index = 2
+    while index < len(arguments):
+        flag = arguments[index]
+        if flag == "--value":
+            row = _require_cli_argv_row(arguments, index, 4, flag)
+            values.append(row[1:])
+            index += 4
+        elif flag == "--null":
+            row = _require_cli_argv_row(arguments, index, 2, flag)
+            nulls.append(row[1])
+            index += 2
+        elif flag == "--property":
+            row = _require_cli_argv_row(arguments, index, 5, flag)
+            properties.append(row[1:])
+            index += 5
+        elif flag == "--event":
+            row = _require_cli_argv_row(arguments, index, 4, flag)
+            events.append(row[1:])
+            index += 4
+        elif flag == "--selector":
+            if index + 3 > len(arguments):
+                raise OperationComposerError("--selector is incomplete.")
+            field = arguments[index + 1]
+            _selector, consumed = _parse_cli_selector(arguments[index + 2 :])
+            end = index + 2 + consumed
+            selectors.append((field, *arguments[index + 2 : end]))
+            index = end
+        elif flag == "--reference":
+            if index + 4 > len(arguments):
+                raise OperationComposerError("--reference is incomplete.")
+            field = arguments[index + 1]
+            name = arguments[index + 2]
+            _selector, consumed = _parse_cli_selector(arguments[index + 3 :])
+            end = index + 3 + consumed
+            references.append((field, name, *arguments[index + 3 : end]))
+            index = end
+        elif flag == "--assignment":
+            if index + 3 > len(arguments):
+                raise OperationComposerError("--assignment is incomplete.")
+            field = arguments[index + 1]
+            mode = arguments[index + 2]
+            if mode == "none":
+                assignments.append((field, mode))
+                index += 3
+            elif mode == "switch" and index + 4 <= len(arguments):
+                assignments.append((field, mode, arguments[index + 3]))
+                index += 4
+            else:
+                raise OperationComposerError("--assignment is invalid.")
+        else:
+            raise OperationComposerError(
+                "Typed action argv contains an unknown fact flag.",
+                details={"flag": flag},
+            )
+    return build_typed_action_from_cli(
+        action_name,
+        values=values,
+        nulls=nulls,
+        selectors=selectors,
+        properties=properties,
+        references=references,
+        events=events,
+        assignments=assignments,
+    )
+
+
+def _require_cli_argv_row(
+    arguments: Sequence[str],
+    index: int,
+    size: int,
+    flag: str,
+) -> tuple[str, ...]:
+    end = index + size
+    if end > len(arguments):
+        raise OperationComposerError(f"{flag} is incomplete.")
+    return tuple(arguments[index:end])
+
+
+def typed_action_cli_arguments(action: Mapping[str, Any]) -> tuple[str, ...]:
+    """Serialize one validated action as typed argv facts without JSON quoting."""
+
+    _require_json_object(action, label="action")
+    if action.get("contract") != OPERATION_DRAFT_ACTION_CONTRACT:
+        raise OperationComposerError("Typed action has an invalid contract.")
+    action_name = action.get("action")
+    if not isinstance(action_name, str) or not action_name:
+        raise OperationComposerError("Typed action has an invalid action name.")
+    arguments: list[str] = ["--action", action_name]
+    for field, value in action.items():
+        if field in {"contract", "action"}:
+            continue
+        if value is None:
+            arguments.extend(("--null", field))
+        elif isinstance(value, Mapping) and "kind" in value:
+            arguments.extend(("--selector", field, *_selector_cli_tokens(value)))
+        elif (
+            isinstance(value, Mapping)
+            and set(value).issubset({"action", "path"})
+            and set(value) == {"action", "path"}
+        ):
+            arguments.extend(
+                ("--event", field, str(value["action"]), str(value["path"]))
+            )
+        elif isinstance(value, Mapping) and "mode" in value:
+            mode = value.get("mode")
+            if mode == "none" and set(value) == {"mode"}:
+                arguments.extend(("--assignment", field, "none"))
+            elif mode == "switch" and set(value) == {"mode", "value"}:
+                arguments.extend(
+                    ("--assignment", field, "switch", str(value["value"]))
+                )
+            else:
+                raise OperationComposerError("Typed assignment is invalid.")
+        elif isinstance(value, list):
+            for descriptor in value:
+                if not isinstance(descriptor, Mapping):
+                    raise OperationComposerError("Typed descriptor list is invalid.")
+                if set(descriptor) == {"name", "value"}:
+                    value_type, raw_value = _scalar_cli_tokens(descriptor["value"])
+                    arguments.extend(
+                        (
+                            "--property",
+                            field,
+                            str(descriptor["name"]),
+                            value_type,
+                            raw_value,
+                        )
+                    )
+                elif set(descriptor) == {"name", "target"} and isinstance(
+                    descriptor["target"], Mapping
+                ):
+                    arguments.extend(
+                        (
+                            "--reference",
+                            field,
+                            str(descriptor["name"]),
+                            *_selector_cli_tokens(descriptor["target"]),
+                        )
+                    )
+                else:
+                    raise OperationComposerError("Typed descriptor is invalid.")
+        else:
+            value_type, raw_value = _scalar_cli_tokens(value)
+            arguments.extend(("--value", field, value_type, raw_value))
+    return tuple(arguments)
+
+
+def _parse_cli_scalar(value_type: str, raw_value: str) -> Any:
+    if value_type == "string":
+        return raw_value
+    if value_type == "boolean":
+        if raw_value == "true":
+            return True
+        if raw_value == "false":
+            return False
+        raise OperationComposerError("boolean values must be true or false.")
+    if value_type == "integer":
+        if not re.fullmatch(r"-?(?:0|[1-9][0-9]*)", raw_value):
+            raise OperationComposerError("integer values must use canonical decimal syntax.")
+        return int(raw_value)
+    if value_type == "number":
+        try:
+            value = json.loads(raw_value)
+        except (json.JSONDecodeError, RecursionError) as exc:
+            raise OperationComposerError("number values must use JSON number syntax.") from exc
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise OperationComposerError("number values must use JSON number syntax.")
+        if isinstance(value, float) and not math.isfinite(value):
+            raise OperationComposerError("number values must be finite.")
+        return value
+    raise OperationComposerError(
+        "Typed scalar type must be string, number, integer, or boolean.",
+        details={"type": value_type},
+    )
+
+
+def _scalar_cli_tokens(value: Any) -> tuple[str, str]:
+    if isinstance(value, str):
+        return "string", value
+    if isinstance(value, bool):
+        return "boolean", "true" if value else "false"
+    if isinstance(value, int):
+        return "integer", str(value)
+    if isinstance(value, float) and math.isfinite(value):
+        return "number", json.dumps(value, ensure_ascii=False, allow_nan=False)
+    raise OperationComposerError("Typed scalar value is unsupported.")
+
+
+def _parse_cli_selector(
+    tokens: Sequence[str],
+    *,
+    depth: int = 0,
+) -> tuple[dict[str, Any], int]:
+    if depth > 8 or not tokens:
+        raise OperationComposerError("Typed selector is missing or too deeply nested.")
+    kind = tokens[0]
+    if kind in {"id", "path"}:
+        if len(tokens) < 2:
+            raise OperationComposerError(f"{kind} selector requires VALUE.")
+        return {"kind": kind, "value": tokens[1]}, 2
+    if kind == "exact-type-name":
+        if len(tokens) < 3:
+            raise OperationComposerError("exact-type-name requires TYPE NAME.")
+        return {"kind": kind, "type": tokens[1], "name": tokens[2]}, 3
+    if kind == "direct-child":
+        if len(tokens) < 3:
+            raise OperationComposerError(
+                "direct-child requires TYPE and a parent selector."
+            )
+        parent, consumed = _parse_cli_selector(tokens[2:], depth=depth + 1)
+        return {"kind": kind, "type": tokens[1], "parent": parent}, 2 + consumed
+    if kind == "scoped-name":
+        if len(tokens) < 4:
+            raise OperationComposerError(
+                "scoped-name requires TYPE NAME and a parent selector."
+            )
+        parent, consumed = _parse_cli_selector(tokens[3:], depth=depth + 1)
+        return {
+            "kind": kind,
+            "type": tokens[1],
+            "name": tokens[2],
+            "parent": parent,
+        }, 3 + consumed
+    raise OperationComposerError(
+        "Typed selector kind is not supported.", details={"kind": kind}
+    )
+
+
+def _selector_cli_tokens(selector: Mapping[str, Any], *, depth: int = 0) -> tuple[str, ...]:
+    if depth > 8:
+        raise OperationComposerError("Typed selector is too deeply nested.")
+    kind = selector.get("kind")
+    if kind in {"id", "path"} and set(selector) == {"kind", "value"}:
+        return str(kind), str(selector["value"])
+    if kind == "exact-type-name" and set(selector) == {"kind", "type", "name"}:
+        return kind, str(selector["type"]), str(selector["name"])
+    if kind == "direct-child" and set(selector) == {"kind", "type", "parent"}:
+        parent = selector["parent"]
+        if not isinstance(parent, Mapping):
+            raise OperationComposerError("Typed selector parent is invalid.")
+        return kind, str(selector["type"]), *_selector_cli_tokens(parent, depth=depth + 1)
+    if kind == "scoped-name" and set(selector) == {
+        "kind",
+        "type",
+        "name",
+        "parent",
+    }:
+        parent = selector["parent"]
+        if not isinstance(parent, Mapping):
+            raise OperationComposerError("Typed selector parent is invalid.")
+        return (
+            kind,
+            str(selector["type"]),
+            str(selector["name"]),
+            *_selector_cli_tokens(parent, depth=depth + 1),
+        )
+    raise OperationComposerError("Typed selector is invalid.")
 
 
 def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:

@@ -745,7 +745,7 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "gateway.py operation-schema <operation-name>" not in OPERATE
     assert "Follow the schema's sole `input_mode`; never seek another" in OPERATE
     assert "For `composer`, run `composer.start.gateway_argv`" in OPERATE
-    assert "returned actions/handles" in OPERATE
+    assert "returned typed fact flags/handles; Gateway serializes" in OPERATE
     assert "`object.set` starts rows with `add_target`" in OPERATE
     assert "`audio.import` uses its selected row action" in OPERATE
     assert "Later actions only correct or nest" in OPERATE

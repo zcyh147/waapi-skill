@@ -44,6 +44,7 @@ from wwise_waapi.builders.metadata import (
     GET_PROPERTY_INFO_URI,
     GET_TYPES_URI,
 )
+from wwise_waapi.operation_composer import typed_action_cli_arguments
 from wwise_waapi.canonical import canonical_sha256
 from wwise_waapi.operation_composer import (
     apply_composer_action,
@@ -676,8 +677,8 @@ def _typed_action_argv(step: Any, action: Mapping[str, Any]) -> tuple[str, ...]:
         "--expected-revision",
         revision,
         "--compact",
-        "--action-json",
-        json.dumps(action, separators=(",", ":")),
+        "--facts",
+        *typed_action_cli_arguments(action),
     )
 
 
