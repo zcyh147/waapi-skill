@@ -426,6 +426,9 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         "required_in_initial_row_action": True,
         "ordinary_row": {"mode": "none"},
         "when_user_requested": {"mode": "switch", "value": "VALUE"},
+        "applies_to": "this_row_object_path",
+        "new_parent_or_container": "switch_when_user_assigns_that_object",
+        "other_rows": "none_unless_user_assigns_that_row",
     }
     assert row_shape["user_fact_checklist"][
         "switch_assignment_value_only_when_explicit"

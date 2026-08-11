@@ -333,6 +333,11 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
             "required_in_initial_row_action": True,
             "ordinary_row": {"mode": "none"},
             "when_user_requested": {"mode": "switch", "value": "VALUE"},
+            "applies_to": "this_row_object_path",
+            "new_parent_or_container": (
+                "switch_when_user_assigns_that_object"
+            ),
+            "other_rows": "none_unless_user_assigns_that_row",
         },
         "never_guess_assignment_intent": True,
         "include_every_known_field_in_one_action": True,
@@ -450,6 +455,11 @@ def test_audio_import_exposes_one_row_action_with_explicit_assignment_intent(
             "required_in_initial_row_action": True,
             "ordinary_row": {"mode": "none"},
             "when_user_requested": {"mode": "switch", "value": "VALUE"},
+            "applies_to": "this_row_object_path",
+            "new_parent_or_container": (
+                "switch_when_user_assigns_that_object"
+            ),
+            "other_rows": "none_unless_user_assigns_that_row",
         },
         "never_guess_assignment_intent": True,
         "include_every_known_field_in_one_action": True,
@@ -470,6 +480,11 @@ def test_audio_import_draft_start_places_assignment_rule_on_the_row_action(
         "required_on_every_row": True,
         "ordinary_row": ["--assignment", "none"],
         "when_user_requested": ["--assignment", "switch", "<exact-value>"],
+        "applies_to": "this row's --object-path",
+        "new_parent_or_container": (
+            "use switch on that row when the user assigns the new object"
+        ),
+        "other_rows": "use none unless the user assigns that row",
         "guessing_allowed": False,
     }
 

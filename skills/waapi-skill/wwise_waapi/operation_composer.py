@@ -1242,6 +1242,11 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                     "mode": "switch",
                     "value": "VALUE",
                 },
+                "applies_to": "this_row_object_path",
+                "new_parent_or_container": (
+                    "switch_when_user_assigns_that_object"
+                ),
+                "other_rows": "none_unless_user_assigns_that_row",
             },
             "never_guess_assignment_intent": True,
             "include_every_known_field_in_one_action": True,
@@ -3028,6 +3033,11 @@ def _audio_import_composition_projection(
                     "switch",
                     "<exact-value>",
                 ],
+                "applies_to": "this row's --object-path",
+                "new_parent_or_container": (
+                    "use switch on that row when the user assigns the new object"
+                ),
+                "other_rows": "use none unless the user assigns that row",
                 "guessing_allowed": False,
             }
         },
