@@ -2044,11 +2044,11 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
         if step["subcommand"] == "draft-apply"
         and step["arguments"][-1].get("kind") == "draft_action_json"
         and step["arguments"][-1]["value"].get("action")
-        == "add_import_row"
+        == "add_switch_assigned_import_row"
         and step["arguments"][-1]["value"].get("assignment", {}).get("mode")
         == "switch"
     )
-    assert serialized_row["action"] == "add_import_row"
+    assert serialized_row["action"] == "add_switch_assigned_import_row"
     assert serialized_row["assignment"] == {"mode": "switch", "value": "Rain"}
     assert "switch_assignment" not in serialized_row
     assert deserialize_protocol(serialized) == protocol

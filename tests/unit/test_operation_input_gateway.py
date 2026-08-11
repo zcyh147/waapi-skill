@@ -438,7 +438,6 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         },
         "required_fields": ["object_path"],
         "optional_fields": [
-            "assignment",
             "audio_file",
             "audio_file_base64",
             "audio_source_notes",
@@ -453,8 +452,14 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             "references",
         ],
         "construction_discipline": {
-            "single_initial_row_action": "add_import_row",
-            "assignment_is_explicit_data_not_action_routing": True,
+            "initial_row_action_by_intent": {
+                "without_switch_assignment": "add_import_row",
+                "with_requested_switch_assignment": (
+                    "add_switch_assigned_import_row"
+                ),
+            },
+            "one_initial_action_per_row": True,
+            "assignment_intent_is_explicit_in_action_name": True,
             "never_guess_assignment_intent": True,
             "include_every_known_field": True,
             "split_initial_row_across_follow_up_actions": False,
@@ -492,16 +497,23 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
                 "reason": "media rows require an explicit import language",
             },
         ],
-        "assignment_contract": {
-            "omitted_means_no_switch_assignment": True,
-            "normal_form": {
-                "mode": "switch",
-                "required_fields": ["mode", "value"],
-                "additional_fields": False,
-            },
-            "requested_switch_assignment_must_use_mode": "switch",
-            "switch_assignment_is_not_a_later_action": True,
+    }
+    assigned_row = schema["composer"]["action_shapes"][
+        "add_switch_assigned_import_row"
+    ]
+    assert assigned_row["required_fields"] == ["object_path", "assignment"]
+    assert assigned_row["optional_fields"] == schema["composer"][
+        "action_shapes"
+    ]["add_import_row"]["optional_fields"]
+    assert assigned_row["assignment_contract"] == {
+        "required": True,
+        "normal_form": {
+            "mode": "switch",
+            "required_fields": ["mode", "value"],
+            "additional_fields": False,
         },
+        "requested_switch_assignment_must_use_mode": "switch",
+        "switch_assignment_is_not_a_later_action": True,
     }
     assert schema["composer"]["planning_discipline"][
         "dynamic_metadata"

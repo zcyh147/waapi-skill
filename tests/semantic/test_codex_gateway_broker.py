@@ -1925,50 +1925,53 @@ def test_audio_import_action_binds_dynamic_tokens_to_live_metadata(
         broker._validate_step(action, actual)  # noqa: SLF001
 
 
+@pytest.mark.parametrize("switch_assigned", [False, True])
 def test_audio_import_typed_action_treats_named_field_order_as_semantic(
     tmp_path: Path,
+    switch_assigned: bool,
 ) -> None:
+    import_row = {
+        "object_path": (
+            r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\Rain"
+        ),
+        "object_type": "Sound SFX",
+        "audio_file": native_absolute_test_path("inputs", "rain.wav"),
+        "import_language": "SFX",
+        "properties": [
+            {"name": "IsLoopingEnabled", "value": True},
+            {"name": "Volume", "value": -4.0},
+        ],
+        "references": [
+            {
+                "name": "OutputBus",
+                "target": {
+                    "kind": "path",
+                    "value": (
+                        r"\Master-Mixer Hierarchy\Default Work Unit"
+                        r"\Weather"
+                    ),
+                },
+            },
+            {
+                "name": "UserAuxSend0",
+                "target": {
+                    "kind": "path",
+                    "value": (
+                        r"\Master-Mixer Hierarchy\Default Work Unit"
+                        r"\Weather Aux"
+                    ),
+                },
+            },
+        ],
+    }
+    if switch_assigned:
+        import_row["switch_assignment"] = "Rain"
     request = {
         "contract": "waapi-skill.operation-request/v1",
         "version": "2022.1",
         "operation": "audio.import",
         "arguments": {
-            "imports": [
-                {
-                    "object_path": (
-                        r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\Rain"
-                    ),
-                    "object_type": "Sound SFX",
-                    "audio_file": native_absolute_test_path("inputs", "rain.wav"),
-                    "import_language": "SFX",
-                    "properties": [
-                        {"name": "IsLoopingEnabled", "value": True},
-                        {"name": "Volume", "value": -4.0},
-                    ],
-                    "references": [
-                        {
-                            "name": "OutputBus",
-                            "target": {
-                                "kind": "path",
-                                "value": (
-                                    r"\Master-Mixer Hierarchy\Default Work Unit"
-                                    r"\Weather"
-                                ),
-                            },
-                        },
-                        {
-                            "name": "UserAuxSend0",
-                            "target": {
-                                "kind": "path",
-                                "value": (
-                                    r"\Master-Mixer Hierarchy\Default Work Unit"
-                                    r"\Weather Aux"
-                                ),
-                            },
-                        },
-                    ],
-                }
-            ],
+            "imports": [import_row],
             "import_operation": "createNew",
         },
     }
@@ -1997,7 +2000,11 @@ def test_audio_import_typed_action_treats_named_field_order_as_semantic(
         "--compact",
         "--facts",
         "--action",
-        "add_import_row",
+        (
+            "add_switch_assigned_import_row"
+            if switch_assigned
+            else "add_import_row"
+        ),
         "--value",
         "object_path",
         "string",
@@ -2014,6 +2021,11 @@ def test_audio_import_typed_action_treats_named_field_order_as_semantic(
         "import_language",
         "string",
         "SFX",
+        *(
+            ("--assignment", "switch", "Rain")
+            if switch_assigned
+            else ()
+        ),
     )
     reordered_named_fields = (
         *fixed,

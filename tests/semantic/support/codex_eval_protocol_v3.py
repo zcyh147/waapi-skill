@@ -352,7 +352,11 @@ def build_audio_import_composer_transaction_steps(
         switch_assignment = row_fields.pop("switch_assignment", None)
         action = {
             "contract": OPERATION_DRAFT_ACTION_CONTRACT,
-            "action": "add_import_row",
+            "action": (
+                "add_switch_assigned_import_row"
+                if has_switch_assignment
+                else "add_import_row"
+            ),
             **row_fields,
         }
         if has_switch_assignment:

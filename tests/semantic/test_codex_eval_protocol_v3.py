@@ -155,11 +155,14 @@ def test_audio_import_switch_assignment_is_explicit_on_the_single_row_action() -
     ]
 
     row = actions[-1]
-    assert row["action"] == "add_import_row"
+    assert row["action"] == "add_switch_assigned_import_row"
     assert row["assignment"] == {"mode": "switch", "value": switch_assignment}
     assert "switch_assignment" not in row
     assert sum(
-        action["action"] == "add_import_row"
+        action["action"] in {
+            "add_import_row",
+            "add_switch_assigned_import_row",
+        }
         for action in actions
     ) == 1
 
