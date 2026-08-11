@@ -274,7 +274,7 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
                 "contract": ACTION_CONTRACT,
                 "action": "add_import_row",
             },
-            "required_fields": ["object_path"],
+            "required_fields": ["object_path", "switch_assignment"],
             "optional_fields": [
                 "audio_file",
                 "audio_file_base64",
@@ -288,13 +288,14 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
                 "originals_subfolder",
                 "properties",
                 "references",
-                "switch_assignment",
             ],
             "construction_discipline": {
                 "initial_action": "add_import_row",
                 "switch_assignment": {
-                    "when_requested": "include_on_initial_row",
-                    "when_absent": "omit",
+                    "decision_field_required": True,
+                    "assigned": "exact_user_requested_string",
+                    "unassigned": "null",
+                    "null_materializes_as": "omitted_canonical_field",
                     "never_guess": True,
                 },
                 "include_every_known_field": True,
@@ -423,8 +424,10 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
     assert contract["flat_import_row_discipline"] == {
         "initial_action": "add_import_row",
         "switch_assignment": {
-            "when_requested": "include_on_initial_row",
-            "when_absent": "omit",
+            "decision_field_required": True,
+            "assigned": "exact_user_requested_string",
+            "unassigned": "null",
+            "null_materializes_as": "omitted_canonical_field",
             "never_guess": True,
         },
         "include_every_known_field": True,
@@ -469,12 +472,15 @@ def test_audio_import_exposes_one_row_action_for_assigned_and_unassigned_rows(
     assert "add_switch_assigned_import_row" not in contract["actions"]
     assert "add_switch_assigned_import_row" not in contract["action_shapes"]
     row = contract["action_shapes"]["add_import_row"]
-    assert "switch_assignment" in row["optional_fields"]
+    assert row["required_fields"] == ["object_path", "switch_assignment"]
+    assert "switch_assignment" not in row["optional_fields"]
     assert contract["flat_import_row_discipline"] == {
         "initial_action": "add_import_row",
         "switch_assignment": {
-            "when_requested": "include_on_initial_row",
-            "when_absent": "omit",
+            "decision_field_required": True,
+            "assigned": "exact_user_requested_string",
+            "unassigned": "null",
+            "null_materializes_as": "omitted_canonical_field",
             "never_guess": True,
         },
         "include_every_known_field": True,
@@ -511,6 +517,7 @@ def test_base_audio_import_media_row_materializes_existing_canonical_request(
             audio_file=str(source),
             object_type="Sound SFX",
             import_language="SFX",
+            switch_assignment=None,
         ),
     )
 
@@ -553,6 +560,48 @@ def test_base_audio_import_media_row_materializes_existing_canonical_request(
     }
 
 
+def test_audio_import_row_requires_an_explicit_assignment_decision_atomically(
+    tmp_path: Path,
+) -> None:
+    _code, started = _execute(tmp_path, "draft-start", "audio.import")
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    record_path = (
+        tmp_path
+        / "state"
+        / "operation-drafts-v1"
+        / "records"
+        / f"{draft_id}.json"
+    )
+    before = record_path.read_bytes()
+
+    exit_code, rejected = _execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--action-json",
+        _action(
+            "add_import_row",
+            object_path=(
+                r"\Actor-Mixer Hierarchy\Default Work Unit\Composer\Container"
+            ),
+            object_type="RandomSequenceContainer",
+        ),
+    )
+
+    assert exit_code == 2
+    assert rejected["error_code"] == OperationComposerError.error_code
+    assert rejected["details"] == {
+        "missing": ["switch_assignment"],
+        "unexpected": [],
+    }
+    assert record_path.read_bytes() == before
+
+
 @pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
 def test_audio_import_row_actions_disclose_complete_structure_and_media_facts(
     version: str,
@@ -560,8 +609,8 @@ def test_audio_import_row_actions_disclose_complete_structure_and_media_facts(
     contract = operation_composer_contract("audio.import", version)
 
     row = contract["action_shapes"]["add_import_row"]
-    assert row["required_fields"] == ["object_path"]
-    assert "switch_assignment" in row["optional_fields"]
+    assert row["required_fields"] == ["object_path", "switch_assignment"]
+    assert "switch_assignment" not in row["optional_fields"]
     assert row["conditional_required_fields"] == [
         {
             "when": "every_row",
@@ -611,6 +660,7 @@ def test_audio_import_media_row_without_explicit_language_is_atomic(
             ),
             object_type="Sound SFX",
             audio_file=str(source),
+            switch_assignment=None,
         ),
     )
 
@@ -690,6 +740,7 @@ def test_base_audio_import_structure_row_is_correctable_by_stable_handle(
                 r"\Actor-Mixer Hierarchy\Default Work Unit\Composer\Container"
             ),
             object_type="RandomSequenceContainer",
+            switch_assignment=None,
         ),
     )
     assert added_code == 0
@@ -905,6 +956,7 @@ def test_complete_audio_import_inline_media_is_bounded_and_not_echoed(
             object_type="Sound SFX",
             audio_file_base64=encoded,
             import_language="SFX",
+            switch_assignment=None,
         ),
     )
 
@@ -1075,31 +1127,41 @@ def test_larger_audio_action_parser_does_not_expand_object_set_action_limit(
 @pytest.mark.parametrize(
     "invalid_action",
     (
-        _action("add_import_row", object_path="relative\\Rain", object_type="Sound SFX"),
+        _action(
+            "add_import_row",
+            object_path="relative\\Rain",
+            object_type="Sound SFX",
+            switch_assignment=None,
+        ),
         _action(
             "add_import_row",
             object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
             audio_file=7,
+            switch_assignment=None,
         ),
         _action(
             "add_import_row",
             object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
             import_language="",
+            switch_assignment=None,
         ),
         _action(
             "add_import_row",
             object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
             event={"path": r"\Not Events\Play_Rain"},
+            switch_assignment=None,
         ),
         _action(
             "add_import_row",
             object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
             properties=[{"name": "@Volume", "value": -3.0}],
+            switch_assignment=None,
         ),
         _action(
             "add_import_row",
             object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
             native_args={"@Volume": -3},
+            switch_assignment=None,
         ),
         _action(
             "add_switch_assigned_import_row",
@@ -1217,6 +1279,7 @@ def _complete_media_draft(
             audio_file=str(source),
             object_type="Sound SFX",
             import_language="SFX",
+            switch_assignment=None,
         ),
     )
     request = OperationDraftStore(root / "state").materialize_request(
@@ -1479,6 +1542,7 @@ def test_base_audio_import_unknown_structure_type_fails_check_atomically(
                 r"\Actor-Mixer Hierarchy\Default Work Unit\Composer\Unknown"
             ),
             object_type="UnreviewedContainer",
+            switch_assignment=None,
         ),
     )
     assert apply_code == 0, applied

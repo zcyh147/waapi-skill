@@ -759,6 +759,64 @@ class ResponseBinding:
     pointer: str
 
 
+@dataclass(frozen=True, slots=True)
+class ExactArgumentAlternatives:
+    """Accept exactly one member of a closed argv spelling set."""
+
+    values: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.values, tuple)
+            or len(self.values) < 2
+            or any(
+                not isinstance(value, str)
+                or not value
+                or value != value.strip()
+                or len(value) > 4096
+                for value in self.values
+            )
+            or len(set(self.values)) != len(self.values)
+        ):
+            raise ValueError(
+                "ExactArgumentAlternatives.values must contain at least two unique bounded exact strings"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class ResponseBindingOrExactArgument:
+    """Accept a prior scalar binding or one sealed exact equivalent.
+
+    This is for a read-only identity hop whose prior exact selector and returned
+    scalar both name the same runtime-validated object.  It does not admit an
+    arbitrary third spelling.
+    """
+
+    binding: ResponseBinding
+    exact_values: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.binding, ResponseBinding):
+            raise ValueError(
+                "ResponseBindingOrExactArgument.binding must be a ResponseBinding"
+            )
+        if (
+            not isinstance(self.exact_values, tuple)
+            or not self.exact_values
+            or any(
+                not isinstance(value, str)
+                or not value
+                or value != value.strip()
+                or len(value) > 4096
+                for value in self.exact_values
+            )
+            or len(set(self.exact_values)) != len(self.exact_values)
+        ):
+            raise ValueError(
+                "ResponseBindingOrExactArgument.exact_values must contain unique bounded exact strings"
+            )
+
+
 _DRAFT_HANDLE_ARGUMENT_NAMES = frozenset(
     {
         "target_handle",
@@ -1100,12 +1158,14 @@ class DraftActionJsonArgument:
 
 ExpectedArgument = (
     str
+    | ExactArgumentAlternatives
     | SemanticJsonArgument
     | SealedQueryIdentityBoundJsonArgument
     | MetadataQueryArgument
     | BoundedIntegerArgument
     | MetadataBoundJsonArgument
     | ResponseBinding
+    | ResponseBindingOrExactArgument
     | DraftActionJsonArgument
 )
 
@@ -6814,7 +6874,19 @@ class CodexGatewayBroker:
             for index, (supplied, expected) in enumerate(
                 zip(validation_arguments, step.arguments)
             ):
-                if isinstance(expected, str):
+                if isinstance(expected, ExactArgumentAlternatives):
+                    if supplied not in expected.values:
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} argument {index} must match one "
+                            "sealed exact alternative"
+                        )
+                    semantic_values.append(
+                        {
+                            "exact_alternatives": list(expected.values),
+                            "selected": supplied,
+                        }
+                    )
+                elif isinstance(expected, str):
                     if (
                         index not in unordered_return_field_indexes
                         and supplied != expected
@@ -7148,6 +7220,36 @@ class CodexGatewayBroker:
                                 metadata_evidence,
                             )
                         )
+                elif isinstance(expected, ResponseBindingOrExactArgument):
+                    source = self._payloads_by_step.get(expected.binding.step)
+                    if source is None:
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} binding source "
+                            f"{expected.binding.step!r} is unavailable"
+                        )
+                    bound = _json_pointer(source, expected.binding.pointer)
+                    if (
+                        not isinstance(bound, (str, int, float, bool))
+                        or bound is None
+                    ):
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} binding "
+                            f"{expected.binding.pointer!r} is not a scalar argv value"
+                        )
+                    if supplied != str(bound) and supplied not in expected.exact_values:
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} argument {index} does not match "
+                            "the response binding or a sealed exact value"
+                        )
+                    semantic_values.append(
+                        {
+                            "binding": bound,
+                            "exact_values": list(expected.exact_values),
+                            "selected": (
+                                "binding" if supplied == str(bound) else "sealed_exact"
+                            ),
+                        }
+                    )
                 elif isinstance(expected, ResponseBinding):
                     source = self._payloads_by_step.get(expected.step)
                     if (
@@ -8053,6 +8155,7 @@ __all__ = [
     "DraftActionMetadataBinding",
     "DraftActionQueryIdentityBinding",
     "DraftActionResponseBinding",
+    "ExactArgumentAlternatives",
     "ExpectedGatewayStep",
     "GatewayBrokerError",
     "GatewayBrokerEvidence",
@@ -8066,6 +8169,7 @@ __all__ = [
     "OBJECT_SET_SCHEMA_DEFAULTS",
     "ResolvedGatewayInvocation",
     "ResponseBinding",
+    "ResponseBindingOrExactArgument",
     "SealedQueryIdentityBoundJsonArgument",
     "SemanticJsonArgument",
     "SUBSCRIPTION_ACK_CONTRACT",

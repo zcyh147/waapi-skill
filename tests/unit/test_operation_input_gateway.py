@@ -429,7 +429,7 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             "contract": "waapi-skill.operation-draft-action/v1",
             "action": "add_import_row",
         },
-        "required_fields": ["object_path"],
+        "required_fields": ["object_path", "switch_assignment"],
         "optional_fields": [
             "audio_file",
             "audio_file_base64",
@@ -443,13 +443,14 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             "originals_subfolder",
             "properties",
             "references",
-            "switch_assignment",
         ],
         "construction_discipline": {
             "initial_action": "add_import_row",
             "switch_assignment": {
-                "when_requested": "include_on_initial_row",
-                "when_absent": "omit",
+                "decision_field_required": True,
+                "assigned": "exact_user_requested_string",
+                "unassigned": "null",
+                "null_materializes_as": "omitted_canonical_field",
                 "never_guess": True,
             },
             "include_every_known_field": True,

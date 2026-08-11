@@ -32,6 +32,7 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
     DraftActionJsonArgument,
     DraftActionMetadataBinding,
     DraftActionResponseBinding,
+    ExactArgumentAlternatives,
     ExpectedGatewayStep,
     GATEWAY_REQUIRED_ENV,
     GatewayDerivedReferenceActivationAllowance,
@@ -41,6 +42,7 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
     MetadataQueryArgument,
     MetadataTokenProjection,
     ResponseBinding,
+    ResponseBindingOrExactArgument,
     SemanticJsonArgument,
     SHIM_TRUSTED_PYTHON_ENV,
     SUBSCRIPTION_ACK_CONTRACT,
@@ -1202,6 +1204,104 @@ def test_broker_executes_exact_order_with_semantic_json_and_response_bindings(
         assert len(calls) == 4
 
 
+@pytest.mark.parametrize("use_exact_literal", (False, True))
+def test_broker_accepts_bound_or_sealed_exact_argument_without_a_third_form(
+    tmp_path: Path,
+    use_exact_literal: bool,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    request = {"operation": "test.seed"}
+    sealed_path = r"\Events\Default Work Unit\Alarm\Play"
+    steps = (
+        ExpectedGatewayStep(
+            "seed",
+            "preview",
+            ("--request-json", SemanticJsonArgument(request)),
+        ),
+        ExpectedGatewayStep(
+            "children",
+            "query-object",
+            (
+                ExactArgumentAlternatives(("--object-id", "--path")),
+                ResponseBindingOrExactArgument(
+                    binding=ResponseBinding("seed", "/transaction_id"),
+                    exact_values=(sealed_path,),
+                ),
+                "--select",
+                "children",
+            ),
+        ),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        transport="tcp",
+    ) as broker:
+        seeded = run_model_command(
+            broker,
+            ["preview", "--request-json", json.dumps(request)],
+        )
+        assert seeded.returncode == 0
+        selected = sealed_path if use_exact_literal else "tx-dynamic-123"
+        selected_flag = "--path" if use_exact_literal else "--object-id"
+        accepted = run_model_command(
+            broker,
+            ["query-object", selected_flag, selected, "--select", "children"],
+        )
+        assert accepted.returncode == 0
+        assert broker.evidence().passed is True
+
+
+def test_broker_rejects_unsealed_third_argument_form_for_bound_or_exact_value(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    request = {"operation": "test.seed"}
+    steps = (
+        ExpectedGatewayStep(
+            "seed",
+            "preview",
+            ("--request-json", SemanticJsonArgument(request)),
+        ),
+        ExpectedGatewayStep(
+            "children",
+            "query-object",
+            (
+                ExactArgumentAlternatives(("--object-id", "--path")),
+                ResponseBindingOrExactArgument(
+                    binding=ResponseBinding("seed", "/transaction_id"),
+                    exact_values=(r"\Events\Default Work Unit\Alarm\Play",),
+                ),
+                "--select",
+                "children",
+            ),
+        ),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        transport="tcp",
+    ) as broker:
+        assert run_model_command(
+            broker,
+            ["preview", "--request-json", json.dumps(request)],
+        ).returncode == 0
+        rejected = run_model_command(
+            broker,
+            [
+                "query-object",
+                "--object-id",
+                r"\Events\Default Work Unit\Alarm\Decoy",
+                "--select",
+                "children",
+            ],
+        )
+        assert rejected.returncode == 126
+        assert broker.evidence().passed is False
+
+
 def test_broker_executes_typed_draft_actions_with_gateway_response_bindings(
     tmp_path: Path,
 ) -> None:
@@ -1593,6 +1693,26 @@ def test_audio_import_numbered_actions_remain_strictly_ordered(tmp_path: Path) -
         "task_authority": authority,
         "draft": {"draft_id": draft_id, "revision": 1},
     }
+    first_action = steps[first_action_index]
+    assert isinstance(first_action.arguments[-1], DraftActionJsonArgument)
+    assert first_action.arguments[-1].expected["switch_assignment"] is None
+
+    omitted_decision = dict(first_action.arguments[-1].expected)
+    omitted_decision.pop("switch_assignment")
+    omitted_argv = (
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--compact",
+        "--action-json",
+        json.dumps(omitted_decision, separators=(",", ":")),
+    )
+    with pytest.raises(GatewayInvocationError, match="typed Draft action"):
+        broker._validate_step(first_action, omitted_argv)  # noqa: SLF001
+
     second_action = steps[first_action_index + 1]
     out_of_order = (
         "draft-apply",

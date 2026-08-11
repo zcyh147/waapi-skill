@@ -43,12 +43,14 @@ from tests.semantic.support.codex_gateway_broker import (
     DraftActionMetadataBinding,
     DraftActionQueryIdentityBinding,
     DraftActionResponseBinding,
+    ExactArgumentAlternatives,
     ExpectedGatewayStep,
     GatewayDerivedReferenceActivationAllowance,
     MetadataBoundJsonArgument,
     MetadataQueryArgument,
     MetadataTokenProjection,
     ResponseBinding,
+    ResponseBindingOrExactArgument,
     SealedQueryIdentityBoundJsonArgument,
     SemanticJsonArgument,
 )
@@ -583,6 +585,13 @@ def _serialize_step(step: ExpectedGatewayStep) -> dict[str, Any]:
     for item in step.arguments:
         if isinstance(item, str):
             arguments.append({"kind": "literal", "value": item})
+        elif isinstance(item, ExactArgumentAlternatives):
+            arguments.append(
+                {
+                    "kind": "exact_argument_alternatives",
+                    "values": list(item.values),
+                }
+            )
         elif isinstance(item, SealedQueryIdentityBoundJsonArgument):
             cloned = _json_clone(item.expected)
             arguments.append(
@@ -693,6 +702,17 @@ def _serialize_step(step: ExpectedGatewayStep) -> dict[str, Any]:
                     "kind": "response_binding",
                     "step": item.step,
                     "pointer": item.pointer,
+                }
+            )
+        elif isinstance(item, ResponseBindingOrExactArgument):
+            arguments.append(
+                {
+                    "kind": "response_binding_or_exact",
+                    "binding": {
+                        "step": item.binding.step,
+                        "pointer": item.binding.pointer,
+                    },
+                    "exact_values": list(item.exact_values),
                 }
             )
         else:
@@ -1098,10 +1118,56 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
                 raise PromptProvenanceError(
                     "Draft-action JSON protocol argument is invalid"
                 ) from exc
+        elif kind == "exact_argument_alternatives" and set(row) == {
+            "kind",
+            "values",
+        }:
+            values = row.get("values")
+            if not isinstance(values, list):
+                raise PromptProvenanceError(
+                    "exact-argument alternatives are invalid"
+                )
+            try:
+                arguments.append(ExactArgumentAlternatives(tuple(values)))
+            except ValueError as exc:
+                raise PromptProvenanceError(
+                    "exact-argument alternatives are invalid"
+                ) from exc
         elif kind == "response_binding" and set(row) == {"kind", "step", "pointer"}:
             if not isinstance(row.get("step"), str) or not isinstance(row.get("pointer"), str):
                 raise PromptProvenanceError("response-binding protocol argument is invalid")
             arguments.append(ResponseBinding(str(row["step"]), str(row["pointer"])))
+        elif kind == "response_binding_or_exact" and set(row) == {
+            "kind",
+            "binding",
+            "exact_values",
+        }:
+            binding = row.get("binding")
+            exact_values = row.get("exact_values")
+            if (
+                not isinstance(binding, Mapping)
+                or set(binding) != {"step", "pointer"}
+                or not isinstance(binding.get("step"), str)
+                or not isinstance(binding.get("pointer"), str)
+                or not isinstance(exact_values, list)
+            ):
+                raise PromptProvenanceError(
+                    "response-binding-or-exact protocol argument is invalid"
+                )
+            try:
+                arguments.append(
+                    ResponseBindingOrExactArgument(
+                        binding=ResponseBinding(
+                            str(binding["step"]),
+                            str(binding["pointer"]),
+                        ),
+                        exact_values=tuple(exact_values),
+                    )
+                )
+            except ValueError as exc:
+                raise PromptProvenanceError(
+                    "response-binding-or-exact protocol argument is invalid"
+                ) from exc
         else:
             raise PromptProvenanceError("protocol argument fields are not closed")
     allowed = value.get("allowed_exit_codes")
@@ -1937,6 +2003,7 @@ def _audio_import_composer_row_origins(
             key: value
             for key, value in action.items()
             if key not in {"contract", "action"}
+            and not (key == "switch_assignment" and value is None)
         }
         if not _json_equal(action_fields, row):
             raise PromptProvenanceError(

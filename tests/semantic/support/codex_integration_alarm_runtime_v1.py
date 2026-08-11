@@ -28,8 +28,10 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_transaction_protocol,
 )
 from tests.semantic.support.codex_gateway_broker import (
+    ExactArgumentAlternatives,
     ExpectedGatewayStep,
     ResponseBinding,
+    ResponseBindingOrExactArgument,
 )
 from tests.semantic.support.codex_version_layout_v3 import (
     get_codex_version_layout_v3,
@@ -1102,8 +1104,11 @@ def _alarm_protocol(
         _query_step(
             "diag.action",
             source=(
-                "--object-id",
-                ResponseBinding("diag.event", "/objects/0/id"),
+                ExactArgumentAlternatives(("--object-id", "--path")),
+                ResponseBindingOrExactArgument(
+                    binding=ResponseBinding("diag.event", "/objects/0/id"),
+                    exact_values=(fixture_paths.event,),
+                ),
             ),
             selects=("children",),
             take=100,

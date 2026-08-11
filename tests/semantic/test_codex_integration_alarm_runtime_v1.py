@@ -28,7 +28,9 @@ from tests.semantic.support.codex_integration_workflows_v1 import (
     load_integration_workflows_profile,
 )
 from tests.semantic.support.codex_gateway_broker import (
+    ExactArgumentAlternatives,
     ResponseBinding,
+    ResponseBindingOrExactArgument,
     SemanticJsonArgument,
 )
 
@@ -458,9 +460,12 @@ def test_protocol_exposes_six_exact_chain_reads_then_one_standard_transaction(
         "--take" not in step.arguments
         for step in protocol.steps[2:6]
     )
-    assert protocol.steps[1].arguments[1] == ResponseBinding(
-        "diag.event",
-        "/objects/0/id",
+    assert protocol.steps[1].arguments[1] == ResponseBindingOrExactArgument(
+        binding=ResponseBinding("diag.event", "/objects/0/id"),
+        exact_values=(alarm_fixture_paths("2022.1").event,),
+    )
+    assert protocol.steps[1].arguments[0] == ExactArgumentAlternatives(
+        ("--object-id", "--path")
     )
     assert protocol.steps[2].arguments[1] == ResponseBinding(
         "diag.action",

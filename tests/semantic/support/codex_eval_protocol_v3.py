@@ -352,6 +352,7 @@ def build_audio_import_composer_transaction_steps(
             "action": "add_import_row",
             **dict(raw_row),
         }
+        action.setdefault("switch_assignment", None)
         action_specs.append(
             (
                 action,

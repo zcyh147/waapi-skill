@@ -671,6 +671,7 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
             "contract": "waapi-skill.operation-draft-action/v1",
             "action": "add_import_row",
             **row,
+            "switch_assignment": row.get("switch_assignment"),
         }
         for row in imports
     ]

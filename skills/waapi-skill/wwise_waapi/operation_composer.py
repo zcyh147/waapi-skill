@@ -92,7 +92,7 @@ _AUDIO_IMPORT_ACTION_FIELDS: dict[
     "set_import_default": (("name", "value"), ()),
     "clear_import_default": (("name",), ()),
     "add_import_row": (
-        ("object_path",),
+        ("object_path", "switch_assignment"),
         (
             "audio_file",
             "audio_file_base64",
@@ -106,7 +106,6 @@ _AUDIO_IMPORT_ACTION_FIELDS: dict[
             "originals_subfolder",
             "properties",
             "references",
-            "switch_assignment",
         ),
     ),
     "set_import_row_field": (("import_handle", "name", "value"), ()),
@@ -177,8 +176,10 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
         flat_import_row_discipline = {
             "initial_action": "add_import_row",
             "switch_assignment": {
-                "when_requested": "include_on_initial_row",
-                "when_absent": "omit",
+                "decision_field_required": True,
+                "assigned": "exact_user_requested_string",
+                "unassigned": "null",
+                "null_materializes_as": "omitted_canonical_field",
                 "never_guess": True,
             },
             "include_every_known_field": True,
@@ -1606,6 +1607,8 @@ def _apply_audio_import_action(
         fields: dict[str, Any] = {}
         for name in row_field_names:
             if name not in action:
+                continue
+            if name == "switch_assignment" and action[name] is None:
                 continue
             descriptor = _validate_audio_import_fragment(
                 version,

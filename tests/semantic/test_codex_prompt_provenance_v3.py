@@ -36,9 +36,11 @@ from tests.semantic.support.codex_gateway_broker import (
     DraftActionJsonArgument,
     DraftActionMetadataBinding,
     DraftActionResponseBinding,
+    ExactArgumentAlternatives,
     ExpectedGatewayStep,
     MetadataTokenProjection,
     ResponseBinding,
+    ResponseBindingOrExactArgument,
     SemanticJsonArgument,
 )
 from tests.semantic.support.codex_integration_workflows_v1 import (
@@ -1431,6 +1433,17 @@ def test_protocol_strict_round_trip_preserves_all_argument_kinds() -> None:
                 ),
             ),
             ExpectedGatewayStep(
+                name="exact-identity-hop",
+                subcommand="query-object",
+                arguments=(
+                    ExactArgumentAlternatives(("--object-id", "--path")),
+                    ResponseBindingOrExactArgument(
+                        binding=ResponseBinding("preview", "/transaction_id"),
+                        exact_values=(r"\Events\Default Work Unit\Alarm\Play",),
+                    ),
+                ),
+            ),
+            ExpectedGatewayStep(
                 name="confirm",
                 subcommand="confirm",
                 arguments=(
@@ -1440,7 +1453,7 @@ def test_protocol_strict_round_trip_preserves_all_argument_kinds() -> None:
                 ),
             ),
         ),
-        turn_prefix_counts=(1, 3),
+        turn_prefix_counts=(1, 4),
     )
 
     serialized = serialize_protocol(protocol)
@@ -1452,11 +1465,22 @@ def test_protocol_strict_round_trip_preserves_all_argument_kinds() -> None:
         "semantic_json_object_operation_v1"
     )
     assert serialized["steps"][0]["arguments"][3]["kind"] == "semantic_json"
-    assert serialized["steps"][2]["arguments"][2] == {
+    assert serialized["steps"][3]["arguments"][2] == {
         "kind": "response_binding",
         "step": "transaction-show",
         "pointer": "/confirmation/token",
     }
+    assert serialized["steps"][2]["arguments"] == [
+        {
+            "kind": "exact_argument_alternatives",
+            "values": ["--object-id", "--path"],
+        },
+        {
+            "kind": "response_binding_or_exact",
+            "binding": {"step": "preview", "pointer": "/transaction_id"},
+            "exact_values": [r"\Events\Default Work Unit\Alarm\Play"],
+        },
+    ]
 
 
 def test_typed_draft_action_protocol_round_trips_dynamic_handle_bindings() -> None:
