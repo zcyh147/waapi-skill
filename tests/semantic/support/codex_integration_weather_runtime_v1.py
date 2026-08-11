@@ -353,7 +353,7 @@ def prepare_weather_workflow(
             required_tokens=sound_required_tokens,
         )
     )
-    _action_metadata, action_projection = _discover(
+    action_metadata, action_projection = _discover(
         direct,
         object_type="Action",
         queries=ACTION_METADATA_QUERIES,
@@ -366,6 +366,7 @@ def prepare_weather_workflow(
             required_tokens=("Volume",),
         )
     )
+    rtpc_metadata = sound_metadata
 
     import_request = _weather_import_request(
         version,
