@@ -1940,6 +1940,8 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
                         r"\Actor-Mixer Hierarchy\Default Work Unit\Target"
                     ),
                     "audio_file": "/owned/source.wav",
+                    "object_type": "Sound SFX",
+                    "import_language": "SFX",
                     "properties": [
                         {"name": "OverrideOutput", "value": True}
                     ],

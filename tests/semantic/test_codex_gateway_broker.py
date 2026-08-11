@@ -1546,11 +1546,13 @@ def test_audio_import_numbered_actions_remain_strictly_ordered(tmp_path: Path) -
                     "audio_file": "/owned/inputs/a.wav",
                     "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\A",
                     "object_type": "Sound SFX",
+                    "import_language": "SFX",
                 },
                 {
                     "audio_file": "/owned/inputs/b.wav",
                     "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\B",
                     "object_type": "Sound SFX",
+                    "import_language": "SFX",
                 },
             ],
         },
@@ -1953,6 +1955,7 @@ def test_draft_replay_is_scoped_to_the_preview_flow_in_multi_transaction_protoco
                     "audio_file": str(tmp_path / "雪.wav"),
                     "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\雪",
                     "object_type": "Sound SFX",
+                    "import_language": "SFX",
                 }
             ],
         },
@@ -6337,11 +6340,12 @@ def test_weather_limit_two_metadata_step_crosses_broker_validation(
                 "import_operation": "createNew",
                 "imports": [
                     {
-                            "audio_file": "/owned/inputs/rain.wav",
-                            "object_path": (
-                                r"\Actor-Mixer Hierarchy\Default Work Unit\Rain"
-                            ),
+                        "audio_file": "/owned/inputs/rain.wav",
+                        "object_path": (
+                            r"\Actor-Mixer Hierarchy\Default Work Unit\Rain"
+                        ),
                         "object_type": "Sound SFX",
+                        "import_language": "SFX",
                     }
                 ],
             }

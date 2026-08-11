@@ -81,6 +81,7 @@ RIFLE_COMMUTATIVE_COMPOSER_SETUP_STEP_GROUPS = (
         "tx01.action.001",
         "tx01.action.002",
         "tx01.action.003",
+        "tx01.action.004",
     ),
 )
 

@@ -612,6 +612,8 @@ def test_metadata_transaction_protocol_selects_closed_audio_import_equivalence()
                         r"\Actor-Mixer Hierarchy\Default Work Unit\Target"
                     ),
                     "audio_file": "/owned/source.wav",
+                    "object_type": "Sound SFX",
+                    "import_language": "SFX",
                 }
             ],
             "defaults": {

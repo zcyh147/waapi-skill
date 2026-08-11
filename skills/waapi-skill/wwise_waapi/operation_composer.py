@@ -92,7 +92,7 @@ _AUDIO_IMPORT_ACTION_FIELDS: dict[
     "set_import_default": (("name", "value"), ()),
     "clear_import_default": (("name",), ()),
     "add_switch_assigned_import_row": (
-        ("switch_assignment",),
+        ("switch_assignment", "object_path"),
         (
             "audio_file",
             "audio_file_base64",
@@ -102,7 +102,6 @@ _AUDIO_IMPORT_ACTION_FIELDS: dict[
             "import_language",
             "import_location",
             "notes",
-            "object_path",
             "object_type",
             "originals_subfolder",
             "properties",
@@ -110,7 +109,7 @@ _AUDIO_IMPORT_ACTION_FIELDS: dict[
         ),
     ),
     "add_import_row": (
-        (),
+        ("object_path",),
         (
             "audio_file",
             "audio_file_base64",
@@ -120,7 +119,6 @@ _AUDIO_IMPORT_ACTION_FIELDS: dict[
             "import_language",
             "import_location",
             "notes",
-            "object_path",
             "object_type",
             "originals_subfolder",
             "properties",
@@ -287,6 +285,40 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                         "user_fact_checklist": dict(
                             import_row_user_fact_checklist
                         )
+                    }
+                    if action_name
+                    in {"add_import_row", "add_switch_assigned_import_row"}
+                    else {}
+                ),
+                **(
+                    {
+                        "conditional_required_fields": [
+                            {
+                                "when": "every_row",
+                                "require_effective": ["object_type"],
+                                "effective_sources": [
+                                    "row",
+                                    "explicit_defaults",
+                                ],
+                                "reason": (
+                                    "every row requires an explicit object type"
+                                ),
+                            },
+                            {
+                                "when_any_present": [
+                                    "audio_file",
+                                    "audio_file_base64",
+                                ],
+                                "require_effective": ["import_language"],
+                                "effective_sources": [
+                                    "row",
+                                    "explicit_defaults",
+                                ],
+                                "reason": (
+                                    "media rows require an explicit import language"
+                                ),
+                            }
+                        ]
                     }
                     if action_name
                     in {"add_import_row", "add_switch_assigned_import_row"}
@@ -1577,17 +1609,17 @@ def _apply_audio_import_action(
                 AUDIO_IMPORT_COMPOSER_OPERATION, version
             )["registry_fragments"]["supported_row_fields"]
         )
-        switch_assigned = action_name == "add_switch_assigned_import_row"
+        required_action_fields, optional_action_fields = (
+            _AUDIO_IMPORT_ACTION_FIELDS[action_name]
+        )
         _require_allowed_keys(
             action,
             required=(
                 "contract",
                 "action",
-                *(("switch_assignment",) if switch_assigned else ()),
+                *required_action_fields,
             ),
-            optional=tuple(
-                name for name in row_field_names if name != "switch_assignment"
-            ),
+            optional=optional_action_fields,
             label=f"{action_name} action",
         )
         rows = composition["imports"]
@@ -1608,6 +1640,25 @@ def _apply_audio_import_action(
                 payload={"name": name, "value": action[name]},
             )
             fields[descriptor["name"]] = descriptor["value"]
+        defaults = composition["defaults"]
+        assert isinstance(defaults, dict)
+        if "object_type" not in fields and "object_type" not in defaults:
+            raise OperationComposerError(
+                "audio.import rows require an explicit object type.",
+                details={
+                    "missing_fields": ["object_type"],
+                    "row_kind": "structure_or_media",
+                },
+            )
+        if any(name in fields for name in ("audio_file", "audio_file_base64")):
+            if "import_language" not in fields and "import_language" not in defaults:
+                raise OperationComposerError(
+                    "audio.import media rows require an explicit import language.",
+                    details={
+                        "missing_fields": ["import_language"],
+                        "row_kind": "media",
+                    },
+                )
         object_path = fields.get("object_path")
         if isinstance(object_path, str) and any(
             row["fields"].get("object_path") == object_path for row in rows

@@ -429,7 +429,7 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             "contract": "waapi-skill.operation-draft-action/v1",
             "action": "add_import_row",
         },
-        "required_fields": [],
+        "required_fields": ["object_path"],
         "optional_fields": [
             "audio_file",
             "audio_file_base64",
@@ -439,7 +439,6 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             "import_language",
             "import_location",
             "notes",
-            "object_path",
             "object_type",
             "originals_subfolder",
             "properties",
@@ -482,6 +481,20 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             "distinct_metadata_tokens_are_independent_facts": True,
             "requested_switch_assignment_is_not_a_later_action": True,
         },
+        "conditional_required_fields": [
+            {
+                "when": "every_row",
+                "require_effective": ["object_type"],
+                "effective_sources": ["row", "explicit_defaults"],
+                "reason": "every row requires an explicit object type",
+            },
+            {
+                "when_any_present": ["audio_file", "audio_file_base64"],
+                "require_effective": ["import_language"],
+                "effective_sources": ["row", "explicit_defaults"],
+                "reason": "media rows require an explicit import language",
+            },
+        ],
     }
     assert schema["composer"]["action_shapes"][
         "add_switch_assigned_import_row"
@@ -490,7 +503,7 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             "contract": "waapi-skill.operation-draft-action/v1",
             "action": "add_switch_assigned_import_row",
         },
-        "required_fields": ["switch_assignment"],
+        "required_fields": ["switch_assignment", "object_path"],
         "optional_fields": [
             "audio_file",
             "audio_file_base64",
@@ -500,7 +513,6 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             "import_language",
             "import_location",
             "notes",
-            "object_path",
             "object_type",
             "originals_subfolder",
             "properties",
@@ -512,6 +524,9 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         "user_fact_checklist": schema["composer"]["action_shapes"][
             "add_import_row"
         ]["user_fact_checklist"],
+        "conditional_required_fields": schema["composer"]["action_shapes"][
+            "add_import_row"
+        ]["conditional_required_fields"],
     }
     assert schema["composer"]["planning_discipline"][
         "dynamic_metadata"

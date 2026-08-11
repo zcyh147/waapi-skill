@@ -274,7 +274,7 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
                 "contract": ACTION_CONTRACT,
                 "action": "add_import_row",
             },
-            "required_fields": [],
+            "required_fields": ["object_path"],
             "optional_fields": [
                 "audio_file",
                 "audio_file_base64",
@@ -284,7 +284,6 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
                 "import_language",
                 "import_location",
                 "notes",
-                "object_path",
                 "object_type",
                 "originals_subfolder",
                 "properties",
@@ -329,13 +328,30 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
                 "distinct_metadata_tokens_are_independent_facts": True,
                 "requested_switch_assignment_is_not_a_later_action": True,
             },
+            "conditional_required_fields": [
+                {
+                    "when": "every_row",
+                    "require_effective": ["object_type"],
+                    "effective_sources": ["row", "explicit_defaults"],
+                    "reason": "every row requires an explicit object type",
+                },
+                {
+                    "when_any_present": ["audio_file", "audio_file_base64"],
+                    "require_effective": ["import_language"],
+                    "effective_sources": ["row", "explicit_defaults"],
+                    "reason": "media rows require an explicit import language",
+                }
+            ],
         },
         "add_switch_assigned_import_row": {
             "fixed_fields": {
                 "contract": ACTION_CONTRACT,
                 "action": "add_switch_assigned_import_row",
             },
-            "required_fields": ["switch_assignment"],
+            "required_fields": [
+                "switch_assignment",
+                "object_path",
+            ],
             "optional_fields": [
                 "audio_file",
                 "audio_file_base64",
@@ -345,7 +361,6 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
                 "import_language",
                 "import_location",
                 "notes",
-                "object_path",
                 "object_type",
                 "originals_subfolder",
                 "properties",
@@ -390,6 +405,20 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
                 "distinct_metadata_tokens_are_independent_facts": True,
                 "requested_switch_assignment_is_not_a_later_action": True,
             },
+            "conditional_required_fields": [
+                {
+                    "when": "every_row",
+                    "require_effective": ["object_type"],
+                    "effective_sources": ["row", "explicit_defaults"],
+                    "reason": "every row requires an explicit object type",
+                },
+                {
+                    "when_any_present": ["audio_file", "audio_file_base64"],
+                    "require_effective": ["import_language"],
+                    "effective_sources": ["row", "explicit_defaults"],
+                    "reason": "media rows require an explicit import language",
+                }
+            ],
         },
         "set_import_row_field": {
             "fixed_fields": {
@@ -593,6 +622,82 @@ def test_base_audio_import_media_row_materializes_existing_canonical_request(
             "import_operation": "createNew",
         },
     }
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_audio_import_row_actions_disclose_complete_structure_and_media_facts(
+    version: str,
+) -> None:
+    contract = operation_composer_contract("audio.import", version)
+
+    ordinary = contract["action_shapes"]["add_import_row"]
+    switched = contract["action_shapes"]["add_switch_assigned_import_row"]
+    assert ordinary["required_fields"] == ["object_path"]
+    assert switched["required_fields"] == [
+        "switch_assignment",
+        "object_path",
+    ]
+    assert ordinary["conditional_required_fields"] == switched[
+        "conditional_required_fields"
+    ] == [
+        {
+            "when": "every_row",
+            "require_effective": ["object_type"],
+            "effective_sources": ["row", "explicit_defaults"],
+            "reason": "every row requires an explicit object type",
+        },
+        {
+            "when_any_present": ["audio_file", "audio_file_base64"],
+            "require_effective": ["import_language"],
+            "effective_sources": ["row", "explicit_defaults"],
+            "reason": "media rows require an explicit import language",
+        }
+    ]
+
+
+def test_audio_import_media_row_without_explicit_language_is_atomic(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.wav"
+    source.write_bytes(b"RIFF\x04\x00\x00\x00WAVE")
+    _code, started = _execute(tmp_path, "draft-start", "audio.import")
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    record_path = (
+        tmp_path
+        / "state"
+        / "operation-drafts-v1"
+        / "records"
+        / f"{draft_id}.json"
+    )
+    before = record_path.read_bytes()
+
+    exit_code, rejected = _execute(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--action-json",
+        _action(
+            "add_import_row",
+            object_path=(
+                r"\Actor-Mixer Hierarchy\Default Work Unit\Composer\Rain"
+            ),
+            object_type="Sound SFX",
+            audio_file=str(source),
+        ),
+    )
+
+    assert exit_code == 2
+    assert rejected["error_code"] == OperationComposerError.error_code
+    assert rejected["details"] == {
+        "missing_fields": ["import_language"],
+        "row_kind": "media",
+    }
+    assert record_path.read_bytes() == before
 
 
 def test_switch_assignment_requires_the_dedicated_initial_row_action(
