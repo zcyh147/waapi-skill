@@ -79,6 +79,8 @@ RIFLE_COMMUTATIVE_COMPOSER_SETUP_STEP_GROUPS = (
         "metadata.discover",
         "tx01.draft-start",
         "tx01.action.001",
+        "tx01.action.002",
+        "tx01.action.003",
     ),
 )
 

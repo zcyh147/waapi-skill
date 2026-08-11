@@ -879,7 +879,7 @@ def test_rifle_preamble_accepts_only_declared_dependency_safe_orders(
     version: str,
 ) -> None:
     prepared, _fake, _runtime = _prepared(tmp_path, version=version)
-    canonical = tuple(step.name for step in prepared.protocol.steps[:4])
+    canonical = tuple(step.name for step in prepared.protocol.steps[:7])
     groups = prepared.protocol.commutative_read_only_step_groups
     setup_groups = prepared.protocol.commutative_composer_setup_step_groups
 
@@ -888,6 +888,9 @@ def test_rifle_preamble_accepts_only_declared_dependency_safe_orders(
         "metadata.discover",
         "tx01.draft-start",
         "tx01.action.001",
+        "tx01.action.002",
+        "tx01.action.003",
+        "tx01.action.004",
     )
     assert gateway_step_sequence_matches(
         canonical, canonical, groups, setup_groups
@@ -899,6 +902,9 @@ def test_rifle_preamble_accepts_only_declared_dependency_safe_orders(
             "tx01.operation-schema",
             "tx01.draft-start",
             "tx01.action.001",
+            "tx01.action.002",
+            "tx01.action.003",
+            "tx01.action.004",
         ),
         groups,
         setup_groups,
@@ -910,6 +916,9 @@ def test_rifle_preamble_accepts_only_declared_dependency_safe_orders(
             "tx01.draft-start",
             "metadata.discover",
             "tx01.action.001",
+            "tx01.action.002",
+            "tx01.action.003",
+            "tx01.action.004",
         ),
         groups,
         setup_groups,
@@ -920,6 +929,26 @@ def test_rifle_preamble_accepts_only_declared_dependency_safe_orders(
             "tx01.operation-schema",
             "tx01.draft-start",
             "tx01.action.001",
+            "tx01.action.002",
+            "tx01.action.003",
+            "metadata.discover",
+            "tx01.action.004",
+        ),
+        groups,
+        setup_groups,
+    )
+
+    # The final row carries Volume and OutputBus, so metadata may not move
+    # beyond that first metadata-bound action.
+    assert not gateway_step_sequence_matches(
+        canonical,
+        (
+            "tx01.operation-schema",
+            "tx01.draft-start",
+            "tx01.action.001",
+            "tx01.action.002",
+            "tx01.action.003",
+            "tx01.action.004",
             "metadata.discover",
         ),
         groups,
@@ -954,6 +983,9 @@ def test_rifle_preamble_accepts_only_declared_dependency_safe_orders(
             "tx01.draft-start",
             "tx01.operation-schema",
             "tx01.action.001",
+            "tx01.action.002",
+            "tx01.action.003",
+            "tx01.action.004",
         ),
         groups,
         setup_groups,
@@ -965,6 +997,9 @@ def test_rifle_preamble_accepts_only_declared_dependency_safe_orders(
             "tx01.operation-schema",
             "metadata.discover",
             "tx01.action.001",
+            "tx01.action.002",
+            "tx01.action.003",
+            "tx01.action.004",
         ),
         groups,
         setup_groups,
@@ -972,7 +1007,7 @@ def test_rifle_preamble_accepts_only_declared_dependency_safe_orders(
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-def test_rifle_three_step_setup_group_round_trips_prompt_provenance(
+def test_rifle_metadata_free_setup_group_round_trips_prompt_provenance(
     tmp_path: Path,
     version: str,
 ) -> None:
@@ -1051,8 +1086,8 @@ def test_rifle_observer_rejects_duplicate_or_incomplete_read_pair(
     incomplete, _fake, _runtime = _prepared(incomplete_root)
     operation_schema = incomplete.protocol.steps[0]
     draft_start = incomplete.protocol.steps[2]
-    first_action = incomplete.protocol.steps[3]
-    first_metadata_bound_action = incomplete.protocol.steps[4]
+    metadata_free_actions = incomplete.protocol.steps[3:6]
+    first_metadata_bound_action = incomplete.protocol.steps[6]
     incomplete.observe_payload(
         operation_schema,
         {"ok": True, "command": operation_schema.subcommand},
@@ -1061,10 +1096,11 @@ def test_rifle_observer_rejects_duplicate_or_incomplete_read_pair(
         draft_start,
         {"ok": True, "command": draft_start.subcommand},
     )
-    incomplete.observe_payload(
-        first_action,
-        {"ok": True, "command": first_action.subcommand},
-    )
+    for action in metadata_free_actions:
+        incomplete.observe_payload(
+            action,
+            {"ok": True, "command": action.subcommand},
+        )
     with pytest.raises(
         RifleIntegrationRuntimeError,
         match="duplicated or observed out of order",
