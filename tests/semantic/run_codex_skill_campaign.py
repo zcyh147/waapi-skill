@@ -13445,7 +13445,7 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         default="medium",
     )
     parser.add_argument("--service-tier")
-    parser.add_argument("--timeout", type=float, default=240.0)
+    parser.add_argument("--timeout", type=float)
     parser.add_argument("--case-id", action="append", default=[])
     parser.add_argument("--version", action="append", choices=SUPPORTED_VERSIONS, default=[])
     parser.add_argument("--pair-id", action="append", default=[])
@@ -13459,10 +13459,19 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     is_integration_v1 = args.profile == INTEGRATION_WORKFLOWS_V1_PROFILE_ID
     is_integration_v2 = args.profile == INTEGRATION_WORKFLOWS_V2_PROFILE_ID
     is_integration = args.profile == INTEGRATION_PROFILE_ID
+    timeout_seconds = (
+        float(args.timeout)
+        if args.timeout is not None
+        else (
+            matrix.INTEGRATION_CODEX_TIMEOUT_SECONDS
+            if is_integration
+            else matrix.DEFAULT_CODEX_TIMEOUT_SECONDS
+        )
+    )
     is_terra_v3 = args.profile in TERRA_LOCKED_V3_PROFILE_IDS
     if args.verify_only and not args.resume:
         parser.error("--verify-only requires --resume")
-    if args.timeout <= 0 or args.lock_timeout <= 0:
+    if timeout_seconds <= 0 or args.lock_timeout <= 0:
         parser.error("--timeout and --lock-timeout must be greater than zero")
     if args.max_pre_action_retries < 0:
         parser.error("--max-pre-action-retries must be zero or greater")
@@ -13565,7 +13574,7 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         model=str(model),
         reasoning_effort=str(args.reasoning_effort),
         service_tier=str(service_tier),
-        timeout_seconds=float(args.timeout),
+        timeout_seconds=timeout_seconds,
         case_ids=case_ids,
         versions=tuple(str(value) for value in args.version),
         pair_ids=tuple(str(value) for value in args.pair_id),

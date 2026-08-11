@@ -201,6 +201,8 @@ COMPOUND_HEAVY_V1_PROFILE_ID = "compound_heavy_cross_version_24"
 INTEGRATION_WORKFLOWS_V1_PROFILE_ID = "integration_workflows_cross_version_6"
 INTEGRATION_WORKFLOWS_V2_PROFILE_ID = "integration_workflows_v2_cross_version_6"
 INTEGRATION_PROFILE_ID = "integration"
+DEFAULT_CODEX_TIMEOUT_SECONDS = 240.0
+INTEGRATION_CODEX_TIMEOUT_SECONDS = 360.0
 EXECUTABLE_V3_PROFILE_IDS = frozenset(
     {
         HEAVY_V3_PROFILE_ID,
@@ -3442,7 +3444,7 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         default="medium",
     )
     parser.add_argument("--service-tier")
-    parser.add_argument("--timeout", type=float, default=240.0)
+    parser.add_argument("--timeout", type=float)
     parser.add_argument("--case-id", action="append", default=[])
     parser.add_argument("--version", action="append", choices=SUPPORTED_VERSIONS, default=[])
     parser.add_argument("--pair-id", action="append", default=[])
@@ -3459,6 +3461,15 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     is_integration_v1 = args.profile == INTEGRATION_WORKFLOWS_V1_PROFILE_ID
     is_integration_v2 = args.profile == INTEGRATION_WORKFLOWS_V2_PROFILE_ID
     is_integration = args.profile == INTEGRATION_PROFILE_ID
+    timeout_seconds = (
+        float(args.timeout)
+        if args.timeout is not None
+        else (
+            INTEGRATION_CODEX_TIMEOUT_SECONDS
+            if is_integration
+            else DEFAULT_CODEX_TIMEOUT_SECONDS
+        )
+    )
     is_terra_v3 = (
         is_policy_v3
         or is_compound_v1
@@ -3466,7 +3477,7 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         or is_integration_v2
         or is_integration
     )
-    if args.timeout <= 0:
+    if timeout_seconds <= 0:
         parser.error("--timeout must be greater than zero")
     if len(set(args.version)) != len(args.version):
         parser.error("--version values must be unique")
@@ -3589,7 +3600,7 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         model=str(model),
         reasoning_effort=str(args.reasoning_effort),
         service_tier=str(service_tier),
-        timeout_seconds=float(args.timeout),
+        timeout_seconds=timeout_seconds,
         case_ids=case_ids,
         versions=tuple(str(value) for value in args.version),
         pair_ids=tuple(str(value) for value in args.pair_id),

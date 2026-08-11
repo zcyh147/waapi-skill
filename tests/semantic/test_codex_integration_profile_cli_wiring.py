@@ -95,6 +95,8 @@ def test_public_cli_defaults_are_locked_and_legacy_defaults_are_unchanged(
         campaign_options.reasoning_effort,
         campaign_options.service_tier,
     ) == ("gpt-5.6-terra", "medium", "default")
+    assert matrix_options.timeout_seconds == 360.0
+    assert campaign_options.timeout_seconds == 360.0
 
     for profile_id, suite_path, iteration_root in (
         (
@@ -117,6 +119,31 @@ def test_public_cli_defaults_are_locked_and_legacy_defaults_are_unchanged(
         )
         assert legacy.suite_path == suite_path.resolve()
         assert legacy.iteration_root == iteration_root.resolve()
+        assert legacy.timeout_seconds == 240.0
+
+
+@pytest.mark.parametrize("surface", ("matrix", "campaign"))
+def test_public_integration_explicit_timeout_override_is_preserved(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    surface: str,
+) -> None:
+    monkeypatch.setattr(
+        matrix,
+        "resolve_codex_binary",
+        lambda value: Path(str(value)).resolve(),
+    )
+    argv = (
+        _matrix_args(tmp_path / "matrix", "--timeout", "275.5")
+        if surface == "matrix"
+        else _campaign_args(tmp_path / "campaign", "--timeout", "275.5")
+    )
+
+    options = (matrix.parse_args if surface == "matrix" else campaign.parse_args)(
+        argv
+    )
+
+    assert options.timeout_seconds == 275.5
 
 
 @pytest.mark.parametrize("surface", ("matrix", "campaign"))
