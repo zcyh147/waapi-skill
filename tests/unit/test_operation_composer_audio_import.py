@@ -221,6 +221,13 @@ def _live_execute(
 
 
 def _action(action_name: str, **fields: Any) -> str:
+    if action_name == "add_import_row" and "switch_assignment" in fields:
+        assignment = fields["switch_assignment"]
+        fields["switch_assignment"] = (
+            {"mode": "no_assignment_requested"}
+            if assignment is None
+            else {"mode": "assign_requested_value", "value": assignment}
+        )
     return json.dumps(
         {"contract": ACTION_CONTRACT, "action": action_name, **fields},
         ensure_ascii=False,
@@ -291,18 +298,17 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
             ],
             "construction_discipline": {
                 "initial_action": "add_import_row",
-                "switch_assignment": {
-                    "decision_field_required": True,
-                    "assigned": "exact_user_requested_string",
-                    "unassigned": "null",
-                    "requested_assignment": (
-                        "exact_nonempty_user_requested_string"
-                    ),
-                    "explicit_no_assignment": "null",
-                    "null_does_not_assign": True,
-                    "null_materializes_as": "omitted_canonical_field",
-                    "never_guess": True,
+            "switch_assignment": {
+                "decision_field_required": True,
+                "assigned": {
+                    "mode": "assign_requested_value",
+                    "value": "exact_nonempty_user_requested_string",
                 },
+                "unassigned": {"mode": "no_assignment_requested"},
+                "raw_string_or_null_invalid": True,
+                "none_materializes_as": "omitted_canonical_field",
+                "never_guess": True,
+            },
                 "include_every_known_field": True,
                 "split_initial_row_across_follow_up_actions": False,
                 "follow_up_row_actions": "corrections_only",
@@ -430,12 +436,13 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
         "initial_action": "add_import_row",
         "switch_assignment": {
             "decision_field_required": True,
-            "assigned": "exact_user_requested_string",
-            "unassigned": "null",
-            "requested_assignment": "exact_nonempty_user_requested_string",
-            "explicit_no_assignment": "null",
-            "null_does_not_assign": True,
-            "null_materializes_as": "omitted_canonical_field",
+            "assigned": {
+                "mode": "assign_requested_value",
+                "value": "exact_nonempty_user_requested_string",
+            },
+            "unassigned": {"mode": "no_assignment_requested"},
+            "raw_string_or_null_invalid": True,
+            "none_materializes_as": "omitted_canonical_field",
             "never_guess": True,
         },
         "include_every_known_field": True,
@@ -483,21 +490,23 @@ def test_audio_import_exposes_one_row_action_for_assigned_and_unassigned_rows(
     assert row["required_fields"] == ["object_path", "switch_assignment"]
     assert "switch_assignment" not in row["optional_fields"]
     decision = row["construction_discipline"]["switch_assignment"]
-    assert decision["requested_assignment"] == (
-        "exact_nonempty_user_requested_string"
-    )
-    assert decision["explicit_no_assignment"] == "null"
-    assert decision["null_does_not_assign"] is True
+    assert decision["assigned"] == {
+        "mode": "assign_requested_value",
+        "value": "exact_nonempty_user_requested_string",
+    }
+    assert decision["unassigned"] == {"mode": "no_assignment_requested"}
+    assert decision["raw_string_or_null_invalid"] is True
     assert contract["flat_import_row_discipline"] == {
         "initial_action": "add_import_row",
         "switch_assignment": {
             "decision_field_required": True,
-            "assigned": "exact_user_requested_string",
-            "unassigned": "null",
-            "requested_assignment": "exact_nonempty_user_requested_string",
-            "explicit_no_assignment": "null",
-            "null_does_not_assign": True,
-            "null_materializes_as": "omitted_canonical_field",
+            "assigned": {
+                "mode": "assign_requested_value",
+                "value": "exact_nonempty_user_requested_string",
+            },
+            "unassigned": {"mode": "no_assignment_requested"},
+            "raw_string_or_null_invalid": True,
+            "none_materializes_as": "omitted_canonical_field",
             "never_guess": True,
         },
         "include_every_known_field": True,
@@ -865,7 +874,10 @@ def test_complete_audio_import_adapter_materializes_every_registry_field(
         audio_source_notes="source notes",
         event={"path": r"\Events\Default Work Unit\Play_Full", "action": "Play"},
         dialogue_event="DialogueEvent:Full",
-        switch_assignment="Mud",
+        switch_assignment={
+            "mode": "assign_requested_value",
+            "value": "Mud",
+        },
         properties=[{"name": "Pitch", "value": 2.0}],
         references=[
             {
@@ -1144,6 +1156,28 @@ def test_larger_audio_action_parser_does_not_expand_object_set_action_limit(
 @pytest.mark.parametrize(
     "invalid_action",
     (
+        json.dumps(
+            {
+                "contract": ACTION_CONTRACT,
+                "action": "add_import_row",
+                "object_path": (
+                    r"\Actor-Mixer Hierarchy\Default Work Unit\Rain"
+                ),
+                "object_type": "Sound SFX",
+                "switch_assignment": None,
+            }
+        ),
+        json.dumps(
+            {
+                "contract": ACTION_CONTRACT,
+                "action": "add_import_row",
+                "object_path": (
+                    r"\Actor-Mixer Hierarchy\Default Work Unit\Rain"
+                ),
+                "object_type": "Sound SFX",
+                "switch_assignment": "Snow",
+            }
+        ),
         _action(
             "add_import_row",
             object_path="relative\\Rain",

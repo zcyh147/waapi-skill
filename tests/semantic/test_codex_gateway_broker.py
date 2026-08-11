@@ -1696,7 +1696,9 @@ def test_audio_import_numbered_actions_remain_strictly_ordered(tmp_path: Path) -
     }
     first_action = steps[first_action_index]
     assert isinstance(first_action.arguments[-1], DraftActionJsonArgument)
-    assert first_action.arguments[-1].expected["switch_assignment"] is None
+    assert first_action.arguments[-1].expected["switch_assignment"] == {
+        "mode": "no_assignment_requested"
+    }
 
     omitted_decision = dict(first_action.arguments[-1].expected)
     omitted_decision.pop("switch_assignment")

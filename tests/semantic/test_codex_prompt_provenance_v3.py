@@ -1969,6 +1969,7 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
                     "audio_file": native_absolute_test_path("audio", "source.wav"),
                     "object_type": "Sound SFX",
                     "import_language": "SFX",
+                    "switch_assignment": "Rain",
                     "properties": [
                         {"name": "OverrideOutput", "value": True}
                     ],
@@ -2036,6 +2037,18 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
         and step["arguments"][-1].get("metadata_binding") is not None
     ]
     assert len(serialized_metadata_rows) == 2
+    serialized_row = next(
+        step["arguments"][-1]["value"]
+        for step in serialized["steps"]
+        if step["subcommand"] == "draft-apply"
+        and step["arguments"][-1].get("kind") == "draft_action_json"
+        and step["arguments"][-1]["value"].get("action")
+        == "add_import_row"
+    )
+    assert serialized_row["switch_assignment"] == {
+        "mode": "assign_requested_value",
+        "value": "Rain",
+    }
     assert deserialize_protocol(serialized) == protocol
     gateway_authored_request = {
         **request,

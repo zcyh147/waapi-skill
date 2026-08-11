@@ -177,12 +177,13 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             "initial_action": "add_import_row",
             "switch_assignment": {
                 "decision_field_required": True,
-                "assigned": "exact_user_requested_string",
-                "unassigned": "null",
-                "requested_assignment": "exact_nonempty_user_requested_string",
-                "explicit_no_assignment": "null",
-                "null_does_not_assign": True,
-                "null_materializes_as": "omitted_canonical_field",
+                "assigned": {
+                    "mode": "assign_requested_value",
+                    "value": "exact_nonempty_user_requested_string",
+                },
+                "unassigned": {"mode": "no_assignment_requested"},
+                "raw_string_or_null_invalid": True,
+                "none_materializes_as": "omitted_canonical_field",
                 "never_guess": True,
             },
             "include_every_known_field": True,
@@ -1611,12 +1612,15 @@ def _apply_audio_import_action(
         for name in row_field_names:
             if name not in action:
                 continue
-            if name == "switch_assignment" and action[name] is None:
-                continue
+            value = action[name]
+            if name == "switch_assignment":
+                value = _audio_import_switch_assignment_value(value)
+                if value is None:
+                    continue
             descriptor = _validate_audio_import_fragment(
                 version,
                 fragment="row_field",
-                payload={"name": name, "value": action[name]},
+                payload={"name": name, "value": value},
             )
             fields[descriptor["name"]] = descriptor["value"]
         defaults = composition["defaults"]
@@ -1707,6 +1711,36 @@ def _apply_audio_import_action(
                 AUDIO_IMPORT_COMPOSER_OPERATION, version
             )["actions"],
         },
+    )
+
+
+def _audio_import_switch_assignment_value(value: Any) -> str | None:
+    """Resolve one explicit assign/none decision without guessing intent."""
+
+    _require_json_object(value, label="switch_assignment decision")
+    mode = value.get("mode")
+    if mode == "assign_requested_value":
+        _require_exact_keys(
+            value,
+            required=("mode", "value"),
+            label="switch_assignment assign decision",
+        )
+        assigned = value.get("value")
+        if not isinstance(assigned, str) or not assigned or assigned != assigned.strip():
+            raise OperationComposerError(
+                "A switch_assignment assign decision requires one exact non-empty value."
+            )
+        return assigned
+    if mode == "no_assignment_requested":
+        _require_exact_keys(
+            value,
+            required=("mode",),
+            label="switch_assignment none decision",
+        )
+        return None
+    raise OperationComposerError(
+        "switch_assignment must explicitly choose mode "
+        "'assign_requested_value' or 'no_assignment_requested'."
     )
 
 

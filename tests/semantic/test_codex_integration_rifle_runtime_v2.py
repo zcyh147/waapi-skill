@@ -786,7 +786,14 @@ def test_rifle_composer_preserves_every_exact_import_row_and_metadata_binding(
             "contract": "waapi-skill.operation-draft-action/v1",
             "action": "add_import_row",
             **row,
-            "switch_assignment": row.get("switch_assignment"),
+            "switch_assignment": (
+                {"mode": "no_assignment_requested"}
+                if row.get("switch_assignment") is None
+                else {
+                    "mode": "assign_requested_value",
+                    "value": row["switch_assignment"],
+                }
+            ),
         }
         for row in rows
     ]

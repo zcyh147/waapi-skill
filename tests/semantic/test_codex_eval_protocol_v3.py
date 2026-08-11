@@ -155,7 +155,10 @@ def test_audio_import_switch_assignment_uses_the_same_row_action() -> None:
 
     row = actions[-1]
     assert row["action"] == "add_import_row"
-    assert row["switch_assignment"] == switch_assignment
+    assert row["switch_assignment"] == {
+        "mode": "assign_requested_value",
+        "value": switch_assignment,
+    }
     assert all(action["action"] != "add_switch_assigned_import_row" for action in actions)
 
 
