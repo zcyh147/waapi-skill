@@ -130,6 +130,7 @@ def test_audio_import_composer_emits_ordered_typed_actions_without_full_json() -
     ]
     assert action_arguments[3].metadata_binding == metadata
     assert action_arguments[4].metadata_binding == metadata
+    assert "assignment" not in action_arguments[4].expected
     assert next(step for step in steps if step.name == "tx01.preview").subcommand == (
         "preview-from-draft"
     )

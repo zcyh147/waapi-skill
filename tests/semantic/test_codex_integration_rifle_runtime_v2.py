@@ -785,7 +785,6 @@ def test_rifle_composer_preserves_every_exact_import_row_and_metadata_binding(
         {
             "contract": "waapi-skill.operation-draft-action/v1",
             "action": "add_import_row",
-            "assignment": {"mode": "none"},
             **row,
         }
         for row in rows

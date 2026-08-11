@@ -2005,12 +2005,15 @@ def _audio_import_composer_row_origins(
             for key, value in action.items()
             if key not in {"contract", "action", "assignment"}
         }
+        has_assignment = "assignment" in action
         assignment = action.get("assignment")
-        if not isinstance(assignment, Mapping):
+        if has_assignment and not isinstance(assignment, Mapping):
             raise PromptProvenanceError(
                 "audio.import typed row assignment intent is invalid"
             )
-        if assignment.get("mode") == "switch":
+        if not has_assignment:
+            pass
+        elif assignment.get("mode") == "switch":
             if set(assignment) != {"mode", "value"}:
                 raise PromptProvenanceError(
                     "audio.import switch assignment intent is invalid"

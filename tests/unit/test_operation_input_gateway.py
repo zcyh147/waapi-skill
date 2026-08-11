@@ -400,6 +400,11 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         "draft-start",
         "audio.import",
     ]
+    assert schema["composer"]["apply"]["typed_fact_flags"]["--assignment"] == [
+        "FIELD",
+        "switch",
+        "VALUE",
+    ]
     assert schema["composer"]["start"]["preconditions"] == {
         "dynamic_metadata": {
             "fields": ["properties", "references"],
@@ -432,8 +437,9 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             "contract": "waapi-skill.operation-draft-action/v1",
             "action": "add_import_row",
         },
-        "required_fields": ["object_path", "assignment"],
+        "required_fields": ["object_path"],
         "optional_fields": [
+            "assignment",
             "audio_file",
             "audio_file_base64",
             "audio_source_notes",
@@ -488,18 +494,12 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             },
         ],
         "assignment_contract": {
-            "one_of": [
-                {
-                    "mode": "switch",
-                    "required_fields": ["mode", "value"],
-                    "additional_fields": False,
-                },
-                {
-                    "mode": "none",
-                    "required_fields": ["mode"],
-                    "additional_fields": False,
-                },
-            ],
+            "omitted_means_no_switch_assignment": True,
+            "normal_form": {
+                "mode": "switch",
+                "required_fields": ["mode", "value"],
+                "additional_fields": False,
+            },
             "requested_switch_assignment_must_use_mode": "switch",
             "switch_assignment_is_not_a_later_action": True,
         },

@@ -353,13 +353,13 @@ def build_audio_import_composer_transaction_steps(
         action = {
             "contract": OPERATION_DRAFT_ACTION_CONTRACT,
             "action": "add_import_row",
-            "assignment": (
-                {"mode": "switch", "value": switch_assignment}
-                if has_switch_assignment
-                else {"mode": "none"}
-            ),
             **row_fields,
         }
+        if has_switch_assignment:
+            action["assignment"] = {
+                "mode": "switch",
+                "value": switch_assignment,
+            }
         action_specs.append(
             (
                 action,

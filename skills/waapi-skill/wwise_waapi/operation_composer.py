@@ -107,8 +107,8 @@ _AUDIO_IMPORT_ACTION_FIELDS: dict[
     "set_import_default": (("name", "value"), ()),
     "clear_import_default": (("name",), ()),
     "add_import_row": (
-        ("object_path", "assignment"),
-        _AUDIO_IMPORT_ROW_OPTIONAL_FIELDS,
+        ("object_path",),
+        ("assignment", *_AUDIO_IMPORT_ROW_OPTIONAL_FIELDS),
     ),
     "set_import_row_field": (("import_handle", "name", "value"), ()),
     "clear_import_row_field": (("import_handle", "name"), ()),
@@ -672,18 +672,12 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 **(
                     {
                         "assignment_contract": {
-                            "one_of": [
-                                {
-                                    "mode": "switch",
-                                    "required_fields": ["mode", "value"],
-                                    "additional_fields": False,
-                                },
-                                {
-                                    "mode": "none",
-                                    "required_fields": ["mode"],
-                                    "additional_fields": False,
-                                },
-                            ],
+                            "omitted_means_no_switch_assignment": True,
+                            "normal_form": {
+                                "mode": "switch",
+                                "required_fields": ["mode", "value"],
+                                "additional_fields": False,
+                            },
                             "requested_switch_assignment_must_use_mode": "switch",
                             "switch_assignment_is_not_a_later_action": True,
                         }
@@ -1989,13 +1983,16 @@ def _apply_audio_import_action(
             optional=optional_action_fields,
             label=f"{action_name} action",
         )
+        has_assignment = "assignment" in action
         assignment = action.get("assignment")
-        if not isinstance(assignment, Mapping):
+        if has_assignment and not isinstance(assignment, Mapping):
             raise OperationComposerError(
                 "add_import_row assignment must be an object."
             )
-        mode = assignment.get("mode")
-        if mode == "switch":
+        mode = assignment.get("mode") if isinstance(assignment, Mapping) else None
+        if not has_assignment:
+            switch_assignment = None
+        elif mode == "switch":
             _require_exact_keys(
                 assignment,
                 required=("mode", "value"),
@@ -2013,7 +2010,7 @@ def _apply_audio_import_action(
             _require_exact_keys(
                 assignment,
                 required=("mode",),
-                label="add_import_row no-assignment intent",
+                label="legacy add_import_row no-assignment intent",
             )
             switch_assignment = None
         else:
