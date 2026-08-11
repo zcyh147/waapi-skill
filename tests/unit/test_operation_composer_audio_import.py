@@ -433,6 +433,21 @@ def test_audio_import_exposes_one_row_action_with_optional_positive_assignment(
     }
 
 
+def test_audio_import_draft_start_places_assignment_rule_at_the_next_action(
+    tmp_path: Path,
+) -> None:
+    code, started = _execute(tmp_path, "draft-start", "audio.import")
+
+    assert code == 0
+    assert started["draft"]["action_guidance"]["switch_assignment"] == {
+        "when_user_requested": "include_in_same_add_import_row",
+        "typed_argv_suffix": ["--assignment", "switch", "<exact-value>"],
+        "omission_means": "no_switch_assignment",
+        "follow_up_assignment_action_exists": False,
+        "guessing_allowed": False,
+    }
+
+
 def test_base_audio_import_media_row_materializes_existing_canonical_request(
     tmp_path: Path,
 ) -> None:

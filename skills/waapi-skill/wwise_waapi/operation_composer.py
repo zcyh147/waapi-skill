@@ -2299,6 +2299,19 @@ def _audio_import_composition_projection(
     return {
         "request_options": dict(composition["request_options"]),
         "defaults": _audio_import_public_fields(defaults),
+        "action_guidance": {
+            "switch_assignment": {
+                "when_user_requested": "include_in_same_add_import_row",
+                "typed_argv_suffix": [
+                    "--assignment",
+                    "switch",
+                    "<exact-value>",
+                ],
+                "omission_means": "no_switch_assignment",
+                "follow_up_assignment_action_exists": False,
+                "guessing_allowed": False,
+            }
+        },
         "current_facts": facts,
         "missing_fields": missing,
         "missing_fields_status": "complete" if not missing else "incomplete",
