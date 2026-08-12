@@ -1796,10 +1796,12 @@ def test_each_generated_topic_prompt_reaches_a_name_only_request_and_hidden_guid
 
 def test_generated_topic_reference_closes_model_owned_request_fields() -> None:
     reference = " ".join(QUERY_REFERENCE.read_text(encoding="utf-8").split())
-    assert '`{"return":["id","name","type","path"]}`' in reference
+    assert "Run `topic-schema`" in reference
+    assert "exact typed option handles" in reference
+    assert "`id,name,type,path`" in reference
     assert "`soundbank.name`" in reference
     assert "`platform.name`" in reference
-    assert "omit `--match-json` instead of passing an empty object" in reference
+    assert "otherwise submit no match facts" in reference
     assert "Never discover or inject a GUID" in reference
 
 

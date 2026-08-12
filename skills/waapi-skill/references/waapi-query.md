@@ -447,7 +447,7 @@ timeout and add the subcommand flag `--no-timeout`. Do not combine the two flags
 One timeout covers setup and collection. A Topic contract timeout is its default
 or recommendation, not a maximum. With `--no-timeout`, collection still stops at
 1–64 matching events, and the command still returns one terminal JSON document. Recursive
-`--match-json` is applied per event; nonmatches do not consume count. The route
+Typed match facts from `topic-schema` are applied per event; nonmatches do not consume count. The route
 unsubscribes after success, timeout, or user cancellation. Every payload is
 publish-schema validated, and the complete dispatcher collection still shares
 the topic execution contract's 256 KiB JSON result ceiling. Reaching N matches
@@ -465,16 +465,11 @@ silently dropping an event. Every exit always attempts to unsubscribe and emits
 one terminal NDJSON record. Relay events immediately; do not restart between
 events or wait for the terminal record.
 
-For `ak.wwise.core.soundbank.generated`, the gateway itself keeps the ordinary 10-second omitted-duration default. The Skill must explicitly pass gateway-global `--timeout 120` and tell the user that this subscription will use 120 seconds. This is an explicit Skill-selected timeout, not a different gateway default; a user-supplied positive finite duration or explicit no-time-limit bounded wait still takes precedence. Use exactly
-`{"return":["id","name","type","path"]}` and set event count to requested
-Bank × platform × language cells. Include `soundbank.name` or
-`platform.name` in `--match-json` only when one explicit name is common to all
-cells; otherwise omit `--match-json` instead of passing an empty object. Never
+For `ak.wwise.core.soundbank.generated`, the gateway itself keeps the ordinary 10-second omitted-duration default. The Skill must explicitly pass gateway-global `--timeout 120` and tell the user that this subscription will use 120 seconds. This is an explicit Skill-selected timeout, not a different gateway default; a user-supplied positive finite duration or explicit no-time-limit bounded wait still takes precedence. Run `topic-schema` and use its exact typed option handles for the four return fields `id,name,type,path`; set event count to requested
+Bank × platform × language cells. Add typed match facts for `soundbank.name` or
+`platform.name` only when one explicit name is common to all
+cells; otherwise submit no match facts. Never
 discover or inject a GUID for this predicate.
-
-```bash
-python scripts/run.py gateway.py --timeout 120 wait-topic ak.wwise.core.soundbank.generated --options-json '{"return":["id","name","type","path"]}' --event-count 2 --match-json '{"soundbank":{"name":"Weapons_Core"}}'
-```
 
 Use `ak.wwise.core.soundbank.generated` for per-Bank × platform × language
 result events. Use `ak.wwise.core.soundbank.generationDone` only for the overall

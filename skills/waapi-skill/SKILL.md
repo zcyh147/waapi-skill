@@ -59,10 +59,11 @@ python scripts/run.py gateway.py --version <supported-version> query-object (--r
 python scripts/run.py gateway.py --version <supported-version> object-types --query '<type keywords>' --limit 20
 python scripts/run.py gateway.py metadata types --summary-only
 python scripts/run.py gateway.py wait-topic <topic-uri>
-python scripts/run.py gateway.py --timeout <positive-finite-seconds> wait-topic <topic-uri> --event-count <1..64> --match-json '<object>'
+python scripts/run.py gateway.py topic-schema <topic-uri>
+python scripts/run.py gateway.py --timeout <positive-finite-seconds> wait-topic <topic-uri> --event-count <1..64> <typed-topic-facts-from-topic-schema>
 python scripts/run.py gateway.py wait-topic <topic-uri> --no-timeout
-python scripts/run.py gateway.py stream-topic <topic-uri> --options-json '<object>' --match-json '<object>'
-python scripts/run.py gateway.py --timeout <positive-finite-seconds> stream-topic <topic-uri> --match-json '<object>'
+python scripts/run.py gateway.py stream-topic <topic-uri> <typed-topic-facts-from-topic-schema>
+python scripts/run.py gateway.py --timeout <positive-finite-seconds> stream-topic <topic-uri> <typed-topic-facts-from-topic-schema>
 python scripts/run.py gateway.py operations
 python scripts/run.py gateway.py operation-schema object.create
 python scripts/run.py gateway.py operation-schema object.set
@@ -113,8 +114,8 @@ Select `stream-topic` only for explicit streaming or persistent intent such as
 or “不要收到后退出”. It creates one persistent subscription, emits each matched
 event immediately as a compact flushed JSON record, and by default runs until
 cancellation; a gateway-global `--timeout <positive-finite-seconds>` gives it a
-finite duration. Pass reviewed `--options-json` and recursive `--match-json`
-when needed. Each event is publish-schema and size validated; a bounded buffer
+finite duration. When options or matching are needed, run `topic-schema` once
+and use its typed continuation for the already-selected wait or stream lifecycle. Each event is publish-schema and size validated; a bounded buffer
 fails closed on overflow, cleanup always attempts unsubscribe, and a terminal
 record reports why the stream ended.
 

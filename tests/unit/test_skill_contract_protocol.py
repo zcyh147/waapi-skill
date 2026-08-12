@@ -543,11 +543,9 @@ def test_mixed_parent_child_query_keeps_both_required_types_in_candidate_set() -
 
 
 def test_soundbank_generated_uses_an_explicit_skill_selected_timeout() -> None:
-    command = (
-        "--timeout 120 wait-topic ak.wwise.core.soundbank.generated "
-        "--options-json"
-    )
-    assert command in QUERY
+    assert "For `ak.wwise.core.soundbank.generated`" in QUERY
+    assert "Run `topic-schema`" in QUERY
+    assert "exact typed option handles" in QUERY
     assert "--timeout 10 wait-topic ak.wwise.core.soundbank.generated" not in QUERY
     assert "gateway itself keeps the ordinary 10-second omitted-duration default" in QUERY
     assert "explicitly pass gateway-global `--timeout 120`" in QUERY
@@ -579,12 +577,14 @@ def test_topic_wait_duration_policy_is_explicit_and_output_remains_bounded() -> 
         "is its default or recommendation, not a maximum",
         "add the subcommand flag `--no-timeout`",
         "the command still returns one terminal JSON document",
+        "Typed match facts from `topic-schema` are applied per event",
         "after success, timeout, or user cancellation",
         "complete dispatcher collection still shares the topic execution contract's 256 KiB JSON result ceiling",
     ):
         assert phrase in query_flat
 
     assert "gateway.py wait-topic <topic-uri>" in SKILL
+    assert "gateway.py topic-schema <topic-uri>" in SKILL
     assert (
         "gateway.py --timeout <positive-finite-seconds> wait-topic <topic-uri>"
         in SKILL

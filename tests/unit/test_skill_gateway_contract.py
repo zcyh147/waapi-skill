@@ -31,6 +31,7 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
         "python scripts/run.py gateway.py --version <supported-version> query-object (--request-json '<object-query-v1-json>' | --advanced-request-json '<advanced-object-query-v1-json>')",
         "python scripts/run.py gateway.py metadata types --summary-only",
         "python scripts/run.py gateway.py wait-topic <topic-uri>",
+        "python scripts/run.py gateway.py topic-schema <topic-uri>",
         "python scripts/run.py gateway.py --timeout <positive-finite-seconds> wait-topic <topic-uri>",
         "python scripts/run.py gateway.py wait-topic <topic-uri> --no-timeout",
         "python scripts/run.py gateway.py stream-topic <topic-uri>",

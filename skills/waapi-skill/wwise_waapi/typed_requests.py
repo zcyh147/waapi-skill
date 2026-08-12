@@ -1660,17 +1660,18 @@ def _collect_object_fields(
         raise TypedRequestError("Typed request schema exceeds its packaged structure limits")
     if node.get("type") != "object":
         raise TypedRequestError(f"Typed request {section} root must be an object")
-    if node.get("additionalProperties") is not False and not (
-        node.get("additionalProperties") is True
-        or isinstance(node.get("additionalProperties"), Mapping)
+    additional_properties = node.get("additionalProperties", True)
+    if additional_properties is not False and not (
+        additional_properties is True
+        or isinstance(additional_properties, Mapping)
         or isinstance(node.get("patternProperties"), Mapping)
     ):
         raise TypedRequestError(
             "This typed request object requires a later open-map or branch adapter"
         )
     if (
-        node.get("additionalProperties") is True
-        or isinstance(node.get("additionalProperties"), Mapping)
+        additional_properties is True
+        or isinstance(additional_properties, Mapping)
         or isinstance(node.get("patternProperties"), Mapping)
     ):
         _append_map_overlay(
@@ -2063,7 +2064,7 @@ def _append_map_overlay(
                 ),
             )
         )
-    additional = node.get("additionalProperties")
+    additional = node.get("additionalProperties", True)
     overlay_path = (*(
         path if handle_path_prefix is None else handle_path_prefix
     ), "<map>")

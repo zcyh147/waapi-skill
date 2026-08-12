@@ -141,6 +141,13 @@ from wwise_waapi.typed_queries import (  # noqa: E402  # pyright: ignore[reportM
     typed_query_contract,
     typed_query_schema_payload,
 )
+from wwise_waapi.typed_topics import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    TOPIC_MATCH_OPERATION_PREFIX,
+    TOPIC_OPTIONS_OPERATION_PREFIX,
+    materialize_typed_topic_inputs,
+    topic_match_contract,
+    topic_options_contract,
+)
 from wwise_waapi.builders.schema import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     validate_semantic_event,
     validate_semantic_payload,
@@ -293,6 +300,7 @@ OFFLINE_COMMANDS = frozenset(
         "request-schema",
         "request-map-container",
         "request-array-item",
+        "topic-schema",
         "query-schema",
         "object-types",
         "config-show",
@@ -1477,6 +1485,7 @@ def build_parser() -> argparse.ArgumentParser:
     wait_topic.add_argument("api")
     wait_topic.add_argument("--options-json", default="{}")
     wait_topic.add_argument("--match-json", default="{}")
+    add_typed_topic_input_arguments(wait_topic)
     wait_topic.add_argument(
         "--event-count",
         type=int,
@@ -1507,6 +1516,13 @@ def build_parser() -> argparse.ArgumentParser:
     stream_topic.add_argument("api")
     stream_topic.add_argument("--options-json", default="{}")
     stream_topic.add_argument("--match-json", default="{}")
+    add_typed_topic_input_arguments(stream_topic)
+
+    topic_schema = subparsers.add_parser(
+        "topic-schema",
+        help="Describe exact-version typed subscription options and event matching offline",
+    )
+    topic_schema.add_argument("api")
 
     capabilities = subparsers.add_parser(
         "capabilities",
@@ -1858,6 +1874,55 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def add_typed_topic_input_arguments(parser: argparse.ArgumentParser) -> None:
+    """Add the one closed typed Topic input vocabulary to a subscription command."""
+
+    parser.add_argument("--options-schema-digest")
+    parser.add_argument("--match-schema-digest")
+    for prefix in ("option", "match"):
+        parser.add_argument(
+            f"--{prefix}-set",
+            action="append",
+            nargs=3,
+            metavar=("FIELD_HANDLE", "TYPE", "VALUE"),
+            default=[],
+        )
+        parser.add_argument(
+            f"--{prefix}-append",
+            action="append",
+            nargs=3,
+            metavar=("FIELD_HANDLE", "TYPE", "VALUE"),
+            default=[],
+        )
+        parser.add_argument(
+            f"--{prefix}-present",
+            action="append",
+            metavar="CONTAINER_HANDLE",
+            default=[],
+        )
+        parser.add_argument(
+            f"--{prefix}-choose",
+            action="append",
+            nargs=2,
+            metavar=("BRANCH_HANDLE", "CHOICE_HANDLE"),
+            default=[],
+        )
+        parser.add_argument(
+            f"--{prefix}-choose-dynamic",
+            action="append",
+            nargs=3,
+            metavar=("OBJECT_HANDLE", "KEY", "CHOICE_HANDLE"),
+            default=[],
+        )
+        parser.add_argument(
+            f"--{prefix}-map-put",
+            action="append",
+            nargs=4,
+            metavar=("MAP_HANDLE", "KEY", "TYPE", "VALUE"),
+            default=[],
+        )
+
+
 def execute_gateway(
     argv: Sequence[str] | None = None,
     *,
@@ -1959,6 +2024,8 @@ def _execute_gateway_unconstrained(
             )
         if args.command == "query-object":
             preflight_query_object_input(args, env=source_env)
+        if args.command in {"wait-topic", "stream-topic"}:
+            preflight_typed_topic_input(args, env=source_env)
         if args.command == "metadata":
             preflight_metadata_input(args)
         if args.command in {
@@ -3457,8 +3524,14 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
                 dry_run=args.dry_run,
             )
     elif args.command in {"wait-topic", "stream-topic"}:
-        parse_json_object(args.options_json, "--options-json")
-        parse_json_object(args.match_json, "--match-json")
+        if topic_typed_input_requested(args):
+            if args.options_json != "{}" or args.match_json != "{}":
+                raise GatewayInputError(
+                    "Typed Topic input cannot be combined with options or match JSON"
+                )
+        else:
+            parse_json_object(args.options_json, "--options-json")
+            parse_json_object(args.match_json, "--match-json")
         if (
             args.command == "wait-topic"
             and args.no_timeout
@@ -3489,6 +3562,86 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
             value = getattr(args, field_name)
             if value is not None:
                 parse_json_object(value, option_name)
+
+
+def topic_typed_input_requested(args: argparse.Namespace) -> bool:
+    """Return whether one subscription invocation selected its typed input surface."""
+
+    return any(
+        (
+            getattr(args, "options_schema_digest", None),
+            getattr(args, "match_schema_digest", None),
+            *(getattr(args, name, ()) for name in (
+                "option_set",
+                "option_append",
+                "option_present",
+                "option_choose",
+                "option_choose_dynamic",
+                "option_map_put",
+                "match_set",
+                "match_append",
+                "match_present",
+                "match_choose",
+                "match_choose_dynamic",
+                "match_map_put",
+            )),
+        )
+    )
+
+
+def _typed_topic_facts(args: argparse.Namespace, prefix: str) -> tuple[TypedRequestFact, ...]:
+    facts = [
+        TypedRequestFact("set", handle, value_type, value)
+        for handle, value_type, value in getattr(args, f"{prefix}_set")
+    ]
+    facts.extend(
+        TypedRequestFact("append", handle, value_type, value)
+        for handle, value_type, value in getattr(args, f"{prefix}_append")
+    )
+    facts.extend(
+        TypedRequestFact("present", handle, "null", "null")
+        for handle in getattr(args, f"{prefix}_present")
+    )
+    facts.extend(
+        TypedRequestFact("choose", handle, "branch", choice)
+        for handle, choice in getattr(args, f"{prefix}_choose")
+    )
+    facts.extend(
+        TypedRequestFact("choose-dynamic", handle, "choice", choice, key=key)
+        for handle, key, choice in getattr(args, f"{prefix}_choose_dynamic")
+    )
+    facts.extend(
+        TypedRequestFact("map-put", handle, value_type, value, key=key)
+        for handle, key, value_type, value in getattr(args, f"{prefix}_map_put")
+    )
+    return tuple(facts)
+
+
+def preflight_typed_topic_input(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+) -> None:
+    """Materialize exact Topic options and subset match before connecting."""
+
+    if not topic_typed_input_requested(args):
+        args.typed_topic_input = None
+        return
+    if not isinstance(args.options_schema_digest, str) or not isinstance(
+        args.match_schema_digest, str
+    ):
+        raise GatewayInputError(
+            "Typed Topic input requires both schema digests from topic-schema"
+        )
+    (version,) = resolve_catalog_versions(args, env=env)
+    args.typed_topic_input = materialize_typed_topic_inputs(
+        version=version,
+        topic=args.api,
+        options_schema_digest=args.options_schema_digest,
+        option_facts=_typed_topic_facts(args, "option"),
+        match_schema_digest=args.match_schema_digest,
+        match_facts=_typed_topic_facts(args, "match"),
+    )
 
 
 _LEGACY_OPERATION_PROJECTION_FIELDS = frozenset(
@@ -3769,12 +3922,93 @@ def public_typed_contract(version: str, api: str) -> Any:
         return typed_query_contract(version)
     if api == ADVANCED_TYPED_QUERY_OPERATION:
         return typed_query_contract(version, advanced=True)
+    if api.startswith(TOPIC_OPTIONS_OPERATION_PREFIX):
+        return topic_options_contract(
+            version, api.removeprefix(TOPIC_OPTIONS_OPERATION_PREFIX)
+        )
+    if api.startswith(TOPIC_MATCH_OPERATION_PREFIX):
+        return topic_match_contract(
+            version, api.removeprefix(TOPIC_MATCH_OPERATION_PREFIX)
+        )
     return request_contract(version, api)
+
+
+def typed_topic_contract_payload(contract: Any, *, prefix: str) -> dict[str, Any]:
+    """Project one shared Core contract with Topic-specific continuation names."""
+
+    payload = contract.as_gateway_payload()
+    payload["input_shape"] = "typed-facts"
+    payload["continuation"] = {
+        "dynamic_container_commands": {
+            "map_value": "request-map-container",
+            "array_item": "request-array-item",
+        },
+        "facts": {
+            "set": f"--{prefix}-set <field_handle> <type> <value>",
+            "append": f"--{prefix}-append <field_handle> <type> <value>",
+            "present": f"--{prefix}-present <container_handle>",
+            "choose": f"--{prefix}-choose <branch_handle> <choice_handle>",
+            "choose_dynamic": (
+                f"--{prefix}-choose-dynamic <object_handle> <key> <choice_handle>"
+            ),
+            "map_put": f"--{prefix}-map-put <map_handle> <key> <type> <value>",
+        }
+    }
+    return payload
 
 
 def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]) -> dict[str, Any]:
     """Run catalog commands without requiring a WAAPI port or live Wwise."""
 
+    if args.command == "topic-schema":
+        (version,) = resolve_catalog_versions(args, env=env)
+        options = topic_options_contract(version, args.api)
+        match = topic_match_contract(version, args.api)
+        return {
+            "contract": "waapi-skill.typed-topic-input/v1",
+            "ok": True,
+            "status": "ok",
+            "command": "topic-schema",
+            "offline": True,
+            "version": version,
+            "topic": args.api,
+            "options": typed_topic_contract_payload(options, prefix="option"),
+            "event_match": typed_topic_contract_payload(match, prefix="match"),
+            "continuation": {
+                "subcommands": ["wait-topic", "stream-topic"],
+                "bind": {
+                    "--options-schema-digest": options.schema_digest,
+                    "--match-schema-digest": match.schema_digest,
+                },
+                "options_facts": {
+                    "set": "--option-set <handle> <type> <value>",
+                    "append": "--option-append <handle> <type> <value>",
+                    "present": "--option-present <handle>",
+                    "choose": "--option-choose <handle> <choice_handle>",
+                    "choose_dynamic": (
+                        "--option-choose-dynamic <handle> <key> <choice_handle>"
+                    ),
+                    "map_put": "--option-map-put <handle> <key> <type> <value>",
+                },
+                "match_facts": {
+                    "set": "--match-set <handle> <type> <value>",
+                    "append": "--match-append <handle> <type> <value>",
+                    "present": "--match-present <handle>",
+                    "choose": "--match-choose <handle> <choice_handle>",
+                    "choose_dynamic": (
+                        "--match-choose-dynamic <handle> <key> <choice_handle>"
+                    ),
+                    "map_put": "--match-map-put <handle> <key> <type> <value>",
+                },
+                "lifecycle": {
+                    "wait-topic": "bounded matching-event collection, then unsubscribe",
+                    "stream-topic": (
+                        "persistent event emission until cancellation or finite timeout, "
+                        "then unsubscribe"
+                    ),
+                },
+            },
+        }
     if args.command in {"request-schema", "request-map-container", "request-array-item"}:
         versions = resolve_catalog_versions(args, env=env)
         if len(versions) != 1:
@@ -3787,6 +4021,12 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             raise GatewayInputError(
                 "Typed object queries use query-schema as their single schema entry."
             )
+        if args.command == "request-schema" and args.api.startswith(
+            (TOPIC_OPTIONS_OPERATION_PREFIX, TOPIC_MATCH_OPERATION_PREFIX)
+        ):
+            raise GatewayInputError(
+                "Typed Topics use topic-schema <topic-uri> as their single schema entry."
+            )
         if args.command == "request-schema":
             return contract.as_gateway_payload()
         draft_shape = contract.as_gateway_payload()["input_shape"] == "draft"
@@ -3794,6 +4034,13 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             STRUCTURED_TYPED_QUERY_OPERATION,
             ADVANCED_TYPED_QUERY_OPERATION,
         }
+        topic_prefix = (
+            "option"
+            if args.api.startswith(TOPIC_OPTIONS_OPERATION_PREFIX)
+            else "match"
+            if args.api.startswith(TOPIC_MATCH_OPERATION_PREFIX)
+            else None
+        )
         if args.schema_digest != contract.schema_digest:
             raise GatewayInputError("Typed request schema digest is stale")
         parent_handle = (
@@ -3942,6 +4189,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 "subcommand": (
                     "query-object"
                     if query_shape
+                    else "topic-input-fact" if topic_prefix is not None
                     else "draft-apply" if draft_shape else "typed-call"
                 ),
                 **(
@@ -3960,16 +4208,28 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                             ),
                         ],
                     }
-                    if draft_shape and not query_shape
+                    if draft_shape and not query_shape and topic_prefix is None
                     else {
                         "fact": [
                             (
                                 f"--typed-{fact[0].removeprefix('--')}"
                                 if query_shape
+                                else f"--{topic_prefix}-{fact[0].removeprefix('--')}"
+                                if topic_prefix is not None
                                 else fact[0]
                             ),
                             *fact[1:],
-                        ]
+                        ],
+                        **(
+                            {
+                                "valid_subscription_subcommands": [
+                                    "wait-topic",
+                                    "stream-topic",
+                                ]
+                            }
+                            if topic_prefix is not None
+                            else {}
+                        ),
                     }
                 ),
                 **(
@@ -6655,8 +6915,17 @@ def dispatch_command(
             stream_sink=stream_sink,
         )
     if args.command == "wait-topic":
-        request_options = parse_json_object(args.options_json, "--options-json")
-        match = parse_json_object(args.match_json, "--match-json")
+        typed_topic_input = getattr(args, "typed_topic_input", None)
+        request_options = (
+            dict(typed_topic_input.options)
+            if typed_topic_input is not None
+            else parse_json_object(args.options_json, "--options-json")
+        )
+        match = (
+            dict(typed_topic_input.match)
+            if typed_topic_input is not None
+            else parse_json_object(args.match_json, "--match-json")
+        )
         authoring_boundary = live_authoring_api_boundary(
             args.api,
             command="wait-topic",
@@ -6946,8 +7215,17 @@ def dispatch_topic_stream(
 ) -> dict[str, Any]:
     """Keep one reviewed topic subscription open and publish events immediately."""
 
-    request_options = parse_json_object(args.options_json, "--options-json")
-    match = parse_json_object(args.match_json, "--match-json")
+    typed_topic_input = getattr(args, "typed_topic_input", None)
+    request_options = (
+        dict(typed_topic_input.options)
+        if typed_topic_input is not None
+        else parse_json_object(args.options_json, "--options-json")
+    )
+    match = (
+        dict(typed_topic_input.match)
+        if typed_topic_input is not None
+        else parse_json_object(args.match_json, "--match-json")
+    )
     authoring_boundary = live_authoring_api_boundary(
         args.api,
         command="stream-topic",
