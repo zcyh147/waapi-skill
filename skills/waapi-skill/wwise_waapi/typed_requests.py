@@ -94,6 +94,15 @@ class TypedFieldContract:
         ]
         if enum_values:
             payload["enum"] = enum_values
+        patterns = sorted(
+            {
+                str(variant["pattern"])
+                for variant in self.variants
+                if isinstance(variant.get("pattern"), str)
+            }
+        )
+        if patterns:
+            payload["patterns"] = patterns
         if self.shape == "array":
             payload["minimum_items"] = self.minimum_items
             payload["maximum_items"] = self.maximum_items
@@ -173,18 +182,58 @@ class TypedRequestContract:
                     "map_correct": "--map-correct <map_handle> <key> <type> <value>",
                     "map_remove": "--map-remove <map_handle> <key>",
                 }
-            continuation = {
-                "subcommand": "typed-call",
-                "uri": self.uri,
-                "schema_digest": self.schema_digest,
-                "fact_flags": fact_flags,
-                **({"apply": True} if self.effect != "read" else {}),
-            }
-            if not flat_inline:
-                continuation["dynamic_container_commands"] = {
-                    "map_value": "request-map-container",
-                    "array_item": "request-array-item",
+            if flat_inline or self.uri == TYPED_REQUEST_COMPLEX_TRACER_URI:
+                continuation = {
+                    "subcommand": "typed-call",
+                    "uri": self.uri,
+                    "schema_digest": self.schema_digest,
+                    "fact_flags": fact_flags,
+                    **({"apply": True} if self.effect != "read" else {}),
                 }
+                if not flat_inline:
+                    continuation["dynamic_container_commands"] = {
+                        "map_value": "request-map-container",
+                        "array_item": "request-array-item",
+                    }
+                input_shape = "inline"
+            else:
+                continuation = {
+                    "subcommand": "draft-start",
+                    "operation": self.uri,
+                    "business_values_required": True,
+                    "action_argv": {
+                        "add_typed_fact": (
+                            "--action add_typed_fact --fact-action "
+                            "(set|append) --field-handle HANDLE --value-type TYPE "
+                            "--fact-value VALUE | --fact-action present "
+                            "--field-handle HANDLE | --fact-action choose "
+                            "--field-handle HANDLE --fact-value CHOICE_HANDLE | "
+                            "--fact-action choose-dynamic --field-handle HANDLE "
+                            "--key KEY --fact-value CHOICE_HANDLE | --fact-action "
+                            "map-put --field-handle HANDLE --key KEY "
+                            "--value-type TYPE --fact-value VALUE"
+                        ),
+                        "correct_typed_fact": (
+                            "--action correct_typed_fact --fact-handle FACT_HANDLE "
+                            "then one complete add_typed_fact shape"
+                        ),
+                        "remove_typed_fact": (
+                            "--action remove_typed_fact --fact-handle FACT_HANDLE"
+                        ),
+                    },
+                    "dynamic_container_commands": {
+                        "map_value": "request-map-container",
+                        "array_item": "request-array-item",
+                    },
+                    "completion": (
+                        "draft-check executes this read directly"
+                        if self.effect == "read"
+                        else "draft-check then preview-from-draft"
+                    ),
+                }
+                input_shape = "draft"
+        if not self.fields:
+            input_shape = "zero"
         return {
             "contract": TYPED_REQUEST_SCHEMA_CONTRACT,
             "ok": True,
@@ -192,7 +241,7 @@ class TypedRequestContract:
             "command": "request-schema",
             "version": self.version,
             "uri": self.uri,
-            "input_shape": "zero" if not self.fields else "inline",
+            "input_shape": input_shape,
             "schema_digest": self.schema_digest,
             "fields": [field.as_dict() for field in self.fields],
             "continuation": continuation,
@@ -253,19 +302,11 @@ def request_contract(version: str, uri: str) -> TypedRequestContract:
         raise TypedRequestError(
             f"WAAPI URI {uri!r} requires the typed compound-operation adapter"
         )
-    generic_inline = (
-        _contract_is_flat_inline(compiled)
-        and capability.execution_contract["route"] != "isolated_transaction"
-        and not capability.transaction_boundaries
-        and (
-            capability.preferred_route == "manifest_dispatch"
-            or tuple(capability.transaction_operations) == ("waapi.call",)
-        )
-    )
+    generic = _generic_typed_contract_is_public(capability)
     if compiled.fields and uri not in {
         TYPED_REQUEST_TRACER_URI,
         TYPED_REQUEST_COMPLEX_TRACER_URI,
-    } and not generic_inline:
+    } and not generic:
         raise TypedRequestError(
             f"WAAPI URI {uri!r} has not migrated to an executable typed adapter"
         )
@@ -282,6 +323,18 @@ def request_contract(version: str, uri: str) -> TypedRequestContract:
             str(item) for item in capability.execution_contract["gateway_commands"]
         ),
         timeout_seconds=float(capability.execution_contract["timeout_seconds"]),
+    )
+
+
+def _generic_typed_contract_is_public(capability: Any) -> bool:
+    return (
+        capability.execution_contract["route"]
+        not in {"compound_transaction_member", "isolated_transaction"}
+        and not capability.transaction_boundaries
+        and (
+            capability.preferred_route == "manifest_dispatch"
+            or tuple(capability.transaction_operations) == ("waapi.call",)
+        )
     )
 
 
@@ -1244,7 +1297,9 @@ def _collect_object_fields(
                 branch = _expanded_schema(
                     raw_branch, root_schema=root_schema, graph=graph
                 )
-                branch_type = branch.get("type")
+                branch_type = branch.get("type", child_type)
+                if "type" not in branch and isinstance(branch_type, str):
+                    branch = {"type": branch_type, **branch}
                 branch_path = (*child_path, f"<branch:{index}>")
                 branch_handle = TYPED_REQUEST_HANDLE_PREFIX + canonical_sha256(
                     {
@@ -1626,6 +1681,15 @@ def _scalar_variants(
         if not isinstance(candidate, Mapping):
             raise TypedRequestError("Typed request scalar branch must be an object")
         resolved = _expanded_schema(candidate, root_schema=root_schema, graph=graph)
+        inherited_type = expanded.get("type")
+        inherited_constraints = {
+            key: value
+            for key, value in expanded.items()
+            if key not in {"oneOf", "anyOf", "description"}
+        }
+        resolved = {**inherited_constraints, **resolved}
+        if "type" not in resolved and isinstance(inherited_type, str):
+            resolved["type"] = inherited_type
         value_type = resolved.get("type")
         if value_type not in {"string", "integer", "number", "boolean", "null"}:
             raise TypedRequestError(

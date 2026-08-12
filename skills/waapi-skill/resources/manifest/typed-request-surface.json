@@ -1,7 +1,7 @@
 {
   "contract": "waapi-skill.typed-request-surface/v1",
   "intentionally_blocked_field_occurrences": 79,
-  "inventory_sha256": "f2c509b0b3c24e3677a612d3d9f5b9ca4f539151abd64cba3e8199f71c18f938",
+  "inventory_sha256": "8eadf5b0e8c196a16de5a57c887b4ab69bdfdfa9c2a17dd15359c222a26716cc",
   "lanes": [
     {
       "construction_shape": "inline",
@@ -33470,7 +33470,7 @@
       "version": "2025.1"
     },
     {
-      "construction_shape": "draft",
+      "construction_shape": "inline",
       "correct_host": "wwise-console",
       "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
       "execution_policy": {
@@ -34238,7 +34238,7 @@
       "version": "2025.1"
     },
     {
-      "construction_shape": "draft",
+      "construction_shape": "inline",
       "correct_host": "wwise-console",
       "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
       "execution_policy": {
@@ -35522,7 +35522,7 @@
       "version": "2025.1"
     },
     {
-      "construction_shape": "draft",
+      "construction_shape": "inline",
       "correct_host": "wwise-console",
       "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
       "execution_policy": {

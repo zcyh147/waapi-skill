@@ -1992,7 +1992,6 @@ def _validate_durable_seal(
     *,
     revision: int,
     state: OperationDraftState,
-    operation: str,
     version: str,
     schema_digest: str,
     composer_digest: str,
@@ -2075,7 +2074,8 @@ def _validate_durable_seal(
     if (
         request.get("contract") != "waapi-skill.operation-request/v1"
         or request.get("version") != version
-        or request.get("operation") != operation
+        or not isinstance(request.get("operation"), str)
+        or not request.get("operation")
         or not isinstance(request.get("arguments"), Mapping)
         or canonical_sha256(request) != seal.get("request_digest")
         or seal.get("request_digest") != check.get("request_digest")
@@ -2367,7 +2367,6 @@ def _record_from_mapping(
             payload["seal"],
             revision=revision,
             state=state,
-            operation=payload["operation"],
             version=payload["version"],
             schema_digest=schema_digest,
             composer_digest=composer_digest,

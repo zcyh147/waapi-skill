@@ -25,6 +25,13 @@ from .operation_registry import (
     validate_audio_import_composer_fragment,
     validate_object_set_composer_fragment,
 )
+from .typed_requests import (
+    MAX_TYPED_REQUEST_FACTS,
+    TypedRequestError,
+    TypedRequestFact,
+    materialize_typed_request,
+    request_contract,
+)
 
 
 OPERATION_DRAFT_ACTION_CONTRACT = "waapi-skill.operation-draft-action/v1"
@@ -35,6 +42,24 @@ AUDIO_IMPORT_COMPOSER_OPERATION = "audio.import"
 MAX_COMPOSER_ACTION_BYTES = 32 * 1024
 MAX_AUDIO_IMPORT_COMPOSER_ACTION_BYTES = 384 * 1024
 _TARGET_HANDLE_PATTERN = re.compile(r"^odh1-[0-9a-f]{24}$")
+_TYPED_FACT_HANDLE_PATTERN = re.compile(r"^tdh1-[0-9a-f]{24}$")
+_GENERIC_TYPED_ACTION_FIELDS: dict[
+    str, tuple[tuple[str, ...], tuple[str, ...]]
+] = {
+    "add_typed_fact": (
+        ("fact_action", "field_handle"),
+        ("value_type", "value", "key"),
+    ),
+    "correct_typed_fact": (
+        (
+            "fact_handle",
+            "fact_action",
+            "field_handle",
+        ),
+        ("value_type", "value", "key"),
+    ),
+    "remove_typed_fact": (("fact_handle",), ()),
+}
 _BASE_ACTION_FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "set_request_option": (("name", "value"), ()),
     "clear_request_option": (("name",), ()),
@@ -279,6 +304,8 @@ def parse_typed_action_cli_arguments(
             "Typed action argv must start with --action ACTION."
         )
     action_name = arguments[1]
+    if action_name in _GENERIC_TYPED_ACTION_FIELDS:
+        return _parse_generic_typed_action_cli_arguments(arguments)
     index = 2
     while index < len(arguments):
         flag = arguments[index]
@@ -701,6 +728,27 @@ def typed_action_cli_arguments(action: Mapping[str, Any]) -> tuple[str, ...]:
     action_name = action.get("action")
     if not isinstance(action_name, str) or not action_name:
         raise OperationComposerError("Typed action has an invalid action name.")
+    if action_name in _GENERIC_TYPED_ACTION_FIELDS:
+        required, optional = _GENERIC_TYPED_ACTION_FIELDS[action_name]
+        _require_allowed_keys(
+            action,
+            required=("contract", "action", *required),
+            optional=optional,
+            label="generic typed action",
+        )
+        arguments: list[str] = ["--action", action_name]
+        flag_by_field = {
+            "fact_handle": "--fact-handle",
+            "fact_action": "--fact-action",
+            "field_handle": "--field-handle",
+            "value_type": "--value-type",
+            "value": "--fact-value",
+            "key": "--key",
+        }
+        for field in (*required, *optional):
+            if field in action:
+                arguments.extend((flag_by_field[field], str(action[field])))
+        return tuple(arguments)
     if action_name == "assign_import_row_switch":
         raise OperationComposerError(
             "The handle-bound Switch assignment action is available only for "
@@ -1188,6 +1236,56 @@ def _selector_cli_tokens(selector: Mapping[str, Any], *, depth: int = 0) -> tupl
 def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
     """Return one reviewed Adapter contract, derived from the Registry."""
 
+    if operation.startswith("ak."):
+        typed = request_contract(version, operation)
+        if typed.as_gateway_payload()["input_shape"] != "draft":
+            raise OperationComposerError(
+                f"No Operation Composer Adapter is available for {operation!r}.",
+                error_code="OPERATION_DRAFT_ADAPTER_UNAVAILABLE",
+                details={"operation": operation, "version": version},
+            )
+        return {
+            "contract": OPERATION_COMPOSER_CONTRACT,
+            "operation": operation,
+            "version": version,
+            "action_contract": OPERATION_DRAFT_ACTION_CONTRACT,
+            "action_construction": {
+                "fixed_fields_are_required": True,
+                "include_every_required_field": True,
+                "include_only_selected_optional_fields": True,
+                "additional_fields": False,
+            },
+            "action_shapes": {
+                name: {
+                    "fixed_fields": {
+                        "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+                        "action": name,
+                    },
+                    "required_fields": list(required),
+                    "optional_fields": list(optional),
+                }
+                for name, (required, optional) in _GENERIC_TYPED_ACTION_FIELDS.items()
+            },
+            "composition_contract": OPERATION_COMPOSITION_CONTRACT,
+            "actions": list(_GENERIC_TYPED_ACTION_FIELDS),
+            "limits": {
+                "facts": MAX_TYPED_REQUEST_FACTS,
+                "action_bytes": MAX_COMPOSER_ACTION_BYTES,
+            },
+            "typed_request_schema_digest": typed.schema_digest,
+            "typed_request_fields": [field.as_dict() for field in typed.fields],
+            "complete_request_is_never_an_action": True,
+            "completion_discipline": {
+                "successful_action_response_is_complete": True,
+                "compact_projection_is_not_truncation": True,
+                "schema_required_fields_status_scope": (
+                    "structural_preview_readiness_only"
+                ),
+                "user_intent_coverage": "compare_planned_actions_before_draft-check",
+                "draft_inspect_required_before_next_planned_action": False,
+            },
+        }
+
     try:
         input_mode = operation_input_mode(operation, version)
     except OperationContractError as exc:
@@ -1510,8 +1608,268 @@ def operation_composer_digest(operation: str, version: str) -> str:
     return canonical_sha256(operation_composer_contract(operation, version))
 
 
+def _typed_contract_is_flat(contract: Any) -> bool:
+    by_handle = contract.fields_by_handle
+    for field in contract.fields:
+        if field.shape in {"object", "map"}:
+            return False
+        if field.parent_handle is not None:
+            parent = by_handle.get(field.parent_handle)
+            if parent is None or parent.shape != "branch":
+                return False
+        if field.shape == "array" and any(
+            variant.get("type") in {"object", "array"}
+            for variant in field.variants
+        ):
+            return False
+    return True
+
+
+def _typed_request_error_is_incomplete(message: str) -> bool:
+    return (
+        (message.startswith("Required field ") and message.endswith(" is missing"))
+        or (
+            message.startswith("Required field ")
+            and message.endswith(" branch is missing")
+        )
+        or (
+            message.startswith("Typed object ")
+            and " is missing required keys" in message
+        )
+        or (message.startswith("Field ") and " requires at least " in message)
+    )
+
+
+def _parse_generic_typed_action_cli_arguments(
+    arguments: Sequence[str],
+) -> dict[str, Any]:
+    action_name = arguments[1]
+    required, optional = _GENERIC_TYPED_ACTION_FIELDS[action_name]
+    field_by_flag = {
+        "--fact-handle": "fact_handle",
+        "--fact-action": "fact_action",
+        "--field-handle": "field_handle",
+        "--value-type": "value_type",
+        "--fact-value": "value",
+        "--key": "key",
+    }
+    action: dict[str, Any] = {
+        "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+        "action": action_name,
+    }
+    index = 2
+    while index < len(arguments):
+        flag = arguments[index]
+        field = field_by_flag.get(flag)
+        if field is None or index + 1 >= len(arguments):
+            raise OperationComposerError(
+                "Generic typed action contains an unknown or incomplete flag.",
+                details={"flag": flag},
+            )
+        if field in action:
+            raise OperationComposerError("Generic typed action fields must be unique.")
+        action[field] = arguments[index + 1]
+        index += 2
+    _require_allowed_keys(
+        action,
+        required=("contract", "action", *required),
+        optional=optional,
+        label="generic typed action",
+    )
+    return action
+
+
+def _new_typed_fact_handle() -> str:
+    return f"tdh1-{secrets.token_hex(12)}"
+
+
+def _normalize_generic_typed_composition(
+    operation: str,
+    version: str,
+    composition: Mapping[str, Any],
+) -> dict[str, Any]:
+    _require_json_object(composition, label="composition")
+    _require_exact_keys(
+        composition,
+        required=("contract", "typed_request_schema_digest", "facts"),
+        label="generic typed composition",
+    )
+    if composition.get("contract") != OPERATION_COMPOSITION_CONTRACT:
+        raise OperationComposerError("Operation Draft composition contract is invalid.")
+    contract = request_contract(version, operation)
+    if composition.get("typed_request_schema_digest") != contract.schema_digest:
+        raise OperationComposerError("Typed request schema digest is stale.")
+    raw_facts = composition.get("facts")
+    if not isinstance(raw_facts, list) or len(raw_facts) > MAX_TYPED_REQUEST_FACTS:
+        raise OperationComposerError("Generic typed fact count exceeds its ceiling.")
+    facts: list[dict[str, Any]] = []
+    handles: set[str] = set()
+    for raw_fact in raw_facts:
+        _require_json_object(raw_fact, label="typed fact")
+        _require_allowed_keys(
+            raw_fact,
+            required=(
+                "handle",
+                "fact_action",
+                "field_handle",
+                "value_type",
+                "value",
+            ),
+            optional=("key",),
+            label="typed fact",
+        )
+        handle = raw_fact.get("handle")
+        if (
+            not isinstance(handle, str)
+            or _TYPED_FACT_HANDLE_PATTERN.fullmatch(handle) is None
+            or handle in handles
+        ):
+            raise OperationComposerError("Generic typed fact handle is invalid.")
+        handles.add(handle)
+        normalized = dict(raw_fact)
+        for field in ("fact_action", "field_handle", "value_type", "value"):
+            if not isinstance(normalized.get(field), str):
+                raise OperationComposerError(
+                    f"Generic typed fact {field!r} must be a string."
+                )
+        if "key" in normalized and not isinstance(normalized["key"], str):
+            raise OperationComposerError("Generic typed fact key must be a string.")
+        facts.append(normalized)
+    return {
+        "contract": OPERATION_COMPOSITION_CONTRACT,
+        "typed_request_schema_digest": contract.schema_digest,
+        "facts": facts,
+    }
+
+
+def _apply_generic_typed_action(
+    operation: str,
+    version: str,
+    composition: Mapping[str, Any],
+    action: Mapping[str, Any],
+    *,
+    handle_factory: Callable[[], str] | None,
+) -> tuple[dict[str, Any], str]:
+    normalized = _normalize_generic_typed_composition(
+        operation, version, composition
+    )
+    _require_json_object(action, label="action")
+    try:
+        action_size = len(canonical_json_bytes(dict(action)))
+    except (RecursionError, TypeError, UnicodeError, ValueError) as exc:
+        raise OperationComposerError(
+            "Generic typed Draft action must be strict JSON."
+        ) from exc
+    if action_size > MAX_COMPOSER_ACTION_BYTES:
+        raise OperationComposerError(
+            "Generic typed Draft action exceeds its fixed byte ceiling.",
+            details={
+                "size_bytes": action_size,
+                "limit_bytes": MAX_COMPOSER_ACTION_BYTES,
+            },
+        )
+    if action.get("contract") != OPERATION_DRAFT_ACTION_CONTRACT:
+        raise OperationComposerError(
+            f"action contract must be {OPERATION_DRAFT_ACTION_CONTRACT!r}."
+        )
+    action_name = action.get("action")
+    if action_name not in _GENERIC_TYPED_ACTION_FIELDS:
+        raise OperationComposerError("Generic typed Draft action is unsupported.")
+    required, optional = _GENERIC_TYPED_ACTION_FIELDS[str(action_name)]
+    _require_allowed_keys(
+        action,
+        required=("contract", "action", *required),
+        optional=optional,
+        label="generic typed action",
+    )
+    facts = [dict(fact) for fact in normalized["facts"]]
+    if action_name == "remove_typed_fact":
+        fact_handle = action.get("fact_handle")
+        matches = [index for index, fact in enumerate(facts) if fact["handle"] == fact_handle]
+        if len(matches) != 1:
+            raise OperationComposerError("fact_handle does not name a current typed fact.")
+        facts.pop(matches[0])
+        affected_handle = str(fact_handle)
+    else:
+        fact_payload = {
+            field: action[field]
+            for field in ("fact_action", "field_handle", "value_type", "value", "key")
+            if field in action
+        }
+        for field, value in fact_payload.items():
+            if not isinstance(value, str):
+                raise OperationComposerError(
+                    f"Generic typed action field {field!r} must be a string."
+                )
+        fact_action = fact_payload.get("fact_action")
+        field_handle = fact_payload.get("field_handle")
+        if not isinstance(fact_action, str) or not isinstance(field_handle, str):
+            raise OperationComposerError(
+                "Generic typed action requires fact_action and field_handle."
+            )
+        supplied = set(fact_payload) - {"fact_action", "field_handle"}
+        required_by_fact_action = {
+            "set": {"value_type", "value"},
+            "append": {"value_type", "value"},
+            "present": set(),
+            "choose": {"value"},
+            "choose-dynamic": {"key", "value"},
+            "map-put": {"key", "value_type", "value"},
+        }
+        expected = required_by_fact_action.get(fact_action)
+        if expected is None or supplied != expected:
+            raise OperationComposerError(
+                "Generic typed fact fields do not match the selected fact action.",
+                details={
+                    "fact_action": fact_action,
+                    "required": sorted(expected or ()),
+                    "supplied": sorted(supplied),
+                },
+            )
+        if fact_action == "present":
+            fact_payload.update({"value_type": "null", "value": "null"})
+        elif fact_action == "choose":
+            fact_payload["value_type"] = "branch"
+        elif fact_action == "choose-dynamic":
+            fact_payload["value_type"] = "choice"
+        if action_name == "add_typed_fact":
+            affected_handle = (
+                handle_factory() if handle_factory is not None else _new_typed_fact_handle()
+            )
+            if (
+                not isinstance(affected_handle, str)
+                or _TYPED_FACT_HANDLE_PATTERN.fullmatch(affected_handle) is None
+                or any(fact["handle"] == affected_handle for fact in facts)
+            ):
+                raise OperationComposerError("Generated typed fact handle is invalid.")
+            facts.append({"handle": affected_handle, **fact_payload})
+        else:
+            fact_handle = action.get("fact_handle")
+            matches = [index for index, fact in enumerate(facts) if fact["handle"] == fact_handle]
+            if len(matches) != 1:
+                raise OperationComposerError("fact_handle does not name a current typed fact.")
+            affected_handle = str(fact_handle)
+            facts[matches[0]] = {"handle": affected_handle, **fact_payload}
+    candidate = {**normalized, "facts": facts}
+    # Run the Core whenever the Draft is complete. Incomplete intermediate
+    # revisions remain editable, while malformed supplied facts still fail
+    # before any durable write.
+    try:
+        materialize_operation_request(operation, version, candidate)
+    except OperationComposerError as exc:
+        if exc.error_code != "OPERATION_DRAFT_INCOMPLETE":
+            raise
+    return candidate, str(action_name)
+
+
 def new_composition(operation: str, version: str) -> dict[str, Any]:
     contract = operation_composer_contract(operation, version)
+    if operation.startswith("ak."):
+        return {
+            "contract": OPERATION_COMPOSITION_CONTRACT,
+            "typed_request_schema_digest": contract["typed_request_schema_digest"],
+            "facts": [],
+        }
     if operation == AUDIO_IMPORT_COMPOSER_OPERATION:
         gateway_default = contract["planning_discipline"]["import_operation"][
             "gateway_default"
@@ -1540,6 +1898,14 @@ def apply_composer_action(
     """Validate and apply one closed action without mutating the input mapping."""
 
     operation_composer_contract(operation, version)
+    if operation.startswith("ak."):
+        return _apply_generic_typed_action(
+            operation,
+            version,
+            composition,
+            action,
+            handle_factory=handle_factory,
+        )
     normalized = _normalize_composition(composition, operation=operation, version=version)
     _require_json_object(action, label="action")
     try:
@@ -2196,6 +2562,42 @@ def materialize_operation_request(
     """Build and canonically reparse the complete operation request."""
 
     normalized = _normalize_composition(composition, operation=operation, version=version)
+    if operation.startswith("ak."):
+        typed = request_contract(version, operation)
+        try:
+            materialized = materialize_typed_request(
+                typed,
+                schema_digest=normalized["typed_request_schema_digest"],
+                facts=tuple(
+                    TypedRequestFact(
+                        fact["fact_action"],
+                        fact["field_handle"],
+                        fact["value_type"],
+                        fact["value"],
+                        key=fact.get("key"),
+                    )
+                    for fact in normalized["facts"]
+                ),
+            )
+        except TypedRequestError as exc:
+            raise OperationComposerError(
+                str(exc),
+                error_code=(
+                    "OPERATION_DRAFT_INCOMPLETE"
+                    if _typed_request_error_is_incomplete(str(exc))
+                    else "OPERATION_DRAFT_ACTION_INVALID"
+                ),
+            ) from exc
+        return {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": version,
+            "operation": "waapi.call",
+            "arguments": {
+                "api": operation,
+                "args": dict(materialized.args),
+                "options": dict(materialized.options),
+            },
+        }
     if operation == AUDIO_IMPORT_COMPOSER_OPERATION:
         return _materialize_audio_import_request(version, normalized)
     targets = normalized["targets"]
@@ -2283,6 +2685,25 @@ def composition_projection(
     composition: Mapping[str, Any],
 ) -> dict[str, Any]:
     normalized = _normalize_composition(composition, operation=operation, version=version)
+    if operation.startswith("ak."):
+        missing: list[str] = []
+        try:
+            materialize_operation_request(operation, version, normalized)
+        except OperationComposerError as exc:
+            if exc.error_code != "OPERATION_DRAFT_INCOMPLETE":
+                raise
+            missing.append("complete_typed_request")
+        return {
+            "current_facts": [dict(fact) for fact in normalized["facts"]],
+            "missing_fields": missing,
+            "missing_fields_status": "complete" if not missing else "incomplete",
+            "allowed_actions": [
+                *operation_composer_contract(operation, version)["actions"],
+                "check",
+                "inspect",
+                "cancel",
+            ],
+        }
     if operation == AUDIO_IMPORT_COMPOSER_OPERATION:
         return _audio_import_composition_projection(version, normalized)
     facts = [
@@ -2419,6 +2840,10 @@ def _normalize_composition(
     version: str,
 ) -> dict[str, Any]:
     operation_composer_contract(operation, version)
+    if operation.startswith("ak."):
+        return _normalize_generic_typed_composition(
+            operation, version, composition
+        )
     if operation == AUDIO_IMPORT_COMPOSER_OPERATION:
         return _normalize_audio_import_composition(composition, version=version)
     _require_json_object(composition, label="composition")

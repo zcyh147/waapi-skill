@@ -275,149 +275,66 @@ class PublicGateway:
         self,
         switch_container_id: str,
     ) -> tuple[Mapping[str, Any], ...]:
-        request = {
-            "contract": "waapi-skill.operation-request/v1",
-            "version": self.version,
-            "operation": "waapi.call",
-            "arguments": {
-                "api": GET_ASSIGNMENTS_API,
-                "args": {
-                    "id": _guid(
-                        switch_container_id,
-                        "Switch Container id",
-                    )
-                },
-                "options": {},
-            },
-        }
-        # ``getAssignments`` is a reflected read, but its reviewed public lane
-        # is an explicit-confirmation transaction rather than generic ``call``.
-        # Keep the maintenance transaction isolated and ephemeral while still
-        # exercising every public Gateway phase exactly once.
-        with tempfile.TemporaryDirectory(
-            prefix="waapi-skill-integration-v2-read-"
-        ) as temporary_root:
-            transaction_root = Path(temporary_root).resolve(strict=True)
-            state_dir = transaction_root / "state"
-            evidence_dir = transaction_root / "evidence"
-            state_dir.mkdir(mode=0o700)
-            evidence_dir.mkdir(mode=0o700)
-
-            preview = self._invoke(
-                (
-                    "preview",
-                    "--request-json",
-                    _compact_json(request),
-                ),
-                expected_command="preview",
-                state_dir=state_dir,
-                evidence_dir=evidence_dir,
-            )
-            transaction_id = _transaction_field(
-                preview,
-                "transaction_id",
-                "getAssignments preview",
-            )
-            artifact_hash = _transaction_hash(
-                preview,
-                "getAssignments preview",
-            )
-            preview_summary = preview.get("preview_summary")
-            if (
-                preview.get("state") != "awaiting_confirmation"
-                or preview.get("executed") is not False
-                or not isinstance(preview_summary, Mapping)
-                or preview_summary.get("request") != request
-            ):
-                raise IntegrationBaselineCollectionError(
-                    "getAssignments preview did not preserve the exact awaiting read transaction"
-                )
-
-            shown = self._invoke(
-                (
-                    "transaction-show",
-                    transaction_id,
-                    "--summary-only",
-                ),
-                expected_command="transaction-show",
-                state_dir=state_dir,
-                evidence_dir=evidence_dir,
-                require_live_version=False,
-            )
-            confirmation = shown.get("confirmation")
-            token = (
-                confirmation.get("token")
-                if isinstance(confirmation, Mapping)
-                else None
-            )
-            if (
-                shown.get("transaction_id") != transaction_id
-                or shown.get("artifact_hash") != artifact_hash
-                or shown.get("state") != "awaiting_confirmation"
-                or not isinstance(token, str)
-                or not token
-            ):
-                raise IntegrationBaselineCollectionError(
-                    "getAssignments transaction-show omitted its exact confirmation binding"
-                )
-
-            confirmed = self._invoke(
-                (
-                    "confirm",
-                    transaction_id,
-                    "--confirmation-token",
-                    token,
-                ),
-                expected_command="confirm",
-                state_dir=state_dir,
-                evidence_dir=evidence_dir,
-                require_live_version=False,
-            )
-            if (
-                confirmed.get("transaction_id") != transaction_id
-                or confirmed.get("artifact_hash") != artifact_hash
-                or confirmed.get("state") != "confirmed"
-            ):
-                raise IntegrationBaselineCollectionError(
-                    "getAssignments confirmation did not bind the immutable preview"
-                )
-
-            executed = self._invoke(
-                ("execute", transaction_id),
-                expected_command="execute",
-                state_dir=state_dir,
-                evidence_dir=evidence_dir,
-            )
-            if (
-                executed.get("transaction_id") != transaction_id
-                or executed.get("artifact_hash") != artifact_hash
-                or executed.get("state") != "executed_unverified"
-                or executed.get("executed") is not True
-            ):
-                raise IntegrationBaselineCollectionError(
-                    "getAssignments execute did not persist one unverified result"
-                )
-
-            payload = self._invoke(
-                ("verify", transaction_id),
-                expected_command="verify",
-                state_dir=state_dir,
-                evidence_dir=evidence_dir,
-            )
-        agent_result = payload.get("agent_result")
-        if (
-            payload.get("transaction_id") != transaction_id
-            or payload.get("artifact_hash") != artifact_hash
-            or payload.get("state") != "result_schema_checked"
-            or payload.get("result_schema_checked") is not True
-            or not isinstance(agent_result, Mapping)
-            or agent_result.get("request") != request
-            or agent_result.get("executed") is not True
-        ):
+        object_id = _guid(switch_container_id, "Switch Container id")
+        schema = self._invoke(
+            ("request-schema", GET_ASSIGNMENTS_API),
+            expected_command="request-schema",
+            require_live_version=False,
+        )
+        schema_digest = schema.get("schema_digest")
+        fields = schema.get("fields")
+        if not isinstance(schema_digest, str) or not isinstance(fields, list):
             raise IntegrationBaselineCollectionError(
-                "getAssignments verification did not return the exact terminal read transaction"
+                "getAssignments typed schema is malformed"
             )
-        result = agent_result.get("result")
+        branch = next(
+            (
+                field
+                for field in fields
+                if isinstance(field, Mapping)
+                and field.get("name") == "id"
+                and field.get("shape") == "branch"
+            ),
+            None,
+        )
+        guid_choice = next(
+            (
+                field
+                for field in fields
+                if isinstance(field, Mapping)
+                and field.get("parent_handle") == (
+                    branch.get("handle") if isinstance(branch, Mapping) else None
+                )
+                and isinstance(field.get("patterns"), list)
+                and any(
+                    isinstance(pattern, str)
+                    and re.fullmatch(pattern, object_id) is not None
+                    for pattern in field["patterns"]
+                )
+            ),
+            None,
+        )
+        if not isinstance(branch, Mapping) or not isinstance(guid_choice, Mapping):
+            raise IntegrationBaselineCollectionError(
+                "getAssignments schema does not disclose its GUID branch"
+            )
+        payload = self._invoke(
+            (
+                "typed-call",
+                GET_ASSIGNMENTS_API,
+                "--schema-digest",
+                schema_digest,
+                "--choose",
+                str(branch["handle"]),
+                str(guid_choice["handle"]),
+                "--set",
+                str(guid_choice["handle"]),
+                "string",
+                object_id,
+            ),
+            expected_command="typed-call",
+        )
+        result = payload.get("agent_result")
         if not isinstance(result, Mapping):
             raise IntegrationBaselineCollectionError(
                 "getAssignments Gateway result is not an object"

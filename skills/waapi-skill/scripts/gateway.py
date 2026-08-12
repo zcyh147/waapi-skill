@@ -2748,6 +2748,13 @@ def preflight_typed_request_input(
     if len(versions) != 1:
         raise GatewayInputError("typed-call requires one exact Wwise version")
     contract = request_contract(versions[0], args.api)
+    if (
+        contract.as_gateway_payload()["input_shape"] == "draft"
+        and contract.uri != TYPED_REQUEST_COMPLEX_TRACER_URI
+    ):
+        raise GatewayInputError(
+            "This complex typed request must use its single draft-start entry."
+        )
     facts = [
         TypedRequestFact("set", handle, value_type, value)
         for handle, value_type, value in args.typed_set_facts
@@ -3500,6 +3507,14 @@ def operation_composer_input_contract(
     }
 
 
+def operation_draft_schema_digest(operation: str, version: str) -> str:
+    """Bind named-operation and exact-URI Drafts to their owning schema."""
+
+    if operation.startswith("ak."):
+        return request_contract(version, operation).schema_digest
+    return operation_request_schema_digest(operation, version)
+
+
 def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]) -> dict[str, Any]:
     """Run catalog commands without requiring a WAAPI port or live Wwise."""
 
@@ -3510,6 +3525,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         contract = request_contract(versions[0], args.api)
         if args.command == "request-schema":
             return contract.as_gateway_payload()
+        draft_shape = contract.as_gateway_payload()["input_shape"] == "draft"
         if args.schema_digest != contract.schema_digest:
             raise GatewayInputError("Typed request schema digest is stale")
         if args.command == "request-map-container":
@@ -3573,8 +3589,26 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "child_contract": child_contract,
             "schema_lineage_token": lineage_token,
             "continuation": {
-                "subcommand": "typed-call",
-                "fact": fact,
+                "subcommand": "draft-apply" if draft_shape else "typed-call",
+                **(
+                    {
+                        "action": "add_typed_fact",
+                        "action_argv": [
+                            "--action", "add_typed_fact",
+                            "--fact-action", fact[0].removeprefix("--"),
+                            "--field-handle", str(fact[1]),
+                            "--value-type", str(fact[-2]),
+                            "--fact-value", str(fact[-1]),
+                            *(
+                                ["--key", str(fact[2])]
+                                if fact[0] == "--map-put"
+                                else []
+                            ),
+                        ],
+                    }
+                    if draft_shape
+                    else {"fact": fact}
+                ),
                 **(
                     {}
                     if args.member_key is not None or args.shape != "object"
@@ -3610,9 +3644,8 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             raise GatewayInputError(
                 "draft-start requires an explicit or configured Wwise version."
             )
-        schema_digest = operation_request_schema_digest(
-            args.operation,
-            request_version,
+        schema_digest = operation_draft_schema_digest(
+            args.operation, request_version
         )
         composer_digest = operation_composer_digest(
             args.operation,
@@ -3638,9 +3671,8 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             args.draft_id,
             task_authority=args.task_authority,
         )
-        schema_digest = operation_request_schema_digest(
-            inspected.operation,
-            inspected.version,
+        schema_digest = operation_draft_schema_digest(
+            inspected.operation, inspected.version
         )
         composer_digest = operation_composer_digest(
             inspected.operation,
@@ -6947,9 +6979,8 @@ def dispatch_operation_draft_check(
         args.draft_id,
         task_authority=args.task_authority,
     )
-    schema_digest = operation_request_schema_digest(
-        inspected.operation,
-        inspected.version,
+    schema_digest = operation_draft_schema_digest(
+        inspected.operation, inspected.version
     )
     composer_digest = operation_composer_digest(
         inspected.operation,
@@ -6971,6 +7002,81 @@ def dispatch_operation_draft_check(
             },
         )
     request_payload = dict(materialized.request)
+    if inspected.operation.startswith("ak."):
+        capability = live_capability(
+            detected_version,
+            inspected.operation,
+            live_info=live_info,
+        )
+        if capability.execution_contract["effect"] == "read":
+            arguments = require_mapping(
+                request_payload.get("arguments"),
+                "typed Draft request arguments",
+            )
+            request_args = require_mapping(
+                arguments.get("args"), "typed Draft request args"
+            )
+            request_options = require_mapping(
+                arguments.get("options"), "typed Draft request options"
+            )
+            validation = validate_semantic_payload(
+                inspected.operation,
+                request_args,
+                request_options,
+                version=detected_version,
+                authoring_ui_profile=live_info.get("isCommandLine") is False,
+            )
+            result = dispatch(
+                dispatcher,
+                inspected.operation,
+                connection=connection,
+                version=detected_version,
+                args=request_args,
+                options=request_options,
+                result_limit_bytes=int(
+                    capability.execution_contract["result_limit_bytes"]
+                ),
+                operation_timeout=float(
+                    capability.execution_contract["timeout_seconds"]
+                ),
+            )
+            result_validation = (
+                validate_semantic_result(
+                    inspected.operation,
+                    result.get("result"),
+                    version=detected_version,
+                    authoring_ui_profile=live_info.get("isCommandLine") is False,
+                )
+                if result.get("ok")
+                else None
+            )
+            return {
+                "contract": GATEWAY_RESULT_CONTRACT,
+                "ok": bool(result.get("ok")),
+                "status": "ok" if result.get("ok") else "error",
+                "command": args.command,
+                "offline": False,
+                **common,
+                "api_attempted": inspected.operation,
+                "typed_request": {
+                    "contract": "waapi-skill.typed-request/v1",
+                    "schema_digest": schema_digest,
+                },
+                "call": dispatch_call_summary(result),
+                "schema_validation": {
+                    "request": validation.as_dict(),
+                    "result": (
+                        result_validation.as_dict()
+                        if result_validation is not None
+                        else None
+                    ),
+                },
+                "agent_result": result.get("result") if result.get("ok") else None,
+            }
+    canonical_request = parse_operation_request(
+        request_payload,
+        expected_version=detected_version,
+    )
     authoring_boundary = live_authoring_transaction_boundary(
         request_payload,
         command=args.command,
@@ -7024,10 +7130,6 @@ def dispatch_operation_draft_check(
         live_info=live_info,
         project=project,
         state_dir=state_dir,
-    )
-    canonical_request = parse_operation_request(
-        request_payload,
-        expected_version=detected_version,
     )
     if canonical_request.operation == OBJECT_SET_COMPOSER_OPERATION:
         read_call = prepare_object_set_composer_check(
@@ -7110,9 +7212,8 @@ def dispatch_operation_draft_preview(
         args.draft_id,
         task_authority=args.task_authority,
     )
-    schema_digest = operation_request_schema_digest(
-        inspected.operation,
-        inspected.version,
+    schema_digest = operation_draft_schema_digest(
+        inspected.operation, inspected.version
     )
     composer_digest = operation_composer_digest(
         inspected.operation,

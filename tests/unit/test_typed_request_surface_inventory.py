@@ -88,12 +88,12 @@ def test_packaged_surface_closes_all_824_exact_lanes() -> None:
         row["construction_shape"] == "inline"
         for row in result["lanes"]
         if row["item_type"] == "function"
-    ) == 460
+    ) == 463
     assert sum(
         row["construction_shape"] == "draft"
         for row in result["lanes"]
         if row["item_type"] == "function"
-    ) == 117
+    ) == 114
     assert sum(
         row["execution_policy"]["route"] == "compound_transaction_member"
         for row in result["lanes"]
@@ -191,9 +191,9 @@ def test_every_generated_inline_lane_is_either_generic_or_exactly_isolated() -> 
             assert contract.as_gateway_payload()["input_shape"] == "inline"
             generic.append((row["version"], row["uri"]))
 
-    assert len(inline_rows) == 460
-    assert len(generic) == 273
-    assert len(isolated) == 187
+    assert len(inline_rows) == 463
+    assert len(generic) == 275
+    assert len(isolated) == 188
     assert ("2025.1", "ak.wwise.core.object.setName") in isolated
     assert ("2025.1", "ak.wwise.core.log.get") in generic
 

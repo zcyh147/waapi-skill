@@ -665,13 +665,18 @@ def _flat_value_schema(
         )
     branches = node.get("oneOf", node.get("anyOf"))
     if branches is not None:
+        inherited = {
+            key: value
+            for key, value in node.items()
+            if key not in {"oneOf", "anyOf", "description"}
+        }
         return (
             isinstance(branches, list)
             and bool(branches)
             and all(
                 isinstance(branch, Mapping)
                 and _flat_value_schema(
-                    branch,
+                    {**inherited, **branch},
                     root_schema=root_schema,
                     graph=graph,
                     active_references=active_references,
