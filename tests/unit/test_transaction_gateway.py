@@ -720,6 +720,10 @@ def preview(
             "object.createPlugin",
             "object.set",
             "object.setRTPC",
+            "soundbank.convertExternalSources",
+            "soundbank.generate",
+            "soundbank.processDefinitionFiles",
+            "soundbank.setInclusions",
         }
         else "preview"
     )
@@ -6436,7 +6440,15 @@ def test_remote_local_filesystem_previews_fail_before_project_or_path_proof(
     }
     preview_command = (
         "legacy-preview"
-        if operation in {"audio.import", "object.set"}
+        if operation
+        in {
+            "audio.import",
+            "object.set",
+            "soundbank.convertExternalSources",
+            "soundbank.generate",
+            "soundbank.processDefinitionFiles",
+            "soundbank.setInclusions",
+        }
         else "preview"
     )
 

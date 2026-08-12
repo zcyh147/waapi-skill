@@ -57,12 +57,21 @@ def test_inventory_exactly_covers_every_registry_operation_and_version_lane() ->
     for name, spec in OPERATION_SPECS.items():
         modes = {operation_input_mode(name, version) for version in spec.supported_versions}
         expected_mode = LEGACY_JSON_INPUT_MODE
-        if assignments[name][1] in {"wave-00-complete", "wave-02-object-graph"} or name == "object.create":
+        if (
+            assignments[name][1]
+            in {"wave-00-complete", "wave-02-object-graph"}
+            or name == "object.create"
+            or (
+                assignments[name][1] == "wave-04-soundbank-and-files"
+                and name != "soundbank.processDefinitionFiles"
+            )
+        ):
             expected_mode = COMPOSER_INPUT_MODE
         elif assignments[name][1] in {
             "wave-01-single-object-edits",
             "wave-02-object-lifecycle",
             "wave-03-switch-assignments",
+            "wave-04-soundbank-and-files",
         }:
             expected_mode = INLINE_TYPED_INPUT_MODE
         assert modes == {expected_mode}

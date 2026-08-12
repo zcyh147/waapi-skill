@@ -106,6 +106,8 @@
       "ak.wwise.core.object.setReference",
       "ak.wwise.core.soundbank.convertExternalSources",
       "ak.wwise.core.soundbank.generate",
+      "ak.wwise.core.soundbank.processDefinitionFiles",
+      "ak.wwise.core.soundbank.setInclusions",
       "ak.wwise.core.switchContainer.addAssignment",
       "ak.wwise.core.switchContainer.removeAssignment",
       "ak.wwise.ui.getSelectedObjects"
@@ -2189,6 +2191,85 @@
           "selector": "relationship.prestate::exact-pair-present",
           "status": "normalized_equivalent",
           "reason": "Remove requires the exact pair to exist, seals the complete assignment list, revalidates it before execution, and verifies that the exact pair disappears."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.soundbank.processDefinitionFiles",
+      "profile": "wwise-console",
+      "versions": ["2022.1", "2023.1", "2024.1", "2025.1"],
+      "execution_mode": "isolated_transaction",
+      "operations": ["soundbank.processDefinitionFiles"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": ["files"],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "gateway.io_root::required-confinement",
+          "status": "normalized_equivalent",
+          "reason": "The public typed operation adds a sealed I/O root, proves every caller-owned Definition file without rewriting it, derives exact object and inclusion expectations from its hashed TSV bytes, and verifies the resulting SoundBank state."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.soundbank.setInclusions",
+      "profile": "wwise-console",
+      "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"],
+      "execution_mode": "transaction",
+      "operations": ["soundbank.setInclusions"],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": ["inclusions", "operation", "soundbank"],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/argsSchema/properties/inclusions/items",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": ["filter", "object"],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "gateway.identities::closed-typed-resolution",
+          "status": "normalized_equivalent",
+          "reason": "The public operation resolves the SoundBank and every inclusion identity through closed selectors, seals the complete live pre-state, preserves mode-specific add/remove/replace semantics, revalidates drift, and verifies the exact post-state."
         }
       ]
     },

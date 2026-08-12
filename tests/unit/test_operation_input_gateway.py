@@ -304,6 +304,43 @@ def test_typed_switch_assignment_enters_the_single_preview_ingress(
     assert payload["request"] == captured[0]
 
 
+def test_typed_definition_files_enters_the_single_preview_ingress(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: list[Mapping[str, Any]] = []
+
+    def fake_preview(request_payload: Mapping[str, Any], **_kwargs: Any) -> dict[str, Any]:
+        captured.append(request_payload)
+        return {"ok": True, "status": "ok", "request": request_payload}
+
+    monkeypatch.setattr(waapi_gateway, "create_transaction_preview", fake_preview)
+    operation = "soundbank.processDefinitionFiles"
+    digest = waapi_gateway.operation_request_schema_digest(operation, "2022.1")
+    definition = str((tmp_path / "Definition File.tsv").resolve())
+    io_root = str(tmp_path.resolve())
+    client = FakeClient({"ak.wwise.core.getInfo": [live_info()]})
+    code, payload = waapi_gateway.execute_gateway(
+        [
+            "typed-operation", operation, "--schema-digest", digest, "--apply",
+            "--file", definition, "--io-root", io_root,
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert code == 0, payload
+    assert captured == [
+        {
+            "contract": OPERATION_REQUEST_CONTRACT,
+            "version": "2022.1",
+            "operation": operation,
+            "arguments": {"files": [definition], "io_root": io_root},
+        }
+    ]
+    assert payload["request"] == captured[0]
+
+
 def _without_route_specific_schema_fields(payload: Mapping[str, Any]) -> dict[str, Any]:
     result = copy.deepcopy(dict(payload))
     result.pop("command", None)

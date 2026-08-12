@@ -280,12 +280,12 @@ def test_native_surface_policy_partitions_every_function_and_binds_high_risk_dif
         "reviewed_special_uri_count": 51,
         "reviewed_generic_restriction_count": 6,
     }
-    assert summary["version_rows"] == 87
-    assert summary["rules"] == 38
-    assert summary["scopes"] == 201
-    assert summary["schema_selectors"] == 800
-    assert summary["semantic_boundaries"] == 56
-    assert sum(summary["selectors_by_status"].values()) == 800
+    assert summary["version_rows"] == 96
+    assert summary["rules"] == 40
+    assert summary["scopes"] == 224
+    assert summary["schema_selectors"] == 829
+    assert summary["semantic_boundaries"] == 58
+    assert sum(summary["selectors_by_status"].values()) == 829
     assert summary["selectors_by_status"]["intentionally_blocked"] > 0
     assert summary["selectors_by_status"]["missing"] == 0
 
@@ -364,6 +364,28 @@ def test_native_surface_policy_records_closed_switch_assignment_boundaries() -> 
             else "relationship.prestate::exact-pair-present"
         )
         assert boundaries[expected_prestate]["status"] == "normalized_equivalent"
+
+
+def test_native_surface_policy_records_closed_soundbank_file_and_inclusion_boundaries() -> None:
+    payload = load_native_surface_policy()
+    rules = {rule["uri"]: rule for rule in payload["rules"]}
+    definitions = rules["ak.wwise.core.soundbank.processDefinitionFiles"]
+    assert definitions["versions"] == ["2022.1", "2023.1", "2024.1", "2025.1"]
+    assert definitions["scopes"][0]["classifications"]["normalized_equivalent"] == ["files"]
+    assert definitions["semantic_boundaries"][0]["selector"] == (
+        "gateway.io_root::required-confinement"
+    )
+
+    inclusions = rules["ak.wwise.core.soundbank.setInclusions"]
+    assert inclusions["versions"] == [
+        "2021.1", "2022.1", "2023.1", "2024.1", "2025.1"
+    ]
+    assert inclusions["scopes"][0]["classifications"]["normalized_equivalent"] == [
+        "inclusions", "operation", "soundbank"
+    ]
+    assert inclusions["semantic_boundaries"][0]["selector"] == (
+        "gateway.identities::closed-typed-resolution"
+    )
 
 
 def test_native_surface_policy_records_bounded_advanced_waql_equivalence() -> None:

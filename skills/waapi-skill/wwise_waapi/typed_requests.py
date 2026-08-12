@@ -2171,6 +2171,23 @@ def _structural_variants(
             }
             if len(inferred_types) == 1 and None not in inferred_types:
                 resolved = {"type": inferred_types.pop(), **resolved}
+        value_type = resolved.get("type")
+        if isinstance(value_type, list):
+            for item_type in value_type:
+                if item_type not in {
+                    "string",
+                    "integer",
+                    "number",
+                    "boolean",
+                    "null",
+                    "object",
+                    "array",
+                }:
+                    raise TypedRequestError(
+                        "Typed structural field declares an unsupported type"
+                    )
+                variants.append({**resolved, "type": item_type})
+            continue
         variants.append(resolved)
     return tuple(variants)
 

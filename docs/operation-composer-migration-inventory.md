@@ -46,10 +46,10 @@ planning; the Registry remains authoritative during implementation.
 | `object.setProperty` | 2021.1–2025.1 | Inline typed | object/property/value/platform | live metadata and typed readback | wave 01 complete |
 | `object.setRTPC` | 2022.1–2025.1 | Composer | object/property/control input/points | dedicated curve on shared URI | wave 02 complete |
 | `object.setReference` | 2021.1–2025.1 | Inline typed | object/reference/nullable target/platform | metadata and exact null clearing | wave 01 complete |
-| `soundbank.convertExternalSources` | 2022.1–2025.1 | Legacy | sources and I/O root | proven files and isolated artifacts | wave 04 |
-| `soundbank.generate` | 2021.1–2025.1 | Legacy | banks/platforms/languages/output root | host paths and artifacts | wave 04 |
-| `soundbank.processDefinitionFiles` | 2022.1–2025.1 | Legacy | definition files and I/O root | derived identities/inclusions | wave 04 |
-| `soundbank.setInclusions` | 2021.1–2025.1 | Legacy | bank/mode/inclusions | list pre-state/replacement | wave 04 |
+| `soundbank.convertExternalSources` | 2022.1–2025.1 | Composer | sources and I/O root | proven files and isolated artifacts | wave 04 complete |
+| `soundbank.generate` | 2021.1–2025.1 | Composer | banks/platforms/languages/output root | host paths and artifacts | wave 04 complete |
+| `soundbank.processDefinitionFiles` | 2022.1–2025.1 | Inline typed | definition files and I/O root | derived identities/inclusions | wave 04 complete |
+| `soundbank.setInclusions` | 2021.1–2025.1 | Composer | bank/mode/inclusions | list pre-state/replacement | wave 04 complete |
 | `switchContainer.addAssignment` | 2021.1–2025.1 | Inline typed | container/child/state-or-switch | three identities and pair readback | wave 03 complete |
 | `switchContainer.removeAssignment` | 2021.1–2025.1 | Inline typed | container/child/state-or-switch | existing-pair and absence readback | wave 03 complete |
 | `ui.captureScreen` | 2021.1–2025.1 | Legacy | optional view/channel/rectangle | Authoring and output confinement | wave 05 |
@@ -61,10 +61,10 @@ planning; the Registry remains authoritative during implementation.
 
 ## Migration order
 
-Waves 00 through 03 are complete: complex Draft Adapters and concise typed operations
+Waves 00 through 04 are complete: complex Draft Adapters and concise typed operations
 cover object batches, imports, single-object edits, recursive creation, object
-lifecycle, plug-in topology, RTPC curves, and Switch Container assignments.
-Planned waves cover SoundBank and isolated-file workflows, Authoring-only UI operations, and the
+lifecycle, plug-in topology, RTPC curves, Switch Container assignments, and
+SoundBank/isolated-file workflows. Planned waves cover Authoring-only UI operations and the
 compound Undo Group after relevant child contracts stabilize.
 
 Each operation owns its action vocabulary and verifier. A wave reuses deep

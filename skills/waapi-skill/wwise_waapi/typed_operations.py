@@ -40,10 +40,18 @@ INLINE_OPERATIONS = frozenset(
         "object.delete",
         "object.copy",
         "object.move",
+        "soundbank.processDefinitionFiles",
     }
 )
 DRAFT_TYPED_OPERATIONS = frozenset(
-    {"object.create", "object.createPlugin", "object.setRTPC"}
+    {
+        "object.create",
+        "object.createPlugin",
+        "object.setRTPC",
+        "soundbank.convertExternalSources",
+        "soundbank.generate",
+        "soundbank.setInclusions",
+    }
 )
 _MAX_SELECTOR_DEPTH = 8
 MAX_INLINE_OPERATION_VALUE_BYTES = 32 * 1024
@@ -195,7 +203,27 @@ def materialize_inline_operation_request(
     if operation not in INLINE_OPERATIONS:
         raise TypedOperationInputError(f"No inline typed adapter exists for {operation!r}")
     arguments: dict[str, Any]
-    if operation in {
+    if operation == "soundbank.processDefinitionFiles":
+        _require_keys(values, required=frozenset({"files", "io_root"}))
+        files = values["files"]
+        if (
+            not isinstance(files, Sequence)
+            or isinstance(files, (str, bytes))
+            or not files
+            or len(files) > 32
+        ):
+            raise TypedOperationInputError(
+                "soundbank.processDefinitionFiles requires 1-32 caller-owned files"
+            )
+        arguments = {
+            "files": [
+                _bounded_text(path, field="file", allow_empty=False) for path in files
+            ],
+            "io_root": _bounded_text(
+                values["io_root"], field="io_root", allow_empty=False
+            ),
+        }
+    elif operation in {
         "switchContainer.addAssignment",
         "switchContainer.removeAssignment",
     }:
@@ -343,14 +371,22 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
         ]
         if operation
         in {"switchContainer.addAssignment", "switchContainer.removeAssignment"}
-        else ["--object SELECTOR"]
+        else (
+            ["--file ABSOLUTE_PATH (repeat 1-32)", "--io-root ABSOLUTE_PATH"]
+            if operation == "soundbank.processDefinitionFiles"
+            else ["--object SELECTOR"]
+        )
     )
     continuation: dict[str, Any] = {
         "subcommand": "typed-operation",
         "operation": operation,
         "required_flag": "--apply",
     }
-    if operation in {"switchContainer.addAssignment", "switchContainer.removeAssignment"}:
+    if operation in {
+        "switchContainer.addAssignment",
+        "switchContainer.removeAssignment",
+        "soundbank.processDefinitionFiles",
+    }:
         pass
     elif operation in {"object.setName", "object.setNotes"}:
         fields.append("--text TEXT")

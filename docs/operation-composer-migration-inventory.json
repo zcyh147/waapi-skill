@@ -3,10 +3,10 @@
   "scope": {
     "registry_operations": 34,
     "registry_version_lanes": 153,
-    "composer_version_lanes": 22,
-    "inline_typed_version_lanes": 48,
-    "legacy_json_version_lanes": 83,
-    "lane_inventory_sha256": "f3fbf91b7fe02bfe367e1004154f15a22a9678177fae08cdb83ecaeb9df958a4",
+    "composer_version_lanes": 36,
+    "inline_typed_version_lanes": 52,
+    "legacy_json_version_lanes": 65,
+    "lane_inventory_sha256": "20ee5909b7557e81a29a52385f4d59f497abc6a3615386ad06e56b496b6dc840",
     "version_rule": "Every supported version lane inherits the disposition of its exact Registry operation name.",
     "normal_input_rule": "The Operation Registry exposes one normal input mode per operation and version. The Agent never chooses between Composer and Legacy JSON for one normal request.",
     "native_uri_rule": "A shared native URI never implies a shared migration decision. Isolation is keyed by exact operation name and version."
@@ -128,7 +128,7 @@
     },
     {
       "id": "wave-04-soundbank-and-files",
-      "status": "planned",
+      "status": "complete",
       "purpose": "Migrate SoundBank inclusion, generation, definition-file, and external-source workflows while retaining host-path and isolated-I/O authority.",
       "operations": [
         "soundbank.convertExternalSources",
@@ -137,7 +137,8 @@
         "soundbank.setInclusions"
       ],
       "reuse": [
-        "OperationDraftStore",
+        "OperationDraftStore for repeated and nested facts",
+        "concise inline submission for caller-owned Definition files",
         "bounded file and host-path facts",
         "isolated I/O guards",
         "Canonical OperationRequest parser",

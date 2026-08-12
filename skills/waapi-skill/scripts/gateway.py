@@ -1241,6 +1241,8 @@ def build_parser() -> argparse.ArgumentParser:
     typed_operation.add_argument("--on-name-conflict", choices=("fail", "rename", "replace"))
     typed_operation.add_argument("--auto-check-out", choices=("true", "false"))
     typed_operation.add_argument("--auto-add", choices=("true", "false"))
+    typed_operation.add_argument("--file", action="append", dest="files")
+    typed_operation.add_argument("--io-root")
     typed_call.add_argument(
         "--choose-dynamic",
         action="append",
@@ -3096,6 +3098,10 @@ def preflight_typed_operation_input(
         values["auto_check_out_to_source_control"] = args.auto_check_out
     if args.auto_add is not None:
         values["auto_add_to_source_control"] = args.auto_add
+    if args.files is not None:
+        values["files"] = tuple(args.files)
+    if args.io_root is not None:
+        values["io_root"] = args.io_root
     if args.value is not None:
         values["value_type"], values["value"] = args.value
     if args.target is not None:

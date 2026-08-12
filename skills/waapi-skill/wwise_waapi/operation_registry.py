@@ -1300,8 +1300,8 @@ _SOUNDBANK_GENERATE_ITEM_SCHEMA: Mapping[str, Any] = {
                 "all soundbanks[] rows."
             ),
         },
-        "events": {"type": "array", "minItems": 1, "items": IDENTITY_ARGUMENT_SCHEMA},
-        "aux_busses": {"type": "array", "minItems": 1, "items": IDENTITY_ARGUMENT_SCHEMA},
+        "events": {"type": "array", "minItems": 1, "maxItems": 256, "items": IDENTITY_ARGUMENT_SCHEMA},
+        "aux_busses": {"type": "array", "minItems": 1, "maxItems": 256, "items": IDENTITY_ARGUMENT_SCHEMA},
         "inclusions": {
             "type": "array",
             "minItems": 1,
@@ -3203,6 +3203,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 "mode": {"type": "string", "enum": ["add", "remove", "replace"]},
                 "inclusions": {
                     "type": "array",
+                    "maxItems": 128,
                     "empty_allowed_when": {"mode": "replace"},
                     "items": _object_contract(
                         ("object", "filters"),
@@ -3270,10 +3271,11 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             ("soundbanks", "platforms", "skip_languages", "write_to_disk", "io_root"),
             {
                 "soundbanks": {"type": "array", "minItems": 1, "maxItems": 64, "items": _SOUNDBANK_GENERATE_ITEM_SCHEMA},
-                "platforms": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+                "platforms": {"type": "array", "minItems": 1, "maxItems": 16, "items": {"type": "string", "minLength": 1}},
                 "languages": {
                     "type": "array",
                     "minItems": 1,
+                    "maxItems": 64,
                     "items": {"type": "string", "minLength": 1},
                     "description": (
                         "Batch language selection. Omit when every SoundBank has "
@@ -3505,10 +3507,10 @@ _OPERATION_INPUT_MODE_DECLARATIONS: tuple[
     ("object.setProperty", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
     ("object.setRTPC", ("2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
     ("object.setReference", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
-    ("soundbank.convertExternalSources", ("2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("soundbank.generate", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("soundbank.processDefinitionFiles", ("2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("soundbank.setInclusions", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("soundbank.convertExternalSources", ("2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
+    ("soundbank.generate", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
+    ("soundbank.processDefinitionFiles", ("2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
+    ("soundbank.setInclusions", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
     ("switchContainer.addAssignment", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
     ("switchContainer.removeAssignment", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
     ("ui.captureScreen", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),

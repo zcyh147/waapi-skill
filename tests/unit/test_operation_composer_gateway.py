@@ -213,7 +213,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
 
     assert len(non_object_set_digests) == 149
     assert canonical_sha256(non_object_set_digests) == (
-        "dc04aa305b2122079eb41fdb01fbca7fe94a1792f0e98586af9d017f9f3c929f"
+        "fd8e781df41a0cc56d1ed927fa300e753cce876bf6d1fe4978e28e3eac60313a"
     )
     assert {
         version: operation_input_mode("object.set", version)
@@ -1469,6 +1469,9 @@ def test_registry_composer_lanes_and_real_adapters_are_one_to_one() -> None:
         "object.createPlugin",
         "object.set",
         "object.setRTPC",
+        "soundbank.convertExternalSources",
+        "soundbank.generate",
+        "soundbank.setInclusions",
     }
 
 

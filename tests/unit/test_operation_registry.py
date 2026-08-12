@@ -88,6 +88,9 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                 "object.createPlugin",
                 "object.set",
                 "object.setRTPC",
+                "soundbank.convertExternalSources",
+                "soundbank.generate",
+                "soundbank.setInclusions",
             }
             else "inline_typed"
             if name in {
@@ -101,6 +104,7 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                     "object.move",
                     "switchContainer.addAssignment",
                     "switchContainer.removeAssignment",
+                    "soundbank.processDefinitionFiles",
                 }
             else LEGACY_JSON_INPUT_MODE
         )
