@@ -4274,6 +4274,56 @@ def _normalize_audio_import_draft_action_named_fields(value: Any) -> Any:
     return normalized
 
 
+def _normalize_audio_import_request_named_fields(value: Any) -> Any:
+    """Canonicalize only name-keyed fields while preserving import row order."""
+
+    if not isinstance(value, Mapping) or value.get("operation") != "audio.import":
+        return value
+    arguments = value.get("arguments")
+    if not isinstance(arguments, Mapping):
+        return value
+
+    def normalize_owner(owner: Any, *, path: str) -> Any:
+        if not isinstance(owner, Mapping):
+            raise ValueError(f"{path} must be an object")
+        normalized_owner = dict(owner)
+        for field, kind in (
+            ("properties", "property"),
+            ("references", "reference"),
+        ):
+            if field not in normalized_owner:
+                continue
+            named = _named_audio_import_fields(
+                normalized_owner[field],
+                path=f"{path}.{field}",
+                kind=kind,
+            )
+            normalized_owner[field] = [named[name] for name in sorted(named)]
+        return normalized_owner
+
+    try:
+        normalized_arguments = dict(arguments)
+        if "defaults" in normalized_arguments:
+            normalized_arguments["defaults"] = normalize_owner(
+                normalized_arguments["defaults"],
+                path="arguments.defaults",
+            )
+        if "imports" in normalized_arguments:
+            imports = normalized_arguments["imports"]
+            if not isinstance(imports, list):
+                return value
+            normalized_arguments["imports"] = [
+                normalize_owner(row, path=f"arguments.imports[{index}]")
+                for index, row in enumerate(imports)
+            ]
+    except ValueError:
+        return value
+
+    normalized = dict(value)
+    normalized["arguments"] = normalized_arguments
+    return normalized
+
+
 def _normalize_audio_import_request_activation_properties(
     actual: Any,
     expected: Any,
@@ -7807,6 +7857,12 @@ class CodexGatewayBroker:
                 actual_request,
                 expected_request=expected_request,
                 preview_step=step,
+            )
+            actual_request = _normalize_audio_import_request_named_fields(
+                actual_request
+            )
+            expected_request = _normalize_audio_import_request_named_fields(
+                expected_request
             )
             if actual_request != expected_request:
                 raise GatewayInvocationError(

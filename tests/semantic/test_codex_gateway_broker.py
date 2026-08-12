@@ -2235,6 +2235,120 @@ def test_audio_import_preview_replay_normalizes_explicit_gateway_owned_activatio
     ) == request
 
 
+def test_audio_import_preview_replay_treats_named_field_order_as_semantic(
+    tmp_path: Path,
+) -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2025.1",
+        "operation": "audio.import",
+        "arguments": {
+            "imports": [
+                {
+                    "audio_file": native_absolute_test_path("inputs", "rain.wav"),
+                    "object_path": (
+                        r"\Containers\Default Work Unit\Weather\Rain"
+                    ),
+                    "object_type": "Sound SFX",
+                    "import_language": "SFX",
+                    "properties": [
+                        {"name": "IsLoopingEnabled", "value": True},
+                        {"name": "Volume", "value": -4.0},
+                    ],
+                    "references": [
+                        {
+                            "name": "OutputBus",
+                            "target": {
+                                "kind": "path",
+                                "value": (
+                                    r"\Master-Mixer Hierarchy\Default Work Unit"
+                                    r"\Weather"
+                                ),
+                            },
+                        },
+                        {
+                            "name": "UserAuxSend0",
+                            "target": {
+                                "kind": "path",
+                                "value": (
+                                    r"\Master-Mixer Hierarchy\Default Work Unit"
+                                    r"\Weather Aux"
+                                ),
+                            },
+                        },
+                    ],
+                }
+            ],
+            "import_operation": "createNew",
+        },
+    }
+    steps = build_audio_import_composer_transaction_steps(request, label="tx01")
+    start = next(step for step in steps if step.subcommand == "draft-start")
+    preview = next(
+        step for step in steps if step.subcommand == "preview-from-draft"
+    )
+    broker = CodexGatewayBroker(
+        skill_source=make_fake_skill(tmp_path),
+        expected_steps=steps,
+        expected_wwise_version="2025.1",
+    )
+    broker._payloads_by_step[start.name] = {  # noqa: SLF001
+        "task_authority": "da1-" + "2" * 40,
+        "draft": {
+            "draft_id": "od1-" + "1" * 32,
+            "revision": 1,
+            "binding": {"operation": "audio.import", "version": "2025.1"},
+        },
+    }
+    composition = new_composition("audio.import", "2025.1")
+    handles = iter(("odh1-" + "3" * 24,))
+    revision = 1
+    for action_step in (
+        step for step in steps if step.subcommand == "draft-apply"
+    ):
+        action = dict(action_step.arguments[-1].expected)
+        composition, _ = apply_composer_action(
+            "audio.import",
+            "2025.1",
+            composition,
+            action,
+            handle_factory=lambda: next(handles),
+        )
+        revision += 1
+        broker._payloads_by_step[action_step.name] = {  # noqa: SLF001
+            "draft": {
+                "revision": revision,
+                **composition_projection(
+                    "audio.import",
+                    "2025.1",
+                    composition,
+                ),
+            }
+        }
+
+    reordered = json.loads(json.dumps(request))
+    row = reordered["arguments"]["imports"][0]
+    row["properties"].reverse()
+    row["references"].reverse()
+    payload = {
+        "transaction_id": "tx1-" + "4" * 20,
+        "state": "awaiting_confirmation",
+        "agent_result": {"request": reordered},
+    }
+
+    broker._validate_operation_draft_payload(preview, payload)  # noqa: SLF001
+
+    row["properties"][0]["value"] = -5.0
+    with pytest.raises(
+        GatewayInvocationError,
+        match="does not replay from the reviewed typed actions",
+    ):
+        broker._validate_operation_draft_payload(  # noqa: SLF001
+            preview,
+            payload,
+        )
+
+
 def test_numbered_draft_action_sequence_matches_any_exact_permutation() -> None:
     expected = (
         "tx01.draft-start",
