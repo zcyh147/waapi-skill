@@ -40,12 +40,12 @@ planning; the Registry remains authoritative during implementation.
 | `object.delete` | 2021.1–2025.1 | Legacy | object; optional checkout | protected object and GUID absence | wave 02 |
 | `object.move` | 2021.1–2025.1 | Legacy boundary | object and parent | no implemented public verifier | non-model-facing exclusion |
 | `object.set` | 2022.1–2025.1 | Composer | ordered bounded object batch | recursive mixed fields/references | wave 00 complete |
-| `object.setLinked` | 2023.1–2025.1 | Legacy | object/property/platform/link state | dedicated link semantics | wave 01 |
-| `object.setName` | 2021.1–2025.1 | Legacy | object and name | same-GUID path transition | wave 01 |
-| `object.setNotes` | 2021.1–2025.1 | Legacy | object and exact text | empty text versus omission | wave 01 |
-| `object.setProperty` | 2021.1–2025.1 | Legacy | object/property/value/platform | live metadata and typed readback | wave 01 |
+| `object.setLinked` | 2023.1–2025.1 | Inline typed | object/property/platform/link state | dedicated link semantics | wave 01 complete |
+| `object.setName` | 2021.1–2025.1 | Inline typed | object and name | same-GUID path transition | wave 01 complete |
+| `object.setNotes` | 2021.1–2025.1 | Inline typed | object and exact text | empty text versus omission | wave 01 complete |
+| `object.setProperty` | 2021.1–2025.1 | Inline typed | object/property/value/platform | live metadata and typed readback | wave 01 complete |
 | `object.setRTPC` | 2022.1–2025.1 | Legacy | object/property/control input/points | dedicated curve on shared URI | wave 02 |
-| `object.setReference` | 2021.1–2025.1 | Legacy | object/reference/nullable target/platform | metadata and exact null clearing | wave 01 |
+| `object.setReference` | 2021.1–2025.1 | Inline typed | object/reference/nullable target/platform | metadata and exact null clearing | wave 01 complete |
 | `soundbank.convertExternalSources` | 2022.1–2025.1 | Legacy | sources and I/O root | proven files and isolated artifacts | wave 04 |
 | `soundbank.generate` | 2021.1–2025.1 | Legacy | banks/platforms/languages/output root | host paths and artifacts | wave 04 |
 | `soundbank.processDefinitionFiles` | 2022.1–2025.1 | Legacy | definition files and I/O root | derived identities/inclusions | wave 04 |
@@ -61,15 +61,11 @@ planning; the Registry remains authoritative during implementation.
 
 ## Migration order
 
-Wave 00 is complete: `object.set` and `audio.import` prove one Draft lifecycle
-with two deliberately different business structures. Planned waves cover:
-
-1. single-object edits;
-2. object graph, plug-in, delete, and RTPC work;
-3. Switch Container assignments;
-4. SoundBank and isolated-file workflows;
-5. Authoring-only UI operations;
-6. compound Undo Group work after relevant child contracts stabilize.
+Waves 00 and 01 are complete: the two complex Draft Adapters and five concise
+single-object operations prove both typed mutation construction shapes. Planned
+waves cover object graph/plug-in/delete/RTPC work, Switch Container assignments,
+SoundBank and isolated-file workflows, Authoring-only UI operations, and the
+compound Undo Group after relevant child contracts stabilize.
 
 Each operation owns its action vocabulary and verifier. A wave reuses deep
 Draft, canonical parsing, and Preview modules without inventing a generic

@@ -4,8 +4,9 @@
     "registry_operations": 34,
     "registry_version_lanes": 153,
     "composer_version_lanes": 9,
-    "legacy_json_version_lanes": 144,
-    "lane_inventory_sha256": "fc50d762d922421973990dbbe6ac6fd1b539407550b869d42c33ed7c6c5396a4",
+    "inline_typed_version_lanes": 23,
+    "legacy_json_version_lanes": 121,
+    "lane_inventory_sha256": "bdda88f1d6ddd021186ba618e7445df736b12c399012924fb668302640d46472",
     "version_rule": "Every supported version lane inherits the disposition of its exact Registry operation name.",
     "normal_input_rule": "The Operation Registry exposes one normal input mode per operation and version. The Agent never chooses between Composer and Legacy JSON for one normal request.",
     "native_uri_rule": "A shared native URI never implies a shared migration decision. Isolation is keyed by exact operation name and version."
@@ -22,10 +23,10 @@
     },
     {
       "id": "wave-01-single-object-edits",
-      "status": "planned",
+      "status": "complete",
       "purpose": "Migrate one-target scalar, metadata-backed property/reference, and platform-link edits through a small-target Adapter family.",
       "operations": ["object.setLinked", "object.setName", "object.setNotes", "object.setProperty", "object.setReference"],
-      "reuse": ["OperationDraftStore", "object identity typed facts", "metadata-backed field checks", "Canonical OperationRequest parser", "Change Preview ingress"],
+      "reuse": ["typed selector and scalar values", "metadata-backed field checks", "Canonical OperationRequest parser", "Change Preview ingress"],
       "isolation_regressions": ["Each operation retains its own fields and verifier", "null reference clearing stays distinct from omission", "platform linking never becomes an ordinary property edit"],
       "minimum_real_evidence": "One real mutation per distinct verifier shape, including Alarm object.setReference on both integration versions and both hosts; version-only behavior runs on its matching real Wwise version."
     },

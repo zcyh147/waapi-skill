@@ -82,6 +82,14 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
         expected_mode = (
             COMPOSER_INPUT_MODE
             if name in {"audio.import", "object.set"}
+            else "inline_typed"
+            if name in {
+                "object.setLinked",
+                "object.setName",
+                "object.setNotes",
+                "object.setProperty",
+                "object.setReference",
+            }
             else LEGACY_JSON_INPUT_MODE
         )
         assert operation_input_modes_by_version(name) == {

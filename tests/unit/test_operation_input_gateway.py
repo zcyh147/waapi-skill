@@ -203,6 +203,59 @@ def offline_execute(
     )
 
 
+def test_inline_operation_schema_exposes_one_typed_continuation(tmp_path: Path) -> None:
+    code, payload = offline_execute(
+        tmp_path,
+        "--version",
+        "2025.1",
+        "operation-schema",
+        "object.setReference",
+    )
+
+    assert code == 0
+    assert payload["request_envelope"] is None
+    assert payload["operation"]["input_mode"] == "inline_typed"
+    assert payload["typed_operation"]["continuation"]["subcommand"] == "typed-operation"
+    assert "request-json" not in json.dumps(payload["typed_operation"])
+
+
+def test_typed_operation_materializes_exact_request_into_the_single_preview_ingress(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: list[Mapping[str, Any]] = []
+
+    def fake_preview(request_payload: Mapping[str, Any], **_kwargs: Any) -> dict[str, Any]:
+        captured.append(request_payload)
+        return {"ok": True, "status": "ok", "request": request_payload}
+
+    monkeypatch.setattr(waapi_gateway, "create_transaction_preview", fake_preview)
+    digest = waapi_gateway.operation_request_schema_digest(
+        "object.setNotes", "2022.1"
+    )
+    client = FakeClient({"ak.wwise.core.getInfo": [live_info()]})
+    code, payload = waapi_gateway.execute_gateway(
+        [
+            "typed-operation",
+            "object.setNotes",
+            "--schema-digest",
+            digest,
+            "--apply",
+            "--object",
+            "id-string",
+            OBJECT_GUID,
+            "--text",
+            "",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert code == 0, payload
+    assert captured == [set_notes_request() | {"arguments": {**set_notes_request()["arguments"], "value": ""}}]
+    assert payload["request"] == captured[0]
+
+
 def _without_route_specific_schema_fields(payload: Mapping[str, Any]) -> dict[str, Any]:
     result = copy.deepcopy(dict(payload))
     result.pop("command", None)
@@ -573,18 +626,20 @@ def test_legacy_schema_is_explicit_deprecated_and_uses_the_same_registry_contrac
         "submit_command": "legacy-preview",
     }
     assert legacy["operation"]["input_mode"] == LEGACY_JSON_INPUT_MODE
-    assert {
-        key: value
-        for key, value in normal["operation"].items()
-        if key not in {"summary", "selection_guidance"}
-    } == legacy["operation"]
-    assert legacy["request_envelope"] == normal["request_envelope"]
+    assert normal["operation"]["input_mode"] == "inline_typed"
+    assert normal["typed_operation"]["schema_digest"] == (
+        waapi_gateway.operation_request_schema_digest("object.setNotes", "2022.1")
+    )
+    assert legacy["operation"]["argument_contract"] == (
+        describe_operation("object.setNotes").as_dict(version="2022.1")[
+            "argument_contract"
+        ]
+    )
+    assert normal["request_envelope"] is None
+    assert legacy["request_envelope"] == set_notes_request() | {"arguments": {}}
     assert legacy["request_envelope_policy"]["preview_invocation"][
         "intended_change"
     ]["subcommand"] == "legacy-preview"
-    assert _without_route_specific_schema_fields(legacy) == (
-        _without_route_specific_schema_fields(normal)
-    )
     assert "\n" not in waapi_gateway.gateway_stdout_json_encoder(legacy).encode(
         legacy
     )
@@ -828,7 +883,7 @@ def test_preview_routes_share_transaction_timeout_and_live_dispatch_set(
         fake_dispatch_transaction_command,
     )
     request_json = json.dumps(set_notes_request())
-    for command in ("preview", "legacy-preview"):
+    for command in ("legacy-preview",):
         client = FakeClient({"ak.wwise.core.getInfo": [live_info()]})
         exit_code, payload = waapi_gateway.execute_gateway(
             [command, "--request-json", request_json],
@@ -840,12 +895,11 @@ def test_preview_routes_share_transaction_timeout_and_live_dispatch_set(
         assert payload["command"] == command
 
     assert observed == [
-        ("preview", waapi_gateway.DEFAULT_TRANSACTION_TIMEOUT),
         ("legacy-preview", waapi_gateway.DEFAULT_TRANSACTION_TIMEOUT),
     ]
 
 
-def test_preview_and_legacy_preview_create_identical_canonical_artifacts(
+def test_legacy_preview_preserves_the_canonical_artifact_after_normal_migration(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -864,7 +918,7 @@ def test_preview_and_legacy_preview_create_identical_canonical_artifacts(
     request = set_notes_request()
     request_json = json.dumps(request, ensure_ascii=False)
     results: dict[str, tuple[dict[str, Any], dict[str, Any], FakeClient]] = {}
-    for command in ("preview", "legacy-preview"):
+    for command in ("legacy-preview",):
         state_dir = tmp_path / command
         client = preview_client()
         exit_code, payload = waapi_gateway.execute_gateway(
@@ -884,12 +938,10 @@ def test_preview_and_legacy_preview_create_identical_canonical_artifacts(
         ).artifact
         results[command] = (payload, artifact, client)
 
-    normal_payload, normal_artifact, normal_client = results["preview"]
     legacy_payload, legacy_artifact, legacy_client = results["legacy-preview"]
-    assert normal_payload["artifact_hash"] == legacy_payload["artifact_hash"]
-    assert normal_artifact == legacy_artifact
-    assert normal_artifact["request"] == request
-    assert normal_client.calls == legacy_client.calls
+    assert legacy_payload["artifact_hash"]
+    assert legacy_artifact["request"] == request
+    assert legacy_client.calls
 
 
 def test_legacy_preview_keeps_its_truthful_command_on_early_live_boundaries(
@@ -1088,6 +1140,10 @@ def test_preview_routes_keep_boundary_and_live_version_mismatch_errors_equivalen
         )
 
     assert results[0][0] == results[1][0] == 2
-    assert results[0][1]["error_code"] == results[1][1]["error_code"]
-    assert results[0][1]["message"] == results[1][1]["message"]
-    assert results[0][1]["details"] == results[1][1]["details"]
+    if request_payload["operation"] == "object.setNotes":
+        assert results[0][1]["error_code"] == "INPUT_MODE_MISMATCH"
+        assert results[1][1]["error_code"] == "VERSION_MISMATCH"
+    else:
+        assert results[0][1]["error_code"] == results[1][1]["error_code"]
+        assert results[0][1]["message"] == results[1][1]["message"]
+        assert results[0][1]["details"] == results[1][1]["details"]

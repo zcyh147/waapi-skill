@@ -179,8 +179,9 @@ VERIFICATION_RESULT_CONTRACT = "waapi-skill.operation-verification/v1"
 ROLE_VALIDATION_CONTRACT = "waapi-skill.role-validation/v1"
 LEGACY_JSON_INPUT_MODE = "legacy_json"
 COMPOSER_INPUT_MODE = "composer"
+INLINE_TYPED_INPUT_MODE = "inline_typed"
 SUPPORTED_OPERATION_INPUT_MODES = frozenset(
-    {LEGACY_JSON_INPUT_MODE, COMPOSER_INPUT_MODE}
+    {LEGACY_JSON_INPUT_MODE, COMPOSER_INPUT_MODE, INLINE_TYPED_INPUT_MODE}
 )
 OBJECT_GET_URI = "ak.wwise.core.object.get"
 OBJECT_GET_TYPES_URI = "ak.wwise.core.object.getTypes"
@@ -3453,12 +3454,12 @@ _OPERATION_INPUT_MODE_DECLARATIONS: tuple[
     ("object.delete", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
     ("object.move", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
     ("object.set", ("2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
-    ("object.setLinked", ("2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("object.setName", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("object.setNotes", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("object.setProperty", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("object.setLinked", ("2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
+    ("object.setName", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
+    ("object.setNotes", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
+    ("object.setProperty", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
     ("object.setRTPC", ("2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("object.setReference", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("object.setReference", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
     ("soundbank.convertExternalSources", ("2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
     ("soundbank.generate", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
     ("soundbank.processDefinitionFiles", ("2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
@@ -4176,6 +4177,33 @@ def validate_object_set_composer_fragment(
         "The requested object.set fragment is outside the reviewed Composer Adapter.",
         details={"operation": "object.set", "version": version, "fragment": fragment},
     )
+
+
+def validate_operation_identity_fragment(
+    operation: str,
+    version: str,
+    *,
+    role: str,
+    payload: Any,
+) -> dict[str, Any]:
+    """Validate one typed identity through an exact Registry operation lane."""
+
+    machine = operation_request_machine_contract(operation, version)
+    if role not in machine["identity_arguments"]:
+        raise OperationContractError(
+            "INVALID_IDENTITY",
+            f"{role!r} is not an identity argument for {operation!r}.",
+        )
+    try:
+        descriptors = normalize_reference_descriptors(
+            [{"name": role, "target": payload}],
+            request_path=f"$.arguments.{role}",
+        )
+    except ObjectOperationContractError as exc:
+        raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+    if len(descriptors) != 1:  # pragma: no cover - normalizer invariant
+        raise RuntimeError("one operation identity fragment did not normalize once")
+    return descriptors[0].target.as_dict()
 
 
 def _normalize_composer_scalar(
@@ -20446,6 +20474,7 @@ def _audio_import_object_path_contract(
 
 __all__ = [
     "COMPOSER_INPUT_MODE",
+    "INLINE_TYPED_INPUT_MODE",
     "CONDITIONAL_LOCAL_FILESYSTEM_OPERATIONS",
     "DYNAMIC_LOCAL_FILESYSTEM_OPERATIONS",
     "LOCAL_FILESYSTEM_OPERATION_ROLES",
@@ -20477,6 +20506,7 @@ __all__ = [
     "validate_operation_input_mode_lanes",
     "validate_audio_import_composer_fragment",
     "validate_object_set_composer_fragment",
+    "validate_operation_identity_fragment",
     "validate_prepared_roles",
     "verify_prepared_operation",
 ]

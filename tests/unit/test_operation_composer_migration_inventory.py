@@ -6,6 +6,7 @@ from pathlib import Path
 
 from wwise_waapi.operation_registry import (
     COMPOSER_INPUT_MODE,
+    INLINE_TYPED_INPUT_MODE,
     LEGACY_JSON_INPUT_MODE,
     OPERATION_SPECS,
     operation_input_mode,
@@ -55,7 +56,13 @@ def test_inventory_exactly_covers_every_registry_operation_and_version_lane() ->
     lane_rows = []
     for name, spec in OPERATION_SPECS.items():
         modes = {operation_input_mode(name, version) for version in spec.supported_versions}
-        expected_mode = COMPOSER_INPUT_MODE if assignments[name][1] == "wave-00-complete" else LEGACY_JSON_INPUT_MODE
+        expected_mode = (
+            COMPOSER_INPUT_MODE
+            if assignments[name][1] == "wave-00-complete"
+            else INLINE_TYPED_INPUT_MODE
+            if assignments[name][1] == "wave-01-single-object-edits"
+            else LEGACY_JSON_INPUT_MODE
+        )
         assert modes == {expected_mode}
         for version in spec.supported_versions:
             lane_rows.append(
@@ -77,6 +84,7 @@ def test_inventory_exactly_covers_every_registry_operation_and_version_lane() ->
     ).encode("utf-8")
     assert hashlib.sha256(encoded).hexdigest() == inventory["scope"]["lane_inventory_sha256"]
     assert sum(row["input_mode"] == COMPOSER_INPUT_MODE for row in lane_rows) == inventory["scope"]["composer_version_lanes"]
+    assert sum(row["input_mode"] == INLINE_TYPED_INPUT_MODE for row in lane_rows) == inventory["scope"]["inline_typed_version_lanes"]
     assert sum(row["input_mode"] == LEGACY_JSON_INPUT_MODE for row in lane_rows) == inventory["scope"]["legacy_json_version_lanes"]
 
 

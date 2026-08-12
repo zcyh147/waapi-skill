@@ -189,6 +189,7 @@ from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[re
     COMPOSER_INPUT_MODE,
     FORBIDDEN_MODEL_AUTHORED_COMMAND_FIELDS,
     LEGACY_JSON_INPUT_MODE,
+    INLINE_TYPED_INPUT_MODE,
     OPERATION_REQUEST_CONTRACT,
     PACKAGED_TRANSACTION_READBACK_URIS,
     PREPARED_OPERATION_CONTRACT,
@@ -204,6 +205,12 @@ from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[re
     prepare_object_set_composer_check,
     validate_prepared_roles,
     verify_prepared_operation,
+)
+from wwise_waapi.typed_operations import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    INLINE_OPERATIONS,
+    TypedOperationInputError,
+    inline_operation_contract,
+    materialize_inline_operation_request,
 )
 from wwise_waapi.operation_drafts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     OPERATION_DRAFT_CONTRACT,
@@ -1207,6 +1214,24 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         dest="typed_branch_facts",
     )
+
+    typed_operation = subparsers.add_parser(
+        "typed-operation",
+        help="Preview one concise dedicated operation from typed business values",
+    )
+    typed_operation.add_argument("operation", choices=tuple(sorted(INLINE_OPERATIONS)))
+    typed_operation.add_argument("--schema-digest", required=True)
+    typed_operation.add_argument("--apply", action="store_true", required=True)
+    typed_operation.add_argument("--ttl", type=int, default=DEFAULT_PREVIEW_TTL_SECONDS)
+    typed_operation.add_argument("--object", nargs="+", required=True, dest="typed_object")
+    typed_operation.add_argument("--text")
+    typed_operation.add_argument("--property")
+    typed_operation.add_argument("--reference")
+    typed_operation.add_argument("--value", nargs=2, metavar=("TYPE", "VALUE"))
+    typed_operation.add_argument("--platform")
+    typed_operation.add_argument("--target", nargs="+")
+    typed_operation.add_argument("--clear", action="store_true")
+    typed_operation.add_argument("--linked", choices=("true", "false"))
     typed_call.add_argument(
         "--choose-dynamic",
         action="append",
@@ -2009,6 +2034,7 @@ def _execute_gateway_unconstrained(
             "preview-from-draft",
             "typed-zero-call",
             "typed-call",
+            "typed-operation",
         } and args.apply:
             require_project_modification_policy(
                 env=source_env,
@@ -2035,6 +2061,8 @@ def _execute_gateway_unconstrained(
             preflight_stable_read_input(args, env=source_env)
         if args.command == "typed-call":
             preflight_typed_request_input(args, env=source_env)
+        if args.command == "typed-operation":
+            preflight_typed_operation_input(args, env=source_env)
         if args.command == "typed-zero-call":
             preflight_typed_zero_input(args, env=source_env)
         if args.command in {"debug-wal-tree", "debug-validate-call"}:
@@ -3019,6 +3047,44 @@ def preflight_typed_request_input(
             raise GatewayInputError(str(exc)) from exc
         if target.item_type != "function":
             raise GatewayInputError("typed debug validation accepts only a function URI")
+
+
+def preflight_typed_operation_input(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+) -> None:
+    """Materialize one exact dedicated operation before opening WAAPI."""
+
+    versions = resolve_catalog_versions(args, env=env)
+    if len(versions) != 1:
+        raise GatewayInputError("typed-operation requires one configured Wwise version")
+    version = versions[0]
+    if operation_input_mode(args.operation, version) != INLINE_TYPED_INPUT_MODE:
+        raise GatewayInputError(
+            "This operation is not available through the concise typed-operation entry"
+        )
+    if operation_request_schema_digest(args.operation, version) != args.schema_digest:
+        raise GatewayInputError("Typed operation schema digest is stale")
+    values: dict[str, object] = {"object": tuple(args.typed_object)}
+    for field in ("text", "property", "reference", "platform", "linked"):
+        value = getattr(args, field)
+        if value is not None:
+            values[field] = value
+    if args.value is not None:
+        values["value_type"], values["value"] = args.value
+    if args.target is not None:
+        values["target"] = tuple(args.target)
+    if args.clear:
+        values["clear"] = True
+    try:
+        args.typed_operation_request = materialize_inline_operation_request(
+            args.operation,
+            version,
+            values,
+        )
+    except TypedOperationInputError as exc:
+        raise GatewayInputError(str(exc)) from exc
 
 
 def preflight_typed_zero_input(
@@ -4642,7 +4708,12 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 for version in spec.supported_versions
             }
             if COMPOSER_INPUT_MODE not in modes.values():
-                operations.append(spec.as_dict())
+                if INLINE_TYPED_INPUT_MODE in modes.values():
+                    projection = composer_operation_projection(spec, version=None)
+                    projection["input_modes_by_version"] = modes
+                    operations.append(projection)
+                else:
+                    operations.append(spec.as_dict())
                 continue
             projection = composer_operation_projection(spec, version=None)
             projection["composer_contracts_by_version"] = {
@@ -4701,9 +4772,12 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         normal_composer = (
             not legacy_compatibility and input_mode == COMPOSER_INPUT_MODE
         )
+        normal_inline = (
+            not legacy_compatibility and input_mode == INLINE_TYPED_INPUT_MODE
+        )
         operation_projection = (
             composer_operation_projection(spec, version=request_version)
-            if normal_composer
+            if normal_composer or normal_inline
             else spec.as_dict(version=request_version)
         )
         if legacy_compatibility:
@@ -4712,11 +4786,13 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             # projections still derive from this exact Registry spec.
             operation_projection.pop("summary", None)
             operation_projection.pop("selection_guidance", None)
-            if input_mode == COMPOSER_INPUT_MODE:
+            if input_mode in {COMPOSER_INPUT_MODE, INLINE_TYPED_INPUT_MODE}:
                 operation_projection["input_mode"] = LEGACY_JSON_INPUT_MODE
-        if normal_composer:
+        if normal_composer or normal_inline:
             request_envelope = None
-            request_envelope_status = "composer_ready"
+            request_envelope_status = (
+                "composer_ready" if normal_composer else "inline_typed_ready"
+            )
         payload = {
             "contract": GATEWAY_RESULT_CONTRACT,
             "ok": True,
@@ -4727,10 +4803,10 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "request_envelope": request_envelope,
             "request_envelope_policy": (
                 {
-                    "status": "composer_ready",
+                    "status": request_envelope_status,
                     "complete_request_authored_by_gateway": True,
                 }
-                if normal_composer
+                if normal_composer or normal_inline
                 else {
                     "status": request_envelope_status,
                     "required_top_level_keys": [
@@ -4787,6 +4863,12 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         }
         if normal_composer and request_version is not None:
             payload["composer"] = operation_composer_input_contract(
+                spec.name,
+                request_version,
+            )
+        if normal_inline and request_version is not None:
+            operation_projection["input_mode"] = INLINE_TYPED_INPUT_MODE
+            payload["typed_operation"] = inline_operation_contract(
                 spec.name,
                 request_version,
             )
@@ -5602,6 +5684,7 @@ def resolve_connection(args: argparse.Namespace, *, env: Mapping[str, str]) -> G
                     args.command == "typed-call"
                     and bool(getattr(args, "typed_requires_preview", False))
                 )
+                or args.command == "typed-operation"
                 else float(args.typed_zero_read_timeout)
                 if (
                     args.command == "typed-zero-call"
@@ -6059,6 +6142,23 @@ def dispatch_command(
                 "contract": typed_request.as_dict()["contract"],
                 "schema_digest": typed_request.schema_digest,
             },
+            },
+        )
+    if args.command == "typed-operation":
+        return create_transaction_preview(
+            args.typed_operation_request,
+            args=args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common={
+                **common,
+                "typed_operation": {
+                    "operation": args.operation,
+                    "schema_digest": args.schema_digest,
+                },
             },
         )
     if args.command == "typed-zero-call":
