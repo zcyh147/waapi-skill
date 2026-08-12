@@ -256,6 +256,54 @@ def test_typed_operation_materializes_exact_request_into_the_single_preview_ingr
     assert payload["request"] == captured[0]
 
 
+@pytest.mark.parametrize(
+    "operation",
+    ("switchContainer.addAssignment", "switchContainer.removeAssignment"),
+)
+def test_typed_switch_assignment_enters_the_single_preview_ingress(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    operation: str,
+) -> None:
+    captured: list[Mapping[str, Any]] = []
+
+    def fake_preview(request_payload: Mapping[str, Any], **_kwargs: Any) -> dict[str, Any]:
+        captured.append(request_payload)
+        return {"ok": True, "status": "ok", "request": request_payload}
+
+    monkeypatch.setattr(waapi_gateway, "create_transaction_preview", fake_preview)
+    digest = waapi_gateway.operation_request_schema_digest(operation, "2022.1")
+    client = FakeClient({"ak.wwise.core.getInfo": [live_info()]})
+    code, payload = waapi_gateway.execute_gateway(
+        [
+            "typed-operation", operation, "--schema-digest", digest, "--apply",
+            "--switch-container", "id-string", OBJECT_GUID,
+            "--child", "id-string", PARENT_GUID,
+            "--state-or-switch", "path", r"\Switches\Default Work Unit\Ground",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert code == 0, payload
+    assert captured == [
+        {
+            "contract": OPERATION_REQUEST_CONTRACT,
+            "version": "2022.1",
+            "operation": operation,
+            "arguments": {
+                "switch_container": {"kind": "id", "value": OBJECT_GUID},
+                "child": {"kind": "id", "value": PARENT_GUID},
+                "state_or_switch": {
+                    "kind": "path",
+                    "value": r"\Switches\Default Work Unit\Ground",
+                },
+            },
+        }
+    ]
+    assert payload["request"] == captured[0]
+
+
 def _without_route_specific_schema_fields(payload: Mapping[str, Any]) -> dict[str, Any]:
     result = copy.deepcopy(dict(payload))
     result.pop("command", None)

@@ -1225,7 +1225,10 @@ def build_parser() -> argparse.ArgumentParser:
     typed_operation.add_argument("--schema-digest", required=True)
     typed_operation.add_argument("--apply", action="store_true", required=True)
     typed_operation.add_argument("--ttl", type=int, default=DEFAULT_PREVIEW_TTL_SECONDS)
-    typed_operation.add_argument("--object", nargs="+", required=True, dest="typed_object")
+    typed_operation.add_argument("--object", nargs="+", dest="typed_object")
+    typed_operation.add_argument("--switch-container", nargs="+")
+    typed_operation.add_argument("--child", nargs="+")
+    typed_operation.add_argument("--state-or-switch", nargs="+")
     typed_operation.add_argument("--text")
     typed_operation.add_argument("--property")
     typed_operation.add_argument("--reference")
@@ -3072,7 +3075,15 @@ def preflight_typed_operation_input(
         )
     if operation_request_schema_digest(args.operation, version) != args.schema_digest:
         raise GatewayInputError("Typed operation schema digest is stale")
-    values: dict[str, object] = {"object": tuple(args.typed_object)}
+    values: dict[str, object] = {}
+    if args.typed_object is not None:
+        values["object"] = tuple(args.typed_object)
+    if args.switch_container is not None:
+        values["switch_container"] = tuple(args.switch_container)
+    if args.child is not None:
+        values["child"] = tuple(args.child)
+    if args.state_or_switch is not None:
+        values["state_or_switch"] = tuple(args.state_or_switch)
     for field in ("text", "property", "reference", "platform", "linked"):
         value = getattr(args, field)
         if value is not None:

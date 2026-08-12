@@ -3509,8 +3509,8 @@ _OPERATION_INPUT_MODE_DECLARATIONS: tuple[
     ("soundbank.generate", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
     ("soundbank.processDefinitionFiles", ("2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
     ("soundbank.setInclusions", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("switchContainer.addAssignment", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("switchContainer.removeAssignment", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("switchContainer.addAssignment", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
+    ("switchContainer.removeAssignment", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
     ("ui.captureScreen", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
     ("ui.commands.execute", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
     ("ui.commands.register", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
@@ -12701,6 +12701,10 @@ def _prepare_switch_assignment(
         "switch_assignment": {
             "switch_container_id": container.object,
             "reference_id": group.object,
+            "selectors": {
+                role: _json_mapping(arguments[role])
+                for role in ("switch_container", "child", "state_or_switch")
+            },
             "assignments": _public_assignment_pairs(assignments),
             "target_pair": {"child": child.object, "stateOrSwitch": state.object},
         }
@@ -14075,6 +14079,53 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         assignment_state = pre_state.get("switch_assignment")
         if isinstance(assignment_state, Mapping):
             container_id = assignment_state.get("switch_container_id")
+            selectors = assignment_state.get("selectors")
+            if not isinstance(selectors, Mapping):
+                raise OperationContractError(
+                    "INVALID_PREVIEW",
+                    "Switch Container assignment selector evidence is missing.",
+                )
+            for role in ("switch_container", "child", "state_or_switch"):
+                selector = selectors.get(role)
+                expected_role = roles.get(role)
+                if not isinstance(selector, Mapping) or not isinstance(expected_role, Mapping):
+                    raise OperationContractError(
+                        "INVALID_PREVIEW",
+                        f"Switch Container assignment {role} selector evidence is malformed.",
+                    )
+                # Exact IDs are already covered by the bounded role GUID batch.
+                # Every other selector must still resolve uniquely to that same
+                # GUID, including its recursively resolved parent selector.
+                if selector.get("kind") == "id":
+                    continue
+                try:
+                    resolved = _resolve_identity(
+                        selector,
+                        role=f"{role}.execution_selector",
+                        read=read_call,
+                    )
+                    passed = _same_identity(
+                        resolved.object, expected_role.get("object")
+                    )
+                    evidence: Any = {
+                        "selector": dict(selector),
+                        "expected_object": expected_role.get("object"),
+                        "actual_object": resolved.object,
+                    }
+                except OperationContractError as exc:
+                    passed = False
+                    evidence = {
+                        "selector": dict(selector),
+                        "expected_object": expected_role.get("object"),
+                        "error": exc.as_dict(),
+                    }
+                assertions.append(
+                    {
+                        "name": f"{role} original selector remains unique and unchanged",
+                        "passed": passed,
+                        "evidence": evidence,
+                    }
+                )
             reference_args = {"from": {"id": [container_id]}}
             reference_options = {"return": ["id", "path", SWITCH_GROUP_REFERENCE]}
             reference_result = read_call(OBJECT_GET_URI, reference_args, reference_options)

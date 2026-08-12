@@ -97,9 +97,11 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                 "object.setProperty",
                 "object.setReference",
                 "object.copy",
-                "object.delete",
-                "object.move",
-            }
+                    "object.delete",
+                    "object.move",
+                    "switchContainer.addAssignment",
+                    "switchContainer.removeAssignment",
+                }
             else LEGACY_JSON_INPUT_MODE
         )
         assert operation_input_modes_by_version(name) == {
@@ -5646,6 +5648,99 @@ def test_switch_assignment_validates_relationship_prestate_drift_and_exact_post_
         item["name"] == "complete Switch Container assignment state matches expected post-state"
         for item in verified.assertions
     )
+
+
+def test_switch_assignment_execution_guard_rejects_new_selector_ambiguity() -> None:
+    container_id = "{aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}"
+    child_id = "{bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb}"
+    state_id = "{cccccccc-cccc-cccc-cccc-cccccccccccc}"
+    group_id = "{dddddddd-dddd-dddd-dddd-dddddddddddd}"
+    duplicate_id = "{eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee}"
+    container_row = object_row(
+        object_id=container_id,
+        name="ClosedSwitch",
+        object_type="SwitchContainer",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\ClosedSwitch",
+        parent=PARENT_GUID,
+    )
+    child_row = object_row(
+        object_id=child_id,
+        name="Child",
+        object_type="Sound",
+        path=container_row["path"] + r"\Child",
+        parent=container_id,
+    )
+    group_row = object_row(
+        object_id=group_id,
+        name="ClosedGroup",
+        object_type="SwitchGroup",
+        path=r"\Switches\Default Work Unit\ClosedGroup",
+        parent="{switches-workunit}",
+    )
+    state_row = object_row(
+        object_id=state_id,
+        name="ClosedState",
+        object_type="Switch",
+        path=group_row["path"] + r"\ClosedState",
+        parent=group_id,
+    )
+    reference_row = {
+        "id": container_id,
+        "path": container_row["path"],
+        "SwitchGroupOrStateGroup": {"id": group_id},
+    }
+    prepared = prepare_operation(
+        parse_operation_request(
+            request(
+                "switchContainer.addAssignment",
+                {
+                    "switch_container": {
+                        "kind": "exact-type-name",
+                        "type": "SwitchContainer",
+                        "name": "ClosedSwitch",
+                    },
+                    "child": {"kind": "id", "value": child_id},
+                    "state_or_switch": {"kind": "id", "value": state_id},
+                },
+            )
+        ),
+        read_call=ScriptedReader(
+            {
+                "ak.wwise.core.object.get": [
+                    {"return": [container_row]},
+                    {"return": [child_row]},
+                    {"return": [state_row]},
+                    {"return": [reference_row]},
+                    {"return": [group_row]},
+                ],
+                "ak.wwise.core.switchContainer.getAssignments": [{"return": []}],
+            }
+        ),
+    ).as_dict()
+
+    duplicate = {**container_row, "id": duplicate_id, "path": container_row["path"] + "2"}
+    guarded = validate_prepared_roles(
+        prepared,
+        read_call=ScriptedReader(
+            {
+                "ak.wwise.core.object.get": [
+                    {"return": [container_row, child_row, state_row, group_row]},
+                    {"return": [container_row, duplicate]},
+                    {"return": [reference_row]},
+                ],
+                "ak.wwise.core.switchContainer.getAssignments": [{"return": []}],
+            }
+        ),
+    )
+
+    assert guarded["status"] == "repreview_required"
+    selector_assertion = next(
+        item
+        for item in guarded["assertions"]
+        if item["name"] == "switch_container original selector remains unique and unchanged"
+    )
+    assert selector_assertion["passed"] is False
+    assert selector_assertion["evidence"]["error"]["error_code"] == "AMBIGUOUS_IDENTITY"
 
 
 @pytest.mark.parametrize(

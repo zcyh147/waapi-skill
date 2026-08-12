@@ -62,6 +62,7 @@ def test_inventory_exactly_covers_every_registry_operation_and_version_lane() ->
         elif assignments[name][1] in {
             "wave-01-single-object-edits",
             "wave-02-object-lifecycle",
+            "wave-03-switch-assignments",
         }:
             expected_mode = INLINE_TYPED_INPUT_MODE
         assert modes == {expected_mode}

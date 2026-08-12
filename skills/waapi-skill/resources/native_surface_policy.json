@@ -106,6 +106,8 @@
       "ak.wwise.core.object.setReference",
       "ak.wwise.core.soundbank.convertExternalSources",
       "ak.wwise.core.soundbank.generate",
+      "ak.wwise.core.switchContainer.addAssignment",
+      "ak.wwise.core.switchContainer.removeAssignment",
       "ak.wwise.ui.getSelectedObjects"
     ],
     "wwise-authoring-ui": [
@@ -2085,6 +2087,108 @@
           "selector": "args.commands[].program-args-luaScript::raw-handler",
           "status": "intentionally_blocked",
           "reason": "Registration accepts only the closed descriptor-backed command form; arbitrary program, argument, and Lua handler definitions remain unavailable."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.switchContainer.addAssignment",
+      "profile": "wwise-console",
+      "versions": [
+        "2021.1",
+        "2022.1",
+        "2023.1",
+        "2024.1",
+        "2025.1"
+      ],
+      "execution_mode": "transaction",
+      "operations": [
+        "switchContainer.addAssignment"
+      ],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "child",
+              "stateOrSwitch"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "gateway.switch_container::relationship-owner",
+          "status": "normalized_equivalent",
+          "reason": "The typed operation requires the exact SwitchContainer owner, resolves all three identities, proves direct-child and group topology, and dispatches only the reviewed child/state GUID pair."
+        },
+        {
+          "selector": "relationship.prestate::child-unassigned",
+          "status": "normalized_equivalent",
+          "reason": "Add requires the child to have no existing assignment, seals the complete assignment list, revalidates it before execution, and verifies that the exact pair appears."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.switchContainer.removeAssignment",
+      "profile": "wwise-console",
+      "versions": [
+        "2021.1",
+        "2022.1",
+        "2023.1",
+        "2024.1",
+        "2025.1"
+      ],
+      "execution_mode": "transaction",
+      "operations": [
+        "switchContainer.removeAssignment"
+      ],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "child",
+              "stateOrSwitch"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "gateway.switch_container::relationship-owner",
+          "status": "normalized_equivalent",
+          "reason": "The typed operation requires the exact SwitchContainer owner, resolves all three identities, proves direct-child and group topology, and dispatches only the reviewed child/state GUID pair."
+        },
+        {
+          "selector": "relationship.prestate::exact-pair-present",
+          "status": "normalized_equivalent",
+          "reason": "Remove requires the exact pair to exist, seals the complete assignment list, revalidates it before execution, and verifies that the exact pair disappears."
         }
       ]
     },

@@ -280,12 +280,12 @@ def test_native_surface_policy_partitions_every_function_and_binds_high_risk_dif
         "reviewed_special_uri_count": 51,
         "reviewed_generic_restriction_count": 6,
     }
-    assert summary["version_rows"] == 77
-    assert summary["rules"] == 36
-    assert summary["scopes"] == 181
-    assert summary["schema_selectors"] == 780
-    assert summary["semantic_boundaries"] == 52
-    assert sum(summary["selectors_by_status"].values()) == 780
+    assert summary["version_rows"] == 87
+    assert summary["rules"] == 38
+    assert summary["scopes"] == 201
+    assert summary["schema_selectors"] == 800
+    assert summary["semantic_boundaries"] == 56
+    assert sum(summary["selectors_by_status"].values()) == 800
     assert summary["selectors_by_status"]["intentionally_blocked"] > 0
     assert summary["selectors_by_status"]["missing"] == 0
 
@@ -331,6 +331,39 @@ def test_native_surface_policy_records_closed_import_semantic_boundaries() -> No
         assert boundaries[
             "tab-columns.Audio File::relative-to-import-file"
         ] == "intentionally_blocked"
+
+
+def test_native_surface_policy_records_closed_switch_assignment_boundaries() -> None:
+    payload = load_native_surface_policy()
+    rules = {
+        rule["uri"]: rule
+        for rule in payload["rules"]
+        if rule["uri"].startswith("ak.wwise.core.switchContainer.")
+        and rule["uri"].endswith("Assignment")
+    }
+
+    assert set(rules) == {
+        "ak.wwise.core.switchContainer.addAssignment",
+        "ak.wwise.core.switchContainer.removeAssignment",
+    }
+    for uri, rule in rules.items():
+        args_scope = next(
+            scope for scope in rule["scopes"] if scope["pointer"] == "/argsSchema"
+        )
+        assert args_scope["classifications"]["normalized_equivalent"] == [
+            "child",
+            "stateOrSwitch",
+        ]
+        boundaries = {row["selector"]: row for row in rule["semantic_boundaries"]}
+        assert boundaries["gateway.switch_container::relationship-owner"]["status"] == (
+            "normalized_equivalent"
+        )
+        expected_prestate = (
+            "relationship.prestate::child-unassigned"
+            if uri.endswith("addAssignment")
+            else "relationship.prestate::exact-pair-present"
+        )
+        assert boundaries[expected_prestate]["status"] == "normalized_equivalent"
 
 
 def test_native_surface_policy_records_bounded_advanced_waql_equivalence() -> None:

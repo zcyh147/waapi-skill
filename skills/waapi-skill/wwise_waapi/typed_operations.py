@@ -35,6 +35,8 @@ INLINE_OPERATIONS = frozenset(
         "object.setNotes",
         "object.setProperty",
         "object.setReference",
+        "switchContainer.addAssignment",
+        "switchContainer.removeAssignment",
         "object.delete",
         "object.copy",
         "object.move",
@@ -193,7 +195,23 @@ def materialize_inline_operation_request(
     if operation not in INLINE_OPERATIONS:
         raise TypedOperationInputError(f"No inline typed adapter exists for {operation!r}")
     arguments: dict[str, Any]
-    if operation in {"object.setName", "object.setNotes"}:
+    if operation in {
+        "switchContainer.addAssignment",
+        "switchContainer.removeAssignment",
+    }:
+        _require_keys(
+            values,
+            required=frozenset(
+                {"switch_container", "child", "state_or_switch"}
+            ),
+        )
+        arguments = {
+            role: _selector(
+                values[role], operation=operation, version=version, field=role
+            )
+            for role in ("switch_container", "child", "state_or_switch")
+        }
+    elif operation in {"object.setName", "object.setNotes"}:
         _require_keys(values, required=frozenset({"object", "text"}))
         arguments = {
             "object": _selector(values["object"], operation=operation, version=version, field="object"),
@@ -317,13 +335,24 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
 
     if operation not in INLINE_OPERATIONS:
         raise TypedOperationInputError(f"No inline typed adapter exists for {operation!r}")
-    fields: list[str] = ["--object SELECTOR"]
+    fields: list[str] = (
+        [
+            "--switch-container SELECTOR",
+            "--child SELECTOR",
+            "--state-or-switch SELECTOR",
+        ]
+        if operation
+        in {"switchContainer.addAssignment", "switchContainer.removeAssignment"}
+        else ["--object SELECTOR"]
+    )
     continuation: dict[str, Any] = {
         "subcommand": "typed-operation",
         "operation": operation,
         "required_flag": "--apply",
     }
-    if operation in {"object.setName", "object.setNotes"}:
+    if operation in {"switchContainer.addAssignment", "switchContainer.removeAssignment"}:
+        pass
+    elif operation in {"object.setName", "object.setNotes"}:
         fields.append("--text TEXT")
     elif operation == "object.delete":
         fields.append("--auto-check-out true|false (optional; 2023.1+)")

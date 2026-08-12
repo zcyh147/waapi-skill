@@ -4,9 +4,9 @@
     "registry_operations": 34,
     "registry_version_lanes": 153,
     "composer_version_lanes": 22,
-    "inline_typed_version_lanes": 38,
-    "legacy_json_version_lanes": 93,
-    "lane_inventory_sha256": "f47e10ed032ad9ec774fd102862e59cdbf6709c7f53a28a9d7e82a73de6b0f12",
+    "inline_typed_version_lanes": 48,
+    "legacy_json_version_lanes": 83,
+    "lane_inventory_sha256": "f3fbf91b7fe02bfe367e1004154f15a22a9678177fae08cdb83ecaeb9df958a4",
     "version_rule": "Every supported version lane inherits the disposition of its exact Registry operation name.",
     "normal_input_rule": "The Operation Registry exposes one normal input mode per operation and version. The Agent never chooses between Composer and Legacy JSON for one normal request.",
     "native_uri_rule": "A shared native URI never implies a shared migration decision. Isolation is keyed by exact operation name and version."
@@ -107,15 +107,14 @@
     },
     {
       "id": "wave-03-switch-assignments",
-      "status": "planned",
+      "status": "complete",
       "purpose": "Migrate the exact child-to-state-or-switch relationship through a dedicated relational Adapter.",
       "operations": [
         "switchContainer.addAssignment",
         "switchContainer.removeAssignment"
       ],
       "reuse": [
-        "OperationDraftStore",
-        "identity typed facts",
+        "concise typed identity submission",
         "relationship pre-state/readback",
         "Canonical OperationRequest parser",
         "Change Preview ingress"

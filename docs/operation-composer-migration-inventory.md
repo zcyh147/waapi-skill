@@ -50,8 +50,8 @@ planning; the Registry remains authoritative during implementation.
 | `soundbank.generate` | 2021.1–2025.1 | Legacy | banks/platforms/languages/output root | host paths and artifacts | wave 04 |
 | `soundbank.processDefinitionFiles` | 2022.1–2025.1 | Legacy | definition files and I/O root | derived identities/inclusions | wave 04 |
 | `soundbank.setInclusions` | 2021.1–2025.1 | Legacy | bank/mode/inclusions | list pre-state/replacement | wave 04 |
-| `switchContainer.addAssignment` | 2021.1–2025.1 | Legacy | container/child/state-or-switch | three identities and pair readback | wave 03 |
-| `switchContainer.removeAssignment` | 2021.1–2025.1 | Legacy | container/child/state-or-switch | existing-pair and absence readback | wave 03 |
+| `switchContainer.addAssignment` | 2021.1–2025.1 | Inline typed | container/child/state-or-switch | three identities and pair readback | wave 03 complete |
+| `switchContainer.removeAssignment` | 2021.1–2025.1 | Inline typed | container/child/state-or-switch | existing-pair and absence readback | wave 03 complete |
 | `ui.captureScreen` | 2021.1–2025.1 | Legacy | optional view/channel/rectangle | Authoring and output confinement | wave 05 |
 | `ui.commands.execute` | 2021.1–2025.1 | Legacy | command; optional targets/values/files | fresh command inventory | wave 05 |
 | `ui.commands.register` | 2021.1–2025.1 | Legacy | descriptors; optional authority | ownership and registration readback | wave 05 |
@@ -61,10 +61,10 @@ planning; the Registry remains authoritative during implementation.
 
 ## Migration order
 
-Waves 00, 01, and both slices of wave 02 are complete: complex Draft Adapters and concise typed operations
+Waves 00 through 03 are complete: complex Draft Adapters and concise typed operations
 cover object batches, imports, single-object edits, recursive creation, object
-lifecycle, plug-in topology, and RTPC curves. Planned waves cover Switch Container assignments,
-SoundBank and isolated-file workflows, Authoring-only UI operations, and the
+lifecycle, plug-in topology, RTPC curves, and Switch Container assignments.
+Planned waves cover SoundBank and isolated-file workflows, Authoring-only UI operations, and the
 compound Undo Group after relevant child contracts stabilize.
 
 Each operation owns its action vocabulary and verifier. A wave reuses deep
