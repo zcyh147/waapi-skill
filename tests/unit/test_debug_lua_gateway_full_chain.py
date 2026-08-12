@@ -16,7 +16,10 @@ from tests.unit.test_transaction_gateway import (
     project,
 )
 from wwise_waapi.builders.debug_lua import LUA_SOURCE_AUTHORITY
-from wwise_waapi.operation_registry import OPERATION_REQUEST_CONTRACT
+from wwise_waapi.operation_registry import (
+    OPERATION_REQUEST_CONTRACT,
+    operation_request_schema_digest,
+)
 from wwise_waapi.transactions import TransactionState, TransactionStore
 
 
@@ -44,17 +47,40 @@ def _preview_and_confirm(
     version = str(request["version"])
     year = int(version.split(".", 1)[0])
     active_project = project() if project_result is None else project_result
-    transaction = preview(
-        request,
-        tmp_path=tmp_path,
-        state_dir=state_dir,
-        client=FakeClient(
-            {
-                "ak.wwise.core.getInfo": [live_info(year=year)],
-                "ak.wwise.core.getProjectInfo": [active_project],
-            }
-        ),
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [live_info(year=year)],
+            "ak.wwise.core.getProjectInfo": [active_project],
+        }
     )
+    operation = str(request["operation"])
+    if operation.startswith("debug."):
+        argv = [
+            "typed-operation",
+            operation,
+            "--schema-digest",
+            operation_request_schema_digest(operation, version),
+            "--apply",
+        ]
+        if operation in {"debug.setAsserts", "debug.setAutomationMode"}:
+            argv.extend(
+                ["--enable", "true" if request["arguments"]["enable"] else "false"]
+            )
+        code, transaction = execute(
+            argv,
+            tmp_path=tmp_path,
+            state_dir=state_dir,
+            client=client,
+            version=version,
+        )
+        assert code == 0, transaction
+    else:
+        transaction = preview(
+            request,
+            tmp_path=tmp_path,
+            state_dir=state_dir,
+            client=client,
+        )
     confirm(
         transaction["transaction_id"],
         transaction["artifact_hash"],

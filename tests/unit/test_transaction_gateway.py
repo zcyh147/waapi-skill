@@ -36,6 +36,7 @@ from wwise_waapi.platform_commands import (  # pyright: ignore[reportMissingImpo
     encode_windows_model_argv,
     encode_windows_powershell_argv,
 )
+from wwise_waapi.typed_requests import request_contract  # pyright: ignore[reportMissingImports]
 from wwise_waapi.transactions import TransactionState, TransactionStore
 
 
@@ -733,6 +734,11 @@ def preview(
             "lua.executeCoreFile",
             "lua.executeCoreInline",
             "audio.importTabDelimited",
+            "debug.restartWaapiServers",
+            "debug.setAsserts",
+            "debug.setAutomationMode",
+            "debug.testAssert",
+            "debug.testCrash",
         }
         else "preview"
     )
@@ -881,7 +887,7 @@ def test_allow_changes_keeps_dangerous_host_control_on_confirmation_path(
 
     exit_code, payload = execute(
         [
-            "preview",
+            "legacy-preview",
             "--apply",
             "--request-json",
             json.dumps(request),
@@ -932,13 +938,12 @@ def test_allow_changes_keeps_dangerous_host_control_on_confirmation_path(
         ("2021.1", "ak.wwise.debug.testCrash", "debug.testCrash"),
     ),
 )
-def test_zero_input_debug_preview_is_gateway_authored_and_confirmation_only(
+def test_zero_input_debug_native_route_is_rejected_in_favor_of_named_operation(
     tmp_path: Path,
     version: str,
     api: str,
     operation: str,
 ) -> None:
-    year, major = (int(item) for item in version.split("."))
     state_dir = tmp_path / "state"
     schema_exit, schema = execute(
         ["request-schema", api],
@@ -946,49 +951,24 @@ def test_zero_input_debug_preview_is_gateway_authored_and_confirmation_only(
         state_dir=state_dir,
         version=version,
     )
-    assert schema_exit == 0
-    assert schema["fields"] == []
-    assert schema["continuation"]["apply"] is True
-    assert "acknowledge" not in json.dumps(schema)
+    assert schema_exit == 2
+    assert f"operation-schema {operation}" in schema["message"]
+
+    reflected = request_contract(version, api)
 
     exit_code, payload = execute(
         [
             "typed-zero-call", api,
-            "--schema-digest", schema["schema_digest"],
+            "--schema-digest", reflected.schema_digest,
             "--apply",
         ],
         tmp_path=tmp_path,
         state_dir=state_dir,
         version=version,
         policy="allow_changes",
-        client=FakeClient(
-            {
-                "ak.wwise.core.getInfo": [live_info(year=year, major=major)],
-                "ak.wwise.core.getProjectInfo": [project()],
-                "ak.wwise.core.object.get": [
-                    {
-                        "return": [
-                            {
-                                **project(),
-                                "type": "Project",
-                            }
-                        ]
-                    }
-                ],
-            }
-        ),
     )
-    assert exit_code == 0, json.dumps(payload, indent=2)
-    assert payload["state"] == TransactionState.AWAITING_CONFIRMATION.value
-    assert payload["authorization"]["mode"] == "explicit_confirmation"
-    assert payload["typed_request"]["gateway_owned_acknowledgement"] is True
-    artifact = TransactionStore(state_dir).load_preview(payload["transaction_id"]).artifact
-    assert artifact["request"]["operation"] == operation
-    assert artifact["prepared_operation"]["dispatch"] == {
-        "uri": api,
-        "args": {},
-        "options": {},
-    }
+    assert exit_code == 2
+    assert f"operation-schema {operation}" in payload["message"]
 
 
 def test_zero_input_generic_mutation_enters_existing_preview_lifecycle(

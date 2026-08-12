@@ -26,11 +26,11 @@ planning; the Registry remains authoritative during implementation.
 | --- | --- | --- | --- | --- | --- |
 | `audio.import` | 2021.1–2025.1 | Composer | imports; optional defaults/mode/source-control | nested rows, files, metadata, side effects | wave 00 complete |
 | `audio.importTabDelimited` | 2021.1–2025.1 | Inline typed | file, location, language; optional mode/source-control | caller-owned serialized file | wave 05 file/Lua complete |
-| `debug.restartWaapiServers` | 2023.1–2025.1 | Legacy | acknowledgement | expected connection loss | exception candidate |
-| `debug.setAsserts` | 2021.1–2025.1 | Legacy | boolean enable | process-wide ref-count state | exception candidate |
-| `debug.setAutomationMode` | 2021.1–2025.1 | Legacy | boolean enable | process-wide host mode | exception candidate |
-| `debug.testAssert` | 2021.1–2025.1 | Legacy | acknowledgement | deliberate assertion | exception candidate |
-| `debug.testCrash` | 2021.1–2025.1 | Legacy | acknowledgement | deliberate termination | exception candidate |
+| `debug.restartWaapiServers` | 2023.1–2025.1 | Inline typed (zero value) | Gateway-owned acknowledgement | expected connection loss | wave 05 debug complete |
+| `debug.setAsserts` | 2021.1–2025.1 | Inline typed | boolean enable | process-wide ref-count state | wave 05 debug complete |
+| `debug.setAutomationMode` | 2021.1–2025.1 | Inline typed | boolean enable | process-wide host mode | wave 05 debug complete |
+| `debug.testAssert` | 2021.1–2025.1 | Inline typed (zero value) | Gateway-owned acknowledgement | deliberate assertion | wave 05 debug complete |
+| `debug.testCrash` | 2021.1–2025.1 | Inline typed (zero value) | Gateway-owned acknowledgement | deliberate termination | wave 05 debug complete |
 | `lua.executeCliFile` | 2023.1–2025.1 | Composer | source file/root/authority; optional typed args/watchdog | exact user code and isolated I/O | wave 05 file/Lua complete |
 | `lua.executeCoreFile` | 2023.1–2025.1 | Composer | source file/root/authority; optional typed args | exact user code in Authoring | wave 05 file/Lua complete |
 | `lua.executeCoreInline` | 2025.1 | Composer | source text/root/authority; optional typed args | Agent composition forbidden | wave 05 file/Lua complete |

@@ -4,9 +4,9 @@
     "registry_operations": 34,
     "registry_version_lanes": 153,
     "composer_version_lanes": 53,
-    "inline_typed_version_lanes": 67,
-    "legacy_json_version_lanes": 33,
-    "lane_inventory_sha256": "f9bae442d36a8043492be82f54274690a3080e9f8d1a0c4eaf22981717155de8",
+    "inline_typed_version_lanes": 90,
+    "legacy_json_version_lanes": 10,
+    "lane_inventory_sha256": "fb6673434d591a754bb530b232c3a3e652bee126d1efcef0514b087b34456667",
     "version_rule": "Every supported version lane inherits the disposition of its exact Registry operation name.",
     "normal_input_rule": "The Operation Registry exposes one normal input mode per operation and version. The Agent never chooses between Composer and Legacy JSON for one normal request.",
     "native_uri_rule": "A shared native URI never implies a shared migration decision. Isolation is keyed by exact operation name and version."
@@ -203,6 +203,31 @@
       "minimum_real_evidence": "Representative tab import and each distinct Lua execution host/verification shape on matching real Wwise versions; exact source hashes and non-retry semantics remain sealed."
     },
     {
+      "id": "wave-05-debug-host-control",
+      "status": "complete",
+      "purpose": "Migrate boolean debug controls and no-business-value terminal host controls without exposing acknowledgement literals.",
+      "operations": [
+        "debug.restartWaapiServers",
+        "debug.setAsserts",
+        "debug.setAutomationMode",
+        "debug.testAssert",
+        "debug.testCrash"
+      ],
+      "reuse": [
+        "inline typed boolean values",
+        "zero-value dedicated operation requests",
+        "Change Preview ingress",
+        "dangerous host-control terminal journal"
+      ],
+      "isolation_regressions": [
+        "fixed acknowledgements remain Gateway-owned and absent from public facts",
+        "dangerous controls remain explicit-confirmation-only under allow_changes",
+        "expected disconnect and accepted-result indeterminacy remain distinct",
+        "terminal controls have no retry, reconnect-and-repeat, or generic verify continuation"
+      ],
+      "minimum_real_evidence": "No deliberate crash is required for Program acceptance; a matching-host representative may validate terminal evidence without granting retry semantics."
+    },
+    {
       "id": "wave-06-compound-undo",
       "status": "planned",
       "purpose": "Migrate the bounded multi-call Undo Group after its intended child call families have stable typed inputs.",
@@ -226,17 +251,6 @@
     }
   ],
   "exceptions": [
-    {
-      "id": "exception-debug-host-control",
-      "operations": [
-        "debug.restartWaapiServers",
-        "debug.setAsserts",
-        "debug.setAutomationMode",
-        "debug.testAssert",
-        "debug.testCrash"
-      ],
-      "reason": "These small host/debug controls include deliberate crash and assertion routes. Confirmation and terminal outcomes dominate JSON ergonomics, so migration requires a separate risk decision."
-    },
     {
       "id": "exception-guarded-generic-call",
       "operations": [

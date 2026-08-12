@@ -201,7 +201,7 @@ Policy behavior:
 | `ask_before_changes` | preview returns `awaiting_confirmation`; present the concrete expected result and decision-relevant risk/cleanup/verifier limit, say nothing changed, ask whether to proceed, and end the turn |
 | `allow_changes` | preview may return `policy_authorized`; after preview and before execution, tell the user the concrete impending change and that current mode permits it, then continue in the same turn |
 
-Dangerous debug host controls remain confirmation-only even under `allow_changes`; obey their schema acknowledgement and never infer ordinary "yes" as the required value.
+Dangerous debug host controls take no business facts: follow their zero-value typed continuation. The Gateway owns the fixed acknowledgement internally, and the resulting Preview remains confirmation-only even under `allow_changes`.
 Normal prose covers only objects, changes, results, risks, and whether anything changed. Hide API/operation names, Draft/transaction internals, ids, hashes, tokens, states, and commands. Keep exact `agent_result` machine-readable.
 
 ## Continue only from Gateway-owned commands

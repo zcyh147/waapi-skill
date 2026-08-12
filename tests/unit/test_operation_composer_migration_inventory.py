@@ -80,6 +80,7 @@ def test_inventory_exactly_covers_every_registry_operation_and_version_lane() ->
             "wave-04-soundbank-and-files",
             "wave-05-authoring-ui",
             "wave-05-file-lua",
+            "wave-05-debug-host-control",
         }:
             expected_mode = INLINE_TYPED_INPUT_MODE
         assert modes == {expected_mode}

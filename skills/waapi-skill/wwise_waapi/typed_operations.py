@@ -30,6 +30,11 @@ from .operation_registry import (
 INLINE_OPERATION_CONTRACT = "waapi-skill.inline-operation-input/v1"
 INLINE_OPERATIONS = frozenset(
     {
+        "debug.restartWaapiServers",
+        "debug.setAsserts",
+        "debug.setAutomationMode",
+        "debug.testAssert",
+        "debug.testCrash",
         "object.setLinked",
         "object.setName",
         "object.setNotes",
@@ -211,7 +216,23 @@ def materialize_inline_operation_request(
     if operation not in INLINE_OPERATIONS:
         raise TypedOperationInputError(f"No inline typed adapter exists for {operation!r}")
     arguments: dict[str, Any]
-    if operation == "audio.importTabDelimited":
+    if operation in {
+        "debug.restartWaapiServers",
+        "debug.testAssert",
+        "debug.testCrash",
+    }:
+        _require_keys(values, required=frozenset())
+        arguments = {
+            "acknowledge": {
+                "debug.restartWaapiServers": "restart_waapi_servers",
+                "debug.testAssert": "trigger_debug_assert",
+                "debug.testCrash": "crash_wwise_process",
+            }[operation]
+        }
+    elif operation in {"debug.setAsserts", "debug.setAutomationMode"}:
+        _require_keys(values, required=frozenset({"enable"}))
+        arguments = {"enable": _typed_scalar("boolean", values["enable"])}
+    elif operation == "audio.importTabDelimited":
         _require_keys(
             values,
             required=frozenset(
@@ -474,6 +495,15 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
     if operation not in INLINE_OPERATIONS:
         raise TypedOperationInputError(f"No inline typed adapter exists for {operation!r}")
     fields: list[str] = (
+        []
+        if operation in {
+            "debug.restartWaapiServers",
+            "debug.testAssert",
+            "debug.testCrash",
+        }
+        else ["--enable true|false"]
+        if operation in {"debug.setAsserts", "debug.setAutomationMode"}
+        else
         [
             "--switch-container SELECTOR",
             "--child SELECTOR",
@@ -512,6 +542,11 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
         "required_flag": "--apply",
     }
     if operation in {
+        "debug.restartWaapiServers",
+        "debug.setAsserts",
+        "debug.setAutomationMode",
+        "debug.testAssert",
+        "debug.testCrash",
         "switchContainer.addAssignment",
         "switchContainer.removeAssignment",
         "soundbank.processDefinitionFiles",
@@ -546,7 +581,16 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
         "operation": operation,
         "version": version,
         "schema_digest": operation_request_schema_digest(operation, version),
-        "input_shape": "inline",
+        "input_shape": (
+            "zero"
+            if operation
+            in {
+                "debug.restartWaapiServers",
+                "debug.testAssert",
+                "debug.testCrash",
+            }
+            else "inline"
+        ),
         "selector_grammar": (
             "id-string VALUE | id-integer VALUE | path VALUE | "
             "exact-type-name TYPE NAME | direct-child TYPE PARENT_ID_OR_PATH_SELECTOR | "
@@ -559,6 +603,37 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
         },
         "continuation": continuation,
     }
+    if contract["input_shape"] == "zero":
+        terminal = {
+            "debug.restartWaapiServers": {
+                "expected_disconnect": True,
+                "process_expectation": (
+                    "wwise_process_remains_running_waapi_servers_restart"
+                ),
+            },
+            "debug.testAssert": {
+                "expected_disconnect": False,
+                "process_expectation": (
+                    "assert_handler_or_dialog_is_host_build_dependent"
+                ),
+            },
+            "debug.testCrash": {
+                "expected_disconnect": True,
+                "process_expectation": "wwise_process_termination",
+            },
+        }[operation]
+        contract["business_values_required"] = False
+        contract["risk"] = {
+            "dangerous_host_control": True,
+            **terminal,
+            "authorization": "explicit_confirmation_only",
+            "terminal_result": "indeterminate_after_single_dispatch_attempt",
+            "automatic_retry": False,
+            "reconnect_and_repeat": False,
+            "generic_verify_allowed": False,
+        }
+    if operation.startswith("debug."):
+        contract.pop("selector_grammar", None)
     if operation == "object.setProperty":
         contract["metadata_dependency"] = {
             "token": "property",

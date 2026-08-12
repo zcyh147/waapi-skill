@@ -1256,6 +1256,7 @@ def build_parser() -> argparse.ArgumentParser:
     typed_operation.add_argument("--command", dest="typed_ui_command")
     typed_operation.add_argument("--command-object", action="append", dest="command_objects")
     typed_operation.add_argument("--command-platform", action="append", dest="command_platforms")
+    typed_operation.add_argument("--enable", choices=("true", "false"))
     typed_call.add_argument(
         "--choose-dynamic",
         action="append",
@@ -3103,6 +3104,8 @@ def preflight_typed_operation_input(
         value = getattr(args, field)
         if value is not None:
             values[field] = value
+    if args.enable is not None:
+        values["enable"] = args.enable
     if args.parent is not None:
         values["parent"] = tuple(args.parent)
     if args.on_name_conflict is not None:
@@ -3162,6 +3165,16 @@ def preflight_typed_zero_input(
     if len(versions) != 1:
         raise GatewayInputError("typed-zero-call requires one configured Wwise version")
     contract = request_contract(versions[0], args.api)
+    dedicated_zero = {
+        "ak.wwise.debug.restartWaapiServers": "debug.restartWaapiServers",
+        "ak.wwise.debug.testAssert": "debug.testAssert",
+        "ak.wwise.debug.testCrash": "debug.testCrash",
+    }.get(args.api)
+    if dedicated_zero is not None:
+        raise GatewayInputError(
+            "This dangerous host control uses operation-schema "
+            f"{dedicated_zero} and typed-operation as its single entry."
+        )
     if contract.schema_digest != args.schema_digest:
         raise GatewayInputError("Typed request schema digest is stale")
     if contract.fields:
@@ -4187,6 +4200,17 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 "Typed Topics use topic-schema <topic-uri> as their single schema entry."
             )
         if args.command == "request-schema":
+            dedicated_zero = {
+                "ak.wwise.debug.restartWaapiServers": "debug.restartWaapiServers",
+                "ak.wwise.debug.testAssert": "debug.testAssert",
+                "ak.wwise.debug.testCrash": "debug.testCrash",
+            }.get(args.api)
+            if dedicated_zero is not None:
+                raise GatewayInputError(
+                    "This dangerous host control uses operation-schema "
+                    f"{dedicated_zero} as its single typed entry."
+                )
+        if args.command == "request-schema":
             return contract.as_gateway_payload()
         draft_shape = contract.as_gateway_payload()["input_shape"] == "draft"
         query_shape = args.api in {
@@ -4868,11 +4892,25 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         normal_inline = (
             not legacy_compatibility and input_mode == INLINE_TYPED_INPUT_MODE
         )
-        operation_projection = (
-            composer_operation_projection(spec, version=request_version)
-            if normal_composer or normal_inline
-            else spec.as_dict(version=request_version)
+        unsupported_version = (
+            request_version is not None
+            and request_version not in spec.supported_versions
         )
+        if unsupported_version:
+            operation_projection = spec.as_compact_dict()
+            operation_projection.pop("required_arguments", None)
+            operation_projection.pop("optional_arguments", None)
+            operation_projection["availability"] = {
+                "status": "unsupported_version",
+                "requested_version": request_version,
+                "supported_versions": list(spec.supported_versions),
+            }
+        else:
+            operation_projection = (
+                composer_operation_projection(spec, version=request_version)
+                if normal_composer or normal_inline
+                else spec.as_dict(version=request_version)
+            )
         if legacy_compatibility:
             # Compatibility automation needs the complete machine request
             # shape, not duplicated normal-Agent routing prose.  Both
@@ -4895,6 +4933,14 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "operation": operation_projection,
             "request_envelope": request_envelope,
             "request_envelope_policy": (
+                {
+                    "status": "unsupported_version",
+                    "requested_version": request_version,
+                    "supported_versions": list(spec.supported_versions),
+                    "complete_request_authored_by_gateway": True,
+                }
+                if unsupported_version
+                else
                 {
                     "status": request_envelope_status,
                     "complete_request_authored_by_gateway": True,
@@ -6274,27 +6320,7 @@ def dispatch_command(
             live_info=live_info,
         )
         if capability.execution_contract["effect"] != "read":
-            zero_operation = {
-                "ak.wwise.debug.restartWaapiServers": (
-                    "debug.restartWaapiServers", "restart_waapi_servers"
-                ),
-                "ak.wwise.debug.testAssert": (
-                    "debug.testAssert", "trigger_debug_assert"
-                ),
-                "ak.wwise.debug.testCrash": (
-                    "debug.testCrash", "crash_wwise_process"
-                ),
-            }.get(typed_request.uri) if capability.execution_contract["effect"] != "read" else None
-            gateway_owned_acknowledgement = zero_operation is not None
-            if zero_operation is not None:
-                operation, acknowledgement = zero_operation
-                request_payload = {
-                    "contract": OPERATION_REQUEST_CONTRACT,
-                    "version": detected_version,
-                    "operation": operation,
-                    "arguments": {"acknowledge": acknowledgement},
-                }
-            elif tuple(capability.transaction_operations) == ("waapi.call",):
+            if tuple(capability.transaction_operations) == ("waapi.call",):
                 request_payload = {
                     "contract": OPERATION_REQUEST_CONTRACT,
                     "version": detected_version,
@@ -6323,9 +6349,7 @@ def dispatch_command(
                         "contract": typed_request.as_dict()["contract"],
                         "schema_digest": typed_request.schema_digest,
                         "business_values_required": False,
-                        "gateway_owned_acknowledgement": (
-                            gateway_owned_acknowledgement
-                        ),
+                        "gateway_owned_acknowledgement": False,
                     },
                 },
             )

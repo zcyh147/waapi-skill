@@ -97,9 +97,14 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                 "lua.executeCoreFile",
                 "lua.executeCoreInline",
             }
-            else "inline_typed"
-            if name in {
-                "object.setLinked",
+                else "inline_typed"
+                if name in {
+                    "debug.restartWaapiServers",
+                    "debug.setAsserts",
+                    "debug.setAutomationMode",
+                    "debug.testAssert",
+                    "debug.testCrash",
+                    "object.setLinked",
                 "object.setName",
                 "object.setNotes",
                 "object.setProperty",
