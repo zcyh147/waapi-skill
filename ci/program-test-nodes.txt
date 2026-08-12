@@ -35,6 +35,7 @@ tests/unit/test_operation_draft_store.py
 tests/unit/test_operation_draft_gateway.py
 tests/unit/test_operation_composer_audio_import.py
 tests/unit/test_operation_composer_gateway.py
+tests/unit/test_operation_composer_migration_inventory.py
 tests/unit/test_operation_draft_seal.py
 tests/unit/test_operation_draft_storage_security.py
 tests/unit/test_transaction_store.py

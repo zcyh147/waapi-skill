@@ -1,0 +1,120 @@
+{
+  "contract": "waapi-skill.operation-composer-migration-inventory/v1",
+  "scope": {
+    "registry_operations": 34,
+    "registry_version_lanes": 153,
+    "composer_version_lanes": 9,
+    "legacy_json_version_lanes": 144,
+    "lane_inventory_sha256": "fc50d762d922421973990dbbe6ac6fd1b539407550b869d42c33ed7c6c5396a4",
+    "version_rule": "Every supported version lane inherits the disposition of its exact Registry operation name.",
+    "normal_input_rule": "The Operation Registry exposes one normal input mode per operation and version. The Agent never chooses between Composer and Legacy JSON for one normal request.",
+    "native_uri_rule": "A shared native URI never implies a shared migration decision. Isolation is keyed by exact operation name and version."
+  },
+  "waves": [
+    {
+      "id": "wave-00-complete",
+      "status": "complete",
+      "purpose": "Freeze two structurally different reference Adapters and the shared Draft-to-Preview lifecycle.",
+      "operations": ["audio.import", "object.set"],
+      "reuse": ["OperationDraftStore", "Operation Composer lifecycle", "Canonical OperationRequest parser", "Change Preview ingress"],
+      "isolation_regressions": ["All non-member input-mode lanes remain exact", "object.setRTPC and object.createPlugin remain Legacy despite sharing the object.set native URI", "Legacy archive replay remains valid"],
+      "minimum_real_evidence": "Weather, Rifle, Footsteps, and Weapons on Wwise 2022.1 and 2025.1 on macOS and native Windows; every failure remains a failure rather than coverage credit."
+    },
+    {
+      "id": "wave-01-single-object-edits",
+      "status": "planned",
+      "purpose": "Migrate one-target scalar, metadata-backed property/reference, and platform-link edits through a small-target Adapter family.",
+      "operations": ["object.setLinked", "object.setName", "object.setNotes", "object.setProperty", "object.setReference"],
+      "reuse": ["OperationDraftStore", "object identity typed facts", "metadata-backed field checks", "Canonical OperationRequest parser", "Change Preview ingress"],
+      "isolation_regressions": ["Each operation retains its own fields and verifier", "null reference clearing stays distinct from omission", "platform linking never becomes an ordinary property edit"],
+      "minimum_real_evidence": "One real mutation per distinct verifier shape, including Alarm object.setReference on both integration versions and both hosts; version-only behavior runs on its matching real Wwise version."
+    },
+    {
+      "id": "wave-02-object-graph",
+      "status": "planned",
+      "purpose": "Migrate object lifecycle, recursive creation, plug-in topology, and RTPC curves without collapsing their separate contracts.",
+      "operations": ["object.create", "object.createPlugin", "object.delete", "object.setRTPC"],
+      "reuse": ["OperationDraftStore", "recursive bounded node handles", "identity and metadata checks", "Canonical OperationRequest parser", "Change Preview ingress"],
+      "isolation_regressions": ["createPlugin and setRTPC remain distinct from object.set despite their shared native URI", "replace-owned-root authority stays confined to object.create", "delete retains protected-object and GUID-absence checks", "RTPC points stay dedicated"],
+      "minimum_real_evidence": "Weather object.create and object.setRTPC on both integration versions and hosts, plus matching real-host cases for createPlugin and delete verification."
+    },
+    {
+      "id": "wave-03-switch-assignments",
+      "status": "planned",
+      "purpose": "Migrate the exact child-to-state-or-switch relationship through a dedicated relational Adapter.",
+      "operations": ["switchContainer.addAssignment", "switchContainer.removeAssignment"],
+      "reuse": ["OperationDraftStore", "identity typed facts", "relationship pre-state/readback", "Canonical OperationRequest parser", "Change Preview ingress"],
+      "isolation_regressions": ["Assignments never route through object.set or object.setReference", "identity precision is preserved", "add and remove retain opposite preconditions and verifiers"],
+      "minimum_real_evidence": "Footsteps assignment workflows on Wwise 2022.1 and 2025.1 on macOS and native Windows with exact relationship readback."
+    },
+    {
+      "id": "wave-04-soundbank-and-files",
+      "status": "planned",
+      "purpose": "Migrate SoundBank inclusion, generation, definition-file, and external-source workflows while retaining host-path and isolated-I/O authority.",
+      "operations": ["soundbank.convertExternalSources", "soundbank.generate", "soundbank.processDefinitionFiles", "soundbank.setInclusions"],
+      "reuse": ["OperationDraftStore", "bounded file and host-path facts", "isolated I/O guards", "Canonical OperationRequest parser", "Change Preview ingress"],
+      "isolation_regressions": ["No path escapes the sealed I/O root", "setInclusions remains a project mutation while generators retain artifact verification", "platform and language limits remain operation-specific", "Windows drive, UNC, junction, reparse, Unicode, and space cases remain explicit"],
+      "minimum_real_evidence": "Harbor setInclusions and generate on both integration versions and hosts, matching real-host evidence for each file-processing verifier, and native-Windows filesystem security probes."
+    },
+    {
+      "id": "wave-05-authoring-ui",
+      "status": "planned",
+      "purpose": "Migrate Authoring-only UI commands and capture without treating packaged inventory snapshots as runtime authority.",
+      "operations": ["ui.captureScreen", "ui.commands.execute", "ui.commands.register", "ui.commands.unregister"],
+      "reuse": ["OperationDraftStore", "bounded UI descriptor facts", "fresh command-inventory check", "Canonical OperationRequest parser", "Change Preview ingress"],
+      "isolation_regressions": ["Every route still requires Authoring", "fresh getCommands remains authoritative", "register and unregister ownership is not inferred", "capture stays inside its I/O boundary"],
+      "minimum_real_evidence": "A matching real Authoring host exercises every distinct UI side effect and verifier; native Windows evidence covers command transport and output paths."
+    },
+    {
+      "id": "wave-06-compound-undo",
+      "status": "planned",
+      "purpose": "Migrate the bounded multi-call Undo Group after its intended child call families have stable typed inputs.",
+      "operations": ["waapi.undoGroup"],
+      "reuse": ["OperationDraftStore", "bounded ordered call handles", "Undo Group cancellation journal", "Canonical OperationRequest parser", "Change Preview ingress"],
+      "isolation_regressions": ["Nested calls cannot bypass manifests", "one outcome produces one Preview", "begin/end/cancel failures remain terminal and non-retryable", "inner result and timeout ceilings remain Gateway-owned"],
+      "minimum_real_evidence": "Successful and reviewed cancellation/failure shapes on matching real Wwise versions, then macOS and native-Windows fresh-Agent evidence for one representative compound outcome."
+    }
+  ],
+  "exceptions": [
+    {
+      "id": "exception-tab-delimited-import",
+      "operations": ["audio.importTabDelimited"],
+      "reason": "The user supplies an already serialized strict UTF-8 file. A Draft would wrap rather than eliminate that external composition boundary; retain explicit Legacy pending a dedicated file-workflow decision."
+    },
+    {
+      "id": "exception-user-authored-lua",
+      "operations": ["lua.executeCliFile", "lua.executeCoreFile", "lua.executeCoreInline"],
+      "reason": "These routes execute exact user-supplied source under source-authority and I/O controls. The Agent must not compose or repair code, so mutation composition does not address their governing risk."
+    },
+    {
+      "id": "exception-debug-host-control",
+      "operations": ["debug.restartWaapiServers", "debug.setAsserts", "debug.setAutomationMode", "debug.testAssert", "debug.testCrash"],
+      "reason": "These small host/debug controls include deliberate crash and assertion routes. Confirmation and terminal outcomes dominate JSON ergonomics, so migration requires a separate risk decision."
+    },
+    {
+      "id": "exception-guarded-generic-call",
+      "operations": ["waapi.call"],
+      "reason": "This manifest-registered compatibility substrate spans heterogeneous reviewed functions. A generic Composer would recreate raw args/options composition and conflict with operation-specific Adapters."
+    }
+  ],
+  "exclusions": [
+    {
+      "id": "exclusion-unimplemented-object-boundaries",
+      "operations": ["object.copy", "object.move"],
+      "reason": "These rows are explicit unimplemented boundaries, not executable model-facing mutations. Public implementation and verification require separate approval before migration."
+    }
+  ],
+  "legacy_exit_gates": [
+    {"id": "all-lanes-decided", "requirement": "Every Registry operation/version lane is Composer-complete, covered by an approved exception decision, or remains an explicit unimplemented exclusion."},
+    {"id": "normal-surface-single-entry", "requirement": "Normal schema, detail, Skill guidance, and semantic protocols expose exactly one Registry-selected input mode; compatibility commands are never presented as an Agent choice."},
+    {"id": "consumer-inventory", "requirement": "Repository scripts, tests, docs, packaged continuations, maintainer-named external automation, and sealed archive replay consumers have been searched and their compatibility needs recorded."},
+    {"id": "archive-and-replay", "requirement": "Historical evidence remains replayable through a versioned compatibility parser or a separately reviewed migration tool before compatibility grammar is removed."},
+    {"id": "cross-platform-release-evidence", "requirement": "The final frozen Skill and semantic harness pass the complete public integration profile on macOS and native Windows; cumulative or failed roots remain reported as such."},
+    {"id": "explicit-removal-decision", "requirement": "A later decision ticket reviews actual consumer evidence and chooses retain or remove. This inventory neither authorizes removal nor creates a deletion implementation ticket."}
+  ],
+  "second_round_ticketing": {
+    "source_rule": "Create implementation tickets one planned wave at a time after its action vocabulary and evidence cases are reviewed. Do not pre-split operation fields.",
+    "required_ticket_slices": ["Registry-derived typed Adapter and materialization", "Broker provenance and archive adoption", "normal cutover with exact-name isolation", "focused program and non-live gates", "matching real-host and fresh-Agent evidence"],
+    "dependency_rule": "Cutover depends on Adapter and semantic support; real evidence depends on program and non-live gates. Legacy removal depends on every wave or approved exception plus every exit gate."
+  }
+}

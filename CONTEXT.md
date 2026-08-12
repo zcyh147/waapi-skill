@@ -55,6 +55,21 @@ compatibility surface for existing consumers while operations migrate. It is
 not shown as a competing normal input when an operation's Registry lane is
 `composer`, and the Agent never chooses between both paths.
 
+## Migration Wave
+
+A Migration Wave is a reviewed group of exact Registry operations that can
+reuse Composer infrastructure without merging their business contracts. Each
+operation still owns its typed Adapter, version lanes, safety checks, and
+verifier. A shared native URI never places operations in the same wave.
+
+## Legacy Exit Decision
+
+A Legacy Exit Decision is the later evidence-based choice to retain or remove
+the Legacy JSON Adapter. Migration plans and deprecation notices do not
+authorize deletion. The decision requires exact consumer, archive-replay, and
+cross-platform release evidence; a remove decision creates a separate
+implementation ticket.
+
 ## Change Preview
 
 A Change Preview is an immutable transaction artifact derived from a Canonical
