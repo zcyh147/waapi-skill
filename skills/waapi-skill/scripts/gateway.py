@@ -207,8 +207,10 @@ from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[re
     verify_prepared_operation,
 )
 from wwise_waapi.typed_operations import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    DRAFT_TYPED_OPERATIONS,
     INLINE_OPERATIONS,
     TypedOperationInputError,
+    draft_operation_request_contract,
     inline_operation_contract,
     materialize_inline_operation_request,
 )
@@ -1232,6 +1234,10 @@ def build_parser() -> argparse.ArgumentParser:
     typed_operation.add_argument("--target", nargs="+")
     typed_operation.add_argument("--clear", action="store_true")
     typed_operation.add_argument("--linked", choices=("true", "false"))
+    typed_operation.add_argument("--parent", nargs="+")
+    typed_operation.add_argument("--on-name-conflict", choices=("fail", "rename", "replace"))
+    typed_operation.add_argument("--auto-check-out", choices=("true", "false"))
+    typed_operation.add_argument("--auto-add", choices=("true", "false"))
     typed_call.add_argument(
         "--choose-dynamic",
         action="append",
@@ -3071,6 +3077,14 @@ def preflight_typed_operation_input(
         value = getattr(args, field)
         if value is not None:
             values[field] = value
+    if args.parent is not None:
+        values["parent"] = tuple(args.parent)
+    if args.on_name_conflict is not None:
+        values["on_name_conflict"] = args.on_name_conflict
+    if args.auto_check_out is not None:
+        values["auto_check_out_to_source_control"] = args.auto_check_out
+    if args.auto_add is not None:
+        values["auto_add_to_source_control"] = args.auto_add
     if args.value is not None:
         values["value_type"], values["value"] = args.value
     if args.target is not None:
@@ -3749,10 +3763,19 @@ def operation_composer_input_contract(
 
     contract = operation_composer_contract(operation, version)
     if inventory:
-        fragments = require_mapping(
-            contract.get("registry_fragments"),
-            "operation Composer registry fragments",
-        )
+        fragments = contract.get("registry_fragments")
+        if fragments is not None:
+            fragments = require_mapping(
+                fragments,
+                "operation Composer registry fragments",
+            )
+            source_schema_digest = fragments["source_schema_digest"]
+        else:
+            source_schema_digest = contract.get("typed_request_schema_digest")
+            if not isinstance(source_schema_digest, str) or not source_schema_digest:
+                raise GatewayInputError(
+                    "operation Composer typed request schema digest must be a non-empty string"
+                )
         return {
             "contract": contract["contract"],
             "operation": operation,
@@ -3760,7 +3783,7 @@ def operation_composer_input_contract(
             "action_contract": contract["action_contract"],
             "actions": list(contract["actions"]),
             "limits": dict(contract["limits"]),
-            "registry_source_schema_digest": fragments["source_schema_digest"],
+            "registry_source_schema_digest": source_schema_digest,
             "inspect_with": f"operation-schema {operation}",
         }
     audio_import_option_names = (
@@ -3775,6 +3798,18 @@ def operation_composer_input_contract(
     ):
         raise RuntimeError("audio.import source-control option projection is invalid")
     audio_import_option_choice = "(" + "|".join(audio_import_option_names) + ")"
+    generic_typed_action_argv = {
+        "add_typed_fact": [
+            "--fact-action", "ACTION", "--field-handle", "HANDLE",
+            "[--value-type TYPE]", "[--fact-value VALUE]", "[--key KEY]",
+        ],
+        "correct_typed_fact": [
+            "--fact-handle", "HANDLE", "--fact-action", "ACTION",
+            "--field-handle", "HANDLE", "[--value-type TYPE]",
+            "[--fact-value VALUE]", "[--key KEY]",
+        ],
+        "remove_typed_fact": ["--fact-handle", "HANDLE"],
+    }
     action_argv_by_operation = {
         "object.set": {
             "set_request_option": ["--option", "NAME", "TYPE", "VALUE"],
@@ -3868,6 +3903,7 @@ def operation_composer_input_contract(
             "clear_import_row_field": ["--import-handle", "HANDLE", "--field", "NAME"],
             "remove_import_row": ["--import-handle", "HANDLE"],
         },
+        "object.create": generic_typed_action_argv,
     }
     operation_argv = action_argv_by_operation[operation]
     if not set(contract["actions"]).issubset(operation_argv):
@@ -3978,6 +4014,8 @@ def operation_draft_schema_digest(operation: str, version: str) -> str:
 
     if operation.startswith("ak."):
         return request_contract(version, operation).schema_digest
+    if operation in DRAFT_TYPED_OPERATIONS:
+        return draft_operation_request_contract(operation, version).schema_digest
     return operation_request_schema_digest(operation, version)
 
 
@@ -3996,6 +4034,8 @@ def public_typed_contract(version: str, api: str) -> Any:
         return topic_match_contract(
             version, api.removeprefix(TOPIC_MATCH_OPERATION_PREFIX)
         )
+    if api in DRAFT_TYPED_OPERATIONS:
+        return draft_operation_request_contract(api, version)
     return request_contract(version, api)
 
 

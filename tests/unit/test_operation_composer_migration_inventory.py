@@ -56,13 +56,14 @@ def test_inventory_exactly_covers_every_registry_operation_and_version_lane() ->
     lane_rows = []
     for name, spec in OPERATION_SPECS.items():
         modes = {operation_input_mode(name, version) for version in spec.supported_versions}
-        expected_mode = (
-            COMPOSER_INPUT_MODE
-            if assignments[name][1] == "wave-00-complete"
-            else INLINE_TYPED_INPUT_MODE
-            if assignments[name][1] == "wave-01-single-object-edits"
-            else LEGACY_JSON_INPUT_MODE
-        )
+        expected_mode = LEGACY_JSON_INPUT_MODE
+        if assignments[name][1] == "wave-00-complete" or name == "object.create":
+            expected_mode = COMPOSER_INPUT_MODE
+        elif assignments[name][1] in {
+            "wave-01-single-object-edits",
+            "wave-02-object-lifecycle",
+        }:
+            expected_mode = INLINE_TYPED_INPUT_MODE
         assert modes == {expected_mode}
         for version in spec.supported_versions:
             lane_rows.append(
@@ -99,8 +100,9 @@ def test_every_assignment_has_reason_or_complete_wave_evidence() -> None:
     for group in (*inventory["exceptions"], *inventory["exclusions"]):
         assert group["operations"]
         assert group["reason"]
-    for operation in inventory["exclusions"][0]["operations"]:
-        assert OPERATION_SPECS[operation].implemented is False
+    for group in inventory["exclusions"]:
+        for operation in group["operations"]:
+            assert OPERATION_SPECS[operation].implemented is False
 
 
 def test_human_inventory_names_every_exact_operation_once() -> None:

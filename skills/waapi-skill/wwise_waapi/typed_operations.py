@@ -8,16 +8,20 @@ preparer, Preview lifecycle, dispatcher, and verifier.
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 import math
 import re
 from typing import Any, Mapping, Sequence
 
 from .canonical import canonical_json_bytes
+from .schema_inventory import load_definition_graph
+from .typed_requests import TypedRequestContract, compile_typed_request_contract
 from .operation_registry import (
     INLINE_TYPED_INPUT_MODE,
     OPERATION_REQUEST_CONTRACT,
     OperationContractError,
     operation_request_schema_digest,
+    operation_request_machine_contract,
     parse_operation_request,
     validate_operation_identity_fragment,
 )
@@ -31,8 +35,12 @@ INLINE_OPERATIONS = frozenset(
         "object.setNotes",
         "object.setProperty",
         "object.setReference",
+        "object.delete",
+        "object.copy",
+        "object.move",
     }
 )
+DRAFT_TYPED_OPERATIONS = frozenset({"object.create"})
 _MAX_SELECTOR_DEPTH = 8
 MAX_INLINE_OPERATION_VALUE_BYTES = 32 * 1024
 MAX_INLINE_OPERATION_REQUEST_BYTES = 64 * 1024
@@ -193,6 +201,48 @@ def materialize_inline_operation_request(
                 allow_empty=operation == "object.setNotes",
             ),
         }
+    elif operation == "object.delete":
+        _require_keys(
+            values,
+            required=frozenset({"object"}),
+            optional=frozenset({"auto_check_out_to_source_control"}),
+        )
+        arguments = {
+            "object": _selector(values["object"], operation=operation, version=version, field="object"),
+        }
+        if "auto_check_out_to_source_control" in values:
+            arguments["auto_check_out_to_source_control"] = _typed_scalar(
+                "boolean", values["auto_check_out_to_source_control"]
+            )
+    elif operation in {"object.copy", "object.move"}:
+        _require_keys(
+            values,
+            required=frozenset({"object", "parent"}),
+            optional=frozenset({"on_name_conflict", "auto_add_to_source_control", "auto_check_out_to_source_control"}),
+        )
+        arguments = {
+            "object": _selector(values["object"], operation=operation, version=version, field="object"),
+            "parent": _selector(values["parent"], operation=operation, version=version, field="parent"),
+        }
+        if "on_name_conflict" in values:
+            conflict = _bounded_text(
+                values["on_name_conflict"], field="on_name_conflict", allow_empty=False
+            )
+            if conflict not in {"fail", "rename"}:
+                raise TypedOperationInputError(
+                    "on_name_conflict must be fail or rename; replace is not exposed"
+                )
+            arguments["on_name_conflict"] = conflict
+        if "auto_add_to_source_control" in values:
+            if operation != "object.copy":
+                raise TypedOperationInputError("auto_add_to_source_control applies only to object.copy")
+            arguments["auto_add_to_source_control"] = _typed_scalar(
+                "boolean", values["auto_add_to_source_control"]
+            )
+        if "auto_check_out_to_source_control" in values:
+            arguments["auto_check_out_to_source_control"] = _typed_scalar(
+                "boolean", values["auto_check_out_to_source_control"]
+            )
     elif operation == "object.setProperty":
         _require_keys(
             values,
@@ -273,6 +323,13 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
     }
     if operation in {"object.setName", "object.setNotes"}:
         fields.append("--text TEXT")
+    elif operation == "object.delete":
+        fields.append("--auto-check-out true|false (optional; 2023.1+)")
+    elif operation in {"object.copy", "object.move"}:
+        fields.extend(["--parent SELECTOR", "--on-name-conflict fail|rename (optional)"])
+        fields.append("--auto-check-out true|false (optional; 2023.1+)")
+        if operation == "object.copy":
+            fields.append("--auto-add true|false (optional; 2023.1+)")
     elif operation == "object.setProperty":
         fields.extend(
             ["--property TOKEN", "--value TYPE VALUE", "--platform PLATFORM (optional)"]
@@ -321,13 +378,52 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
     return contract
 
 
+def draft_operation_request_contract(operation: str, version: str) -> TypedRequestContract:
+    """Compile one complex dedicated operation through the shared Typed Core."""
+
+    if operation not in DRAFT_TYPED_OPERATIONS:
+        raise TypedOperationInputError(f"No typed Draft adapter exists for {operation!r}")
+    machine = operation_request_machine_contract(operation, version)
+    arguments = deepcopy(machine["argument_contract"])
+    node = {
+        "type": "object",
+        "required": ["type", "name"],
+        "additionalProperties": False,
+        "properties": {
+            "type": deepcopy(arguments["properties"]["type"]),
+            "name": {"type": "string", "minLength": 1},
+            "notes": {"type": "string"},
+            "properties": deepcopy(arguments["properties"]["properties"]),
+            "references": deepcopy(arguments["properties"]["references"]),
+            "children": {"type": "array", "items": {"$ref": "#/definitions/objectNode"}},
+        },
+    }
+    arguments["definitions"] = {"objectNode": node}
+    arguments["properties"]["children"]["items"] = {"$ref": "#/definitions/objectNode"}
+    return compile_typed_request_contract(
+        version=version,
+        uri=operation,
+        schema={
+            "argsSchema": arguments,
+            "optionsSchema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False,
+            },
+        },
+        graph=load_definition_graph(version),
+    )
+
+
 __all__ = [
     "INLINE_OPERATION_CONTRACT",
     "INLINE_OPERATIONS",
+    "DRAFT_TYPED_OPERATIONS",
     "INLINE_TYPED_INPUT_MODE",
     "MAX_INLINE_OPERATION_REQUEST_BYTES",
     "MAX_INLINE_OPERATION_VALUE_BYTES",
     "TypedOperationInputError",
     "inline_operation_contract",
+    "draft_operation_request_contract",
     "materialize_inline_operation_request",
 ]

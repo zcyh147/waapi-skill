@@ -81,7 +81,7 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
     for name, spec in specs.items():
         expected_mode = (
             COMPOSER_INPUT_MODE
-            if name in {"audio.import", "object.set"}
+            if name in {"audio.import", "object.create", "object.set"}
             else "inline_typed"
             if name in {
                 "object.setLinked",
@@ -89,6 +89,9 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                 "object.setNotes",
                 "object.setProperty",
                 "object.setReference",
+                "object.copy",
+                "object.delete",
+                "object.move",
             }
             else LEGACY_JSON_INPUT_MODE
         )
@@ -603,7 +606,10 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
     assert specs["object.set"]["argument_contract"]["properties"]["objects"]["items"]["properties"][
         "platform"
     ]["minLength"] == 1
-    assert "returned copy GUID" in specs["object.copy"]["boundary"]
+    assert specs["object.copy"]["implemented"] is True
+    assert specs["object.move"]["implemented"] is True
+    assert specs["object.copy"]["boundary"] is None
+    assert "returned copy GUID" in specs["object.copy"]["constraints"][0]
     assert specs["object.setProperty"]["identity_contract"]["caller_rows_allowed"] is False
     assert specs["object.setProperty"]["identity_contract"]["one_of"] == [
         "id",
@@ -1881,8 +1887,8 @@ def test_compact_operation_inventory_is_stable_and_keeps_boundary_text() -> None
     }
     assert specs["object.create"]["implemented"] is True
     assert specs["object.create"]["boundary"] is None
-    assert specs["object.copy"]["implemented"] is False
-    assert "returned copy GUID" in specs["object.copy"]["boundary"]
+    assert specs["object.copy"]["implemented"] is True
+    assert specs["object.copy"]["boundary"] is None
     assert "argument_contract" not in specs["object.create"]
 
 
@@ -1908,9 +1914,16 @@ def test_request_contract_rejects_unknown_fields_metadata_injection_and_boundari
     assert injected.value.error_code == "INVALID_REQUEST"
     assert injected.value.details["unknown_fields"] == ["property_info"]
 
-    with pytest.raises(OperationContractError) as boundary:
-        parse_operation_request(request("object.copy", {"object": {}, "parent": {}}))
-    assert boundary.value.error_code == "OPERATION_BOUNDARY"
+    copied = parse_operation_request(
+        request(
+            "object.copy",
+            {
+                "object": {"kind": "id", "value": GUID},
+                "parent": {"kind": "id", "value": TARGET_GUID},
+            },
+        )
+    )
+    assert copied.operation == "object.copy"
 
     with pytest.raises(OperationContractError) as mismatch:
         parse_operation_request(

@@ -148,3 +148,4 @@ tests/unit/test_generic_typed_draft.py
 tests/unit/test_typed_query_construction.py
 tests/unit/test_typed_topic_construction.py
 tests/unit/test_typed_named_operations.py
+tests/unit/test_typed_object_lifecycle.py

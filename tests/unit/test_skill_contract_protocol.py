@@ -907,8 +907,7 @@ def test_operate_metadata_and_import_prose_only_rules_are_preserved() -> None:
     compact = " ".join(OPERATE.split())
     for phrase in (
         "one repeated `--query '<ordinary phrase>'` per requested setting",
-        "Count only those repeated `--query` flags in this invocation",
-        "not objects, rows, files, values, or other settings",
+            "Use the deterministic candidate budget",
         "one or two flags require `--limit 8`",
         "three or four require `--limit 3`",
         "five through eight require `--limit 2`",
@@ -918,9 +917,9 @@ def test_operate_metadata_and_import_prose_only_rules_are_preserved() -> None:
         "`--object` for one existing object",
         "`--object-type Sound`",
         "`PropertyContainer` in `2025.1`",
-        "Translate localized user wording into short English Wwise UI",
+            "Translate localized wording into short English Wwise UI",
         "do not copy CJK wording into the live lexical matcher",
-        "independent enable switches and numeric values as separate queries",
+            "independent switches and numeric values separately",
         "`fallback_detail_scan.status` is `partial`",
         "A `complete` scan with no match is terminal",
         "for table imports, only dynamic `Property[...]`, `Reference[...]`, or `@...` columns",

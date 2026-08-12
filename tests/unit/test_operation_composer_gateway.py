@@ -203,7 +203,7 @@ def test_object_set_composer_discloses_every_exact_typed_action_shape(
     assert ("add_import_file" in contract["actions"]) is (version != "2022.1")
 
 
-def test_object_set_composer_does_not_change_other_operation_schema_digests() -> None:
+def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     non_object_set_digests = {
         f"{spec.name}@{version}": operation_request_schema_digest(spec.name, version)
         for spec in list_operation_specs()
@@ -211,9 +211,9 @@ def test_object_set_composer_does_not_change_other_operation_schema_digests() ->
         for version in spec.supported_versions
     }
 
-    assert len(non_object_set_digests) == 139
+    assert len(non_object_set_digests) == 149
     assert canonical_sha256(non_object_set_digests) == (
-        "b90e10a9528dfc250453a1958043034d4fdbcde6e52f628e340f9dbacc7499b1"
+        "4f2cc39fe3aa208ebd6cd3ae921977f07f70eebc441d884e6bbfb87293dee09a"
     )
     assert {
         version: operation_input_mode("object.set", version)
@@ -1465,6 +1465,7 @@ def test_registry_composer_lanes_and_real_adapters_are_one_to_one() -> None:
     assert adapter_lanes == composer_lanes
     assert {operation for operation, _version in composer_lanes} == {
         "audio.import",
+        "object.create",
         "object.set",
     }
 

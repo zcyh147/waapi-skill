@@ -837,7 +837,7 @@ _OBJECT_NODE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
         "references": {"type": "array", "items": _OBJECT_REFERENCE_ARGUMENT_SCHEMA},
         "children": {
             "type": "array",
-            "description": "Recursive closed object-node DSL with the same six fields; depth 8 and 128 total nodes.",
+            "description": "Recursive closed object-node DSL; depth 8 and 128 total nodes.",
         },
     },
 }
@@ -1327,6 +1327,28 @@ _DELETE_AUTO_CHECK_OUT_SCHEMA: Mapping[str, Any] = {
     "supported_versions": list(AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS),
     "description": (
         "Ask Wwise to check out affected source-control files before deletion. "
+        "Omission defaults to false; explicit use is accepted only in Wwise "
+        "2023.1-2025.1."
+    ),
+}
+
+_OBJECT_MUTATION_AUTO_CHECK_OUT_SCHEMA: Mapping[str, Any] = {
+    "type": "boolean",
+    "default": False,
+    "supported_versions": list(AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS),
+    "description": (
+        "Ask Wwise to check out affected source-control files before the object "
+        "mutation. Omission defaults to false; explicit use is accepted only "
+        "in Wwise 2023.1-2025.1."
+    ),
+}
+
+_COPY_AUTO_ADD_SCHEMA: Mapping[str, Any] = {
+    "type": "boolean",
+    "default": False,
+    "supported_versions": list(AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS),
+    "description": (
+        "Ask Wwise to add affected work units to source control after copy. "
         "Omission defaults to false; explicit use is accepted only in Wwise "
         "2023.1-2025.1."
     ),
@@ -3123,13 +3145,20 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "object-mutation",
         "Copy one object under one parent.",
         ("object", "parent"),
+        ("on_name_conflict", "auto_add_to_source_control", "auto_check_out_to_source_control"),
         argument_contract=_object_contract(
             ("object", "parent"),
-            {"object": IDENTITY_ARGUMENT_SCHEMA, "parent": IDENTITY_ARGUMENT_SCHEMA},
+            {
+                "object": IDENTITY_ARGUMENT_SCHEMA,
+                "parent": IDENTITY_ARGUMENT_SCHEMA,
+                "on_name_conflict": {"type": "string", "enum": ["fail", "rename"]},
+                "auto_add_to_source_control": _COPY_AUTO_ADD_SCHEMA,
+                "auto_check_out_to_source_control": _OBJECT_MUTATION_AUTO_CHECK_OUT_SCHEMA,
+            },
+            optional=("on_name_conflict", "auto_add_to_source_control", "auto_check_out_to_source_control"),
         ),
         identity_arguments=("object", "parent"),
-        implemented=False,
-        boundary="The current builder reads back the source instead of the returned copy GUID.",
+        constraints=("the returned copy GUID is captured and verified under the requested parent",),
     ),
     "object.move": OperationSpec(
         "object.move",
@@ -3137,13 +3166,19 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "object-mutation",
         "Move one object under one parent.",
         ("object", "parent"),
+        ("on_name_conflict", "auto_check_out_to_source_control"),
         argument_contract=_object_contract(
             ("object", "parent"),
-            {"object": IDENTITY_ARGUMENT_SCHEMA, "parent": IDENTITY_ARGUMENT_SCHEMA},
+            {
+                "object": IDENTITY_ARGUMENT_SCHEMA,
+                "parent": IDENTITY_ARGUMENT_SCHEMA,
+                "on_name_conflict": {"type": "string", "enum": ["fail", "rename"]},
+                "auto_check_out_to_source_control": _OBJECT_MUTATION_AUTO_CHECK_OUT_SCHEMA,
+            },
+            optional=("on_name_conflict", "auto_check_out_to_source_control"),
         ),
         identity_arguments=("object", "parent"),
-        implemented=False,
-        boundary="The current builder does not assert the new parent/path or preserve a rollback snapshot.",
+        constraints=("the source GUID is preserved and its new parent/path are verified",),
     ),
     "soundbank.setInclusions": OperationSpec(
         "soundbank.setInclusions",
@@ -3448,11 +3483,11 @@ _OPERATION_INPUT_MODE_DECLARATIONS: tuple[
     ("lua.executeCliFile", ("2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
     ("lua.executeCoreFile", ("2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
     ("lua.executeCoreInline", ("2025.1",), LEGACY_JSON_INPUT_MODE),
-    ("object.copy", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("object.create", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("object.copy", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
+    ("object.create", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
     ("object.createPlugin", ("2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("object.delete", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("object.move", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("object.delete", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
+    ("object.move", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
     ("object.set", ("2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
     ("object.setLinked", ("2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
     ("object.setName", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
@@ -8574,6 +8609,88 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
         }
         verification = {"kind": "guid-absent", "object_id": target.object}
         cleanup = {"kind": "none-after-delete", "irreversible": True}
+    elif request.operation in {"object.copy", "object.move"}:
+        source = _resolve_identity(arguments["object"], role="object", read=read)
+        parent = _resolve_identity(arguments["parent"], role="parent", read=read)
+        if _same_identity(source.object, parent.object):
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                "object and parent must identify different live objects.",
+            )
+        _reject_protected_delete(source)
+        roles.update({"object": source, "parent": parent})
+        conflict = str(arguments.get("on_name_conflict", "fail"))
+        if conflict == "replace":
+            raise OperationContractError(
+                "UNSUPPORTED_DESTRUCTIVE_COLLISION_POLICY",
+                "object.copy and object.move do not expose native replace because it can delete an unreviewed destination subtree.",
+            )
+        source_name = source.row.get("name")
+        parent_path = parent.row.get("path")
+        if not isinstance(source_name, str) or not source_name or not isinstance(parent_path, str):
+            raise OperationContractError(
+                "INVALID_READBACK",
+                "copy/move collision review requires live source name and parent path evidence.",
+            )
+        collision_path = parent_path.rstrip("\\") + "\\" + source_name
+        collision_rows = _read_object_path_rows(
+            collision_path,
+            fields=IDENTITY_RETURN_FIELDS,
+            read=read,
+        )
+        if len(collision_rows) > 1:
+            raise OperationContractError(
+                "AMBIGUOUS_COLLISION",
+                "copy/move destination path must resolve to at most one object.",
+                details={"path": collision_path, "rows": collision_rows},
+            )
+        if conflict == "fail" and collision_rows:
+            raise OperationContractError(
+                "NAME_COLLISION",
+                "copy/move destination already contains the source name; choose rename or another parent.",
+                details={"path": collision_path, "rows": collision_rows},
+            )
+        metadata["copy_move_collision_guard"] = {
+            "path": collision_path,
+            "rows": collision_rows,
+        }
+        try:
+            auto_check_out = normalize_auto_check_out_to_source_control(
+                arguments.get("auto_check_out_to_source_control"),
+                version=request.version,
+                supplied="auto_check_out_to_source_control" in arguments,
+            )
+            auto_add = (
+                normalize_auto_check_out_to_source_control(
+                    arguments.get("auto_add_to_source_control"),
+                    version=request.version,
+                    supplied="auto_add_to_source_control" in arguments,
+                )
+                if request.operation == "object.copy"
+                else None
+            )
+        except ImportContractError as exc:
+            raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+        builder = ObjectMutationBuilder(version=request.version)
+        preview = (
+            builder.copy(object=source, parent=parent, on_name_conflict=conflict, auto_add_to_source_control=auto_add, auto_check_out_to_source_control=auto_check_out)
+            if request.operation == "object.copy"
+            else builder.move(object=source, parent=parent, on_name_conflict=conflict, auto_check_out_to_source_control=auto_check_out)
+        )
+        verification = {
+            "kind": "copied-guid-under-parent" if request.operation == "object.copy" else "moved-guid-under-parent",
+            "source_id": source.object,
+            "source_name": source.row.get("name"),
+            "old_path": source.row.get("path"),
+            "old_parent": _parent_value(source.row.get("parent")),
+            "expected_parent_id": parent.object,
+            "expected_parent_path": parent.row.get("path"),
+            "on_name_conflict": conflict,
+        }
+        cleanup = {
+            "kind": "delete-created-copy" if request.operation == "object.copy" else "move-back-to-original-parent",
+            "source_snapshot": dict(source.row),
+        }
     elif request.operation in {"object.setName", "object.setNotes"}:
         target = _resolve_identity(arguments["object"], role="object", read=read)
         roles["object"] = target
@@ -12966,6 +13083,47 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 }
             )
 
+    copy_move_collision_guard = (
+        pre_state.get("copy_move_collision_guard")
+        if isinstance(pre_state, Mapping)
+        else None
+    )
+    if isinstance(copy_move_collision_guard, Mapping):
+        path = copy_move_collision_guard.get("path")
+        expected_rows = copy_move_collision_guard.get("rows")
+        if not isinstance(path, str) or not isinstance(expected_rows, list):
+            raise OperationContractError(
+                "INVALID_PREVIEW",
+                "copy/move collision guard is malformed.",
+            )
+        result = read_call(
+            OBJECT_GET_URI,
+            {"from": {"path": [path]}},
+            {"return": list(IDENTITY_RETURN_FIELDS)},
+        )
+        if not isinstance(result, Mapping):
+            raise OperationContractError(
+                "INVALID_READBACK",
+                "copy/move collision guard readback must be an object.",
+            )
+        actual_rows = _rows(result)
+        readbacks.append(
+            {
+                "role": "copy-move-collision",
+                "uri": OBJECT_GET_URI,
+                "args": {"from": {"path": [path]}},
+                "options": {"return": list(IDENTITY_RETURN_FIELDS)},
+                "result": dict(result),
+            }
+        )
+        assertions.append(
+            {
+                "name": "copy/move destination collision state is unchanged",
+                "passed": actual_rows == expected_rows,
+                "evidence": {"path": path, "expected": expected_rows, "actual": actual_rows},
+            }
+        )
+
     linked_before = pre_state.get("linked_before") if isinstance(pre_state, Mapping) else None
     if isinstance(linked_before, Mapping):
         object_id = linked_before.get("object_id")
@@ -16344,6 +16502,56 @@ def verify_prepared_operation(
     elif kind == "guid-absent":
         rows = read_object(object_id=plan.get("object_id"), fields=("id", "name", "type", "path"))
         check("deleted GUID is absent", len(rows) == 0, rows)
+    elif kind in {"copied-guid-under-parent", "moved-guid-under-parent"}:
+        is_copy = kind == "copied-guid-under-parent"
+        object_id = _execution_result_id(execution_result)
+        check(
+            "execution returned copied GUID" if is_copy else "moved source GUID is known",
+            object_id is not None,
+            dict(execution_result),
+        )
+        if object_id is None:
+            return _verification(operation, assertions, readbacks)
+        rows = read_object(object_id=object_id, fields=("id", "name", "type", "path", "parent"))
+        check("result GUID resolves exactly once", len(rows) == 1, rows)
+        if len(rows) == 1:
+            row = rows[0]
+            check("result GUID is stable", _same_identity(row.get("id"), object_id), row.get("id"))
+            if is_copy:
+                check("copy GUID differs from source", not _same_identity(object_id, plan.get("source_id")), object_id)
+            else:
+                check("move preserves source GUID", _same_identity(object_id, plan.get("source_id")), object_id)
+            result_name = row.get("name")
+            conflict_policy = plan.get("on_name_conflict", "fail")
+            name_matches = (
+                isinstance(result_name, str) and bool(result_name)
+                if conflict_policy == "rename"
+                else result_name == plan.get("source_name")
+            )
+            check("result name satisfies conflict policy", name_matches, result_name)
+            parent_matches = _same_identity(
+                _parent_value(row.get("parent")), plan.get("expected_parent_id")
+            )
+            check("result parent matches requested parent", parent_matches, row.get("parent"))
+            path = row.get("path")
+            expected_parent_path = plan.get("expected_parent_path")
+            path_matches = (
+                isinstance(path, str)
+                and isinstance(expected_parent_path, str)
+                and path.startswith(expected_parent_path.rstrip("\\") + "\\")
+                and isinstance(result_name, str)
+                and path.rstrip("\\").endswith("\\" + result_name)
+            )
+            check("result path is below requested parent", path_matches, path)
+        if not is_copy:
+            old_path = plan.get("old_path")
+            if isinstance(old_path, str) and old_path:
+                old_rows = read_object(path=old_path, fields=("id", "path"))
+                check(
+                    "old path no longer resolves to moved GUID",
+                    not any(_same_identity(row.get("id"), plan.get("source_id")) for row in old_rows),
+                    old_rows,
+                )
     elif kind == "same-guid-renamed":
         object_id = plan.get("object_id")
         rows = read_object(object_id=object_id, fields=("id", "name", "type", "path", "parent"))
@@ -20074,6 +20282,11 @@ def _execution_result_id(result: Mapping[str, Any]) -> Any:
     for _ in range(3):
         if isinstance(current, Mapping) and current.get("id") is not None:
             return current.get("id")
+        if isinstance(current, Mapping) and isinstance(current.get("return"), list):
+            rows = current["return"]
+            if len(rows) == 1 and isinstance(rows[0], Mapping):
+                return rows[0].get("id")
+            return None
         if isinstance(current, Mapping) and isinstance(current.get("result"), Mapping):
             current = current["result"]
             continue

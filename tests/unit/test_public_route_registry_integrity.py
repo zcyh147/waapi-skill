@@ -263,29 +263,29 @@ def test_native_surface_policy_partitions_every_function_and_binds_high_risk_dif
             "wwise-console": {
                 "function_rows": 662,
                 "unique_function_uris": 167,
-                "generic_reflected_rows": 450,
-                "generic_reflected_unique_uris": 118,
-                "special_rows": 212,
-                "special_unique_uris": 49,
+                "generic_reflected_rows": 440,
+                "generic_reflected_unique_uris": 116,
+                "special_rows": 222,
+                "special_unique_uris": 51,
             },
             "wwise-authoring-ui": {
                 "function_rows": 670,
                 "unique_function_uris": 167,
-                "generic_reflected_rows": 452,
-                "generic_reflected_unique_uris": 118,
-                "special_rows": 218,
-                "special_unique_uris": 49,
+                "generic_reflected_rows": 442,
+                "generic_reflected_unique_uris": 116,
+                "special_rows": 228,
+                "special_unique_uris": 51,
             },
         },
-        "reviewed_special_uri_count": 49,
+        "reviewed_special_uri_count": 51,
         "reviewed_generic_restriction_count": 6,
     }
-    assert summary["version_rows"] == 67
-    assert summary["rules"] == 31
-    assert summary["scopes"] == 161
-    assert summary["schema_selectors"] == 738
-    assert summary["semantic_boundaries"] == 47
-    assert sum(summary["selectors_by_status"].values()) == 738
+    assert summary["version_rows"] == 77
+    assert summary["rules"] == 36
+    assert summary["scopes"] == 181
+    assert summary["schema_selectors"] == 780
+    assert summary["semantic_boundaries"] == 52
+    assert sum(summary["selectors_by_status"].values()) == 780
     assert summary["selectors_by_status"]["intentionally_blocked"] > 0
     assert summary["selectors_by_status"]["missing"] == 0
 

@@ -13,18 +13,18 @@
       "wwise-console": {
         "function_rows": 662,
         "unique_function_uris": 167,
-        "generic_reflected_rows": 450,
-        "generic_reflected_unique_uris": 118,
-        "special_rows": 212,
-        "special_unique_uris": 49
+        "generic_reflected_rows": 440,
+        "generic_reflected_unique_uris": 116,
+        "special_rows": 222,
+        "special_unique_uris": 51
       },
       "wwise-authoring-ui": {
         "function_rows": 670,
         "unique_function_uris": 167,
-        "generic_reflected_rows": 452,
-        "generic_reflected_unique_uris": 118,
-        "special_rows": 218,
-        "special_unique_uris": 49
+        "generic_reflected_rows": 442,
+        "generic_reflected_unique_uris": 116,
+        "special_rows": 228,
+        "special_unique_uris": 51
       }
     },
     "reviewed_generic_restrictions": {
@@ -47,6 +47,7 @@
       "ak.wwise.core.getInfo",
       "ak.wwise.core.getProjectInfo",
       "ak.wwise.core.mediaPool.get",
+      "ak.wwise.core.object.copy",
       "ak.wwise.core.object.create",
       "ak.wwise.core.object.delete",
       "ak.wwise.core.object.get",
@@ -55,6 +56,7 @@
       "ak.wwise.core.object.getPropertyInfo",
       "ak.wwise.core.object.getTypes",
       "ak.wwise.core.object.isPropertyEnabled",
+      "ak.wwise.core.object.move",
       "ak.wwise.core.object.set",
       "ak.wwise.core.object.setLinked",
       "ak.wwise.core.object.setName",
@@ -95,9 +97,11 @@
       "ak.wwise.core.audio.import",
       "ak.wwise.core.audio.importTabDelimited",
       "ak.wwise.core.executeLuaScript",
+      "ak.wwise.core.object.copy",
       "ak.wwise.core.object.create",
       "ak.wwise.core.object.delete",
       "ak.wwise.core.object.get",
+      "ak.wwise.core.object.move",
       "ak.wwise.core.object.set",
       "ak.wwise.core.object.setReference",
       "ak.wwise.core.soundbank.convertExternalSources",
@@ -112,9 +116,13 @@
     {
       "uri": "ak.wwise.cli.generateSoundbank",
       "profile": "wwise-console",
-      "versions": ["2021.1"],
+      "versions": [
+        "2021.1"
+      ],
       "execution_mode": "isolated_transaction",
-      "operations": ["waapi.call"],
+      "operations": [
+        "waapi.call"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
@@ -175,9 +183,13 @@
     {
       "uri": "ak.wwise.cli.generateSoundbank",
       "profile": "wwise-console",
-      "versions": ["2022.1"],
+      "versions": [
+        "2022.1"
+      ],
       "execution_mode": "isolated_transaction",
-      "operations": ["waapi.call"],
+      "operations": [
+        "waapi.call"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
@@ -241,9 +253,13 @@
     {
       "uri": "ak.wwise.cli.generateSoundbank",
       "profile": "wwise-console",
-      "versions": ["2023.1"],
+      "versions": [
+        "2023.1"
+      ],
       "execution_mode": "isolated_transaction",
-      "operations": ["waapi.call"],
+      "operations": [
+        "waapi.call"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
@@ -308,9 +324,14 @@
     {
       "uri": "ak.wwise.cli.generateSoundbank",
       "profile": "wwise-console",
-      "versions": ["2024.1", "2025.1"],
+      "versions": [
+        "2024.1",
+        "2025.1"
+      ],
       "execution_mode": "isolated_transaction",
-      "operations": ["waapi.call"],
+      "operations": [
+        "waapi.call"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
@@ -374,9 +395,14 @@
     {
       "uri": "ak.wwise.cli.tabDelimitedImport",
       "profile": "wwise-console",
-      "versions": ["2021.1", "2022.1"],
+      "versions": [
+        "2021.1",
+        "2022.1"
+      ],
       "execution_mode": "isolated_transaction",
-      "operations": ["waapi.call"],
+      "operations": [
+        "waapi.call"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
@@ -415,9 +441,15 @@
     {
       "uri": "ak.wwise.cli.tabDelimitedImport",
       "profile": "wwise-console",
-      "versions": ["2023.1", "2024.1", "2025.1"],
+      "versions": [
+        "2023.1",
+        "2024.1",
+        "2025.1"
+      ],
       "execution_mode": "isolated_transaction",
-      "operations": ["waapi.call"],
+      "operations": [
+        "waapi.call"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
@@ -457,16 +489,27 @@
     {
       "uri": "ak.wwise.core.object.get",
       "profile": "wwise-console",
-      "versions": ["2021.1", "2022.1", "2023.1"],
+      "versions": [
+        "2021.1",
+        "2022.1",
+        "2023.1"
+      ],
       "execution_mode": "fixed_command",
       "operations": [],
-      "fixed_commands": ["query-object", "buses"],
+      "fixed_commands": [
+        "query-object",
+        "buses"
+      ],
       "scopes": [
         {
           "pointer": "/argsSchema",
           "classifications": {
             "mapped": [],
-            "normalized_equivalent": ["from", "transform", "waql"],
+            "normalized_equivalent": [
+              "from",
+              "transform",
+              "waql"
+            ],
             "intentionally_blocked": [],
             "missing": []
           }
@@ -494,16 +537,26 @@
     {
       "uri": "ak.wwise.core.object.get",
       "profile": "wwise-console",
-      "versions": ["2024.1", "2025.1"],
+      "versions": [
+        "2024.1",
+        "2025.1"
+      ],
       "execution_mode": "fixed_command",
       "operations": [],
-      "fixed_commands": ["query-object", "buses"],
+      "fixed_commands": [
+        "query-object",
+        "buses"
+      ],
       "scopes": [
         {
           "pointer": "/argsSchema",
           "classifications": {
             "mapped": [],
-            "normalized_equivalent": ["from", "transform", "waql"],
+            "normalized_equivalent": [
+              "from",
+              "transform",
+              "waql"
+            ],
             "intentionally_blocked": [],
             "missing": []
           }
@@ -531,10 +584,16 @@
     {
       "uri": "ak.wwise.ui.getSelectedObjects",
       "profile": "wwise-console",
-      "versions": ["2021.1", "2022.1", "2023.1"],
+      "versions": [
+        "2021.1",
+        "2022.1",
+        "2023.1"
+      ],
       "execution_mode": "fixed_command",
       "operations": [],
-      "fixed_commands": ["selected"],
+      "fixed_commands": [
+        "selected"
+      ],
       "scopes": [
         {
           "pointer": "/argsSchema",
@@ -568,9 +627,14 @@
     {
       "uri": "ak.wwise.core.audio.import",
       "profile": "wwise-console",
-      "versions": ["2021.1", "2022.1"],
+      "versions": [
+        "2021.1",
+        "2022.1"
+      ],
       "execution_mode": "isolated_transaction",
-      "operations": ["audio.import"],
+      "operations": [
+        "audio.import"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
@@ -666,9 +730,13 @@
     {
       "uri": "ak.wwise.core.audio.import",
       "profile": "wwise-console",
-      "versions": ["2023.1"],
+      "versions": [
+        "2023.1"
+      ],
       "execution_mode": "isolated_transaction",
-      "operations": ["audio.import"],
+      "operations": [
+        "audio.import"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
@@ -765,9 +833,14 @@
     {
       "uri": "ak.wwise.core.audio.import",
       "profile": "wwise-console",
-      "versions": ["2024.1", "2025.1"],
+      "versions": [
+        "2024.1",
+        "2025.1"
+      ],
       "execution_mode": "isolated_transaction",
-      "operations": ["audio.import"],
+      "operations": [
+        "audio.import"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
@@ -864,9 +937,14 @@
     {
       "uri": "ak.wwise.core.audio.importTabDelimited",
       "profile": "wwise-console",
-      "versions": ["2021.1", "2022.1"],
+      "versions": [
+        "2021.1",
+        "2022.1"
+      ],
       "execution_mode": "isolated_transaction",
-      "operations": ["audio.importTabDelimited"],
+      "operations": [
+        "audio.importTabDelimited"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
@@ -927,9 +1005,13 @@
     {
       "uri": "ak.wwise.core.audio.importTabDelimited",
       "profile": "wwise-console",
-      "versions": ["2023.1"],
+      "versions": [
+        "2023.1"
+      ],
       "execution_mode": "isolated_transaction",
-      "operations": ["audio.importTabDelimited"],
+      "operations": [
+        "audio.importTabDelimited"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
@@ -991,9 +1073,14 @@
     {
       "uri": "ak.wwise.core.audio.importTabDelimited",
       "profile": "wwise-console",
-      "versions": ["2024.1", "2025.1"],
+      "versions": [
+        "2024.1",
+        "2025.1"
+      ],
       "execution_mode": "isolated_transaction",
-      "operations": ["audio.importTabDelimited"],
+      "operations": [
+        "audio.importTabDelimited"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
@@ -1055,9 +1142,15 @@
     {
       "uri": "ak.wwise.core.object.create",
       "profile": "wwise-console",
-      "versions": ["2021.1", "2022.1", "2023.1"],
+      "versions": [
+        "2021.1",
+        "2022.1",
+        "2023.1"
+      ],
       "execution_mode": "transaction",
-      "operations": ["object.create"],
+      "operations": [
+        "object.create"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
@@ -1075,7 +1168,9 @@
               "platform",
               "type"
             ],
-            "intentionally_blocked": ["pattern:^@[:_a-zA-Z0-9]+$"],
+            "intentionally_blocked": [
+              "pattern:^@[:_a-zA-Z0-9]+$"
+            ],
             "missing": []
           }
         },
@@ -1089,7 +1184,9 @@
               "notes",
               "type"
             ],
-            "intentionally_blocked": ["pattern:^@[:_a-zA-Z0-9]+$"],
+            "intentionally_blocked": [
+              "pattern:^@[:_a-zA-Z0-9]+$"
+            ],
             "missing": []
           }
         },
@@ -1114,9 +1211,14 @@
     {
       "uri": "ak.wwise.core.object.create",
       "profile": "wwise-console",
-      "versions": ["2024.1", "2025.1"],
+      "versions": [
+        "2024.1",
+        "2025.1"
+      ],
       "execution_mode": "transaction",
-      "operations": ["object.create"],
+      "operations": [
+        "object.create"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
@@ -1184,9 +1286,15 @@
     {
       "uri": "ak.wwise.core.object.set",
       "profile": "wwise-console",
-      "versions": ["2022.1"],
+      "versions": [
+        "2022.1"
+      ],
       "execution_mode": "transaction",
-      "operations": ["object.createPlugin", "object.set", "object.setRTPC"],
+      "operations": [
+        "object.createPlugin",
+        "object.set",
+        "object.setRTPC"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
@@ -1217,7 +1325,9 @@
               "onNameConflict",
               "platform"
             ],
-            "intentionally_blocked": ["pattern:^@[:_a-zA-Z0-9]+$"],
+            "intentionally_blocked": [
+              "pattern:^@[:_a-zA-Z0-9]+$"
+            ],
             "missing": []
           }
         },
@@ -1234,7 +1344,9 @@
               "platform",
               "type"
             ],
-            "intentionally_blocked": ["pattern:^@[:_a-zA-Z0-9]+$"],
+            "intentionally_blocked": [
+              "pattern:^@[:_a-zA-Z0-9]+$"
+            ],
             "missing": []
           }
         },
@@ -1266,9 +1378,15 @@
     {
       "uri": "ak.wwise.core.object.set",
       "profile": "wwise-console",
-      "versions": ["2023.1"],
+      "versions": [
+        "2023.1"
+      ],
       "execution_mode": "transaction",
-      "operations": ["object.createPlugin", "object.set", "object.setRTPC"],
+      "operations": [
+        "object.createPlugin",
+        "object.set",
+        "object.setRTPC"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
@@ -1300,7 +1418,9 @@
               "onNameConflict",
               "platform"
             ],
-            "intentionally_blocked": ["pattern:^@[:_a-zA-Z0-9]+$"],
+            "intentionally_blocked": [
+              "pattern:^@[:_a-zA-Z0-9]+$"
+            ],
             "missing": []
           }
         },
@@ -1318,7 +1438,9 @@
               "platform",
               "type"
             ],
-            "intentionally_blocked": ["pattern:^@[:_a-zA-Z0-9]+$"],
+            "intentionally_blocked": [
+              "pattern:^@[:_a-zA-Z0-9]+$"
+            ],
             "missing": []
           }
         },
@@ -1350,9 +1472,16 @@
     {
       "uri": "ak.wwise.core.object.set",
       "profile": "wwise-console",
-      "versions": ["2024.1", "2025.1"],
+      "versions": [
+        "2024.1",
+        "2025.1"
+      ],
       "execution_mode": "transaction",
-      "operations": ["object.createPlugin", "object.set", "object.setRTPC"],
+      "operations": [
+        "object.createPlugin",
+        "object.set",
+        "object.setRTPC"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
@@ -1384,7 +1513,9 @@
               "onNameConflict",
               "platform"
             ],
-            "intentionally_blocked": ["pattern:^@[:_a-zA-Z0-9]+$"],
+            "intentionally_blocked": [
+              "pattern:^@[:_a-zA-Z0-9]+$"
+            ],
             "missing": []
           }
         },
@@ -1442,16 +1573,23 @@
     {
       "uri": "ak.wwise.core.object.delete",
       "profile": "wwise-console",
-      "versions": ["2021.1", "2022.1"],
+      "versions": [
+        "2021.1",
+        "2022.1"
+      ],
       "execution_mode": "transaction",
-      "operations": ["object.delete"],
+      "operations": [
+        "object.delete"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
           "pointer": "/argsSchema",
           "classifications": {
             "mapped": [],
-            "normalized_equivalent": ["object"],
+            "normalized_equivalent": [
+              "object"
+            ],
             "intentionally_blocked": [],
             "missing": []
           }
@@ -1471,9 +1609,15 @@
     {
       "uri": "ak.wwise.core.object.delete",
       "profile": "wwise-console",
-      "versions": ["2023.1", "2024.1", "2025.1"],
+      "versions": [
+        "2023.1",
+        "2024.1",
+        "2025.1"
+      ],
       "execution_mode": "transaction",
-      "operations": ["object.delete"],
+      "operations": [
+        "object.delete"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
@@ -1503,9 +1647,17 @@
     {
       "uri": "ak.wwise.core.object.setReference",
       "profile": "wwise-console",
-      "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"],
+      "versions": [
+        "2021.1",
+        "2022.1",
+        "2023.1",
+        "2024.1",
+        "2025.1"
+      ],
       "execution_mode": "transaction",
-      "operations": ["object.setReference"],
+      "operations": [
+        "object.setReference"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
@@ -1543,16 +1695,22 @@
     {
       "uri": "ak.wwise.cli.executeLuaScript",
       "profile": "wwise-console",
-      "versions": ["2023.1"],
+      "versions": [
+        "2023.1"
+      ],
       "execution_mode": "isolated_transaction",
-      "operations": ["lua.executeCliFile"],
+      "operations": [
+        "lua.executeCliFile"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
           "pointer": "/argsSchema",
           "classifications": {
             "mapped": [],
-            "normalized_equivalent": ["lua-script"],
+            "normalized_equivalent": [
+              "lua-script"
+            ],
             "intentionally_blocked": [
               "allow-migration",
               "do-file",
@@ -1584,16 +1742,23 @@
     {
       "uri": "ak.wwise.cli.executeLuaScript",
       "profile": "wwise-console",
-      "versions": ["2024.1"],
+      "versions": [
+        "2024.1"
+      ],
       "execution_mode": "isolated_transaction",
-      "operations": ["lua.executeCliFile"],
+      "operations": [
+        "lua.executeCliFile"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
           "pointer": "/argsSchema",
           "classifications": {
             "mapped": [],
-            "normalized_equivalent": ["lua-script", "watchdog-timeout"],
+            "normalized_equivalent": [
+              "lua-script",
+              "watchdog-timeout"
+            ],
             "intentionally_blocked": [
               "allow-migration",
               "do-file",
@@ -1625,16 +1790,23 @@
     {
       "uri": "ak.wwise.cli.executeLuaScript",
       "profile": "wwise-console",
-      "versions": ["2025.1"],
+      "versions": [
+        "2025.1"
+      ],
       "execution_mode": "isolated_transaction",
-      "operations": ["lua.executeCliFile"],
+      "operations": [
+        "lua.executeCliFile"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
           "pointer": "/argsSchema",
           "classifications": {
             "mapped": [],
-            "normalized_equivalent": ["lua-script", "watchdog-timeout"],
+            "normalized_equivalent": [
+              "lua-script",
+              "watchdog-timeout"
+            ],
             "intentionally_blocked": [
               "allow-migration",
               "do-file",
@@ -1667,17 +1839,28 @@
     {
       "uri": "ak.wwise.core.executeLuaScript",
       "profile": "wwise-console",
-      "versions": ["2023.1", "2024.1"],
+      "versions": [
+        "2023.1",
+        "2024.1"
+      ],
       "execution_mode": "isolated_transaction",
-      "operations": ["lua.executeCoreFile"],
+      "operations": [
+        "lua.executeCoreFile"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
           "pointer": "/argsSchema",
           "classifications": {
             "mapped": [],
-            "normalized_equivalent": ["luaScript"],
-            "intentionally_blocked": ["doFiles", "luaPaths", "requires"],
+            "normalized_equivalent": [
+              "luaScript"
+            ],
+            "intentionally_blocked": [
+              "doFiles",
+              "luaPaths",
+              "requires"
+            ],
             "missing": []
           }
         },
@@ -1702,17 +1885,29 @@
     {
       "uri": "ak.wwise.core.executeLuaScript",
       "profile": "wwise-console",
-      "versions": ["2025.1"],
+      "versions": [
+        "2025.1"
+      ],
       "execution_mode": "isolated_transaction",
-      "operations": ["lua.executeCoreFile", "lua.executeCoreInline"],
+      "operations": [
+        "lua.executeCoreFile",
+        "lua.executeCoreInline"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
           "pointer": "/argsSchema",
           "classifications": {
             "mapped": [],
-            "normalized_equivalent": ["luaScript", "luaString"],
-            "intentionally_blocked": ["doFiles", "luaPaths", "requires"],
+            "normalized_equivalent": [
+              "luaScript",
+              "luaString"
+            ],
+            "intentionally_blocked": [
+              "doFiles",
+              "luaPaths",
+              "requires"
+            ],
             "missing": []
           }
         },
@@ -1737,9 +1932,17 @@
     {
       "uri": "ak.wwise.core.soundbank.generate",
       "profile": "wwise-console",
-      "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"],
+      "versions": [
+        "2021.1",
+        "2022.1",
+        "2023.1",
+        "2024.1",
+        "2025.1"
+      ],
       "execution_mode": "isolated_transaction",
-      "operations": ["soundbank.generate"],
+      "operations": [
+        "soundbank.generate"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
@@ -1786,16 +1989,25 @@
     {
       "uri": "ak.wwise.core.soundbank.convertExternalSources",
       "profile": "wwise-console",
-      "versions": ["2022.1", "2023.1", "2024.1", "2025.1"],
+      "versions": [
+        "2022.1",
+        "2023.1",
+        "2024.1",
+        "2025.1"
+      ],
       "execution_mode": "isolated_transaction",
-      "operations": ["soundbank.convertExternalSources"],
+      "operations": [
+        "soundbank.convertExternalSources"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
           "pointer": "/argsSchema",
           "classifications": {
             "mapped": [],
-            "normalized_equivalent": ["sources"],
+            "normalized_equivalent": [
+              "sources"
+            ],
             "intentionally_blocked": [],
             "missing": []
           }
@@ -1804,7 +2016,11 @@
           "pointer": "/argsSchema/properties/sources/items",
           "classifications": {
             "mapped": [],
-            "normalized_equivalent": ["input", "output", "platform"],
+            "normalized_equivalent": [
+              "input",
+              "output",
+              "platform"
+            ],
             "intentionally_blocked": [],
             "missing": []
           }
@@ -1830,16 +2046,26 @@
     {
       "uri": "ak.wwise.ui.commands.register",
       "profile": "wwise-authoring-ui",
-      "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"],
+      "versions": [
+        "2021.1",
+        "2022.1",
+        "2023.1",
+        "2024.1",
+        "2025.1"
+      ],
       "execution_mode": "managed_transaction",
-      "operations": ["ui.commands.register"],
+      "operations": [
+        "ui.commands.register"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
           "pointer": "/argsSchema",
           "classifications": {
             "mapped": [],
-            "normalized_equivalent": ["commands"],
+            "normalized_equivalent": [
+              "commands"
+            ],
             "intentionally_blocked": [],
             "missing": []
           }
@@ -1859,6 +2085,235 @@
           "selector": "args.commands[].program-args-luaScript::raw-handler",
           "status": "intentionally_blocked",
           "reason": "Registration accepts only the closed descriptor-backed command form; arbitrary program, argument, and Lua handler definitions remain unavailable."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.object.copy",
+      "profile": "wwise-console",
+      "versions": [
+        "2021.1",
+        "2022.1"
+      ],
+      "execution_mode": "transaction",
+      "operations": [
+        "object.copy"
+      ],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "object",
+              "onNameConflict",
+              "parent"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.onNameConflict::replace",
+          "status": "intentionally_blocked",
+          "reason": "Native replace can delete an unreviewed destination subtree; the dedicated typed operation exposes only fail and rename."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.object.copy",
+      "profile": "wwise-console",
+      "versions": [
+        "2023.1"
+      ],
+      "execution_mode": "transaction",
+      "operations": [
+        "object.copy"
+      ],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "autoAddToSourceControl",
+              "autoCheckOutToSourceControl",
+              "object",
+              "onNameConflict",
+              "parent"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "$ref:#/definitions/objectReturnOptions"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.onNameConflict::replace",
+          "status": "intentionally_blocked",
+          "reason": "Native replace can delete an unreviewed destination subtree; the dedicated typed operation exposes only fail and rename."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.object.move",
+      "profile": "wwise-console",
+      "versions": [
+        "2021.1",
+        "2022.1"
+      ],
+      "execution_mode": "transaction",
+      "operations": [
+        "object.move"
+      ],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "object",
+              "onNameConflict",
+              "parent"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.onNameConflict::replace",
+          "status": "intentionally_blocked",
+          "reason": "Native replace deletes the destination including children; the dedicated typed operation exposes only fail and rename."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.object.move",
+      "profile": "wwise-console",
+      "versions": [
+        "2023.1",
+        "2024.1",
+        "2025.1"
+      ],
+      "execution_mode": "transaction",
+      "operations": [
+        "object.move"
+      ],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "autoCheckOutToSourceControl",
+              "object",
+              "onNameConflict",
+              "parent"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.onNameConflict::replace",
+          "status": "intentionally_blocked",
+          "reason": "Native replace deletes the destination including children; the dedicated typed operation exposes only fail and rename."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.core.object.copy",
+      "profile": "wwise-console",
+      "versions": [
+        "2024.1",
+        "2025.1"
+      ],
+      "execution_mode": "transaction",
+      "operations": [
+        "object.copy"
+      ],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "autoAddToSourceControl",
+              "autoCheckOutToSourceControl",
+              "object",
+              "onNameConflict",
+              "parent"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "$ref:waapi_definitions.json#/definitions/objectReturnOptions"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.onNameConflict::replace",
+          "status": "intentionally_blocked",
+          "reason": "Native replace can delete an unreviewed destination subtree; the dedicated typed operation exposes only fail and rename."
         }
       ]
     }

@@ -34,11 +34,11 @@ planning; the Registry remains authoritative during implementation.
 | `lua.executeCliFile` | 2023.1–2025.1 | Legacy | source file/root/authority; optional args/watchdog | exact user code and isolated I/O | exception candidate |
 | `lua.executeCoreFile` | 2023.1–2025.1 | Legacy | source file/root/authority; optional args | exact user code in Authoring | exception candidate |
 | `lua.executeCoreInline` | 2025.1 | Legacy | source text/root/authority; optional args | Agent composition forbidden | exception candidate |
-| `object.copy` | 2021.1–2025.1 | Legacy boundary | object and parent | no implemented public verifier | non-model-facing exclusion |
-| `object.create` | 2021.1–2025.1 | Legacy | parent/type/name; recursive options | recursive bounds and replace ownership | wave 02 |
+| `object.copy` | 2021.1–2025.1 | Inline typed | object and parent | returned GUID and parent/path verification | wave 02 object lifecycle complete |
+| `object.create` | 2021.1–2025.1 | Composer | parent/type/name; recursive options | recursive bounds and replace ownership | wave 02 object lifecycle complete |
 | `object.createPlugin` | 2022.1–2025.1 | Legacy | target and exact class | versioned topology on shared URI | wave 02 |
-| `object.delete` | 2021.1–2025.1 | Legacy | object; optional checkout | protected object and GUID absence | wave 02 |
-| `object.move` | 2021.1–2025.1 | Legacy boundary | object and parent | no implemented public verifier | non-model-facing exclusion |
+| `object.delete` | 2021.1–2025.1 | Inline typed | object; optional checkout | protected object and GUID absence | wave 02 object lifecycle complete |
+| `object.move` | 2021.1–2025.1 | Inline typed | object and parent | stable GUID and parent/path verification | wave 02 object lifecycle complete |
 | `object.set` | 2022.1–2025.1 | Composer | ordered bounded object batch | recursive mixed fields/references | wave 00 complete |
 | `object.setLinked` | 2023.1–2025.1 | Inline typed | object/property/platform/link state | dedicated link semantics | wave 01 complete |
 | `object.setName` | 2021.1–2025.1 | Inline typed | object and name | same-GUID path transition | wave 01 complete |
@@ -61,9 +61,9 @@ planning; the Registry remains authoritative during implementation.
 
 ## Migration order
 
-Waves 00 and 01 are complete: the two complex Draft Adapters and five concise
-single-object operations prove both typed mutation construction shapes. Planned
-waves cover object graph/plug-in/delete/RTPC work, Switch Container assignments,
+Waves 00, 01, and the object-lifecycle slice of wave 02 are complete: complex Draft Adapters and concise typed operations
+cover object batches, imports, single-object edits, recursive creation, object
+lifecycle. Planned waves cover plug-in topology, RTPC curves, Switch Container assignments,
 SoundBank and isolated-file workflows, Authoring-only UI operations, and the
 compound Undo Group after relevant child contracts stabilize.
 
@@ -73,8 +73,8 @@ business schema.
 
 Tab-delimited import, user-authored Lua, debug/host controls, and guarded
 generic `waapi.call` are exception candidates requiring later retain-or-migrate
-decisions. Unimplemented `object.copy` and `object.move` are excluded until a
-separate public-operation proposal supplies safety and verification contracts.
+decisions. `object.copy` and `object.move` now have closed typed inputs and
+operation-specific identity, parent, and path verification.
 
 ## Legacy exit decision
 

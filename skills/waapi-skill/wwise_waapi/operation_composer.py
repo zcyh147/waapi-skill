@@ -32,6 +32,7 @@ from .typed_requests import (
     materialize_typed_request,
     request_contract,
 )
+from .typed_operations import DRAFT_TYPED_OPERATIONS, draft_operation_request_contract
 
 
 OPERATION_DRAFT_ACTION_CONTRACT = "waapi-skill.operation-draft-action/v1"
@@ -1236,8 +1237,12 @@ def _selector_cli_tokens(selector: Mapping[str, Any], *, depth: int = 0) -> tupl
 def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
     """Return one reviewed Adapter contract, derived from the Registry."""
 
-    if operation.startswith("ak."):
-        typed = request_contract(version, operation)
+    if operation.startswith("ak.") or operation in DRAFT_TYPED_OPERATIONS:
+        typed = (
+            request_contract(version, operation)
+            if operation.startswith("ak.")
+            else draft_operation_request_contract(operation, version)
+        )
         if typed.as_gateway_payload()["input_shape"] != "draft":
             raise OperationComposerError(
                 f"No Operation Composer Adapter is available for {operation!r}.",
@@ -1696,7 +1701,11 @@ def _normalize_generic_typed_composition(
     )
     if composition.get("contract") != OPERATION_COMPOSITION_CONTRACT:
         raise OperationComposerError("Operation Draft composition contract is invalid.")
-    contract = request_contract(version, operation)
+    contract = (
+        draft_operation_request_contract(operation, version)
+        if operation in DRAFT_TYPED_OPERATIONS
+        else request_contract(version, operation)
+    )
     if composition.get("typed_request_schema_digest") != contract.schema_digest:
         raise OperationComposerError("Typed request schema digest is stale.")
     raw_facts = composition.get("facts")
@@ -1864,7 +1873,7 @@ def _apply_generic_typed_action(
 
 def new_composition(operation: str, version: str) -> dict[str, Any]:
     contract = operation_composer_contract(operation, version)
-    if operation.startswith("ak."):
+    if operation.startswith("ak.") or operation in DRAFT_TYPED_OPERATIONS:
         return {
             "contract": OPERATION_COMPOSITION_CONTRACT,
             "typed_request_schema_digest": contract["typed_request_schema_digest"],
@@ -1898,7 +1907,7 @@ def apply_composer_action(
     """Validate and apply one closed action without mutating the input mapping."""
 
     operation_composer_contract(operation, version)
-    if operation.startswith("ak."):
+    if operation.startswith("ak.") or operation in DRAFT_TYPED_OPERATIONS:
         return _apply_generic_typed_action(
             operation,
             version,
@@ -2562,8 +2571,12 @@ def materialize_operation_request(
     """Build and canonically reparse the complete operation request."""
 
     normalized = _normalize_composition(composition, operation=operation, version=version)
-    if operation.startswith("ak."):
-        typed = request_contract(version, operation)
+    if operation.startswith("ak.") or operation in DRAFT_TYPED_OPERATIONS:
+        typed = (
+            request_contract(version, operation)
+            if operation.startswith("ak.")
+            else draft_operation_request_contract(operation, version)
+        )
         try:
             materialized = materialize_typed_request(
                 typed,
@@ -2588,16 +2601,28 @@ def materialize_operation_request(
                     else "OPERATION_DRAFT_ACTION_INVALID"
                 ),
             ) from exc
-        return {
+        request = {
             "contract": "waapi-skill.operation-request/v1",
             "version": version,
-            "operation": "waapi.call",
-            "arguments": {
-                "api": operation,
-                "args": dict(materialized.args),
-                "options": dict(materialized.options),
-            },
+            "operation": "waapi.call" if operation.startswith("ak.") else operation,
+            "arguments": (
+                {
+                    "api": operation,
+                    "args": dict(materialized.args),
+                    "options": dict(materialized.options),
+                }
+                if operation.startswith("ak.")
+                else dict(materialized.args)
+            ),
         }
+        if operation in DRAFT_TYPED_OPERATIONS:
+            try:
+                return parse_operation_request(request, expected_version=version).as_dict()
+            except OperationContractError as exc:
+                raise OperationComposerError(
+                    str(exc), details=exc.details, error_code=exc.error_code
+                ) from exc
+        return request
     if operation == AUDIO_IMPORT_COMPOSER_OPERATION:
         return _materialize_audio_import_request(version, normalized)
     targets = normalized["targets"]
@@ -2685,7 +2710,7 @@ def composition_projection(
     composition: Mapping[str, Any],
 ) -> dict[str, Any]:
     normalized = _normalize_composition(composition, operation=operation, version=version)
-    if operation.startswith("ak."):
+    if operation.startswith("ak.") or operation in DRAFT_TYPED_OPERATIONS:
         missing: list[str] = []
         try:
             materialize_operation_request(operation, version, normalized)
@@ -2840,7 +2865,7 @@ def _normalize_composition(
     version: str,
 ) -> dict[str, Any]:
     operation_composer_contract(operation, version)
-    if operation.startswith("ak."):
+    if operation.startswith("ak.") or operation in DRAFT_TYPED_OPERATIONS:
         return _normalize_generic_typed_composition(
             operation, version, composition
         )

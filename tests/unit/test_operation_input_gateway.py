@@ -752,7 +752,6 @@ def test_schema_input_mode_projection_is_isolated_by_exact_operation_key(
 @pytest.mark.parametrize(
     ("operation", "version", "expected_status"),
     [
-        ("object.copy", "2022.1", "unsupported_boundary"),
         ("object.set", "2021.1", "ok"),
     ],
 )
@@ -1144,6 +1143,5 @@ def test_preview_routes_keep_boundary_and_live_version_mismatch_errors_equivalen
         assert results[0][1]["error_code"] == "INPUT_MODE_MISMATCH"
         assert results[1][1]["error_code"] == "VERSION_MISMATCH"
     else:
-        assert results[0][1]["error_code"] == results[1][1]["error_code"]
-        assert results[0][1]["message"] == results[1][1]["message"]
-        assert results[0][1]["details"] == results[1][1]["details"]
+        assert results[0][1]["error_code"] == "INPUT_MODE_MISMATCH"
+        assert results[1][1]["error_code"] == "INVALID_REQUEST"

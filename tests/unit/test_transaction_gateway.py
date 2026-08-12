@@ -713,7 +713,9 @@ def preview(
     # object.set normal surface is Composer-only; its reviewed JSON fixtures
     # therefore exercise the explicit compatibility adapter.
     command = (
-        "legacy-preview" if request.get("operation") == "object.set" else "preview"
+        "legacy-preview"
+        if request.get("operation") in {"object.create", "object.set"}
+        else "preview"
     )
     arguments = [command]
     if apply:
@@ -1442,8 +1444,8 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
         "optional_arguments",
     }
     assert operations["object.create"]["implemented"] is True
-    assert operations["object.copy"]["implemented"] is False
-    assert "returned copy GUID" in operations["object.copy"]["boundary"]
+    assert operations["object.copy"]["implemented"] is True
+    assert "returned copy GUID" in operations["object.copy"]["constraints"][0]
     assert "argument_contract" not in operations["object.create"]
     assert operations["ui.commands.execute"]["implemented"] is True
     assert operations["ui.commands.register"]["implemented"] is True
@@ -3512,7 +3514,7 @@ def test_ask_before_changes_uses_same_home_state_store_without_broker_injection(
 
     preview_exit, transaction = waapi_gateway.execute_gateway(
         [
-            "preview",
+            "legacy-preview",
             "--apply",
             "--request-json",
             json.dumps(create_request()),

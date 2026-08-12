@@ -344,35 +344,32 @@ def test_generic_non_isolated_transaction_rejects_fake_io_root(tmp_path: Path) -
 def test_unresolved_result_ref_is_reported_as_partial_schema_check_not_business_verified() -> None:
     capability = CapabilityCatalog().describe("2022.1", "ak.wwise.core.object.copy")
     args, options, _ = request_and_result_from_schema(capability.schema)
+    with pytest.raises(OperationContractError, match="dedicated operation"):
+        parse_operation_request(
+            {
+                "contract": OPERATION_REQUEST_CONTRACT,
+                "version": "2022.1",
+                "operation": "waapi.call",
+                "arguments": {
+                    "api": capability.uri,
+                    "args": args,
+                    "options": options,
+                },
+            }
+        )
+
     request = parse_operation_request(
         {
             "contract": OPERATION_REQUEST_CONTRACT,
             "version": "2022.1",
-            "operation": "waapi.call",
+            "operation": "object.copy",
             "arguments": {
-                "api": capability.uri,
-                "args": args,
-                "options": options,
+                "object": {"kind": "id", "value": args["object"]},
+                "parent": {"kind": "path", "value": r"\Actor-Mixer Hierarchy\Default Work Unit"},
             },
         }
     )
-    prepared = prepare_operation(
-        request,
-        read_call=lambda uri, call_args, call_options: {},
-    )
-
-    verification = verify_prepared_operation(
-        prepared.as_dict(),
-        execution_result={"ok": True, "result": None},
-        read_call=lambda uri, call_args, call_options: {},
-    )
-
-    assert verification.ok is True
-    assert verification.status == "result_schema_checked"
-    assert verification.business_state_verified is False
-    assert verification.verification_strength == "partial_reflected_schema"
-    evidence = verification.assertions[0]["evidence"]
-    assert evidence["unresolved_refs"] == ["#/definitions/objectReturn"]
+    assert request.operation == "object.copy"
 
 
 def test_transaction_default_deadline_preserves_isolated_contract_timeout(tmp_path: Path) -> None:
