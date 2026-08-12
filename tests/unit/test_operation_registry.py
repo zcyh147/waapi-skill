@@ -91,6 +91,8 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                 "soundbank.convertExternalSources",
                 "soundbank.generate",
                 "soundbank.setInclusions",
+                "ui.commands.register",
+                "ui.commands.unregister",
             }
             else "inline_typed"
             if name in {
@@ -105,6 +107,8 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                     "switchContainer.addAssignment",
                     "switchContainer.removeAssignment",
                     "soundbank.processDefinitionFiles",
+                    "ui.captureScreen",
+                    "ui.commands.execute",
                 }
             else LEGACY_JSON_INPUT_MODE
         )

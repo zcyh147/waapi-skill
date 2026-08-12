@@ -113,7 +113,10 @@
       "ak.wwise.ui.getSelectedObjects"
     ],
     "wwise-authoring-ui": [
-      "ak.wwise.ui.commands.register"
+      "ak.wwise.ui.captureScreen",
+      "ak.wwise.ui.commands.execute",
+      "ak.wwise.ui.commands.register",
+      "ak.wwise.ui.commands.unregister"
     ]
   },
   "rules": [
@@ -2197,16 +2200,25 @@
     {
       "uri": "ak.wwise.core.soundbank.processDefinitionFiles",
       "profile": "wwise-console",
-      "versions": ["2022.1", "2023.1", "2024.1", "2025.1"],
+      "versions": [
+        "2022.1",
+        "2023.1",
+        "2024.1",
+        "2025.1"
+      ],
       "execution_mode": "isolated_transaction",
-      "operations": ["soundbank.processDefinitionFiles"],
+      "operations": [
+        "soundbank.processDefinitionFiles"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
           "pointer": "/argsSchema",
           "classifications": {
             "mapped": [],
-            "normalized_equivalent": ["files"],
+            "normalized_equivalent": [
+              "files"
+            ],
             "intentionally_blocked": [],
             "missing": []
           }
@@ -2232,16 +2244,28 @@
     {
       "uri": "ak.wwise.core.soundbank.setInclusions",
       "profile": "wwise-console",
-      "versions": ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"],
+      "versions": [
+        "2021.1",
+        "2022.1",
+        "2023.1",
+        "2024.1",
+        "2025.1"
+      ],
       "execution_mode": "transaction",
-      "operations": ["soundbank.setInclusions"],
+      "operations": [
+        "soundbank.setInclusions"
+      ],
       "fixed_commands": [],
       "scopes": [
         {
           "pointer": "/argsSchema",
           "classifications": {
             "mapped": [],
-            "normalized_equivalent": ["inclusions", "operation", "soundbank"],
+            "normalized_equivalent": [
+              "inclusions",
+              "operation",
+              "soundbank"
+            ],
             "intentionally_blocked": [],
             "missing": []
           }
@@ -2250,7 +2274,10 @@
           "pointer": "/argsSchema/properties/inclusions/items",
           "classifications": {
             "mapped": [],
-            "normalized_equivalent": ["filter", "object"],
+            "normalized_equivalent": [
+              "filter",
+              "object"
+            ],
             "intentionally_blocked": [],
             "missing": []
           }
@@ -2499,6 +2526,232 @@
           "selector": "args.onNameConflict::replace",
           "status": "intentionally_blocked",
           "reason": "Native replace can delete an unreviewed destination subtree; the dedicated typed operation exposes only fail and rename."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.ui.captureScreen",
+      "profile": "wwise-authoring-ui",
+      "versions": [
+        "2021.1"
+      ],
+      "execution_mode": "isolated_transaction",
+      "operations": [
+        "ui.captureScreen"
+      ],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "rect",
+              "viewName",
+              "viewSyncGroup"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.rect+view::typed-output-confinement",
+          "status": "normalized_equivalent",
+          "reason": "The closed typed operation maps the historical view channel field, enforces a complete positive rectangle, and retains bounded image content validation."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.ui.captureScreen",
+      "profile": "wwise-authoring-ui",
+      "versions": [
+        "2022.1",
+        "2023.1",
+        "2024.1",
+        "2025.1"
+      ],
+      "execution_mode": "isolated_transaction",
+      "operations": [
+        "ui.captureScreen"
+      ],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "rect",
+              "viewName",
+              "viewSelectionChannel"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.rect+view::typed-output-confinement",
+          "status": "normalized_equivalent",
+          "reason": "The closed typed operation bounds view/channel/rectangle input and retains image content-type, base64, and result-size validation."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.ui.commands.execute",
+      "profile": "wwise-authoring-ui",
+      "versions": [
+        "2021.1",
+        "2022.1",
+        "2023.1",
+        "2024.1"
+      ],
+      "execution_mode": "managed_transaction",
+      "operations": [
+        "ui.commands.execute"
+      ],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "command",
+              "objects",
+              "platforms",
+              "value"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.command::fresh-getCommands",
+          "status": "normalized_equivalent",
+          "reason": "The typed command ID remains subject to a fresh bounded getCommands presence check immediately before its one dispatch; result-schema-only effects remain explicit."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.ui.commands.execute",
+      "profile": "wwise-authoring-ui",
+      "versions": [
+        "2025.1"
+      ],
+      "execution_mode": "managed_transaction",
+      "operations": [
+        "ui.commands.execute"
+      ],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "command",
+              "files",
+              "objects",
+              "platforms",
+              "value"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.command+files::fresh-getCommands-and-sealed-files",
+          "status": "normalized_equivalent",
+          "reason": "The typed command ID is freshly checked and every caller-owned file identity/content proof is sealed and replayed before the single dispatch."
+        }
+      ]
+    },
+    {
+      "uri": "ak.wwise.ui.commands.unregister",
+      "profile": "wwise-authoring-ui",
+      "versions": [
+        "2021.1",
+        "2022.1",
+        "2023.1",
+        "2024.1",
+        "2025.1"
+      ],
+      "execution_mode": "managed_transaction",
+      "operations": [
+        "ui.commands.unregister"
+      ],
+      "fixed_commands": [],
+      "scopes": [
+        {
+          "pointer": "/argsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [
+              "commands"
+            ],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        },
+        {
+          "pointer": "/optionsSchema",
+          "classifications": {
+            "mapped": [],
+            "normalized_equivalent": [],
+            "intentionally_blocked": [],
+            "missing": []
+          }
+        }
+      ],
+      "semantic_boundaries": [
+        {
+          "selector": "args.commands::explicit-destructive-branch",
+          "status": "normalized_equivalent",
+          "reason": "The public operation accepts either closed descriptor evidence or an explicit acknowledged existing-ID branch; ownership is never inferred, and fresh getCommands proves presence then absence."
         }
       ]
     }

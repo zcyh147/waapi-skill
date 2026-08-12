@@ -41,6 +41,8 @@ INLINE_OPERATIONS = frozenset(
         "object.copy",
         "object.move",
         "soundbank.processDefinitionFiles",
+        "ui.captureScreen",
+        "ui.commands.execute",
     }
 )
 DRAFT_TYPED_OPERATIONS = frozenset(
@@ -51,6 +53,8 @@ DRAFT_TYPED_OPERATIONS = frozenset(
         "soundbank.convertExternalSources",
         "soundbank.generate",
         "soundbank.setInclusions",
+        "ui.commands.register",
+        "ui.commands.unregister",
     }
 )
 _MAX_SELECTOR_DEPTH = 8
@@ -203,7 +207,69 @@ def materialize_inline_operation_request(
     if operation not in INLINE_OPERATIONS:
         raise TypedOperationInputError(f"No inline typed adapter exists for {operation!r}")
     arguments: dict[str, Any]
-    if operation == "soundbank.processDefinitionFiles":
+    if operation == "ui.captureScreen":
+        _require_keys(
+            values,
+            required=frozenset(),
+            optional=frozenset({"view_name", "view_channel", "rect"}),
+        )
+        arguments = {}
+        if "view_name" in values:
+            arguments["view_name"] = _bounded_text(
+                values["view_name"], field="view_name", allow_empty=False
+            )
+        if "view_channel" in values:
+            raw_channel = values["view_channel"]
+            if not isinstance(raw_channel, str) or raw_channel not in {"1", "2", "3", "4"}:
+                raise TypedOperationInputError("view_channel must be 1, 2, 3, or 4")
+            arguments["view_channel"] = int(raw_channel)
+        if "rect" in values:
+            raw_rect = values["rect"]
+            if (
+                not isinstance(raw_rect, Sequence)
+                or isinstance(raw_rect, (str, bytes))
+                or len(raw_rect) != 4
+            ):
+                raise TypedOperationInputError("rect requires X Y WIDTH HEIGHT")
+            parsed: list[int] = []
+            for name, raw in zip(("x", "y", "width", "height"), raw_rect):
+                if not isinstance(raw, str) or re.fullmatch(r"(?:0|[1-9][0-9]*)", raw) is None:
+                    raise TypedOperationInputError(f"rect {name} must be a non-negative integer")
+                parsed.append(int(raw))
+            if parsed[2] < 1 or parsed[3] < 1:
+                raise TypedOperationInputError("rect width and height must be positive")
+            arguments["rect"] = dict(zip(("x", "y", "width", "height"), parsed))
+    elif operation == "ui.commands.execute":
+        _require_keys(
+            values,
+            required=frozenset({"command"}),
+            optional=frozenset(
+                {"objects", "platforms", "value_type", "value", "files"}
+            ),
+        )
+        if ("value_type" in values) != ("value" in values):
+            raise TypedOperationInputError("command value requires both TYPE and VALUE")
+        arguments = {
+            "command": _bounded_text(values["command"], field="command", allow_empty=False)
+        }
+        for name, maximum in (("objects", 64), ("platforms", 16), ("files", 64)):
+            if name not in values:
+                continue
+            raw_items = values[name]
+            if (
+                not isinstance(raw_items, Sequence)
+                or isinstance(raw_items, (str, bytes))
+                or not 1 <= len(raw_items) <= maximum
+            ):
+                raise TypedOperationInputError(f"{name} requires 1-{maximum} values")
+            arguments[name] = [
+                _bounded_text(item, field=name, allow_empty=False) for item in raw_items
+            ]
+        if "files" in arguments and version != "2025.1":
+            raise TypedOperationInputError("command files are available only in Wwise 2025.1")
+        if "value" in values:
+            arguments["value"] = _typed_scalar(values["value_type"], values["value"])
+    elif operation == "soundbank.processDefinitionFiles":
         _require_keys(values, required=frozenset({"files", "io_root"}))
         files = values["files"]
         if (
@@ -374,7 +440,13 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
         else (
             ["--file ABSOLUTE_PATH (repeat 1-32)", "--io-root ABSOLUTE_PATH"]
             if operation == "soundbank.processDefinitionFiles"
-            else ["--object SELECTOR"]
+            else (
+                ["--view-name NAME (optional)", "--view-channel 1|2|3|4 (optional)", "--rect X Y WIDTH HEIGHT (optional)"]
+                if operation == "ui.captureScreen"
+                else ["--command ID", "--command-object VALUE (repeat)", "--command-platform VALUE (repeat)", "--value TYPE VALUE (optional)", "--file ABSOLUTE_PATH (2025.1 only; repeat)"]
+                if operation == "ui.commands.execute"
+                else ["--object SELECTOR"]
+            )
         )
     )
     continuation: dict[str, Any] = {

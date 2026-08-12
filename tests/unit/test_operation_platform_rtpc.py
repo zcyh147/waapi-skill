@@ -931,7 +931,9 @@ def test_capture_screen_maps_the_stable_view_channel_and_verifies_image(
         read_call=lambda *_: {},
     )
     assert verified.ok
-    assert verified.business_state_verified is True
+    assert verified.status == "result_schema_checked"
+    assert verified.verification_strength == "result_schema_only"
+    assert verified.business_state_verified is False
 
 
 @pytest.mark.parametrize(

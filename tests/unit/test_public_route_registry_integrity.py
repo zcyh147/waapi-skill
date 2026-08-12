@@ -280,12 +280,12 @@ def test_native_surface_policy_partitions_every_function_and_binds_high_risk_dif
         "reviewed_special_uri_count": 51,
         "reviewed_generic_restriction_count": 6,
     }
-    assert summary["version_rows"] == 96
-    assert summary["rules"] == 40
-    assert summary["scopes"] == 224
-    assert summary["schema_selectors"] == 829
-    assert summary["semantic_boundaries"] == 58
-    assert sum(summary["selectors_by_status"].values()) == 829
+    assert summary["version_rows"] == 111
+    assert summary["rules"] == 45
+    assert summary["scopes"] == 254
+    assert summary["schema_selectors"] == 870
+    assert summary["semantic_boundaries"] == 63
+    assert sum(summary["selectors_by_status"].values()) == 870
     assert summary["selectors_by_status"]["intentionally_blocked"] > 0
     assert summary["selectors_by_status"]["missing"] == 0
 

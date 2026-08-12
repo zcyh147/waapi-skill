@@ -13,6 +13,16 @@ import pytest  # pyright: ignore[reportMissingImports]
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     OPERATION_REQUEST_CONTRACT,
 )
+from wwise_waapi.typed_operations import (  # pyright: ignore[reportMissingImports]
+    draft_operation_request_contract,
+    inline_operation_contract,
+)
+from wwise_waapi.typed_requests import (  # pyright: ignore[reportMissingImports]
+    TypedRequestFact,
+    dynamic_array_item_handle,
+    dynamic_container_disclosure,
+    dynamic_map_entry_handle,
+)
 from wwise_waapi.transactions import (  # pyright: ignore[reportMissingImports]
     TransactionState,
 )
@@ -206,6 +216,86 @@ def operation_request(
         "operation": operation,
         "arguments": dict(arguments),
     }
+
+
+def notification_descriptor_facts(operation: str) -> tuple[Any, list[TypedRequestFact]]:
+    contract = draft_operation_request_contract(operation, "2024.1")
+    commands = next(field for field in contract.fields if field.path == ("commands",))
+    row = dynamic_array_item_handle(
+        contract, array_handle=commands.handle, index=0, shape="object"
+    )
+    disclosure = dynamic_container_disclosure(
+        contract,
+        parent_handle=commands.handle,
+        key="0",
+        shape="object",
+        child_handle=row,
+    )
+    choice = next(
+        item["handle"]
+        for branch in disclosure["branch_choices"]
+        if branch["key"] == "handler"
+        for item in branch["choices"]
+        if item["constant_fields"] == {"kind": "notification"}
+    )
+    handler = dynamic_map_entry_handle(
+        contract,
+        map_handle=row,
+        key="handler",
+        shape="object",
+        choice_handle=choice,
+        parent_schema=disclosure["schema_lineage"],
+    )
+    return contract, [
+        TypedRequestFact("append", commands.handle, "object", row),
+        TypedRequestFact("map-put", row, "string", "example.notify", key="id"),
+        TypedRequestFact("map-put", row, "string", "Notify", key="display_name"),
+        TypedRequestFact("choose-dynamic", row, "choice", choice, key="handler"),
+        TypedRequestFact("map-put", row, "object", handler, key="handler"),
+        TypedRequestFact("map-put", handler, "string", "notification", key="kind"),
+    ]
+
+
+def apply_typed_draft_facts(
+    *,
+    tmp_path: Path,
+    state_dir: Path,
+    started: Mapping[str, Any],
+    facts: Sequence[TypedRequestFact],
+) -> int:
+    revision = 1
+    for fact in facts:
+        argv = [
+            "draft-apply",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(revision),
+            "--compact",
+            "--facts",
+            "--action",
+            "add_typed_fact",
+            "--fact-action",
+            fact.action,
+            "--field-handle",
+            fact.handle,
+        ]
+        if fact.key is not None:
+            argv.extend(["--key", fact.key])
+        if fact.action in {"choose", "choose-dynamic"}:
+            argv.extend(["--fact-value", fact.value])
+        elif fact.action != "present":
+            argv.extend(["--value-type", fact.value_type, "--fact-value", fact.value])
+        code, payload = execute(
+            argv,
+            tmp_path=tmp_path,
+            version="2024.1",
+            state_dir=state_dir,
+        )
+        assert code == 0, payload
+        revision = payload["draft"]["revision"]
+    return revision
 
 
 def test_offline_capability_profile_is_explicit_and_defaults_to_console(
@@ -482,7 +572,7 @@ def test_console_rejects_all_ui_command_previews_before_project_read(
     )
     code, payload = execute(
         [
-            "preview",
+            "legacy-preview",
             "--request-json",
             json.dumps(
                 operation_request(
@@ -505,6 +595,212 @@ def test_console_rejects_all_ui_command_previews_before_project_read(
     assert [row[0] for row in client.calls] == [GET_INFO_URI]
 
 
+@pytest.mark.parametrize("operation", ("ui.captureScreen", "ui.commands.execute"))
+def test_typed_inline_ui_operations_reject_console_before_project_read(
+    tmp_path: Path,
+    operation: str,
+) -> None:
+    contract = inline_operation_contract(operation, "2024.1")
+    argv = [
+        "typed-operation",
+        operation,
+        "--schema-digest",
+        contract["schema_digest"],
+        "--apply",
+    ]
+    if operation == "ui.commands.execute":
+        argv.extend(["--command", "SaveProject"])
+    client = FakeClient({GET_INFO_URI: [live_info(command_line=True)]})
+    code, payload = execute(
+        argv,
+        tmp_path=tmp_path,
+        version="2024.1",
+        state_dir=tmp_path / operation,
+        client=client,
+    )
+    assert code == 2
+    assert payload["error_code"] == "AUTHORING_HOST_REQUIRED"
+    assert [row[0] for row in client.calls] == [GET_INFO_URI]
+
+
+def test_typed_register_draft_seals_preview_and_fresh_inventory_remains_authoritative(
+    tmp_path: Path,
+) -> None:
+    operation = "ui.commands.register"
+    state_dir = tmp_path / "typed-register"
+    contract, facts = notification_descriptor_facts(operation)
+    code, started = execute(
+        ["draft-start", operation],
+        tmp_path=tmp_path,
+        version="2024.1",
+        state_dir=state_dir,
+    )
+    assert code == 0, started
+    revision = apply_typed_draft_facts(
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        started=started,
+        facts=facts,
+    )
+    info = live_info()
+    preview_client = FakeClient(
+        {
+            GET_INFO_URI: [info, info],
+            GET_PROJECT_INFO_URI: [project(tmp_path)],
+        }
+    )
+    code, checked = execute(
+        [
+            "draft-check", started["draft"]["draft_id"],
+            "--task-authority", started["task_authority"],
+            "--expected-revision", str(revision),
+        ],
+        tmp_path=tmp_path,
+        version="2024.1",
+        state_dir=state_dir,
+        client=preview_client,
+    )
+    assert code == 0, checked
+    assert GET_COMMANDS_URI not in [row[0] for row in preview_client.calls]
+
+    code, preview = execute(
+        [
+            "preview-from-draft", started["draft"]["draft_id"],
+            "--task-authority", started["task_authority"],
+            "--expected-revision", str(checked["draft"]["revision"]),
+            "--apply",
+        ],
+        tmp_path=tmp_path,
+        version="2024.1",
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                GET_INFO_URI: [info, info],
+                GET_PROJECT_INFO_URI: [project(tmp_path)],
+            }
+        ),
+    )
+    assert code == 0, preview
+    assert preview["agent_result"]["request"]["arguments"]["commands"][0]["id"] == (
+        "example.notify"
+    )
+    assert preview["state"] == TransactionState.AWAITING_CONFIRMATION.value
+
+    code, _confirmed = execute(
+        ["confirm", preview["transaction_id"], "--artifact-hash", preview["artifact_hash"]],
+        tmp_path=tmp_path,
+        version="2024.1",
+        state_dir=state_dir,
+    )
+    assert code == 0
+    missing_inventory = FakeClient(
+        {
+            GET_INFO_URI: [info, info],
+            GET_PROJECT_INFO_URI: [project(tmp_path)],
+            GET_COMMANDS_URI: [{"commands": ["Copy", "example.notify"]}],
+        }
+    )
+    code, rejected = execute(
+        ["execute", preview["transaction_id"]],
+        tmp_path=tmp_path,
+        version="2024.1",
+        state_dir=state_dir,
+        client=missing_inventory,
+    )
+    assert code == 2
+    assert rejected["executed"] is False
+    assert "ak.wwise.ui.commands.register" not in [
+        row[0] for row in missing_inventory.calls
+    ]
+
+
+def test_typed_capture_screen_finishes_as_result_schema_only(
+    tmp_path: Path,
+) -> None:
+    version = "2024.1"
+    operation = "ui.captureScreen"
+    state_dir = tmp_path / "typed-capture"
+    contract = inline_operation_contract(operation, version)
+    info = live_info()
+    code, preview = execute(
+        [
+            "typed-operation",
+            operation,
+            "--schema-digest",
+            contract["schema_digest"],
+            "--apply",
+            "--view-name",
+            "Project Explorer",
+        ],
+        tmp_path=tmp_path,
+        version=version,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                GET_INFO_URI: [info],
+                GET_PROJECT_INFO_URI: [project(tmp_path)],
+            }
+        ),
+    )
+    assert code == 0, preview
+    assert preview["state"] == TransactionState.AWAITING_CONFIRMATION.value
+
+    code, confirmed = execute(
+        [
+            "confirm",
+            preview["transaction_id"],
+            "--artifact-hash",
+            preview["artifact_hash"],
+        ],
+        tmp_path=tmp_path,
+        version=version,
+        state_dir=state_dir,
+    )
+    assert code == 0, confirmed
+    encoded = "iVBORw0KGgo="
+    code, executed = execute(
+        ["execute", preview["transaction_id"]],
+        tmp_path=tmp_path,
+        version=version,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                GET_INFO_URI: [info],
+                GET_PROJECT_INFO_URI: [project(tmp_path)],
+                "ak.wwise.ui.captureScreen": [
+                    {"contentType": "image/png", "contentBase64": encoded}
+                ],
+            }
+        ),
+    )
+    assert code == 0, json.dumps(executed, indent=2)
+    assert executed["state"] == TransactionState.EXECUTED_UNVERIFIED.value
+
+    verify_client = FakeClient(
+        {
+            GET_INFO_URI: [info],
+            GET_PROJECT_INFO_URI: [project(tmp_path)],
+        }
+    )
+    code, verified = execute(
+        ["verify", preview["transaction_id"]],
+        tmp_path=tmp_path,
+        version=version,
+        state_dir=state_dir,
+        client=verify_client,
+    )
+    assert code == 0, verified
+    assert verified["state"] == TransactionState.RESULT_SCHEMA_CHECKED.value
+    assert verified["result_schema_checked"] is True
+    assert verified["verified"] is False
+    assert verified["verification"]["verification_strength"] == "result_schema_only"
+    assert verified["verification"]["business_state_verified"] is False
+    assert [row[0] for row in verify_client.calls] == [
+        GET_INFO_URI,
+        GET_PROJECT_INFO_URI,
+    ]
+
+
 @pytest.mark.parametrize("platform", ("linux", None, "windows"))
 def test_register_preview_rejects_unmapped_get_info_platform_before_project_read(
     tmp_path: Path,
@@ -515,7 +811,7 @@ def test_register_preview_rejects_unmapped_get_info_platform_before_project_read
     )
     code, payload = execute(
         [
-            "preview",
+            "legacy-preview",
             "--request-json",
             json.dumps(
                 operation_request(
@@ -572,7 +868,7 @@ def test_remote_ui_execute_files_fail_before_project_or_file_proof(
         [
             "--host",
             "192.0.2.10",
-            "preview",
+            "legacy-preview",
             "--request-json",
             json.dumps(
                 operation_request(
@@ -617,7 +913,7 @@ def test_confirmed_ui_file_transaction_cannot_switch_to_remote_execute(
         }
     )
     code, transaction = execute(
-        ["preview", "--request-json", json.dumps(request)],
+        ["legacy-preview", "--request-json", json.dumps(request)],
         tmp_path=tmp_path,
         version="2025.1",
         state_dir=state_dir,
@@ -671,7 +967,7 @@ def test_remote_ui_program_descriptors_fail_before_project_or_executable_proof(
         [
             "--host",
             "wwise-studio",
-            "preview",
+            "legacy-preview",
             "--request-json",
             json.dumps(
                 operation_request(
@@ -744,7 +1040,7 @@ def test_confirmed_ui_program_transaction_cannot_switch_to_remote_execute(
         }
     )
     code, transaction = execute(
-        ["preview", "--request-json", json.dumps(request)],
+        ["legacy-preview", "--request-json", json.dumps(request)],
         tmp_path=tmp_path,
         version="2024.1",
         state_dir=state_dir,
@@ -864,7 +1160,7 @@ def test_ui_command_transactions_run_full_fake_gateway_chain(
     preview_client = FakeClient(preview_responses)
     code, preview = execute(
         [
-            "preview",
+                "legacy-preview",
             "--request-json",
             json.dumps(request),
         ],

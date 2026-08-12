@@ -1243,6 +1243,12 @@ def build_parser() -> argparse.ArgumentParser:
     typed_operation.add_argument("--auto-add", choices=("true", "false"))
     typed_operation.add_argument("--file", action="append", dest="files")
     typed_operation.add_argument("--io-root")
+    typed_operation.add_argument("--view-name")
+    typed_operation.add_argument("--view-channel")
+    typed_operation.add_argument("--rect", nargs=4, metavar=("X", "Y", "WIDTH", "HEIGHT"))
+    typed_operation.add_argument("--command", dest="typed_ui_command")
+    typed_operation.add_argument("--command-object", action="append", dest="command_objects")
+    typed_operation.add_argument("--command-platform", action="append", dest="command_platforms")
     typed_call.add_argument(
         "--choose-dynamic",
         action="append",
@@ -2791,7 +2797,7 @@ def live_authoring_transaction_boundary(
     common: Mapping[str, Any],
 ) -> dict[str, Any] | None:
     operation = request_payload.get("operation")
-    if operation not in UI_COMMAND_OPERATIONS:
+    if operation not in {*UI_COMMAND_OPERATIONS, "ui.captureScreen"}:
         return None
     if live_info.get("isCommandLine") is not False:
         return authoring_host_required_payload(
@@ -3102,6 +3108,18 @@ def preflight_typed_operation_input(
         values["files"] = tuple(args.files)
     if args.io_root is not None:
         values["io_root"] = args.io_root
+    if args.view_name is not None:
+        values["view_name"] = args.view_name
+    if args.view_channel is not None:
+        values["view_channel"] = args.view_channel
+    if args.rect is not None:
+        values["rect"] = tuple(args.rect)
+    if args.typed_ui_command is not None:
+        values["command"] = args.typed_ui_command
+    if args.command_objects is not None:
+        values["objects"] = tuple(args.command_objects)
+    if args.command_platforms is not None:
+        values["platforms"] = tuple(args.command_platforms)
     if args.value is not None:
         values["value_type"], values["value"] = args.value
     if args.target is not None:

@@ -1038,7 +1038,7 @@ def test_legacy_preview_keeps_its_truthful_command_on_early_live_boundaries(
         "arguments": {},
     }
 
-    for command in ("preview", "legacy-preview"):
+    for command in ("legacy-preview",):
         client = FakeClient({"ak.wwise.core.getInfo": [live_info()]})
         exit_code, payload = waapi_gateway.execute_gateway(
             [command, "--request-json", json.dumps(request_payload)],

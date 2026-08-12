@@ -3,10 +3,10 @@
   "scope": {
     "registry_operations": 34,
     "registry_version_lanes": 153,
-    "composer_version_lanes": 36,
-    "inline_typed_version_lanes": 52,
-    "legacy_json_version_lanes": 65,
-    "lane_inventory_sha256": "20ee5909b7557e81a29a52385f4d59f497abc6a3615386ad06e56b496b6dc840",
+    "composer_version_lanes": 46,
+    "inline_typed_version_lanes": 62,
+    "legacy_json_version_lanes": 45,
+    "lane_inventory_sha256": "02aca9f50599fe9e511dc93da2eba8fa633a2a087e0df19ad3818d67ea4f2b28",
     "version_rule": "Every supported version lane inherits the disposition of its exact Registry operation name.",
     "normal_input_rule": "The Operation Registry exposes one normal input mode per operation and version. The Agent never chooses between Composer and Legacy JSON for one normal request.",
     "native_uri_rule": "A shared native URI never implies a shared migration decision. Isolation is keyed by exact operation name and version."
@@ -154,7 +154,7 @@
     },
     {
       "id": "wave-05-authoring-ui",
-      "status": "planned",
+      "status": "complete",
       "purpose": "Migrate Authoring-only UI commands and capture without treating packaged inventory snapshots as runtime authority.",
       "operations": [
         "ui.captureScreen",

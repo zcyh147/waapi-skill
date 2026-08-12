@@ -23,6 +23,7 @@ from wwise_waapi.execution_contracts import (  # pyright: ignore[reportMissingIm
 )
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     OPERATION_REQUEST_CONTRACT,
+    OPERATION_SPECS,
     UNDO_GROUP_INNER_URIS_BY_VERSION,
     parse_operation_request,
 )
@@ -724,6 +725,10 @@ def preview(
             "soundbank.generate",
             "soundbank.processDefinitionFiles",
             "soundbank.setInclusions",
+            "ui.captureScreen",
+            "ui.commands.execute",
+            "ui.commands.register",
+            "ui.commands.unregister",
         }
         else "preview"
     )
@@ -1678,9 +1683,7 @@ def test_operation_schema_exposes_closed_ui_command_items(
     )
 
     assert exit_code == 0
-    item = payload["operation"]["argument_contract"]["properties"]["commands"][
-        "items"
-    ]
+    item = OPERATION_SPECS[operation].argument_contract["properties"]["commands"]["items"]
     assert item["additionalProperties"] is False
     assert item["required"] == ["id", "display_name", "handler"]
     handlers = {
@@ -3305,7 +3308,7 @@ def test_preview_apply_read_only_blocks_before_connection_or_state_write(
 
     exit_code, payload = execute(
         [
-            "preview",
+            "legacy-preview",
             "--apply",
             "--request-json",
             json.dumps(create_request()),
@@ -6635,7 +6638,7 @@ def test_confirmed_named_soundbank_transaction_stays_confirmed_on_remote_execute
     ]
 
 
-def test_remote_named_capture_screen_is_not_a_locality_transaction(
+def test_remote_named_capture_screen_still_requires_authoring(
     tmp_path: Path,
 ) -> None:
     request = {
@@ -6655,7 +6658,7 @@ def test_remote_named_capture_screen_is_not_a_locality_transaction(
         [
             "--host",
             "192.0.2.10",
-            "preview",
+            "legacy-preview",
             "--request-json",
             json.dumps(request),
         ],
@@ -6664,12 +6667,9 @@ def test_remote_named_capture_screen_is_not_a_locality_transaction(
         client=client,
     )
 
-    assert exit_code == 0, payload
-    assert payload["status"] == "awaiting_confirmation"
-    assert [call[0] for call in client.calls] == [
-        "ak.wwise.core.getInfo",
-        "ak.wwise.core.getProjectInfo",
-    ]
+    assert exit_code == 2, payload
+    assert payload["error_code"] == "AUTHORING_HOST_REQUIRED"
+    assert [call[0] for call in client.calls] == ["ak.wwise.core.getInfo"]
 
 
 @pytest.mark.skipif(

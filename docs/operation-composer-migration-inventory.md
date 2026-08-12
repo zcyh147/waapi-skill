@@ -52,20 +52,20 @@ planning; the Registry remains authoritative during implementation.
 | `soundbank.setInclusions` | 2021.1–2025.1 | Composer | bank/mode/inclusions | list pre-state/replacement | wave 04 complete |
 | `switchContainer.addAssignment` | 2021.1–2025.1 | Inline typed | container/child/state-or-switch | three identities and pair readback | wave 03 complete |
 | `switchContainer.removeAssignment` | 2021.1–2025.1 | Inline typed | container/child/state-or-switch | existing-pair and absence readback | wave 03 complete |
-| `ui.captureScreen` | 2021.1–2025.1 | Legacy | optional view/channel/rectangle | Authoring and output confinement | wave 05 |
-| `ui.commands.execute` | 2021.1–2025.1 | Legacy | command; optional targets/values/files | fresh command inventory | wave 05 |
-| `ui.commands.register` | 2021.1–2025.1 | Legacy | descriptors; optional authority | ownership and registration readback | wave 05 |
-| `ui.commands.unregister` | 2021.1–2025.1 | Legacy | descriptors or acknowledged IDs | ownership cannot be inferred | wave 05 |
+| `ui.captureScreen` | 2021.1–2025.1 | Inline typed | optional view/channel/rectangle | Authoring and output confinement | wave 05 complete |
+| `ui.commands.execute` | 2021.1–2025.1 | Inline typed | command; optional targets/values/files | fresh command inventory | wave 05 complete |
+| `ui.commands.register` | 2021.1–2025.1 | Composer | descriptors; optional authority | ownership and registration readback | wave 05 complete |
+| `ui.commands.unregister` | 2021.1–2025.1 | Composer | descriptors or acknowledged IDs | ownership cannot be inferred | wave 05 complete |
 | `waapi.call` | 2021.1–2025.1 | Legacy | manifest API; optional args/options/root | heterogeneous compatibility | exception candidate |
 | `waapi.undoGroup` | 2021.1–2025.1 | Legacy | name and ordered calls | nested routes and cancellation journal | wave 06 |
 
 ## Migration order
 
-Waves 00 through 04 are complete: complex Draft Adapters and concise typed operations
+Waves 00 through 05 are complete: complex Draft Adapters and concise typed operations
 cover object batches, imports, single-object edits, recursive creation, object
 lifecycle, plug-in topology, RTPC curves, Switch Container assignments, and
-SoundBank/isolated-file workflows. Planned waves cover Authoring-only UI operations and the
-compound Undo Group after relevant child contracts stabilize.
+SoundBank/isolated-file workflows, and Authoring-only UI operations. The planned wave
+covers the compound Undo Group after relevant child contracts stabilize.
 
 Each operation owns its action vocabulary and verifier. A wave reuses deep
 Draft, canonical parsing, and Preview modules without inventing a generic

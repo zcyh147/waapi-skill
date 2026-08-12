@@ -99,6 +99,13 @@ class TypedFieldContract:
         ]
         if enum_values:
             payload["enum"] = enum_values
+        constant_values = [
+            variant["const"]
+            for variant in self.variants
+            if "const" in variant
+        ]
+        if constant_values:
+            payload["constant_values"] = constant_values
         patterns = sorted(
             {
                 str(variant["pattern"])

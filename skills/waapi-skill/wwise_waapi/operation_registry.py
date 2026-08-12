@@ -240,6 +240,7 @@ REPLAY_GUARD_OPERATIONS = frozenset(
         "debug.restartWaapiServers",
         "debug.testAssert",
         "debug.testCrash",
+        "ui.captureScreen",
     }
 )
 PACKAGED_TRANSACTION_READBACK_URIS = frozenset(
@@ -3513,10 +3514,10 @@ _OPERATION_INPUT_MODE_DECLARATIONS: tuple[
     ("soundbank.setInclusions", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
     ("switchContainer.addAssignment", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
     ("switchContainer.removeAssignment", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
-    ("ui.captureScreen", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("ui.commands.execute", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("ui.commands.register", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("ui.commands.unregister", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("ui.captureScreen", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
+    ("ui.commands.execute", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
+    ("ui.commands.register", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
+    ("ui.commands.unregister", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
     ("waapi.call", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
     ("waapi.undoGroup", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
 )
@@ -16692,6 +16693,9 @@ def verify_prepared_operation(
                     {"actual": actual, "expected": expected},
                 )
     elif kind == "ui-capture-screen-result":
+        success_status = "result_schema_checked"
+        verification_strength = "result_schema_only"
+        business_state_verified = False
         version = plan.get("version")
         max_chars = plan.get("max_base64_chars")
         if (
@@ -18708,6 +18712,15 @@ def _validate_nested_request_shape(
                     f"{context_operation} commands[{index}].handler.kind is unsupported.",
                     details={"kind": kind},
                 )
+            if kind == "lua_script" and version not in UI_COMMAND_LUA_VERSIONS:
+                raise OperationContractError(
+                    "UNAVAILABLE_IN_VERSION",
+                    f"{context_operation} lua_script handlers are not available in Wwise {version}.",
+                    details={
+                        "version": version,
+                        "supported_versions": sorted(UI_COMMAND_LUA_VERSIONS),
+                    },
+                )
             required = (
                 ("kind", "program_path")
                 if kind == "program"
@@ -18751,7 +18764,18 @@ def _validate_nested_request_shape(
                         f"{context_operation} commands[{index}].{field_name}"
                     ),
                 )
+        requires_source_authority = any(
+            isinstance(command.get("handler"), Mapping)
+            and command["handler"].get("kind") in {"program", "lua_script"}
+            for command in raw_commands
+        )
         authority = arguments.get("source_authority")
+        if requires_source_authority and authority is None:
+            raise OperationContractError(
+                "SOURCE_AUTHORITY_REQUIRED",
+                f"{context_operation} requires source_authority for Program or Lua handlers.",
+                details={"expected": UI_COMMAND_SOURCE_AUTHORITY},
+            )
         if authority is not None and authority != UI_COMMAND_SOURCE_AUTHORITY:
             raise OperationContractError(
                 "INVALID_SOURCE_AUTHORITY",
@@ -20499,6 +20523,44 @@ def _json_mapping(value: Any) -> Any:
     return value
 
 
+_UNAVAILABLE_VERSION_SCHEMA = object()
+
+
+def _project_supported_version_contract(value: Any, *, version: str) -> Any:
+    """Remove Registry schema nodes that do not belong to one exact lane."""
+
+    if isinstance(value, Mapping):
+        supported = value.get("supported_versions")
+        if supported is not None:
+            if not isinstance(supported, list) or not all(
+                isinstance(item, str) for item in supported
+            ):
+                raise RuntimeError("Registry supported_versions must be a string array")
+            if version not in supported:
+                return _UNAVAILABLE_VERSION_SCHEMA
+        projected: dict[str, Any] = {}
+        for key, item in value.items():
+            child = _project_supported_version_contract(item, version=version)
+            if child is not _UNAVAILABLE_VERSION_SCHEMA:
+                projected[str(key)] = child
+        properties = projected.get("properties")
+        if isinstance(properties, Mapping):
+            allowed = set(properties)
+            for keyword in ("required", "optional"):
+                names = projected.get(keyword)
+                if isinstance(names, list):
+                    projected[keyword] = [name for name in names if name in allowed]
+        return projected
+    if isinstance(value, list):
+        projected_items = []
+        for item in value:
+            child = _project_supported_version_contract(item, version=version)
+            if child is not _UNAVAILABLE_VERSION_SCHEMA:
+                projected_items.append(child)
+        return projected_items
+    return value
+
+
 def _operation_argument_contract(
     operation: str,
     value: Mapping[str, Any],
@@ -20506,6 +20568,14 @@ def _operation_argument_contract(
     version: str | None,
 ) -> dict[str, Any]:
     contract = _json_mapping(value)
+    if version is not None and operation in {
+        "ui.commands.register",
+        "ui.commands.unregister",
+    }:
+        projected = _project_supported_version_contract(contract, version=version)
+        if not isinstance(projected, dict):  # pragma: no cover - root invariant
+            raise RuntimeError("Operation argument contract is unavailable in its own version lane")
+        contract = projected
     if operation == "waapi.undoGroup":
         try:
             api_contract = contract["properties"]["calls"]["items"][
