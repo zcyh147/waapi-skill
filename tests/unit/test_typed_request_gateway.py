@@ -97,7 +97,40 @@ def _request_contract(tmp_path: Path, version: str = "2025.1") -> dict[str, Any]
 
 
 def _field_handles(payload: Mapping[str, Any]) -> dict[str, str]:
-    return {str(field["name"]): str(field["handle"]) for field in payload["fields"]}
+    return {
+        str(field["name"]): str(field["handle"])
+        for field in payload["fields"]
+        if "parent_handle" not in field
+    }
+
+
+def _typed_scalar_args(
+    payload: Mapping[str, Any],
+    field_name: str,
+    value_type: str,
+    value: str,
+) -> list[str]:
+    top = next(
+        field
+        for field in payload["fields"]
+        if field["name"] == field_name and "parent_handle" not in field
+    )
+    if top["shape"] != "branch":
+        return ["--set", top["handle"], value_type, value]
+    choice = next(
+        field
+        for field in payload["fields"]
+        if field.get("parent_handle") == top["handle"] and field["name"] == value_type
+    )
+    return [
+        "--choose",
+        top["handle"],
+        choice["handle"],
+        "--set",
+        choice["handle"],
+        value_type,
+        value,
+    ]
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
@@ -119,7 +152,9 @@ def test_request_schema_returns_one_typed_continuation_for_tracer(
     assert payload["continuation"]["schema_digest"] == payload["schema_digest"]
     assert "args-json" not in json.dumps(payload)
     assert "options-json" not in json.dumps(payload)
-    assert {field["name"] for field in payload["fields"]} == {
+    assert {
+        field["name"] for field in payload["fields"] if "parent_handle" not in field
+    } == {
         "time",
         "voicePipelineID",
         "bussesPipelineID",
@@ -154,10 +189,7 @@ def test_typed_call_materializes_and_dispatches_without_preview(
             GET_VOICE_CONTRIBUTIONS_URI,
             "--schema-digest",
             contract["schema_digest"],
-            "--set",
-            handles["time"],
-            "integer",
-            "1200",
+            *_typed_scalar_args(contract, "time", "integer", "1200"),
             "--set",
             handles["voicePipelineID"],
             "integer",
@@ -206,12 +238,7 @@ def test_invalid_typed_facts_fail_before_connection(
 ) -> None:
     contract = _request_contract(tmp_path)
     handles = _field_handles(contract)
-    facts = [
-        "--set",
-        handles["time"],
-        "integer",
-        "1200",
-    ]
+    facts = _typed_scalar_args(contract, "time", "integer", "1200")
     if case != "missing":
         facts.extend(
             [
@@ -247,10 +274,7 @@ def test_typed_call_rejects_configured_live_version_drift(tmp_path: Path) -> Non
             GET_VOICE_CONTRIBUTIONS_URI,
             "--schema-digest",
             contract["schema_digest"],
-            "--set",
-            handles["time"],
-            "string",
-            "capture",
+            *_typed_scalar_args(contract, "time", "string", "capture"),
             "--set",
             handles["voicePipelineID"],
             "integer",

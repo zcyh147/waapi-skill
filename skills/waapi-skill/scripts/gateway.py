@@ -121,10 +121,16 @@ from wwise_waapi.builders.stable_reads import (  # noqa: E402  # pyright: ignore
     normalize_project_default_work_units_result,
 )
 from wwise_waapi.typed_requests import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    TYPED_REQUEST_COMPLEX_TRACER_URI,
     TYPED_REQUEST_TRACER_URI,
     TypedRequestFact,
+    dynamic_array_item_handle,
+    dynamic_container_disclosure,
+    dynamic_map_entry_handle,
     materialize_typed_request,
+    parse_typed_schema_lineage_token,
     request_contract,
+    typed_schema_lineage_token,
 )
 from wwise_waapi.builders.schema import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     validate_semantic_event,
@@ -276,6 +282,8 @@ OFFLINE_COMMANDS = frozenset(
         "operation-schema",
         "legacy-operation-schema",
         "request-schema",
+        "request-map-container",
+        "request-array-item",
         "query-schema",
         "object-types",
         "config-show",
@@ -1080,6 +1088,36 @@ def build_parser() -> argparse.ArgumentParser:
     )
     request_schema.add_argument("api")
 
+    request_map_container = subparsers.add_parser(
+        "request-map-container",
+        help="Issue a schema-bound child handle for one open-map key",
+    )
+    request_map_container.add_argument("api")
+    request_map_container.add_argument("--schema-digest", required=True)
+    request_map_container.add_argument("--map-handle", required=True)
+    request_map_container.add_argument("--key", required=True)
+    request_map_container.add_argument("--shape", choices=("object", "array"), required=True)
+    request_map_container.add_argument(
+        "--member-key",
+        help="Exact child-object key whose opaque branch choices must be disclosed",
+    )
+    request_map_container.add_argument("--parent-schema-token")
+
+    request_array_item = subparsers.add_parser(
+        "request-array-item",
+        help="Issue a schema-bound child handle for one ordered complex array item",
+    )
+    request_array_item.add_argument("api")
+    request_array_item.add_argument("--schema-digest", required=True)
+    request_array_item.add_argument("--array-handle", required=True)
+    request_array_item.add_argument("--index", required=True, type=int)
+    request_array_item.add_argument("--shape", choices=("object", "array"), required=True)
+    request_array_item.add_argument(
+        "--member-key",
+        help="Exact child-object key whose opaque branch choices must be disclosed",
+    )
+    request_array_item.add_argument("--parent-schema-token")
+
     typed_call = subparsers.add_parser(
         "typed-call",
         help="Dispatch one read-only API from Gateway-owned typed field handles",
@@ -1108,6 +1146,39 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="CONTAINER_HANDLE",
         default=[],
         dest="typed_present_facts",
+    )
+    typed_call.add_argument(
+        "--choose",
+        action="append",
+        nargs=2,
+        metavar=("BRANCH_HANDLE", "CHOICE_HANDLE"),
+        default=[],
+        dest="typed_branch_facts",
+    )
+    typed_call.add_argument(
+        "--choose-dynamic",
+        action="append",
+        nargs=3,
+        metavar=("OBJECT_HANDLE", "KEY", "CHOICE_HANDLE"),
+        default=[],
+        dest="typed_dynamic_branch_facts",
+    )
+    for action_name in ("map-put", "map-correct"):
+        typed_call.add_argument(
+            f"--{action_name}",
+            action="append",
+            nargs=4,
+            metavar=("MAP_HANDLE", "KEY", "TYPE", "VALUE"),
+            default=[],
+            dest=f"typed_{action_name.replace('-', '_')}_facts",
+        )
+    typed_call.add_argument(
+        "--map-remove",
+        action="append",
+        nargs=2,
+        metavar=("MAP_HANDLE", "KEY"),
+        default=[],
+        dest="typed_map_remove_facts",
     )
 
     debug_wal_tree = subparsers.add_parser(
@@ -2658,6 +2729,31 @@ def preflight_typed_request_input(
         TypedRequestFact("present", handle, "null", "null")
         for handle in args.typed_present_facts
     )
+    facts.extend(
+        TypedRequestFact("choose", handle, "branch", choice)
+        for handle, choice in args.typed_branch_facts
+    )
+    facts.extend(
+        TypedRequestFact("choose-dynamic", handle, "choice", choice, key=key)
+        for handle, key, choice in args.typed_dynamic_branch_facts
+    )
+    for action_name in ("map_put", "map_correct"):
+        facts.extend(
+            TypedRequestFact(
+                action_name.replace("_", "-"),
+                handle,
+                value_type,
+                value,
+                key=key,
+            )
+            for handle, key, value_type, value in getattr(
+                args, f"typed_{action_name}_facts"
+            )
+        )
+    facts.extend(
+        TypedRequestFact("map-remove", handle, "null", "null", key=key)
+        for handle, key in args.typed_map_remove_facts
+    )
     args.typed_request = materialize_typed_request(
         contract,
         schema_digest=args.schema_digest,
@@ -2672,6 +2768,16 @@ def preflight_typed_request_input(
                 args.typed_request.args.get("bussesPipelineID", ())
             ),
         )
+    elif args.typed_request.uri == TYPED_REQUEST_COMPLEX_TRACER_URI:
+        target_uri = args.typed_request.args.get("id")
+        if not isinstance(target_uri, str) or not target_uri.startswith("ak."):
+            raise GatewayInputError("typed debug validation requires an exact target API id")
+        try:
+            target = CapabilityCatalog().describe(versions[0], target_uri)
+        except CapabilityNotFoundError as exc:
+            raise GatewayInputError(str(exc)) from exc
+        if target.item_type != "function":
+            raise GatewayInputError("typed debug validation accepts only a function URI")
 
 
 def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, str]) -> None:
@@ -3308,11 +3414,107 @@ def operation_composer_input_contract(
 def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]) -> dict[str, Any]:
     """Run catalog commands without requiring a WAAPI port or live Wwise."""
 
-    if args.command == "request-schema":
+    if args.command in {"request-schema", "request-map-container", "request-array-item"}:
         versions = resolve_catalog_versions(args, env=env)
         if len(versions) != 1:
-            raise GatewayInputError("request-schema requires one exact Wwise version")
-        return request_contract(versions[0], args.api).as_gateway_payload()
+            raise GatewayInputError(f"{args.command} requires one exact Wwise version")
+        contract = request_contract(versions[0], args.api)
+        if args.command == "request-schema":
+            return contract.as_gateway_payload()
+        if args.schema_digest != contract.schema_digest:
+            raise GatewayInputError("Typed request schema digest is stale")
+        if args.command == "request-map-container":
+            child_handle = dynamic_map_entry_handle(
+                contract,
+                map_handle=args.map_handle,
+                key=args.key,
+                shape=args.shape,
+            )
+            parent_handle = args.map_handle
+            key: str | int = args.key
+            fact = ["--map-put", args.map_handle, args.key, args.shape, child_handle]
+        else:
+            child_handle = dynamic_array_item_handle(
+                contract,
+                array_handle=args.array_handle,
+                index=args.index,
+                shape=args.shape,
+            )
+            parent_handle = args.array_handle
+            key = args.index
+            fact = ["--append", args.array_handle, args.shape, child_handle]
+        parent_lineage = parse_typed_schema_lineage_token(
+            contract,
+            parent_handle=parent_handle,
+            token=args.parent_schema_token,
+        )
+        parent_schema = parent_lineage[0] if parent_lineage is not None else None
+        parent_section = parent_lineage[1] if parent_lineage is not None else None
+        child_contract = dynamic_container_disclosure(
+            contract,
+            parent_handle=parent_handle,
+            key=str(key),
+            shape=args.shape,
+            child_handle=child_handle,
+            member_key=args.member_key,
+            parent_schema=parent_schema,
+            parent_section=parent_section,
+        )
+        child_contract.pop("schema_lineage")
+        lineage_token = typed_schema_lineage_token(
+            contract,
+            child_handle=child_handle,
+            parent_token=args.parent_schema_token,
+            parent_handle=parent_handle,
+            key=str(key),
+            shape=args.shape,
+        )
+        return {
+            "contract": "waapi-skill.typed-container-handle/v1",
+            "ok": True,
+            "status": "ok",
+            "command": args.command,
+            "version": contract.version,
+            "uri": contract.uri,
+            "schema_digest": contract.schema_digest,
+            "parent_handle": parent_handle,
+            "key": key,
+            "shape": args.shape,
+            "handle": child_handle,
+            "child_contract": child_contract,
+            "schema_lineage_token": lineage_token,
+            "continuation": {
+                "subcommand": "typed-call",
+                "fact": fact,
+                **(
+                    {}
+                    if args.member_key is not None or args.shape != "object"
+                    else {
+                        "branch_disclosure": [
+                            args.command,
+                            args.api,
+                            "--schema-digest",
+                            contract.schema_digest,
+                            *(
+                                ["--map-handle", args.map_handle, "--key", args.key]
+                                if args.command == "request-map-container"
+                                else [
+                                    "--array-handle", args.array_handle,
+                                    "--index", str(args.index),
+                                ]
+                            ),
+                            "--shape", args.shape,
+                            "--member-key", "<exact-key>",
+                            *(
+                                ["--parent-schema-token", args.parent_schema_token]
+                                if args.parent_schema_token is not None
+                                else []
+                            ),
+                        ]
+                    }
+                ),
+            },
+        }
     if args.command == "draft-start":
         request_version = resolve_operation_schema_version(args, env=env)
         if request_version is None:
@@ -4724,6 +4926,64 @@ def dispatch_profiler_voice_contributions_request(
     }
 
 
+def dispatch_typed_debug_validation(
+    typed_request: Any,
+    *,
+    connection: GatewayConnection,
+    detected_version: str,
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Run the existing bounded Debug validateCall adapter from typed facts."""
+
+    api = TYPED_REQUEST_COMPLEX_TRACER_URI
+    capability = CapabilityCatalog().describe(detected_version, api)
+    call_args = dict(typed_request.args)
+    supplied_sections = [
+        name for name in ("args", "options", "result") if name in call_args
+    ]
+    request_validation = validate_semantic_payload(
+        api, call_args, {}, version=detected_version
+    )
+    result = dispatch(
+        dispatcher,
+        api,
+        connection=connection,
+        version=detected_version,
+        args=call_args,
+        options={},
+        result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
+        operation_timeout=float(capability.execution_contract["timeout_seconds"]),
+    )
+    result_validation = (
+        validate_semantic_result(api, result.get("result"), version=detected_version)
+        if result.get("ok")
+        else None
+    )
+    return {
+        "ok": bool(result.get("ok")),
+        "status": "ok" if result.get("ok") else "error",
+        **dict(common),
+        "api_attempted": api,
+        "validated_api": call_args["id"],
+        "supplied_sections": supplied_sections,
+        "call": dispatch_call_summary(result),
+        "schema_validation": {
+            "request": request_validation.as_dict(),
+            "result": result_validation.as_dict() if result_validation else None,
+        },
+        "agent_result": (
+            {
+                "validated_api": call_args["id"],
+                "supplied_sections": supplied_sections,
+                "accepted_by_wwise": True,
+            }
+            if result.get("ok")
+            else None
+        ),
+    }
+
+
 def dispatch_command(
     args: argparse.Namespace,
     *,
@@ -4916,9 +5176,21 @@ def dispatch_command(
                 "Typed request version changed after preflight; request-schema must be rerun"
             )
         if typed_request.uri != TYPED_REQUEST_TRACER_URI:
-            raise GatewayInputError(
-                f"WAAPI URI {typed_request.uri!r} has no typed dispatch adapter"
-            )
+            if typed_request.uri == TYPED_REQUEST_COMPLEX_TRACER_URI:
+                return dispatch_typed_debug_validation(
+                    typed_request,
+                    connection=connection,
+                    detected_version=detected_version,
+                    dispatcher=dispatcher,
+                    common={
+                        **common,
+                        "typed_request": {
+                            "contract": typed_request.as_dict()["contract"],
+                            "schema_digest": typed_request.schema_digest,
+                        },
+                    },
+                )
+            raise GatewayInputError(f"WAAPI URI {typed_request.uri!r} has no typed dispatch adapter")
         request = args.typed_stable_request
         return dispatch_profiler_voice_contributions_request(
             request,

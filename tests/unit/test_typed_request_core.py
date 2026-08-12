@@ -24,12 +24,12 @@ def test_tracer_contract_is_schema_derived_for_every_supported_version(
     contract = request_contract(version, TYPED_REQUEST_TRACER_URI)
 
     assert contract.version == version
-    assert {field.name for field in contract.fields} == {
+    assert {field.name for field in contract.fields if field.parent_handle is None} == {
         "time",
         "voicePipelineID",
         "bussesPipelineID",
     }
-    assert len({field.handle for field in contract.fields}) == 3
+    assert len({field.handle for field in contract.fields}) == len(contract.fields)
     assert all(field.handle.startswith("trh1-") for field in contract.fields)
 
 
@@ -211,7 +211,9 @@ def test_invalid_fact_sets_fail_atomically_without_a_partial_request(
     contract = request_contract("2025.1", TYPED_REQUEST_TRACER_URI)
     handles = {field.name: field.handle for field in contract.fields}
     facts = [
-        TypedRequestFact("set", handles["time"], "integer", "1200"),
+        *_tracer_fact(
+            contract, field_name="time", value_type="integer", value="1200"
+        ),
         TypedRequestFact("set", handles["voicePipelineID"], "integer", "17"),
     ]
     digest = contract.schema_digest
@@ -220,13 +222,17 @@ def test_invalid_fact_sets_fail_atomically_without_a_partial_request(
     elif mutation == "foreign_handle":
         facts.append(TypedRequestFact("set", "trh1-foreign", "integer", "1"))
     elif mutation == "wrong_action":
-        facts.append(TypedRequestFact("append", handles["time"], "integer", "1"))
+        facts.append(TypedRequestFact("append", handles["voicePipelineID"], "integer", "1"))
     elif mutation == "wrong_type":
         facts[1] = TypedRequestFact(
             "set", handles["voicePipelineID"], "string", "17"
         )
     elif mutation == "duplicate":
-        facts.append(TypedRequestFact("set", handles["time"], "integer", "1"))
+        facts.extend(
+            _tracer_fact(
+                contract, field_name="time", value_type="integer", value="1"
+            )
+        )
     elif mutation == "missing_required":
         facts.pop()
     elif mutation == "oversized_array":
@@ -244,7 +250,9 @@ def test_invalid_fact_sets_fail_atomically_without_a_partial_request(
         contract,
         schema_digest=contract.schema_digest,
         facts=(
-            TypedRequestFact("set", handles["time"], "integer", "1200"),
+            *_tracer_fact(
+                contract, field_name="time", value_type="integer", value="1200"
+            ),
             TypedRequestFact("set", handles["voicePipelineID"], "integer", "17"),
         ),
     )
@@ -270,6 +278,31 @@ def test_handles_and_digest_are_version_bound() -> None:
                 ),
             ),
         )
+
+
+def _tracer_fact(
+    contract,
+    *,
+    field_name: str,
+    value_type: str,
+    value: str,
+) -> tuple[TypedRequestFact, ...]:
+    field = next(
+        item
+        for item in contract.fields
+        if item.name == field_name and item.parent_handle is None
+    )
+    if field.shape != "branch":
+        return (TypedRequestFact("set", field.handle, value_type, value),)
+    choice = next(
+        item
+        for item in contract.fields
+        if item.parent_handle == field.handle and item.name == value_type
+    )
+    return (
+        TypedRequestFact("choose", field.handle, "branch", choice.handle),
+        TypedRequestFact("set", choice.handle, value_type, value),
+    )
 
 
 def test_materialization_rejects_contract_tampering() -> None:

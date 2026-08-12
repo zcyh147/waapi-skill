@@ -195,7 +195,13 @@ FIXED_COMMANDS_BY_URI: Mapping[str, tuple[str, ...]] = MappingProxyType(
             "typed-call",
         ),
         "ak.wwise.debug.getWalTree": ("debug-wal-tree",),
-        "ak.wwise.debug.validateCall": ("debug-validate-call",),
+        "ak.wwise.debug.validateCall": (
+            "debug-validate-call",
+            "request-schema",
+            "request-map-container",
+            "request-array-item",
+            "typed-call",
+        ),
         "ak.wwise.ui.getSelectedObjects": ("selected",),
     }
 )

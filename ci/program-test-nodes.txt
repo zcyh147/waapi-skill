@@ -142,3 +142,5 @@ tests/unit/test_public_route_registry_integrity.py
 tests/unit/test_typed_request_surface_inventory.py
 tests/unit/test_typed_request_gateway.py
 tests/unit/test_typed_request_core.py
+tests/unit/test_typed_request_complex_core.py
+tests/unit/test_typed_request_complex_gateway.py
