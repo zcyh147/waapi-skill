@@ -120,6 +120,12 @@ from wwise_waapi.builders.stable_reads import (  # noqa: E402  # pyright: ignore
     normalize_profiler_voice_contributions_result,
     normalize_project_default_work_units_result,
 )
+from wwise_waapi.typed_requests import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    TYPED_REQUEST_TRACER_URI,
+    TypedRequestFact,
+    materialize_typed_request,
+    request_contract,
+)
 from wwise_waapi.builders.schema import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     validate_semantic_event,
     validate_semantic_payload,
@@ -269,6 +275,7 @@ OFFLINE_COMMANDS = frozenset(
         "operations",
         "operation-schema",
         "legacy-operation-schema",
+        "request-schema",
         "query-schema",
         "object-types",
         "config-show",
@@ -1067,6 +1074,42 @@ def build_parser() -> argparse.ArgumentParser:
         help="Repeat in voice-path order; omit all values for the dry path",
     )
 
+    request_schema = subparsers.add_parser(
+        "request-schema",
+        help="Return the one typed construction continuation for a migrated WAAPI API",
+    )
+    request_schema.add_argument("api")
+
+    typed_call = subparsers.add_parser(
+        "typed-call",
+        help="Dispatch one read-only API from Gateway-owned typed field handles",
+    )
+    typed_call.add_argument("api")
+    typed_call.add_argument("--schema-digest", required=True)
+    typed_call.add_argument(
+        "--set",
+        action="append",
+        nargs=3,
+        metavar=("FIELD_HANDLE", "TYPE", "VALUE"),
+        default=[],
+        dest="typed_set_facts",
+    )
+    typed_call.add_argument(
+        "--append",
+        action="append",
+        nargs=3,
+        metavar=("FIELD_HANDLE", "TYPE", "VALUE"),
+        default=[],
+        dest="typed_append_facts",
+    )
+    typed_call.add_argument(
+        "--present",
+        action="append",
+        metavar="CONTAINER_HANDLE",
+        default=[],
+        dest="typed_present_facts",
+    )
+
     debug_wal_tree = subparsers.add_parser(
         "debug-wal-tree",
         help="Return a bounded deterministic projection of the private WAL tree",
@@ -1710,6 +1753,8 @@ def _execute_gateway_unconstrained(
             "profiler-voice-contributions",
         }:
             preflight_stable_read_input(args, env=source_env)
+        if args.command == "typed-call":
+            preflight_typed_request_input(args, env=source_env)
         if args.command in {"debug-wal-tree", "debug-validate-call"}:
             preflight_debug_read_input(args)
         if args.command in OFFLINE_COMMANDS:
@@ -2590,6 +2635,45 @@ def preflight_public_route(
     return None
 
 
+def preflight_typed_request_input(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+) -> None:
+    """Bind all typed facts to one exact packaged schema before connecting."""
+
+    versions = resolve_catalog_versions(args, env=env)
+    if len(versions) != 1:
+        raise GatewayInputError("typed-call requires one exact Wwise version")
+    contract = request_contract(versions[0], args.api)
+    facts = [
+        TypedRequestFact("set", handle, value_type, value)
+        for handle, value_type, value in args.typed_set_facts
+    ]
+    facts.extend(
+        TypedRequestFact("append", handle, value_type, value)
+        for handle, value_type, value in args.typed_append_facts
+    )
+    facts.extend(
+        TypedRequestFact("present", handle, "null", "null")
+        for handle in args.typed_present_facts
+    )
+    args.typed_request = materialize_typed_request(
+        contract,
+        schema_digest=args.schema_digest,
+        facts=facts,
+    )
+    if args.typed_request.uri == TYPED_REQUEST_TRACER_URI:
+        args.typed_stable_request = build_profiler_voice_contributions_request(
+            version=args.typed_request.version,
+            time=args.typed_request.args["time"],
+            voice_pipeline_id=args.typed_request.args["voicePipelineID"],
+            bus_pipeline_ids=tuple(
+                args.typed_request.args.get("bussesPipelineID", ())
+            ),
+        )
+
+
 def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, str]) -> None:
     """Reject closed query input errors before opening a WAAPI transport."""
 
@@ -3224,6 +3308,11 @@ def operation_composer_input_contract(
 def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]) -> dict[str, Any]:
     """Run catalog commands without requiring a WAAPI port or live Wwise."""
 
+    if args.command == "request-schema":
+        versions = resolve_catalog_versions(args, env=env)
+        if len(versions) != 1:
+            raise GatewayInputError("request-schema requires one exact Wwise version")
+        return request_contract(versions[0], args.api).as_gateway_payload()
     if args.command == "draft-start":
         request_version = resolve_operation_schema_version(args, env=env)
         if request_version is None:
@@ -4574,6 +4663,67 @@ def resolve_connection(args: argparse.Namespace, *, env: Mapping[str, str]) -> G
     )
 
 
+def dispatch_profiler_voice_contributions_request(
+    request: Any,
+    *,
+    connection: GatewayConnection,
+    detected_version: str,
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Run the one existing bounded voice-contribution read adapter."""
+
+    request_validation = validate_semantic_payload(
+        request.uri,
+        request.args,
+        request.options,
+        version=detected_version,
+    )
+    result = dispatch(
+        dispatcher,
+        request.uri,
+        connection=connection,
+        version=detected_version,
+        args=request.args,
+        options=request.options,
+        result_limit_bytes=STABLE_READ_RESULT_LIMIT_BYTES,
+    )
+    if not result.get("ok"):
+        return {
+            "ok": False,
+            "status": "error",
+            **dict(common),
+            "semantic_preview": request.as_dict(),
+            "schema_validation": {
+                "request": request_validation.as_dict(),
+                "result": None,
+            },
+            "call": dispatch_call_summary(result),
+        }
+    raw_result = result.get("result")
+    result_validation = validate_semantic_result(
+        request.uri,
+        raw_result,
+        version=detected_version,
+    )
+    projection = normalize_profiler_voice_contributions_result(
+        version=detected_version,
+        result=raw_result,
+    )
+    return {
+        "ok": True,
+        "status": "ok",
+        **dict(common),
+        "semantic_preview": request.as_dict(),
+        "schema_validation": {
+            "request": request_validation.as_dict(),
+            "result": result_validation.as_dict(),
+        },
+        "call": dispatch_call_summary(result),
+        "agent_result": projection,
+    }
+
+
 def dispatch_command(
     args: argparse.Namespace,
     *,
@@ -4759,6 +4909,30 @@ def dispatch_command(
             "call": dispatch_call_summary(result),
             "agent_result": projection,
         }
+    if args.command == "typed-call":
+        typed_request = args.typed_request
+        if typed_request.version != detected_version:
+            raise GatewayInputError(
+                "Typed request version changed after preflight; request-schema must be rerun"
+            )
+        if typed_request.uri != TYPED_REQUEST_TRACER_URI:
+            raise GatewayInputError(
+                f"WAAPI URI {typed_request.uri!r} has no typed dispatch adapter"
+            )
+        request = args.typed_stable_request
+        return dispatch_profiler_voice_contributions_request(
+            request,
+            connection=connection,
+            detected_version=detected_version,
+            dispatcher=dispatcher,
+            common={
+                **common,
+                "typed_request": {
+                "contract": typed_request.as_dict()["contract"],
+                "schema_digest": typed_request.schema_digest,
+            },
+            },
+        )
     if args.command == "profiler-game-objects":
         request = build_profiler_game_objects_request(
             version=detected_version,
@@ -4820,55 +4994,13 @@ def dispatch_command(
             voice_pipeline_id=args.voice_pipeline_id,
             bus_pipeline_ids=tuple(args.bus_pipeline_id),
         )
-        request_validation = validate_semantic_payload(
-            request.uri,
-            request.args,
-            request.options,
-            version=detected_version,
-        )
-        result = dispatch(
-            dispatcher,
-            request.uri,
+        return dispatch_profiler_voice_contributions_request(
+            request,
             connection=connection,
-            version=detected_version,
-            args=request.args,
-            options=request.options,
-            result_limit_bytes=STABLE_READ_RESULT_LIMIT_BYTES,
+            detected_version=detected_version,
+            dispatcher=dispatcher,
+            common=common,
         )
-        if not result.get("ok"):
-            return {
-                "ok": False,
-                "status": "error",
-                **common,
-                "semantic_preview": request.as_dict(),
-                "schema_validation": {
-                    "request": request_validation.as_dict(),
-                    "result": None,
-                },
-                "call": dispatch_call_summary(result),
-            }
-        raw_result = result.get("result")
-        result_validation = validate_semantic_result(
-            request.uri,
-            raw_result,
-            version=detected_version,
-        )
-        projection = normalize_profiler_voice_contributions_result(
-            version=detected_version,
-            result=raw_result,
-        )
-        return {
-            "ok": True,
-            "status": "ok",
-            **common,
-            "semantic_preview": request.as_dict(),
-            "schema_validation": {
-                "request": request_validation.as_dict(),
-                "result": result_validation.as_dict(),
-            },
-            "call": dispatch_call_summary(result),
-            "agent_result": projection,
-        }
     if args.command == "debug-wal-tree":
         api = "ak.wwise.debug.getWalTree"
         try:

@@ -1,7 +1,7 @@
 {
   "contract": "waapi-skill.typed-request-surface/v1",
   "intentionally_blocked_field_occurrences": 79,
-  "inventory_sha256": "37ac50926f820cc4908d145df2355e5c9ecfef8b421beb8cc5965806ef49409e",
+  "inventory_sha256": "304575f5cf5865edcb6c5da64b65061092af7897a4a43e74bbdd41473cb5ed75",
   "lanes": [
     {
       "correct_host": "wwise-console",
@@ -2940,7 +2940,9 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "profiler-voice-contributions"
+          "profiler-voice-contributions",
+          "request-schema",
+          "typed-call"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -2955,7 +2957,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2021.1"
       },
-      "execution_policy_sha256": "5507cd9e0844d900099a6c5aaa2308b959cd741e8d40bbed07b01fcc8f588f3a",
+      "execution_policy_sha256": "d632edfa5398822301602fa3b8e66787b812083e2107b9b00f0beb6fe5991542",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 4,
@@ -9214,7 +9216,9 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "profiler-voice-contributions"
+          "profiler-voice-contributions",
+          "request-schema",
+          "typed-call"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -9229,7 +9233,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2022.1"
       },
-      "execution_policy_sha256": "d0a704eca6fc2a9569be9d0f20ef492d941e0669c97ce42e3a2e79fa629160b2",
+      "execution_policy_sha256": "83c071ed04dc2643eec060ec26d207e278cc52c181906ecbe1ae354040f4dcff",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 4,
@@ -16976,7 +16980,9 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "profiler-voice-contributions"
+          "profiler-voice-contributions",
+          "request-schema",
+          "typed-call"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -16991,7 +16997,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2023.1"
       },
-      "execution_policy_sha256": "4e388d81936a5e97408b65b58f9436bb1c75eb4d247c8ac443e71f7f4eee0f88",
+      "execution_policy_sha256": "7eda6ee2a0d96c6bea1fcbf14c0d613820dc4075b930612a4bd82ee3271cc12b",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 4,
@@ -25946,7 +25952,9 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "profiler-voice-contributions"
+          "profiler-voice-contributions",
+          "request-schema",
+          "typed-call"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -25961,7 +25969,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2024.1"
       },
-      "execution_policy_sha256": "db9fead7f8bf51ff78dfd92f94a33b25c05acdff469a21ae554603c3fbe053a3",
+      "execution_policy_sha256": "ee91157f486c669211f11a542a023b1820f93b60b263abdc329daf7154671ced",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 4,
@@ -34691,7 +34699,9 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "profiler-voice-contributions"
+          "profiler-voice-contributions",
+          "request-schema",
+          "typed-call"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -34706,7 +34716,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2025.1"
       },
-      "execution_policy_sha256": "72fe287054d05d9875c1fb3ba00ebc4625ecdee2e4d6716c87de314ae175f1d8",
+      "execution_policy_sha256": "6ceb55eb2cc684e6ec2bc0220b3e85639b282b25ff099ecee2ab09466a410b30",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 4,

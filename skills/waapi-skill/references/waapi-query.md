@@ -3,15 +3,11 @@
 Use this reference for read-only project facts, hierarchy inspection, metadata
 discovery, bounded Topic waits, and persistent streams.
 
-Read once with a complete standalone `cat`. Complete only when the
-unique terminal sentinel required by `SKILL.md` is the final visible line and
-output has no truncation or omission marker. Otherwise report an incomplete
-read and stop; do not reread a range or invoke the Gateway.
+Require the unique terminal sentinel required by `SKILL.md` and no truncation or omission marker; do not reread a range or invoke the Gateway.
 
 ## Boundaries and routing
 
-- Use only the Skill-local Gateway. Return its structured evidence or a clear
-  blocker; never use direct `WaapiClient`, inline Python, or a generated helper.
+- Use only the Skill-local Gateway; return its structured evidence or blocker.
 - Use fixed `status`, `buses`, `selected`, `query-schema`,
   `query-object`, `object-types`, `metadata`, `wait-topic`, and `stream-topic`
   directly. Public shapes are offline `gateway.py query-schema`, simple
@@ -414,6 +410,10 @@ Use fixed reads rather than reflected payloads:
   2025 `defaultWorkUnits` and `defaultImportWorkUnit`.
 
 Each exposes its stable terminal `agent_result`; do not rebuild it.
+
+For a migrated reflected read, run `request-schema <uri>` with the configured version, then
+its sole continuation with the returned handles, digest, and typed values. On
+stale/schema errors, rerun discovery.
 
 ## Exact-hop playback diagnosis
 

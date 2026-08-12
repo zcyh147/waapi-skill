@@ -43,6 +43,7 @@ python scripts/run.py gateway.py selected
 python scripts/run.py gateway.py project-default-work-units
 python scripts/run.py gateway.py profiler-game-objects --time capture
 python scripts/run.py gateway.py profiler-voice-contributions --time capture --voice-pipeline-id <uint32> --bus-pipeline-id <uint32>
+python scripts/run.py gateway.py request-schema <migrated-api-uri>
 python scripts/run.py gateway.py debug-wal-tree --take 128
 python scripts/run.py gateway.py debug-validate-call <exact-function-uri> --args-json '{}'
 python scripts/run.py gateway.py capabilities --all-versions --summary-only
@@ -81,6 +82,7 @@ Use exactly one command for the corresponding intent:
 | inspect project default Work Units | `project-default-work-units` |
 | list profiler game objects at a time/cursor | `profiler-game-objects` |
 | inspect one voice-path contribution tree | `profiler-voice-contributions` |
+| build a migrated API request from typed values | run `request-schema`; execute its sole continuation |
 | inspect the private WAL tree | `debug-wal-tree` |
 | ask a Debug Wwise build to validate one reflected call shape without executing it | `debug-validate-call` |
 | inspect packaged API support, schema, route, or boundary | `capabilities` / `describe` |

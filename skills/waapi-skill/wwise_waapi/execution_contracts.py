@@ -191,6 +191,8 @@ FIXED_COMMANDS_BY_URI: Mapping[str, tuple[str, ...]] = MappingProxyType(
         ),
         "ak.wwise.core.profiler.getVoiceContributions": (
             "profiler-voice-contributions",
+            "request-schema",
+            "typed-call",
         ),
         "ak.wwise.debug.getWalTree": ("debug-wal-tree",),
         "ak.wwise.debug.validateCall": ("debug-validate-call",),
