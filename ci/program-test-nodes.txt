@@ -149,3 +149,4 @@ tests/unit/test_typed_query_construction.py
 tests/unit/test_typed_topic_construction.py
 tests/unit/test_typed_named_operations.py
 tests/unit/test_typed_object_lifecycle.py
+tests/unit/test_typed_plugin_rtpc.py

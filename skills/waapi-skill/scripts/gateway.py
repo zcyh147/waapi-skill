@@ -3903,7 +3903,10 @@ def operation_composer_input_contract(
             "clear_import_row_field": ["--import-handle", "HANDLE", "--field", "NAME"],
             "remove_import_row": ["--import-handle", "HANDLE"],
         },
-        "object.create": generic_typed_action_argv,
+        **{
+            operation_name: generic_typed_action_argv
+            for operation_name in DRAFT_TYPED_OPERATIONS
+        },
     }
     operation_argv = action_argv_by_operation[operation]
     if not set(contract["actions"]).issubset(operation_argv):

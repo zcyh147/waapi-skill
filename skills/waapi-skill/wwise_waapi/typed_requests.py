@@ -33,10 +33,14 @@ TYPED_REQUEST_COMPLEX_TRACER_URI = "ak.wwise.debug.validateCall"
 TYPED_DYNAMIC_HANDLE_PREFIX = "trm1-"
 TYPED_DYNAMIC_CHOICE_PREFIX = "trc1-"
 TYPED_SCHEMA_LINEAGE_PREFIX = "trl1-"
-MAX_TYPED_REQUEST_FACTS = 256
-MAX_TYPED_ARRAY_ITEMS = 128
-MAX_TYPED_STRING_BYTES = 16 * 1024
-MAX_TYPED_REQUEST_BYTES = 64 * 1024
+# The largest reviewed closed request is one complete 256-point RTPC curve.
+# Each point needs one array-membership fact plus its three scalar fields.  The
+# remaining headroom covers the two identities and curve options without
+# weakening the independent canonical-document ceiling.
+MAX_TYPED_REQUEST_FACTS = 1280
+MAX_TYPED_ARRAY_ITEMS = 256
+MAX_TYPED_STRING_BYTES = 64 * 1024
+MAX_TYPED_REQUEST_BYTES = 256 * 1024
 MAX_TYPED_SCHEMA_NODES = 1024
 MAX_TYPED_SCHEMA_DEPTH = 16
 

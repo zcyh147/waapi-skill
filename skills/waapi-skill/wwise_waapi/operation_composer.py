@@ -26,7 +26,10 @@ from .operation_registry import (
     validate_object_set_composer_fragment,
 )
 from .typed_requests import (
+    MAX_TYPED_ARRAY_ITEMS,
     MAX_TYPED_REQUEST_FACTS,
+    MAX_TYPED_REQUEST_BYTES,
+    MAX_TYPED_STRING_BYTES,
     TypedRequestError,
     TypedRequestFact,
     materialize_typed_request,
@@ -41,6 +44,10 @@ OPERATION_COMPOSER_CONTRACT = "waapi-skill.operation-composer/v1"
 OBJECT_SET_COMPOSER_OPERATION = "object.set"
 AUDIO_IMPORT_COMPOSER_OPERATION = "audio.import"
 MAX_COMPOSER_ACTION_BYTES = 32 * 1024
+# Schema-derived typed Draft facts may carry one Registry-authorized 64 KiB
+# scalar plus the fixed action envelope.  This does not widen object.set's
+# bespoke action surface or audio.import's separate media-aware ceiling.
+MAX_TYPED_COMPOSER_ACTION_BYTES = 72 * 1024
 MAX_AUDIO_IMPORT_COMPOSER_ACTION_BYTES = 384 * 1024
 _TARGET_HANDLE_PATTERN = re.compile(r"^odh1-[0-9a-f]{24}$")
 _TYPED_FACT_HANDLE_PATTERN = re.compile(r"^tdh1-[0-9a-f]{24}$")
@@ -1275,7 +1282,10 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             "actions": list(_GENERIC_TYPED_ACTION_FIELDS),
             "limits": {
                 "facts": MAX_TYPED_REQUEST_FACTS,
-                "action_bytes": MAX_COMPOSER_ACTION_BYTES,
+                "array_items": MAX_TYPED_ARRAY_ITEMS,
+                "string_utf8_bytes": MAX_TYPED_STRING_BYTES,
+                "canonical_request_bytes": MAX_TYPED_REQUEST_BYTES,
+                "action_bytes": MAX_TYPED_COMPOSER_ACTION_BYTES,
             },
             "typed_request_schema_digest": typed.schema_digest,
             "typed_request_fields": [field.as_dict() for field in typed.fields],
@@ -1769,12 +1779,12 @@ def _apply_generic_typed_action(
         raise OperationComposerError(
             "Generic typed Draft action must be strict JSON."
         ) from exc
-    if action_size > MAX_COMPOSER_ACTION_BYTES:
+    if action_size > MAX_TYPED_COMPOSER_ACTION_BYTES:
         raise OperationComposerError(
             "Generic typed Draft action exceeds its fixed byte ceiling.",
             details={
                 "size_bytes": action_size,
-                "limit_bytes": MAX_COMPOSER_ACTION_BYTES,
+                "limit_bytes": MAX_TYPED_COMPOSER_ACTION_BYTES,
             },
         )
     if action.get("contract") != OPERATION_DRAFT_ACTION_CONTRACT:

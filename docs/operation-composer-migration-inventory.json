@@ -3,10 +3,10 @@
   "scope": {
     "registry_operations": 34,
     "registry_version_lanes": 153,
-    "composer_version_lanes": 14,
+    "composer_version_lanes": 22,
     "inline_typed_version_lanes": 38,
-    "legacy_json_version_lanes": 101,
-    "lane_inventory_sha256": "e5ee376f2dd5cae5029b46c5c96268a4ac14ab3240986a13e66d9b44da7c7e86",
+    "legacy_json_version_lanes": 93,
+    "lane_inventory_sha256": "f47e10ed032ad9ec774fd102862e59cdbf6709c7f53a28a9d7e82a73de6b0f12",
     "version_rule": "Every supported version lane inherits the disposition of its exact Registry operation name.",
     "normal_input_rule": "The Operation Registry exposes one normal input mode per operation and version. The Agent never chooses between Composer and Legacy JSON for one normal request.",
     "native_uri_rule": "A shared native URI never implies a shared migration decision. Isolation is keyed by exact operation name and version."
@@ -28,7 +28,7 @@
       ],
       "isolation_regressions": [
         "All non-member input-mode lanes remain exact",
-        "object.setRTPC and object.createPlugin remain Legacy despite sharing the object.set native URI",
+        "object.setRTPC and object.createPlugin remain exact-name isolated despite sharing the object.set native URI",
         "Legacy archive replay remains valid"
       ],
       "minimum_real_evidence": "Weather, Rifle, Footsteps, and Weapons on Wwise 2022.1 and 2025.1 on macOS and native Windows; every failure remains a failure rather than coverage credit."
@@ -59,7 +59,7 @@
     },
     {
       "id": "wave-02-object-graph",
-      "status": "planned",
+      "status": "complete",
       "purpose": "Migrate plug-in topology and RTPC curves without collapsing their separate contracts.",
       "operations": [
         "object.createPlugin",

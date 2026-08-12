@@ -684,6 +684,12 @@ _PLUGIN_PROPERTY_ARGUMENT_SCHEMA: Mapping[str, Any] = {
             ),
         },
         "value": {
+            "oneOf": [
+                {"type": "string"},
+                {"type": "integer"},
+                {"type": "number"},
+                {"type": "boolean"},
+            ],
             "description": (
                 "Finite JSON scalar accepted only after live getPropertyInfo "
                 "name/type validation."
@@ -709,7 +715,11 @@ _PLUGIN_CREATION_ARGUMENT_SCHEMA: Mapping[str, Any] = {
                 "a display name."
             ),
         },
-        "notes": {"type": "string", "maxLength": 64 * 1024},
+        "notes": {
+            "type": "string",
+            "maxLength": 64 * 1024,
+            "x-maxUtf8Bytes": 64 * 1024,
+        },
         "platform": PLATFORM_ARGUMENT_SCHEMA,
         "language": {
             "type": "string",
@@ -3485,7 +3495,7 @@ _OPERATION_INPUT_MODE_DECLARATIONS: tuple[
     ("lua.executeCoreInline", ("2025.1",), LEGACY_JSON_INPUT_MODE),
     ("object.copy", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
     ("object.create", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
-    ("object.createPlugin", ("2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("object.createPlugin", ("2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
     ("object.delete", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
     ("object.move", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
     ("object.set", ("2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
@@ -3493,7 +3503,7 @@ _OPERATION_INPUT_MODE_DECLARATIONS: tuple[
     ("object.setName", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
     ("object.setNotes", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
     ("object.setProperty", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
-    ("object.setRTPC", ("2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("object.setRTPC", ("2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
     ("object.setReference", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
     ("soundbank.convertExternalSources", ("2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
     ("soundbank.generate", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),

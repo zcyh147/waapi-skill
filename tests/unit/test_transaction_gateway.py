@@ -710,11 +710,17 @@ def preview(
     policy: str = "ask_before_changes",
 ) -> dict[str, Any]:
     # These registry-preparation fixtures author full canonical requests.  The
-    # object.set normal surface is Composer-only; its reviewed JSON fixtures
-    # therefore exercise the explicit compatibility adapter.
+    # Composer normal surfaces reject canonical JSON; these reviewed Registry
+    # fixtures therefore exercise the explicit compatibility adapter.
     command = (
         "legacy-preview"
-        if request.get("operation") in {"object.create", "object.set"}
+        if request.get("operation")
+        in {
+            "object.create",
+            "object.createPlugin",
+            "object.set",
+            "object.setRTPC",
+        }
         else "preview"
     )
     arguments = [command]

@@ -36,7 +36,7 @@ planning; the Registry remains authoritative during implementation.
 | `lua.executeCoreInline` | 2025.1 | Legacy | source text/root/authority; optional args | Agent composition forbidden | exception candidate |
 | `object.copy` | 2021.1–2025.1 | Inline typed | object and parent | returned GUID and parent/path verification | wave 02 object lifecycle complete |
 | `object.create` | 2021.1–2025.1 | Composer | parent/type/name; recursive options | recursive bounds and replace ownership | wave 02 object lifecycle complete |
-| `object.createPlugin` | 2022.1–2025.1 | Legacy | target and exact class | versioned topology on shared URI | wave 02 |
+| `object.createPlugin` | 2022.1–2025.1 | Composer | target and exact class | versioned topology on shared URI | wave 02 complete |
 | `object.delete` | 2021.1–2025.1 | Inline typed | object; optional checkout | protected object and GUID absence | wave 02 object lifecycle complete |
 | `object.move` | 2021.1–2025.1 | Inline typed | object and parent | stable GUID and parent/path verification | wave 02 object lifecycle complete |
 | `object.set` | 2022.1–2025.1 | Composer | ordered bounded object batch | recursive mixed fields/references | wave 00 complete |
@@ -44,7 +44,7 @@ planning; the Registry remains authoritative during implementation.
 | `object.setName` | 2021.1–2025.1 | Inline typed | object and name | same-GUID path transition | wave 01 complete |
 | `object.setNotes` | 2021.1–2025.1 | Inline typed | object and exact text | empty text versus omission | wave 01 complete |
 | `object.setProperty` | 2021.1–2025.1 | Inline typed | object/property/value/platform | live metadata and typed readback | wave 01 complete |
-| `object.setRTPC` | 2022.1–2025.1 | Legacy | object/property/control input/points | dedicated curve on shared URI | wave 02 |
+| `object.setRTPC` | 2022.1–2025.1 | Composer | object/property/control input/points | dedicated curve on shared URI | wave 02 complete |
 | `object.setReference` | 2021.1–2025.1 | Inline typed | object/reference/nullable target/platform | metadata and exact null clearing | wave 01 complete |
 | `soundbank.convertExternalSources` | 2022.1–2025.1 | Legacy | sources and I/O root | proven files and isolated artifacts | wave 04 |
 | `soundbank.generate` | 2021.1–2025.1 | Legacy | banks/platforms/languages/output root | host paths and artifacts | wave 04 |
@@ -61,9 +61,9 @@ planning; the Registry remains authoritative during implementation.
 
 ## Migration order
 
-Waves 00, 01, and the object-lifecycle slice of wave 02 are complete: complex Draft Adapters and concise typed operations
+Waves 00, 01, and both slices of wave 02 are complete: complex Draft Adapters and concise typed operations
 cover object batches, imports, single-object edits, recursive creation, object
-lifecycle. Planned waves cover plug-in topology, RTPC curves, Switch Container assignments,
+lifecycle, plug-in topology, and RTPC curves. Planned waves cover Switch Container assignments,
 SoundBank and isolated-file workflows, Authoring-only UI operations, and the
 compound Undo Group after relevant child contracts stabilize.
 

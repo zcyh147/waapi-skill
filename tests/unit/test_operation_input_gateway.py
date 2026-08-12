@@ -730,8 +730,8 @@ def test_schema_input_mode_projection_is_isolated_by_exact_operation_key(
 
     cases = (
         ("object.set", "2025.1", COMPOSER_INPUT_MODE),
-        ("object.setRTPC", "2025.1", LEGACY_JSON_INPUT_MODE),
-        ("object.createPlugin", "2025.1", LEGACY_JSON_INPUT_MODE),
+        ("object.setRTPC", "2025.1", COMPOSER_INPUT_MODE),
+        ("object.createPlugin", "2025.1", COMPOSER_INPUT_MODE),
         ("lua.executeCoreInline", "2025.1", LEGACY_JSON_INPUT_MODE),
         ("lua.executeCoreFile", "2025.1", LEGACY_JSON_INPUT_MODE),
     )

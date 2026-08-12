@@ -81,7 +81,14 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
     for name, spec in specs.items():
         expected_mode = (
             COMPOSER_INPUT_MODE
-            if name in {"audio.import", "object.create", "object.set"}
+            if name
+            in {
+                "audio.import",
+                "object.create",
+                "object.createPlugin",
+                "object.set",
+                "object.setRTPC",
+            }
             else "inline_typed"
             if name in {
                 "object.setLinked",
@@ -187,8 +194,8 @@ def test_input_mode_selection_is_isolated_by_exact_operation_not_shared_native_u
     monkeypatch.setattr(registry, "OPERATION_INPUT_MODE_LANES", migrated)
 
     assert operation_input_mode("object.set", "2022.1") == COMPOSER_INPUT_MODE
-    assert operation_input_mode("object.setRTPC", "2022.1") == LEGACY_JSON_INPUT_MODE
-    assert operation_input_mode("object.createPlugin", "2022.1") == LEGACY_JSON_INPUT_MODE
+    assert operation_input_mode("object.setRTPC", "2022.1") == COMPOSER_INPUT_MODE
+    assert operation_input_mode("object.createPlugin", "2022.1") == COMPOSER_INPUT_MODE
     assert operation_input_mode("lua.executeCoreInline", "2025.1") == COMPOSER_INPUT_MODE
     assert operation_input_mode("lua.executeCoreFile", "2025.1") == LEGACY_JSON_INPUT_MODE
     assert {

@@ -74,6 +74,11 @@ MAX_OPERATION_DRAFT_RESULT_BYTES = 256 * 1024
 # envelope, session context, binding, timestamps, and check/seal summaries
 # makes the pre-write proof independent of Gateway serialization order.
 MAX_OPERATION_DRAFT_FACTS_BYTES = MAX_OPERATION_DRAFT_RESULT_BYTES // 4
+# Generic schema-derived Drafts include a reviewed 256-point RTPC curve whose
+# canonical fact projection is about 170 KiB.  Keep the established object.set
+# and audio.import result budget unchanged; only the exact typed-Draft family
+# receives this larger, still fixed projection allowance.
+MAX_TYPED_OPERATION_DRAFT_FACTS_BYTES = MAX_OPERATION_DRAFT_RESULT_BYTES * 3 // 4
 _DRAFT_ID_PATTERN = re.compile(r"^od1-[0-9a-f]{32}$")
 _TASK_AUTHORITY_PATTERN = re.compile(r"^da1-[0-9a-f]{40}$")
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
@@ -1889,12 +1894,22 @@ def _require_composition_projection_budget(
 ) -> None:
     projection = composition_projection(operation, version, composition)
     observed = len(canonical_json_bytes(projection))
-    if observed > MAX_OPERATION_DRAFT_FACTS_BYTES:
+    is_schema_derived_typed_draft = (
+        composition.get("contract") == "waapi-skill.operation-composition/v1"
+        and "typed_request_schema_digest" in composition
+        and "facts" in composition
+    )
+    limit = (
+        MAX_TYPED_OPERATION_DRAFT_FACTS_BYTES
+        if is_schema_derived_typed_draft
+        else MAX_OPERATION_DRAFT_FACTS_BYTES
+    )
+    if observed > limit:
         raise OperationDraftLimitExceeded(
             "Operation Draft facts exceed the pre-write public result budget.",
             details={
                 "facts_bytes": observed,
-                "facts_limit_bytes": MAX_OPERATION_DRAFT_FACTS_BYTES,
+                "facts_limit_bytes": limit,
                 "result_limit_bytes": MAX_OPERATION_DRAFT_RESULT_BYTES,
             },
         )

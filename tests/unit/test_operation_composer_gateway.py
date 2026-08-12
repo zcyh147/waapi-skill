@@ -213,7 +213,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
 
     assert len(non_object_set_digests) == 149
     assert canonical_sha256(non_object_set_digests) == (
-        "4f2cc39fe3aa208ebd6cd3ae921977f07f70eebc441d884e6bbfb87293dee09a"
+        "dc04aa305b2122079eb41fdb01fbca7fe94a1792f0e98586af9d017f9f3c929f"
     )
     assert {
         version: operation_input_mode("object.set", version)
@@ -1432,16 +1432,16 @@ def test_legacy_record_is_readable_but_composer_requires_recreate_without_write(
     assert record_path.read_bytes() == before
 
 
-def test_composer_is_exactly_isolated_from_shared_uri_operations(
+def test_shared_uri_composers_are_isolated_by_exact_operation_name(
     tmp_path: Path,
 ) -> None:
     assert operation_input_mode("object.set", "2022.1") == COMPOSER_INPUT_MODE
-    assert operation_input_mode("object.setRTPC", "2022.1") == LEGACY_JSON_INPUT_MODE
-    exit_code, rejected = execute(tmp_path, "draft-start", "object.setRTPC")
+    assert operation_input_mode("object.setRTPC", "2022.1") == COMPOSER_INPUT_MODE
+    assert operation_input_mode("object.createPlugin", "2022.1") == COMPOSER_INPUT_MODE
+    exit_code, started = execute(tmp_path, "draft-start", "object.setRTPC")
 
-    assert exit_code == 2
-    assert rejected["error_code"] == "OPERATION_DRAFT_ADAPTER_UNAVAILABLE"
-    assert not (tmp_path / "state" / "operation-drafts-v1").exists()
+    assert exit_code == 0
+    assert started["draft"]["binding"]["operation"] == "object.setRTPC"
 
 
 def test_registry_composer_lanes_and_real_adapters_are_one_to_one() -> None:
@@ -1466,7 +1466,9 @@ def test_registry_composer_lanes_and_real_adapters_are_one_to_one() -> None:
     assert {operation for operation, _version in composer_lanes} == {
         "audio.import",
         "object.create",
+        "object.createPlugin",
         "object.set",
+        "object.setRTPC",
     }
 
 

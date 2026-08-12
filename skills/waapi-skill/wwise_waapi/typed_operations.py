@@ -40,7 +40,9 @@ INLINE_OPERATIONS = frozenset(
         "object.move",
     }
 )
-DRAFT_TYPED_OPERATIONS = frozenset({"object.create"})
+DRAFT_TYPED_OPERATIONS = frozenset(
+    {"object.create", "object.createPlugin", "object.setRTPC"}
+)
 _MAX_SELECTOR_DEPTH = 8
 MAX_INLINE_OPERATION_VALUE_BYTES = 32 * 1024
 MAX_INLINE_OPERATION_REQUEST_BYTES = 64 * 1024
@@ -385,6 +387,20 @@ def draft_operation_request_contract(operation: str, version: str) -> TypedReque
         raise TypedOperationInputError(f"No typed Draft adapter exists for {operation!r}")
     machine = operation_request_machine_contract(operation, version)
     arguments = deepcopy(machine["argument_contract"])
+    if operation != "object.create":
+        return compile_typed_request_contract(
+            version=version,
+            uri=operation,
+            schema={
+                "argsSchema": arguments,
+                "optionsSchema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False,
+                },
+            },
+            graph=load_definition_graph(version),
+        )
     node = {
         "type": "object",
         "required": ["type", "name"],

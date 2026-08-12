@@ -260,7 +260,10 @@ def test_set_linked_uses_is_linked_for_prestate_and_postcondition() -> None:
     assert verified.ok
 
 
-def test_rtpc_add_materializes_only_the_closed_append_shape_and_verifies_full_list() -> None:
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+def test_rtpc_add_materializes_only_the_closed_append_shape_and_verifies_full_list(
+    version: str,
+) -> None:
     points = [
         {"x": 0, "y": -20.0, "shape": "Linear"},
         {"x": 100, "y": 0.0, "shape": "SCurve"},
@@ -275,7 +278,7 @@ def test_rtpc_add_materializes_only_the_closed_append_shape_and_verifies_full_li
                 "points": points,
                 "notes": "Distance curve",
             },
-            version="2022.1",
+            version=version,
         )
     )
     prepare_reader = ScriptedReader(
