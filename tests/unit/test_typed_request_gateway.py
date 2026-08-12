@@ -406,6 +406,132 @@ def test_unmigrated_nonzero_function_does_not_disclose_a_broken_continuation(
     assert "continuation" not in payload
 
 
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_flat_generic_read_materializes_and_dispatches_across_versions(
+    tmp_path: Path,
+    version: str,
+) -> None:
+    api = "ak.wwise.core.log.get"
+    exit_code, schema = waapi_gateway.execute_gateway(
+        ["request-schema", api],
+        env=_env(tmp_path, version),
+        client_factory=lambda _url: pytest.fail("discovery must remain offline"),
+    )
+    assert exit_code == 0, schema
+    handle = next(field["handle"] for field in schema["fields"] if field["name"] == "channel")
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": _live_info(version),
+            api: {"items": []},
+        }
+    )
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "typed-call", api,
+            "--schema-digest", schema["schema_digest"],
+            "--set", handle, "string", "general",
+        ],
+        env=_env(tmp_path, version),
+        client_factory=lambda _url: client,
+    )
+    assert exit_code == 0, payload
+    assert payload["agent_result"] == {"items": []}
+    assert client.calls == [
+        ("ak.wwise.core.getInfo", None, None),
+        (api, {"channel": "general"}, {}),
+    ]
+
+
+def test_flat_generic_mutation_requires_apply_before_connection(tmp_path: Path) -> None:
+    api = "ak.wwise.core.remote.connect"
+    version = "2021.1"
+    exit_code, schema = waapi_gateway.execute_gateway(
+        ["request-schema", api],
+        env=_env(tmp_path, version),
+        client_factory=lambda _url: pytest.fail("discovery must remain offline"),
+    )
+    assert exit_code == 0, schema
+    host = next(field["handle"] for field in schema["fields"] if field["name"] == "host")
+    assert schema["continuation"]["subcommand"] == "typed-call"
+    assert schema["continuation"]["apply"] is True
+    assert set(schema["continuation"]["fact_flags"]) == {"scalar"}
+    assert "args" not in json.dumps(schema["continuation"])
+    assert "options" not in json.dumps(schema["continuation"])
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "typed-call", api,
+            "--schema-digest", schema["schema_digest"],
+            "--set", host, "string", "127.0.0.1",
+        ],
+        env=_env(tmp_path, version),
+        client_factory=lambda _url: pytest.fail("mutation boundary must remain offline"),
+    )
+    assert exit_code == 2
+    assert "requires --apply" in payload["message"]
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_flat_generic_enum_error_is_exact_and_preconnection(
+    tmp_path: Path,
+    version: str,
+) -> None:
+    api = "ak.wwise.core.log.get"
+    exit_code, schema = waapi_gateway.execute_gateway(
+        ["request-schema", api],
+        env=_env(tmp_path, version),
+        client_factory=lambda _url: pytest.fail("schema must remain offline"),
+    )
+    assert exit_code == 0
+    channel = next(field for field in schema["fields"] if field["name"] == "channel")
+    assert "general" in channel["enum"]
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "typed-call", api,
+            "--schema-digest", schema["schema_digest"],
+            "--set", channel["handle"], "string", "invented-channel",
+        ],
+        env=_env(tmp_path, version),
+        client_factory=lambda _url: pytest.fail("invalid enum must remain offline"),
+    )
+    assert exit_code == 2
+    assert payload["message"] == "Field 'channel' violates its reflected schema"
+
+
+def test_flat_generic_optional_array_can_be_explicitly_empty(tmp_path: Path) -> None:
+    version = "2025.1"
+    api = "ak.wwise.core.profiler.getBusses"
+    exit_code, schema = waapi_gateway.execute_gateway(
+        ["request-schema", api],
+        env=_env(tmp_path, version),
+        client_factory=lambda _url: pytest.fail("schema must remain offline"),
+    )
+    assert exit_code == 0, schema
+    handles = _field_handles(schema)
+    time_args = _typed_scalar_args(schema, "time", "string", "capture")
+    assert "container" in schema["continuation"]["fact_flags"]
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": _live_info(version),
+            api: {"return": []},
+        }
+    )
+
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "typed-call", api,
+            "--schema-digest", schema["schema_digest"],
+            *time_args,
+            "--present", handles["return"],
+        ],
+        env=_env(tmp_path, version),
+        client_factory=lambda _url: client,
+    )
+    assert exit_code == 0, payload
+    assert client.calls[-1] == (api, {"time": "capture"}, {"return": []})
+
+
 @pytest.mark.parametrize(
     "api,commands",
     (

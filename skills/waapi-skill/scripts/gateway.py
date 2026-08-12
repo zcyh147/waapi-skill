@@ -1137,10 +1137,20 @@ def build_parser() -> argparse.ArgumentParser:
 
     typed_call = subparsers.add_parser(
         "typed-call",
-        help="Dispatch one read-only API from Gateway-owned typed field handles",
+        help="Run one migrated API from Gateway-owned typed field handles",
     )
     typed_call.add_argument("api")
     typed_call.add_argument("--schema-digest", required=True)
+    typed_call.add_argument(
+        "--apply",
+        action="store_true",
+        help="Enter the existing Preview authorization lifecycle for a change",
+    )
+    typed_call.add_argument(
+        "--ttl",
+        type=int,
+        default=DEFAULT_PREVIEW_TTL_SECONDS,
+    )
     typed_call.add_argument(
         "--set",
         action="append",
@@ -1820,6 +1830,7 @@ def _execute_gateway_unconstrained(
             "legacy-preview",
             "preview-from-draft",
             "typed-zero-call",
+            "typed-call",
         } and args.apply:
             require_project_modification_policy(
                 env=source_env,
@@ -2778,6 +2789,20 @@ def preflight_typed_request_input(
         contract,
         schema_digest=args.schema_digest,
         facts=facts,
+    )
+    capability = CapabilityCatalog().describe(versions[0], args.api)
+    requires_preview = capability.execution_contract["effect"] != "read"
+    if not requires_preview and args.apply:
+        raise GatewayInputError("typed-call --apply is reserved for changes")
+    if requires_preview and not args.apply:
+        raise GatewayInputError(
+            "typed-call requires --apply to enter the Preview lifecycle for this API"
+        )
+    args.typed_requires_preview = requires_preview
+    args.typed_read_timeout = (
+        float(capability.execution_contract["timeout_seconds"])
+        if not requires_preview
+        else None
     )
     if args.typed_request.uri == TYPED_REQUEST_TRACER_URI:
         args.typed_stable_request = build_profiler_voice_contributions_request(
@@ -4905,10 +4930,19 @@ def resolve_connection(args: argparse.Namespace, *, env: Mapping[str, str]) -> G
                     args.command == "typed-zero-call"
                     and bool(getattr(args, "typed_zero_requires_preview", False))
                 )
+                or (
+                    args.command == "typed-call"
+                    and bool(getattr(args, "typed_requires_preview", False))
+                )
                 else float(args.typed_zero_read_timeout)
                 if (
                     args.command == "typed-zero-call"
                     and getattr(args, "typed_zero_read_timeout", None) is not None
+                )
+                else float(args.typed_read_timeout)
+                if (
+                    args.command == "typed-call"
+                    and getattr(args, "typed_read_timeout", None) is not None
                 )
                 else DEFAULT_METADATA_DISCOVERY_TIMEOUT
                 if args.command == "metadata" and args.operation == "discover"
@@ -5263,7 +5297,88 @@ def dispatch_command(
                         },
                     },
                 )
-            raise GatewayInputError(f"WAAPI URI {typed_request.uri!r} has no typed dispatch adapter")
+            capability = live_capability(
+                detected_version,
+                typed_request.uri,
+                live_info=live_info,
+            )
+            if capability.execution_contract["effect"] != "read":
+                request_payload = {
+                    "contract": OPERATION_REQUEST_CONTRACT,
+                    "version": detected_version,
+                    "operation": "waapi.call",
+                    "arguments": {
+                        "api": typed_request.uri,
+                        "args": dict(typed_request.args),
+                        "options": dict(typed_request.options),
+                    },
+                }
+                return create_transaction_preview(
+                    request_payload,
+                    args=args,
+                    env=env,
+                    connection=connection,
+                    detected_version=detected_version,
+                    live_info=live_info,
+                    dispatcher=dispatcher,
+                    common={
+                        **common,
+                        "typed_request": {
+                            "contract": typed_request.as_dict()["contract"],
+                            "schema_digest": typed_request.schema_digest,
+                        },
+                    },
+                )
+            request_validation = validate_semantic_payload(
+                typed_request.uri,
+                typed_request.args,
+                typed_request.options,
+                version=detected_version,
+                authoring_ui_profile=live_info.get("isCommandLine") is False,
+            )
+            result = dispatch(
+                dispatcher,
+                typed_request.uri,
+                connection=connection,
+                version=detected_version,
+                args=typed_request.args,
+                options=typed_request.options,
+                allow_destructive=True,
+                result_limit_bytes=int(
+                    capability.execution_contract["result_limit_bytes"]
+                ),
+                operation_timeout=float(
+                    capability.execution_contract["timeout_seconds"]
+                ),
+            )
+            result_validation = (
+                validate_semantic_result(
+                    typed_request.uri,
+                    result.get("result"),
+                    version=detected_version,
+                    authoring_ui_profile=live_info.get("isCommandLine") is False,
+                )
+                if result.get("ok")
+                else None
+            )
+            return {
+                "ok": bool(result.get("ok")),
+                "status": "ok" if result.get("ok") else "error",
+                **common,
+                "api_attempted": typed_request.uri,
+                "typed_request": {
+                    "contract": typed_request.as_dict()["contract"],
+                    "schema_digest": typed_request.schema_digest,
+                },
+                "call": dispatch_call_summary(result),
+                "schema_validation": {
+                    "request": request_validation.as_dict(),
+                    "result": (
+                        result_validation.as_dict() if result_validation else None
+                    ),
+                },
+                "agent_result": result.get("result") if result.get("ok") else None,
+            }
         request = args.typed_stable_request
         return dispatch_profiler_voice_contributions_request(
             request,

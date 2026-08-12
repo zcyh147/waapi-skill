@@ -18,7 +18,7 @@ from wwise_waapi.schema_inventory import (
 )
 from wwise_waapi.manifest import DeterministicJsonWriter
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
-from wwise_waapi.typed_requests import request_contract
+from wwise_waapi.typed_requests import TypedRequestError, request_contract
 
 
 RESOURCE_ROOT = Path("skills/waapi-skill/resources/manifest")
@@ -78,22 +78,28 @@ def test_packaged_surface_closes_all_824_exact_lanes() -> None:
         for row in result["lanes"]
         if row["item_type"] == "function"
     }
-    assert function_shapes == {"zero", "typed", "draft"}
+    assert function_shapes == {"zero", "inline", "draft"}
     assert sum(
         row["construction_shape"] == "zero"
         for row in result["lanes"]
         if row["item_type"] == "function"
     ) == 93
     assert sum(
+        row["construction_shape"] == "inline"
+        for row in result["lanes"]
+        if row["item_type"] == "function"
+    ) == 460
+    assert sum(
         row["construction_shape"] == "draft"
         for row in result["lanes"]
         if row["item_type"] == "function"
-    ) == 15
-    assert all(
+    ) == 117
+    assert sum(
         row["execution_policy"]["route"] == "compound_transaction_member"
         for row in result["lanes"]
-        if row["construction_shape"] == "draft"
-    )
+        if row["item_type"] == "function"
+        and row["construction_shape"] == "draft"
+    ) == 15
     assert all(
         row["construction_shape"] == "topic"
         for row in result["lanes"]
@@ -162,6 +168,48 @@ def test_every_generated_zero_function_lane_has_no_typed_facts() -> None:
         assert contract.fields == ()
         assert contract.effect == capability.execution_contract["effect"]
         assert contract.as_gateway_payload()["input_shape"] == "zero"
+
+
+def test_every_generated_inline_lane_is_either_generic_or_exactly_isolated() -> None:
+    result = validate_packaged_typed_request_surface(root=RESOURCE_ROOT)
+    inline_rows = [
+        row
+        for row in result["lanes"]
+        if row["item_type"] == "function"
+        and row["construction_shape"] == "inline"
+    ]
+    generic: list[tuple[str, str]] = []
+    isolated: list[tuple[str, str]] = []
+    for row in inline_rows:
+        try:
+            contract = request_contract(row["version"], row["uri"])
+        except TypedRequestError as exc:
+            assert "has not migrated to an executable typed adapter" in str(exc)
+            isolated.append((row["version"], row["uri"]))
+        else:
+            assert contract.fields
+            assert contract.as_gateway_payload()["input_shape"] == "inline"
+            generic.append((row["version"], row["uri"]))
+
+    assert len(inline_rows) == 460
+    assert len(generic) == 273
+    assert len(isolated) == 187
+    assert ("2025.1", "ak.wwise.core.object.setName") in isolated
+    assert ("2025.1", "ak.wwise.core.log.get") in generic
+
+
+def test_external_definition_local_refs_remain_bound_to_their_document() -> None:
+    result = validate_packaged_typed_request_surface(root=RESOURCE_ROOT)
+    row = next(
+        row
+        for row in result["lanes"]
+        if row["version"] == "2024.1"
+        and row["uri"] == "ak.wwise.cli.createNewProject"
+        and row["item_type"] == "function"
+    )
+
+    assert row["construction_shape"] == "inline"
+    assert row["reference_count"] > 0
 
 
 def test_definition_graph_never_falls_back_to_another_version(tmp_path: Path) -> None:

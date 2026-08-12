@@ -1025,6 +1025,109 @@ def test_zero_input_generic_mutation_enters_existing_preview_lifecycle(
     }
 
 
+def test_flat_generic_mutation_enters_existing_preview_with_exact_args(
+    tmp_path: Path,
+) -> None:
+    version = "2021.1"
+    api = "ak.wwise.core.remote.connect"
+    state_dir = tmp_path / "state"
+    schema_exit, schema = execute(
+        ["request-schema", api],
+        tmp_path=tmp_path,
+        version=version,
+    )
+    assert schema_exit == 0
+    handles = {field["name"]: field["handle"] for field in schema["fields"]}
+
+    exit_code, payload = execute(
+        [
+            "typed-call", api,
+            "--schema-digest", schema["schema_digest"],
+            "--set", handles["host"], "string", "127.0.0.1",
+            "--set", handles["commandPort"], "integer", "24024",
+            "--apply",
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        version=version,
+        policy="ask_before_changes",
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info(year=2021)],
+                "ak.wwise.core.object.get": [
+                    {"return": [{**project(), "type": "Project"}]}
+                ],
+            }
+        ),
+    )
+    assert exit_code == 0, json.dumps(payload, indent=2)
+    assert payload["state"] == TransactionState.AWAITING_CONFIRMATION.value
+    artifact = TransactionStore(state_dir).load_preview(payload["transaction_id"]).artifact
+    assert artifact["request"] == {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": version,
+        "operation": "waapi.call",
+        "arguments": {
+            "api": api,
+            "args": {"host": "127.0.0.1", "commandPort": 24024},
+            "options": {},
+        },
+    }
+    assert artifact["prepared_operation"]["dispatch"] == {
+        "uri": api,
+        "args": {"host": "127.0.0.1", "commandPort": 24024},
+        "options": {},
+    }
+
+
+def test_flat_generic_simple_array_enters_preview_with_exact_order(
+    tmp_path: Path,
+) -> None:
+    version = "2021.1"
+    api = "ak.soundengine.setDefaultListeners"
+    state_dir = tmp_path / "state"
+    schema_exit, schema = execute(
+        ["request-schema", api],
+        tmp_path=tmp_path,
+        version=version,
+    )
+    assert schema_exit == 0
+    listeners = next(field for field in schema["fields"] if field["name"] == "listeners")
+    assert set(schema["continuation"]["fact_flags"]) == {
+        "array_item",
+        "container",
+    }
+
+    exit_code, payload = execute(
+        [
+            "typed-call", api,
+            "--schema-digest", schema["schema_digest"],
+            "--append", listeners["handle"], "integer", "17",
+            "--append", listeners["handle"], "integer", "23",
+            "--apply",
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        version=version,
+        policy="ask_before_changes",
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info(year=2021)],
+                "ak.wwise.core.object.get": [
+                    {"return": [{**project(), "type": "Project"}]}
+                ],
+            }
+        ),
+    )
+    assert exit_code == 0, json.dumps(payload, indent=2)
+    artifact = TransactionStore(state_dir).load_preview(payload["transaction_id"]).artifact
+    assert artifact["request"]["arguments"] == {
+        "api": api,
+        "args": {"listeners": [17, 23]},
+        "options": {},
+    }
+
+
 def test_zero_input_managed_read_dispatches_directly_with_its_route_contract(
     tmp_path: Path,
 ) -> None:

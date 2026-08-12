@@ -18,6 +18,7 @@ from .capabilities import CapabilityCatalog, CapabilityNotFoundError
 from .schema_inventory import (
     DefinitionGraph,
     SchemaInventoryError,
+    contextual_schema_target,
     load_definition_graph,
     resolve_schema_reference,
 )
@@ -144,25 +145,46 @@ class TypedRequestContract:
                     "business_values_required": False,
                 }
         else:
-            continuation = {
-                "subcommand": "typed-call",
-                "uri": self.uri,
-                "schema_digest": self.schema_digest,
-                "fact_flags": {
+            flat_inline = _contract_is_flat_inline(self)
+            if flat_inline:
+                shapes = {field.shape for field in self.fields}
+                fact_flags: dict[str, str] = {}
+                if "scalar" in shapes:
+                    fact_flags["scalar"] = "--set <field_handle> <type> <value>"
+                if "array" in shapes:
+                    fact_flags["array_item"] = (
+                        "--append <field_handle> <type> <value>"
+                    )
+                    fact_flags["container"] = "--present <array_handle>"
+                if "branch" in shapes:
+                    fact_flags["branch"] = (
+                        "--choose <branch_handle> <choice_handle>"
+                    )
+            else:
+                fact_flags = {
                     "scalar": "--set <field_handle> <type> <value>",
                     "array_item": "--append <field_handle> <type> <value>",
                     "container": "--present <object_or_array_handle>",
                     "branch": "--choose <branch_handle> <choice_handle>",
-                    "dynamic_branch": "--choose-dynamic <object_handle> <key> <choice_handle>",
+                    "dynamic_branch": (
+                        "--choose-dynamic <object_handle> <key> <choice_handle>"
+                    ),
                     "map_put": "--map-put <map_handle> <key> <type> <value>",
                     "map_correct": "--map-correct <map_handle> <key> <type> <value>",
                     "map_remove": "--map-remove <map_handle> <key>",
-                },
-                "dynamic_container_commands": {
+                }
+            continuation = {
+                "subcommand": "typed-call",
+                "uri": self.uri,
+                "schema_digest": self.schema_digest,
+                "fact_flags": fact_flags,
+                **({"apply": True} if self.effect != "read" else {}),
+            }
+            if not flat_inline:
+                continuation["dynamic_container_commands"] = {
                     "map_value": "request-map-container",
                     "array_item": "request-array-item",
-                },
-            }
+                }
         return {
             "contract": TYPED_REQUEST_SCHEMA_CONTRACT,
             "ok": True,
@@ -231,10 +253,19 @@ def request_contract(version: str, uri: str) -> TypedRequestContract:
         raise TypedRequestError(
             f"WAAPI URI {uri!r} requires the typed compound-operation adapter"
         )
+    generic_inline = (
+        _contract_is_flat_inline(compiled)
+        and capability.execution_contract["route"] != "isolated_transaction"
+        and not capability.transaction_boundaries
+        and (
+            capability.preferred_route == "manifest_dispatch"
+            or tuple(capability.transaction_operations) == ("waapi.call",)
+        )
+    )
     if compiled.fields and uri not in {
         TYPED_REQUEST_TRACER_URI,
         TYPED_REQUEST_COMPLEX_TRACER_URI,
-    }:
+    } and not generic_inline:
         raise TypedRequestError(
             f"WAAPI URI {uri!r} has not migrated to an executable typed adapter"
         )
@@ -252,6 +283,34 @@ def request_contract(version: str, uri: str) -> TypedRequestContract:
         ),
         timeout_seconds=float(capability.execution_contract["timeout_seconds"]),
     )
+
+
+def _contract_is_flat_inline(contract: TypedRequestContract) -> bool:
+    """Accept only top-level scalars, scalar arrays, and their explicit branches."""
+
+    if not contract.fields:
+        return False
+    by_handle = contract.fields_by_handle
+    for field in contract.fields:
+        if field.shape in {"object", "map"}:
+            return False
+        if field.parent_handle is None:
+            if field.shape not in {"scalar", "array", "branch"}:
+                return False
+        else:
+            parent = by_handle.get(field.parent_handle)
+            if parent is None or parent.shape != "branch":
+                return False
+            if field.shape not in {"scalar", "array"}:
+                return False
+        if field.shape == "array" and any(
+            variant.get("type") not in {
+                "string", "integer", "number", "boolean", "null"
+            }
+            for variant in field.variants
+        ):
+            return False
+    return True
 
 
 def compile_typed_request_contract(
@@ -1405,7 +1464,7 @@ def _expanded_schema(
         )
     except SchemaInventoryError as exc:
         raise TypedRequestError(str(exc)) from exc
-    merged = dict(resolved.target)
+    merged = dict(contextual_schema_target(resolved))
     merged.update({key: value for key, value in node.items() if key not in {"$ref", "#ref"}})
     return merged
 

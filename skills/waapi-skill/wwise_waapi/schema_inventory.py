@@ -137,6 +137,36 @@ class ResolvedSchemaReference:
     target: Mapping[str, Any]
 
 
+def contextual_schema_target(
+    resolved: ResolvedSchemaReference,
+) -> Mapping[str, Any]:
+    """Keep nested local references bound to the document that defined them."""
+
+    if resolved.document_name == "<schema>":
+        return resolved.target
+
+    def qualify(value: Any) -> Any:
+        if isinstance(value, Mapping):
+            return {
+                key: (
+                    f"{resolved.document_name}{item}"
+                    if key in {"$ref", "#ref"}
+                    and isinstance(item, str)
+                    and item.startswith("#/")
+                    else qualify(item)
+                )
+                for key, item in value.items()
+            }
+        if isinstance(value, list):
+            return [qualify(item) for item in value]
+        return value
+
+    qualified = qualify(resolved.target)
+    if not isinstance(qualified, Mapping):  # pragma: no cover - dataclass invariant
+        raise SchemaInventoryError("Resolved schema target must remain an object")
+    return qualified
+
+
 def load_definition_graph(
     version: str,
     *,
@@ -521,20 +551,148 @@ def _function_construction_shape(
     if execution_policy.get("route") == "compound_transaction_member":
         return "draft"
 
+    has_business_input = False
+    flat = True
     for section_name in ("argsSchema", "optionsSchema"):
         section = schema.get(section_name)
         if not isinstance(section, Mapping):
             raise SchemaInventoryError(
                 f"Function {section_name} must be an object for construction classification"
             )
-        if _schema_accepts_business_input(
+        section_has_input = _schema_accepts_business_input(
             section,
             root_schema=section,
             graph=graph,
             active_references=frozenset(),
-        ):
-            return "typed"
-    return "zero"
+        )
+        has_business_input = has_business_input or section_has_input
+        if section_has_input:
+            try:
+                section_is_flat = _schema_is_flat_inline(
+                    section,
+                    root_schema=section,
+                    graph=graph,
+                    active_references=frozenset(),
+                )
+            except SchemaInventoryError as exc:
+                # The inventory audit below owns unresolved-reference reporting.
+                # Classification must not hide that complete diagnostic set.
+                if not str(exc).startswith(
+                    ("Unresolved same-version", "Unpackaged same-version")
+                ):
+                    raise
+                section_is_flat = False
+            if not section_is_flat:
+                flat = False
+    if not has_business_input:
+        return "zero"
+    return "inline" if flat else "draft"
+
+
+def _schema_is_flat_inline(
+    section: Mapping[str, Any],
+    *,
+    root_schema: Mapping[str, Any],
+    graph: DefinitionGraph,
+    active_references: frozenset[str],
+) -> bool:
+    """Return whether one root object needs only scalar or scalar-array facts."""
+
+    reference = section.get("$ref", section.get("#ref"))
+    if isinstance(reference, str):
+        if reference in active_references:
+            return False
+        resolved = resolve_schema_reference(
+            reference,
+            root_schema=root_schema,
+            graph=graph,
+        )
+        return _schema_is_flat_inline(
+            contextual_schema_target(resolved),
+            root_schema=root_schema,
+            graph=graph,
+            active_references=active_references | {reference},
+        )
+    if section.get("type") != "object":
+        return False
+    if section.get("patternProperties") or section.get("additionalProperties") is not False:
+        return False
+    properties = section.get("properties", {})
+    if not isinstance(properties, Mapping):
+        raise SchemaInventoryError(
+            "Function request schema properties are malformed for construction classification"
+        )
+    return all(
+        isinstance(child, Mapping)
+        and _flat_value_schema(
+            child,
+            root_schema=root_schema,
+            graph=graph,
+            active_references=frozenset(),
+            array_item=False,
+        )
+        for child in properties.values()
+    )
+
+
+def _flat_value_schema(
+    node: Mapping[str, Any],
+    *,
+    root_schema: Mapping[str, Any],
+    graph: DefinitionGraph,
+    active_references: frozenset[str],
+    array_item: bool,
+) -> bool:
+    reference = node.get("$ref", node.get("#ref"))
+    if isinstance(reference, str):
+        if reference in active_references:
+            return False
+        resolved = resolve_schema_reference(
+            reference,
+            root_schema=root_schema,
+            graph=graph,
+        )
+        merged = dict(contextual_schema_target(resolved))
+        merged.update(
+            {key: value for key, value in node.items() if key not in {"$ref", "#ref"}}
+        )
+        return _flat_value_schema(
+            merged,
+            root_schema=root_schema,
+            graph=graph,
+            active_references=active_references | {reference},
+            array_item=array_item,
+        )
+    branches = node.get("oneOf", node.get("anyOf"))
+    if branches is not None:
+        return (
+            isinstance(branches, list)
+            and bool(branches)
+            and all(
+                isinstance(branch, Mapping)
+                and _flat_value_schema(
+                    branch,
+                    root_schema=root_schema,
+                    graph=graph,
+                    active_references=active_references,
+                    array_item=array_item,
+                )
+                for branch in branches
+            )
+        )
+    value_type = node.get("type")
+    if value_type in {"string", "integer", "number", "boolean", "null"}:
+        return True
+    if value_type == "array" and not array_item:
+        items = node.get("items")
+        return isinstance(items, Mapping) and _flat_value_schema(
+            items,
+            root_schema=root_schema,
+            graph=graph,
+            active_references=frozenset(),
+            array_item=True,
+        )
+    return False
 
 
 def _schema_accepts_business_input(
@@ -554,7 +712,7 @@ def _schema_accepts_business_input(
             graph=graph,
         )
         return _schema_accepts_business_input(
-            resolved.target,
+            contextual_schema_target(resolved),
             root_schema=root_schema,
             graph=graph,
             active_references=active_references | {reference},
@@ -988,6 +1146,7 @@ __all__ = [
     "ResolvedSchemaReference",
     "SchemaInventoryError",
     "build_typed_request_surface",
+    "contextual_schema_target",
     "load_definition_graph",
     "resolve_schema_reference",
     "validate_schema_envelope",
