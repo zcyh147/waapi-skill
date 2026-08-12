@@ -93,6 +93,9 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                 "soundbank.setInclusions",
                 "ui.commands.register",
                 "ui.commands.unregister",
+                "lua.executeCliFile",
+                "lua.executeCoreFile",
+                "lua.executeCoreInline",
             }
             else "inline_typed"
             if name in {
@@ -109,6 +112,7 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                     "soundbank.processDefinitionFiles",
                     "ui.captureScreen",
                     "ui.commands.execute",
+                    "audio.importTabDelimited",
                 }
             else LEGACY_JSON_INPUT_MODE
         )
@@ -207,7 +211,7 @@ def test_input_mode_selection_is_isolated_by_exact_operation_not_shared_native_u
     assert operation_input_mode("object.setRTPC", "2022.1") == COMPOSER_INPUT_MODE
     assert operation_input_mode("object.createPlugin", "2022.1") == COMPOSER_INPUT_MODE
     assert operation_input_mode("lua.executeCoreInline", "2025.1") == COMPOSER_INPUT_MODE
-    assert operation_input_mode("lua.executeCoreFile", "2025.1") == LEGACY_JSON_INPUT_MODE
+    assert operation_input_mode("lua.executeCoreFile", "2025.1") == COMPOSER_INPUT_MODE
     assert {
         (spec.name, version): operation_request_schema_digest(spec.name, version)
         for spec in list_operation_specs()
@@ -245,7 +249,7 @@ def test_operation_request_schema_digest_owns_only_versioned_machine_contract() 
     )
     assert operation_request_schema_digest(
         "audio.importTabDelimited", "2022.1"
-    ) == "3380aa555705e7432d3cce8626e99a1de7e17155f1d552a34031d6f51f0c418d"
+    ) == "66596c320b3cb9905249882d588ce91be6fd13c0ab683f8114ca7399d949c3d7"
     assert operation_request_schema_digest(
         "audio.importTabDelimited", "2025.1"
     ) == "231a06eaa5f85cbd1b842af68e7ec93eb096dad57f918b85140a2a04642530c3"

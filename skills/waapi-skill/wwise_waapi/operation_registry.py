@@ -1377,6 +1377,8 @@ _LUA_SOURCE_AUTHORITY_SCHEMA: Mapping[str, Any] = {
 _LUA_WA_ARGS_SCHEMA: Mapping[str, Any] = {
     "type": "object",
     "maxProperties": MAX_LUA_WA_ARGS_KEYS,
+    "maximumBytes": MAX_LUA_WA_ARGS_BYTES,
+    "x-keyMaximumBytes": 128,
     "description": (
         f"Strict JSON data passed to wa_args, capped at {MAX_LUA_WA_ARGS_BYTES} "
         "bytes. Packaged Lua source/loader fields are reserved."
@@ -3487,15 +3489,15 @@ _OPERATION_INPUT_MODE_DECLARATIONS: tuple[
     tuple[str, tuple[str, ...], str], ...
 ] = (
     ("audio.import", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
-    ("audio.importTabDelimited", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("audio.importTabDelimited", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
     ("debug.restartWaapiServers", ("2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
     ("debug.setAsserts", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
     ("debug.setAutomationMode", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
     ("debug.testAssert", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
     ("debug.testCrash", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("lua.executeCliFile", ("2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("lua.executeCoreFile", ("2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("lua.executeCoreInline", ("2025.1",), LEGACY_JSON_INPUT_MODE),
+    ("lua.executeCliFile", ("2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
+    ("lua.executeCoreFile", ("2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
+    ("lua.executeCoreInline", ("2025.1",), COMPOSER_INPUT_MODE),
     ("object.copy", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
     ("object.create", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
     ("object.createPlugin", ("2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
@@ -20569,6 +20571,10 @@ def _operation_argument_contract(
 ) -> dict[str, Any]:
     contract = _json_mapping(value)
     if version is not None and operation in {
+        "audio.importTabDelimited",
+        "lua.executeCliFile",
+        "lua.executeCoreFile",
+        "lua.executeCoreInline",
         "ui.commands.register",
         "ui.commands.unregister",
     }:

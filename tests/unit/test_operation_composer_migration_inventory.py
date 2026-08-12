@@ -69,6 +69,8 @@ def test_inventory_exactly_covers_every_registry_operation_and_version_lane() ->
                 assignments[name][1] == "wave-05-authoring-ui"
                 and name in {"ui.commands.register", "ui.commands.unregister"}
             )
+            or assignments[name][1] == "wave-05-file-lua"
+            and name.startswith("lua.")
         ):
             expected_mode = COMPOSER_INPUT_MODE
         elif assignments[name][1] in {
@@ -77,6 +79,7 @@ def test_inventory_exactly_covers_every_registry_operation_and_version_lane() ->
             "wave-03-switch-assignments",
             "wave-04-soundbank-and-files",
             "wave-05-authoring-ui",
+            "wave-05-file-lua",
         }:
             expected_mode = INLINE_TYPED_INPUT_MODE
         assert modes == {expected_mode}

@@ -300,6 +300,46 @@ def test_open_map_depth_and_total_request_bytes_are_bounded() -> None:
         )
 
 
+def test_nested_dynamic_map_enforces_its_schema_byte_limit() -> None:
+    contract = _compile(
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["open"],
+            "properties": {
+                "open": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "patternProperties": {
+                        "^child$": {
+                            "type": "object",
+                            "additionalProperties": True,
+                            "maximumBytes": 9,
+                        }
+                    },
+                }
+            },
+        }
+    )
+    root = next(field for field in contract.fields if field.shape == "map")
+    child = dynamic_map_entry_handle(
+        contract, map_handle=root.handle, key="child", shape="object"
+    )
+
+    with pytest.raises(TypedRequestError, match="9-byte limit"):
+        materialize_typed_request(
+            contract,
+            schema_digest=contract.schema_digest,
+            facts=(
+                TypedRequestFact(
+                    "map-put", root.handle, "object", child, key="child"
+                ),
+                TypedRequestFact("map-put", child, "string", "1", key="a"),
+                TypedRequestFact("map-put", child, "string", "2", key="b"),
+            ),
+        )
+
+
 def test_dynamic_child_removal_and_scalar_correction_do_not_resurrect_it() -> None:
     contract = _compile(
         {

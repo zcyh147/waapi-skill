@@ -152,4 +152,5 @@ tests/unit/test_typed_object_lifecycle.py
 tests/unit/test_typed_plugin_rtpc.py
 tests/unit/test_typed_switch_assignment.py
 tests/unit/test_typed_soundbank_input.py
+tests/unit/test_typed_file_lua_input.py
 tests/unit/test_typed_authoring_ui_input.py

@@ -3,10 +3,10 @@
   "scope": {
     "registry_operations": 34,
     "registry_version_lanes": 153,
-    "composer_version_lanes": 46,
-    "inline_typed_version_lanes": 62,
-    "legacy_json_version_lanes": 45,
-    "lane_inventory_sha256": "02aca9f50599fe9e511dc93da2eba8fa633a2a087e0df19ad3818d67ea4f2b28",
+    "composer_version_lanes": 53,
+    "inline_typed_version_lanes": 67,
+    "legacy_json_version_lanes": 33,
+    "lane_inventory_sha256": "f9bae442d36a8043492be82f54274690a3080e9f8d1a0c4eaf22981717155de8",
     "version_rule": "Every supported version lane inherits the disposition of its exact Registry operation name.",
     "normal_input_rule": "The Operation Registry exposes one normal input mode per operation and version. The Agent never chooses between Composer and Legacy JSON for one normal request.",
     "native_uri_rule": "A shared native URI never implies a shared migration decision. Isolation is keyed by exact operation name and version."
@@ -178,6 +178,31 @@
       "minimum_real_evidence": "A matching real Authoring host exercises every distinct UI side effect and verifier; native Windows evidence covers command transport and output paths."
     },
     {
+      "id": "wave-05-file-lua",
+      "status": "complete",
+      "purpose": "Migrate caller-owned tabular import and exact Lua source through typed file facts and a bounded open argument map.",
+      "operations": [
+        "audio.importTabDelimited",
+        "lua.executeCliFile",
+        "lua.executeCoreFile",
+        "lua.executeCoreInline"
+      ],
+      "reuse": [
+        "concise typed file import submission",
+        "OperationDraftStore for bounded Lua wa_args",
+        "source authority and isolated I/O proofs",
+        "Canonical OperationRequest parser",
+        "Change Preview ingress"
+      ],
+      "isolation_regressions": [
+        "The Gateway preserves caller-owned TSV and Lua bytes",
+        "Lua source and loader fields remain reserved",
+        "watchdog is disclosed only in exact supported versions",
+        "Open wa_args keys, bytes, depth, and fact counts stay bounded"
+      ],
+      "minimum_real_evidence": "Representative tab import and each distinct Lua execution host/verification shape on matching real Wwise versions; exact source hashes and non-retry semantics remain sealed."
+    },
+    {
       "id": "wave-06-compound-undo",
       "status": "planned",
       "purpose": "Migrate the bounded multi-call Undo Group after its intended child call families have stable typed inputs.",
@@ -201,22 +226,6 @@
     }
   ],
   "exceptions": [
-    {
-      "id": "exception-tab-delimited-import",
-      "operations": [
-        "audio.importTabDelimited"
-      ],
-      "reason": "The user supplies an already serialized strict UTF-8 file. A Draft would wrap rather than eliminate that external composition boundary; retain explicit Legacy pending a dedicated file-workflow decision."
-    },
-    {
-      "id": "exception-user-authored-lua",
-      "operations": [
-        "lua.executeCliFile",
-        "lua.executeCoreFile",
-        "lua.executeCoreInline"
-      ],
-      "reason": "These routes execute exact user-supplied source under source-authority and I/O controls. The Agent must not compose or repair code, so mutation composition does not address their governing risk."
-    },
     {
       "id": "exception-debug-host-control",
       "operations": [

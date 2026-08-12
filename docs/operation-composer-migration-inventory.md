@@ -25,15 +25,15 @@ planning; the Registry remains authoritative during implementation.
 | Exact operation | Versions | Current input | Closed request shape | Primary risk | Assignment |
 | --- | --- | --- | --- | --- | --- |
 | `audio.import` | 2021.1–2025.1 | Composer | imports; optional defaults/mode/source-control | nested rows, files, metadata, side effects | wave 00 complete |
-| `audio.importTabDelimited` | 2021.1–2025.1 | Legacy | file, location, language; optional mode/source-control | caller-owned serialized file | exception candidate |
+| `audio.importTabDelimited` | 2021.1–2025.1 | Inline typed | file, location, language; optional mode/source-control | caller-owned serialized file | wave 05 file/Lua complete |
 | `debug.restartWaapiServers` | 2023.1–2025.1 | Legacy | acknowledgement | expected connection loss | exception candidate |
 | `debug.setAsserts` | 2021.1–2025.1 | Legacy | boolean enable | process-wide ref-count state | exception candidate |
 | `debug.setAutomationMode` | 2021.1–2025.1 | Legacy | boolean enable | process-wide host mode | exception candidate |
 | `debug.testAssert` | 2021.1–2025.1 | Legacy | acknowledgement | deliberate assertion | exception candidate |
 | `debug.testCrash` | 2021.1–2025.1 | Legacy | acknowledgement | deliberate termination | exception candidate |
-| `lua.executeCliFile` | 2023.1–2025.1 | Legacy | source file/root/authority; optional args/watchdog | exact user code and isolated I/O | exception candidate |
-| `lua.executeCoreFile` | 2023.1–2025.1 | Legacy | source file/root/authority; optional args | exact user code in Authoring | exception candidate |
-| `lua.executeCoreInline` | 2025.1 | Legacy | source text/root/authority; optional args | Agent composition forbidden | exception candidate |
+| `lua.executeCliFile` | 2023.1–2025.1 | Composer | source file/root/authority; optional typed args/watchdog | exact user code and isolated I/O | wave 05 file/Lua complete |
+| `lua.executeCoreFile` | 2023.1–2025.1 | Composer | source file/root/authority; optional typed args | exact user code in Authoring | wave 05 file/Lua complete |
+| `lua.executeCoreInline` | 2025.1 | Composer | source text/root/authority; optional typed args | Agent composition forbidden | wave 05 file/Lua complete |
 | `object.copy` | 2021.1–2025.1 | Inline typed | object and parent | returned GUID and parent/path verification | wave 02 object lifecycle complete |
 | `object.create` | 2021.1–2025.1 | Composer | parent/type/name; recursive options | recursive bounds and replace ownership | wave 02 object lifecycle complete |
 | `object.createPlugin` | 2022.1–2025.1 | Composer | target and exact class | versioned topology on shared URI | wave 02 complete |
@@ -64,16 +64,16 @@ planning; the Registry remains authoritative during implementation.
 Waves 00 through 05 are complete: complex Draft Adapters and concise typed operations
 cover object batches, imports, single-object edits, recursive creation, object
 lifecycle, plug-in topology, RTPC curves, Switch Container assignments, and
-SoundBank/isolated-file workflows, and Authoring-only UI operations. The planned wave
+SoundBank/isolated-file workflows, Authoring-only UI operations, caller-owned table
+imports, and exact user-authored Lua with bounded typed argument maps. The planned wave
 covers the compound Undo Group after relevant child contracts stabilize.
 
 Each operation owns its action vocabulary and verifier. A wave reuses deep
 Draft, canonical parsing, and Preview modules without inventing a generic
 business schema.
 
-Tab-delimited import, user-authored Lua, debug/host controls, and guarded
-generic `waapi.call` are exception candidates requiring later retain-or-migrate
-decisions. `object.copy` and `object.move` now have closed typed inputs and
+Debug/host controls and guarded generic `waapi.call` are exception candidates
+requiring later retain-or-migrate decisions. `object.copy` and `object.move` now have closed typed inputs and
 operation-specific identity, parent, and path verification.
 
 ## Legacy exit decision

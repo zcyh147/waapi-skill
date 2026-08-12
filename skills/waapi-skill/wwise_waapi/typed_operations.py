@@ -41,6 +41,7 @@ INLINE_OPERATIONS = frozenset(
         "object.copy",
         "object.move",
         "soundbank.processDefinitionFiles",
+        "audio.importTabDelimited",
         "ui.captureScreen",
         "ui.commands.execute",
     }
@@ -55,6 +56,9 @@ DRAFT_TYPED_OPERATIONS = frozenset(
         "soundbank.setInclusions",
         "ui.commands.register",
         "ui.commands.unregister",
+        "lua.executeCliFile",
+        "lua.executeCoreFile",
+        "lua.executeCoreInline",
     }
 )
 _MAX_SELECTOR_DEPTH = 8
@@ -207,7 +211,47 @@ def materialize_inline_operation_request(
     if operation not in INLINE_OPERATIONS:
         raise TypedOperationInputError(f"No inline typed adapter exists for {operation!r}")
     arguments: dict[str, Any]
-    if operation == "ui.captureScreen":
+    if operation == "audio.importTabDelimited":
+        _require_keys(
+            values,
+            required=frozenset(
+                {"import_file", "import_location", "import_language"}
+            ),
+            optional=frozenset(
+                {
+                    "import_operation",
+                    "auto_add_to_source_control",
+                    "auto_check_out_to_source_control",
+                }
+            ),
+        )
+        arguments = {
+            "import_file": _bounded_text(
+                values["import_file"], field="import_file", allow_empty=False
+            ),
+            "import_location": _selector(
+                values["import_location"],
+                operation=operation,
+                version=version,
+                field="import_location",
+            ),
+            "import_language": _bounded_text(
+                values["import_language"], field="import_language", allow_empty=False
+            ),
+        }
+        if "import_operation" in values:
+            arguments["import_operation"] = _bounded_text(
+                values["import_operation"],
+                field="import_operation",
+                allow_empty=False,
+            )
+        for field in (
+            "auto_add_to_source_control",
+            "auto_check_out_to_source_control",
+        ):
+            if field in values:
+                arguments[field] = _typed_scalar("boolean", values[field])
+    elif operation == "ui.captureScreen":
         _require_keys(
             values,
             required=frozenset(),
@@ -441,7 +485,20 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
             ["--file ABSOLUTE_PATH (repeat 1-32)", "--io-root ABSOLUTE_PATH"]
             if operation == "soundbank.processDefinitionFiles"
             else (
-                ["--view-name NAME (optional)", "--view-channel 1|2|3|4 (optional)", "--rect X Y WIDTH HEIGHT (optional)"]
+                [
+                    "--import-file ABSOLUTE_PATH",
+                    "--import-location SELECTOR",
+                    "--import-language LANGUAGE",
+                    "--import-operation createNew|useExisting|replaceExisting (optional)",
+                    "--auto-add true|false (optional)",
+                    *(
+                        ["--auto-check-out true|false (optional)"]
+                        if version in {"2023.1", "2024.1", "2025.1"}
+                        else []
+                    ),
+                ]
+                if operation == "audio.importTabDelimited"
+                else ["--view-name NAME (optional)", "--view-channel 1|2|3|4 (optional)", "--rect X Y WIDTH HEIGHT (optional)"]
                 if operation == "ui.captureScreen"
                 else ["--command ID", "--command-object VALUE (repeat)", "--command-platform VALUE (repeat)", "--value TYPE VALUE (optional)", "--file ABSOLUTE_PATH (2025.1 only; repeat)"]
                 if operation == "ui.commands.execute"
@@ -458,6 +515,9 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
         "switchContainer.addAssignment",
         "switchContainer.removeAssignment",
         "soundbank.processDefinitionFiles",
+        "audio.importTabDelimited",
+        "ui.captureScreen",
+        "ui.commands.execute",
     }:
         pass
     elif operation in {"object.setName", "object.setNotes"}:

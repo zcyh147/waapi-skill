@@ -105,7 +105,7 @@ def test_remote_lua_preview_fails_before_project_or_local_source_proof(
         [
             "--host",
             "wwise-studio",
-            "preview",
+            "legacy-preview",
             "--request-json",
             json.dumps(_request(operation, arguments, version="2025.1")),
         ],

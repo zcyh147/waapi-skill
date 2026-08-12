@@ -1241,6 +1241,13 @@ def build_parser() -> argparse.ArgumentParser:
     typed_operation.add_argument("--on-name-conflict", choices=("fail", "rename", "replace"))
     typed_operation.add_argument("--auto-check-out", choices=("true", "false"))
     typed_operation.add_argument("--auto-add", choices=("true", "false"))
+    typed_operation.add_argument("--import-file")
+    typed_operation.add_argument("--import-location", nargs="+")
+    typed_operation.add_argument("--import-language")
+    typed_operation.add_argument(
+        "--import-operation",
+        choices=("createNew", "useExisting", "replaceExisting"),
+    )
     typed_operation.add_argument("--file", action="append", dest="files")
     typed_operation.add_argument("--io-root")
     typed_operation.add_argument("--view-name")
@@ -3104,6 +3111,14 @@ def preflight_typed_operation_input(
         values["auto_check_out_to_source_control"] = args.auto_check_out
     if args.auto_add is not None:
         values["auto_add_to_source_control"] = args.auto_add
+    if args.import_file is not None:
+        values["import_file"] = args.import_file
+    if args.import_location is not None:
+        values["import_location"] = tuple(args.import_location)
+    if args.import_language is not None:
+        values["import_language"] = args.import_language
+    if args.import_operation is not None:
+        values["import_operation"] = args.import_operation
     if args.files is not None:
         values["files"] = tuple(args.files)
     if args.io_root is not None:

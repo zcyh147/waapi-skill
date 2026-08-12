@@ -424,7 +424,7 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
         operation_request_schema_digest("audio.import", version)
     )
     assert operation_input_mode("audio.import", version) == COMPOSER_INPUT_MODE
-    assert operation_input_mode("audio.importTabDelimited", version) == LEGACY_JSON_INPUT_MODE
+    assert operation_input_mode("audio.importTabDelimited", version) == "inline_typed"
 
 
 @pytest.mark.parametrize("version", ("2022.1", "2025.1"))

@@ -729,6 +729,10 @@ def preview(
             "ui.commands.execute",
             "ui.commands.register",
             "ui.commands.unregister",
+            "lua.executeCliFile",
+            "lua.executeCoreFile",
+            "lua.executeCoreInline",
+            "audio.importTabDelimited",
         }
         else "preview"
     )
@@ -1597,22 +1601,14 @@ def test_operation_schema_exposes_tab_import_path_only_progression(
 
     assert exit_code == 0
     assert payload["offline"] is True
-    assert payload["request_envelope"] == {
-        "contract": OPERATION_REQUEST_CONTRACT,
-        "version": "2025.1",
-        "operation": "audio.importTabDelimited",
-        "arguments": {},
-    }
-    operation = payload["operation"]
-    assert operation["file_read_policy"] == "pass_path_without_reading"
-    assert operation["next_step"] == "preview"
-    assert operation["preview_owns"] == [
-        "tsv_parsing",
-        "tsv_hash_validation",
-        "inline_base64_validation",
-        "media_validation",
-        "exact_path_conflict_validation",
-    ]
+    assert payload["request_envelope"] is None
+    assert payload["typed_operation"]["continuation"]["subcommand"] == (
+        "typed-operation"
+    )
+    continuation = payload["typed_operation"]["continuation"]
+    assert continuation["operation"] == "audio.importTabDelimited"
+    assert "--import-file ABSOLUTE_PATH" in continuation["fields"]
+    assert "--import-location SELECTOR" in continuation["fields"]
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
@@ -6446,6 +6442,7 @@ def test_remote_local_filesystem_previews_fail_before_project_or_path_proof(
         if operation
         in {
             "audio.import",
+            "audio.importTabDelimited",
             "object.set",
             "soundbank.convertExternalSources",
             "soundbank.generate",

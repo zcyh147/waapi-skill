@@ -341,6 +341,53 @@ def test_typed_definition_files_enters_the_single_preview_ingress(
     assert payload["request"] == captured[0]
 
 
+def test_typed_tab_import_enters_the_single_preview_ingress(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: list[Mapping[str, Any]] = []
+
+    def fake_preview(request_payload: Mapping[str, Any], **_kwargs: Any) -> dict[str, Any]:
+        captured.append(request_payload)
+        return {"ok": True, "status": "ok", "request": request_payload}
+
+    monkeypatch.setattr(waapi_gateway, "create_transaction_preview", fake_preview)
+    operation = "audio.importTabDelimited"
+    digest = waapi_gateway.operation_request_schema_digest(operation, "2022.1")
+    source = str((tmp_path / "Import.tsv").resolve())
+    location = r"\Actor-Mixer Hierarchy\Default Work Unit"
+    client = FakeClient({"ak.wwise.core.getInfo": [live_info()]})
+    code, payload = waapi_gateway.execute_gateway(
+        [
+            "typed-operation", operation, "--schema-digest", digest, "--apply",
+            "--import-file", source,
+            "--import-location", "path", location,
+            "--import-language", "SFX",
+            "--import-operation", "useExisting",
+            "--auto-add", "true",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert code == 0, payload
+    assert captured == [
+        {
+            "contract": OPERATION_REQUEST_CONTRACT,
+            "version": "2022.1",
+            "operation": operation,
+            "arguments": {
+                "import_file": source,
+                "import_location": {"kind": "path", "value": location},
+                "import_language": "SFX",
+                "import_operation": "useExisting",
+                "auto_add_to_source_control": True,
+            },
+        }
+    ]
+    assert payload["request"] == captured[0]
+
+
 def _without_route_specific_schema_fields(payload: Mapping[str, Any]) -> dict[str, Any]:
     result = copy.deepcopy(dict(payload))
     result.pop("command", None)
@@ -614,10 +661,9 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         "2024.1",
         "2025.1",
     }
-    assert tab_schema["operation"]["input_mode"] == LEGACY_JSON_INPUT_MODE
-    assert tab_schema["request_envelope"]["operation"] == (
-        "audio.importTabDelimited"
-    )
+    assert tab_schema["operation"]["input_mode"] == "inline_typed"
+    assert tab_schema["request_envelope"] is None
+    assert tab_schema["typed_operation"]["operation"] == "audio.importTabDelimited"
     assert "composer" not in tab_schema
     normal_surfaces = json.dumps({"schema": schema, "detail": detail})
     assert "legacy-preview" not in normal_surfaces
@@ -817,8 +863,8 @@ def test_schema_input_mode_projection_is_isolated_by_exact_operation_key(
         ("object.set", "2025.1", COMPOSER_INPUT_MODE),
         ("object.setRTPC", "2025.1", COMPOSER_INPUT_MODE),
         ("object.createPlugin", "2025.1", COMPOSER_INPUT_MODE),
-        ("lua.executeCoreInline", "2025.1", LEGACY_JSON_INPUT_MODE),
-        ("lua.executeCoreFile", "2025.1", LEGACY_JSON_INPUT_MODE),
+        ("lua.executeCoreInline", "2025.1", COMPOSER_INPUT_MODE),
+        ("lua.executeCoreFile", "2025.1", COMPOSER_INPUT_MODE),
     )
     for operation, version, expected in cases:
         exit_code, payload = offline_execute(

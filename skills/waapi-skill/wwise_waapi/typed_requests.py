@@ -63,6 +63,9 @@ class TypedFieldContract:
     parent_handle: str | None = None
     minimum_items: int | None = None
     maximum_items: int | None = None
+    maximum_properties: int | None = None
+    maximum_bytes: int | None = None
+    maximum_key_bytes: int | None = None
     unique_items: bool = False
     map_patterns: tuple[tuple[str, tuple[Mapping[str, Any], ...]], ...] = ()
     additional_variants: tuple[Mapping[str, Any], ...] = ()
@@ -128,6 +131,9 @@ class TypedFieldContract:
                 "schema_authorized_additional_keys": bool(self.additional_variants),
                 "one_key_per_fact": True,
             }
+            payload["maximum_properties"] = self.maximum_properties
+            payload["maximum_bytes"] = self.maximum_bytes
+            payload["maximum_key_bytes"] = self.maximum_key_bytes
         return payload
 
 
@@ -1403,6 +1409,9 @@ def materialize_typed_request(
         elif fact.action in {"map-put", "map-correct", "map-remove"}:
             if field.shape != "map" or not isinstance(fact.key, str):
                 raise TypedRequestError("Typed map action requires a map handle and key")
+            _require_bounded_map_key(
+                fact.key, maximum_bytes=field.maximum_key_bytes
+            )
             if fact.key in field.fixed_map_keys:
                 raise TypedRequestError(
                     "Typed map facts cannot override a fixed reflected property"
@@ -1422,6 +1431,15 @@ def materialize_typed_request(
             else:
                 if fact.action == "map-put" and fact.key in values:
                     raise TypedRequestError("Typed map key already exists; use correction")
+                if (
+                    fact.action == "map-put"
+                    and field.maximum_properties is not None
+                    and len(values) >= field.maximum_properties
+                ):
+                    raise TypedRequestError(
+                        f"Field {field.name!r} accepts at most "
+                        f"{field.maximum_properties} properties"
+                    )
                 if fact.action == "map-correct" and fact.key not in values:
                     raise TypedRequestError("Typed map key must exist before correction")
                 variants = _map_key_variants(field, fact.key)
@@ -1558,6 +1576,8 @@ def materialize_typed_request(
                 raise TypedRequestError(
                     f"Typed object {dynamic_field.name!r} is missing required keys"
                 )
+        if shape == "object" and container is not None:
+            _require_materialized_map_limits(dynamic_field, container)
         if parent_handle in array_values:
             index = int(key)
             if container is not None and array_values[parent_handle][index] in ({}, []):
@@ -1616,6 +1636,7 @@ def materialize_typed_request(
             materialized_containers.add(field.handle)
         elif field.shape == "map":
             value = dict(map_values.get(field.handle, {}))
+            _require_materialized_map_limits(field, value)
             materialized_containers.add(field.handle)
         else:
             if field.handle not in scalar_values:
@@ -1891,6 +1912,18 @@ def _collect_object_fields(
                             else ()
                         ),
                         open_map=open_map,
+                        maximum_properties=_optional_nonnegative_integer(
+                            child.get("maxProperties"),
+                            label=f"{name}.maxProperties",
+                        ),
+                        maximum_bytes=_optional_nonnegative_integer(
+                            child.get("maximumBytes"),
+                            label=f"{name}.maximumBytes",
+                        ),
+                        maximum_key_bytes=_optional_nonnegative_integer(
+                            child.get("x-keyMaximumBytes"),
+                            label=f"{name}.x-keyMaximumBytes",
+                        ),
                     )
                 )
                 continue
@@ -2106,6 +2139,16 @@ def _append_map_overlay(
                 else ()
             ),
             open_map=additional is True,
+            maximum_properties=_optional_nonnegative_integer(
+                node.get("maxProperties"), label=f"{name}.maxProperties"
+            ),
+            maximum_bytes=_optional_nonnegative_integer(
+                node.get("maximumBytes"), label=f"{name}.maximumBytes"
+            ),
+            maximum_key_bytes=_optional_nonnegative_integer(
+                node.get("x-keyMaximumBytes"),
+                label=f"{name}.x-keyMaximumBytes",
+            ),
             handle_path=overlay_path,
             overlay=True,
             fixed_map_keys=tuple(
@@ -2382,7 +2425,7 @@ def _map_key_variants(
     field: TypedFieldContract,
     key: str,
 ) -> tuple[Mapping[str, Any], ...]:
-    _require_bounded_map_key(key)
+    _require_bounded_map_key(key, maximum_bytes=field.maximum_key_bytes)
     matches = [
         variants
         for pattern, variants in field.map_patterns
@@ -2590,13 +2633,50 @@ def _dynamic_container_contract(
             else ()
         ),
         open_map=additional is True,
+        maximum_properties=_optional_nonnegative_integer(
+            schema.get("maxProperties"), label=f"{name}.maxProperties"
+        ),
+        maximum_bytes=_optional_nonnegative_integer(
+            schema.get("maximumBytes"), label=f"{name}.maximumBytes"
+        ),
+        maximum_key_bytes=_optional_nonnegative_integer(
+            schema.get("x-keyMaximumBytes"),
+            label=f"{name}.x-keyMaximumBytes",
+        ),
         required_map_keys=tuple(required),
     )
 
 
-def _require_bounded_map_key(key: str) -> None:
-    if len(key.encode("utf-8")) > MAX_TYPED_STRING_BYTES:
+def _require_bounded_map_key(
+    key: str, *, maximum_bytes: int | None = None
+) -> None:
+    limit = MAX_TYPED_STRING_BYTES if maximum_bytes is None else min(
+        maximum_bytes, MAX_TYPED_STRING_BYTES
+    )
+    if len(key.encode("utf-8")) > limit:
         raise TypedRequestError("Typed map key exceeds its UTF-8 byte limit")
+
+
+def _require_materialized_map_limits(
+    field: TypedFieldContract,
+    value: Mapping[str, Any],
+) -> None:
+    if (
+        field.maximum_properties is not None
+        and len(value) > field.maximum_properties
+    ):
+        raise TypedRequestError(
+            f"Field {field.name!r} accepts at most "
+            f"{field.maximum_properties} properties"
+        )
+    if (
+        field.maximum_bytes is not None
+        and len(canonical_json_bytes(value)) > field.maximum_bytes
+    ):
+        raise TypedRequestError(
+            f"Field {field.name!r} exceeds its "
+            f"{field.maximum_bytes}-byte limit"
+        )
 
 
 def _optional_nonnegative_integer(value: Any, *, label: str) -> int | None:
