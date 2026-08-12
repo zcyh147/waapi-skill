@@ -28,6 +28,22 @@ COMPOSER_EVIDENCE_ROOTS = (
     "iwin-import-0be8266-r3-rifle-footsteps",
     "iwin-import-0be8266-r4-rifle",
 )
+COMPOSER_PUBLIC_INTEGRATION_CANDIDATE = (
+    "198a510e49f1215b3c02f6d3108c734fc5c59400"
+)
+COMPOSER_PUBLIC_INTEGRATION_MAC_ROOTS = (
+    "imac-integration-198a510-r1",
+    "imac-integration-198a510-r2-int22-weather",
+    "imac-integration-198a510-r3-int22-weather",
+    "imac-integration-198a510-r4-int22-weather",
+    "imac-integration-198a510-r5-int22-weather",
+)
+COMPOSER_PUBLIC_INTEGRATION_WINDOWS_ROOTS = (
+    "iwin-integration-198a510-r1",
+    "iwin-integration-198a510-r2-retry6",
+    "iwin-integration-198a510-r3-footsteps",
+    "iwin-integration-198a510-r4-footsteps",
+)
 
 CODEX_PROFILE_COMMANDS = (
     "skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py "
@@ -207,3 +223,46 @@ def test_public_integration_candidate_docs_forbid_false_windows_completion() -> 
             "single-root 12/12 at `imac-int-7f54506-r1`",
         ):
             assert false_claim not in document
+
+
+def test_composer_public_integration_evidence_is_exact_and_cumulative() -> None:
+    documents = tuple(
+        path.read_text(encoding="utf-8")
+        for path in (ROOT_AGENTS, TESTS_AGENTS, SEMANTIC_README, TEST_INVENTORY)
+    )
+
+    for document in documents:
+        compact = " ".join(document.split())
+        assert COMPOSER_PUBLIC_INTEGRATION_CANDIDATE in document
+        for root in (
+            *COMPOSER_PUBLIC_INTEGRATION_MAC_ROOTS,
+            *COMPOSER_PUBLIC_INTEGRATION_WINDOWS_ROOTS,
+        ):
+            assert root in document
+        for phrase in (
+            "complete cumulative evidence on both hosts",
+            "neither host has a single-root 12/12 result",
+            "passed 11 units and failed INT22 Weather",
+            "passed 6 and failed 6",
+            "passed 5 and failed INT25 Footsteps",
+            "passed Footsteps fresh plus identical verify-only",
+            "all 12 unique public-profile units have PASS on the same frozen Skill/harness candidate",
+            "Every FAIL root was frozen without verify-only",
+            "every source full hash and project mtime was unchanged",
+            "PASS sandboxes were removed",
+            "FAIL sandboxes were sealed/quarantined",
+            "focused semantic 464 passed / 4 skipped",
+            "Program 2923 passed / 2 skipped",
+            "Non-live 7763 passed / 104 skipped / 27 deselected",
+            "Native-Windows focused validation passed 462 / skipped 6 POSIX-only cases",
+            "030231b41e623e72f72de785d6bcbc3780d7eb37",
+        ):
+            assert phrase in compact
+
+    for false_claim in (
+        "imac-integration-198a510-r1 passed 12/12",
+        "iwin-integration-198a510-r1 passed 12/12",
+        "iwin-integration-198a510-r2-retry6 passed 6/6",
+        "single-root 12/12 for 198a510",
+    ):
+        assert all(false_claim not in document for document in documents)

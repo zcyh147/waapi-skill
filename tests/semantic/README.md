@@ -182,6 +182,32 @@ credit. On both hosts every source-project full hash and mtime remained
 unchanged, passing sandboxes were removed, failed sandboxes were sealed and
 quarantined, and no scoped residual process remained.
 
+The frozen Composer public `integration` candidate
+`198a510e49f1215b3c02f6d3108c734fc5c59400` has complete cumulative evidence
+on both hosts, but neither host has a single-root 12/12 result. On macOS,
+`imac-integration-198a510-r1` passed 11 units and failed INT22 Weather;
+`imac-integration-198a510-r2-int22-weather`,
+`imac-integration-198a510-r3-int22-weather`, and
+`imac-integration-198a510-r4-int22-weather` each preserved one further
+ordinary INT22 Weather FAIL,
+while `imac-integration-198a510-r5-int22-weather` passed that unit fresh
+and then passed identical `--resume --verify-only`. On native Windows,
+`iwin-integration-198a510-r1` passed 6 and failed 6,
+`iwin-integration-198a510-r2-retry6` passed 5 and failed INT25 Footsteps,
+`iwin-integration-198a510-r3-footsteps` preserved another Footsteps FAIL, and
+`iwin-integration-198a510-r4-footsteps` passed Footsteps fresh plus identical
+verify-only. Thus all 12 unique public-profile units have PASS on the same
+frozen Skill/harness candidate on each host, cumulatively across roots. Every
+FAIL root was frozen without verify-only; every source full hash and project
+mtime was unchanged, PASS sandboxes were removed, and FAIL sandboxes were
+sealed/quarantined. Frozen-candidate development gates passed with focused
+semantic 464 passed / 4 skipped, Program 2923 passed / 2 skipped, and Non-live
+7763 passed / 104 skipped / 27 deselected. Native-Windows focused validation
+passed 462 / skipped 6 POSIX-only cases. Commit
+`030231b41e623e72f72de785d6bcbc3780d7eb37`
+changes only domain/planning docs, one unit test, and the program manifest, so
+it does not replace the frozen Skill, suite, runner, or semantic harness.
+
 Composer migration evidence is focused Adapter evidence, not public
 `integration` acceptance. For `object.set`, candidate
 `68697244063e02304eea79da54da502270be3704` passed Weather and Weapons on
