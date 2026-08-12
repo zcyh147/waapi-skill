@@ -12,6 +12,7 @@ from wwise_waapi.schema_inventory import (
     SchemaInventoryError,
     build_typed_request_surface,
     load_definition_graph,
+    validate_schema_envelope,
     validate_packaged_typed_request_surface,
 )
 from wwise_waapi.manifest import DeterministicJsonWriter
@@ -70,6 +71,44 @@ def test_packaged_surface_closes_all_824_exact_lanes() -> None:
     assert result["unresolved_references"] == []
     assert result["unknown_schema_keywords"] == []
     assert result["intentionally_blocked_field_occurrences"] == 79
+    blocked = [
+        (row["version"], row["uri"], item["pointer"], item["field"])
+        for row in result["lanes"]
+        for item in row["intentionally_blocked_fields"]
+    ]
+    assert len(blocked) == 79
+    assert (
+        "2025.1",
+        "ak.wwise.cli.generateSoundbank",
+        "/argsSchema",
+        "custom-pre-gen-cmd",
+    ) in blocked
+    assert (
+        "2025.1",
+        "ak.wwise.core.object.set",
+        "/argsSchema/properties/objects/items",
+        "pattern:^@[:_a-zA-Z0-9]+$",
+    ) in blocked
+    assert (
+        "2025.1",
+        "ak.wwise.core.executeLuaScript",
+        "/argsSchema",
+        "requires",
+    ) in blocked
+    soundbank_topic = next(
+        row
+        for row in result["lanes"]
+        if row["version"] == "2025.1"
+        and row["uri"] == "ak.wwise.core.soundbank.generated"
+        and row["item_type"] == "topic"
+    )
+    assert soundbank_topic["execution_policy"]["timeout_seconds"] == 120.0
+    assert soundbank_topic["execution_policy"]["result_limit_bytes"] == 262144
+    assert soundbank_topic["execution_policy"]["gateway_commands"] == [
+        "wait-topic",
+        "stream-topic",
+    ]
+    assert soundbank_topic["execution_policy_sha256"]
 
 
 def test_definition_graph_never_falls_back_to_another_version(tmp_path: Path) -> None:
@@ -180,6 +219,107 @@ def test_arbitrary_uppercase_schema_keyword_is_not_legacy_compatible(
 
     with pytest.raises(SchemaInventoryError, match="unknown schema keywords"):
         validate_packaged_typed_request_surface(root=tmp_path / "manifest")
+
+
+def test_legacy_2021_soundbank_name_is_not_a_global_keyword_escape(
+    tmp_path: Path,
+) -> None:
+    shutil.copytree(RESOURCE_ROOT, tmp_path / "manifest")
+    path = tmp_path / "manifest" / "2025.1" / "definitions.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["documents"]["waapi_definitions.json"]["definitions"]["objectArg"][
+        "GameParameters"
+    ] = {"type": "boolean"}
+    unsigned = dict(payload)
+    unsigned.pop("inventory_sha256")
+    payload["inventory_sha256"] = _canonical_sha256(unsigned)
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SchemaInventoryError, match="unknown schema keywords"):
+        validate_packaged_typed_request_surface(root=tmp_path / "manifest")
+
+
+@pytest.mark.parametrize(
+    ("keyword", "bad_value", "message"),
+    (
+        ("properties", [{"$ref": "#/definitions/DOES_NOT_EXIST"}], "object"),
+        ("oneOf", {"$ref": "#/definitions/DOES_NOT_EXIST"}, "array"),
+        ("items", "not-a-schema", "object"),
+    ),
+)
+def test_malformed_schema_container_never_hides_a_reference(
+    tmp_path: Path,
+    keyword: str,
+    bad_value: object,
+    message: str,
+) -> None:
+    shutil.copytree(RESOURCE_ROOT, tmp_path / "manifest")
+    path = tmp_path / "manifest" / "2025.1" / "definitions.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["documents"]["waapi_definitions.json"]["definitions"]["objectArg"][
+        keyword
+    ] = bad_value
+    unsigned = dict(payload)
+    unsigned.pop("inventory_sha256")
+    payload["inventory_sha256"] = _canonical_sha256(unsigned)
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SchemaInventoryError, match=message):
+        validate_packaged_typed_request_surface(root=tmp_path / "manifest")
+
+
+def test_unknown_schema_envelope_section_blocks_the_inventory() -> None:
+    unknown = validate_schema_envelope(
+        {
+            "argsSchema": {"type": "object"},
+            "optionsSchema": {"type": "object"},
+            "resultSchema": {"type": "object"},
+            "requestSchema": {"type": "object"},
+        },
+        version="2025.1",
+        uri="ak.example.future",
+    )
+
+    assert unknown == [
+        {
+            "version": "2025.1",
+            "uri": "ak.example.future",
+            "section": "<envelope>",
+            "pointer": "/",
+            "keyword": "requestSchema",
+        }
+    ]
+
+
+def test_malformed_known_schema_envelope_section_fails_closed() -> None:
+    with pytest.raises(SchemaInventoryError, match="argsSchema.*must be an object"):
+        validate_schema_envelope(
+            {"argsSchema": []},
+            version="2025.1",
+            uri="ak.example.future",
+        )
+
+
+def test_execution_policy_drift_changes_the_lane_contract() -> None:
+    result = build_typed_request_surface(root=RESOURCE_ROOT)
+    row = next(
+        row
+        for row in result["lanes"]
+        if row["version"] == "2025.1"
+        and row["uri"] == "ak.wwise.core.soundbank.generated"
+        and row["item_type"] == "topic"
+    )
+    original_digest = row["execution_policy_sha256"]
+    changed = dict(row["execution_policy"])
+    changed["timeout_seconds"] = 121.0
+
+    assert _canonical_sha256(changed) != original_digest
 
 
 def test_surface_digest_detects_lane_or_policy_drift(tmp_path: Path) -> None:
