@@ -124,13 +124,22 @@ from wwise_waapi.typed_requests import (  # noqa: E402  # pyright: ignore[report
     TYPED_REQUEST_COMPLEX_TRACER_URI,
     TYPED_REQUEST_TRACER_URI,
     TypedRequestFact,
+    dynamic_array_item_choices,
     dynamic_array_item_handle,
     dynamic_container_disclosure,
+    dynamic_map_container_choices,
     dynamic_map_entry_handle,
     materialize_typed_request,
     parse_typed_schema_lineage_token,
     request_contract,
     typed_schema_lineage_token,
+)
+from wwise_waapi.typed_queries import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    ADVANCED_TYPED_QUERY_OPERATION,
+    STRUCTURED_TYPED_QUERY_OPERATION,
+    materialize_typed_query,
+    typed_query_contract,
+    typed_query_schema_payload,
 )
 from wwise_waapi.builders.schema import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     validate_semantic_event,
@@ -1115,6 +1124,10 @@ def build_parser() -> argparse.ArgumentParser:
     request_map_container.add_argument("--key", required=True)
     request_map_container.add_argument("--shape", choices=("object", "array"), required=True)
     request_map_container.add_argument(
+        "--choice-handle",
+        help="Gateway-disclosed opaque branch choice for an ambiguous map member",
+    )
+    request_map_container.add_argument(
         "--member-key",
         help="Exact child-object key whose opaque branch choices must be disclosed",
     )
@@ -1129,6 +1142,10 @@ def build_parser() -> argparse.ArgumentParser:
     request_array_item.add_argument("--array-handle", required=True)
     request_array_item.add_argument("--index", required=True, type=int)
     request_array_item.add_argument("--shape", choices=("object", "array"), required=True)
+    request_array_item.add_argument(
+        "--choice-handle",
+        help="Gateway-disclosed opaque branch choice for an ambiguous complex item",
+    )
     request_array_item.add_argument(
         "--member-key",
         help="Exact child-object key whose opaque branch choices must be disclosed",
@@ -1239,7 +1256,7 @@ def build_parser() -> argparse.ArgumentParser:
         "query-object",
         help="Run a source-grounded read-only object query without composing WAAPI code",
     )
-    query_source = query_object.add_mutually_exclusive_group(required=True)
+    query_source = query_object.add_mutually_exclusive_group()
     query_source.add_argument("--path")
     query_source.add_argument("--object-id")
     query_source.add_argument("--type", dest="object_type")
@@ -1269,7 +1286,87 @@ def build_parser() -> argparse.ArgumentParser:
             "structured query contract cannot express the requested read"
         ),
     )
+    query_source.add_argument(
+        "--typed-advanced",
+        action="store_true",
+        help="Use Gateway-owned typed facts for the bounded advanced WAQL layer",
+    )
+    query_source.add_argument(
+        "--typed-structured",
+        action="store_true",
+        help="Use Gateway-owned typed facts for the structured Builder layer",
+    )
+    query_object.add_argument("--schema-digest")
+    query_object.add_argument("--waql")
+    query_object.add_argument("--advanced-return", action="append", default=[])
+    query_object.add_argument("--max-results", type=int)
+    query_object.add_argument(
+        "--typed-schema-digest",
+        help="Bind structured typed facts to the exact configured-version query schema",
+    )
+    query_object.add_argument(
+        "--typed-set",
+        action="append",
+        nargs=3,
+        metavar=("FIELD_HANDLE", "TYPE", "VALUE"),
+        default=[],
+    )
+    query_object.add_argument(
+        "--typed-append",
+        action="append",
+        nargs=3,
+        metavar=("FIELD_HANDLE", "TYPE", "VALUE"),
+        default=[],
+    )
+    query_object.add_argument(
+        "--typed-present",
+        action="append",
+        metavar="CONTAINER_HANDLE",
+        default=[],
+    )
+    query_object.add_argument(
+        "--typed-choose",
+        action="append",
+        nargs=2,
+        metavar=("BRANCH_HANDLE", "CHOICE_HANDLE"),
+        default=[],
+    )
+    query_object.add_argument(
+        "--typed-choose-dynamic",
+        action="append",
+        nargs=3,
+        metavar=("OBJECT_HANDLE", "KEY", "CHOICE_HANDLE"),
+        default=[],
+    )
+    for action_name in ("map-put", "map-correct"):
+        query_object.add_argument(
+            f"--typed-{action_name}",
+            action="append",
+            nargs=4,
+            metavar=("MAP_HANDLE", "KEY", "TYPE", "VALUE"),
+            default=[],
+            dest=f"typed_query_{action_name.replace('-', '_')}",
+        )
+    query_object.add_argument(
+        "--typed-map-remove",
+        action="append",
+        nargs=2,
+        metavar=("MAP_HANDLE", "KEY"),
+        default=[],
+        dest="typed_query_map_remove",
+    )
     query_object.add_argument("--where-json")
+    query_object.add_argument(
+        "--where",
+        nargs=4,
+        action="append",
+        default=[],
+        metavar=("FIELD", "OPERATOR", "TYPE", "VALUE"),
+        help=(
+            "Append one typed conjunctive predicate; TYPE is string, integer, "
+            "number, or boolean"
+        ),
+    )
     query_object.add_argument(
         "--match-original-file-path",
         action="append",
@@ -1614,6 +1711,13 @@ def build_parser() -> argparse.ArgumentParser:
     draft_check.add_argument("draft_id")
     draft_check.add_argument("--task-authority", required=True)
     draft_check.add_argument("--expected-revision", required=True, type=int)
+    draft_check.add_argument(
+        "--detail",
+        action="store_true",
+        help="Include complete validation and dispatch evidence",
+    )
+    draft_check.add_argument("--post-filter-value")
+    draft_check.add_argument("--post-filter-limit", type=int)
 
     preview_from_draft = subparsers.add_parser(
         "preview-from-draft",
@@ -1737,6 +1841,15 @@ def build_parser() -> argparse.ArgumentParser:
             "Apply the closed Media Pool Filename case-sensitive contains "
             "post-filter after a complete bounded candidate read"
         ),
+    )
+    call.add_argument(
+        "--post-filter-value",
+        help="Typed Media Pool Filename case-sensitive contains literal",
+    )
+    call.add_argument(
+        "--post-filter-limit",
+        type=int,
+        help="Typed Media Pool post-filter result limit",
     )
     call.add_argument("--dry-run", action="store_true")
     call.add_argument("--allow-destructive", action="store_true", help=argparse.SUPPRESS)
@@ -1987,6 +2100,15 @@ def _execute_gateway_unconstrained(
         if (
             args.command == "query-object"
             and not original_file_reference_match_requested(args)
+            and not post_result_cleanup_failed
+        ):
+            payload = project_successful_query_object_payload(
+                payload,
+                detail=args.detail,
+            )
+        if (
+            args.command == "draft-check"
+            and payload.get("query_layer") == "structured-builder"
             and not post_result_cleanup_failed
         ):
             payload = project_successful_query_object_payload(
@@ -2879,6 +3001,118 @@ def preflight_typed_zero_input(
 def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, str]) -> None:
     """Reject closed query input errors before opening a WAAPI transport."""
 
+    if getattr(args, "typed_structured", False):
+        _require_typed_structured_query_option_exclusivity(args)
+        (preflight_version,) = resolve_catalog_versions(args, env=env)
+        contract = typed_query_contract(preflight_version)
+        if not isinstance(args.typed_schema_digest, str):
+            raise GatewayInputError(
+                "typed structured query requires --typed-schema-digest"
+            )
+        facts = [
+            TypedRequestFact("set", handle, value_type, value)
+            for handle, value_type, value in args.typed_set
+        ]
+        facts.extend(
+            TypedRequestFact("append", handle, value_type, value)
+            for handle, value_type, value in args.typed_append
+        )
+        facts.extend(
+            TypedRequestFact("present", handle, "null", "null")
+            for handle in args.typed_present
+        )
+        facts.extend(
+            TypedRequestFact("choose", handle, "branch", choice)
+            for handle, choice in args.typed_choose
+        )
+        facts.extend(
+            TypedRequestFact("choose-dynamic", handle, "choice", choice, key=key)
+            for handle, key, choice in args.typed_choose_dynamic
+        )
+        for action_name in ("map_put", "map_correct"):
+            facts.extend(
+                TypedRequestFact(
+                    action_name.replace("_", "-"),
+                    handle,
+                    value_type,
+                    value,
+                    key=key,
+                )
+                for handle, key, value_type, value in getattr(
+                    args, f"typed_query_{action_name}"
+                )
+            )
+        facts.extend(
+            TypedRequestFact("map-remove", handle, "null", "null", key=key)
+            for handle, key in args.typed_query_map_remove
+        )
+        args.typed_query = materialize_typed_query(
+            STRUCTURED_TYPED_QUERY_OPERATION,
+            preflight_version,
+            args.typed_schema_digest,
+            tuple(facts),
+        )
+        _require_structured_exact_identity_return_field(args.typed_query.preview)
+        args.typed_query_read_timeout = DEFAULT_TIMEOUT
+        return
+    if getattr(args, "typed_advanced", False):
+        _require_typed_advanced_query_option_exclusivity(args)
+        (preflight_version,) = resolve_catalog_versions(args, env=env)
+        contract = typed_query_contract(preflight_version, advanced=True)
+        fields = {field.name: field for field in contract.fields}
+        if not isinstance(args.schema_digest, str):
+            raise GatewayInputError("typed advanced query requires --schema-digest")
+        if not isinstance(args.waql, str):
+            raise GatewayInputError("typed advanced query requires --waql")
+        if not args.advanced_return:
+            raise GatewayInputError("typed advanced query requires --advanced-return")
+        if args.max_results is None:
+            raise GatewayInputError("typed advanced query requires --max-results")
+        args.typed_query = materialize_typed_query(
+            ADVANCED_TYPED_QUERY_OPERATION,
+            preflight_version,
+            args.schema_digest,
+            (
+                TypedRequestFact("set", fields["waql"].handle, "string", args.waql),
+                *(
+                    TypedRequestFact("append", fields["return"].handle, "string", value)
+                    for value in args.advanced_return
+                ),
+                TypedRequestFact(
+                    "set", fields["max_results"].handle, "integer", str(args.max_results)
+                ),
+            ),
+        )
+        args.typed_query_read_timeout = DEFAULT_TIMEOUT
+        return
+    if any(
+        (
+            args.schema_digest is not None,
+            args.waql is not None,
+            bool(args.advanced_return),
+            args.max_results is not None,
+        )
+    ):
+        raise GatewayInputError(
+            "--schema-digest, --waql, --advanced-return, and --max-results "
+            "require query-object --typed-advanced"
+        )
+    if any(
+        (
+            args.typed_schema_digest is not None,
+            bool(args.typed_set),
+            bool(args.typed_append),
+            bool(args.typed_present),
+            bool(args.typed_choose),
+            bool(args.typed_choose_dynamic),
+            bool(args.typed_query_map_put),
+            bool(args.typed_query_map_correct),
+            bool(args.typed_query_map_remove),
+        )
+    ):
+        raise GatewayInputError(
+            "structured typed fact flags require query-object --typed-structured"
+        )
     if advanced_query_requested(args):
         _require_advanced_query_option_exclusivity(args)
         request = parse_json_object(
@@ -2917,7 +3151,20 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
         )
         return
 
-    where = parse_optional_json(args.where_json, "--where-json")
+    if not any(
+        (
+            args.path is not None,
+            args.object_id is not None,
+            args.object_type is not None,
+            args.search is not None,
+            args.query is not None,
+        )
+    ):
+        raise GatewayInputError(
+            "query-object requires one simple source or one typed/structured query layer"
+        )
+
+    where = typed_query_predicates(args)
     return_fields = tuple(args.return_fields or ("id", "name", "type", "path"))
     _require_exact_identity_return_field(args, return_fields)
     (preflight_version,) = resolve_catalog_versions(args, env=env)
@@ -2959,7 +3206,7 @@ def validate_original_file_reference_match_input(
             "--match-original-file-path requires exactly "
             f"--type {ORIGINAL_FILE_REFERENCE_MATCH_TYPE}"
         )
-    if args.where_json is not None:
+    if args.where_json is not None or args.where:
         raise GatewayInputError(
             "--match-original-file-path cannot be combined with --where-json"
         )
@@ -3200,7 +3447,7 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
     if args.command == "call":
         request_args = parse_json_object(args.args_json, "--args-json")
         request_options = parse_json_object(args.options_json, "--options-json")
-        post_filter = parse_media_pool_post_filter_spec(args.post_filter_json)
+        post_filter = media_pool_post_filter_spec_from_args(args)
         if post_filter is not None:
             validate_media_pool_post_filter_request(
                 api=args.api,
@@ -3515,6 +3762,16 @@ def operation_draft_schema_digest(operation: str, version: str) -> str:
     return operation_request_schema_digest(operation, version)
 
 
+def public_typed_contract(version: str, api: str) -> Any:
+    """Resolve one function or query construction contract by exact public key."""
+
+    if api == STRUCTURED_TYPED_QUERY_OPERATION:
+        return typed_query_contract(version)
+    if api == ADVANCED_TYPED_QUERY_OPERATION:
+        return typed_query_contract(version, advanced=True)
+    return request_contract(version, api)
+
+
 def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]) -> dict[str, Any]:
     """Run catalog commands without requiring a WAAPI port or live Wwise."""
 
@@ -3522,32 +3779,28 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         versions = resolve_catalog_versions(args, env=env)
         if len(versions) != 1:
             raise GatewayInputError(f"{args.command} requires one exact Wwise version")
-        contract = request_contract(versions[0], args.api)
+        contract = public_typed_contract(versions[0], args.api)
+        if args.command == "request-schema" and args.api in {
+            STRUCTURED_TYPED_QUERY_OPERATION,
+            ADVANCED_TYPED_QUERY_OPERATION,
+        }:
+            raise GatewayInputError(
+                "Typed object queries use query-schema as their single schema entry."
+            )
         if args.command == "request-schema":
             return contract.as_gateway_payload()
         draft_shape = contract.as_gateway_payload()["input_shape"] == "draft"
+        query_shape = args.api in {
+            STRUCTURED_TYPED_QUERY_OPERATION,
+            ADVANCED_TYPED_QUERY_OPERATION,
+        }
         if args.schema_digest != contract.schema_digest:
             raise GatewayInputError("Typed request schema digest is stale")
-        if args.command == "request-map-container":
-            child_handle = dynamic_map_entry_handle(
-                contract,
-                map_handle=args.map_handle,
-                key=args.key,
-                shape=args.shape,
-            )
-            parent_handle = args.map_handle
-            key: str | int = args.key
-            fact = ["--map-put", args.map_handle, args.key, args.shape, child_handle]
-        else:
-            child_handle = dynamic_array_item_handle(
-                contract,
-                array_handle=args.array_handle,
-                index=args.index,
-                shape=args.shape,
-            )
-            parent_handle = args.array_handle
-            key = args.index
-            fact = ["--append", args.array_handle, args.shape, child_handle]
+        parent_handle = (
+            args.map_handle
+            if args.command == "request-map-container"
+            else args.array_handle
+        )
         parent_lineage = parse_typed_schema_lineage_token(
             contract,
             parent_handle=parent_handle,
@@ -3555,6 +3808,101 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         )
         parent_schema = parent_lineage[0] if parent_lineage is not None else None
         parent_section = parent_lineage[1] if parent_lineage is not None else None
+        if args.command == "request-map-container":
+            map_choices = dynamic_map_container_choices(
+                contract,
+                map_handle=args.map_handle,
+                key=args.key,
+                shape=args.shape,
+                parent_schema=parent_schema,
+                parent_section=parent_section,
+            )
+            if len(map_choices) > 1 and args.choice_handle is None:
+                return {
+                    "contract": "waapi-skill.typed-map-container-choices/v1",
+                    "ok": True,
+                    "status": "choice_required",
+                    "command": args.command,
+                    "version": contract.version,
+                    "uri": contract.uri,
+                    "schema_digest": contract.schema_digest,
+                    "map_handle": args.map_handle,
+                    "key": args.key,
+                    "shape": args.shape,
+                    "choices": [
+                        {
+                            "handle": choice_handle,
+                            "accepted_type": str(variant.get("type")),
+                            "required_keys": list(variant.get("required", ())),
+                        }
+                        for choice_handle, _variant_index, variant in map_choices
+                    ],
+                    "continuation": {
+                        "subcommand": "request-map-container",
+                        "choice_flag": "--choice-handle <choice_handle>",
+                    },
+                }
+            child_handle = dynamic_map_entry_handle(
+                contract,
+                map_handle=args.map_handle,
+                key=args.key,
+                shape=args.shape,
+                choice_handle=args.choice_handle,
+                parent_schema=parent_schema,
+                parent_section=parent_section,
+            )
+            key: str | int = args.key
+            fact = ["--map-put", args.map_handle, args.key, args.shape, child_handle]
+        else:
+            array_choices = (
+                dynamic_array_item_choices(
+                    contract,
+                    array_handle=args.array_handle,
+                    index=args.index,
+                    shape=args.shape,
+                    parent_schema=parent_schema,
+                    parent_section=parent_section,
+                )
+                if args.array_handle in contract.fields_by_handle
+                or parent_schema is not None
+                else ()
+            )
+            if len(array_choices) > 1 and args.choice_handle is None:
+                return {
+                    "contract": "waapi-skill.typed-array-item-choices/v1",
+                    "ok": True,
+                    "status": "choice_required",
+                    "command": args.command,
+                    "version": contract.version,
+                    "uri": contract.uri,
+                    "schema_digest": contract.schema_digest,
+                    "array_handle": args.array_handle,
+                    "index": args.index,
+                    "shape": args.shape,
+                    "choices": [
+                        {
+                            "handle": choice_handle,
+                            "accepted_type": str(variant.get("type")),
+                            "required_keys": list(variant.get("required", ())),
+                        }
+                        for choice_handle, _variant_index, variant in array_choices
+                    ],
+                    "continuation": {
+                        "subcommand": "request-array-item",
+                        "choice_flag": "--choice-handle <choice_handle>",
+                    },
+                }
+            child_handle = dynamic_array_item_handle(
+                contract,
+                array_handle=args.array_handle,
+                index=args.index,
+                shape=args.shape,
+                choice_handle=args.choice_handle,
+                parent_schema=parent_schema,
+                parent_section=parent_section,
+            )
+            key = args.index
+            fact = ["--append", args.array_handle, args.shape, child_handle]
         child_contract = dynamic_container_disclosure(
             contract,
             parent_handle=parent_handle,
@@ -3564,6 +3912,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             member_key=args.member_key,
             parent_schema=parent_schema,
             parent_section=parent_section,
+            choice_handle=getattr(args, "choice_handle", None),
         )
         child_contract.pop("schema_lineage")
         lineage_token = typed_schema_lineage_token(
@@ -3573,6 +3922,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             parent_handle=parent_handle,
             key=str(key),
             shape=args.shape,
+            choice_handle=getattr(args, "choice_handle", None),
         )
         return {
             "contract": "waapi-skill.typed-container-handle/v1",
@@ -3589,7 +3939,11 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "child_contract": child_contract,
             "schema_lineage_token": lineage_token,
             "continuation": {
-                "subcommand": "draft-apply" if draft_shape else "typed-call",
+                "subcommand": (
+                    "query-object"
+                    if query_shape
+                    else "draft-apply" if draft_shape else "typed-call"
+                ),
                 **(
                     {
                         "action": "add_typed_fact",
@@ -3606,8 +3960,17 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                             ),
                         ],
                     }
-                    if draft_shape
-                    else {"fact": fact}
+                    if draft_shape and not query_shape
+                    else {
+                        "fact": [
+                            (
+                                f"--typed-{fact[0].removeprefix('--')}"
+                                if query_shape
+                                else fact[0]
+                            ),
+                            *fact[1:],
+                        ]
+                    }
                 ),
                 **(
                     {}
@@ -3627,6 +3990,11 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                                 ]
                             ),
                             "--shape", args.shape,
+                            *(
+                                ["--choice-handle", args.choice_handle]
+                                if args.choice_handle is not None
+                                else []
+                            ),
                             "--member-key", "<exact-key>",
                             *(
                                 ["--parent-schema-token", args.parent_schema_token]
@@ -3929,21 +4297,41 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         }
     if args.command == "query-schema":
         versions = resolve_catalog_versions(args, env=env)
-        if args.advanced:
+        if len(versions) == 1:
             return {
-                "contract": GATEWAY_RESULT_CONTRACT,
-                "ok": True,
-                "status": "ok",
-                "command": "query-schema",
+                **typed_query_schema_payload(versions[0], advanced=args.advanced),
                 "offline": True,
-                "query_layer": "advanced-native-waql",
-                "query_contract": ADVANCED_QUERY_CONTRACT,
                 "versions": list(versions),
-                "schemas": {
-                    version: advanced_query_schema(version=version)
-                    for version in versions
-                },
-                "boundary": {
+            }
+        return {
+            "contract": GATEWAY_RESULT_CONTRACT,
+            "ok": True,
+            "status": "ok",
+            "command": "query-schema",
+            "offline": True,
+            "query_layer": (
+                "advanced-native-waql" if args.advanced else "structured-builder"
+            ),
+            "query_contract": (
+                ADVANCED_QUERY_CONTRACT if args.advanced else STRUCTURED_QUERY_CONTRACT
+            ),
+            "versions": list(versions),
+            "schemas": {
+                version: (
+                    advanced_query_schema(version=version)
+                    if args.advanced
+                    else structured_query_schema(version=version)
+                )
+                for version in versions
+            },
+            "contracts": {
+                version: typed_query_schema_payload(
+                    version, advanced=args.advanced
+                )
+                for version in versions
+            },
+            "boundary": (
+                {
                     "fixed_api": OBJECT_GET_URI,
                     "read_only": True,
                     "native_waql_accepted": True,
@@ -3954,46 +4342,34 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     "gateway_result_bytes": MAX_GATEWAY_RESULT_JSON_BYTES,
                     "version_specific_syntax_validated_by": "connected Wwise",
                     "fallback_or_retry_on_invalid_query": False,
-                },
-            }
-        return {
-            "contract": GATEWAY_RESULT_CONTRACT,
-            "ok": True,
-            "status": "ok",
-            "command": "query-schema",
-            "offline": True,
-            "query_layer": "structured-builder",
-            "query_contract": STRUCTURED_QUERY_CONTRACT,
-            "versions": list(versions),
-            "schemas": {
-                version: structured_query_schema(version=version)
-                for version in versions
-            },
-            "boundary": {
-                "raw_waql_accepted": False,
-                "raw_expression_accepted": False,
-                "result_limit_required_for": [
-                    "broad sources",
-                    "multiple object sources",
-                    "select transforms",
-                ],
-                "deferred_syntax": [
-                    "skip",
-                    "orderby",
-                    "distinct",
-                    "regular-expression literals",
-                    "WAQL 2.0 list functions",
-                ],
-                "advanced_fallback": {
-                    "available": True,
-                    "disclose_with": "query-schema --advanced",
-                    "execute_with": "query-object --advanced-request-json",
-                    "use_only_when": (
-                        "the structured schema cannot express the requested "
-                        "read-only WAQL construct"
-                    ),
-                },
-            },
+                }
+                if args.advanced
+                else {
+                    "raw_waql_accepted": False,
+                    "raw_expression_accepted": False,
+                    "result_limit_required_for": [
+                        "broad sources",
+                        "multiple object sources",
+                        "select transforms",
+                    ],
+                    "deferred_syntax": [
+                        "skip",
+                        "orderby",
+                        "distinct",
+                        "regular-expression literals",
+                        "WAQL 2.0 list functions",
+                    ],
+                    "advanced_fallback": {
+                        "available": True,
+                        "disclose_with": "query-schema --advanced",
+                        "execute_with": "query-object --typed-advanced",
+                        "use_only_when": (
+                            "the structured schema cannot express the requested "
+                            "read-only WAQL construct"
+                        ),
+                    },
+                }
+            ),
         }
     if args.command == "operations":
         operations: list[dict[str, Any]] = []
@@ -5937,6 +6313,98 @@ def dispatch_command(
                 dispatcher=dispatcher,
                 common=common,
             )
+        if getattr(args, "typed_structured", False):
+            typed_query = args.typed_query
+            if typed_query.version != detected_version:
+                raise GatewayInputError(
+                    "Typed query version changed after preflight; query-schema must be rerun"
+                )
+            preview = typed_query.preview
+            _require_structured_exact_identity_return_field(preview)
+            envelope = preview.envelope
+            exact_identity = _structured_query_exact_identity(preview)
+            query_bound = _structured_query_bound(preview)
+            result = dispatch(
+                dispatcher,
+                envelope.uri,
+                connection=connection,
+                version=detected_version,
+                args=envelope.args,
+                options=envelope.options,
+                exact_object_lookup=exact_identity is not None,
+            )
+            rows = (
+                strict_object_get_rows(
+                    result,
+                    command="query-object --typed-structured",
+                    maximum_rows=_structured_query_result_maximum(
+                        query_bound,
+                        exact_identity=exact_identity,
+                    ),
+                )
+                if result.get("ok")
+                else []
+            )
+            if result.get("ok"):
+                validate_structured_exact_query_identity(exact_identity, rows)
+            payload = {
+                "ok": bool(result.get("ok")),
+                "status": "ok" if result.get("ok") else "error",
+                **common,
+                "query_layer": "structured-builder",
+                "query_contract": STRUCTURED_QUERY_CONTRACT,
+                "typed_query": {"schema_digest": typed_query.schema_digest},
+                "semantic_preview": preview.as_dict(),
+                "query_bound": query_bound,
+                "call": dispatch_call_summary(result),
+                "count": len(rows) if result.get("ok") else None,
+                "objects": rows if result.get("ok") else None,
+                "agent_result": rows if result.get("ok") else None,
+            }
+            return payload
+        if getattr(args, "typed_advanced", False):
+            typed_query = args.typed_query
+            if typed_query.version != detected_version:
+                raise GatewayInputError(
+                    "Typed query version changed after preflight; query-schema must be rerun"
+                )
+            preview = typed_query.preview
+            envelope = preview.envelope
+            query_bound = _advanced_query_bound(preview)
+            maximum_rows = query_bound["value"]
+            result = dispatch(
+                dispatcher,
+                envelope.uri,
+                connection=connection,
+                version=detected_version,
+                args=envelope.args,
+                options=envelope.options,
+                exact_object_lookup=False,
+            )
+            rows = (
+                strict_object_get_rows(
+                    result,
+                    command="query-object --typed-advanced",
+                    maximum_rows=maximum_rows,
+                )
+                if result.get("ok")
+                else []
+            )
+            return {
+                "ok": bool(result.get("ok")),
+                "status": "ok" if result.get("ok") else "error",
+                **common,
+                "query_layer": "advanced-native-waql",
+                "query_contract": ADVANCED_QUERY_CONTRACT,
+                "typed_query": {"schema_digest": typed_query.schema_digest},
+                "semantic_preview": preview.as_dict(),
+                "query_bound": query_bound,
+                "call": dispatch_call_summary(result),
+                "count": len(rows) if result.get("ok") else None,
+                "limit_reached": len(rows) == maximum_rows if result.get("ok") else None,
+                "objects": rows if result.get("ok") else None,
+                "agent_result": rows if result.get("ok") else None,
+            }
         if advanced_query_requested(args):
             _require_advanced_query_option_exclusivity(args)
             request = parse_json_object(
@@ -6032,7 +6500,7 @@ def dispatch_command(
                 "count": len(rows) if result.get("ok") else None,
                 "objects": rows if result.get("ok") else None,
             }
-        where = parse_optional_json(args.where_json, "--where-json")
+        where = typed_query_predicates(args)
         return_fields = tuple(args.return_fields or ("id", "name", "type", "path"))
         _require_exact_identity_return_field(args, return_fields)
         preview = build_object_get_query(
@@ -6309,7 +6777,7 @@ def dispatch_command(
     if args.command == "call":
         request_args = parse_json_object(args.args_json, "--args-json")
         request_options = parse_json_object(args.options_json, "--options-json")
-        post_filter = parse_media_pool_post_filter_spec(args.post_filter_json)
+        post_filter = media_pool_post_filter_spec_from_args(args)
         if post_filter is not None:
             validate_media_pool_post_filter_request(
                 api=args.api,
@@ -7019,6 +7487,15 @@ def dispatch_operation_draft_check(
             request_options = require_mapping(
                 arguments.get("options"), "typed Draft request options"
             )
+            post_filter = media_pool_post_filter_spec_from_args(args)
+            if post_filter is not None:
+                validate_media_pool_post_filter_request(
+                    api=inspected.operation,
+                    spec=post_filter,
+                    request_args=request_args,
+                    request_options=request_options,
+                    dry_run=False,
+                )
             validation = validate_semantic_payload(
                 inspected.operation,
                 request_args,
@@ -7050,7 +7527,33 @@ def dispatch_operation_draft_check(
                 if result.get("ok")
                 else None
             )
-            return {
+            agent_result = result.get("result") if result.get("ok") else None
+            post_filter_audit = None
+            if post_filter is not None and result.get("ok"):
+                agent_result, post_filter_audit = apply_media_pool_post_filter(
+                    result.get("result"),
+                    spec=post_filter,
+                    request_max_results=request_args["maxResults"],
+                    evidence_path=result.get("evidence_path"),
+                )
+                if agent_result is None:
+                    return {
+                        "contract": GATEWAY_RESULT_CONTRACT,
+                        "ok": False,
+                        "status": "incomplete_boundary",
+                        "command": args.command,
+                        "offline": False,
+                        **common,
+                        "api_attempted": inspected.operation,
+                        "error_code": "MEDIA_POOL_POST_FILTER_INCOMPLETE",
+                        "message": (
+                            "The Media Pool candidate response reached maxResults, so "
+                            "the case-sensitive post-filter cannot prove completeness."
+                        ),
+                        "post_filter": post_filter_audit,
+                        "agent_result": None,
+                    }
+            payload = {
                 "contract": GATEWAY_RESULT_CONTRACT,
                 "ok": bool(result.get("ok")),
                 "status": "ok" if result.get("ok") else "error",
@@ -7071,8 +7574,15 @@ def dispatch_operation_draft_check(
                         else None
                     ),
                 },
-                "agent_result": result.get("result") if result.get("ok") else None,
+                "agent_result": agent_result,
             }
+            if post_filter_audit is not None:
+                payload = {
+                    **{key: value for key, value in payload.items() if key != "agent_result"},
+                    "post_filter": post_filter_audit,
+                    "agent_result": agent_result,
+                }
+            return payload
     canonical_request = parse_operation_request(
         request_payload,
         expected_version=detected_version,
@@ -9418,7 +9928,7 @@ def _require_advanced_query_option_exclusivity(
     """Keep the advanced request document authoritative for the complete read."""
 
     conflicting: list[str] = []
-    if args.where_json is not None:
+    if args.where_json is not None or args.where:
         conflicting.append("--where-json")
     if args.match_original_file_paths:
         conflicting.append("--match-original-file-path")
@@ -9436,6 +9946,63 @@ def _require_advanced_query_option_exclusivity(
             "expressions, and result bound; it cannot be combined with "
             + ", ".join(conflicting)
             + "."
+        )
+
+
+def _require_typed_advanced_query_option_exclusivity(
+    args: argparse.Namespace,
+) -> None:
+    """Keep the short typed advanced continuation authoritative."""
+
+    conflicting: list[str] = []
+    if args.where_json is not None or args.where:
+        conflicting.append("--where")
+    if args.match_original_file_paths:
+        conflicting.append("--match-original-file-path")
+    if args.select:
+        conflicting.append("--select")
+    if args.take is not None:
+        conflicting.append("--take")
+    if args.all_results:
+        conflicting.append("--all-results")
+    if args.return_fields:
+        conflicting.append("--return-field")
+    if args.request_json is not None:
+        conflicting.append("--request-json")
+    if args.advanced_request_json is not None:
+        conflicting.append("--advanced-request-json")
+    if conflicting:
+        raise GatewayInputError(
+            "query-object --typed-advanced owns the WAQL scalar, return expressions, "
+            "and result bound; it cannot be combined with "
+            + ", ".join(conflicting)
+            + "."
+        )
+
+
+def _require_typed_structured_query_option_exclusivity(
+    args: argparse.Namespace,
+) -> None:
+    """Keep typed structured facts authoritative for the complete read."""
+
+    conflicting: list[str] = []
+    for enabled, label in (
+        (args.where_json is not None or bool(args.where), "--where"),
+        (bool(args.match_original_file_paths), "--match-original-file-path"),
+        (bool(args.select), "--select"),
+        (args.take is not None, "--take"),
+        (bool(args.all_results), "--all-results"),
+        (bool(args.return_fields), "--return-field"),
+        (args.request_json is not None, "--request-json"),
+        (args.advanced_request_json is not None, "--advanced-request-json"),
+        (bool(args.typed_advanced), "--typed-advanced"),
+    ):
+        if enabled:
+            conflicting.append(label)
+    if conflicting:
+        raise GatewayInputError(
+            "query-object --typed-structured owns the complete structured read; "
+            "it cannot be combined with " + ", ".join(conflicting) + "."
         )
 
 
@@ -9475,7 +10042,7 @@ def _require_structured_query_option_exclusivity(
     """Keep one structured document authoritative for the complete query."""
 
     conflicting: list[str] = []
-    if args.where_json is not None:
+    if args.where_json is not None or args.where:
         conflicting.append("--where-json")
     if args.match_original_file_paths:
         conflicting.append("--match-original-file-path")
@@ -9636,7 +10203,7 @@ def validate_structured_exact_query_identity(
 def _canonical_exact_query_request(args: argparse.Namespace) -> bool:
     """Trust exactness from parsed CLI fields, never by reparsing generated WAQL."""
 
-    if args.where_json is not None or args.select or args.take is not None:
+    if args.where_json is not None or args.where or args.select or args.take is not None:
         return False
     if args.path is not None:
         return _canonical_wwise_path(args.path)
@@ -12707,6 +13274,40 @@ def parse_optional_json(text: str | None, option_name: str) -> Any:
     return parse_strict_json(text, option_name)
 
 
+def typed_query_predicates(args: argparse.Namespace) -> Any:
+    """Return the closed legacy predicate or repeated typed simple predicates."""
+
+    if args.where_json is not None and args.where:
+        raise GatewayInputError("--where cannot be combined with --where-json")
+    if args.where_json is not None:
+        return parse_optional_json(args.where_json, "--where-json")
+    predicates: list[dict[str, Any]] = []
+    for field, operator, value_type, raw_value in args.where:
+        if value_type == "string":
+            value: Any = raw_value
+        elif value_type == "integer":
+            if re.fullmatch(r"-?(0|[1-9][0-9]*)", raw_value) is None:
+                raise GatewayInputError("--where integer values must be canonical")
+            value = int(raw_value)
+        elif value_type == "number":
+            try:
+                value = float(raw_value)
+            except ValueError as exc:
+                raise GatewayInputError("--where number values must be numeric") from exc
+            if not math.isfinite(value):
+                raise GatewayInputError("--where number values must be finite")
+        elif value_type == "boolean":
+            if raw_value not in {"true", "false"}:
+                raise GatewayInputError("--where boolean values must be true or false")
+            value = raw_value == "true"
+        else:
+            raise GatewayInputError(
+                "--where TYPE must be string, integer, number, or boolean"
+            )
+        predicates.append({"field": field, "operator": operator, "value": value})
+    return predicates or None
+
+
 def parse_strict_json(
     text: str,
     option_name: str,
@@ -12801,6 +13402,42 @@ def parse_media_pool_post_filter_spec(text: str | None) -> dict[str, Any] | None
             f"{MAX_MEDIA_POOL_RESULTS}"
         )
     return spec
+
+
+def media_pool_post_filter_spec_from_args(
+    args: argparse.Namespace,
+) -> dict[str, Any] | None:
+    """Build the closed Media Pool filter from its normal typed scalars."""
+
+    typed_value = getattr(args, "post_filter_value", None)
+    typed_limit = getattr(args, "post_filter_limit", None)
+    legacy_json = getattr(args, "post_filter_json", None)
+    if legacy_json is not None and (
+        typed_value is not None or typed_limit is not None
+    ):
+        raise GatewayInputError(
+            "Typed Media Pool post-filter flags cannot be combined with --post-filter-json"
+        )
+    if legacy_json is not None:
+        return parse_media_pool_post_filter_spec(legacy_json)
+    if typed_value is None and typed_limit is None:
+        return None
+    if typed_value is None or typed_limit is None:
+        raise GatewayInputError(
+            "Media Pool post-filter requires both --post-filter-value and --post-filter-limit"
+        )
+    return parse_media_pool_post_filter_spec(
+        json.dumps(
+            {
+                "field": "Filename",
+                "operator": "containsCaseSensitive",
+                "value": typed_value,
+                "limit": typed_limit,
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+    )
 
 
 def validate_media_pool_post_filter_request(

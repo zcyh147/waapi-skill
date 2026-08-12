@@ -59,6 +59,7 @@ class TypedFieldContract:
     parent_handle: str | None = None
     minimum_items: int | None = None
     maximum_items: int | None = None
+    unique_items: bool = False
     map_patterns: tuple[tuple[str, tuple[Mapping[str, Any], ...]], ...] = ()
     additional_variants: tuple[Mapping[str, Any], ...] = ()
     open_map: bool = False
@@ -106,6 +107,7 @@ class TypedFieldContract:
         if self.shape == "array":
             payload["minimum_items"] = self.minimum_items
             payload["maximum_items"] = self.maximum_items
+            payload["unique_items"] = self.unique_items
         if self.parent_handle is not None:
             payload["parent_handle"] = self.parent_handle
         if self.shape == "map":
@@ -234,7 +236,7 @@ class TypedRequestContract:
                 input_shape = "draft"
         if not self.fields:
             input_shape = "zero"
-        return {
+        payload = {
             "contract": TYPED_REQUEST_SCHEMA_CONTRACT,
             "ok": True,
             "status": "ok",
@@ -246,6 +248,22 @@ class TypedRequestContract:
             "fields": [field.as_dict() for field in self.fields],
             "continuation": continuation,
         }
+        if self.uri == "ak.wwise.core.mediaPool.get":
+            payload["result_filter"] = {
+                "contract": "waapi-skill.media-pool-post-filter/v1",
+                "availability": "optional_after_complete_typed_candidate_request",
+                "completion_subcommand": "draft-check",
+                "typed_scalars": {
+                    "value": "--post-filter-value <exact case-sensitive text>",
+                    "limit": "--post-filter-limit <1..1000>",
+                },
+                "requirements": [
+                    "typed request filters includes Filename contains with the same value",
+                    "typed request options return includes Filename",
+                    "typed request maxResults is greater than or equal to the filter limit",
+                ],
+            }
+        return payload
 
 
 @dataclass(frozen=True, slots=True)
@@ -446,11 +464,25 @@ def dynamic_map_entry_handle(
     map_handle: str,
     key: str,
     shape: str,
+    choice_handle: str | None = None,
+    parent_schema: Mapping[str, Any] | None = None,
+    parent_section: str | None = None,
 ) -> str:
     """Issue one deterministic handle for a caller-named open-map container."""
 
     field = contract.fields_by_handle.get(map_handle)
     dynamic_parent = map_handle.startswith(TYPED_DYNAMIC_HANDLE_PREFIX)
+    if field is None and dynamic_parent and parent_schema is not None:
+        section = parent_section or "args"
+        field = _dynamic_container_contract(
+            handle=map_handle,
+            name="dynamic-parent",
+            shape=str(parent_schema.get("type")),
+            schema=parent_schema,
+            root_schema=contract.schema_roots[section],
+            graph=contract.definition_graph,
+            section=section,
+        )
     if not dynamic_parent and (
         field is None or field.shape != "map"
     ):
@@ -462,14 +494,120 @@ def dynamic_map_entry_handle(
     else:
         assert field is not None
         _map_key_variants(field, key)
+    variant_index: int | None = None
+    if field is not None:
+        matching = [
+            (index, variant)
+            for index, variant in enumerate(_map_key_variants(field, key))
+            if variant.get("type") == shape
+        ]
+        if len(matching) > 1:
+            choices = _dynamic_map_container_choices(
+                contract, field=field, key=key, shape=shape
+            )
+            selected = [
+                index for handle, index, _variant in choices if handle == choice_handle
+            ]
+            if len(selected) != 1:
+                raise TypedRequestError(
+                    "Typed map container branch requires a disclosed choice handle"
+                )
+            variant_index = selected[0]
+        elif len(matching) == 1 and choice_handle is not None:
+            raise TypedRequestError("Typed map container choice is unknown or stale")
     return TYPED_DYNAMIC_HANDLE_PREFIX + canonical_sha256(
         {
             "schema_digest": contract.schema_digest,
             "parent_handle": map_handle,
             "key": key,
             "shape": shape,
+            **({"variant_index": variant_index} if variant_index is not None else {}),
         }
     )[:24]
+
+
+def _dynamic_map_container_choices(
+    contract: TypedRequestContract,
+    *,
+    field: TypedFieldContract,
+    key: str,
+    shape: str,
+) -> tuple[tuple[str, int, Mapping[str, Any]], ...]:
+    matching = [
+        (index, variant)
+        for index, variant in enumerate(_map_key_variants(field, key))
+        if variant.get("type") == shape
+    ]
+    return tuple(
+        (
+            TYPED_DYNAMIC_CHOICE_PREFIX + canonical_sha256(
+                {
+                    "schema_digest": contract.schema_digest,
+                    "object_handle": field.handle,
+                    "key": key,
+                    "index": index,
+                }
+            )[:24],
+            index,
+            variant,
+        )
+        for index, variant in matching
+    )
+
+
+def dynamic_map_container_choices(
+    contract: TypedRequestContract,
+    *,
+    map_handle: str,
+    key: str,
+    shape: str,
+    parent_schema: Mapping[str, Any] | None = None,
+    parent_section: str | None = None,
+) -> tuple[tuple[str, int, Mapping[str, Any]], ...]:
+    """Disclose opaque choices for an ambiguous object/array map member."""
+
+    field = contract.fields_by_handle.get(map_handle)
+    if field is None and parent_schema is not None:
+        section = parent_section or "args"
+        field = _dynamic_container_contract(
+            handle=map_handle,
+            name="dynamic-parent",
+            shape=str(parent_schema.get("type")),
+            schema=parent_schema,
+            root_schema=contract.schema_roots[section],
+            graph=contract.definition_graph,
+            section=section,
+        )
+    if field is None or field.shape != "map":
+        return ()
+    return _dynamic_map_container_choices(
+        contract, field=field, key=key, shape=shape
+    )
+
+
+def _map_container_variant_for_handle(
+    contract: TypedRequestContract,
+    *,
+    field: TypedFieldContract,
+    key: str,
+    shape: str,
+    handle: str,
+) -> Mapping[str, Any]:
+    for _choice, index, variant in _dynamic_map_container_choices(
+        contract, field=field, key=key, shape=shape
+    ):
+        expected = TYPED_DYNAMIC_HANDLE_PREFIX + canonical_sha256(
+            {
+                "schema_digest": contract.schema_digest,
+                "parent_handle": field.handle,
+                "key": key,
+                "shape": shape,
+                "variant_index": index,
+            }
+        )[:24]
+        if handle == expected:
+            return variant
+    raise TypedRequestError("Typed map container handle is unknown or stale")
 
 
 def dynamic_array_item_handle(
@@ -478,29 +616,159 @@ def dynamic_array_item_handle(
     array_handle: str,
     index: int,
     shape: str,
+    choice_handle: str | None = None,
+    parent_schema: Mapping[str, Any] | None = None,
+    parent_section: str | None = None,
 ) -> str:
     """Issue one deterministic handle for one ordered complex array item."""
 
     field = contract.fields_by_handle.get(array_handle)
+    if field is None and parent_schema is not None:
+        section = parent_section or "args"
+        field = _dynamic_container_contract(
+            handle=array_handle,
+            name="dynamic-parent",
+            shape=str(parent_schema.get("type")),
+            schema=parent_schema,
+            root_schema=contract.schema_roots[section],
+            graph=contract.definition_graph,
+            section=section,
+        )
     if field is None and not array_handle.startswith(TYPED_DYNAMIC_HANDLE_PREFIX):
         raise TypedRequestError("Dynamic array items require an array handle")
     if isinstance(index, bool) or not isinstance(index, int) or index < 0:
         raise TypedRequestError("Dynamic array item index must be non-negative")
     if shape not in {"object", "array"} or (
-        field is not None
-        and (field.shape != "array" or not any(
-            variant.get("type") == shape for variant in field.variants
-        ))
+        field is not None and field.shape != "array"
     ):
         raise TypedRequestError("Dynamic array item shape violates its schema")
+    selected_index: int | None = None
+    if field is not None:
+        choices = _dynamic_array_item_choices_for_field(
+            contract, field=field, index=index, shape=shape
+        )
+        if len(choices) > 1:
+            matching = [
+                variant_index
+                for handle, variant_index, _variant in choices
+                if handle == choice_handle
+            ]
+            if len(matching) != 1:
+                raise TypedRequestError(
+                    "Typed array item branch requires a disclosed choice handle"
+                )
+            selected_index = matching[0]
+        elif len(choices) == 1:
+            if choice_handle not in {None, choices[0][0]}:
+                raise TypedRequestError("Typed array item choice is unknown or stale")
+            selected_index = None
+        else:
+            raise TypedRequestError("Dynamic array item shape violates its schema")
     return TYPED_DYNAMIC_HANDLE_PREFIX + canonical_sha256(
         {
             "schema_digest": contract.schema_digest,
             "parent_handle": array_handle,
             "key": str(index),
             "shape": shape,
+            **(
+                {"variant_index": selected_index}
+                if selected_index is not None
+                else {}
+            ),
         }
     )[:24]
+
+
+def _array_item_variant_for_handle(
+    contract: TypedRequestContract,
+    *,
+    field: TypedFieldContract,
+    index: int,
+    shape: str,
+    handle: str,
+) -> Mapping[str, Any]:
+    choices = _dynamic_array_item_choices_for_field(
+        contract,
+        field=field,
+        index=index,
+        shape=shape,
+    )
+    for choice_handle, variant_index, variant in choices:
+        expected = TYPED_DYNAMIC_HANDLE_PREFIX + canonical_sha256(
+            {
+                "schema_digest": contract.schema_digest,
+                "parent_handle": field.handle,
+                "key": str(index),
+                "shape": shape,
+                "variant_index": variant_index,
+            }
+        )[:24]
+        if handle == expected:
+            return variant
+    raise TypedRequestError("Typed array item handle is unknown or stale")
+
+
+def dynamic_array_item_choices(
+    contract: TypedRequestContract,
+    *,
+    array_handle: str,
+    index: int,
+    shape: str,
+    parent_schema: Mapping[str, Any] | None = None,
+    parent_section: str | None = None,
+) -> tuple[tuple[str, int, Mapping[str, Any]], ...]:
+    """Disclose opaque choices for an ambiguous complex array element."""
+
+    field = contract.fields_by_handle.get(array_handle)
+    if field is None and parent_schema is not None:
+        section = parent_section or "args"
+        field = _dynamic_container_contract(
+            handle=array_handle,
+            name="dynamic-parent",
+            shape=str(parent_schema.get("type")),
+            schema=parent_schema,
+            root_schema=contract.schema_roots[section],
+            graph=contract.definition_graph,
+            section=section,
+        )
+    if field is None or field.shape != "array":
+        raise TypedRequestError("Dynamic array item choices require an array handle")
+    return _dynamic_array_item_choices_for_field(
+        contract,
+        field=field,
+        index=index,
+        shape=shape,
+    )
+
+
+def _dynamic_array_item_choices_for_field(
+    contract: TypedRequestContract,
+    *,
+    field: TypedFieldContract,
+    index: int,
+    shape: str,
+) -> tuple[tuple[str, int, Mapping[str, Any]], ...]:
+    matching = [
+        (variant_index, variant)
+        for variant_index, variant in enumerate(field.variants)
+        if variant.get("type") == shape
+    ]
+    return tuple(
+        (
+            TYPED_DYNAMIC_CHOICE_PREFIX + canonical_sha256(
+                {
+                    "schema_digest": contract.schema_digest,
+                    "array_handle": field.handle,
+                    "index": index,
+                    "shape": shape,
+                    "variant_index": variant_index,
+                }
+            )[:24],
+            variant_index,
+            variant,
+        )
+        for variant_index, variant in matching
+    )
 
 
 def dynamic_branch_choices(
@@ -535,6 +803,17 @@ def dynamic_branch_choices(
     )
 
 
+def _variant_constant_fields(variant: Mapping[str, Any]) -> dict[str, Any]:
+    properties = variant.get("properties")
+    if not isinstance(properties, Mapping):
+        return {}
+    return {
+        str(name): value_schema["const"]
+        for name, value_schema in properties.items()
+        if isinstance(value_schema, Mapping) and "const" in value_schema
+    }
+
+
 def dynamic_container_disclosure(
     contract: TypedRequestContract,
     *,
@@ -545,6 +824,7 @@ def dynamic_container_disclosure(
     member_key: str | None = None,
     parent_schema: Mapping[str, Any] | None = None,
     parent_section: str | None = None,
+    choice_handle: str | None = None,
 ) -> dict[str, Any]:
     """Describe one schema-known dynamic container without exposing a document."""
 
@@ -569,17 +849,80 @@ def dynamic_container_disclosure(
             section=parent_section or "args",
         )
         if lineage_parent.shape == "array":
-            schema = _require_unique_container_variant(lineage_parent.variants, shape)
+            choices = _dynamic_array_item_choices_for_field(
+                contract,
+                field=lineage_parent,
+                index=int(key),
+                shape=shape,
+            )
+            matching = [
+                variant
+                for handle, _variant_index, variant in choices
+                if handle == choice_handle
+            ]
+            if len(choices) > 1:
+                if len(matching) != 1:
+                    raise TypedRequestError(
+                        "Typed array item disclosure requires its issued choice handle"
+                    )
+                schema = matching[0]
+            else:
+                schema = _require_unique_container_variant(
+                    lineage_parent.variants, shape
+                )
         elif lineage_parent.shape == "map":
-            schema = _map_container_variant(lineage_parent, key, shape)
+            matching = [
+                variant
+                for variant in _map_key_variants(lineage_parent, key)
+                if variant.get("type") == shape
+            ]
+            schema = (
+                _map_container_variant_for_handle(
+                    contract,
+                    field=lineage_parent,
+                    key=key,
+                    shape=shape,
+                    handle=child_handle,
+                )
+                if len(matching) > 1
+                else _map_container_variant(lineage_parent, key, shape)
+            )
         else:
             raise TypedRequestError("Dynamic container parent is not a collection")
         root_schema = contract.schema_roots[parent_section or "args"]
     elif parent.shape == "array":
-        schema = _require_unique_container_variant(parent.variants, shape)
+        matching = [
+            variant for variant in parent.variants if variant.get("type") == shape
+        ]
+        schema = (
+            _array_item_variant_for_handle(
+                contract,
+                field=parent,
+                index=int(key),
+                shape=shape,
+                handle=child_handle,
+            )
+            if len(matching) > 1
+            else _require_unique_container_variant(parent.variants, shape)
+        )
         root_schema = contract.schema_roots[parent.section]
     elif parent.shape == "map":
-        schema = _map_container_variant(parent, key, shape)
+        matching = [
+            variant
+            for variant in _map_key_variants(parent, key)
+            if variant.get("type") == shape
+        ]
+        schema = (
+            _map_container_variant_for_handle(
+                contract,
+                field=parent,
+                key=key,
+                shape=shape,
+                handle=child_handle,
+            )
+            if len(matching) > 1
+            else _map_container_variant(parent, key, shape)
+        )
         root_schema = contract.schema_roots[parent.section]
     else:
         raise TypedRequestError("Dynamic container parent is not a collection")
@@ -627,6 +970,8 @@ def dynamic_container_disclosure(
                         {
                             "handle": choice_handle,
                             "accepted_types": [str(variant.get("type"))],
+                            "required_keys": list(variant.get("required", ())),
+                            "constant_fields": _variant_constant_fields(variant),
                             **(
                                 {"enum": list(variant["enum"])}
                                 if isinstance(variant.get("enum"), list)
@@ -665,6 +1010,7 @@ def typed_schema_lineage_token(
     parent_handle: str,
     key: str,
     shape: str,
+    choice_handle: str | None = None,
 ) -> str:
     """Encode bounded route steps; the Gateway always rederives their schema."""
 
@@ -679,6 +1025,7 @@ def typed_schema_lineage_token(
                 "parent_handle": parent_handle,
                 "key": key,
                 "shape": shape,
+                "choice_handle": choice_handle,
             },
         ],
     }
@@ -759,15 +1106,16 @@ def _derive_schema_from_lineage_steps(
     origin_section: str | None = None
     for index, raw_step in enumerate(raw_steps):
         if not isinstance(raw_step, Mapping) or set(raw_step) != {
-            "parent_handle", "key", "shape"
+            "parent_handle", "key", "shape", "choice_handle"
         }:
             return None
         parent_handle = raw_step.get("parent_handle")
         key = raw_step.get("key")
         shape = raw_step.get("shape")
+        choice_handle = raw_step.get("choice_handle")
         if not isinstance(parent_handle, str) or not isinstance(key, str) or shape not in {
             "object", "array"
-        }:
+        } or (choice_handle is not None and not isinstance(choice_handle, str)):
             return None
         if index == 0:
             current_field = contract.fields_by_handle.get(parent_handle)
@@ -788,11 +1136,47 @@ def _derive_schema_from_lineage_steps(
             )
         assert current_field is not None
         if current_field.shape == "array":
-            current_schema = _require_unique_container_variant(
-                current_field.variants, shape
+            if re.fullmatch(r"0|[1-9][0-9]*", key) is None:
+                return None
+            choices = _dynamic_array_item_choices_for_field(
+                contract,
+                field=current_field,
+                index=int(key),
+                shape=shape,
             )
+            selected = [
+                (variant_index, variant)
+                for handle, variant_index, variant in choices
+                if handle == choice_handle
+            ]
+            if len(choices) > 1:
+                if len(selected) != 1:
+                    return None
+                variant_index, current_schema = selected[0]
+            elif len(choices) == 1 and choice_handle in {None, choices[0][0]}:
+                variant_index, current_schema = choices[0][1], choices[0][2]
+            else:
+                return None
         elif current_field.shape == "map":
-            current_schema = _map_container_variant(current_field, key, shape)
+            choices = _dynamic_map_container_choices(
+                contract,
+                field=current_field,
+                key=key,
+                shape=shape,
+            )
+            selected = [
+                (variant_index, variant)
+                for handle, variant_index, variant in choices
+                if handle == choice_handle
+            ]
+            if len(choices) > 1:
+                if len(selected) != 1:
+                    return None
+                variant_index, current_schema = selected[0]
+            elif len(choices) == 1 and choice_handle in {None, choices[0][0]}:
+                variant_index, current_schema = choices[0][1], choices[0][2]
+            else:
+                return None
         else:
             return None
         expected_handle = TYPED_DYNAMIC_HANDLE_PREFIX + canonical_sha256(
@@ -801,6 +1185,11 @@ def _derive_schema_from_lineage_steps(
                 "parent_handle": parent_handle,
                 "key": key,
                 "shape": shape,
+                **(
+                    {"variant_index": variant_index}
+                    if len(choices) > 1
+                    else {}
+                ),
             }
         )[:24]
     if current_schema is None or expected_handle is None:
@@ -904,16 +1293,30 @@ def materialize_typed_request(
                     raise TypedRequestError(
                         f"Field {field.name!r} does not accept {fact.value_type} items"
                     )
-                expected = TYPED_DYNAMIC_HANDLE_PREFIX + canonical_sha256(
-                    {
-                        "schema_digest": contract.schema_digest,
-                        "parent_handle": field.handle,
-                        "key": str(len(values)),
-                        "shape": fact.value_type,
-                    }
-                )[:24]
-                if fact.value != expected:
-                    raise TypedRequestError("Typed array item handle is unknown or stale")
+                matching_variants = [
+                    variant
+                    for variant in field.variants
+                    if variant.get("type") == fact.value_type
+                ]
+                if len(matching_variants) == 1:
+                    expected = dynamic_array_item_handle(
+                        contract,
+                        array_handle=field.handle,
+                        index=len(values),
+                        shape=fact.value_type,
+                    )
+                    selected_variant = matching_variants[0]
+                    if fact.value != expected:
+                        raise TypedRequestError("Typed array item handle is unknown or stale")
+                else:
+                    selected_variant = _array_item_variant_for_handle(
+                        contract,
+                        field=field,
+                        index=len(values),
+                        shape=fact.value_type,
+                        handle=fact.value,
+                    )
+                    expected = fact.value
                 parent_depth = dynamic[3] if dynamic is not None else 0
                 if parent_depth + 1 > MAX_TYPED_SCHEMA_DEPTH:
                     raise TypedRequestError("Typed array nesting exceeds its depth limit")
@@ -927,9 +1330,7 @@ def materialize_typed_request(
                         handle=expected,
                         name=f"{field.name}[{len(values) - 1}]",
                         shape=fact.value_type,
-                        schema=_require_unique_container_variant(
-                            field.variants, fact.value_type
-                        ),
+                        schema=selected_variant,
                         root_schema=contract.schema_roots[field.section],
                         graph=contract.definition_graph,
                         section=field.section,
@@ -937,14 +1338,17 @@ def materialize_typed_request(
                 )
                 array_object_values[expected] = values[-1]
             else:
-                values.append(
-                    _parse_typed_scalar(
-                        fact.value_type,
-                        fact.value,
-                        variants=field.variants,
-                        field_name=field.name,
-                    )
+                parsed_item = _parse_typed_scalar(
+                    fact.value_type,
+                    fact.value,
+                    variants=field.variants,
+                    field_name=field.name,
                 )
+                if field.unique_items and parsed_item in values:
+                    raise TypedRequestError(
+                        f"Field {field.name!r} requires unique array items"
+                    )
+                values.append(parsed_item)
             present_handles.add(fact.handle)
         elif fact.action == "present":
             if field.shape not in {"object", "array", "map"}:
@@ -1033,17 +1437,57 @@ def materialize_typed_request(
                     parent_depth = dynamic[3] if dynamic is not None else 0
                     if parent_depth + 1 > MAX_TYPED_SCHEMA_DEPTH:
                         raise TypedRequestError("Typed map nesting exceeds its depth limit")
-                    expected = (
-                        TYPED_DYNAMIC_HANDLE_PREFIX
-                        + canonical_sha256(
-                            {
-                                "schema_digest": contract.schema_digest,
-                                "parent_handle": field.handle,
-                                "key": fact.key,
-                                "shape": fact.value_type,
-                            }
-                        )[:24]
+                    matching_containers = [
+                        variant
+                        for variant in variants
+                        if variant.get("type") == fact.value_type
+                    ]
+                    unrestricted_open_container = (
+                        field.open_map
+                        and not field.additional_variants
+                        and not any(
+                            re.search(pattern, fact.key) is not None
+                            for pattern, _group in field.map_patterns
+                        )
                     )
+                    if unrestricted_open_container:
+                        selected_variant = _map_container_variant(
+                            field, fact.key, fact.value_type
+                        )
+                    elif len(matching_containers) != 1:
+                        raise TypedRequestError(
+                            "Typed map container branch requires an explicit choice"
+                        )
+                    else:
+                        selected_variant = matching_containers[0]
+                    original_variants = _map_key_variants(field, fact.key)
+                    matching_original = [
+                        (index, variant)
+                        for index, variant in enumerate(original_variants)
+                        if variant.get("type") == fact.value_type
+                    ]
+                    selected_original_index = next(
+                        (
+                            index
+                            for index, variant in matching_original
+                            if variant is selected_variant or variant == selected_variant
+                        ),
+                        None,
+                    )
+                    expected = TYPED_DYNAMIC_HANDLE_PREFIX + canonical_sha256(
+                        {
+                            "schema_digest": contract.schema_digest,
+                            "parent_handle": field.handle,
+                            "key": fact.key,
+                            "shape": fact.value_type,
+                            **(
+                                {"variant_index": selected_original_index}
+                                if not unrestricted_open_container
+                                and len(matching_original) > 1
+                                else {}
+                            ),
+                        }
+                    )[:24]
                     if fact.value != expected:
                         raise TypedRequestError("Typed map container handle is unknown or stale")
                     previous_generation = [
@@ -1066,9 +1510,7 @@ def materialize_typed_request(
                             handle=expected,
                             name=fact.key,
                             shape=fact.value_type,
-                            schema=_map_container_variant(
-                                field, fact.key, fact.value_type
-                            ),
+                            schema=selected_variant,
                             root_schema=contract.schema_roots[field.section],
                             graph=contract.definition_graph,
                             section=field.section,
@@ -1211,6 +1653,7 @@ def _collect_object_fields(
     node_count: list[int],
     depth: int,
     parent_handle: str | None,
+    handle_path_prefix: tuple[str, ...] | None = None,
 ) -> None:
     node_count[0] += 1
     if node_count[0] > MAX_TYPED_SCHEMA_NODES or depth >= MAX_TYPED_SCHEMA_DEPTH:
@@ -1242,6 +1685,7 @@ def _collect_object_fields(
             required=False,
             name=path[-1] if path else section,
             node_count=node_count,
+            handle_path_prefix=handle_path_prefix,
         )
     properties = node.get("properties", {})
     if not isinstance(properties, Mapping):
@@ -1261,6 +1705,9 @@ def _collect_object_fields(
         if not isinstance(name, str) or not isinstance(raw_child, Mapping):
             raise TypedRequestError("Typed request properties must contain schema objects")
         child_path = (*path, name)
+        child_handle_path = (*(
+            path if handle_path_prefix is None else handle_path_prefix
+        ), name)
         child = _expanded_schema(raw_child, root_schema=root_schema, graph=graph)
         branch_nodes = child.get("oneOf", child.get("anyOf"))
         child_type = child.get("type")
@@ -1268,7 +1715,7 @@ def _collect_object_fields(
             {
                 "schema_digest": schema_digest,
                 "section": section,
-                "path": list(child_path),
+                "path": list(child_handle_path),
             }
         )[:24]
         if isinstance(branch_nodes, list):
@@ -1284,6 +1731,7 @@ def _collect_object_fields(
                     shape="branch",
                     variants=(),
                     parent_handle=parent_handle,
+                    handle_path=child_handle_path,
                 )
             )
             for index, raw_branch in enumerate(branch_nodes):
@@ -1300,7 +1748,7 @@ def _collect_object_fields(
                 branch_type = branch.get("type", child_type)
                 if "type" not in branch and isinstance(branch_type, str):
                     branch = {"type": branch_type, **branch}
-                branch_path = (*child_path, f"<branch:{index}>")
+                branch_path = (*child_handle_path, f"<branch:{index}>")
                 branch_handle = TYPED_REQUEST_HANDLE_PREFIX + canonical_sha256(
                     {
                         "schema_digest": schema_digest,
@@ -1334,6 +1782,7 @@ def _collect_object_fields(
                         node_count=node_count,
                         depth=depth + 1,
                         parent_handle=branch_handle,
+                        handle_path_prefix=branch_path,
                     )
                 elif branch_type == "array":
                     value_schema = branch.get("items")
@@ -1361,6 +1810,7 @@ def _collect_object_fields(
                             maximum_items=_optional_nonnegative_integer(
                                 branch.get("maxItems"), label=f"{name}.maxItems"
                             ),
+                            unique_items=branch.get("uniqueItems") is True,
                             handle_path=branch_path,
                         )
                     )
@@ -1417,6 +1867,7 @@ def _collect_object_fields(
                         shape="map",
                         variants=(),
                         parent_handle=parent_handle,
+                        handle_path=child_handle_path,
                         map_patterns=tuple(map_patterns),
                         additional_variants=(
                             _structural_variants(
@@ -1441,6 +1892,7 @@ def _collect_object_fields(
                     shape="object",
                     variants=(),
                     parent_handle=parent_handle,
+                    handle_path=child_handle_path,
                 )
             )
             _collect_object_fields(
@@ -1454,6 +1906,7 @@ def _collect_object_fields(
                 node_count=node_count,
                 depth=depth + 1,
                 parent_handle=handle,
+                handle_path_prefix=child_handle_path,
             )
             continue
         collection = child_type == "array"
@@ -1488,6 +1941,7 @@ def _collect_object_fields(
                 shape="array" if collection else "scalar",
                 variants=variants,
                 parent_handle=parent_handle,
+                handle_path=child_handle_path,
                 minimum_items=_optional_nonnegative_integer(
                     child.get("minItems"),
                     label=f"{name}.minItems",
@@ -1496,6 +1950,7 @@ def _collect_object_fields(
                     child.get("maxItems"),
                     label=f"{name}.maxItems",
                 ),
+                unique_items=child.get("uniqueItems") is True,
             )
         )
 
@@ -1585,6 +2040,7 @@ def _append_map_overlay(
     required: bool,
     name: str,
     node_count: list[int],
+    handle_path_prefix: tuple[str, ...] | None = None,
 ) -> None:
     pattern_properties = node.get("patternProperties", {})
     if not isinstance(pattern_properties, Mapping):
@@ -1608,7 +2064,9 @@ def _append_map_overlay(
             )
         )
     additional = node.get("additionalProperties")
-    overlay_path = (*path, "<map>")
+    overlay_path = (*(
+        path if handle_path_prefix is None else handle_path_prefix
+    ), "<map>")
     fields.append(
         TypedFieldContract(
             handle=TYPED_REQUEST_HANDLE_PREFIX + canonical_sha256(
@@ -1663,7 +2121,52 @@ def _structural_variants(
     for candidate in candidates:
         if not isinstance(candidate, Mapping):
             raise TypedRequestError("Typed map value branch must be an object")
-        variants.append(_expanded_schema(candidate, root_schema=root_schema, graph=graph))
+        resolved = _expanded_schema(candidate, root_schema=root_schema, graph=graph)
+        nested_branches = resolved.get("oneOf", resolved.get("anyOf"))
+        if isinstance(nested_branches, list):
+            variants.extend(
+                _structural_variants(
+                    resolved,
+                    root_schema=root_schema,
+                    graph=graph,
+                )
+            )
+            continue
+        if "type" not in resolved and "const" in resolved:
+            constant = resolved["const"]
+            inferred = (
+                "null"
+                if constant is None
+                else "boolean"
+                if isinstance(constant, bool)
+                else "integer"
+                if isinstance(constant, int)
+                else "number"
+                if isinstance(constant, float)
+                else "string"
+                if isinstance(constant, str)
+                else None
+            )
+            if inferred is not None:
+                resolved = {"type": inferred, **resolved}
+        if "type" not in resolved and isinstance(resolved.get("enum"), list):
+            inferred_types = {
+                "null"
+                if value is None
+                else "boolean"
+                if isinstance(value, bool)
+                else "integer"
+                if isinstance(value, int)
+                else "number"
+                if isinstance(value, float)
+                else "string"
+                if isinstance(value, str)
+                else None
+                for value in resolved["enum"]
+            }
+            if len(inferred_types) == 1 and None not in inferred_types:
+                resolved = {"type": inferred_types.pop(), **resolved}
+        variants.append(resolved)
     return tuple(variants)
 
 
@@ -1691,6 +2194,33 @@ def _scalar_variants(
         if "type" not in resolved and isinstance(inherited_type, str):
             resolved["type"] = inherited_type
         value_type = resolved.get("type")
+        if value_type is None and "const" in resolved:
+            constant = resolved["const"]
+            value_type = (
+                "null"
+                if constant is None
+                else "boolean"
+                if isinstance(constant, bool)
+                else "integer"
+                if isinstance(constant, int)
+                else "number"
+                if isinstance(constant, float)
+                else "string"
+                if isinstance(constant, str)
+                else None
+            )
+            if value_type is not None:
+                resolved["type"] = value_type
+        if isinstance(value_type, list):
+            for item_type in value_type:
+                if item_type not in {
+                    "string", "integer", "number", "boolean", "null"
+                }:
+                    raise TypedRequestError(
+                        "This typed request field requires a later complex-shape adapter"
+                    )
+                variants.append({**resolved, "type": item_type})
+            continue
         if value_type not in {"string", "integer", "number", "boolean", "null"}:
             raise TypedRequestError(
                 "This typed request field requires a later complex-shape adapter"
@@ -1729,10 +2259,6 @@ def _parse_typed_scalar(
         value = None
     else:
         raise TypedRequestError(f"Unsupported typed scalar type {value_type!r}")
-    if isinstance(value, str) and len(value.encode("utf-8")) > MAX_TYPED_STRING_BYTES:
-        raise TypedRequestError(
-            f"Field {field_name!r} exceeds the {MAX_TYPED_STRING_BYTES}-byte string limit"
-        )
     matching = [
         variant
         for variant in variants
@@ -1743,12 +2269,25 @@ def _parse_typed_scalar(
         raise TypedRequestError(
             f"Field {field_name!r} does not accept typed value {value_type!r}"
         )
+    if isinstance(value, str):
+        for variant in matching:
+            declared = variant.get("x-maxUtf8Bytes")
+            if declared is not None and (
+                isinstance(declared, bool)
+                or not isinstance(declared, int)
+                or not 1 <= declared <= MAX_TYPED_REQUEST_BYTES
+            ):
+                raise TypedRequestError(
+                    f"Field {field_name!r} has an invalid packaged UTF-8 byte limit"
+                )
     if not any(_scalar_matches_variant(value, variant) for variant in matching):
         raise TypedRequestError(f"Field {field_name!r} violates its reflected schema")
     return value
 
 
 def _scalar_matches_variant(value: Any, variant: Mapping[str, Any]) -> bool:
+    if "const" in variant and value != variant["const"]:
+        return False
     enum = variant.get("enum")
     if isinstance(enum, list) and value not in enum:
         return False
@@ -1760,6 +2299,9 @@ def _scalar_matches_variant(value: Any, variant: Mapping[str, Any]) -> bool:
         if isinstance(maximum, (int, float)) and value > maximum:
             return False
     pattern = variant.get("pattern")
+    byte_limit = variant.get("x-maxUtf8Bytes", MAX_TYPED_STRING_BYTES)
+    if isinstance(value, str) and len(value.encode("utf-8")) > byte_limit:
+        return False
     if isinstance(value, str) and isinstance(pattern, str):
         try:
             if re.search(pattern, value) is None:
@@ -1772,6 +2314,14 @@ def _scalar_matches_variant(value: Any, variant: Mapping[str, Any]) -> bool:
         and isinstance(minimum_length, int)
         and not isinstance(minimum_length, bool)
         and len(value) < minimum_length
+    ):
+        return False
+    maximum_length = variant.get("maxLength")
+    if (
+        isinstance(value, str)
+        and isinstance(maximum_length, int)
+        and not isinstance(maximum_length, bool)
+        and len(value) > maximum_length
     ):
         return False
     return True
@@ -1948,6 +2498,7 @@ def _dynamic_container_contract(
             maximum_items=_optional_nonnegative_integer(
                 schema.get("maxItems"), label=f"{name}.maxItems"
             ),
+            unique_items=schema.get("uniqueItems") is True,
         )
     properties = schema.get("properties", {})
     if not isinstance(properties, Mapping):
@@ -1961,7 +2512,22 @@ def _dynamic_container_contract(
     map_patterns = tuple(
         (
             pattern,
-            _structural_variants(
+            _scalar_variants(
+                value_schema, root_schema=root_schema, graph=graph
+            )
+            if _expanded_schema(
+                value_schema, root_schema=root_schema, graph=graph
+            ).get("type")
+            not in {"object", "array"}
+            and not isinstance(
+                _expanded_schema(
+                    value_schema, root_schema=root_schema, graph=graph
+                ).get("oneOf", _expanded_schema(
+                    value_schema, root_schema=root_schema, graph=graph
+                ).get("anyOf")),
+                list,
+            )
+            else _structural_variants(
                 value_schema, root_schema=root_schema, graph=graph
             ),
         )

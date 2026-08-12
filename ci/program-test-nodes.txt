@@ -145,3 +145,4 @@ tests/unit/test_typed_request_core.py
 tests/unit/test_typed_request_complex_core.py
 tests/unit/test_typed_request_complex_gateway.py
 tests/unit/test_generic_typed_draft.py
+tests/unit/test_typed_query_construction.py

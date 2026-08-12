@@ -389,8 +389,9 @@ def test_fixed_complex_tracer_cannot_bypass_its_typed_call_with_a_draft(
 
 
 class _ReadClient:
-    def __init__(self) -> None:
+    def __init__(self, rows: list[dict[str, Any]] | None = None) -> None:
         self.calls: list[tuple[str, Mapping[str, Any] | None, Mapping[str, Any] | None]] = []
+        self.rows = list(rows or [])
 
     def call(self, uri: str, args=None, options=None):
         self.calls.append((uri, args, options))
@@ -400,7 +401,7 @@ class _ReadClient:
                 "version": {"year": 2025, "major": 1},
             }
         if uri == "ak.wwise.core.mediaPool.get":
-            return {"return": []}
+            return {"return": self.rows}
         raise AssertionError(f"unexpected call {uri}")
 
     def disconnect(self) -> None:
@@ -492,6 +493,141 @@ def test_complex_read_draft_check_dispatches_directly_without_preview(
         {"searchText": "rain"},
         {},
     )
+    assert not (state_dir / "transactions").exists()
+
+
+def test_media_pool_request_schema_discloses_typed_result_filter(
+    tmp_path: Path,
+) -> None:
+    code, payload = gateway.execute_gateway(
+        ["request-schema", "ak.wwise.core.mediaPool.get"],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda _url: pytest.fail("request-schema must be offline"),
+    )
+
+    assert code == 0
+    assert payload["result_filter"] == {
+        "contract": "waapi-skill.media-pool-post-filter/v1",
+        "availability": "optional_after_complete_typed_candidate_request",
+        "completion_subcommand": "draft-check",
+        "typed_scalars": {
+            "value": "--post-filter-value <exact case-sensitive text>",
+            "limit": "--post-filter-limit <1..1000>",
+        },
+        "requirements": [
+            "typed request filters includes Filename contains with the same value",
+            "typed request options return includes Filename",
+            "typed request maxResults is greater than or equal to the filter limit",
+        ],
+    }
+
+
+def test_media_pool_typed_draft_applies_typed_post_filter_without_json(
+    tmp_path: Path,
+) -> None:
+    uri = "ak.wwise.core.mediaPool.get"
+    env = _env(tmp_path, "2025.1")
+    state_dir = tmp_path / "state"
+    contract = request_contract("2025.1", uri)
+    fields = {field.name: field for field in contract.fields}
+    filter_handle = gateway.dynamic_array_item_handle(
+        contract,
+        array_handle=fields["filters"].handle,
+        index=0,
+        shape="object",
+    )
+    filter_contract = gateway.dynamic_container_disclosure(
+        contract,
+        parent_handle=fields["filters"].handle,
+        key="0",
+        shape="object",
+        child_handle=filter_handle,
+    )
+    choices = {
+        row["key"]: row["choices"]
+        for row in filter_contract["branch_choices"]
+    }
+    selected_choices = {
+        "field": next(
+            row["handle"] for row in choices["field"]
+            if row.get("enum") == ["Filename"]
+        ),
+        "operator": next(
+            row["handle"] for row in choices["operator"]
+            if row.get("enum") == ["contains"]
+        ),
+        "type": next(
+            row["handle"] for row in choices["type"]
+            if row.get("enum") == ["field"]
+        ),
+        "value": choices["value"][0]["handle"],
+    }
+    start_code, started = gateway.execute_gateway(
+        ["--state-dir", str(state_dir), "draft-start", uri],
+        env=env,
+        client_factory=lambda _url: pytest.fail("draft-start must be offline"),
+    )
+    assert start_code == 0
+    revision = 1
+    facts = (
+        ("append", fields["databases"].handle, "string", r"\Databases\Project Originals", None),
+        ("append", fields["filters"].handle, "object", filter_handle, None),
+        *(
+            ("choose-dynamic", filter_handle, "choice", choice, key)
+            for key, choice in selected_choices.items()
+        ),
+        ("map-put", filter_handle, "string", "Filename", "field"),
+        ("map-put", filter_handle, "string", "contains", "operator"),
+        ("map-put", filter_handle, "string", "field", "type"),
+        ("map-put", filter_handle, "string", "footstep", "value"),
+        ("set", fields["maxResults"].handle, "integer", "5", None),
+        ("append", fields["return"].handle, "string", "Filename", None),
+        ("append", fields["return"].handle, "string", "FileId", None),
+    )
+    for fact_index, (fact_action, handle, value_type, value, key) in enumerate(facts):
+        argv = [
+            "--state-dir", str(state_dir), "draft-apply", started["draft"]["draft_id"],
+            "--task-authority", started["task_authority"],
+            "--expected-revision", str(revision), "--facts",
+            "--action", "add_typed_fact", "--fact-action", fact_action,
+            "--field-handle", handle,
+        ]
+        if fact_action == "choose-dynamic":
+            argv += ["--fact-value", value]
+        else:
+            argv += ["--value-type", value_type, "--fact-value", value]
+        if key is not None:
+            argv += ["--key", key]
+        code, applied = gateway.execute_gateway(
+            argv, env=env,
+            client_factory=lambda _url: pytest.fail("draft-apply must be offline"),
+        )
+        assert code == 0, repr(
+            {"fact_index": fact_index, "fact": facts[fact_index], **applied}
+        )
+        revision = applied["draft"]["revision"]
+
+    rows = [
+        {"Filename": "footstep_gravel.wav", "FileId": "first"},
+        {"Filename": "Footstep_decoy.wav", "FileId": "second"},
+        {"Filename": "footstep_wood.wav", "FileId": "third"},
+    ]
+    client = _ReadClient(rows)
+    code, checked = gateway.execute_gateway(
+        [
+            "--state-dir", str(state_dir), "draft-check", started["draft"]["draft_id"],
+            "--task-authority", started["task_authority"],
+            "--expected-revision", str(revision),
+            "--post-filter-value", "footstep", "--post-filter-limit", "2",
+        ],
+        env=env,
+        client_factory=lambda _url: client,
+    )
+
+    assert code == 0, checked
+    assert checked["agent_result"] == {"return": [rows[0], rows[2]]}
+    assert checked["post_filter"]["operator"] == "containsCaseSensitive"
+    assert list(checked)[-1] == "agent_result"
     assert not (state_dir / "transactions").exists()
 
 
