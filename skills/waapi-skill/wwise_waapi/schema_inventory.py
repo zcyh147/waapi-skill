@@ -446,6 +446,15 @@ def build_typed_request_surface(
                     capability.execution_contract
                 ),
                 "schema_sha256": _canonical_sha256(schema),
+                "construction_shape": (
+                    _function_construction_shape(
+                        schema,
+                        graph=graph,
+                        execution_policy=capability.execution_contract,
+                    )
+                    if capability.item_type == "function"
+                    else "topic"
+                ),
                 "definition_graph_sha256": graph.inventory_sha256,
                 "schema_keywords": sorted(schema_keywords),
                 "reference_count": reference_count,
@@ -499,6 +508,82 @@ def build_typed_request_surface(
         "lanes": rows,
     }
     return {**unsigned, "inventory_sha256": _canonical_sha256(unsigned)}
+
+
+def _function_construction_shape(
+    schema: Mapping[str, Any],
+    *,
+    graph: DefinitionGraph,
+    execution_policy: Mapping[str, Any],
+) -> str:
+    """Classify exact reflected request structure without a URI allowlist."""
+
+    if execution_policy.get("route") == "compound_transaction_member":
+        return "draft"
+
+    for section_name in ("argsSchema", "optionsSchema"):
+        section = schema.get(section_name)
+        if not isinstance(section, Mapping):
+            raise SchemaInventoryError(
+                f"Function {section_name} must be an object for construction classification"
+            )
+        if _schema_accepts_business_input(
+            section,
+            root_schema=section,
+            graph=graph,
+            active_references=frozenset(),
+        ):
+            return "typed"
+    return "zero"
+
+
+def _schema_accepts_business_input(
+    section: Mapping[str, Any],
+    *,
+    root_schema: Mapping[str, Any],
+    graph: DefinitionGraph,
+    active_references: frozenset[str],
+) -> bool:
+    reference = section.get("$ref", section.get("#ref"))
+    if isinstance(reference, str):
+        if reference in active_references:
+            return False
+        resolved = resolve_schema_reference(
+            reference,
+            root_schema=root_schema,
+            graph=graph,
+        )
+        return _schema_accepts_business_input(
+            resolved.target,
+            root_schema=root_schema,
+            graph=graph,
+            active_references=active_references | {reference},
+        )
+    branches = section.get("oneOf", section.get("anyOf"))
+    if isinstance(branches, list):
+        return any(
+            isinstance(branch, Mapping)
+            and _schema_accepts_business_input(
+                branch,
+                root_schema=root_schema,
+                graph=graph,
+                active_references=active_references,
+            )
+            for branch in branches
+        )
+    properties = section.get("properties", {})
+    required = section.get("required", [])
+    patterns = section.get("patternProperties", {})
+    additional = section.get("additionalProperties", False)
+    if (
+        not isinstance(properties, Mapping)
+        or not isinstance(required, list)
+        or not isinstance(patterns, Mapping)
+    ):
+        raise SchemaInventoryError(
+            "Function request schema is malformed for construction classification"
+        )
+    return bool(properties or required or patterns or additional is not False)
 
 
 def validate_schema_envelope(

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from wwise_waapi.capabilities import CapabilityCatalog
 from wwise_waapi.schema_inventory import (
     DEFINITION_GRAPH_CONTRACT,
     TYPED_REQUEST_SURFACE_CONTRACT,
@@ -17,6 +18,7 @@ from wwise_waapi.schema_inventory import (
 )
 from wwise_waapi.manifest import DeterministicJsonWriter
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
+from wwise_waapi.typed_requests import request_contract
 
 
 RESOURCE_ROOT = Path("skills/waapi-skill/resources/manifest")
@@ -71,6 +73,32 @@ def test_packaged_surface_closes_all_824_exact_lanes() -> None:
     assert result["unresolved_references"] == []
     assert result["unknown_schema_keywords"] == []
     assert result["intentionally_blocked_field_occurrences"] == 79
+    function_shapes = {
+        row["construction_shape"]
+        for row in result["lanes"]
+        if row["item_type"] == "function"
+    }
+    assert function_shapes == {"zero", "typed", "draft"}
+    assert sum(
+        row["construction_shape"] == "zero"
+        for row in result["lanes"]
+        if row["item_type"] == "function"
+    ) == 93
+    assert sum(
+        row["construction_shape"] == "draft"
+        for row in result["lanes"]
+        if row["item_type"] == "function"
+    ) == 15
+    assert all(
+        row["execution_policy"]["route"] == "compound_transaction_member"
+        for row in result["lanes"]
+        if row["construction_shape"] == "draft"
+    )
+    assert all(
+        row["construction_shape"] == "topic"
+        for row in result["lanes"]
+        if row["item_type"] == "topic"
+    )
     blocked = [
         (row["version"], row["uri"], item["pointer"], item["field"])
         for row in result["lanes"]
@@ -109,6 +137,31 @@ def test_packaged_surface_closes_all_824_exact_lanes() -> None:
         "stream-topic",
     ]
     assert soundbank_topic["execution_policy_sha256"]
+
+
+def test_every_generated_zero_function_lane_has_no_typed_facts() -> None:
+    result = validate_packaged_typed_request_surface(root=RESOURCE_ROOT)
+    zero_rows = [
+        row
+        for row in result["lanes"]
+        if row["item_type"] == "function"
+        and row["construction_shape"] == "zero"
+    ]
+    assert len(zero_rows) == 93
+    for row in zero_rows:
+        try:
+            catalog = CapabilityCatalog(manifest_root=RESOURCE_ROOT)
+            capability = (
+                catalog.authoring_ui_describe(row["version"], row["uri"])
+                if row["correct_host"] == "wwise-authoring"
+                else catalog.describe(row["version"], row["uri"])
+            )
+            contract = request_contract(row["version"], row["uri"])
+        except Exception as exc:  # pragma: no cover - diagnostic carries exact lane
+            pytest.fail(f"zero lane did not compile: {row}: {exc}")
+        assert contract.fields == ()
+        assert contract.effect == capability.execution_contract["effect"]
+        assert contract.as_gateway_payload()["input_shape"] == "zero"
 
 
 def test_definition_graph_never_falls_back_to_another_version(tmp_path: Path) -> None:

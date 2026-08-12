@@ -92,7 +92,7 @@ def _request_contract(tmp_path: Path, version: str = "2025.1") -> dict[str, Any]
         env=_env(tmp_path, version),
         client_factory=lambda _url: pytest.fail("discovery must remain offline"),
     )
-    assert exit_code == 0
+    assert exit_code == 0, payload
     return payload
 
 
@@ -287,3 +287,152 @@ def test_typed_call_rejects_configured_live_version_drift(tmp_path: Path) -> Non
     assert exit_code == 2
     assert "Connected Wwise is 2024.1" in payload["message"]
     assert client.calls == [("ak.wwise.core.getInfo", None, None)]
+
+
+@pytest.mark.parametrize(
+    "version,api,result",
+    (
+        (
+            "2021.1",
+            "ak.wwise.core.remote.getConnectionStatus",
+            {"isConnected": False, "status": "Disconnected"},
+        ),
+        ("2024.1", "ak.wwise.core.ping", {"isAvailable": True}),
+        ("2025.1", "ak.wwise.core.mediaPool.getFields", {"return": []}),
+    ),
+)
+def test_zero_input_read_discloses_one_short_continuation_and_dispatches_directly(
+    tmp_path: Path,
+    version: str,
+    api: str,
+    result: Mapping[str, Any],
+) -> None:
+    exit_code, contract = waapi_gateway.execute_gateway(
+        ["request-schema", api],
+        env=_env(tmp_path, version),
+        client_factory=lambda _url: pytest.fail("discovery must remain offline"),
+    )
+    assert exit_code == 0
+    assert contract["input_shape"] == "zero"
+    assert contract["fields"] == []
+    assert contract["continuation"] == {
+        "subcommand": "typed-zero-call",
+        "uri": api,
+        "schema_digest": contract["schema_digest"],
+        "business_values_required": False,
+    }
+    assert "args" not in json.dumps(contract["continuation"])
+    assert "options" not in json.dumps(contract["continuation"])
+
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": _live_info(version),
+            api: result,
+        }
+    )
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "typed-zero-call", api,
+            "--schema-digest", contract["schema_digest"],
+        ],
+        env=_env(tmp_path, version),
+        client_factory=lambda _url: client,
+    )
+    assert exit_code == 0, payload
+    assert payload["typed_request"]["business_values_required"] is False
+    assert payload["agent_result"] == result
+    assert list(payload)[-1] == "agent_result"
+    assert client.calls == [
+        ("ak.wwise.core.getInfo", None, None),
+        (api, {}, {}),
+    ]
+    assert "transaction_id" not in payload
+
+
+def test_zero_input_mutation_cannot_bypass_preview_before_connection(
+    tmp_path: Path,
+) -> None:
+    api = "ak.wwise.core.profiler.startCapture"
+    exit_code, contract = waapi_gateway.execute_gateway(
+        ["request-schema", api],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda _url: pytest.fail("discovery must remain offline"),
+    )
+    assert exit_code == 0
+    assert contract["input_shape"] == "zero"
+
+    assert contract["continuation"] == {
+        "subcommand": "typed-zero-call",
+        "uri": api,
+        "schema_digest": contract["schema_digest"],
+        "business_values_required": False,
+        "apply": True,
+    }
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "typed-zero-call", api,
+            "--schema-digest", contract["schema_digest"],
+        ],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda _url: pytest.fail("mutation must fail before transport"),
+    )
+    assert exit_code == 2
+    assert "requires --apply" in payload["message"]
+
+
+def test_zero_input_call_rejects_stale_digest_before_connection(tmp_path: Path) -> None:
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "typed-zero-call", "ak.wwise.core.ping",
+            "--schema-digest", "0" * 64,
+        ],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda _url: pytest.fail("stale input must remain offline"),
+    )
+    assert exit_code == 2
+    assert payload["ok"] is False
+
+
+def test_unmigrated_nonzero_function_does_not_disclose_a_broken_continuation(
+    tmp_path: Path,
+) -> None:
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["request-schema", "ak.wwise.core.object.setName"],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda _url: pytest.fail("boundary must remain offline"),
+    )
+    assert exit_code == 2
+    assert "has not migrated to an executable typed adapter" in payload["message"]
+    assert "continuation" not in payload
+
+
+@pytest.mark.parametrize(
+    "api,commands",
+    (
+        ("ak.wwise.core.getInfo", ["status"]),
+        (
+            "ak.wwise.core.object.getTypes",
+            ["metadata types", "metadata discover"],
+        ),
+        ("ak.wwise.debug.getWalTree", ["debug-wal-tree"]),
+    ),
+)
+def test_zero_input_fixed_route_discloses_only_its_existing_command(
+    tmp_path: Path,
+    api: str,
+    commands: list[str],
+) -> None:
+    version = "2023.1"
+    exit_code, contract = waapi_gateway.execute_gateway(
+        ["request-schema", api],
+        env=_env(tmp_path, version),
+        client_factory=lambda _url: pytest.fail("discovery must remain offline"),
+    )
+    assert exit_code == 0, contract
+    assert contract["input_shape"] == "zero"
+    assert contract["continuation"] == {
+        "subcommand": commands[0].split()[0],
+        "arguments": commands[0].split()[1:],
+        "business_values_required": False,
+    }
+    assert "typed-zero-call" not in json.dumps(contract)

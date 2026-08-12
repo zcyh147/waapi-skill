@@ -1088,6 +1088,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     request_schema.add_argument("api")
 
+    typed_zero_call = subparsers.add_parser(
+        "typed-zero-call",
+        help="Run one reflected function whose exact schema accepts no business input",
+    )
+    typed_zero_call.add_argument("api")
+    typed_zero_call.add_argument("--schema-digest", required=True)
+    typed_zero_call.add_argument(
+        "--apply",
+        action="store_true",
+        help="Enter the existing Preview authorization lifecycle for a change",
+    )
+    typed_zero_call.add_argument(
+        "--ttl",
+        type=int,
+        default=DEFAULT_PREVIEW_TTL_SECONDS,
+    )
+
     request_map_container = subparsers.add_parser(
         "request-map-container",
         help="Issue a schema-bound child handle for one open-map key",
@@ -1802,6 +1819,7 @@ def _execute_gateway_unconstrained(
             "preview",
             "legacy-preview",
             "preview-from-draft",
+            "typed-zero-call",
         } and args.apply:
             require_project_modification_policy(
                 env=source_env,
@@ -1826,6 +1844,8 @@ def _execute_gateway_unconstrained(
             preflight_stable_read_input(args, env=source_env)
         if args.command == "typed-call":
             preflight_typed_request_input(args, env=source_env)
+        if args.command == "typed-zero-call":
+            preflight_typed_zero_input(args, env=source_env)
         if args.command in {"debug-wal-tree", "debug-validate-call"}:
             preflight_debug_read_input(args)
         if args.command in OFFLINE_COMMANDS:
@@ -2778,6 +2798,50 @@ def preflight_typed_request_input(
             raise GatewayInputError(str(exc)) from exc
         if target.item_type != "function":
             raise GatewayInputError("typed debug validation accepts only a function URI")
+
+
+def preflight_typed_zero_input(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+) -> None:
+    """Bind a zero-input read to its exact generated schema before connecting."""
+
+    versions = resolve_catalog_versions(args, env=env)
+    if len(versions) != 1:
+        raise GatewayInputError("typed-zero-call requires one configured Wwise version")
+    contract = request_contract(versions[0], args.api)
+    if contract.schema_digest != args.schema_digest:
+        raise GatewayInputError("Typed request schema digest is stale")
+    if contract.fields:
+        raise GatewayInputError("typed-zero-call is available only for zero-input schemas")
+    execution = {
+        "effect": contract.effect,
+        "route": contract.route,
+    }
+    if contract.route == "fixed_command":
+        raise GatewayInputError(
+            "This zero-input API retains its packaged fixed command: "
+            + ", ".join(contract.gateway_commands)
+        )
+    requires_preview = execution.get("effect") != "read"
+    if not requires_preview and execution.get("effect") == "read" and args.apply:
+        raise GatewayInputError("typed-zero-call --apply is reserved for changes")
+    if execution.get("effect") != "read" and not args.apply:
+        raise GatewayInputError(
+            "typed-zero-call requires --apply to enter the Preview lifecycle for this API"
+        )
+    args.typed_zero_requires_preview = requires_preview
+    args.typed_zero_read_timeout = (
+        float(contract.timeout_seconds)
+        if not requires_preview
+        else None
+    )
+    args.typed_request = materialize_typed_request(
+        contract,
+        schema_digest=contract.schema_digest,
+        facts=(),
+    )
 
 
 def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, str]) -> None:
@@ -4837,6 +4901,15 @@ def resolve_connection(args: argparse.Namespace, *, env: Mapping[str, str]) -> G
                     "execute",
                     "verify",
                 }
+                or (
+                    args.command == "typed-zero-call"
+                    and bool(getattr(args, "typed_zero_requires_preview", False))
+                )
+                else float(args.typed_zero_read_timeout)
+                if (
+                    args.command == "typed-zero-call"
+                    and getattr(args, "typed_zero_read_timeout", None) is not None
+                )
                 else DEFAULT_METADATA_DISCOVERY_TIMEOUT
                 if args.command == "metadata" and args.operation == "discover"
                 else DEFAULT_TIMEOUT
@@ -5205,6 +5278,128 @@ def dispatch_command(
             },
             },
         )
+    if args.command == "typed-zero-call":
+        typed_request = args.typed_request
+        if typed_request.version != detected_version:
+            raise GatewayInputError(
+                "Typed request version changed after preflight; request-schema must be rerun"
+            )
+        authoring_boundary = live_authoring_api_boundary(
+            typed_request.uri,
+            command="typed-zero-call",
+            live_info=live_info,
+            common=common,
+        )
+        if authoring_boundary is not None:
+            return authoring_boundary
+        capability = live_capability(
+            detected_version,
+            typed_request.uri,
+            live_info=live_info,
+        )
+        if capability.execution_contract["effect"] != "read":
+            zero_operation = {
+                "ak.wwise.debug.restartWaapiServers": (
+                    "debug.restartWaapiServers", "restart_waapi_servers"
+                ),
+                "ak.wwise.debug.testAssert": (
+                    "debug.testAssert", "trigger_debug_assert"
+                ),
+                "ak.wwise.debug.testCrash": (
+                    "debug.testCrash", "crash_wwise_process"
+                ),
+            }.get(typed_request.uri) if capability.execution_contract["effect"] != "read" else None
+            gateway_owned_acknowledgement = zero_operation is not None
+            if zero_operation is not None:
+                operation, acknowledgement = zero_operation
+                request_payload = {
+                    "contract": OPERATION_REQUEST_CONTRACT,
+                    "version": detected_version,
+                    "operation": operation,
+                    "arguments": {"acknowledge": acknowledgement},
+                }
+            elif tuple(capability.transaction_operations) == ("waapi.call",):
+                request_payload = {
+                    "contract": OPERATION_REQUEST_CONTRACT,
+                    "version": detected_version,
+                    "operation": "waapi.call",
+                    "arguments": {
+                        "api": typed_request.uri,
+                        "args": {},
+                        "options": {},
+                    },
+                }
+            else:
+                raise GatewayInputError(
+                    "This zero-input API does not have an executable typed Preview route"
+                )
+            return create_transaction_preview(
+                request_payload,
+                args=args,
+                env=env,
+                connection=connection,
+                detected_version=detected_version,
+                live_info=live_info,
+                dispatcher=dispatcher,
+                common={
+                    **common,
+                    "typed_request": {
+                        "contract": typed_request.as_dict()["contract"],
+                        "schema_digest": typed_request.schema_digest,
+                        "business_values_required": False,
+                        "gateway_owned_acknowledgement": (
+                            gateway_owned_acknowledgement
+                        ),
+                    },
+                },
+            )
+        request_validation = validate_semantic_payload(
+            typed_request.uri,
+            typed_request.args,
+            typed_request.options,
+            version=detected_version,
+            authoring_ui_profile=live_info.get("isCommandLine") is False,
+        )
+        result = dispatch(
+            dispatcher,
+            typed_request.uri,
+            connection=connection,
+            version=detected_version,
+            args=typed_request.args,
+            options=typed_request.options,
+            allow_destructive=(
+                capability.execution_contract["effect"] == "read"
+            ),
+            result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
+            operation_timeout=float(capability.execution_contract["timeout_seconds"]),
+        )
+        result_validation = (
+            validate_semantic_result(
+                typed_request.uri,
+                result.get("result"),
+                version=detected_version,
+                authoring_ui_profile=live_info.get("isCommandLine") is False,
+            )
+            if result.get("ok")
+            else None
+        )
+        return {
+            "ok": bool(result.get("ok")),
+            "status": "ok" if result.get("ok") else "error",
+            **common,
+            "api_attempted": typed_request.uri,
+            "typed_request": {
+                "contract": typed_request.as_dict()["contract"],
+                "schema_digest": typed_request.schema_digest,
+                "business_values_required": False,
+            },
+            "call": dispatch_call_summary(result),
+            "schema_validation": {
+                "request": request_validation.as_dict(),
+                "result": result_validation.as_dict() if result_validation else None,
+            },
+            "agent_result": result.get("result") if result.get("ok") else None,
+        }
     if args.command == "profiler-game-objects":
         request = build_profiler_game_objects_request(
             version=detected_version,

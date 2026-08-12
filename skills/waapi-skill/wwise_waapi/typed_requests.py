@@ -118,23 +118,33 @@ class TypedRequestContract:
     fields: tuple[TypedFieldContract, ...]
     schema_roots: Mapping[str, Mapping[str, Any]]
     definition_graph: DefinitionGraph
+    effect: str = "read"
+    route: str = "bounded_call"
+    gateway_commands: tuple[str, ...] = ()
+    timeout_seconds: float = 10.0
 
     @property
     def fields_by_handle(self) -> Mapping[str, TypedFieldContract]:
         return {field.handle: field for field in self.fields}
 
     def as_gateway_payload(self) -> dict[str, Any]:
-        return {
-            "contract": TYPED_REQUEST_SCHEMA_CONTRACT,
-            "ok": True,
-            "status": "ok",
-            "command": "request-schema",
-            "version": self.version,
-            "uri": self.uri,
-            "input_shape": "inline",
-            "schema_digest": self.schema_digest,
-            "fields": [field.as_dict() for field in self.fields],
-            "continuation": {
+        if not self.fields:
+            continuation: dict[str, Any] = {
+                "subcommand": "typed-zero-call",
+                "uri": self.uri,
+                "schema_digest": self.schema_digest,
+                "business_values_required": False,
+                **({"apply": True} if self.effect != "read" else {}),
+            }
+            if self.route == "fixed_command":
+                command = self.gateway_commands[0].split()
+                continuation = {
+                    "subcommand": command[0],
+                    "arguments": command[1:],
+                    "business_values_required": False,
+                }
+        else:
+            continuation = {
                 "subcommand": "typed-call",
                 "uri": self.uri,
                 "schema_digest": self.schema_digest,
@@ -152,7 +162,18 @@ class TypedRequestContract:
                     "map_value": "request-map-container",
                     "array_item": "request-array-item",
                 },
-            },
+            }
+        return {
+            "contract": TYPED_REQUEST_SCHEMA_CONTRACT,
+            "ok": True,
+            "status": "ok",
+            "command": "request-schema",
+            "version": self.version,
+            "uri": self.uri,
+            "input_shape": "zero" if not self.fields else "inline",
+            "schema_digest": self.schema_digest,
+            "fields": [field.as_dict() for field in self.fields],
+            "continuation": continuation,
         }
 
 
@@ -185,26 +206,51 @@ class MaterializedTypedRequest:
 
 
 def request_contract(version: str, uri: str) -> TypedRequestContract:
-    """Compile the first reviewed read-only typed tracer contract."""
+    """Compile one authorized reflected function into its typed contract."""
 
     if version not in SUPPORTED_WWISE_VERSION_KEYS:
         raise TypedRequestError(f"Unsupported Wwise version {version!r}")
-    if uri not in {TYPED_REQUEST_TRACER_URI, TYPED_REQUEST_COMPLEX_TRACER_URI}:
-        raise TypedRequestError(
-            f"WAAPI URI {uri!r} has not migrated to the typed request surface"
-        )
+    catalog = CapabilityCatalog()
     try:
-        capability = CapabilityCatalog().describe(version, uri)
+        capability = catalog.describe(version, uri)
     except CapabilityNotFoundError as exc:
-        raise TypedRequestError(str(exc)) from exc
+        try:
+            capability = catalog.authoring_ui_describe(version, uri)
+        except CapabilityNotFoundError:
+            raise TypedRequestError(str(exc)) from exc
     if capability.item_type != "function":
-        raise TypedRequestError(f"Typed request tracer requires a function URI: {uri}")
+        raise TypedRequestError(f"Typed request construction requires a function URI: {uri}")
     graph = load_definition_graph(version)
-    return compile_typed_request_contract(
+    compiled = compile_typed_request_contract(
         version=version,
         uri=uri,
         schema=capability.schema,
         graph=graph,
+    )
+    if capability.execution_contract["route"] == "compound_transaction_member":
+        raise TypedRequestError(
+            f"WAAPI URI {uri!r} requires the typed compound-operation adapter"
+        )
+    if compiled.fields and uri not in {
+        TYPED_REQUEST_TRACER_URI,
+        TYPED_REQUEST_COMPLEX_TRACER_URI,
+    }:
+        raise TypedRequestError(
+            f"WAAPI URI {uri!r} has not migrated to an executable typed adapter"
+        )
+    return TypedRequestContract(
+        version=compiled.version,
+        uri=compiled.uri,
+        schema_digest=compiled.schema_digest,
+        fields=compiled.fields,
+        schema_roots=compiled.schema_roots,
+        definition_graph=compiled.definition_graph,
+        effect=str(capability.execution_contract["effect"]),
+        route=str(capability.execution_contract["route"]),
+        gateway_commands=tuple(
+            str(item) for item in capability.execution_contract["gateway_commands"]
+        ),
+        timeout_seconds=float(capability.execution_contract["timeout_seconds"]),
     )
 
 
@@ -275,6 +321,10 @@ def compile_typed_request_contract(
         fields=tuple(fields),
         schema_roots=schema_roots,
         definition_graph=graph,
+        effect="read",
+        route="bounded_call",
+        gateway_commands=(),
+        timeout_seconds=10.0,
     )
 
 

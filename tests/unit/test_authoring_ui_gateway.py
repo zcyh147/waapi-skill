@@ -340,6 +340,56 @@ def test_get_commands_console_boundary_dispatches_only_get_info(
     assert [row[0] for row in client.calls] == [GET_INFO_URI]
 
 
+def test_typed_zero_get_commands_is_discoverable_and_host_attested(
+    tmp_path: Path,
+) -> None:
+    version = "2024.1"
+    schema_code, schema = execute(
+        ["request-schema", GET_COMMANDS_URI],
+        tmp_path=tmp_path,
+        version=version,
+    )
+    assert schema_code == 0, schema
+    assert schema["input_shape"] == "zero"
+    assert schema["continuation"]["subcommand"] == "typed-zero-call"
+
+    console_client = FakeClient({GET_INFO_URI: [live_info(command_line=True)]})
+    console_code, console = execute(
+        [
+            "typed-zero-call", GET_COMMANDS_URI,
+            "--schema-digest", schema["schema_digest"],
+        ],
+        tmp_path=tmp_path,
+        version=version,
+        client=console_client,
+    )
+    assert console_code == 2
+    assert console["error_code"] == "AUTHORING_HOST_REQUIRED"
+    assert [row[0] for row in console_client.calls] == [GET_INFO_URI]
+
+    authoring_client = FakeClient(
+        {
+            GET_INFO_URI: [live_info(command_line=False)],
+            GET_COMMANDS_URI: [{"commands": ["Copy", "SaveProject"]}],
+        }
+    )
+    authoring_code, authoring = execute(
+        [
+            "typed-zero-call", GET_COMMANDS_URI,
+            "--schema-digest", schema["schema_digest"],
+        ],
+        tmp_path=tmp_path,
+        version=version,
+        client=authoring_client,
+    )
+    assert authoring_code == 0, authoring
+    assert authoring["agent_result"] == {"commands": ["Copy", "SaveProject"]}
+    assert [row[0] for row in authoring_client.calls] == [
+        GET_INFO_URI,
+        GET_COMMANDS_URI,
+    ]
+
+
 def test_executed_topic_uses_authoring_overlay_and_unsubscribes(
     tmp_path: Path,
 ) -> None:

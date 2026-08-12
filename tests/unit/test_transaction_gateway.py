@@ -876,7 +876,7 @@ def test_allow_changes_keeps_dangerous_host_control_on_confirmation_path(
         policy="allow_changes",
     )
 
-    assert exit_code == 0, payload
+    assert exit_code == 0, json.dumps(payload, indent=2)
     assert payload["state"] == TransactionState.AWAITING_CONFIRMATION.value
     assert payload["authorization"] == {
         "mode": "explicit_confirmation",
@@ -901,6 +901,175 @@ def test_allow_changes_keeps_dangerous_host_control_on_confirmation_path(
             payload["transaction_id"]
         )
     ] == ["preview_created", "confirmation_requested"]
+
+
+@pytest.mark.parametrize(
+    "version,api,operation",
+    (
+        ("2023.1", "ak.wwise.debug.restartWaapiServers", "debug.restartWaapiServers"),
+        ("2021.1", "ak.wwise.debug.testAssert", "debug.testAssert"),
+        ("2021.1", "ak.wwise.debug.testCrash", "debug.testCrash"),
+    ),
+)
+def test_zero_input_debug_preview_is_gateway_authored_and_confirmation_only(
+    tmp_path: Path,
+    version: str,
+    api: str,
+    operation: str,
+) -> None:
+    year, major = (int(item) for item in version.split("."))
+    state_dir = tmp_path / "state"
+    schema_exit, schema = execute(
+        ["request-schema", api],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        version=version,
+    )
+    assert schema_exit == 0
+    assert schema["fields"] == []
+    assert schema["continuation"]["apply"] is True
+    assert "acknowledge" not in json.dumps(schema)
+
+    exit_code, payload = execute(
+        [
+            "typed-zero-call", api,
+            "--schema-digest", schema["schema_digest"],
+            "--apply",
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        version=version,
+        policy="allow_changes",
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info(year=year, major=major)],
+                "ak.wwise.core.getProjectInfo": [project()],
+                "ak.wwise.core.object.get": [
+                    {
+                        "return": [
+                            {
+                                **project(),
+                                "type": "Project",
+                            }
+                        ]
+                    }
+                ],
+            }
+        ),
+    )
+    assert exit_code == 0, json.dumps(payload, indent=2)
+    assert payload["state"] == TransactionState.AWAITING_CONFIRMATION.value
+    assert payload["authorization"]["mode"] == "explicit_confirmation"
+    assert payload["typed_request"]["gateway_owned_acknowledgement"] is True
+    artifact = TransactionStore(state_dir).load_preview(payload["transaction_id"]).artifact
+    assert artifact["request"]["operation"] == operation
+    assert artifact["prepared_operation"]["dispatch"] == {
+        "uri": api,
+        "args": {},
+        "options": {},
+    }
+
+
+def test_zero_input_generic_mutation_enters_existing_preview_lifecycle(
+    tmp_path: Path,
+) -> None:
+    version = "2025.1"
+    api = "ak.wwise.core.profiler.startCapture"
+    state_dir = tmp_path / "state"
+    schema_exit, schema = execute(
+        ["request-schema", api],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        version=version,
+    )
+    assert schema_exit == 0
+    assert schema["fields"] == []
+
+    exit_code, payload = execute(
+        [
+            "typed-zero-call", api,
+            "--schema-digest", schema["schema_digest"],
+            "--apply",
+        ],
+        tmp_path=tmp_path,
+        state_dir=state_dir,
+        version=version,
+        policy="ask_before_changes",
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info(year=2025)],
+                "ak.wwise.core.getProjectInfo": [project()],
+            }
+        ),
+    )
+
+    assert exit_code == 0, json.dumps(payload, indent=2)
+    assert payload["state"] == TransactionState.AWAITING_CONFIRMATION.value
+    assert payload["typed_request"] == {
+        "contract": "waapi-skill.typed-request/v1",
+        "schema_digest": schema["schema_digest"],
+        "business_values_required": False,
+        "gateway_owned_acknowledgement": False,
+    }
+    artifact = TransactionStore(state_dir).load_preview(payload["transaction_id"]).artifact
+    assert artifact["request"] == {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": version,
+        "operation": "waapi.call",
+        "arguments": {"api": api, "args": {}, "options": {}},
+    }
+    assert artifact["prepared_operation"]["dispatch"] == {
+        "uri": api,
+        "args": {},
+        "options": {},
+    }
+
+
+def test_zero_input_managed_read_dispatches_directly_with_its_route_contract(
+    tmp_path: Path,
+) -> None:
+    version = "2022.1"
+    api = "ak.wwise.core.transport.getList"
+    schema_exit, schema = execute(
+        ["request-schema", api],
+        tmp_path=tmp_path,
+        version=version,
+    )
+    assert schema_exit == 0
+    assert "apply" not in schema["continuation"]
+
+    exit_code, payload = execute(
+        [
+            "typed-zero-call", api,
+            "--schema-digest", schema["schema_digest"],
+        ],
+        tmp_path=tmp_path,
+        version=version,
+        policy="read_only",
+        client=FakeClient(
+            {
+                "ak.wwise.core.getInfo": [live_info(year=2022)],
+                api: [{"list": []}],
+            }
+        ),
+    )
+    assert exit_code == 0, json.dumps(payload, indent=2)
+    assert payload["agent_result"] == {"list": []}
+    assert "transaction_id" not in payload
+
+
+def test_compound_member_is_not_prematurely_exposed_by_request_schema(
+    tmp_path: Path,
+) -> None:
+    version = "2025.1"
+    api = "ak.wwise.core.undo.beginGroup"
+    schema_exit, schema = execute(
+        ["request-schema", api],
+        tmp_path=tmp_path,
+        version=version,
+    )
+    assert schema_exit == 2
+    assert "typed compound-operation adapter" in schema["message"]
 
 
 def preview_and_confirm_public_call(
