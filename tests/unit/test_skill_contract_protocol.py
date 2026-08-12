@@ -24,11 +24,18 @@ def test_composer_domain_terms_and_architecture_decision_are_frozen() -> None:
         "Operation Composer",
         "Operation Draft",
         "Canonical OperationRequest",
-        "Legacy JSON Adapter",
         "Change Preview",
     ):
         assert term in DOMAIN_CONTEXT
         assert term in COMPOSER_ADR
+    for term in (
+        "Gateway-Owned Request Construction",
+        "Typed Request Construction Core",
+        "Historical OperationRequest Record",
+    ):
+        assert term in DOMAIN_CONTEXT
+    assert "Legacy JSON Adapter" not in DOMAIN_CONTEXT
+    assert "Legacy JSON Adapter" in COMPOSER_ADR
     assert "Status: Accepted" in COMPOSER_ADR
     assert "a Legacy lane cannot start a new Operation Draft" in COMPOSER_ADR
     assert "no planner model is embedded" in COMPOSER_ADR
