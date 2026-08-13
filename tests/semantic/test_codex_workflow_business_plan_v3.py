@@ -319,7 +319,7 @@ def test_object_set_composer_rejects_incomplete_or_cross_operation_steps(
     elif attack == "wrong_kind":
         steps[2]["kind"] = "checkpoint"
     elif attack == "wrong_operation":
-        transaction["operation"] = "object.setRTPC"
+        transaction["operation"] = "object.setReference"
     elif attack == "missing_check":
         steps[:] = [row for row in steps if row["name"] != "tx02.check"]
     else:

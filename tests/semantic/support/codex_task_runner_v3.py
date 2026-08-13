@@ -56,10 +56,10 @@ from tests.semantic.support.codex_prompt_asset_reads_v3 import (
     remove_validated_command_occurrences,
     validated_prompt_asset_cat_commands,
 )
-from tests.semantic.support.codex_operation_draft_archive_v3 import (
-    ComposerArchiveError,
+from tests.semantic.support.codex_typed_draft_evidence_v3 import (
+    TypedDraftEvidenceError,
     classify_composer_failure_stage,
-    validate_operation_draft_archive,
+    validate_typed_draft_evidence,
 )
 
 
@@ -593,7 +593,7 @@ def run_v3_codex_task(
         broker_records = broker_payload["records"]
         steps_by_name = {step.name: step for step in protocol.steps}
         try:
-            composer_evidence = validate_operation_draft_archive(
+            composer_evidence = validate_typed_draft_evidence(
                 state_directory=root / "broker" / "state",
                 steps=tuple(
                     steps_by_name[str(record["step_name"])]
@@ -601,7 +601,7 @@ def run_v3_codex_task(
                 ),
                 broker_records=broker_records,
             )
-        except (ComposerArchiveError, KeyError) as exc:
+        except (TypedDraftEvidenceError, KeyError) as exc:
             raise V3TaskRunnerError(
                 f"Composer task evidence cannot be sealed: {exc}",
                 thread_id=run.thread_id,

@@ -1,8 +1,7 @@
-"""Strict offline evidence replay for Composer-backed semantic protocols."""
+"""Strict current typed-Draft evidence validation for semantic protocols."""
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
@@ -35,9 +34,9 @@ from wwise_waapi.transactions import (
 )
 
 
-COMPOSER_ARCHIVE_CONTRACT = "waapi-skill.codex-composer-archive/v1"
-MAX_COMPOSER_ARCHIVE_ACTIONS = 512
-MAX_COMPOSER_ARCHIVE_BYTES = 1024 * 1024
+TYPED_DRAFT_EVIDENCE_CONTRACT = "waapi-skill.codex-typed-draft-evidence/v1"
+MAX_TYPED_DRAFT_EVIDENCE_ACTIONS = 512
+MAX_TYPED_DRAFT_EVIDENCE_BYTES = 1024 * 1024
 _DRAFT_SUBCOMMANDS = frozenset(
     {
         "draft-start",
@@ -50,8 +49,8 @@ _DRAFT_SUBCOMMANDS = frozenset(
 )
 
 
-class ComposerArchiveError(RuntimeError):
-    """Composer evidence is missing, inconsistent, or not replayable."""
+class TypedDraftEvidenceError(RuntimeError):
+    """Current typed-Draft evidence is inconsistent or not replayable."""
 
 
 def classify_composer_failure_stage(subcommand: str) -> str:
@@ -78,7 +77,7 @@ def classify_composer_failure_stage(subcommand: str) -> str:
 
 
 def _fail(message: str) -> None:
-    raise ComposerArchiveError(message)
+    raise TypedDraftEvidenceError(message)
 
 
 def _mapping(value: Any, *, label: str) -> Mapping[str, Any]:
@@ -200,84 +199,21 @@ def _strict_action(
     if type(action_bytes) is not int or action_bytes <= 0:
         _fail("Composer contract is missing its action byte ceiling")
     if "--action-json" in arguments:
-        raw = _option(arguments, "--action-json")
-        if len(raw.encode("utf-8")) > action_bytes:
-            _fail("Composer action exceeds its archive byte ceiling")
-        try:
-            action = json.loads(raw)
-        except (json.JSONDecodeError, RecursionError, UnicodeError) as exc:
-            raise ComposerArchiveError("Composer action is not strict JSON") from exc
-    else:
-        try:
-            facts_index = arguments.index("--facts")
-            action = parse_typed_action_cli_arguments(
-                arguments[facts_index + 1 :],
-                legacy_compatibility=True,
-            )
-        except (OperationComposerError, ValueError) as exc:
-            raise ComposerArchiveError(
-                "Composer typed action argv is invalid"
-            ) from exc
+        _fail("Current typed-Draft evidence cannot contain historical action JSON")
+    try:
+        facts_index = arguments.index("--facts")
+        action = parse_typed_action_cli_arguments(arguments[facts_index + 1 :])
+    except (OperationComposerError, ValueError) as exc:
+        raise TypedDraftEvidenceError("Composer typed action argv is invalid") from exc
     try:
         canonical_action_size = len(canonical_json_bytes(action))
     except (RecursionError, TypeError, UnicodeError, ValueError) as exc:
-        raise ComposerArchiveError("Composer action is not strict JSON") from exc
+        raise TypedDraftEvidenceError("Composer typed action is not canonical") from exc
     if canonical_action_size > action_bytes:
         _fail("Composer action exceeds its archive byte ceiling")
     if not isinstance(action, Mapping):
         _fail("Composer action must be a JSON object")
     return dict(action)
-
-
-def decode_archived_draft_action(
-    gateway_arguments: Sequence[str],
-    *,
-    label: str,
-) -> Mapping[str, Any]:
-    """Decode one historical action only at the explicit archive boundary."""
-
-    arguments = tuple(gateway_arguments)
-    typed_indexes = [
-        index
-        for index, value in enumerate(arguments[:-1])
-        if value == "--facts" and arguments[index + 1] == "--action"
-    ]
-    if len(typed_indexes) == 1:
-        try:
-            return parse_typed_action_cli_arguments(
-                arguments[typed_indexes[0] + 1 :],
-                legacy_compatibility=True,
-            )
-        except OperationComposerError as exc:
-            raise ComposerArchiveError(
-                f"{label} Draft typed action argv is invalid"
-            ) from exc
-    if typed_indexes:
-        _fail(f"{label} Draft action argv contains multiple typed action prefixes")
-    indexes = [
-        index for index, value in enumerate(arguments) if value == "--action-json"
-    ]
-    if len(indexes) != 1 or indexes[0] + 1 >= len(arguments):
-        _fail(f"{label} Draft action argv does not contain one action JSON value")
-    def reject_duplicate_keys(pairs: Sequence[tuple[str, Any]]) -> dict[str, Any]:
-        decoded: dict[str, Any] = {}
-        for key, value in pairs:
-            if key in decoded:
-                raise ValueError(f"duplicate JSON key: {key}")
-            decoded[key] = value
-        return decoded
-    try:
-        decoded = json.loads(
-            arguments[indexes[0] + 1],
-            object_pairs_hook=reject_duplicate_keys,
-        )
-    except (json.JSONDecodeError, RecursionError, UnicodeError, ValueError) as exc:
-        raise ComposerArchiveError(
-            f"{label} Draft action argv is not strict JSON"
-        ) from exc
-    if not isinstance(decoded, Mapping):
-        _fail(f"{label} Draft action JSON is not an object")
-    return dict(decoded)
 
 
 def _handles(value: Any) -> set[str]:
@@ -391,105 +327,13 @@ def _draft_projection(payload: Mapping[str, Any], *, command: str) -> Mapping[st
     return _mapping(payload.get("draft"), label=f"{command} Draft projection")
 
 
-def _legacy_audio_import_projections(
-    projection: Mapping[str, Any],
-) -> tuple[Mapping[str, Any], ...]:
-    """Rebuild the exact pre-operation-specific audio.import projection.
-
-    Frozen archives keep the response contract they actually received.  This
-    adapter is deliberately local to offline replay; the production Gateway
-    continues to emit only the current single normal Composer projection.
-    """
-
-    legacy_actions = [
-        "set_import_option",
-        "clear_import_option",
-        "set_import_default",
-        "clear_import_default",
-        "add_import_row",
-        "set_import_row_field",
-        "clear_import_row_field",
-        "remove_import_row",
-    ]
-    current_actions = {
-        "set_import_operation",
-        "set_import_option",
-        "clear_import_option",
-        "set_import_default",
-        "clear_import_default",
-        "add_import_row",
-        "assign_import_row_switch",
-        "set_import_row_field",
-        "clear_import_row_field",
-        "remove_import_row",
-    }
-    allowed = projection.get("allowed_actions")
-    if not isinstance(allowed, list):
-        _fail("audio.import Composer projection lacks allowed actions")
-    lifecycle = [value for value in allowed if value not in current_actions]
-    f506 = dict(projection)
-    f506["action_guidance"] = {
-        "switch_assignment": {
-            "action": "add_import_row",
-            "required_on_every_row": True,
-            "ordinary_row": ["--assignment", "none"],
-            "when_user_requested": [
-                "--assignment",
-                "switch",
-                "<exact-value>",
-            ],
-            "guessing_allowed": False,
-        }
-    }
-    f506["allowed_actions"] = [*legacy_actions, *lifecycle]
-    pre_f506 = dict(projection)
-    pre_f506["action_guidance"] = {
-        "switch_assignment": {
-            "follow_up_assignment_action_exists": False,
-            "guessing_allowed": False,
-            "omission_means": "no_switch_assignment",
-            "typed_argv_suffix": [
-                "--assignment",
-                "switch",
-                "<exact-value>",
-            ],
-            "when_user_requested": "use_add_switch_assigned_import_row",
-        }
-    }
-    pre_f506["allowed_actions"] = [
-        "set_import_option",
-        "clear_import_option",
-        "set_import_default",
-        "clear_import_default",
-        "add_switch_assigned_import_row",
-        "add_import_row_without_switch_assignment",
-        "set_import_row_field",
-        "clear_import_row_field",
-        "remove_import_row",
-        *lifecycle,
-    ]
-    return f506, pre_f506
-
-
-def _canonical_archive_action(
+def _canonical_typed_action(
     action: Mapping[str, Any],
 ) -> tuple[Mapping[str, Any], str]:
     submitted_name = action.get("action")
     if not isinstance(submitted_name, str) or not submitted_name:
         _fail("Composer archive action name is invalid")
-    if submitted_name not in {
-        "add_switch_assigned_import_row",
-        "add_import_row_without_switch_assignment",
-    }:
-        return action, submitted_name
-    canonical = dict(action)
-    canonical["action"] = "add_import_row"
-    if (
-        submitted_name == "add_import_row_without_switch_assignment"
-        and "assignment" not in canonical
-    ):
-        canonical["assignment"] = {"mode": "none"}
-    return canonical, submitted_name
+    return action, submitted_name
 
 
 def _require_projection(
@@ -515,13 +359,7 @@ def _require_projection(
         }
     ):
         _fail("Composer Draft response does not match its immutable binding")
-    candidates = [projection]
-    if operation == "audio.import":
-        candidates.extend(_legacy_audio_import_projections(projection))
-    if not any(
-        all(draft.get(key) == value for key, value in candidate.items())
-        for candidate in candidates
-    ):
+    if not all(draft.get(key) == value for key, value in projection.items()):
         mismatched = next(
             (
                 key
@@ -535,7 +373,7 @@ def _require_projection(
         )
 
 
-def validate_operation_draft_archive(
+def validate_typed_draft_evidence(
     *,
     state_directory: Path,
     steps: Sequence[Any],
@@ -568,13 +406,13 @@ def validate_operation_draft_archive(
             if draft_ids
             else {}
         )
-        return _validate_operation_draft_archive(
+        return _validate_typed_draft_evidence(
             state_directory=state_directory,
             steps=steps,
             broker_records=broker_records,
             durable_records=durable_records,
         )
-    except ComposerArchiveError:
+    except TypedDraftEvidenceError:
         raise
     except (
         OperationComposerError,
@@ -584,10 +422,10 @@ def validate_operation_draft_archive(
         TypeError,
         ValueError,
     ) as exc:
-        raise ComposerArchiveError(f"Composer archive replay failed: {exc}") from exc
+        raise TypedDraftEvidenceError(f"Composer archive replay failed: {exc}") from exc
 
 
-def _validate_operation_draft_archive(
+def _validate_typed_draft_evidence(
     *,
     state_directory: Path,
     steps: Sequence[Any],
@@ -617,7 +455,7 @@ def _validate_operation_draft_archive(
             if not indexes:
                 _fail("Multi-Composer flow has no archived steps")
             flows.append(
-                _validate_operation_draft_archive(
+                _validate_typed_draft_evidence(
                     state_directory=state_directory,
                     steps=tuple(steps[index] for index in indexes),
                     broker_records=tuple(broker_records[index] for index in indexes),
@@ -625,12 +463,12 @@ def _validate_operation_draft_archive(
                 )
             )
         evidence = {
-            "contract": COMPOSER_ARCHIVE_CONTRACT,
+            "contract": TYPED_DRAFT_EVIDENCE_CONTRACT,
             "flow_count": len(flows),
             "flows": flows,
             "flows_sha256": canonical_sha256(flows),
         }
-        if len(canonical_json_bytes(evidence)) > MAX_COMPOSER_ARCHIVE_BYTES:
+        if len(canonical_json_bytes(evidence)) > MAX_TYPED_DRAFT_EVIDENCE_BYTES:
             _fail("Composer evidence exceeds its fixed archive byte ceiling")
         return evidence
     if len(starts) != 1:
@@ -705,7 +543,7 @@ def _validate_operation_draft_archive(
         if step.subcommand == "draft-start":
             continue
         if step.subcommand == "draft-apply":
-            if len(action_rows) >= MAX_COMPOSER_ARCHIVE_ACTIONS:
+            if len(action_rows) >= MAX_TYPED_DRAFT_EVIDENCE_ACTIONS:
                 _fail("Composer archive action count exceeds its fixed ceiling")
             action = _strict_action(
                 arguments,
@@ -732,7 +570,7 @@ def _validate_operation_draft_archive(
                         required_tokens=metadata_binding.required_tokens,
                     )
                 except GatewayInvocationError as exc:
-                    raise ComposerArchiveError(
+                    raise TypedDraftEvidenceError(
                         "Composer archive metadata source is invalid"
                     ) from exc
                 if (
@@ -753,7 +591,7 @@ def _validate_operation_draft_archive(
                 compact = _compact_action_projection(response_draft)
                 new_handles = compact[1]
             factory, unused_handles = _handle_factory(new_handles)
-            replay_action, submitted_action_name = _canonical_archive_action(action)
+            replay_action, submitted_action_name = _canonical_typed_action(action)
             composition, action_name = apply_composer_action(
                 operation,
                 version,
@@ -1019,7 +857,7 @@ def _validate_operation_draft_archive(
         }
 
     evidence: dict[str, Any] = {
-        "contract": COMPOSER_ARCHIVE_CONTRACT,
+        "contract": TYPED_DRAFT_EVIDENCE_CONTRACT,
         "draft_id": draft_id,
         "operation": operation,
         "version": version,
@@ -1037,6 +875,6 @@ def _validate_operation_draft_archive(
         "preview_binding": preview_binding,
         "cleanup_outcome": cleanup,
     }
-    if len(canonical_json_bytes(evidence)) > MAX_COMPOSER_ARCHIVE_BYTES:
+    if len(canonical_json_bytes(evidence)) > MAX_TYPED_DRAFT_EVIDENCE_BYTES:
         _fail("Composer evidence exceeds its fixed archive byte ceiling")
     return evidence

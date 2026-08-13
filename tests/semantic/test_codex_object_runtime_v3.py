@@ -27,6 +27,9 @@ from tests.semantic.support.codex_object_runtime_v3 import (
     _language_name,
     bounded_result_disclosure,
 )
+from tests.semantic.support.codex_eval_protocol_v3 import (
+    materialize_typed_transaction_protocol_requests,
+)
 
 
 SUITE_V3 = "skills/waapi-skill/evals/suite-v3.json"
@@ -1395,8 +1398,21 @@ def test_all_object_recipes_build_exact_single_or_two_turn_protocols() -> None:
         )
         protocol = runtime.gateway_protocol()
         if isinstance(recipe.request, OperationRequestSpec):
-            assert protocol.turn_prefix_counts == (2, 6)
-            assert len(protocol.steps) == 6
+            preview_index = next(
+                index
+                for index, step in enumerate(protocol.steps)
+                if step.subcommand in {"typed-operation", "preview-from-draft"}
+            )
+            assert protocol.turn_prefix_counts == (
+                preview_index + 1,
+                len(protocol.steps),
+            )
+            assert tuple(step.subcommand for step in protocol.steps[-4:]) == (
+                "transaction-show",
+                "confirm",
+                "execute",
+                "verify",
+            )
         else:
             assert isinstance(recipe.request, QueryObjectRequestSpec)
             assert protocol.turn_prefix_counts == (1,)
@@ -1430,15 +1446,18 @@ def test_compound_object_runtime_binds_2025_request_and_reflected_types(
 
     snapshot = runtime.snapshot()
     protocol = runtime.gateway_protocol()
-    preview_argument = protocol.steps[1].arguments[2]
+    preview_request = materialize_typed_transaction_protocol_requests(
+        protocol,
+        version="2025.1",
+    )[0][1]
 
     assert {item.type for item in snapshot.objects} >= {
         "PropertyContainer",
         "Sound",
     }
-    assert preview_argument.expected["version"] == "2025.1"
+    assert preview_request["version"] == "2025.1"
     assert r"\\Containers\\Default Work Unit\\SemanticLab" in json.dumps(
-        preview_argument.expected,
+        preview_request,
         ensure_ascii=False,
     )
 

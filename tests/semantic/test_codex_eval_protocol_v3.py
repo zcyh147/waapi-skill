@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-import json
-from pathlib import Path
-from types import MappingProxyType
-
 import pytest
 
 from tests.support.platform_filesystem import native_absolute_test_path
@@ -21,20 +17,18 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     call_step,
     metadata_candidate_limit,
     query_object_step,
+    typed_read_draft_steps,
     wait_topic_step,
 )
 from tests.semantic.support.codex_gateway_broker import (
-    CodexGatewayBroker,
-    DraftActionJsonArgument,
+    DraftTypedActionArgument,
     DraftActionMetadataBinding,
     ExpectedGatewayStep,
-    MetadataBoundJsonArgument,
     MetadataQueryArgument,
     MetadataTokenProjection,
     ResponseBinding,
-    SemanticJsonArgument,
+    TypedRequestFactsArgument,
     validate_commutative_composer_setup_step_groups,
-    resolve_gateway_invocation,
 )
 
 
@@ -120,7 +114,7 @@ def test_audio_import_composer_emits_ordered_typed_actions_without_full_json() -
         if step.subcommand == "draft-apply"
     ]
 
-    assert all(isinstance(value, DraftActionJsonArgument) for value in action_arguments)
+    assert all(isinstance(value, DraftTypedActionArgument) for value in action_arguments)
     assert [value.operation for value in action_arguments] == ["audio.import"] * 5
     assert [value.expected["action"] for value in action_arguments] == [
         "set_import_option",
@@ -287,37 +281,42 @@ def test_object_set_composer_keeps_nondefault_request_options_explicit() -> None
 def test_single_transaction_spans_two_turn_prefixes_with_response_bindings() -> None:
     protocol = build_transaction_protocol([_request()])
 
-    assert protocol.turn_prefix_counts == (2, 6)
+    assert protocol.turn_prefix_counts == (9, 13)
     assert tuple(step.subcommand for step in protocol.steps) == (
         "operation-schema",
-        "preview",
+        "draft-start",
+        "draft-apply",
+        "draft-apply",
+        "draft-apply",
+        "draft-apply",
+        "draft-apply",
+        "draft-check",
+        "preview-from-draft",
         "transaction-show",
         "confirm",
         "execute",
         "verify",
     )
-    assert protocol.steps[4].allowed_exit_codes == (0, 2)
-    assert protocol.steps[4].terminal_execute is False
-    assert protocol.steps[5].allowed_exit_codes == (0,)
-    assert protocol.steps[2].arguments == (
+    by_name = {step.name: step for step in protocol.steps}
+    assert by_name["tx01.execute"].allowed_exit_codes == (0, 2)
+    assert by_name["tx01.execute"].terminal_execute is False
+    assert by_name["tx01.verify"].allowed_exit_codes == (0,)
+    assert by_name["tx01.transaction-show"].arguments == (
         ResponseBinding("tx01.preview", "/transaction_id"),
         "--summary-only",
     )
-    assert protocol.steps[3].arguments == (
+    assert by_name["tx01.confirm"].arguments == (
         ResponseBinding("tx01.transaction-show", "/transaction_id"),
         "--confirmation-token",
         ResponseBinding("tx01.transaction-show", "/confirmation/token"),
     )
-    assert protocol.steps[4].arguments == (
+    assert by_name["tx01.execute"].arguments == (
         ResponseBinding("tx01.confirm", "/transaction_id"),
     )
-    assert protocol.steps[5].arguments == (
+    assert by_name["tx01.verify"].arguments == (
         ResponseBinding("tx01.execute", "/transaction_id"),
     )
-    assert protocol.steps[1].arguments[:2] == ("--apply", "--request-json")
-    request_argument = protocol.steps[1].arguments[2]
-    assert isinstance(request_argument, SemanticJsonArgument)
-    assert request_argument.equivalence == "object_operation_v1"
+    assert all("--request-json" not in step.arguments for step in protocol.steps)
 
 
 def test_commutative_read_only_groups_are_adjacent_and_cannot_cross_turns() -> None:
@@ -430,7 +429,7 @@ def test_commutative_composer_setup_groups_are_narrow_and_cannot_cross_turns() -
         "tx01.action.001",
         "draft-apply",
         (
-            DraftActionJsonArgument(
+            DraftTypedActionArgument(
                 {
                     "contract": "waapi-skill.operation-draft-action/v1",
                     "action": "set_import_option",
@@ -450,7 +449,7 @@ def test_commutative_composer_setup_groups_are_narrow_and_cannot_cross_turns() -
         "tx01.action.002",
         "draft-apply",
         (
-            DraftActionJsonArgument(
+            DraftTypedActionArgument(
                 {
                     "contract": "waapi-skill.operation-draft-action/v1",
                     "action": "set_import_default",
@@ -473,22 +472,21 @@ def test_commutative_composer_setup_groups_are_narrow_and_cannot_cross_turns() -
         )
 
 
-def test_non_object_transaction_request_keeps_wire_exact_json() -> None:
-    request = {
-        **_request(),
-        "operation": "audio.import",
-        "arguments": {"imports": []},
-    }
+def test_non_object_transaction_request_uses_typed_composer_actions() -> None:
+    protocol = build_transaction_protocol([_audio_import_request()])
 
-    protocol = build_transaction_protocol([request])
+    actions = tuple(
+        step.arguments[-1]
+        for step in protocol.steps
+        if step.subcommand == "draft-apply"
+    )
+    assert actions
+    assert all(isinstance(value, DraftTypedActionArgument) for value in actions)
+    assert all(value.operation == "audio.import" for value in actions)
+    assert all("--request-json" not in step.arguments for step in protocol.steps)
 
-    assert protocol.steps[1].arguments[:2] == ("--apply", "--request-json")
-    request_argument = protocol.steps[1].arguments[2]
-    assert isinstance(request_argument, SemanticJsonArgument)
-    assert request_argument.equivalence == "wire_exact"
 
-
-def test_soundbank_generate_transaction_uses_narrow_default_equivalence() -> None:
+def test_soundbank_generate_transaction_uses_typed_draft_facts() -> None:
     request = {
         **_request(),
         "operation": "soundbank.generate",
@@ -512,22 +510,22 @@ def test_soundbank_generate_transaction_uses_narrow_default_equivalence() -> Non
 
     protocol = build_transaction_protocol([request])
 
-    request_argument = protocol.steps[1].arguments[2]
-    assert isinstance(request_argument, SemanticJsonArgument)
-    assert request_argument.equivalence == "soundbank_generate_v1"
+    actions = tuple(
+        step.arguments[-1]
+        for step in protocol.steps
+        if step.subcommand == "draft-apply"
+    )
+    assert actions
+    assert all(isinstance(value, DraftTypedActionArgument) for value in actions)
+    assert all(value.operation == "soundbank.generate" for value in actions)
+    assert any(step.subcommand == "preview-from-draft" for step in protocol.steps)
+    assert all("--request-json" not in step.arguments for step in protocol.steps)
 
 
 def test_metadata_transaction_protocol_is_generic_and_binds_every_preview() -> None:
-    first = _request(1)
-    first["arguments"] = {
-        "object": {"kind": "path", "value": r"\Root\One"},
-        "properties": [{"name": "Volume", "value": -1.5}],
-    }
-    second = _request(2)
-    second["arguments"] = {
-        "object": {"kind": "path", "value": r"\Root\Two"},
-        "properties": [{"name": "Volume", "value": -3}],
-    }
+    first = _object_set_request()
+    second = _object_set_request()
+    second["arguments"]["objects"][0]["object"]["value"] = r"\Root\Two"  # type: ignore[index]
 
     protocol = build_metadata_transaction_protocol(
         (first, second),
@@ -539,7 +537,7 @@ def test_metadata_transaction_protocol_is_generic_and_binds_every_preview() -> N
         ),
     )
 
-    assert protocol.turn_prefix_counts == (3, 9, 13)
+    assert protocol.turn_prefix_counts == (6, 15, 19)
     assert protocol.steps[0].name == "metadata.discover"
     assert protocol.steps[0].subcommand == "metadata"
     assert protocol.steps[0].arguments[:3] == (
@@ -556,19 +554,19 @@ def test_metadata_transaction_protocol_is_generic_and_binds_every_preview() -> N
         "output volume",
         "voice gain",
     )
-    previews = tuple(
-        step for step in protocol.steps if step.subcommand == "preview"
+    actions = tuple(
+        step.arguments[-1]
+        for step in protocol.steps
+        if step.subcommand == "draft-apply"
     )
-    assert len(previews) == 2
-    for preview, request in zip(previews, (first, second), strict=True):
-        argument = preview.arguments[2]
-        assert isinstance(argument, MetadataBoundJsonArgument)
-        assert argument.expected == request
-        assert argument.metadata_step == "metadata.discover"
-        assert argument.object_type == "ActorMixer"
-        assert argument.required_tokens == ("Volume",)
-        assert argument.equivalence == "wire_exact"
-        assert argument.expected_required_token_projection == (
+    assert len(actions) == 2
+    for argument in actions:
+        assert isinstance(argument, DraftTypedActionArgument)
+        assert argument.metadata_binding is not None
+        assert argument.metadata_binding.step == "metadata.discover"
+        assert argument.metadata_binding.object_type == "ActorMixer"
+        assert argument.metadata_binding.required_tokens == ("Volume",)
+        assert argument.metadata_binding.expected_projection == (
             MetadataTokenProjection("Volume", "property", "Real32"),
         )
 
@@ -584,7 +582,7 @@ def test_metadata_transaction_protocol_uses_the_skill_query_count_budget(
     queries = tuple(f"setting {index}" for index in range(query_count))
 
     protocol = build_metadata_transaction_protocol(
-        (_request(),),
+        (_object_set_request(),),
         object_type="Sound",
         metadata_queries=queries,
         required_tokens=("Volume",),
@@ -607,7 +605,7 @@ def test_metadata_candidate_budget_rejects_non_protocol_query_counts(
 
 def test_schema_first_metadata_protocol_exposes_version_before_exact_scope() -> None:
     protocol = build_metadata_transaction_protocol(
-        (_request(),),
+        (_object_set_request(),),
         object_type="PropertyContainer",
         metadata_queries=("output volume",),
         required_tokens=("Volume",),
@@ -617,21 +615,26 @@ def test_schema_first_metadata_protocol_exposes_version_before_exact_scope() -> 
         schema_first=True,
     )
 
-    assert protocol.turn_prefix_counts == (3, 7)
+    assert protocol.turn_prefix_counts == (6, 10)
     assert tuple(step.subcommand for step in protocol.steps[:3]) == (
         "operation-schema",
         "metadata",
-        "preview",
+        "draft-start",
     )
     assert protocol.steps[1].arguments[:3] == (
         "discover",
         "--object-type",
         "PropertyContainer",
     )
-    argument = protocol.steps[2].arguments[2]
-    assert isinstance(argument, MetadataBoundJsonArgument)
-    assert argument.metadata_step == "metadata.discover"
-    assert argument.object_type == "PropertyContainer"
+    argument = next(
+        step.arguments[-1]
+        for step in protocol.steps
+        if step.subcommand == "draft-apply"
+    )
+    assert isinstance(argument, DraftTypedActionArgument)
+    assert argument.metadata_binding is not None
+    assert argument.metadata_binding.step == "metadata.discover"
+    assert argument.metadata_binding.object_type == "PropertyContainer"
 
 
 def test_schema_query_protocol_requires_one_exact_auditable_object_lookup() -> None:
@@ -657,11 +660,11 @@ def test_schema_query_protocol_requires_one_exact_auditable_object_lookup() -> N
         query_step=query,
     )
 
-    assert protocol.turn_prefix_counts == (3, 7)
+    assert protocol.turn_prefix_counts == (10, 14)
     assert tuple(step.subcommand for step in protocol.steps[:3]) == (
         "operation-schema",
         "query-object",
-        "preview",
+        "draft-start",
     )
     assert protocol.steps[1] == query
 
@@ -713,7 +716,7 @@ def test_metadata_transaction_protocol_selects_closed_audio_import_equivalence()
         "add_import_row",
     ]
     assert all(
-        isinstance(argument, DraftActionJsonArgument)
+        isinstance(argument, DraftTypedActionArgument)
         and argument.operation == "audio.import"
         for argument in action_arguments
     )
@@ -753,11 +756,12 @@ def test_metadata_transaction_protocol_selects_closed_tab_import_equivalence() -
         required_tokens=("IsLoopingEnabled",),
         equivalence="audio_import_tab_v1",
     )
-    argument = protocol.steps[2].arguments[2]
-
-    assert isinstance(argument, MetadataBoundJsonArgument)
-    assert argument.expected == request
-    assert argument.equivalence == "audio_import_tab_v1"
+    typed_operation = next(
+        step for step in protocol.steps if step.subcommand == "typed-operation"
+    )
+    assert typed_operation.metadata_binding is not None
+    assert typed_operation.metadata_binding.step == "metadata.discover"
+    assert typed_operation.metadata_binding.required_tokens == ("IsLoopingEnabled",)
 
 
 def test_metadata_transaction_protocol_selects_closed_object_set_equivalence() -> None:
@@ -785,11 +789,15 @@ def test_metadata_transaction_protocol_selects_closed_object_set_equivalence() -
         required_tokens=("Volume",),
         equivalence="object_set_v1",
     )
-    argument = protocol.steps[2].arguments[2]
-
-    assert isinstance(argument, MetadataBoundJsonArgument)
-    assert argument.expected == request
-    assert argument.equivalence == "object_set_v1"
+    argument = next(
+        step.arguments[-1]
+        for step in protocol.steps
+        if step.subcommand == "draft-apply"
+    )
+    assert isinstance(argument, DraftTypedActionArgument)
+    assert argument.metadata_binding is not None
+    assert argument.metadata_binding.step == "metadata.discover"
+    assert argument.metadata_binding.required_tokens == ("Volume",)
 
 
 @pytest.mark.parametrize(
@@ -937,9 +945,9 @@ def test_audio_import_metadata_equivalence_rejects_duplicate_expected_names() ->
 def test_three_transactions_preserve_four_natural_turn_boundaries() -> None:
     protocol = build_transaction_protocol([_request(1), _request(2), _request(3)])
 
-    assert protocol.turn_prefix_counts == (2, 8, 14, 18)
-    assert len(protocol.steps) == 18
-    assert [step.name for step in protocol.steps if step.subcommand == "preview"] == [
+    assert protocol.turn_prefix_counts == (9, 22, 35, 39)
+    assert len(protocol.steps) == 39
+    assert [step.name for step in protocol.steps if step.subcommand == "preview-from-draft"] == [
         "tx01.preview",
         "tx02.preview",
         "tx03.preview",
@@ -965,7 +973,7 @@ def test_structured_refusal_is_one_turn_and_exact_exit_two() -> None:
         [_request()], refusal=StructuredRefusal("INPUT_FILE_NOT_FOUND")
     )
 
-    assert protocol.turn_prefix_counts == (2,)
+    assert protocol.turn_prefix_counts == (9,)
     assert protocol.steps[-1].allowed_exit_codes == (2,)
     assert protocol.steps[-1].expected_error_code == "INPUT_FILE_NOT_FOUND"
     assert protocol.steps[-1].expected_result_command == "preview"
@@ -974,10 +982,17 @@ def test_structured_refusal_is_one_turn_and_exact_exit_two() -> None:
 def test_terminal_execute_transaction_ends_at_execute_without_verify() -> None:
     protocol = build_transaction_protocol([_request()], terminal_execute=True)
 
-    assert protocol.turn_prefix_counts == (2, 5)
+    assert protocol.turn_prefix_counts == (9, 12)
     assert tuple(step.subcommand for step in protocol.steps) == (
         "operation-schema",
-        "preview",
+        "draft-start",
+        "draft-apply",
+        "draft-apply",
+        "draft-apply",
+        "draft-apply",
+        "draft-apply",
+        "draft-check",
+        "preview-from-draft",
         "transaction-show",
         "confirm",
         "execute",
@@ -1002,17 +1017,22 @@ def test_terminal_execute_rejects_multi_request_or_refusal_combinations() -> Non
 def test_direct_call_and_topic_protocols_are_single_turn() -> None:
     protocol = build_direct_protocol(
         [
-            call_step("fields", "ak.wwise.core.mediaPool.getFields"),
+            call_step(
+                "fields",
+                "ak.wwise.core.mediaPool.getFields",
+                version="2025.1",
+            ),
             wait_topic_step(
                 "generated",
                 "ak.wwise.core.soundbank.generated",
+                version="2025.1",
                 event_count=4,
-                match={"platform": "Windows"},
+                match={},
             ),
         ]
     )
     assert protocol.turn_prefix_counts == (2,)
-    assert protocol.steps[0].allow_omitted_empty_json_objects is True
+    assert protocol.steps[0].subcommand == "typed-zero-call"
     assert protocol.steps[1].gateway_global_arguments == ("--timeout", "120")
     assert protocol.steps[1].allow_omitted_default_event_count_one is False
 
@@ -1021,11 +1041,13 @@ def test_wait_topic_allows_omitted_event_count_only_for_the_default_one() -> Non
     default_step = wait_topic_step(
         "one",
         "ak.wwise.core.soundbank.generated",
+        version="2025.1",
         event_count=1,
     )
     multiple_step = wait_topic_step(
         "multiple",
         "ak.wwise.core.soundbank.generated",
+        version="2025.1",
         event_count=2,
     )
 
@@ -1033,188 +1055,77 @@ def test_wait_topic_allows_omitted_event_count_only_for_the_default_one() -> Non
     assert multiple_step.allow_omitted_default_event_count_one is False
 
 
-def test_call_step_deeply_normalizes_frozen_json_for_broker_validation(
-    tmp_path: Path,
-) -> None:
-    args = MappingProxyType(
-        {
-            "from": MappingProxyType(
-                {"path": ("\\Interactive Music Hierarchy", "\\Events")}
-            ),
-            "filters": (
-                MappingProxyType({"field": "type", "values": ("MusicSegment",)}),
-            ),
-        }
-    )
-    options = MappingProxyType({"return": ("id", "name", "path")})
-
+def test_call_step_binds_typed_facts_to_exact_contract() -> None:
     step = call_step(
-        "object.get",
-        "ak.wwise.core.object.get",
-        args=args,
-        options=options,
+        "transport.state",
+        "ak.wwise.core.transport.getState",
+        version="2025.1",
+        args={"transport": 42},
     )
-    expected_args = step.arguments[2]
-    expected_options = step.arguments[4]
-    assert isinstance(expected_args, SemanticJsonArgument)
-    assert isinstance(expected_options, SemanticJsonArgument)
-    assert type(expected_args.expected) is dict
-    assert type(expected_args.expected["from"]) is dict
-    assert type(expected_args.expected["from"]["path"]) is list
-    assert type(expected_args.expected["filters"]) is list
-    assert type(expected_args.expected["filters"][0]) is dict
-    assert type(expected_args.expected["filters"][0]["values"]) is list
-    assert type(expected_options.expected["return"]) is list
-    json.dumps(expected_args.expected, allow_nan=False, sort_keys=True)
-    json.dumps(expected_options.expected, allow_nan=False, sort_keys=True)
-
-    skill_source = tmp_path / "waapi-skill"
-    broker = CodexGatewayBroker(
-        skill_source=skill_source,
-        expected_steps=(step,),
+    assert step.subcommand == "typed-call"
+    assert step.arguments[:2] == (
+        "ak.wwise.core.transport.getState",
+        "--schema-digest",
     )
-    gateway_arguments = (
-        "call",
-        "ak.wwise.core.object.get",
-        "--args-json",
-        json.dumps(expected_args.expected, separators=(",", ":")),
-        "--options-json",
-        json.dumps(expected_options.expected, separators=(",", ":")),
-    )
-    resolved = resolve_gateway_invocation(
-        (
-            "python",
-            str(skill_source.resolve() / "scripts" / "run.py"),
-            "gateway.py",
-            *gateway_arguments,
-        ),
-        skill_source=skill_source,
-    )
-
-    semantic_hash, execution_arguments = broker._validate_step(  # noqa: SLF001
-        step,
-        resolved.gateway_arguments,
-    )
-    assert len(semantic_hash) == 64
-    assert execution_arguments == gateway_arguments
+    argument = step.arguments[-1]
+    assert isinstance(argument, TypedRequestFactsArgument)
+    assert argument.contract.version == "2025.1"
+    assert argument.expected_args == {"transport": 42}
+    assert argument.expected_options == {}
 
 
-def test_call_step_appends_closed_post_filter_json_for_media_pool(
-    tmp_path: Path,
-) -> None:
-    step = call_step(
+def test_media_pool_read_draft_appends_typed_post_filter() -> None:
+    steps = typed_read_draft_steps(
         "media.get",
         "ak.wwise.core.mediaPool.get",
+        version="2025.1",
         args={"maxResults": 200},
         options={"return": ["Filename"]},
-        post_filter=MappingProxyType(
-            {
-                "field": "Filename",
-                "operator": "containsCaseSensitive",
-                "value": "footstep",
-                "limit": 20,
-            }
-        ),
+        post_filter={
+            "field": "Filename",
+            "operator": "containsCaseSensitive",
+            "value": "footstep",
+            "limit": 20,
+        },
     )
+    check = steps[-1]
+    assert check.subcommand == "draft-check"
+    assert check.arguments[-4:] == (
+        "--post-filter-value",
+        "footstep",
+        "--post-filter-limit",
+        "20",
+    )
+    assert all("--post-filter-json" not in step.arguments for step in steps)
 
-    assert step.arguments[-2] == "--post-filter-json"
-    assert isinstance(step.arguments[-1], SemanticJsonArgument)
-    assert step.arguments[-1].expected == {
-        "field": "Filename",
-        "operator": "containsCaseSensitive",
-        "value": "footstep",
-        "limit": 20,
-    }
-    assert step.allow_omitted_empty_json_objects is False
-
-    skill_source = tmp_path / "waapi-skill"
-    broker = CodexGatewayBroker(
-        skill_source=skill_source,
-        expected_steps=(step,),
-    )
-    gateway_arguments = (
-        "call",
-        "ak.wwise.core.mediaPool.get",
-        "--args-json",
-        '{"maxResults":200}',
-        "--options-json",
-        '{"return":["Filename"]}',
-        "--post-filter-json",
-        json.dumps(step.arguments[-1].expected, separators=(",", ":")),
-    )
-    resolved = resolve_gateway_invocation(
-        (
-            "python",
-            str(skill_source.resolve() / "scripts" / "run.py"),
-            "gateway.py",
-            *gateway_arguments,
-        ),
-        skill_source=skill_source,
-    )
-    _semantic_hash, execution_arguments = broker._validate_step(  # noqa: SLF001
-        step,
-        resolved.gateway_arguments,
-    )
-    assert execution_arguments == gateway_arguments
-
-    with pytest.raises(V3ProtocolError, match="must not be empty"):
-        call_step(
+    with pytest.raises(V3ProtocolError, match="outside its closed contract"):
+        typed_read_draft_steps(
             "bad",
             "ak.wwise.core.mediaPool.get",
+            version="2025.1",
+            args={"maxResults": 200},
+            options={"return": ["Filename"]},
             post_filter={},
         )
 
 
-def test_wait_topic_and_operation_requests_deeply_normalize_frozen_json() -> None:
+def test_wait_topic_and_operation_requests_use_typed_inputs() -> None:
     topic_step = wait_topic_step(
         "generated",
         "ak.wwise.core.soundbank.generated",
+        version="2025.1",
         event_count=2,
-        match=MappingProxyType(
-            {"platform": MappingProxyType({"name": ("Windows", "Mac")})}
-        ),
-        options=MappingProxyType({"return": ("id", "path")}),
+        match={},
+        options={},
     )
-    topic_options = topic_step.arguments[2]
-    topic_match = topic_step.arguments[6]
-    assert isinstance(topic_options, SemanticJsonArgument)
-    assert isinstance(topic_match, SemanticJsonArgument)
-    assert topic_options.expected == {"return": ["id", "path"]}
-    assert topic_match.expected == {
-        "platform": {"name": ["Windows", "Mac"]}
-    }
+    assert "--options-json" not in topic_step.arguments
+    assert "--match-json" not in topic_step.arguments
+    assert "--options-schema-digest" in topic_step.arguments
+    assert "--match-schema-digest" in topic_step.arguments
 
-    request = MappingProxyType(
-        {
-            "contract": "waapi-skill.operation-request/v1",
-            "version": "2022.1",
-            "operation": "object.create",
-            "arguments": MappingProxyType(
-                {
-                    "objects": (
-                        MappingProxyType(
-                            {"name": "Music_A", "type": "MusicSegment"}
-                        ),
-                        MappingProxyType(
-                            {"name": "Music_B", "type": "MusicSegment"}
-                        ),
-                    )
-                }
-            ),
-        }
-    )
-    protocol = build_transaction_protocol((request,))
-    assert protocol.steps[1].arguments[:2] == ("--apply", "--request-json")
-    preview_request = protocol.steps[1].arguments[2]
-    assert isinstance(preview_request, SemanticJsonArgument)
-    assert type(preview_request.expected) is dict
-    assert type(preview_request.expected["arguments"]) is dict
-    assert type(preview_request.expected["arguments"]["objects"]) is list
-    assert all(
-        type(item) is dict
-        for item in preview_request.expected["arguments"]["objects"]
-    )
-    json.dumps(preview_request.expected, allow_nan=False, sort_keys=True)
+    protocol = build_transaction_protocol((_request(),))
+    assert all("--request-json" not in step.arguments for step in protocol.steps)
+    assert any(step.subcommand == "draft-apply" for step in protocol.steps)
 
 
 @pytest.mark.parametrize(
@@ -1230,17 +1141,28 @@ def test_wait_topic_and_operation_requests_deeply_normalize_frozen_json() -> Non
 )
 def test_call_step_rejects_values_outside_closed_json(invalid) -> None:
     with pytest.raises(V3ProtocolError):
-        call_step("bad", "ak.wwise.core.object.get", args=invalid)
+        call_step(
+            "bad",
+            "ak.wwise.core.transport.getState",
+            version="2025.1",
+            args=invalid,
+        )
 
 
 def test_protocol_entry_points_reject_wrong_container_types_and_cycles() -> None:
     with pytest.raises(V3ProtocolError, match="call args must be a mapping"):
-        call_step("bad", "ak.wwise.core.object.get", args=[])  # type: ignore[arg-type]
+        call_step(
+            "bad",
+            "ak.wwise.core.transport.getState",
+            version="2025.1",
+            args=[],  # type: ignore[arg-type]
+        )
 
     with pytest.raises(V3ProtocolError, match="non-string object key"):
         wait_topic_step(
             "bad",
             "ak.wwise.core.object.created",
+            version="2025.1",
             event_count=1,
             match={False: "not-json"},  # type: ignore[dict-item]
         )

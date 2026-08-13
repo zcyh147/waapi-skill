@@ -22,9 +22,11 @@ from wwise_waapi.execution_contracts import (  # pyright: ignore[reportMissingIm
     ExecutionContractRegistry,
 )
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
+    LEGACY_JSON_INPUT_MODE,
     OPERATION_REQUEST_CONTRACT,
     OPERATION_SPECS,
     UNDO_GROUP_INNER_URIS_BY_VERSION,
+    operation_input_mode,
     parse_operation_request,
 )
 from wwise_waapi.platform_commands import (  # pyright: ignore[reportMissingImports]
@@ -756,34 +758,15 @@ def preview(
     # These registry-preparation fixtures author full canonical requests.  The
     # Composer normal surfaces reject canonical JSON; these reviewed Registry
     # fixtures therefore exercise the explicit compatibility adapter.
+    operation = str(request.get("operation"))
+    version = str(request.get("version", "2022.1"))
+    # These Registry-preparation fixtures intentionally submit a complete
+    # canonical request.  Once an operation has a typed normal entry, the only
+    # test-only compatibility seam for that representation is legacy-preview.
     command = (
-        "legacy-preview"
-        if request.get("operation")
-        in {
-            "object.create",
-            "object.createPlugin",
-            "object.set",
-            "object.setRTPC",
-            "soundbank.convertExternalSources",
-            "soundbank.generate",
-            "soundbank.processDefinitionFiles",
-            "soundbank.setInclusions",
-            "ui.captureScreen",
-            "ui.commands.execute",
-            "ui.commands.register",
-            "ui.commands.unregister",
-            "lua.executeCliFile",
-            "lua.executeCoreFile",
-            "lua.executeCoreInline",
-            "audio.importTabDelimited",
-            "debug.restartWaapiServers",
-            "debug.setAsserts",
-            "debug.setAutomationMode",
-            "debug.testAssert",
-            "debug.testCrash",
-            "waapi.undoGroup",
-        }
-        else "preview"
+        "preview"
+        if operation_input_mode(operation, version) == LEGACY_JSON_INPUT_MODE
+        else "legacy-preview"
     )
     arguments = [command]
     if apply:
@@ -796,7 +779,7 @@ def preview(
         tmp_path=tmp_path,
         state_dir=state_dir,
         client=client,
-        version=str(request.get("version", "2022.1")),
+        version=version,
         policy=policy,
     )
     assert exit_code == 0, payload
@@ -1487,7 +1470,6 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
     }
     assert operations["object.create"]["implemented"] is True
     assert operations["object.copy"]["implemented"] is True
-    assert "returned copy GUID" in operations["object.copy"]["constraints"][0]
     assert "argument_contract" not in operations["object.create"]
     assert operations["ui.commands.execute"]["implemented"] is True
     assert operations["ui.commands.register"]["implemented"] is True
@@ -1499,10 +1481,19 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
 
     assert exit_code == 0
     detailed = {item["name"]: item for item in detail_catalog["operations"]}
-    assert detailed["object.create"]["additional_properties"] is False
-    assert "argument_contract" in detailed["object.create"]
+    assert set(detailed["object.create"]["input_modes_by_version"].values()) == {
+        "composer"
+    }
+    assert "argument_contract" not in detailed["object.create"]
     assert "constraints" in detailed["object.create"]
     assert "identity_contract" in detailed["object.create"]
+    assert set(detailed["object.create"]["composer_contracts_by_version"]) == {
+        "2021.1",
+        "2022.1",
+        "2023.1",
+        "2024.1",
+        "2025.1",
+    }
 
     exit_code, schema = execute(["operation-schema", "object.setNotes"], tmp_path=tmp_path)
 
@@ -1510,9 +1501,9 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
     assert schema["ok"] is True
     assert schema["offline"] is True
     assert schema["operation"]["name"] == "object.setNotes"
-    assert schema["operation"]["required_arguments"] == ["object", "value"]
-    assert schema["operation"]["additional_properties"] is False
-    assert "argument_contract" in schema["operation"]
+    assert schema["operation"]["input_mode"] == "inline_typed"
+    assert "required_arguments" not in schema["operation"]
+    assert "argument_contract" not in schema["operation"]
     assert "identity_contract" in schema["operation"]
     assert schema["operation"]["selection_guidance"]["use_when"] == [
         "Exactly one existing object receives only a notes change."
@@ -1523,60 +1514,14 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
             "when": "the request is only one isolated notes edit",
         }
     ]
-    assert schema["request_envelope"] == {
-        "contract": OPERATION_REQUEST_CONTRACT,
-        "version": "2022.1",
-        "operation": "object.setNotes",
-        "arguments": {},
-    }
+    assert schema["request_envelope"] is None
     assert schema["request_envelope_policy"] == {
-        "status": "ready",
-        "required_top_level_keys": [
-            "contract",
-            "version",
-            "operation",
-            "arguments",
-        ],
-        "copy_top_level_exactly": True,
-        "replace_only": "arguments",
-        "argument_container_path": "$.arguments",
-        "argument_paths": {
-            "object": "$.arguments.object",
-            "value": "$.arguments.value",
-        },
-        "shell_transport": {
-            "outer_quoting": "single_quote_entire_compact_json",
-            "json_string_serialization": "exactly_once",
-            "decoded_value_rules": {
-                "embedded_quotes": (
-                    "ordinary quotation marks with no preceding backslash"
-                ),
-                "wwise_path_separator": "one backslash",
-            },
-            "forbidden": [
-                "double_escape_json_string_contents",
-                "leave_json_escape_backslashes_in_decoded_values",
-                "repair_or_retry_invalid_json_in_the_same_turn",
-            ],
-        },
-        "preview_invocation": {
-            "intended_change": {
-                "subcommand": "preview",
-                "required_flag": "--apply",
-                "effect": (
-                    "required even when the user asks to see only a preview; "
-                    "creates a durable confirmation-bound preview and does not "
-                    "execute the change"
-                ),
-                "includes_later_ordered_transactions": True,
-            },
-            "omit_apply_only_when": [
-                "hypothetical",
-                "design_only",
-                "explicitly_non_executable",
-            ],
-        },
+        "status": "inline_typed_ready",
+        "complete_request_authored_by_gateway": True,
     }
+    assert schema["typed_operation"]["continuation"]["subcommand"] == (
+        "typed-operation"
+    )
 
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
         exit_code, versioned = execute(
@@ -1585,7 +1530,8 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
             version=version,
         )
         assert exit_code == 0
-        assert versioned["request_envelope"]["version"] == version
+        assert versioned["request_envelope"] is None
+        assert versioned["typed_operation"]["version"] == version
 
     exit_code, raw_call = execute(
         ["operation-schema", "waapi.call"],
@@ -1843,7 +1789,12 @@ def test_object_create_operation_schema_discloses_versioned_parent_and_merge_con
     )
 
     assert exit_code == 0
-    contract = payload["operation"]["argument_contract"][
+    _, legacy_payload = execute(
+        ["legacy-operation-schema", "object.create"],
+        tmp_path=tmp_path,
+        version=version,
+    )
+    contract = legacy_payload["operation"]["argument_contract"][
         "same_name_merge_path_contract"
     ]
     assert contract["resolved_target"] == {
@@ -1867,7 +1818,7 @@ def test_object_create_operation_schema_discloses_versioned_parent_and_merge_con
     assert contract["forbidden_intermediate_routes"] == [
         "project-default-work-units"
     ]
-    parent_contract = payload["operation"]["argument_contract"][
+    parent_contract = legacy_payload["operation"]["argument_contract"][
         "default_container_parent_contract"
     ]
     assert parent_contract["resolved_target"] == {
@@ -1993,7 +1944,12 @@ def test_soundbank_generate_operation_schema_closes_batch_language_scope(
     )
 
     assert exit_code == 0
-    properties = payload["operation"]["argument_contract"]["properties"]
+    _, legacy_payload = execute(
+        ["legacy-operation-schema", "soundbank.generate"],
+        tmp_path=tmp_path,
+        version=version,
+    )
+    properties = legacy_payload["operation"]["argument_contract"]["properties"]
     row_expectation = properties["soundbanks"]["items"]["properties"][
         "artifact_expectation"
     ]
@@ -2027,23 +1983,9 @@ def test_soundbank_generate_operation_schema_closes_batch_language_scope(
         and "never SFX" in constraint
         for constraint in payload["operation"]["constraints"]
     )
-    assert payload["request_envelope_policy"]["preview_invocation"] == {
-        "intended_change": {
-            "subcommand": "preview",
-            "required_flag": "--apply",
-            "effect": (
-                "required even when the user asks to see only a preview; "
-                "creates a durable confirmation-bound preview and does not "
-                "execute the change"
-            ),
-            "includes_later_ordered_transactions": True,
-        },
-        "omit_apply_only_when": [
-            "hypothetical",
-            "design_only",
-            "explicitly_non_executable",
-        ],
-    }
+    assert payload["request_envelope"] is None
+    assert payload["composer"]["start"]["subcommand"] == "draft-start"
+    assert payload["composer"]["seal"]["subcommand"] == "preview-from-draft"
 
 
 @pytest.mark.parametrize("version", ["2024.1", "2025.1"])
@@ -4138,7 +4080,7 @@ def test_preview_rejects_transaction_state_inside_live_project_before_state_writ
     )
 
     exit_code, payload = execute(
-        ["preview", "--request-json", json.dumps(create_request())],
+        ["legacy-preview", "--request-json", json.dumps(create_request())],
         tmp_path=tmp_path,
         state_dir=state_dir,
         client=client,
@@ -4177,7 +4119,7 @@ def test_preview_rejects_project_without_stable_id_name_path_guard(
     )
 
     exit_code, payload = execute(
-        ["preview", "--request-json", json.dumps(create_request())],
+        ["legacy-preview", "--request-json", json.dumps(create_request())],
         tmp_path=tmp_path,
         state_dir=state_dir,
         client=client,
@@ -4219,7 +4161,7 @@ def test_2021_preview_rejects_malformed_or_multiple_project_rows(
     )
 
     exit_code, payload = execute(
-        ["preview", "--request-json", json.dumps(request)],
+        ["legacy-preview", "--request-json", json.dumps(request)],
         tmp_path=tmp_path,
         state_dir=state_dir,
         client=client,

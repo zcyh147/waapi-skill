@@ -226,8 +226,8 @@ def test_catalog_keeps_specific_builder_boundaries_and_hides_generic_bypass() ->
         "object.setRTPC",
     )
     assert batch.transaction_boundaries == ()
-    assert copy.transaction_boundaries[0]["operation"] == "object.copy"
-    assert copy.transaction_operations == ("waapi.call",)
+    assert copy.transaction_boundaries == ()
+    assert copy.transaction_operations == ("object.copy",)
     assert audio_import.transaction_operations == ("audio.import",)
     assert audio_import.preferred_route == "transaction_operation"
     assert tab_import.transaction_operations == ("audio.importTabDelimited",)
@@ -518,9 +518,8 @@ def test_compact_capability_representation_is_stable_and_keeps_boundaries_visibl
     }
     assert compact["interface_status"] == "available_via_transaction"
     assert compact["preferred_route"] == "transaction_operation"
-    assert compact["transaction_operations"] == ["waapi.call"]
-    assert compact["transaction_boundaries"][0]["operation"] == "object.copy"
-    assert "returned copy GUID" in compact["transaction_boundaries"][0]["boundary"]
+    assert compact["transaction_operations"] == ["object.copy"]
+    assert compact["transaction_boundaries"] == []
     assert compact["execution_contract"]["contract"] == "waapi-skill.public-execution-contract/v2"
     assert compact["execution_contract"]["route"] == "transaction"
     assert compact["execution_contract"]["executable"] is True

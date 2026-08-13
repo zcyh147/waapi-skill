@@ -295,8 +295,17 @@ def execute(tmp_path: Path, *arguments: str) -> tuple[int, dict[str, Any]]:
     def fail_if_connected(url: str) -> None:
         raise AssertionError(f"Offline Composer command connected to {url}")
 
+    normalized = list(arguments)
+    if "--action-json" in normalized:
+        index = normalized.index("--action-json")
+        mapping = json.loads(normalized[index + 1])
+        try:
+            facts = typed_action_cli_arguments(mapping)
+        except OperationComposerError:
+            facts = ("--action", str(mapping.get("action", "invalid")))
+        normalized[index:] = ["--facts", *facts]
     return waapi_gateway.execute_gateway(
-        ["--state-dir", str(tmp_path / "state"), *arguments],
+        ["--state-dir", str(tmp_path / "state"), *normalized],
         env=gateway_env(tmp_path),
         client_factory=fail_if_connected,
     )
@@ -312,6 +321,39 @@ def action_mapping(action_name: str, **fields: Any) -> dict[str, Any]:
 
 def action(action_name: str, **fields: Any) -> str:
     return json.dumps(action_mapping(action_name, **fields))
+
+
+def test_production_gateway_rejects_historical_action_json_without_writing(
+    tmp_path: Path,
+) -> None:
+    _code, started = execute(tmp_path, "draft-start", "object.set")
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    record_path = (
+        tmp_path / "state" / "operation-drafts-v1" / "records" / f"{draft_id}.json"
+    )
+    before = record_path.read_bytes()
+
+    with pytest.raises(SystemExit) as rejected:
+        waapi_gateway.execute_gateway(
+            [
+                "--state-dir",
+                str(tmp_path / "state"),
+                "draft-apply",
+                draft_id,
+                "--task-authority",
+                authority,
+                "--expected-revision",
+                "1",
+                "--action-json",
+                action("set_request_option", name="list_mode", value="append"),
+            ],
+            env=gateway_env(tmp_path),
+            client_factory=lambda url: pytest.fail(f"unexpected connection: {url}"),
+        )
+
+    assert rejected.value.code == 2
+    assert record_path.read_bytes() == before
 
 
 def live_info() -> dict[str, Any]:

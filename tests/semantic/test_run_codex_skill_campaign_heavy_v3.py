@@ -59,14 +59,17 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_object_set_composer_transaction_steps,
     build_transaction_protocol,
     query_object_step,
+    _typed_fact_cli_arguments,
 )
 from tests.semantic.support.codex_gateway_broker import (
     CodexGatewayBroker,
-    DraftActionJsonArgument,
+    DraftTypedActionArgument,
     ExpectedGatewayStep,
+    InlineTypedOperationArgument,
     MetadataQueryArgument,
     ResponseBinding,
     SemanticJsonArgument,
+    TypedRequestFactsArgument,
     resolve_gateway_invocation,
 )
 from tests.semantic.support.codex_harness import (
@@ -111,6 +114,16 @@ from wwise_waapi.platform_commands import (
     encode_windows_model_argv,
     encode_windows_powershell_argv,
 )
+from wwise_waapi.operation_composer import (
+    composition_projection,
+    operation_composer_digest,
+    typed_action_cli_arguments,
+)
+from wwise_waapi.operation_drafts import OperationDraftStore
+from wwise_waapi.operation_registry import operation_request_schema_digest
+from wwise_waapi.transaction_cleanup import transaction_cleanup_payload
+from wwise_waapi.typed_operations import inline_operation_cli_arguments
+from wwise_waapi.typed_requests import typed_request_construction_for_values
 from tests.semantic.support.codex_object_runtime_v3 import ObjectRuntimeSnapshot
 from tests.semantic.support.codex_soundbank_business_plan_v3 import (
     compile_soundbank_business_plan,
@@ -240,8 +253,8 @@ def test_archived_broker_replay_preserves_declared_composer_setup_order() -> Non
             "--expected-revision",
             ResponseBinding(start.name, "/draft/revision"),
             "--compact",
-            "--action-json",
-            DraftActionJsonArgument(
+            "--facts",
+            DraftTypedActionArgument(
                 {
                     "contract": "waapi-skill.operation-draft-action/v1",
                     "action": "set_import_option",
@@ -1790,16 +1803,19 @@ def _synthetic_protocol(
         request = _synthetic_audio_operation_request(unit, io_root=io_root)
         if unit.scenario.fixture.get("synthetic_preview_only") is not True:
             return build_transaction_protocol((request,))
-        step = ExpectedGatewayStep(
-            name="audio.preview",
-            subcommand="preview",
-            arguments=(
-                "--apply",
-                "--request-json",
-                SemanticJsonArgument(request),
-            ),
+        complete = build_transaction_protocol((request,))
+        preview_index = next(
+            index
+            for index, step in enumerate(complete.steps)
+            if step.subcommand in {"typed-call", "typed-operation", "preview-from-draft"}
         )
-        return V3GatewayProtocol((step,), (1,))
+        # Keep a deliberately incomplete lifecycle for the tamper test while
+        # still using the normal typed construction path.  The oracle must
+        # reject the missing execute/verify phases, not rely on retired JSON.
+        return V3GatewayProtocol(
+            complete.steps[: preview_index + 1],
+            (preview_index + 1,),
+        )
     steps = tuple(
         ExpectedGatewayStep(
             name=f"synthetic-step-{index}",
@@ -1868,7 +1884,10 @@ def _synthetic_gateway_records(
     transaction_id = "synthetic-transaction"
     transaction_store: TransactionStore | None = None
     awaiting_snapshot = None
-    if any(step.subcommand == "transaction-show" for step in protocol.steps):
+    has_draft_preview = any(
+        step.subcommand == "preview-from-draft" for step in protocol.steps
+    )
+    if any(step.subcommand == "transaction-show" for step in protocol.steps) and not has_draft_preview:
         transaction_store = TransactionStore(task_root / "broker" / "state")
         transaction_store.create_preview(
             transaction_id,
@@ -1881,6 +1900,29 @@ def _synthetic_gateway_records(
         awaiting_snapshot = transaction_store.load_snapshot(transaction_id)
         assert awaiting_snapshot.confirmation_token is not None
     records: list[dict[str, Any]] = []
+    draft_store = OperationDraftStore(task_root / "broker" / "state")
+    draft_started: dict[str, tuple[str, str, str, int]] = {}
+    required_response_values: dict[tuple[str, str], Any] = {}
+    for expected_step in protocol.steps:
+        for expected_argument in expected_step.arguments:
+            if isinstance(expected_argument, DraftTypedActionArgument):
+                for binding in expected_argument.response_bindings:
+                    key = binding.pointer.removeprefix("/")
+                    required_response_values[
+                        (binding.step, binding.response_pointer)
+                    ] = expected_argument.expected[key]
+
+    def set_pointer(payload: dict[str, Any], pointer: str, value: Any) -> None:
+        current: dict[str, Any] = payload
+        segments = pointer.removeprefix("/").split("/")
+        for segment in segments[:-1]:
+            child = current.get(segment)
+            if not isinstance(child, dict):
+                child = {}
+                current[segment] = child
+            current = child
+        current[segments[-1]] = value
+
     use_candidate_runner = False
     for index, step in enumerate(protocol.steps, start=1):
         arguments = [*step.gateway_global_arguments, step.subcommand]
@@ -1896,26 +1938,40 @@ def _synthetic_gateway_records(
                         separators=(",", ":"),
                     )
                 )
+            elif isinstance(item, DraftTypedActionArgument):
+                arguments.extend(typed_action_cli_arguments(item.expected))
+            elif isinstance(item, TypedRequestFactsArgument):
+                construction = typed_request_construction_for_values(
+                    item.contract,
+                    args=item.expected_args,
+                    options=item.expected_options,
+                )
+                arguments.extend(
+                    _typed_fact_cli_arguments(
+                        construction.facts,
+                        prefix=item.prefix,
+                    )
+                )
+            elif isinstance(item, InlineTypedOperationArgument):
+                arguments.extend(inline_operation_cli_arguments(item.expected)[1:])
             elif isinstance(item, ResponseBinding):
                 source = replay._payloads_by_step.get(item.step)  # noqa: SLF001
                 if source is None:
                     raise AssertionError("synthetic response binding is unavailable")
-                if item.pointer == "/transaction_id":
-                    bound = source.get("transaction_id")
-                elif item.pointer == "/confirmation/token":
-                    confirmation = source.get("confirmation")
-                    bound = (
-                        confirmation.get("token")
-                        if isinstance(confirmation, Mapping)
-                        else None
-                    )
-                else:
-                    raise AssertionError(
-                        "synthetic response binding pointer is not allow-listed"
-                    )
-                if not isinstance(bound, str) or not bound:
+                current: Any = source
+                for segment in item.pointer.removeprefix("/").split("/"):
+                    if isinstance(current, Mapping):
+                        current = current.get(segment)
+                    elif isinstance(current, list) and segment.isdigit():
+                        position = int(segment)
+                        current = current[position] if position < len(current) else None
+                    else:
+                        current = None
+                        break
+                bound = current
+                if not isinstance(bound, (str, int, float, bool)) or bound is None:
                     raise AssertionError("synthetic response binding is unavailable")
-                arguments.append(bound)
+                arguments.append(str(bound))
             else:
                 raise AssertionError("synthetic protocol argument is unsupported")
         model_argv = [
@@ -1942,7 +1998,218 @@ def _synthetic_gateway_records(
         }
         if structured_refusal:
             payload["error_code"] = step.expected_error_code
-        elif step.subcommand == "preview":
+        elif step.subcommand == "draft-start":
+            operation = str(step.arguments[0])
+            schema_digest = operation_request_schema_digest(operation, version)
+            composer_digest = operation_composer_digest(operation, version)
+            started = draft_store.start(
+                operation=operation,
+                version=version,
+                schema_digest=schema_digest,
+                composer_digest=composer_digest,
+            )
+            draft_started[operation] = (
+                started.record.draft_id,
+                started.task_authority,
+                schema_digest,
+                started.record.revision,
+            )
+            payload.update(
+                {
+                    "draft": {
+                        "draft_id": started.record.draft_id,
+                        "revision": started.record.revision,
+                        "lifecycle_state": "editable",
+                        "binding": {
+                            "operation": operation,
+                            "version": version,
+                            "schema_digest": schema_digest,
+                        },
+                        **composition_projection(
+                            operation,
+                            version,
+                            started.record.composition,
+                        ),
+                    },
+                    "task_authority": started.task_authority,
+                }
+            )
+        elif step.subcommand == "draft-apply":
+            operation = next(reversed(draft_started))
+            draft_id, authority, schema_digest, revision = draft_started[operation]
+            action_argument = next(
+                item
+                for item in step.arguments
+                if isinstance(item, DraftTypedActionArgument)
+            )
+            action = dict(action_argument.expected)
+            for binding in action_argument.response_bindings:
+                action[binding.pointer.removeprefix("/")] = required_response_values[
+                    (binding.step, binding.response_pointer)
+                ]
+            updated = draft_store.apply_action(
+                draft_id,
+                task_authority=authority,
+                expected_revision=revision,
+                schema_digest=schema_digest,
+                composer_digest=operation_composer_digest(operation, version),
+                action=action,
+            )
+            draft_started[operation] = (
+                draft_id,
+                authority,
+                schema_digest,
+                updated.revision,
+            )
+            payload["draft"] = {
+                "draft_id": draft_id,
+                "revision": updated.revision,
+                "lifecycle_state": "editable",
+                "binding": {
+                    "operation": operation,
+                    "version": version,
+                    "schema_digest": schema_digest,
+                },
+                "action_result": {
+                    "created_handles": sorted(
+                        value
+                        for (source_step, pointer), value in required_response_values.items()
+                        if source_step == step.name
+                        and pointer.endswith("/created_handles/0")
+                    ),
+                },
+                **composition_projection(
+                    operation,
+                    version,
+                    updated.composition,
+                ),
+            }
+        elif step.subcommand == "draft-check":
+            operation = next(reversed(draft_started))
+            draft_id, authority, schema_digest, revision = draft_started[operation]
+            materialized = draft_store.materialize_request(
+                draft_id,
+                task_authority=authority,
+                expected_revision=revision,
+                schema_digest=schema_digest,
+                composer_digest=operation_composer_digest(operation, version),
+            )
+            checked = draft_store.record_check(
+                draft_id,
+                task_authority=authority,
+                expected_revision=revision,
+                schema_digest=schema_digest,
+                composer_digest=operation_composer_digest(operation, version),
+                request_digest=materialized.request_digest,
+                project_guard={},
+                runtime_guard_fingerprint="b" * 64,
+                prepared_digest="c" * 64,
+            )
+            draft_started[operation] = (
+                draft_id,
+                authority,
+                schema_digest,
+                checked.revision,
+            )
+            payload["draft"] = {
+                "draft_id": draft_id,
+                "revision": checked.revision,
+                "lifecycle_state": "editable",
+                "binding": {
+                    "operation": operation,
+                    "version": version,
+                    "schema_digest": schema_digest,
+                },
+                **composition_projection(
+                    operation,
+                    version,
+                    checked.composition,
+                ),
+            }
+        elif step.subcommand == "draft-inspect":
+            operation = next(reversed(draft_started))
+            draft_id, _authority, schema_digest, revision = draft_started[operation]
+            payload["draft"] = {
+                "draft_id": draft_id,
+                "revision": revision,
+                "lifecycle_state": "editable",
+                "binding": {
+                    "operation": operation,
+                    "version": version,
+                    "schema_digest": schema_digest,
+                },
+            }
+        elif step.subcommand in {"request-map-container", "request-array-item"}:
+            payload.update(
+                {
+                    "handle": "trm1-" + "0" * 24,
+                    "schema_lineage_token": "synthetic-schema-lineage-token",
+                }
+            )
+        elif step.subcommand == "preview-from-draft":
+            operation = next(reversed(draft_started))
+            draft_id, authority, schema_digest, revision = draft_started[operation]
+            reservation = draft_store.reserve_seal(
+                draft_id,
+                task_authority=authority,
+                expected_revision=revision,
+                schema_digest=schema_digest,
+                composer_digest=operation_composer_digest(operation, version),
+                transaction_id=transaction_id,
+                apply=True,
+                ttl_seconds=1800,
+                policy="ask_before_changes",
+            )
+            artifact_hash = (
+                "a" * 64
+            )
+            canonical_request = reservation.request
+            prepared = {
+                "request": canonical_request,
+                "cleanup": {"kind": "none"},
+            }
+            artifact = {
+                "request": canonical_request,
+                "prepared_operation": prepared,
+            }
+            transaction_store = TransactionStore(task_root / "broker" / "state")
+            transaction_store.create_preview(transaction_id, artifact)
+            transaction_store.submit_for_confirmation(transaction_id)
+            awaiting_snapshot = transaction_store.load_snapshot(transaction_id)
+            artifact_hash = awaiting_snapshot.preview.artifact_hash
+            draft_store.commit_seal(
+                draft_id,
+                task_authority=authority,
+                source_revision=reservation.source_revision,
+                transaction_id=transaction_id,
+                artifact_hash=artifact_hash,
+                transaction_state="awaiting_confirmation",
+            )
+            payload.update(
+                {
+                    "transaction_id": transaction_id,
+                    "artifact_hash": artifact_hash,
+                    "state": "awaiting_confirmation",
+                    "cleanup": transaction_cleanup_payload(
+                        prepared,
+                        phase="preview",
+                    ),
+                }
+            )
+            payload["agent_result"] = {
+                "request": canonical_request,
+                "transaction_id": transaction_id,
+                "artifact_hash": artifact_hash,
+                "cleanup": transaction_cleanup_payload(
+                    prepared,
+                    phase="preview",
+                ),
+            }
+        elif step.subcommand in {
+            "preview",
+            "typed-call",
+            "typed-operation",
+        }:
             payload.update(
                 {
                     "transaction_id": transaction_id,
@@ -2058,21 +2325,61 @@ def _synthetic_gateway_records(
                 {
                     "transaction_id": transaction_id,
                     "artifact_hash": executed.artifact_hash,
+                    "cleanup": transaction_cleanup_payload(
+                        (
+                            awaiting_snapshot.preview.artifact["prepared_operation"]
+                            if "prepared_operation" in awaiting_snapshot.preview.artifact
+                            else {}
+                        ),
+                        phase="executed",
+                        execution_result={},
+                    ),
                 }
             )
         elif step.subcommand == "verify":
             assert transaction_store is not None
+            verification_details = {
+                "verification": {
+                    "contract": "waapi-skill.synthetic-verification/v1",
+                    "operation": (
+                        next(reversed(draft_started))
+                        if draft_started
+                        else "waapi.call"
+                    ),
+                    "status": "result_schema_checked",
+                    "ok": True,
+                    "verification_strength": "result_schema_only",
+                    "business_state_verified": False,
+                    "assertions": [],
+                    "readbacks": [],
+                }
+            }
             verified = transaction_store.record_verification(
                 transaction_id,
                 TransactionState.RESULT_SCHEMA_CHECKED,
+                details=verification_details,
             )
             payload.update(
                 {
                     "transaction_id": transaction_id,
                     "artifact_hash": verified.artifact_hash,
-                    "verification": {"verified": True},
+                    "verification": verification_details["verification"],
+                    "cleanup": transaction_cleanup_payload(
+                        (
+                            awaiting_snapshot.preview.artifact["prepared_operation"]
+                            if "prepared_operation" in awaiting_snapshot.preview.artifact
+                            else {}
+                        ),
+                        phase="verified",
+                        execution_result={},
+                    ),
                 }
             )
+        for (source_step, pointer), value in required_response_values.items():
+            if source_step == step.name:
+                set_pointer(payload, pointer, value)
+        if "agent_result" in payload:
+            payload["agent_result"] = payload.pop("agent_result")
         runner_command = [
             os.path.abspath(sys.executable),
             str(runner.resolve(strict=True)),
@@ -2117,11 +2424,15 @@ def _synthetic_gateway_records(
 def _synthetic_audio_transaction_request() -> dict[str, Any]:
     return {
         "contract": "waapi-skill.operation-request/v1",
-        "version": "2022.1",
+        "version": "2025.1",
         "operation": "waapi.call",
         "arguments": {
             "api": "ak.wwise.core.audio.convert",
-            "args": {"objects": [r"\Actor-Mixer Hierarchy\ConversionTarget"]},
+            "args": {
+                "objects": [r"\Actor-Mixer Hierarchy\ConversionTarget"],
+                "platforms": ["Windows"],
+                "languages": ["SFX"],
+            },
             "options": {},
             "io_root": "/private/synthetic-io",
         },
@@ -2156,12 +2467,16 @@ def test_campaign_accepts_soundbank_generate_semantic_protocol_kind() -> None:
     request = _synthetic_soundbank_generate_request()
     protocol = build_transaction_protocol((request,))
     evidence = SimpleNamespace(
-        provenance=SimpleNamespace(protocol=protocol),
+        provenance=SimpleNamespace(
+            protocol=protocol,
+            payload={"version": request["version"]},
+        ),
     )
-    preview_argument = protocol.steps[1].arguments[2]
-
-    assert isinstance(preview_argument, SemanticJsonArgument)
-    assert preview_argument.equivalence == "soundbank_generate_v1"
+    assert all(
+        not isinstance(argument, SemanticJsonArgument)
+        for step in protocol.steps
+        for argument in step.arguments
+    )
     assert campaign._heavy_v3_protocol_operation_request(evidence) == request
     campaign._validate_heavy_v3_completed_transaction_protocol(
         evidence,
@@ -2173,7 +2488,10 @@ def test_campaign_transaction_validator_accepts_only_the_show_token_response_cha
     request = _synthetic_audio_transaction_request()
     protocol = build_transaction_protocol((request,))
     evidence = SimpleNamespace(
-        provenance=SimpleNamespace(protocol=protocol),
+        provenance=SimpleNamespace(
+            protocol=protocol,
+            payload={"version": request["version"]},
+        ),
     )
 
     campaign._validate_heavy_v3_completed_transaction_protocol(
@@ -2226,7 +2544,10 @@ def test_campaign_transaction_validator_accepts_only_the_show_token_response_cha
         ):
             campaign._validate_heavy_v3_completed_transaction_protocol(
                 SimpleNamespace(
-                    provenance=SimpleNamespace(protocol=tampered),
+                    provenance=SimpleNamespace(
+                        protocol=tampered,
+                        payload={"version": request["version"]},
+                    ),
                 ),
                 expected_operation_request=request,
             )
@@ -2497,7 +2818,7 @@ def _synthetic_events(
                             "completed" if record["exit_code"] == 0 else "failed"
                         ),
                         "aggregated_output": json.dumps(
-                            record["payload"], ensure_ascii=False, sort_keys=True
+                            record["payload"], ensure_ascii=False
                         ),
                     },
                 },
@@ -2881,7 +3202,7 @@ def test_campaign_broker_seal_binds_confirmation_to_archived_transaction_store(
         options=options,
         task_root=task_root,
         protocol=protocol,
-        version="2022.1",
+        version="2025.1",
     )
     command_records = completed_command_records(
         parse_jsonl_events(
@@ -2905,7 +3226,7 @@ def test_campaign_broker_seal_binds_confirmation_to_archived_transaction_store(
         steps=protocol.steps,
         command_records=serialized_commands,
         options=options,
-        version="2022.1",
+        version="2025.1",
         label="durable confirmation",
     )
 
@@ -2940,7 +3261,7 @@ def test_campaign_broker_seal_binds_confirmation_to_archived_transaction_store(
             steps=protocol.steps,
             command_records=serialized_commands,
             options=options,
-            version="2022.1",
+            version="2025.1",
             label="tampered durable confirmation",
         )
 
@@ -2956,7 +3277,7 @@ def test_campaign_archive_rejects_equivalent_requoted_continuation(
         options=options,
         task_root=task_root,
         protocol=protocol,
-        version="2022.1",
+        version="2025.1",
     )
     command_records = list(
         completed_command_records(
@@ -3014,7 +3335,7 @@ def test_campaign_archive_rejects_equivalent_requoted_continuation(
                 for record in command_records
             ],
             options=options,
-            version="2022.1",
+            version="2025.1",
             label="requoted continuation",
         )
 
@@ -4768,6 +5089,21 @@ def _write_passing_project_outcome(
         "complete": True,
         "passed": True,
     }
+    composer_evidence = None
+    if any(
+        step.subcommand.startswith("draft-")
+        or step.subcommand == "preview-from-draft"
+        for step in protocol.steps
+    ):
+        from tests.semantic.support.codex_typed_draft_evidence_v3 import (
+            validate_typed_draft_evidence,
+        )
+
+        composer_evidence = validate_typed_draft_evidence(
+            state_directory=broker_state,
+            steps=protocol.steps,
+            broker_records=records,
+        )
     if unit.scenario.api == "ak.wwise.core.object.get":
         plan_payload = business_oracle_plan.payload
         final_response = _synthetic_object_final_response(plan_payload)
@@ -4842,9 +5178,7 @@ def _write_passing_project_outcome(
             ),
         )
         previous_prefix = prefix
-    matrix.write_json(
-        task_root / "task-result.json",
-        {
+    task_result = {
             "contract": campaign.HEAVY_V3_TASK_RESULT_CONTRACT,
             "scenario_id": unit.unit_id,
             "version": unit.version,
@@ -4856,7 +5190,12 @@ def _write_passing_project_outcome(
             ).hexdigest(),
             "broker": broker,
             "turn_grades": grades,
-        },
+        }
+    if composer_evidence is not None:
+        task_result["composer_evidence"] = composer_evidence
+    matrix.write_json(
+        task_root / "task-result.json",
+        task_result,
     )
     source_hash = {
         "algorithm": "sha256",
@@ -5254,7 +5593,8 @@ def test_heavy_validator_accepts_one_complete_abnormal_prefix_with_pending_suffi
         returncode=130,
     )
 
-    assert [row["status"] for row in result.observations] == ["PASS"]
+    if [row["status"] for row in result.observations] != ["PASS"]:
+        raise AssertionError(repr(result.phase_verdicts))
     assert result.pending_session_ids == ("OBJ22-F-GET-02", "OBJ22-F-GET-03")
 
 
@@ -5358,7 +5698,9 @@ def test_heavy_validator_accepts_frozen_materialized_request_prompt(
         returncode=0,
     )
 
-    assert [row["status"] for row in result.observations] == ["PASS"]
+    assert [row["status"] for row in result.observations] == ["PASS"], "\n".join(
+        verdict.reason for verdict in result.phase_verdicts
+    )
     archived = (
         root
         / "scenarios"
@@ -5392,7 +5734,7 @@ def test_heavy_validator_accepts_reviewed_confirmation_prompt(
         returncode=0,
     )
 
-    assert [row["status"] for row in result.observations] == ["PASS"]
+    assert [row["status"] for row in result.observations] == ["PASS"], result.phase_verdicts
     confirmation = (
         root
         / "scenarios"
@@ -5748,7 +6090,7 @@ def test_heavy_validator_maps_clean_pre_agent_quota_block_to_retryable(
         returncode=1,
     )
 
-    assert [row["status"] for row in result.observations] == ["RETRYABLE"]
+    assert [row["status"] for row in result.observations] == ["RETRYABLE"], result.phase_verdicts
     assert result.phase_verdicts[0].retry_category == "quota_or_rate_limit"
     assert result.retry_categories == ("quota_or_rate_limit",)
     assert result.pending_session_ids == ("OBJ22-F-GET-02", "OBJ22-F-GET-03")
@@ -7718,20 +8060,17 @@ def test_campaign_extracts_exact_media_pool_post_filter_protocol(
     }
 
     steps = list(protocol.steps)
-    media_step = steps[1]
+    media_index = next(
+        index
+        for index, step in enumerate(steps)
+        if step.subcommand == "draft-check"
+    )
+    media_step = steps[media_index]
     tampered_arguments = list(media_step.arguments)
     tampered_arguments[-2] = "--different-post-filter-flag"
-    steps[1] = replace(media_step, arguments=tuple(tampered_arguments))
-    tampered_protocol = replace(protocol, steps=tuple(steps))
-    tampered_provenance = replace(provenance, protocol=tampered_protocol)
-    with pytest.raises(
-        campaign.CampaignEvidenceError,
-        match="does not contain one exact call request",
-    ):
-        campaign._heavy_v3_protocol_call_request(
-            SimpleNamespace(provenance=tampered_provenance),
-            api="ak.wwise.core.mediaPool.get",
-        )
+    steps[media_index] = replace(media_step, arguments=tuple(tampered_arguments))
+    with pytest.raises(ValueError, match="closed Media Pool result filter"):
+        replace(protocol, steps=tuple(steps))
 
     archived = campaign._heavy_v3_plan_json_value(oracle)
     campaign._validate_media_pool_sealed_oracle(

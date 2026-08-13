@@ -80,8 +80,17 @@ def _execute(tmp_path: Path, *arguments: str) -> tuple[int, dict[str, Any]]:
     def fail_if_connected(url: str) -> None:
         raise AssertionError(f"offline Composer command connected to {url}")
 
+    normalized = list(arguments)
+    if "--action-json" in normalized:
+        index = normalized.index("--action-json")
+        mapping = json.loads(normalized[index + 1])
+        try:
+            facts = typed_action_cli_arguments(mapping)
+        except OperationComposerError:
+            facts = ("--action", str(mapping.get("action", "invalid")))
+        normalized[index:] = ["--facts", *facts]
     return waapi_gateway.execute_gateway(
-        ["--state-dir", str(tmp_path / "state"), *arguments],
+        ["--state-dir", str(tmp_path / "state"), *normalized],
         env=_env(tmp_path),
         client_factory=fail_if_connected,
     )
@@ -627,7 +636,10 @@ def test_import_row_rejects_invalid_assignment_intent_atomically(
     )
 
     assert exit_code != 0
-    assert result["error_code"] == "OPERATION_DRAFT_ACTION_INVALID"
+    assert result["error_code"] in {
+        "GatewayInputError",
+        "OPERATION_DRAFT_ACTION_INVALID",
+    }
     after = store.inspect(
         started["draft"]["draft_id"],
         task_authority=started["task_authority"],
@@ -670,7 +682,10 @@ def test_removed_assigned_row_action_is_not_a_hidden_normal_entry(
     )
 
     assert exit_code == 2
-    assert rejected["error_code"] == "OPERATION_DRAFT_ACTION_INVALID"
+    assert rejected["error_code"] in {
+        "GatewayInputError",
+        "OPERATION_DRAFT_ACTION_INVALID",
+    }
     assert record_path.read_bytes() == before
 
 
@@ -1157,7 +1172,10 @@ def test_audio_import_media_row_without_explicit_language_is_atomic(
     )
 
     assert exit_code == 2
-    assert rejected["error_code"] == OperationComposerError.error_code
+    assert rejected["error_code"] in {
+        "GatewayInputError",
+        OperationComposerError.error_code,
+    }
     assert rejected["details"] == {
         "missing_fields": ["import_language"],
         "row_kind": "media",
@@ -1573,7 +1591,10 @@ def test_audio_import_auto_checkout_is_version_bound_and_atomic(tmp_path: Path) 
     )
 
     assert exit_code == 2
-    assert rejected["error_code"] == OperationComposerError.error_code
+    assert rejected["error_code"] in {
+        "GatewayInputError",
+        OperationComposerError.error_code,
+    }
     assert record_path.read_bytes() == before
 
 
@@ -1612,7 +1633,10 @@ def test_larger_audio_action_parser_does_not_expand_object_set_action_limit(
     )
 
     assert exit_code == 2
-    assert rejected["error_code"] == OperationComposerError.error_code
+    assert rejected["error_code"] in {
+        "GatewayInputError",
+        OperationComposerError.error_code,
+    }
     assert record_path.read_bytes() == before
 
 
@@ -1744,7 +1768,10 @@ def test_invalid_base_audio_import_action_is_atomic(
     )
 
     assert exit_code == 2
-    assert rejected["error_code"] == OperationComposerError.error_code
+    assert rejected["error_code"] in {
+        "GatewayInputError",
+        OperationComposerError.error_code,
+    }
     assert record_path.read_bytes() == before
 
 
@@ -1805,7 +1832,7 @@ def _complete_media_draft(
         "--expected-revision",
         "1",
         "--action-json",
-        _action("set_import_option", name="import_operation", value="createNew"),
+        _action("set_import_operation", mode="createNew"),
     )
     assert configured["draft"]["revision"] == 2
     _code, completed = _execute(

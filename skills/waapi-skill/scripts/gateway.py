@@ -1177,6 +1177,10 @@ def build_parser() -> argparse.ArgumentParser:
     typed_call.add_argument("api")
     typed_call.add_argument("--schema-digest", required=True)
     typed_call.add_argument(
+        "--io-root",
+        help="Absolute caller-owned I/O authority for an isolated typed route",
+    )
+    typed_call.add_argument(
         "--apply",
         action="store_true",
         help="Enter the existing Preview authorization lifecycle for a change",
@@ -1771,7 +1775,6 @@ def build_parser() -> argparse.ArgumentParser:
             "option-looking strings as data"
         ),
     )
-    draft_apply.add_argument("--action-json", help=argparse.SUPPRESS)
 
     draft_check = subparsers.add_parser(
         "draft-check",
@@ -3046,6 +3049,16 @@ def preflight_typed_request_input(
         facts=facts,
     )
     capability = CapabilityCatalog().describe(versions[0], args.api)
+    isolated = capability.execution_contract["route"] == "isolated_transaction"
+    if isolated and not isinstance(args.io_root, str):
+        raise GatewayInputError(
+            "isolated typed-call requires --io-root for caller-owned file authority"
+        )
+    if not isolated and args.io_root is not None:
+        raise GatewayInputError(
+            "typed-call --io-root is accepted only for isolated routes"
+        )
+    args.typed_io_root = args.io_root if isolated else None
     requires_preview = capability.execution_contract["effect"] != "read"
     if not requires_preview and args.apply:
         raise GatewayInputError("typed-call --apply is reserved for changes")
@@ -3814,11 +3827,26 @@ def composer_operation_projection(
     *,
     version: str | None,
 ) -> dict[str, Any]:
-    """Return normal discovery without a copyable Legacy request shape."""
+    """Return normal discovery without a copyable Legacy request shape.
+
+    Descriptive constraints remain useful model-facing routing facts.  Only
+    the machine request document and its duplicated field schema are removed;
+    the typed operation/Composer contract below owns executable construction.
+    """
 
     projection = spec.as_dict(version=version)
     for field in _LEGACY_OPERATION_PROJECTION_FIELDS:
         projection.pop(field, None)
+    for field in ("constraints", "identity_contract", "parent_child_contract"):
+        value = spec.as_dict(version=version).get(field)
+        if value is not None:
+            projection[field] = value
+    if spec.name in {
+        "debug.restartWaapiServers",
+        "debug.testAssert",
+        "debug.testCrash",
+    }:
+        projection.pop("constraints", None)
     return projection
 
 
@@ -6274,6 +6302,11 @@ def dispatch_command(
                         "api": typed_request.uri,
                         "args": dict(typed_request.args),
                         "options": dict(typed_request.options),
+                        **(
+                            {"io_root": args.typed_io_root}
+                            if args.typed_io_root is not None
+                            else {}
+                        ),
                     },
                 }
                 return create_transaction_preview(
@@ -13813,31 +13846,9 @@ def parse_preview_request_object(text: str) -> dict[str, Any]:
     )
 
 
-def parse_operation_draft_action_object(text: str) -> dict[str, Any]:
-    """Parse a bounded Draft action that may carry reviewed inline media.
-
-    The Adapter applies its narrower operation-specific action ceiling after
-    this syntax-only parse, so object.set retains its existing 32 KiB limit.
-    """
-
-    return parse_json_object(
-        text,
-        "--action-json",
-        max_document_bytes=MAX_PREVIEW_JSON_INPUT_BYTES,
-        max_string_bytes=MAX_PREVIEW_JSON_STRING_BYTES,
-    )
-
-
 def parse_operation_draft_cli_action(args: argparse.Namespace) -> dict[str, Any]:
-    """Build the normal typed action or parse the hidden compatibility form."""
+    """Build the sole production Draft action from typed facts."""
 
-    typed_rows_present = bool(args.facts)
-    if args.action_json is not None:
-        if typed_rows_present:
-            raise GatewayInputError(
-                "draft-apply cannot combine typed fact flags with --action-json"
-            )
-        return parse_operation_draft_action_object(args.action_json)
     if not args.facts:
         raise GatewayInputError("draft-apply requires --facts --action and typed facts")
     try:

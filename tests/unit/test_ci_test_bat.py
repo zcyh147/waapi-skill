@@ -303,9 +303,9 @@ def test_program_manifest_is_the_single_ordered_cross_platform_node_source() -> 
     lines = PROGRAM_TEST_MANIFEST.read_text(encoding="utf-8").splitlines()
     nodes = load_program_nodes(PROGRAM_TEST_MANIFEST)
 
-    assert len(nodes) == 137
+    assert len(nodes) == 155
     assert nodes[0] == "tests/unit/test_gateway_session_context.py"
-    assert nodes[-1] == "tests/unit/test_public_route_registry_integrity.py"
+    assert nodes[-1] == "tests/unit/test_typed_authoring_ui_input.py"
     assert len(nodes) == len(set(nodes))
     for line in lines:
         if not line or line.startswith("#"):

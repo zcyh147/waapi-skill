@@ -10,6 +10,8 @@ from typing import Any, Mapping
 
 import pytest
 
+from wwise_waapi.typed_operations import inline_operation_cli_arguments
+
 from tests.semantic import run_codex_skill_campaign as campaign
 from tests.semantic.support.codex_campaign import CampaignEvidenceError
 from tests.semantic.support import codex_heavy_project_runner_v3 as project_runner
@@ -20,9 +22,10 @@ from tests.semantic.support.codex_integration_fixture_tree_v2 import (
     wwise_fixture_tree_sha256,
 )
 from tests.semantic.support.codex_gateway_broker import (
-    DraftActionJsonArgument,
+    DraftTypedActionArgument,
     CodexGatewayBroker,
     GatewayInvocationError,
+    InlineTypedOperationArgument,
     SemanticJsonArgument,
 )
 from tests.semantic.support.codex_integration_footsteps_runtime_v2 import (
@@ -628,7 +631,7 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
     ]
     assert len(import_actions) == 5
     assert all(
-        isinstance(argument, DraftActionJsonArgument)
+        isinstance(argument, DraftTypedActionArgument)
         and argument.operation == "audio.import"
         for argument in import_actions
     )
@@ -701,33 +704,26 @@ def test_scoped_remove_request_accepts_only_its_exact_path_equivalents(
         for step in case.prepared.protocol.steps
         if step.name == "tx02.preview"
     )
-    semantic_argument = preview_step.arguments[2]
-    assert isinstance(semantic_argument, SemanticJsonArgument)
-    assert semantic_argument.equivalence == (
-        "switch_container_remove_assignment_v1"
-    )
+    assert preview_step.subcommand == "typed-operation"
+    semantic_argument = preview_step.arguments[-1]
+    assert isinstance(semantic_argument, InlineTypedOperationArgument)
+    assert semantic_argument.expected == remove_request
     broker = CodexGatewayBroker(
         skill_source=(
             Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
         ),
         expected_steps=(preview_step,),
     )
-    encoded_request = json.dumps(
-        _plain(remove_request),
-        ensure_ascii=False,
-        separators=(",", ":"),
+    exact_arguments = (
+        "typed-operation",
+        *inline_operation_cli_arguments(remove_request),
     )
     semantic_hash, execution_arguments = broker._validate_step(  # noqa: SLF001
         preview_step,
-        ("preview", "--apply", "--request-json", encoded_request),
+        exact_arguments,
     )
     assert len(semantic_hash) == 64
-    assert execution_arguments == (
-        "preview",
-        "--apply",
-        "--request-json",
-        encoded_request,
-    )
+    assert execution_arguments[0] == "typed-operation"
 
     for child_as_path, value_as_path in (
         (True, False),
@@ -745,12 +741,14 @@ def test_scoped_remove_request_accepts_only_its_exact_path_equivalents(
                 "kind": "path",
                 "value": case.fake._path("surface_mud"),
             }
-        equivalent_json = json.dumps(equivalent, separators=(",", ":"))
-        _, equivalent_arguments = broker._validate_step(  # noqa: SLF001
-            preview_step,
-            ("preview", "--apply", "--request-json", equivalent_json),
-        )
-        assert equivalent_arguments[-1] == equivalent_json
+        with pytest.raises(GatewayInvocationError, match="sealed request"):
+            broker._validate_step(  # noqa: SLF001
+                preview_step,
+                (
+                    "typed-operation",
+                    *inline_operation_cli_arguments(equivalent),
+                ),
+            )
 
     exact_name_container = copy.deepcopy(_plain(remove_request))
     exact_name_container["arguments"]["switch_container"] = {
@@ -758,12 +756,14 @@ def test_scoped_remove_request_accepts_only_its_exact_path_equivalents(
         "type": "SwitchContainer",
         "name": "Player_Footsteps",
     }
-    exact_name_json = json.dumps(exact_name_container, separators=(",", ":"))
-    _, exact_name_arguments = broker._validate_step(  # noqa: SLF001
-        preview_step,
-        ("preview", "--apply", "--request-json", exact_name_json),
-    )
-    assert exact_name_arguments[-1] == exact_name_json
+    with pytest.raises(GatewayInvocationError, match="sealed request"):
+        broker._validate_step(  # noqa: SLF001
+            preview_step,
+            (
+                "typed-operation",
+                *inline_operation_cli_arguments(exact_name_container),
+            ),
+        )
 
     for invalid_container in (
         {"kind": "path", "value": r"\Player_Footsteps"},
@@ -780,14 +780,12 @@ def test_scoped_remove_request_accepts_only_its_exact_path_equivalents(
     ):
         invalid = copy.deepcopy(_plain(remove_request))
         invalid["arguments"]["switch_container"] = invalid_container
-        with pytest.raises(GatewayInvocationError, match="semantically equal"):
+        with pytest.raises(GatewayInvocationError, match="sealed request"):
             broker._validate_step(  # noqa: SLF001
                 preview_step,
                 (
-                    "preview",
-                    "--apply",
-                    "--request-json",
-                    json.dumps(invalid, separators=(",", ":")),
+                    "typed-operation",
+                    *inline_operation_cli_arguments(invalid),
                 ),
             )
 
@@ -800,14 +798,12 @@ def test_scoped_remove_request_accepts_only_its_exact_path_equivalents(
         "kind": "path",
         "value": case.fake._path("surface_group") + r"\Surface\Mud",
     }
-    with pytest.raises(GatewayInvocationError, match="semantically equal"):
+    with pytest.raises(GatewayInvocationError, match="sealed request"):
         broker._validate_step(  # noqa: SLF001
             preview_step,
             (
-                "preview",
-                "--apply",
-                "--request-json",
-                json.dumps(extra_group_segment, separators=(",", ":")),
+                "typed-operation",
+                *inline_operation_cli_arguments(extra_group_segment),
             ),
         )
 

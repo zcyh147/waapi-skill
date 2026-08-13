@@ -26,7 +26,7 @@ from tests.semantic.support.codex_integration_workflows_v2 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     CodexGatewayBroker,
-    DraftActionJsonArgument,
+    DraftTypedActionArgument,
     DraftActionQueryIdentityBinding,
     GatewayInvocationError,
     ResponseBinding,
@@ -567,7 +567,7 @@ def _typed_action_broker(
 ) -> tuple[CodexGatewayBroker, Any, dict[str, Any]]:
     def matches_requested_action(step: Any) -> bool:
         if step.subcommand != "draft-apply" or not isinstance(
-            step.arguments[-1], DraftActionJsonArgument
+            step.arguments[-1], DraftTypedActionArgument
         ):
             return False
         expected = step.arguments[-1].expected
@@ -584,7 +584,7 @@ def _typed_action_broker(
     ]
     step = matches[occurrence]
     argument = step.arguments[-1]
-    assert isinstance(argument, DraftActionJsonArgument)
+    assert isinstance(argument, DraftTypedActionArgument)
     handles = [f"odh1-{index:024x}" for index in range(1, 4)]
     current_facts = [
         {"handle": handle, "selector": {"kind": "id", "value": _guid(str(index))}}
@@ -594,7 +594,7 @@ def _typed_action_broker(
         candidate
         for candidate in prepared.protocol.steps
         if candidate.subcommand == "draft-apply"
-        and isinstance(candidate.arguments[-1], DraftActionJsonArgument)
+        and isinstance(candidate.arguments[-1], DraftTypedActionArgument)
         and candidate.arguments[-1].expected.get("action") == "add_target"
     ]
     handle_by_step = {
@@ -777,7 +777,7 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
         argument
         for step in tampered["steps"]
         for argument in step["arguments"]
-        if argument.get("kind") == "draft_action_json"
+        if argument.get("kind") == "draft_typed_action"
         and argument.get("query_identity_bindings")
     )
     identity_bound_argument["query_identity_bindings"][0]["step"] = (
@@ -799,7 +799,7 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
     ]
     assert len(action_steps) == 3
     assert all(
-        isinstance(step.arguments[-1], DraftActionJsonArgument)
+        isinstance(step.arguments[-1], DraftTypedActionArgument)
         for step in action_steps
     )
     reference_actions = [
@@ -832,10 +832,11 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
         "descendants",
     )
     assert audit.arguments[4:] == (
-        "--where-json",
-        SemanticJsonArgument(
-            {"field": "type", "operator": "=", "value": "Sound"}
-        ),
+        "--where",
+        "type",
+        "=",
+        "string",
+        "Sound",
         "--all-results",
         "--return-field",
         "id",
@@ -941,7 +942,7 @@ def test_composer_repeats_the_exact_reviewed_output_bus_path(
         step.arguments[-1].expected["references"][0]
         for step in prepared.protocol.steps
         if step.subcommand == "draft-apply"
-        and isinstance(step.arguments[-1], DraftActionJsonArgument)
+        and isinstance(step.arguments[-1], DraftTypedActionArgument)
         and step.arguments[-1].expected.get("references")
     ]
 
@@ -1034,7 +1035,7 @@ def test_compact_draft_replay_accepts_only_the_exact_queried_bus_guid(
     ] = action_steps
     for action_step in action_steps:
         argument = action_step.arguments[-1]
-        assert isinstance(argument, DraftActionJsonArgument)
+        assert isinstance(argument, DraftTypedActionArgument)
         actual_action = copy.deepcopy(dict(argument.expected))
         for binding in argument.response_bindings:
             actual_action[binding.pointer.removeprefix("/")] = handle_by_step[

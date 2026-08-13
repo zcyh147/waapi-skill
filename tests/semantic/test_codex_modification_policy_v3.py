@@ -18,7 +18,6 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
 from tests.semantic.support.codex_gateway_broker import (
     CodexGatewayBroker,
     ResponseBinding,
-    SemanticJsonArgument,
 )
 from tests.semantic.support.codex_modification_policy_v3 import (
     APPROVAL_POLICY,
@@ -176,30 +175,29 @@ def test_policy_protocols_have_exact_apply_and_turn_topologies() -> None:
     assert read_only.allowed_turn_prefix_counts == ((1,), (1,))
     assert read_only.accepted_terminal_prefixes == (1,)
 
-    assert tuple(step.subcommand for step in ask.steps) == (
-        "operation-schema",
-        "preview",
+    preview_index = next(
+        index for index, step in enumerate(ask.steps)
+        if step.subcommand == "preview-from-draft"
+    )
+    assert ask.turn_prefix_counts == (preview_index + 1, len(ask.steps))
+    assert tuple(step.subcommand for step in ask.steps[-4:]) == (
         "transaction-show",
         "confirm",
         "execute",
         "verify",
     )
-    assert ask.turn_prefix_counts == (2, 6)
-    assert ask.steps[1].arguments[:2] == ("--apply", "--request-json")
-    assert isinstance(ask.steps[1].arguments[2], SemanticJsonArgument)
+    assert all("--request-json" not in step.arguments for step in ask.steps)
 
-    assert tuple(step.subcommand for step in allow.steps) == (
-        "operation-schema",
-        "preview",
+    assert tuple(step.subcommand for step in allow.steps[-3:]) == (
+        "preview-from-draft",
         "execute",
         "verify",
     )
-    assert allow.turn_prefix_counts == (4,)
-    assert allow.steps[1].arguments[:2] == ("--apply", "--request-json")
-    assert allow.steps[2].arguments == (
+    assert allow.turn_prefix_counts == (len(allow.steps),)
+    assert allow.steps[-2].arguments == (
         ResponseBinding("tx01.preview", "/transaction_id"),
     )
-    assert allow.steps[3].arguments == (
+    assert allow.steps[-1].arguments == (
         ResponseBinding("tx01.execute", "/transaction_id"),
     )
 
@@ -207,7 +205,7 @@ def test_policy_protocols_have_exact_apply_and_turn_topologies() -> None:
 def test_policy_protocol_rejects_unknown_mode_or_nontransaction_base() -> None:
     with pytest.raises(V3ProtocolError, match="must be"):
         build_modification_policy_protocol(_base_protocol(), policy="unsafe")
-    with pytest.raises(V3ProtocolError, match="ordinary transaction"):
+    with pytest.raises(V3ProtocolError, match="base transaction protocol"):
         build_modification_policy_protocol(
             build_transaction_protocol(
                 [

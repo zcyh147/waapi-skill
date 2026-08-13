@@ -220,6 +220,7 @@ def _campaign_prompt_asset_read_fixture(
         path=scenario_root / "evidence" / "prompt-provenance.json",
         sha256="a" * 64,
         payload={
+            "version": "2022.1",
             "scenario_root": str(scenario_root),
             "owned_root": str(scenario_root / "owned"),
             "request": {

@@ -36,7 +36,10 @@ from tests.semantic.support.codex_audio_media_business_plan_v3 import (
     validate_media_archived_verification,
     validate_media_pool_business_plan,
 )
-from tests.semantic.support.codex_eval_protocol_v3 import build_direct_protocol, build_transaction_protocol, call_step
+from tests.semantic.support.codex_eval_protocol_v3 import (
+    build_direct_protocol,
+    build_transaction_protocol,
+)
 from tests.semantic.support.codex_eval_bundle_v3 import load_eval_bundle_v3
 from tests.semantic.support.codex_media_pool_runtime_v3 import (
     REFERENCE_MATCH_RESULT_CONTRACT,
@@ -299,7 +302,8 @@ def test_audio_rejects_preview_only_protocol_and_noop_stale_output(tmp_path: Pat
         build_transaction_protocol([plan.operation_request]),
         reviewed_scenario_fixture=reviewed_fixture,
     )
-    preview_only = build_direct_protocol([call_step("preview", AUDIO_CONVERT_URI)])
+    complete = build_transaction_protocol([plan.operation_request])
+    preview_only = build_direct_protocol([complete.steps[1]])
     with pytest.raises(AudioMediaBusinessPlanError, match="protocol"):
         validate_audio_conversion_business_plan(
             sections,

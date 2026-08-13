@@ -26,13 +26,18 @@ from tests.semantic.support.codex_prompt_provenance_v3 import (
 
 
 def _transaction_protocol(operation: str) -> V3GatewayProtocol:
+    arguments = (
+        {"files": ["/owned/definition.tsv"], "io_root": "/owned"}
+        if operation == "soundbank.processDefinitionFiles"
+        else {"fixture": "sealed-input"}
+    )
     return build_transaction_protocol(
         (
             {
                 "contract": "waapi-skill.operation-request/v1",
                 "version": "2025.1",
                 "operation": operation,
-                "arguments": {"fixture": "sealed-input"},
+                "arguments": arguments,
             },
         )
     )
@@ -109,6 +114,7 @@ def _provenance(
         path=root / "evidence" / "prompt-provenance.json",
         sha256="c" * 64,
         payload={
+            "version": "2025.1",
             "scenario_root": str(root),
             "owned_root": str(owned),
             "request": {

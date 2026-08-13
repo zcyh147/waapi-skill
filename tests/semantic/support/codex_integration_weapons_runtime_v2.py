@@ -32,7 +32,6 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     ExpectedGatewayStep,
-    SemanticJsonArgument,
     gateway_step_prefix_matches,
     gateway_step_sequence_matches,
 )
@@ -1675,10 +1674,11 @@ def _audit_query_step(root_path: str) -> ExpectedGatewayStep:
         root_path,
         "--select",
         "descendants",
-        "--where-json",
-        SemanticJsonArgument(
-            {"field": "type", "operator": "=", "value": "Sound"}
-        ),
+        "--where",
+        "type",
+        "=",
+        "string",
+        "Sound",
         "--all-results",
     ]
     for field in _AUDIT_RETURN_FIELDS:

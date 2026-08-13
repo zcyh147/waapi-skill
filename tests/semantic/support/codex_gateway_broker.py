@@ -46,6 +46,17 @@ from wwise_waapi.operation_composer import (
     new_composition,
     parse_typed_action_cli_arguments,
 )
+from wwise_waapi.operation_registry import (
+    OperationContractError,
+    parse_operation_request,
+)
+from wwise_waapi.typed_operations import inline_operation_cli_arguments
+from wwise_waapi.typed_requests import (
+    TypedRequestContract,
+    TypedRequestError,
+    TypedRequestFact,
+    materialize_typed_request,
+)
 from wwise_waapi.platform_commands import (
     PlatformCommandError,
     WINDOWS_MODEL_COMMAND_FAMILY,
@@ -830,6 +841,7 @@ _DRAFT_HANDLE_ARGUMENT_NAMES = frozenset(
     }
 )
 _DRAFT_HANDLE_POINTERS = frozenset(f"/{name}" for name in _DRAFT_HANDLE_ARGUMENT_NAMES)
+_DRAFT_TYPED_FACT_BINDING_POINTERS = frozenset({"/field_handle", "/value"})
 _DRAFT_FORBIDDEN_ACTION_KEYS = frozenset(
     {"request", "arguments", "uri", "args", "options", "waql", "request_json"}
 )
@@ -877,6 +889,25 @@ _DRAFT_ACTION_HANDLE_FIELDS_BY_OPERATION = {
         "remove_import_row": "import_handle",
     },
 }
+for _typed_operation in (
+    "object.create",
+    "object.createPlugin",
+    "object.setRTPC",
+    "soundbank.convertExternalSources",
+    "soundbank.generate",
+    "soundbank.setInclusions",
+    "ui.commands.register",
+    "ui.commands.unregister",
+    "lua.executeCliFile",
+    "lua.executeCoreFile",
+    "lua.executeCoreInline",
+    "ak.wwise.core.mediaPool.get",
+):
+    _DRAFT_ACTION_HANDLE_FIELDS_BY_OPERATION[_typed_operation] = {
+        "add_typed_fact": None,
+        "correct_typed_fact": None,
+        "remove_typed_fact": None,
+    }
 
 
 def _draft_action_contains_forbidden_key(value: Any) -> bool:
@@ -904,7 +935,7 @@ class DraftActionResponseBinding:
     response_pointer: str
 
     def __post_init__(self) -> None:
-        if self.pointer not in _DRAFT_HANDLE_POINTERS:
+        if self.pointer not in _DRAFT_HANDLE_POINTERS | _DRAFT_TYPED_FACT_BINDING_POINTERS:
             raise ValueError(
                 "DraftActionResponseBinding.pointer must name one reviewed handle field"
             )
@@ -924,6 +955,8 @@ class DraftActionResponseBinding:
                 )
                 or self.response_pointer
                 == "/draft/action_result/created_handles/0"
+                or self.response_pointer == "/handle"
+                or re.fullmatch(r"/choices/(0|[1-9][0-9]*)/handle", self.response_pointer)
             )
             or len(self.response_pointer) > 512
         ):
@@ -1012,7 +1045,7 @@ class DraftActionMetadataBinding:
 
 
 @dataclass(frozen=True, slots=True)
-class DraftActionJsonArgument:
+class DraftTypedActionArgument:
     """One fixed business action carried by the typed argv Interface."""
 
     expected: Mapping[str, Any]
@@ -1031,7 +1064,7 @@ class DraftActionJsonArgument:
             UnicodeError,
             ValueError,
         ) as exc:
-            raise ValueError("DraftActionJsonArgument.expected must be strict JSON") from exc
+            raise ValueError("DraftTypedActionArgument.expected must be strict JSON") from exc
         if (
             not isinstance(normalized, dict)
             or normalized.get("contract") != "waapi-skill.operation-draft-action/v1"
@@ -1041,13 +1074,13 @@ class DraftActionJsonArgument:
             or len(normalized["action"]) > 80
         ):
             raise ValueError(
-                "DraftActionJsonArgument requires one versioned typed action"
+                "DraftTypedActionArgument requires one versioned typed action"
             )
         forbidden = _draft_action_contains_forbidden_key(normalized)
         authored_handles = _DRAFT_HANDLE_ARGUMENT_NAMES & set(normalized)
         if forbidden or authored_handles:
             raise ValueError(
-                "DraftActionJsonArgument cannot contain a complete request, native payload, "
+                "DraftTypedActionArgument cannot contain a complete request, native payload, "
                 "or model-authored handle"
             )
         if (
@@ -1056,13 +1089,13 @@ class DraftActionJsonArgument:
             or self.operation != self.operation.strip()
             or len(self.operation) > 160
         ):
-            raise ValueError("DraftActionJsonArgument operation must be bounded")
+            raise ValueError("DraftTypedActionArgument operation must be bounded")
         operation_actions = _DRAFT_ACTION_HANDLE_FIELDS_BY_OPERATION.get(self.operation)
         if operation_actions is None:
-            raise ValueError("DraftActionJsonArgument operation is not reviewed")
+            raise ValueError("DraftTypedActionArgument operation is not reviewed")
         expected_handle = operation_actions.get(str(normalized["action"]), ...)
         if expected_handle is ...:
-            raise ValueError("DraftActionJsonArgument action is not in the reviewed vocabulary")
+            raise ValueError("DraftTypedActionArgument action is not in the reviewed vocabulary")
         if (
             not isinstance(self.response_bindings, tuple)
             or any(
@@ -1073,19 +1106,27 @@ class DraftActionJsonArgument:
             != len(self.response_bindings)
         ):
             raise ValueError(
-                "DraftActionJsonArgument.response_bindings must target unique handles"
+                "DraftTypedActionArgument.response_bindings must target unique handles"
             )
         bound_handle_fields = {
             binding.pointer.removeprefix("/") for binding in self.response_bindings
         }
-        if bound_handle_fields != ({expected_handle} if expected_handle is not None else set()):
+        expected_bound_fields = (
+            {expected_handle}
+            if expected_handle is not None
+            else (
+                bound_handle_fields
+                if normalized["action"] == "add_typed_fact"
+                and bound_handle_fields.issubset({"field_handle", "value"})
+                else set()
+            )
+        )
+        if bound_handle_fields != expected_bound_fields:
             raise ValueError(
-                "DraftActionJsonArgument must bind exactly the handle required by its action"
+                "DraftTypedActionArgument must bind exactly the handle required by its action"
             )
         if self.metadata_binding is not None:
-            if self.operation not in {"audio.import", "object.set"} or not isinstance(
-                self.metadata_binding, DraftActionMetadataBinding
-            ):
+            if not isinstance(self.metadata_binding, DraftActionMetadataBinding):
                 raise ValueError(
                     "Draft action metadata binding requires a reviewed Composer operation"
                 )
@@ -1125,6 +1166,10 @@ class DraftActionJsonArgument:
                     if isinstance(row, Mapping)
                     and isinstance(row.get("name"), str)
                 )
+            elif normalized["action"] == "add_typed_fact":
+                value = normalized.get("value")
+                if isinstance(value, str):
+                    dynamic_tokens.add(value)
             if not dynamic_tokens or not dynamic_tokens.issubset(
                 set(self.metadata_binding.required_tokens)
             ):
@@ -1143,14 +1188,14 @@ class DraftActionJsonArgument:
             != len(self.query_identity_bindings)
         ):
             raise ValueError(
-                "DraftActionJsonArgument query identity bindings must be unique"
+                "DraftTypedActionArgument query identity bindings must be unique"
             )
         for binding in self.query_identity_bindings:
             try:
                 target = _json_pointer(normalized, binding.pointer)
             except GatewayInvocationError as exc:
                 raise ValueError(
-                    "DraftActionJsonArgument query-bound target is absent"
+                    "DraftTypedActionArgument query-bound target is absent"
                 ) from exc
             valid_binding_shape = (
                 normalized.get("action") == "set_reference"
@@ -1168,9 +1213,85 @@ class DraftActionJsonArgument:
                 or not target["value"].startswith("\\")
             ):
                 raise ValueError(
-                    "DraftActionJsonArgument query identity is valid only for "
+                    "DraftTypedActionArgument query identity is valid only for "
                     "one exact path reference target"
                 )
+
+
+@dataclass(frozen=True, slots=True)
+class TypedRequestFactsArgument:
+    """One variable typed-fact tail bound to an exact packaged contract."""
+
+    contract: TypedRequestContract
+    expected_args: Mapping[str, Any]
+    expected_options: Mapping[str, Any]
+    prefix: str = ""
+    metadata_binding: DraftActionMetadataBinding | None = None
+    io_root: str | None = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.contract, TypedRequestContract):
+            raise ValueError("TypedRequestFactsArgument requires one typed contract")
+        if self.prefix not in {"", "option", "match", "typed"}:
+            raise ValueError("TypedRequestFactsArgument prefix is invalid")
+        if self.metadata_binding is not None and not isinstance(
+            self.metadata_binding, DraftActionMetadataBinding
+        ):
+            raise ValueError("TypedRequestFactsArgument metadata binding is invalid")
+        if self.io_root is not None and (
+            not isinstance(self.io_root, str)
+            or not self.io_root
+            or self.io_root != self.io_root.strip()
+        ):
+            raise ValueError("TypedRequestFactsArgument io_root is invalid")
+        try:
+            args = json.loads(_canonical_json_bytes(dict(self.expected_args)))
+            options = json.loads(_canonical_json_bytes(dict(self.expected_options)))
+        except (RecursionError, TypeError, UnicodeError, ValueError) as exc:
+            raise ValueError(
+                "TypedRequestFactsArgument values must be strict JSON objects"
+            ) from exc
+        if not isinstance(args, dict) or not isinstance(options, dict):
+            raise ValueError("TypedRequestFactsArgument values must be objects")
+
+
+@dataclass(frozen=True, slots=True)
+class InlineTypedOperationArgument:
+    """Broker-owned witness for one concise typed operation argv tail.
+
+    The canonical request is evidence, not a model-facing argument.  The
+    evaluated Agent still submits only the public typed-operation flags; the
+    Broker derives the only accepted spelling from this request and binds that
+    spelling to its canonical digest.
+    """
+
+    expected: Mapping[str, Any]
+    operation: str
+
+    def __post_init__(self) -> None:
+        try:
+            normalized = json.loads(
+                _canonical_json_bytes(dict(self.expected)).decode("utf-8")
+            )
+            operation = normalized.get("operation")
+            version = normalized.get("version")
+            if not isinstance(operation, str) or not isinstance(version, str):
+                raise ValueError("inline typed operation identity is incomplete")
+            if self.operation is not None and self.operation != operation:
+                raise ValueError("inline typed operation identity is misbound")
+            parse_operation_request(normalized, expected_version=version)
+            inline_operation_cli_arguments(normalized)
+        except (
+            GatewayInvocationError,
+            OperationContractError,
+            RecursionError,
+            TypeError,
+            UnicodeError,
+            ValueError,
+        ) as exc:
+            raise ValueError(
+                "InlineTypedOperationArgument requires one canonical inline request"
+            ) from exc
 
 
 ExpectedArgument = (
@@ -1183,8 +1304,65 @@ ExpectedArgument = (
     | MetadataBoundJsonArgument
     | ResponseBinding
     | ResponseBindingOrExactArgument
-    | DraftActionJsonArgument
+    | DraftTypedActionArgument
+    | TypedRequestFactsArgument
+    | InlineTypedOperationArgument
 )
+
+
+def _parse_typed_request_fact_argv(
+    arguments: Sequence[str],
+    *,
+    prefix: str,
+) -> tuple[TypedRequestFact, ...]:
+    flag_prefix = f"{prefix}-" if prefix else ""
+    flags = {
+        f"--{flag_prefix}set": ("set", 3),
+        f"--{flag_prefix}append": ("append", 3),
+        f"--{flag_prefix}present": ("present", 1),
+        f"--{flag_prefix}choose": ("choose", 2),
+        f"--{flag_prefix}choose-dynamic": ("choose-dynamic", 3),
+        f"--{flag_prefix}map-put": ("map-put", 4),
+        f"--{flag_prefix}map-correct": ("map-correct", 4),
+        f"--{flag_prefix}map-remove": ("map-remove", 2),
+    }
+    result: list[TypedRequestFact] = []
+    index = 0
+    while index < len(arguments):
+        flag = arguments[index]
+        spec = flags.get(flag)
+        if spec is None:
+            raise ValueError(f"unknown typed request fact flag {flag!r}")
+        action, width = spec
+        values = tuple(arguments[index + 1 : index + 1 + width])
+        if len(values) != width:
+            raise ValueError(f"typed request fact {flag!r} is incomplete")
+        if action in {"set", "append"}:
+            result.append(TypedRequestFact(action, values[0], values[1], values[2]))
+        elif action == "present":
+            result.append(TypedRequestFact(action, values[0], "null", "null"))
+        elif action == "choose":
+            result.append(TypedRequestFact(action, values[0], "branch", values[1]))
+        elif action == "choose-dynamic":
+            result.append(
+                TypedRequestFact(action, values[0], "choice", values[2], key=values[1])
+            )
+        elif action in {"map-put", "map-correct"}:
+            result.append(
+                TypedRequestFact(
+                    action,
+                    values[0],
+                    values[2],
+                    values[3],
+                    key=values[1],
+                )
+            )
+        else:
+            result.append(
+                TypedRequestFact(action, values[0], "null", "null", key=values[1])
+            )
+        index += 1 + width
+    return tuple(result)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1201,12 +1379,33 @@ class ExpectedGatewayStep:
     expected_error_code: str = ""
     expected_result_command: str = ""
     terminal_execute: bool = False
+    metadata_binding: DraftActionMetadataBinding | None = None
 
     def __post_init__(self) -> None:
         if not self.name or not self.name.strip():
             raise ValueError("ExpectedGatewayStep.name must be non-empty")
         if not self.subcommand or not self.subcommand.strip():
             raise ValueError("ExpectedGatewayStep.subcommand must be non-empty")
+        if self.metadata_binding is not None and not isinstance(
+            self.metadata_binding, DraftActionMetadataBinding
+        ):
+            raise ValueError("ExpectedGatewayStep metadata binding is invalid")
+        inline_witnesses = tuple(
+            argument
+            for argument in self.arguments
+            if isinstance(argument, InlineTypedOperationArgument)
+        )
+        if inline_witnesses:
+            if (
+                self.subcommand != "typed-operation"
+                or len(self.arguments) != 2
+                or not isinstance(self.arguments[0], str)
+                or len(inline_witnesses) != 1
+                or inline_witnesses[0].operation != self.arguments[0]
+            ):
+                raise ValueError(
+                    "typed-operation must bind one exact operation to its canonical witness"
+                )
         if type(self.allow_omitted_default_event_count_one) is not bool:
             raise ValueError(
                 "ExpectedGatewayStep.allow_omitted_default_event_count_one must be a bool"
@@ -1546,7 +1745,7 @@ def validate_commutative_composer_setup_step_groups(
             )
             or any(
                 not any(
-                    isinstance(argument, DraftActionJsonArgument)
+                    isinstance(argument, DraftTypedActionArgument)
                     and argument.operation == "audio.import"
                     and argument.metadata_binding is None
                     for argument in step.arguments
@@ -1590,7 +1789,7 @@ _DRAFT_SUBCOMMANDS = frozenset(
 )
 _DRAFT_ID_RE = re.compile(r"^od1-[0-9a-f]{32}$")
 _DRAFT_AUTHORITY_RE = re.compile(r"^da1-[0-9a-f]{40}$")
-_DRAFT_HANDLE_RE = re.compile(r"^odh1-[0-9a-f]{24}$")
+_DRAFT_HANDLE_RE = re.compile(r"^(?:odh1|odn1|trm1|trh1|trc1)-[0-9a-f]{24}$")
 _NUMBERED_DRAFT_ACTION_STEP_RE = re.compile(r"^(?P<prefix>.+\.action\.)\d{3}$")
 
 
@@ -1691,11 +1890,25 @@ def validate_operation_draft_protocol_steps(
                 )
             terminal_indexes.append(terminals[0])
         covered_draft_indexes: set[int] = set()
+        shared_pre_draft_reads = tuple(
+            step
+            for step in steps[: start_indexes[0]]
+            if step.subcommand in {"metadata", "query-object"}
+        )
         for flow_index, terminal_index in enumerate(terminal_indexes):
             segment_start = (
                 0 if flow_index == 0 else terminal_indexes[flow_index - 1] + 1
             )
-            segment = steps[segment_start : terminal_index + 1]
+            segment_body = steps[segment_start : terminal_index + 1]
+            # One bounded metadata/query discovery may intentionally bind
+            # several later transactions. Preserve that authenticated
+            # pre-Draft evidence while validating each independent Draft
+            # segment; do not require or duplicate another live read.
+            segment = (
+                segment_body
+                if flow_index == 0
+                else (*shared_pre_draft_reads, *segment_body)
+            )
             validate_operation_draft_protocol_steps(segment)
             covered_draft_indexes.update(
                 range(segment_start, terminal_index + 1)
@@ -1718,6 +1931,21 @@ def validate_operation_draft_protocol_steps(
     ):
         raise ValueError("draft-start must bind one exact operation name")
     draft_operation = start.arguments[0]
+    preceding_schema = next(
+        (
+            step
+            for step in reversed(steps[: steps.index(start)])
+            if step.subcommand == "operation-schema"
+        ),
+        None,
+    )
+    if (
+        preceding_schema is not None
+        and preceding_schema.arguments != (draft_operation,)
+    ):
+        raise ValueError(
+            "draft-start must follow the exact matching operation-schema"
+        )
     for step in steps:
         if step.subcommand not in {"preview", "legacy-preview"}:
             continue
@@ -1759,6 +1987,7 @@ def validate_operation_draft_protocol_steps(
     )
     if any(
         step.subcommand not in _DRAFT_SUBCOMMANDS
+        | {"request-map-container", "request-array-item"}
         for step in steps[start_index : draft_end_index + 1]
     ):
         raise ValueError(
@@ -1832,23 +2061,14 @@ def validate_operation_draft_protocol_steps(
             compact_action = (
                 len(arguments) == 8
                 and arguments[5:7] == ("--compact", "--facts")
-                and isinstance(arguments[7], DraftActionJsonArgument)
+                and isinstance(arguments[7], DraftTypedActionArgument)
             )
-            hidden_compatibility_action = (
-                len(arguments) == 8
-                and arguments[5:7] == ("--compact", "--action-json")
-                and isinstance(arguments[7], DraftActionJsonArgument)
-            ) or (
-                len(arguments) == 7
-                and arguments[5] == "--action-json"
-                and isinstance(arguments[6], DraftActionJsonArgument)
-            )
-            if not compact_action and not hidden_compatibility_action:
+            if not compact_action:
                 raise ValueError(
                     "draft-apply must carry exactly one typed Draft action"
                 )
             action_argument = arguments[-1]
-            assert isinstance(action_argument, DraftActionJsonArgument)
+            assert isinstance(action_argument, DraftTypedActionArgument)
             if action_argument.operation != draft_operation:
                 raise ValueError(
                     "typed Draft action operation must match draft-start"
@@ -1858,7 +2078,8 @@ def validate_operation_draft_protocol_steps(
                 if (
                     source_index is None
                     or source_index >= index
-                    or steps[source_index].subcommand != "draft-apply"
+                    or steps[source_index].subcommand
+                    not in {"draft-apply", "request-map-container", "request-array-item"}
                 ):
                     raise ValueError(
                         "typed Draft action handles must come from one prior draft-apply response"
@@ -1885,10 +2106,28 @@ def validate_operation_draft_protocol_steps(
                     raise ValueError(
                         "typed Draft action metadata must come from one pre-Draft read"
                     )
-        elif any(isinstance(value, DraftActionJsonArgument) for value in arguments):
+        elif any(isinstance(value, DraftTypedActionArgument) for value in arguments):
             raise ValueError("typed Draft actions are valid only on draft-apply")
-        if step.subcommand in {"draft-check", "draft-cancel"} and len(arguments) != 5:
-            raise ValueError(f"{step.subcommand} accepts only bound Draft authority and revision")
+        if step.subcommand == "draft-check":
+            media_pool_filter = (
+                draft_operation == "ak.wwise.core.mediaPool.get"
+                and len(arguments) == 9
+                and arguments[5] == "--post-filter-value"
+                and isinstance(arguments[6], str)
+                and arguments[7] == "--post-filter-limit"
+                and isinstance(arguments[8], str)
+                and arguments[8].isdigit()
+                and int(arguments[8]) > 0
+            )
+            if len(arguments) != 5 and not media_pool_filter:
+                raise ValueError(
+                    "draft-check accepts only bound Draft authority/revision "
+                    "and the closed Media Pool result filter"
+                )
+        if step.subcommand == "draft-cancel" and len(arguments) != 5:
+            raise ValueError(
+                "draft-cancel accepts only bound Draft authority and revision"
+            )
         if step.subcommand == "preview-from-draft":
             trailing = arguments[5:]
             valid_trailing = trailing in {
@@ -6822,21 +7061,10 @@ class CodexGatewayBroker:
         submitted_draft_action: Mapping[str, Any] | None = None
         if step.subcommand == "draft-apply":
             try:
-                if "--action-json" in resolved.gateway_arguments:
-                    action_index = (
-                        resolved.gateway_arguments.index("--action-json") + 1
-                    )
-                    decoded_action = _decode_json_argument(
-                        resolved.gateway_arguments[action_index],
-                        reject_duplicate_keys=True,
-                    )
-                else:
-                    action_index = (
-                        resolved.gateway_arguments.index("--facts") + 1
-                    )
-                    decoded_action = parse_typed_action_cli_arguments(
-                        resolved.gateway_arguments[action_index:]
-                    )
+                action_index = resolved.gateway_arguments.index("--facts") + 1
+                decoded_action = parse_typed_action_cli_arguments(
+                    resolved.gateway_arguments[action_index:]
+                )
             except (OperationComposerError, ValueError) as exc:
                 return self._reject(
                     resolved.raw_model_argv,
@@ -6869,12 +7097,12 @@ class CodexGatewayBroker:
             (
                 argument
                 for argument in current.arguments
-                if isinstance(argument, DraftActionJsonArgument)
+                if isinstance(argument, DraftTypedActionArgument)
             ),
             None,
         )
         if (
-            isinstance(current_argument, DraftActionJsonArgument)
+            isinstance(current_argument, DraftTypedActionArgument)
             and current_argument.operation == "audio.import"
         ):
             # Import row order is part of the canonical operation request and
@@ -7042,11 +7270,7 @@ class CodexGatewayBroker:
             metadata_discovery is None
             and step.subcommand == "draft-apply"
             and step.arguments
-            and isinstance(step.arguments[-1], DraftActionJsonArgument)
-            and (
-                len(step.arguments) < 2
-                or step.arguments[-2] != "--action-json"
-            )
+            and isinstance(step.arguments[-1], DraftTypedActionArgument)
         ):
             fixed_count = len(step.arguments) - 1
             if len(validation_arguments) <= fixed_count:
@@ -7064,6 +7288,91 @@ class CodexGatewayBroker:
             validation_arguments = (
                 *validation_arguments[:fixed_count],
                 _canonical_json_bytes(typed_action).decode("utf-8"),
+            )
+        typed_request_argument = next(
+            (
+                item
+                for item in step.arguments
+                if isinstance(item, TypedRequestFactsArgument)
+            ),
+            None,
+        )
+        if metadata_discovery is None and typed_request_argument is not None:
+            if not isinstance(step.arguments[-1], TypedRequestFactsArgument):
+                raise GatewayInvocationError(
+                    "typed request fact binding must be the final protocol argument"
+                )
+            fixed_count = len(step.arguments) - 1
+            try:
+                typed_facts = _parse_typed_request_fact_argv(
+                    validation_arguments[fixed_count:],
+                    prefix=typed_request_argument.prefix,
+                )
+                materialized = materialize_typed_request(
+                    typed_request_argument.contract,
+                    schema_digest=typed_request_argument.contract.schema_digest,
+                    facts=typed_facts,
+                )
+            except (TypedRequestError, ValueError) as exc:
+                raise GatewayInvocationError(
+                    f"step {step.name!r} typed request facts are invalid: {exc}"
+                ) from exc
+            if (
+                materialized.args != dict(typed_request_argument.expected_args)
+                or materialized.options
+                != dict(typed_request_argument.expected_options)
+            ):
+                raise GatewayInvocationError(
+                    f"step {step.name!r} typed facts do not materialize the sealed request"
+                )
+            validation_arguments = (
+                *validation_arguments[:fixed_count],
+                _canonical_json_bytes(
+                    {
+                        "schema_digest": typed_request_argument.contract.schema_digest,
+                        "facts": [
+                            {
+                                "action": fact.action,
+                                "handle": fact.handle,
+                                "value_type": fact.value_type,
+                                "value": fact.value,
+                                **({"key": fact.key} if fact.key is not None else {}),
+                            }
+                            for fact in typed_facts
+                        ],
+                        "args": materialized.args,
+                        "options": materialized.options,
+                    }
+                ).decode("utf-8"),
+            )
+        inline_operation_argument = next(
+            (
+                item
+                for item in step.arguments
+                if isinstance(item, InlineTypedOperationArgument)
+            ),
+            None,
+        )
+        if metadata_discovery is None and inline_operation_argument is not None:
+            if not isinstance(step.arguments[-1], InlineTypedOperationArgument):
+                raise GatewayInvocationError(
+                    "inline typed operation binding must be the final protocol argument"
+                )
+            expected_argv = inline_operation_cli_arguments(
+                inline_operation_argument.expected
+            )
+            fixed_count = len(step.arguments) - 1
+            expected_tail = expected_argv[fixed_count:]
+            supplied_tail = validation_arguments[fixed_count:]
+            if tuple(supplied_tail) != tuple(expected_tail):
+                raise GatewayInvocationError(
+                    f"step {step.name!r} inline typed argv differs from its sealed request"
+                )
+            validation_arguments = (
+                *validation_arguments[:fixed_count],
+                _canonical_json_bytes(dict(inline_operation_argument.expected)).decode(
+                    "utf-8"
+                ),
             )
         if (
             metadata_discovery is None
@@ -7271,7 +7580,7 @@ class CodexGatewayBroker:
                             ],
                         )
                     )
-                elif isinstance(expected, DraftActionJsonArgument):
+                elif isinstance(expected, DraftTypedActionArgument):
                     actual_json = _decode_json_argument(
                         supplied,
                         reject_duplicate_keys=True,
@@ -7290,7 +7599,7 @@ class CodexGatewayBroker:
                         bound = _json_pointer(source, binding.response_pointer)
                         if (
                             not isinstance(bound, str)
-                            or _DRAFT_HANDLE_RE.fullmatch(bound) is None
+                            or re.fullmatch(r"(?:odh1|tr[ma]1)-[0-9a-f]{24}", bound) is None
                         ):
                             raise GatewayInvocationError(
                                 f"step {step.name!r} Draft handle binding is invalid"
@@ -7459,6 +7768,70 @@ class CodexGatewayBroker:
                                 metadata_evidence,
                             )
                         )
+                elif isinstance(expected, TypedRequestFactsArgument):
+                    actual_json = _decode_json_argument(
+                        supplied,
+                        reject_duplicate_keys=True,
+                    )
+                    if (
+                        not isinstance(actual_json, Mapping)
+                        or actual_json.get("schema_digest")
+                        != expected.contract.schema_digest
+                        or actual_json.get("args") != dict(expected.expected_args)
+                        or actual_json.get("options")
+                        != dict(expected.expected_options)
+                    ):
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} typed materialization binding drifted"
+                        )
+                    semantic_values.append(actual_json)
+                    metadata_binding = expected.metadata_binding
+                    if metadata_binding is not None:
+                        source = self._payloads_by_step.get(metadata_binding.step)
+                        if source is None:
+                            raise GatewayInvocationError(
+                                f"step {step.name!r} typed metadata source is unavailable"
+                            )
+                        projection = project_required_metadata_tokens(
+                            source,
+                            object_type=metadata_binding.object_type,
+                            required_tokens=metadata_binding.required_tokens,
+                        )
+                        if (
+                            metadata_binding.expected_projection is not None
+                            and projection != metadata_binding.expected_projection
+                        ):
+                            raise GatewayInvocationError(
+                                f"step {step.name!r} typed metadata projection drifted"
+                            )
+                        semantic_values.append(
+                            {
+                                "typed_metadata_step": metadata_binding.step,
+                                "object_type": metadata_binding.object_type,
+                                "required_tokens": list(
+                                    metadata_binding.required_tokens
+                                ),
+                                "projection": [item.as_dict() for item in projection],
+                            }
+                        )
+                elif isinstance(expected, InlineTypedOperationArgument):
+                    actual_json = _decode_json_argument(
+                        supplied,
+                        reject_duplicate_keys=True,
+                    )
+                    if actual_json != dict(expected.expected):
+                        raise GatewayInvocationError(
+                            f"step {step.name!r} inline typed materialization drifted"
+                        )
+                    semantic_values.extend(
+                        (
+                            actual_json,
+                            "inline-typed-operation-materialization/v1",
+                            hashlib.sha256(
+                                _canonical_json_bytes(actual_json)
+                            ).hexdigest(),
+                        )
+                    )
                 elif isinstance(expected, ResponseBindingOrExactArgument):
                     source = self._payloads_by_step.get(expected.binding.step)
                     if source is None:
@@ -7533,6 +7906,45 @@ class CodexGatewayBroker:
                     semantic_values.append(bound)
                 else:  # pragma: no cover - type checker prevents this for normal callers
                     raise GatewayInvocationError(f"unsupported expected argument at index {index}")
+        if step.metadata_binding is not None:
+            metadata_binding = step.metadata_binding
+            source = self._payloads_by_step.get(metadata_binding.step)
+            source_steps = tuple(
+                candidate
+                for candidate in self.expected_steps
+                if candidate.name == metadata_binding.step
+            )
+            if (
+                source is None
+                or len(source_steps) != 1
+                or source_steps[0].subcommand != "metadata"
+                or len(source_steps[0].arguments) < 3
+                or source_steps[0].arguments[:2] != ("discover", "--object-type")
+                or source_steps[0].arguments[2] != metadata_binding.object_type
+            ):
+                raise GatewayInvocationError(
+                    f"step {step.name!r} metadata source is unavailable"
+                )
+            projection = project_required_metadata_tokens(
+                source,
+                object_type=metadata_binding.object_type,
+                required_tokens=metadata_binding.required_tokens,
+            )
+            if (
+                metadata_binding.expected_projection is not None
+                and projection != metadata_binding.expected_projection
+            ):
+                raise GatewayInvocationError(
+                    f"step {step.name!r} metadata projection drifted"
+                )
+            semantic_values.append(
+                {
+                    "step_metadata_binding": metadata_binding.step,
+                    "object_type": metadata_binding.object_type,
+                    "required_tokens": list(metadata_binding.required_tokens),
+                    "projection": [item.as_dict() for item in projection],
+                }
+            )
         return (
             _sha256_bytes(_canonical_json_bytes(semantic_values)),
             tuple(execution_arguments),
@@ -7980,7 +8392,7 @@ class CodexGatewayBroker:
             if action_step.subcommand != "draft-apply":
                 continue
             argument = action_step.arguments[-1]
-            if not isinstance(argument, DraftActionJsonArgument):
+            if not isinstance(argument, DraftTypedActionArgument):
                 continue
             for binding in argument.query_identity_bindings:
                 source = self._payloads_by_step.get(binding.step)
@@ -8047,7 +8459,7 @@ class CodexGatewayBroker:
                 continue
             argument = action_step.arguments[-1]
             if (
-                not isinstance(argument, DraftActionJsonArgument)
+                not isinstance(argument, DraftTypedActionArgument)
                 or argument.operation != "audio.import"
                 or argument.metadata_binding is None
             ):
@@ -8115,7 +8527,7 @@ class CodexGatewayBroker:
             if action_step.subcommand != "draft-apply":
                 continue
             argument = action_step.arguments[-1]
-            if not isinstance(argument, DraftActionJsonArgument):
+            if not isinstance(argument, DraftTypedActionArgument):
                 raise GatewayInvocationError(
                     "Draft canonical replay found an untyped action"
                 )
@@ -8396,7 +8808,7 @@ __all__ = [
     "WINDOWS_COMMAND_SHIM_NAMES",
     "WINDOWS_SHIM_SCRIPT_NAME",
     "CodexGatewayBroker",
-    "DraftActionJsonArgument",
+    "DraftTypedActionArgument",
     "DraftActionMetadataBinding",
     "DraftActionQueryIdentityBinding",
     "DraftActionResponseBinding",
@@ -8430,6 +8842,8 @@ __all__ = [
     "TrustedSubscriptionAckSpec",
     "TrustedStepObserver",
     "TrustedStepPreObserver",
+    "TypedRequestFactsArgument",
+    "InlineTypedOperationArgument",
     "reconcile_gateway_commands",
     "project_required_metadata_tokens",
     "resolve_gateway_invocation",

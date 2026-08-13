@@ -96,20 +96,83 @@ def _operation_request(
 
 
 def _workflow_protocol(unit: IntegrationWorkflowUnit) -> V3GatewayProtocol:
+    version = unit.version
+    sample_requests = {
+        "audio.import": {
+            "import_operation": "createNew",
+            "imports": [
+                {
+                    "audio_file": "/owned/rain.wav",
+                    "object_path": (
+                        r"\Actor-Mixer Hierarchy\Default Work Unit\Rain"
+                    ),
+                    "object_type": "Sound SFX",
+                    "import_language": "SFX",
+                }
+            ],
+        },
+        "object.set": {
+            "objects": [
+                {
+                    "object": {
+                        "kind": "path",
+                        "value": r"\Events\Default Work Unit\Play_Rain",
+                    },
+                    "properties": [{"name": "Volume", "value": -3.0}],
+                }
+            ],
+        },
+        "object.setRTPC": {
+            "object": {
+                "kind": "path",
+                "value": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+            },
+            "property": "Volume",
+            "control_input": {
+                "kind": "path",
+                "value": r"\Game Parameters\Default Work Unit\Rain",
+            },
+            "points": [{"x": 0.0, "y": -48.0, "shape": "Linear"}],
+            "mode": "add_or_replace",
+        },
+        "object.setReference": {
+            "object": {
+                "kind": "path",
+                "value": r"\Actor-Mixer Hierarchy\Default Work Unit\Alarm",
+            },
+            "reference": "OutputBus",
+            "target": {
+                "kind": "path",
+                "value": r"\Master-Mixer Hierarchy\Default Work Unit\SFX",
+            },
+        },
+        "soundbank.setInclusions": {
+            "soundbank": {
+                "kind": "path",
+                "value": r"\SoundBanks\Default Work Unit\Harbor_Release",
+            },
+            "mode": "replace",
+            "inclusions": [],
+        },
+        "soundbank.generate": {
+            "soundbanks": [
+                {"name": "Harbor_Release", "artifact_expectation": "nonlocalized"}
+            ],
+            "platforms": ["Windows", "Mac"],
+            "languages": ["SFX"],
+            "skip_languages": False,
+            "write_to_disk": True,
+            "io_root": "/owned",
+        },
+    }
     requests = []
     for transaction in unit.transactions:
-        arguments = (
-            {
-                "soundbanks": [{"name": "Harbor_Release"}],
-                "platforms": ["Windows", "Mac"],
-                "languages": ["SFX"],
-            }
-            if transaction.operation == "soundbank.generate"
-            else {"integration_transaction": transaction.index}
+        request = _operation_request(
+            transaction.operation,
+            sample_requests[transaction.operation],
         )
-        requests.append(
-            _operation_request(transaction.operation, arguments)
-        )
+        request["version"] = version
+        requests.append(request)
     transaction_protocol = build_transaction_protocol(tuple(requests))
     if unit.workflow_id != "alarm_diagnose_and_repair":
         return transaction_protocol

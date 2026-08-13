@@ -30,7 +30,7 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
     BROKER_TOKEN_ENV,
     BoundedIntegerArgument,
     CodexGatewayBroker,
-    DraftActionJsonArgument,
+    DraftTypedActionArgument,
     DraftActionMetadataBinding,
     DraftActionResponseBinding,
     ExactArgumentAlternatives,
@@ -70,6 +70,7 @@ from wwise_waapi.operation_composer import (
     apply_composer_action,
     composition_projection,
     new_composition,
+    typed_action_cli_arguments,
 )
 from wwise_waapi.transactions import confirmation_token_for
 from wwise_waapi.platform_commands import (
@@ -84,6 +85,35 @@ from wwise_waapi.platform_commands import (
 FAKE_ARTIFACT_HASH = "a" * 64
 FAKE_LAST_EVENT_HASH = "b" * 64
 FAKE_EVENT_SEQUENCE = 2
+
+
+def _typed_draft_argv(action: dict[str, object]) -> tuple[str, ...]:
+    return ("--compact", "--facts", *typed_action_cli_arguments(action))
+
+
+def test_current_broker_rejects_historical_draft_action_json_protocol() -> None:
+    start = ExpectedGatewayStep("draft.start", "draft-start", ("object.set",))
+    historical = ExpectedGatewayStep(
+        "draft.apply",
+        "draft-apply",
+        (
+            ResponseBinding(start.name, "/draft/draft_id"),
+            "--task-authority",
+            ResponseBinding(start.name, "/task_authority"),
+            "--expected-revision",
+            ResponseBinding(start.name, "/draft/revision"),
+            "--action-json",
+            DraftTypedActionArgument(
+                {
+                    "contract": "waapi-skill.operation-draft-action/v1",
+                    "action": "add_target",
+                    "selector": {"kind": "id", "value": 1},
+                }
+            ),
+        ),
+    )
+    with pytest.raises(ValueError, match="typed Draft action"):
+        broker_module.validate_operation_draft_protocol_steps((start, historical))
 
 
 def _metadata_discovery_payload(
@@ -652,8 +682,30 @@ elif command == "draft-apply":
         "--expected-revision",
         str(draft_marker["revision"]),
     ]
-    assert command_arguments[5] == "--action-json"
-    draft_action = json.loads(command_arguments[6])
+    assert command_arguments[5:7] == ["--compact", "--facts"]
+    fact_argv = command_arguments[7:]
+    assert fact_argv[:2] == ["--action", fact_argv[1]]
+    action_name = fact_argv[1]
+    draft_action = {
+        "contract": "waapi-skill.operation-draft-action/v1",
+        "action": action_name,
+    }
+    if action_name == "add_target":
+        target_index = fact_argv.index("--target")
+        selector_kind = fact_argv[target_index + 1]
+        selector_value = fact_argv[target_index + 2]
+        draft_action["selector"] = {
+            "kind": "id" if selector_kind.startswith("id-") else selector_kind,
+            "value": int(selector_value) if selector_kind == "id-integer" else selector_value,
+        }
+    elif action_name == "set_target_field":
+        handle_index = fact_argv.index("--target-handle")
+        field_index = fact_argv.index("--field")
+        draft_action.update(
+            target_handle=fact_argv[handle_index + 1],
+            name=fact_argv[field_index + 1],
+            value=fact_argv[field_index + 3],
+        )
     if draft_action["action"] == "add_target":
         draft_marker["current_facts"] = [
             {
@@ -1320,8 +1372,9 @@ def test_broker_executes_typed_draft_actions_with_gateway_response_bindings(
                 ResponseBinding("draft.start", "/task_authority"),
                 "--expected-revision",
                 ResponseBinding("draft.start", "/draft/revision"),
-                "--action-json",
-                DraftActionJsonArgument(
+                "--compact",
+                "--facts",
+                DraftTypedActionArgument(
                     {
                         "contract": action_contract,
                         "action": "add_target",
@@ -1342,8 +1395,9 @@ def test_broker_executes_typed_draft_actions_with_gateway_response_bindings(
                 ResponseBinding("draft.start", "/task_authority"),
                 "--expected-revision",
                 ResponseBinding("draft.target", "/draft/revision"),
-                "--action-json",
-                DraftActionJsonArgument(
+                "--compact",
+                "--facts",
+                DraftTypedActionArgument(
                     {
                         "contract": action_contract,
                         "action": "set_target_field",
@@ -1407,10 +1461,12 @@ def test_broker_executes_typed_draft_actions_with_gateway_response_bindings(
                 authority,
                 "--expected-revision",
                 "1",
-                "--action-json",
-                json.dumps(steps[1].arguments[-1].expected),
+                "--compact",
+                "--facts",
+                *typed_action_cli_arguments(steps[1].arguments[-1].expected),
             ],
         )
+        assert target_result.returncode == 0, target_result.stderr
         targeted = json.loads(target_result.stdout[target_result.stdout.index("{") :])
         handle = targeted["draft"]["current_facts"][0]["handle"]
         notes_action = {
@@ -1426,10 +1482,12 @@ def test_broker_executes_typed_draft_actions_with_gateway_response_bindings(
                 authority,
                 "--expected-revision",
                 "2",
-                "--action-json",
-                json.dumps(notes_action, ensure_ascii=False),
+                "--compact",
+                "--facts",
+                *typed_action_cli_arguments(notes_action),
             ],
         )
+        assert notes_result.returncode == 0, notes_result.stderr
         check_result = run_model_command(
             broker,
             [
@@ -1507,8 +1565,8 @@ def test_numbered_draft_actions_follow_handle_dependencies_not_fixture_order(
             "--expected-revision",
             ResponseBinding(start.name, "/draft/revision"),
             "--compact",
-            "--action-json",
-            DraftActionJsonArgument(
+            "--facts",
+            DraftTypedActionArgument(
                 {
                     "contract": contract,
                     "action": "add_target",
@@ -1530,8 +1588,8 @@ def test_numbered_draft_actions_follow_handle_dependencies_not_fixture_order(
             "--expected-revision",
             ResponseBinding(first_target.name, "/draft/revision"),
             "--compact",
-            "--action-json",
-            DraftActionJsonArgument(
+            "--facts",
+            DraftTypedActionArgument(
                 {
                     "contract": contract,
                     "action": "set_target_field",
@@ -1558,8 +1616,8 @@ def test_numbered_draft_actions_follow_handle_dependencies_not_fixture_order(
             "--expected-revision",
             ResponseBinding(first_notes.name, "/draft/revision"),
             "--compact",
-            "--action-json",
-            DraftActionJsonArgument(
+            "--facts",
+            DraftTypedActionArgument(
                 {
                     "contract": contract,
                     "action": "add_target",
@@ -1581,8 +1639,8 @@ def test_numbered_draft_actions_follow_handle_dependencies_not_fixture_order(
             "--expected-revision",
             ResponseBinding(second_target.name, "/draft/revision"),
             "--compact",
-            "--action-json",
-            DraftActionJsonArgument(
+            "--facts",
+            DraftTypedActionArgument(
                 {
                     "contract": contract,
                     "action": "set_target_field",
@@ -1629,8 +1687,8 @@ def test_numbered_draft_actions_follow_handle_dependencies_not_fixture_order(
             "--expected-revision",
             "2",
             "--compact",
-            "--action-json",
-            json.dumps(action, separators=(",", ":")),
+            "--facts",
+            *typed_action_cli_arguments(action),
         )
 
     second_notes_action = {
@@ -1695,7 +1753,7 @@ def test_audio_import_numbered_actions_remain_strictly_ordered(tmp_path: Path) -
         "draft": {"draft_id": draft_id, "revision": 1},
     }
     first_action = steps[first_action_index]
-    assert isinstance(first_action.arguments[-1], DraftActionJsonArgument)
+    assert isinstance(first_action.arguments[-1], DraftTypedActionArgument)
     assert "switch_assignment" not in first_action.arguments[-1].expected
 
     unexpected_assignment = dict(first_action.arguments[-1].expected)
@@ -1755,8 +1813,9 @@ def test_audio_import_action_handle_binding_rejects_cross_row_or_stale_handle(
                 ResponseBinding(start.name, "/task_authority"),
                 "--expected-revision",
                 ResponseBinding(source_revision, "/draft/revision"),
-                "--action-json",
-                DraftActionJsonArgument(
+                "--compact",
+                "--facts",
+                DraftTypedActionArgument(
                     {
                         "contract": contract,
                         "action": "add_import_row",
@@ -1783,8 +1842,9 @@ def test_audio_import_action_handle_binding_rejects_cross_row_or_stale_handle(
             ResponseBinding(start.name, "/task_authority"),
             "--expected-revision",
             ResponseBinding(row_b.name, "/draft/revision"),
-            "--action-json",
-            DraftActionJsonArgument(
+            "--compact",
+            "--facts",
+            DraftTypedActionArgument(
                 {
                     "contract": contract,
                     "action": "set_import_row_field",
@@ -1835,8 +1895,9 @@ def test_audio_import_action_handle_binding_rejects_cross_row_or_stale_handle(
             authority,
             "--expected-revision",
             "3",
-            "--action-json",
-            json.dumps(action, separators=(",", ":")),
+            "--compact",
+            "--facts",
+            *typed_action_cli_arguments(action),
         )
 
     broker._validate_step(edit_a, argv(handle_a))  # noqa: SLF001
@@ -1875,8 +1936,9 @@ def test_audio_import_action_binds_dynamic_tokens_to_live_metadata(
             ResponseBinding(start.name, "/task_authority"),
             "--expected-revision",
             ResponseBinding(start.name, "/draft/revision"),
-            "--action-json",
-            DraftActionJsonArgument(
+            "--compact",
+            "--facts",
+            DraftTypedActionArgument(
                 action_value,
                 operation="audio.import",
                 metadata_binding=DraftActionMetadataBinding(
@@ -1911,8 +1973,9 @@ def test_audio_import_action_binds_dynamic_tokens_to_live_metadata(
         "da1-" + "2" * 40,
         "--expected-revision",
         "1",
-        "--action-json",
-        json.dumps(action_value, ensure_ascii=False, separators=(",", ":")),
+        "--compact",
+        "--facts",
+        *typed_action_cli_arguments(action_value),
     )
 
     broker._validate_step(action, actual)  # noqa: SLF001
@@ -2090,8 +2153,8 @@ def test_audio_import_draft_action_accepts_explicit_gateway_owned_activation(
             "--expected-revision",
             ResponseBinding(start.name, "/draft/revision"),
             "--compact",
-            "--action-json",
-            DraftActionJsonArgument(
+            "--facts",
+            DraftTypedActionArgument(
                 expected_action,
                 operation="audio.import",
                 metadata_binding=DraftActionMetadataBinding(
@@ -2132,12 +2195,15 @@ def test_audio_import_draft_action_accepts_explicit_gateway_owned_activation(
         "--expected-revision",
         "1",
         "--compact",
-        "--action-json",
-        json.dumps(submitted, separators=(",", ":")),
+        "--facts",
+        *typed_action_cli_arguments(submitted),
     )
 
     explicit_hash, _ = broker._validate_step(action, argv)  # noqa: SLF001
-    omitted_argv = (*argv[:-1], json.dumps(expected_action, separators=(",", ":")))
+    omitted_argv = (
+        *argv[: argv.index("--facts") + 1],
+        *typed_action_cli_arguments(expected_action),
+    )
     omitted_hash, _ = broker._validate_step(action, omitted_argv)  # noqa: SLF001
     assert explicit_hash == omitted_hash
 
@@ -2605,8 +2671,9 @@ def test_broker_rejects_stale_draft_revision_before_runner_dispatch(
                 ResponseBinding("draft.start", "/task_authority"),
                 "--expected-revision",
                 ResponseBinding("draft.start", "/draft/revision"),
-                "--action-json",
-                DraftActionJsonArgument(
+                "--compact",
+                "--facts",
+                DraftTypedActionArgument(
                     {
                         "contract": "waapi-skill.operation-draft-action/v1",
                         "action": "add_target",
@@ -2633,8 +2700,9 @@ def test_broker_rejects_stale_draft_revision_before_runner_dispatch(
                 started["task_authority"],
                 "--expected-revision",
                 "2",
-                "--action-json",
-                json.dumps(steps[1].arguments[-1].expected),
+                "--compact",
+                "--facts",
+                *typed_action_cli_arguments(steps[1].arguments[-1].expected),
             ],
         )
 
@@ -2687,8 +2755,9 @@ def test_broker_does_not_replace_wrong_typed_draft_business_values(
                 ResponseBinding("draft.start", "/task_authority"),
                 "--expected-revision",
                 ResponseBinding("draft.start", "/draft/revision"),
-                "--action-json",
-                DraftActionJsonArgument(
+                "--compact",
+                "--facts",
+                DraftTypedActionArgument(
                     {
                         "contract": action_contract,
                         "action": "add_target",
@@ -2706,8 +2775,9 @@ def test_broker_does_not_replace_wrong_typed_draft_business_values(
                 ResponseBinding("draft.start", "/task_authority"),
                 "--expected-revision",
                 ResponseBinding("draft.target", "/draft/revision"),
-                "--action-json",
-                DraftActionJsonArgument(
+                "--compact",
+                "--facts",
+                DraftTypedActionArgument(
                     {
                         "contract": action_contract,
                         "action": "set_target_field",
@@ -2743,8 +2813,9 @@ def test_broker_does_not_replace_wrong_typed_draft_business_values(
                 started["task_authority"],
                 "--expected-revision",
                 "1",
-                "--action-json",
-                json.dumps(steps[1].arguments[-1].expected),
+                "--compact",
+                "--facts",
+                *typed_action_cli_arguments(steps[1].arguments[-1].expected),
             ],
         )
         targeted = json.loads(target_result.stdout[target_result.stdout.index("{") :])
@@ -2762,8 +2833,9 @@ def test_broker_does_not_replace_wrong_typed_draft_business_values(
                 started["task_authority"],
                 "--expected-revision",
                 "2",
-                "--action-json",
-                json.dumps(wrong_action),
+                "--compact",
+                "--facts",
+                *typed_action_cli_arguments(wrong_action),
             ],
         )
 
@@ -2849,7 +2921,7 @@ def test_typed_draft_protocol_rejects_prefilled_handles_and_json_bypass(
     tmp_path: Path,
 ) -> None:
     with pytest.raises(ValueError, match="model-authored handle"):
-        DraftActionJsonArgument(
+        DraftTypedActionArgument(
             {
                 "contract": "waapi-skill.operation-draft-action/v1",
                 "action": "set_property",
@@ -2859,7 +2931,7 @@ def test_typed_draft_protocol_rejects_prefilled_handles_and_json_bypass(
             }
         )
     with pytest.raises(ValueError, match="complete request"):
-        DraftActionJsonArgument(
+        DraftTypedActionArgument(
             {
                 "contract": "waapi-skill.operation-draft-action/v1",
                 "action": "set_property",
@@ -7043,6 +7115,23 @@ def test_weather_agent_metadata_step_crosses_broker_validation(
                         ],
                     }
                 ]
+            }
+        elif operation == "object.setRTPC":
+            arguments = {
+                "object": {
+                    "kind": "path",
+                    "value": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+                },
+                "property": "Volume",
+                "control_input": {
+                    "kind": "path",
+                    "value": r"\Game Parameters\Default Work Unit\RainIntensity",
+                },
+                "points": [
+                    {"x": 0.0, "y": -96.0, "shape": "Linear"},
+                    {"x": 100.0, "y": 0.0, "shape": "Linear"},
+                ],
+                "mode": "add_or_replace",
             }
         return {
             "contract": "waapi-skill.operation-request/v1",

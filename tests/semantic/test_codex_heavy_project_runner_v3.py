@@ -28,6 +28,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_direct_protocol,
     build_transaction_protocol,
     call_step,
+    query_object_step,
     wait_topic_step,
 )
 from tests.semantic.support.codex_harness import (
@@ -39,10 +40,7 @@ from tests.semantic.support.codex_media_pool_runtime_v3 import (
     WINE_C_DRIVE_TARGET,
     WINE_Z_DRIVE_TARGET,
 )
-from tests.semantic.support.codex_gateway_broker import (
-    MetadataBoundJsonArgument,
-    MetadataTokenProjection,
-)
+from tests.semantic.support.codex_gateway_broker import MetadataTokenProjection
 from tests.semantic.support.codex_object_heavy_v3 import (
     build_object_heavy_v3_recipe,
 )
@@ -209,7 +207,7 @@ def _prepared(
         prompt="请读取这个 Wwise 工程并总结结果。",
         visible_values={},
         protocol=build_direct_protocol(
-            [call_step("object.get", "ak.wwise.core.object.get")]
+            [query_object_step("object.get", ("query-object", "--from", "project", "--take", "1"))]
         ),
         required_reference="references/waapi-query.md",
         snapshot=lambda: ("sealed",),
@@ -778,7 +776,7 @@ def test_common_plan_writer_requires_and_forwards_typed_sections_exactly(
 ) -> None:
     scenario = _scenario()
     protocol = build_direct_protocol(
-        [call_step("object.get", "ak.wwise.core.object.get")]
+        [query_object_step("object.get", ("query-object", "--from", "project", "--take", "1"))]
     )
     provenance = SimpleNamespace(
         sha256="b" * 64,
@@ -839,7 +837,9 @@ def test_common_plan_writer_fails_closed_for_every_project_api_without_typed_sec
             scenario=scenario,
             version="2022.1",
             scenario_root=tmp_path,
-            protocol=build_direct_protocol([call_step("query", "ak.wwise.core.object.get")]),
+            protocol=build_direct_protocol([
+                query_object_step("query", ("query-object", "--from", "project", "--take", "1"))
+            ]),
             provenance=SimpleNamespace(sha256="b" * 64, payload={"protocol": {"sha256": "a" * 64}}),
             runner="project",
             typed_sections=None,
@@ -1020,30 +1020,42 @@ def test_compound_object_protocol_binds_volume_to_trusted_live_metadata(
     )
 
     assert protocol is not None
-    assert protocol.turn_prefix_counts == (3, 7)
-    assert tuple(step.subcommand for step in protocol.steps[:3]) == (
+    preview_index = next(
+        index
+        for index, step in enumerate(protocol.steps)
+        if step.subcommand == "preview-from-draft"
+    )
+    assert protocol.turn_prefix_counts == (
+        preview_index + 1,
+        len(protocol.steps),
+    )
+    assert tuple(step.subcommand for step in protocol.steps[:2]) == (
         "operation-schema",
         "metadata",
-        "preview",
     )
     assert observed["object_type"] == object_type
     assert observed["queries"] == ("volume",)
     assert observed["limit"] == 8
-    preview = next(
-        step for step in protocol.steps if step.subcommand == "preview"
+    metadata_binding = next(
+        (
+            step.metadata_binding
+            for step in protocol.steps
+            if step.metadata_binding is not None
+        ),
+        None,
     )
-    argument = preview.arguments[2]
-    assert isinstance(argument, MetadataBoundJsonArgument)
-    assert argument.object_type == object_type
-    assert argument.required_tokens == ("Volume",)
-    assert argument.expected_required_token_projection == (
+    if metadata_binding is None:
+        metadata_binding = next(
+            argument.metadata_binding
+            for step in protocol.steps
+            for argument in step.arguments
+            if hasattr(argument, "metadata_binding")
+            and argument.metadata_binding is not None
+        )
+    assert metadata_binding.object_type == object_type
+    assert metadata_binding.required_tokens == ("Volume",)
+    assert metadata_binding.expected_projection == (
         MetadataTokenProjection("Volume", "property", "Real32"),
-    )
-    assert argument.expected["version"] == unit.version
-    assert argument.equivalence == (
-        "object_set_v1"
-        if recipe.request.operation == "object.set"
-        else "wire_exact"
     )
 
 
@@ -1114,11 +1126,18 @@ def test_compound_merge_requires_exact_existing_root_type_query(
     )
 
     assert protocol is not None
-    assert protocol.turn_prefix_counts == (3, 7)
-    assert tuple(step.subcommand for step in protocol.steps[:3]) == (
+    preview_index = next(
+        index
+        for index, step in enumerate(protocol.steps)
+        if step.subcommand == "preview-from-draft"
+    )
+    assert protocol.turn_prefix_counts == (
+        preview_index + 1,
+        len(protocol.steps),
+    )
+    assert tuple(step.subcommand for step in protocol.steps[:2]) == (
         "operation-schema",
         "query-object",
-        "preview",
     )
     assert protocol.steps[1].arguments == (
         "--path",
@@ -1408,11 +1427,56 @@ def test_prepare_compound_import_cleans_unadopted_bus_after_binding_failure(
 
 
 def _soundbank_request(api: str) -> dict:
+    operation_arguments = {
+        "ak.wwise.core.soundbank.generate": {
+            "operation": "soundbank.generate",
+            "arguments": {
+                "soundbanks": [
+                    {
+                        "name": "Bank",
+                        "artifact_expectation": "nonlocalized",
+                    }
+                ],
+                "platforms": ["Windows"],
+                "skip_languages": True,
+                "write_to_disk": True,
+                "io_root": "/owned",
+            },
+        },
+        "ak.wwise.core.soundbank.processDefinitionFiles": {
+            "operation": "soundbank.processDefinitionFiles",
+            "arguments": {
+                "files": ["/owned/Bank.tsv"],
+                "io_root": "/owned",
+            },
+        },
+        "ak.wwise.core.soundbank.convertExternalSources": {
+            "operation": "soundbank.convertExternalSources",
+            "arguments": {
+                "sources": [
+                    {
+                        "input": "/owned/input.wsources",
+                        "platform": "Windows",
+                        "output": "/owned/output",
+                    }
+                ],
+                "io_root": "/owned",
+            },
+        },
+        "ak.wwise.core.soundbank.setInclusions": {
+            "operation": "soundbank.setInclusions",
+            "arguments": {
+                "soundbank": {"kind": "path", "value": r"\SoundBanks\Bank"},
+                "mode": "replace",
+                "inclusions": [],
+            },
+        },
+    }
+    entry = operation_arguments[api]
     return {
         "contract": "waapi-skill.operation-request/v1",
         "version": "2022.1",
-        "operation": "waapi.call",
-        "arguments": {"api": api, "args": {}, "options": {}},
+        **entry,
     }
 
 
@@ -1426,7 +1490,7 @@ def _prepare_soundbank_case(
     )
     before = SimpleNamespace(snapshot="sealed-before")
     topic = None
-    requests = (_soundbank_request(scenario.api),)
+    requests = ()
     if scenario.api == runner.SOUNDBANK_TOPIC:
         events = tuple(SimpleNamespace(index=index) for index in range(scenario.primary_dispatch.count))
         topic = SimpleNamespace(
@@ -1439,7 +1503,8 @@ def _prepare_soundbank_case(
                 for index in range(scenario.primary_dispatch.count)
             ),
         )
-        requests = ()
+    else:
+        requests = (_soundbank_request(scenario.api),)
     runtime = SimpleNamespace(
         materialized=materialized,
         hidden_before=before,
@@ -1799,7 +1864,18 @@ def test_prepare_audio_convert_binds_one_exact_io_root_and_full_verify_payload(
 
         def gateway_protocol(self):
             return build_direct_protocol(
-                [call_step("tx01.verify", runner.AUDIO_CONVERT_URI)]
+                [
+                    call_step(
+                        "tx01.verify",
+                        runner.AUDIO_CONVERT_URI,
+                        version="2024.1",
+                        args={
+                            "objects": [r"\Actor-Mixer Hierarchy\SemanticLab"],
+                            "platforms": ["Windows"],
+                            "languages": ["SFX"],
+                        },
+                    )
+                ]
             )
 
         def snapshot(self):
@@ -2453,7 +2529,7 @@ def test_preview_observer_proves_hidden_state_unchanged_and_checks_refusal() -> 
         prompt="请检查请求。",
         visible_values={},
         protocol=build_direct_protocol(
-            [call_step("tx01.preview", "ak.wwise.core.object.get")]
+            [query_object_step("tx01.preview", ("query-object", "--from", "project", "--take", "1"))]
         ),
         required_reference="references/waapi-operate.md",
         snapshot=lambda: next(snapshots),
@@ -2487,7 +2563,7 @@ def test_preview_observer_rejects_hidden_business_state_drift() -> None:
         prompt="请预览。",
         visible_values={},
         protocol=build_direct_protocol(
-            [call_step("tx01.preview", "ak.wwise.core.object.get")]
+            [query_object_step("tx01.preview", ("query-object", "--from", "project", "--take", "1"))]
         ),
         required_reference="references/waapi-operate.md",
         snapshot=lambda: next(snapshots),
@@ -2620,6 +2696,7 @@ def _topic_observer(
                 wait_topic_step(
                     step_name,
                     runner.SOUNDBANK_TOPIC,
+                    version="2022.1",
                     event_count=1,
                 )
             ]

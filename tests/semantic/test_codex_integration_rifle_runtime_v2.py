@@ -30,7 +30,7 @@ from tests.semantic.support.codex_integration_rifle_runtime_v2 import (
     prepare_rifle_integration_runtime,
 )
 from tests.semantic.support.codex_gateway_broker import (
-    DraftActionJsonArgument,
+    DraftTypedActionArgument,
     gateway_step_sequence_matches,
 )
 from tests.semantic.support.codex_integration_workflows_v2 import (
@@ -766,7 +766,7 @@ def test_rifle_composer_preserves_every_exact_import_row(
     ]
     assert len(action_arguments) == 5
     assert all(
-        isinstance(argument, DraftActionJsonArgument)
+        isinstance(argument, DraftTypedActionArgument)
         and argument.operation == "audio.import"
         for argument in action_arguments
     )

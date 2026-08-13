@@ -22,6 +22,7 @@ from tests.semantic.support.codex_filesystem_security import (
 )
 
 import wwise_waapi.dispatcher as dispatcher_module
+from wwise_waapi.operation_registry import OPERATION_SPECS
 from wwise_waapi.builders.query import (  # pyright: ignore[reportMissingImports]
     MAX_ADVANCED_RETURN_EXPRESSION_BYTES,
     MAX_ADVANCED_WAQL_BYTES,
@@ -958,10 +959,12 @@ def test_gateway_import_schemas_share_semantic_import_operation_contract(
     dependency_contract = direct_operation["argument_contract"][
         "request_composition_contract"
     ]["metadata_dependency_closure"]
-    tab_argument_contract = tab_operation["argument_contract"]
+    tab_argument_contract = OPERATION_SPECS["audio.importTabDelimited"].as_dict(
+        version="2022.1"
+    )["argument_contract"]
 
-    assert tab_operation["file_read_policy"] == "pass_path_without_reading"
-    assert "import_operation" in tab_operation["optional_arguments"]
+    assert tab_operation["input_mode"] == "inline_typed"
+    assert tab_argument_contract["properties"]["import_file"]["type"] == "string"
     assert tab_argument_contract["properties"]["import_operation"][
         "default"
     ] == "createNew"
@@ -2263,7 +2266,8 @@ def test_capabilities_detail_is_explicit_and_compact_rows_keep_transaction_bound
     assert exit_code == 0
     compact = compact_payload["capabilities"][0]
     assert set(compact) == CAPABILITY_COMPACT_KEYS
-    assert compact["transaction_boundaries"][0]["operation"] == "object.copy"
+    assert compact["transaction_operations"] == ["object.copy"]
+    assert compact["transaction_boundaries"] == []
     assert compact["execution_contract"]["contract"] == "waapi-skill.public-execution-contract/v2"
     assert compact["execution_contract"]["route"] == "transaction"
     assert compact["execution_contract"]["executable"] is True
@@ -2278,7 +2282,8 @@ def test_capabilities_detail_is_explicit_and_compact_rows_keep_transaction_bound
     detail = detail_payload["capabilities"][0]
     assert {"risk_level", "interface", "execution_contract", "schema", "policy", "behavioral_evidence"} <= set(detail)
     assert "risk" not in detail
-    assert detail["interface"]["transaction_boundaries"][0]["operation"] == "object.copy"
+    assert detail["interface"]["transaction_operations"] == ["object.copy"]
+    assert detail["interface"]["transaction_boundaries"] == []
     assert detail["schema"]["status"] == "ok"
     assert "full" not in detail["schema"]
 

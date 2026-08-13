@@ -157,9 +157,10 @@ from tests.semantic.support.codex_object_business_plan_v3 import (  # noqa: E402
     validate_archived_object_business_plan,
     validate_object_archived_verification,
 )
-from tests.semantic.support.codex_operation_draft_archive_v3 import (  # noqa: E402
-    ComposerArchiveError,
-    validate_operation_draft_archive,
+from tests.semantic.support.codex_typed_draft_evidence_v3 import (  # noqa: E402
+    TYPED_DRAFT_EVIDENCE_CONTRACT,
+    TypedDraftEvidenceError,
+    validate_typed_draft_evidence,
 )
 from tests.semantic.support.codex_soundbank_business_plan_v3 import (  # noqa: E402
     SoundBankBusinessPlanError,
@@ -200,7 +201,13 @@ from tests.semantic.support.codex_prompt_provenance_v3 import (  # noqa: E402
     serialize_protocol,
 )
 from tests.semantic.support.codex_eval_protocol_v3 import (  # noqa: E402
+    V3ProtocolError,
+    materialize_typed_transaction_protocol_requests,
     operation_request_equivalence,
+)
+from tests.semantic.support.codex_gateway_broker import (  # noqa: E402
+    InlineTypedOperationArgument,
+    TypedRequestFactsArgument,
 )
 from tests.semantic.support.codex_filesystem_security import (  # noqa: E402
     CodexFileSecurityError,
@@ -4544,12 +4551,40 @@ def _validate_heavy_v3_prompt_materialization(
             "heavy prompt receipt points outside fixed business-oracle plan"
         )
     try:
-        provenance = read_prompt_provenance(
-            provenance_path,
-            scenario=scenario,
-            version=str(getattr(expected_unit, "version", "")),
-            scenario_root=scenario_root,
-            require_paths=False,
+        raw_provenance = load_strict_regular_json(provenance_path)
+        raw_protocol = (
+            raw_provenance.get("protocol", {}).get("value")
+            if isinstance(raw_provenance, Mapping)
+            and isinstance(raw_provenance.get("protocol"), Mapping)
+            else None
+        )
+        if isinstance(raw_protocol, Mapping):
+            # Lazy, verify-only import: the current campaign/provenance path
+            # never imports or exposes the retired manifest grammar.
+            from tests.semantic.support.codex_prompt_provenance_archive_v3 import (
+                is_archived_prompt_protocol,
+                read_archived_prompt_provenance,
+            )
+
+            archived_protocol = is_archived_prompt_protocol(raw_protocol)
+        else:
+            archived_protocol = False
+        provenance = (
+            read_archived_prompt_provenance(
+                provenance_path,
+                scenario=scenario,
+                version=str(getattr(expected_unit, "version", "")),
+                scenario_root=scenario_root,
+                require_paths=False,
+            )
+            if archived_protocol
+            else read_prompt_provenance(
+                provenance_path,
+                scenario=scenario,
+                version=str(getattr(expected_unit, "version", "")),
+                scenario_root=scenario_root,
+                require_paths=False,
+            )
         )
     except Exception as exc:
         raise CampaignEvidenceError(
@@ -4804,20 +4839,44 @@ def _validate_heavy_v3_task_result(
         consumed_names = broker_value.get("consumed_step_names")
         if not isinstance(broker_records, list) or not isinstance(consumed_names, list):
             raise CampaignEvidenceError("passing Composer Broker evidence is malformed")
+        sealed_composer = value.get("composer_evidence")
+        is_current_typed_evidence = (
+            isinstance(sealed_composer, Mapping)
+            and sealed_composer.get("contract") == TYPED_DRAFT_EVIDENCE_CONTRACT
+        )
         try:
-            replayed_composer = validate_operation_draft_archive(
-                state_directory=task_root / "broker" / "state",
-                steps=_steps_in_consumed_order(
+            validator_arguments = {
+                "state_directory": task_root / "broker" / "state",
+                "steps": _steps_in_consumed_order(
                     protocol.steps[: len(consumed_names)],
                     consumed_names,
                 ),
-                broker_records=broker_records,
-            )
-        except ComposerArchiveError as exc:
+                "broker_records": broker_records,
+            }
+            if is_current_typed_evidence:
+                replayed_composer = validate_typed_draft_evidence(
+                    **validator_arguments
+                )
+            else:
+                # Historical grammar is imported only at the explicit
+                # verify-only archive boundary. Normal campaign construction
+                # and current evidence parsing never import or expose it.
+                from tests.semantic.support.codex_operation_draft_archive_v3 import (
+                    ComposerArchiveError,
+                    validate_operation_draft_archive,
+                )
+
+                try:
+                    replayed_composer = validate_operation_draft_archive(
+                        **validator_arguments
+                    )
+                except ComposerArchiveError as exc:
+                    raise TypedDraftEvidenceError(str(exc)) from exc
+        except TypedDraftEvidenceError as exc:
             raise CampaignEvidenceError(
-                f"passing Composer archive cannot be replayed: {exc}"
+                f"passing Composer evidence cannot be replayed: {exc}"
             ) from exc
-        if replayed_composer is None or value.get("composer_evidence") != replayed_composer:
+        if replayed_composer is None or sealed_composer != replayed_composer:
             raise CampaignEvidenceError(
                 "passing Composer task-result evidence differs from offline replay"
             )
@@ -4986,58 +5045,47 @@ def _archived_draft_action(
     *,
     label: str,
 ) -> Mapping[str, Any]:
-    """Recover the exact submitted Draft action for deterministic replay."""
+    """Recover historical grammar through its offline-only codec."""
 
-    typed_indexes = [
+    from tests.semantic.support.codex_operation_draft_archive_v3 import (
+        ComposerArchiveError,
+        decode_archived_draft_action,
+    )
+
+    try:
+        return decode_archived_draft_action(gateway_arguments, label=label)
+    except ComposerArchiveError as exc:
+        raise CampaignEvidenceError(str(exc)) from exc
+
+
+def _submitted_typed_draft_action(
+    gateway_arguments: Sequence[str],
+    *,
+    label: str,
+) -> Mapping[str, Any]:
+    """Recover one current typed action without historical grammar."""
+
+    if "--action-json" in gateway_arguments:
+        raise CampaignEvidenceError(
+            f"{label} current Draft action cannot contain action JSON"
+        )
+    indexes = [
         index
         for index, value in enumerate(gateway_arguments[:-1])
         if value == "--facts" and gateway_arguments[index + 1] == "--action"
     ]
-    if len(typed_indexes) == 1:
-        try:
-            return parse_typed_action_cli_arguments(
-                gateway_arguments[typed_indexes[0] + 1 :],
-                legacy_compatibility=True,
-            )
-        except OperationComposerError as exc:
-            raise CampaignEvidenceError(
-                f"{label} Draft typed action argv is invalid"
-            ) from exc
-    if typed_indexes:
+    if len(indexes) != 1:
         raise CampaignEvidenceError(
-            f"{label} Draft action argv contains multiple typed action prefixes"
+            f"{label} Draft action argv does not contain one typed action"
         )
-
-    indexes = [
-        index
-        for index, value in enumerate(gateway_arguments)
-        if value == "--action-json"
-    ]
-    if len(indexes) != 1 or indexes[0] + 1 >= len(gateway_arguments):
-        raise CampaignEvidenceError(
-            f"{label} Draft action argv does not contain one action JSON value"
-        )
-
-    def reject_duplicate_keys(pairs: Sequence[tuple[str, Any]]) -> dict[str, Any]:
-        decoded: dict[str, Any] = {}
-        for key, value in pairs:
-            if key in decoded:
-                raise ValueError(f"duplicate JSON key: {key}")
-            decoded[key] = value
-        return decoded
-
     try:
-        decoded = json.loads(
-            gateway_arguments[indexes[0] + 1],
-            object_pairs_hook=reject_duplicate_keys,
+        return parse_typed_action_cli_arguments(
+            gateway_arguments[indexes[0] + 1 :]
         )
-    except (json.JSONDecodeError, ValueError) as exc:
+    except OperationComposerError as exc:
         raise CampaignEvidenceError(
-            f"{label} Draft action argv is not strict JSON"
+            f"{label} Draft typed action argv is invalid"
         ) from exc
-    if not isinstance(decoded, Mapping):
-        raise CampaignEvidenceError(f"{label} Draft action JSON is not an object")
-    return decoded
 
 
 def _validate_heavy_v3_broker_records(
@@ -5166,7 +5214,7 @@ def _validate_heavy_v3_broker_records(
                 f"{label} broker argv cannot replay protocol step {step.name}: {exc}"
             ) from exc
         submitted_draft_action = (
-            _archived_draft_action(
+            _submitted_typed_draft_action(
                 resolved.gateway_arguments,
                 label=f"{label} protocol step {step.name}",
             )
@@ -5859,8 +5907,18 @@ def _validate_heavy_v3_codex_facts(
         or archived_common_gates != expected_common_gates
         or not all(expected_common_gates.values())
     ):
+        mismatched = {
+            key: {
+                "archived": archived_common_gates.get(key),
+                "recomputed": expected_common_gates.get(key),
+            }
+            for key in sorted(expected_common_gates)
+            if archived_common_gates.get(key) != expected_common_gates.get(key)
+            or expected_common_gates.get(key) is not True
+        }
         raise CampaignEvidenceError(
-            "passing heavy turn common gates cannot be recomputed from raw evidence"
+            "passing heavy turn common gates cannot be recomputed from raw evidence: "
+            f"{mismatched}"
         )
     return tuple(
         _json_canonical_value(asdict(record))
@@ -6334,11 +6392,14 @@ def _validate_integration_workflow_business_plan(
     }
     transaction_step_kind = {
         "operation-schema": "operation_schema",
+        "request-array-item": "operation_compose",
+        "request-map-container": "operation_compose",
         "draft-start": "operation_compose",
         "draft-apply": "operation_compose",
         "draft-check": "operation_compose_check",
         "preview": "preview",
         "preview-from-draft": "preview",
+        "typed-operation": "preview",
         "transaction-show": "transaction_show",
         "confirm": "confirm",
         "execute": "execute",
@@ -7931,26 +7992,40 @@ def _heavy_v3_final_response(task_root: Path) -> str:
 def _heavy_v3_protocol_operation_request(
     evidence: HeavyV3PromptEvidence,
 ) -> Mapping[str, Any]:
-    steps = serialize_protocol(evidence.provenance.protocol)["steps"]
-    values: list[Mapping[str, Any]] = []
-    for step in steps:
-        arguments = step.get("arguments")
-        if (
-            step.get("subcommand") == "preview"
-            and isinstance(arguments, list)
-            and len(arguments) == 3
-            and arguments[0] == {"kind": "literal", "value": "--apply"}
-            and arguments[1] == {"kind": "literal", "value": "--request-json"}
-            and isinstance(arguments[2], Mapping)
-            and arguments[2].get("kind") in {
-                "semantic_json",
-                "semantic_json_object_operation_v1",
-                "semantic_json_soundbank_generate_v1",
-                "sealed_query_identity_object_operation_json",
-            }
-            and isinstance(arguments[2].get("value"), Mapping)
-        ):
-            values.append(arguments[2]["value"])
+    version = evidence.provenance.payload.get("version")
+    if not isinstance(version, str):
+        version = next(
+            (
+                str(argument.expected["version"])
+                for step in evidence.provenance.protocol.steps
+                for argument in step.arguments
+                if isinstance(argument, InlineTypedOperationArgument)
+                and isinstance(argument.expected.get("version"), str)
+            ),
+            None,
+        )
+    if version is None:
+        version = next(
+            (
+                argument.contract.version
+                for step in evidence.provenance.protocol.steps
+                for argument in step.arguments
+                if isinstance(argument, TypedRequestFactsArgument)
+            ),
+            None,
+        )
+    if not isinstance(version, str):
+        raise CampaignEvidenceError("heavy typed protocol lacks one exact version")
+    try:
+        values = [
+            request
+            for _pointer, request in materialize_typed_transaction_protocol_requests(
+                evidence.provenance.protocol,
+                version=version,
+            )
+        ]
+    except V3ProtocolError as exc:
+        raise CampaignEvidenceError("heavy typed protocol cannot be materialized") from exc
     if len(values) != 1:
         raise CampaignEvidenceError(
             "heavy protocol does not contain one exact operation request"
@@ -7988,47 +8063,50 @@ def _validate_heavy_v3_completed_transaction_protocol(
         "tx01.execute",
         "/transaction_id",
     )
+    preview_index = next(
+        (index for index, step in enumerate(steps) if step.name == "tx01.preview"),
+        None,
+    )
+    if preview_index is None:
+        raise CampaignEvidenceError(
+            "heavy audio transaction lacks exact preview/confirm/execute/verify binding"
+        )
+    tail = steps[preview_index:]
+    try:
+        materialized = _heavy_v3_protocol_operation_request(evidence)
+    except CampaignEvidenceError:
+        raise
     if (
-        protocol.turn_prefix_counts != (2, 6)
-        or len(steps) != 6
-        or tuple(step.name for step in steps)
+        not _nonempty_text(operation)
+        or materialized != expected_operation_request
+        or protocol.turn_prefix_counts != (preview_index + 1, len(steps))
+        or tuple(step.name for step in tail)
         != (
-            "tx01.operation-schema",
             "tx01.preview",
             "tx01.transaction-show",
             "tx01.confirm",
             "tx01.execute",
             "tx01.verify",
         )
-        or tuple(step.subcommand for step in steps)
-        != (
-            "operation-schema",
-            "preview",
-            "transaction-show",
-            "confirm",
-            "execute",
-            "verify",
-        )
-        or not _nonempty_text(operation)
-        or steps[0].arguments != (operation,)
-        or len(steps[1].arguments) != 3
-        or steps[1].arguments[:2] != ("--apply", "--request-json")
-        or not isinstance(steps[1].arguments[2], SemanticJsonArgument)
-        or steps[1].arguments[2].expected != expected_operation_request
-        or steps[1].arguments[2].equivalence
-        != operation_request_equivalence(str(operation))
-        or steps[2].arguments != (preview_transaction_id, "--summary-only")
-        or steps[3].arguments
+        or tail[0].subcommand not in {
+            "typed-call",
+            "typed-operation",
+            "preview-from-draft",
+        }
+        or tuple(step.subcommand for step in tail[1:])
+        != ("transaction-show", "confirm", "execute", "verify")
+        or tail[1].arguments != (preview_transaction_id, "--summary-only")
+        or tail[2].arguments
         != (
             shown_transaction_id,
             "--confirmation-token",
             confirmation_token,
         )
-        or steps[4].arguments != (confirmed_transaction_id,)
-        or steps[5].arguments != (executed_transaction_id,)
+        or tail[3].arguments != (confirmed_transaction_id,)
+        or tail[4].arguments != (executed_transaction_id,)
         or any(
-            step.allowed_exit_codes != ((0, 2) if index == 4 else (0,))
-            for index, step in enumerate(steps)
+            step.allowed_exit_codes != ((0, 2) if index == 3 else (0,))
+            for index, step in enumerate(tail)
         )
         or any(step.gateway_global_arguments for step in steps)
         or any(step.expected_error_code for step in steps)
@@ -8075,43 +8153,54 @@ def _heavy_v3_protocol_call_request(
     *,
     api: str,
 ) -> Mapping[str, Any]:
-    steps = serialize_protocol(evidence.provenance.protocol)["steps"]
-    values: list[dict[str, Any]] = []
-    for step in steps:
-        arguments = step.get("arguments")
-        has_post_filter = (
-            isinstance(arguments, list)
-            and len(arguments) == 7
-            and arguments[5]
-            == {"kind": "literal", "value": "--post-filter-json"}
-            and isinstance(arguments[6], Mapping)
-            and arguments[6].get("kind") == "semantic_json"
+    payload = evidence.provenance.payload
+    version = payload.get("version") if isinstance(payload, Mapping) else None
+    if not isinstance(version, str):
+        raise CampaignEvidenceError("heavy typed protocol version is unavailable")
+    try:
+        requests = materialize_typed_transaction_protocol_requests(
+            evidence.provenance.protocol,
+            version=version,
         )
+    except V3ProtocolError as exc:
+        raise CampaignEvidenceError(
+            f"heavy protocol cannot materialize the typed request for {api}"
+        ) from exc
+    values: list[dict[str, Any]] = []
+    for _pointer, request in requests:
+        arguments = request.get("arguments")
         if (
-            step.get("subcommand") == "call"
-            and isinstance(arguments, list)
-            and len(arguments) in {5, 7}
-            and arguments[0] == {"kind": "literal", "value": api}
-            and arguments[1] == {"kind": "literal", "value": "--args-json"}
-            and isinstance(arguments[2], Mapping)
-            and arguments[2].get("kind") == "semantic_json"
-            and arguments[3] == {"kind": "literal", "value": "--options-json"}
-            and isinstance(arguments[4], Mapping)
-            and arguments[4].get("kind") == "semantic_json"
-            and (len(arguments) == 5 or has_post_filter)
+            request.get("operation") != "waapi.call"
+            or not isinstance(arguments, Mapping)
+            or arguments.get("api") != api
+            or not isinstance(arguments.get("args"), Mapping)
+            or not isinstance(arguments.get("options"), Mapping)
         ):
-            values.append(
-                {
-                    "args": arguments[2].get("value"),
-                    "options": arguments[4].get("value"),
-                    "post_filter": (
-                        arguments[6].get("value") if has_post_filter else None
-                    ),
-                }
-            )
-    if len(values) != 1 or not all(
-        isinstance(values[0].get(key), Mapping) for key in ("args", "options")
-    ):
+            continue
+        values.append(
+            {
+                "args": arguments["args"],
+                "options": arguments["options"],
+                "post_filter": None,
+            }
+        )
+    check_steps = tuple(
+        step
+        for step in evidence.provenance.protocol.steps
+        if step.subcommand == "draft-check"
+        and len(step.arguments) == 9
+        and step.arguments[5] == "--post-filter-value"
+        and step.arguments[7] == "--post-filter-limit"
+    )
+    if len(values) == 1 and len(check_steps) == 1:
+        check = check_steps[0]
+        values[0]["post_filter"] = {
+            "field": "Filename",
+            "operator": "containsCaseSensitive",
+            "value": check.arguments[6],
+            "limit": int(check.arguments[8]),
+        }
+    if len(values) != 1:
         raise CampaignEvidenceError(
             f"heavy protocol does not contain one exact call request for {api}"
         )

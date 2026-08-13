@@ -33,7 +33,6 @@ from tests.semantic.support.codex_audio_conversion_runtime_v3 import (
     make_audio_conversion_prelaunch_hook,
 )
 from tests.semantic.support.codex_eval_bundle_v3 import load_eval_bundle_v3
-from tests.semantic.support.codex_gateway_broker import SemanticJsonArgument
 from wwise_waapi.operation_registry import parse_operation_request
 
 
@@ -110,17 +109,17 @@ def test_all_five_cases_build_closed_waapi_call_protocols(tmp_path: Path) -> Non
         protocol = runtime.gateway_protocol()
         assert protocol.turn_prefix_counts == (2, 6)
         assert [step.subcommand for step in protocol.steps] == [
-            "operation-schema",
-            "preview",
+            "request-schema",
+            "typed-call",
             "transaction-show",
             "confirm",
             "execute",
             "verify",
         ]
-        assert protocol.steps[1].arguments[:2] == ("--apply", "--request-json")
-        preview_request = protocol.steps[1].arguments[2]
-        assert isinstance(preview_request, SemanticJsonArgument)
-        assert preview_request.expected == plan.operation_request
+        typed_request = protocol.steps[1].arguments[-1]
+        assert typed_request.expected_args == plan.operation_request["arguments"]["args"]
+        assert typed_request.expected_options == {}
+        assert typed_request.io_root == str(io.resolve())
         assert runtime.render_prompt() == _scenario(plan.scenario_id).render_prompt(
             {"io_root": str(io.resolve())}
         )

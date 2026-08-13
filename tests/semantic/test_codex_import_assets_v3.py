@@ -15,7 +15,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_metadata_transaction_protocol,
 )
 from tests.semantic.support.codex_gateway_broker import (
-    DraftActionJsonArgument,
+    DraftTypedActionArgument,
     project_required_metadata_tokens,
 )
 from tests.semantic.support.codex_import_assets_v3 import (
@@ -399,7 +399,7 @@ def test_compound_direct_import_binds_defaults_row_overrides_and_inline_wav(
         if step.subcommand == "draft-apply"
     ]
     assert action_arguments
-    assert all(isinstance(item, DraftActionJsonArgument) for item in action_arguments)
+    assert all(isinstance(item, DraftTypedActionArgument) for item in action_arguments)
     metadata_arguments = [
         item for item in action_arguments if item.metadata_binding is not None
     ]

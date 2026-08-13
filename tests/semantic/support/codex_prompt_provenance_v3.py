@@ -15,7 +15,7 @@ import os
 import stat
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 from tests.semantic.support.codex_business_oracle_plan_v3 import (
     BUSINESS_ORACLE_PLAN_FILE,
@@ -35,16 +35,18 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_modification_policy_protocol,
     build_transaction_protocol,
     materialize_audio_import_composer_protocol_request,
+    materialize_typed_transaction_protocol_requests,
     operation_request_equivalence,
 )
 from tests.semantic.support.codex_gateway_broker import (
     BoundedIntegerArgument,
-    DraftActionJsonArgument,
+    DraftTypedActionArgument,
     DraftActionMetadataBinding,
     DraftActionQueryIdentityBinding,
     DraftActionResponseBinding,
     ExactArgumentAlternatives,
     ExpectedGatewayStep,
+    InlineTypedOperationArgument,
     GatewayDerivedReferenceActivationAllowance,
     MetadataBoundJsonArgument,
     MetadataQueryArgument,
@@ -53,11 +55,14 @@ from tests.semantic.support.codex_gateway_broker import (
     ResponseBindingOrExactArgument,
     SealedQueryIdentityBoundJsonArgument,
     SemanticJsonArgument,
+    TypedRequestFactsArgument,
 )
 from tests.semantic.support.codex_integration_workflows_v1 import (
     EXPECTED_PRIMARY_API as INTEGRATION_V1_PRIMARY_API,
     WORKFLOW_IDS as INTEGRATION_V1_WORKFLOW_IDS,
 )
+from wwise_waapi.typed_operations import draft_operation_request_contract
+from wwise_waapi.typed_requests import request_contract
 from tests.semantic.support.codex_integration_workflows_v2 import (
     EXPECTED_PRIMARY_API as INTEGRATION_V2_PRIMARY_API,
     WORKFLOW_IDS as INTEGRATION_V2_WORKFLOW_IDS,
@@ -210,6 +215,10 @@ def write_prompt_provenance(
         protocol_value=protocol_value,
         trusted_sources=source_value,
         require_paths=True,
+        protocol_request_materializer=lambda value: _protocol_requests(
+            value,
+            version=version,
+        ),
     )
     payload: dict[str, Any] = {
         "contract": PROMPT_PROVENANCE_CONTRACT,
@@ -275,6 +284,46 @@ def read_prompt_provenance(
 ) -> PromptProvenanceEvidence:
     """Read once, reject links/duplicates, and rederive every prompt input."""
 
+    return _read_prompt_provenance_with_codec(
+        path,
+        scenario=scenario,
+        version=version,
+        scenario_root=scenario_root,
+        expected_prompts=expected_prompts,
+        expected_protocol=expected_protocol,
+        require_paths=require_paths,
+        protocol_decoder=deserialize_protocol,
+        protocol_canonicalizer=_canonicalize_legacy_protocol_manifest,
+        protocol_request_materializer=lambda value: _protocol_requests(
+            value,
+            version=version,
+        ),
+    )
+
+
+def _read_prompt_provenance_with_codec(
+    path: Path,
+    *,
+    scenario: OnlineScenario,
+    version: str,
+    scenario_root: Path,
+    expected_prompts: Sequence[str] | None,
+    expected_protocol: V3GatewayProtocol | None,
+    require_paths: bool,
+    protocol_decoder: Callable[[Mapping[str, Any]], V3GatewayProtocol],
+    protocol_canonicalizer: Callable[[Mapping[str, Any]], Mapping[str, Any]],
+    protocol_request_materializer: Callable[
+        [Mapping[str, Any]], tuple[tuple[str, Mapping[str, Any]], ...]
+    ],
+) -> PromptProvenanceEvidence:
+    """Shared sealed-document validator parameterized by an offline codec.
+
+    The public current reader above always supplies the strict typed codec.
+    Historical replay imports this private seam in the opposite dependency
+    direction and supplies its versioned archive decoder; current code never
+    imports or selects the retired grammar.
+    """
+
     root = _scenario_root(scenario_root, require_exists=True)
     expected_path = root / "evidence" / PROMPT_PROVENANCE_FILE
     candidate = Path(os.path.abspath(os.fspath(Path(path).expanduser())))
@@ -331,10 +380,8 @@ def read_prompt_provenance(
         or protocol_row.get("sha256") != _sha256_json(protocol_value)
     ):
         raise PromptProvenanceError("prompt provenance protocol digest is invalid")
-    protocol = deserialize_protocol(protocol_value)
-    canonical_protocol_value = _canonicalize_legacy_protocol_manifest(
-        protocol_value
-    )
+    protocol = protocol_decoder(protocol_value)
+    canonical_protocol_value = protocol_canonicalizer(protocol_value)
     if serialize_protocol(protocol) != canonical_protocol_value:
         raise PromptProvenanceError("protocol manifest is not round-trip exact")
     if (
@@ -360,6 +407,7 @@ def read_prompt_provenance(
         protocol_value=protocol_value,
         trusted_sources=value.get("trusted_sources"),
         require_paths=require_paths,
+        protocol_request_materializer=protocol_request_materializer,
     )
     rendered = scenario.render_prompt(visible_values)
     if (
@@ -657,10 +705,10 @@ def _serialize_step(step: ExpectedGatewayStep) -> dict[str, Any]:
                     ],
                 }
             )
-        elif isinstance(item, DraftActionJsonArgument):
+        elif isinstance(item, DraftTypedActionArgument):
             cloned = _json_clone(item.expected)
             row = {
-                "kind": "draft_action_json",
+                "kind": "draft_typed_action",
                 "value": cloned,
                 "sha256": _sha256_json(cloned),
                 "response_bindings": [
@@ -698,6 +746,48 @@ def _serialize_step(step: ExpectedGatewayStep) -> dict[str, Any]:
                     ),
                 }
             arguments.append(row)
+        elif isinstance(item, TypedRequestFactsArgument):
+            arguments.append(
+                {
+                    "kind": "typed_request_facts",
+                    "version": item.contract.version,
+                    "uri": item.contract.uri,
+                    "schema_digest": item.contract.schema_digest,
+                    "expected_args": _json_clone(item.expected_args),
+                    "expected_options": _json_clone(item.expected_options),
+                    "prefix": item.prefix,
+                    "io_root": item.io_root,
+                    "metadata_binding": (
+                        None
+                        if item.metadata_binding is None
+                        else {
+                            "step": item.metadata_binding.step,
+                            "object_type": item.metadata_binding.object_type,
+                            "required_tokens": list(
+                                item.metadata_binding.required_tokens
+                            ),
+                            "expected_projection": (
+                                None
+                                if item.metadata_binding.expected_projection is None
+                                else [
+                                    value.as_dict()
+                                    for value in item.metadata_binding.expected_projection
+                                ]
+                            ),
+                        }
+                    ),
+                }
+            )
+        elif isinstance(item, InlineTypedOperationArgument):
+            cloned = _json_clone(item.expected)
+            arguments.append(
+                {
+                    "kind": "inline_typed_operation",
+                    "operation": item.operation,
+                    "value": cloned,
+                    "sha256": _sha256_json(cloned),
+                }
+            )
         elif isinstance(item, ResponseBinding):
             arguments.append(
                 {
@@ -732,6 +822,23 @@ def _serialize_step(step: ExpectedGatewayStep) -> dict[str, Any]:
         "expected_error_code": step.expected_error_code,
         "expected_result_command": step.expected_result_command,
         "terminal_execute": step.terminal_execute,
+        "metadata_binding": (
+            None
+            if step.metadata_binding is None
+            else {
+                "step": step.metadata_binding.step,
+                "object_type": step.metadata_binding.object_type,
+                "required_tokens": list(step.metadata_binding.required_tokens),
+                "expected_projection": (
+                    None
+                    if step.metadata_binding.expected_projection is None
+                    else [
+                        item.as_dict()
+                        for item in step.metadata_binding.expected_projection
+                    ]
+                ),
+            }
+        ),
     }
 
 
@@ -747,6 +854,7 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
         "expected_error_code",
         "expected_result_command",
         "terminal_execute",
+        "metadata_binding",
     }:
         raise PromptProvenanceError("protocol step schema is invalid")
     raw_arguments = value.get("arguments")
@@ -764,6 +872,24 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
         raise PromptProvenanceError("protocol step scalar fields are invalid")
     if not isinstance(raw_arguments, list):
         raise PromptProvenanceError("protocol step arguments are invalid")
+    raw_step_metadata = value.get("metadata_binding")
+    if raw_step_metadata is not None and (
+        not isinstance(raw_step_metadata, Mapping)
+        or set(raw_step_metadata)
+        != {"step", "object_type", "required_tokens", "expected_projection"}
+        or not isinstance(raw_step_metadata.get("step"), str)
+        or not isinstance(raw_step_metadata.get("object_type"), str)
+        or not isinstance(raw_step_metadata.get("required_tokens"), list)
+        or any(
+            not isinstance(item, str)
+            for item in raw_step_metadata.get("required_tokens", [])
+        )
+        or (
+            raw_step_metadata.get("expected_projection") is not None
+            and not isinstance(raw_step_metadata.get("expected_projection"), list)
+        )
+    ):
+        raise PromptProvenanceError("protocol step metadata binding is invalid")
     arguments: list[Any] = []
     for row in raw_arguments:
         if not isinstance(row, Mapping) or "kind" not in row:
@@ -975,7 +1101,7 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
                 raise PromptProvenanceError(
                     "metadata-bound JSON protocol argument is invalid"
                 ) from exc
-        elif kind == "draft_action_json" and set(row).issubset(
+        elif kind == "draft_typed_action" and set(row).issubset(
             {
                 "kind",
                 "value",
@@ -1060,11 +1186,11 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
                 )
             ):
                 raise PromptProvenanceError(
-                    "Draft-action JSON protocol argument is invalid"
+                    "Typed Draft protocol argument is invalid"
                 )
             try:
                 arguments.append(
-                    DraftActionJsonArgument(
+                    DraftTypedActionArgument(
                         expected=_json_clone(row.get("value")),
                         response_bindings=tuple(
                             DraftActionResponseBinding(
@@ -1118,7 +1244,109 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
                 )
             except (TypeError, ValueError) as exc:
                 raise PromptProvenanceError(
-                    "Draft-action JSON protocol argument is invalid"
+                    "Typed Draft protocol argument is invalid"
+                ) from exc
+        elif kind == "typed_request_facts" and set(row) == {
+            "kind",
+            "version",
+            "uri",
+            "schema_digest",
+            "expected_args",
+            "expected_options",
+            "prefix",
+            "io_root",
+            "metadata_binding",
+        }:
+            if (
+                not isinstance(row.get("version"), str)
+                or not isinstance(row.get("uri"), str)
+                or not isinstance(row.get("schema_digest"), str)
+                or not isinstance(row.get("expected_args"), Mapping)
+                or not isinstance(row.get("expected_options"), Mapping)
+                or not isinstance(row.get("prefix"), str)
+            ):
+                raise PromptProvenanceError(
+                    "typed request fact protocol argument is invalid"
+                )
+            version = str(row["version"])
+            uri = str(row["uri"])
+            try:
+                contract = (
+                    draft_operation_request_contract(
+                        uri.removeprefix("operation:"),
+                        version,
+                    )
+                    if uri.startswith("operation:")
+                    else request_contract(version, uri)
+                )
+                raw_metadata = row.get("metadata_binding")
+                metadata_binding = (
+                    None
+                    if raw_metadata is None
+                    else DraftActionMetadataBinding(
+                        step=str(raw_metadata["step"]),
+                        object_type=str(raw_metadata["object_type"]),
+                        required_tokens=tuple(raw_metadata["required_tokens"]),
+                        expected_projection=(
+                            None
+                            if raw_metadata.get("expected_projection") is None
+                            else tuple(
+                                MetadataTokenProjection(
+                                    name=str(item["name"]),
+                                    kind=str(item["kind"]),
+                                    metadata_type=str(item["metadata_type"]),
+                                )
+                                for item in raw_metadata["expected_projection"]
+                            )
+                        ),
+                    )
+                )
+                argument = TypedRequestFactsArgument(
+                    contract=contract,
+                    expected_args=_json_clone(row["expected_args"]),
+                    expected_options=_json_clone(row["expected_options"]),
+                    prefix=str(row["prefix"]),
+                    io_root=(
+                        None
+                        if row.get("io_root") is None
+                        else str(row["io_root"])
+                    ),
+                    metadata_binding=metadata_binding,
+                )
+            except (TypeError, ValueError) as exc:
+                raise PromptProvenanceError(
+                    "typed request fact protocol argument is invalid"
+                ) from exc
+            if contract.schema_digest != row["schema_digest"]:
+                raise PromptProvenanceError(
+                    "typed request fact schema digest drifted"
+                )
+            arguments.append(argument)
+        elif kind == "inline_typed_operation" and set(row) == {
+            "kind",
+            "operation",
+            "value",
+            "sha256",
+        }:
+            expected = row.get("value")
+            if (
+                not isinstance(expected, Mapping)
+                or not isinstance(row.get("operation"), str)
+                or row.get("sha256") != _sha256_json(expected)
+            ):
+                raise PromptProvenanceError(
+                    "inline typed operation protocol argument is invalid"
+                )
+            try:
+                arguments.append(
+                    InlineTypedOperationArgument(
+                        _json_clone(expected),
+                        operation=str(row["operation"]),
+                    )
+                )
+            except ValueError as exc:
+                raise PromptProvenanceError(
+                    "inline typed operation protocol argument is invalid"
                 ) from exc
         elif kind == "exact_argument_alternatives" and set(row) == {
             "kind",
@@ -1195,6 +1423,27 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
             expected_error_code=value["expected_error_code"],
             expected_result_command=value["expected_result_command"],
             terminal_execute=value["terminal_execute"],
+            metadata_binding=(
+                None
+                if raw_step_metadata is None
+                else DraftActionMetadataBinding(
+                    step=str(raw_step_metadata["step"]),
+                    object_type=str(raw_step_metadata["object_type"]),
+                    required_tokens=tuple(raw_step_metadata["required_tokens"]),
+                    expected_projection=(
+                        None
+                        if raw_step_metadata["expected_projection"] is None
+                        else tuple(
+                            MetadataTokenProjection(
+                                name=str(item["name"]),
+                                kind=str(item["kind"]),
+                                metadata_type=str(item["metadata_type"]),
+                            )
+                            for item in raw_step_metadata["expected_projection"]
+                        )
+                    ),
+                )
+            ),
         )
     except (TypeError, ValueError) as exc:
         raise PromptProvenanceError(f"protocol step is invalid: {exc}") from exc
@@ -1208,6 +1457,9 @@ def _input_rows(
     protocol_value: Mapping[str, Any],
     trusted_sources: Mapping[str, Any],
     require_paths: bool,
+    protocol_request_materializer: Callable[
+        [Mapping[str, Any]], tuple[tuple[str, Mapping[str, Any]], ...]
+    ],
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     integration_workflow = _integration_workflow_id(scenario)
@@ -1228,6 +1480,7 @@ def _input_rows(
             root=root,
             protocol_value=protocol_value,
             trusted_sources=trusted_sources,
+            protocol_request_materializer=protocol_request_materializer,
         )
         if value != derived.value:
             raise PromptProvenanceError(
@@ -1266,6 +1519,7 @@ def _input_rows(
                 trusted_sources=trusted_sources,
                 reviewed_origin=derived.leaf_origins.get(pointer),
                 require_paths=require_paths,
+                protocol_request_materializer=protocol_request_materializer,
             )
             for pointer, leaf in leaf_values
         ]
@@ -1290,6 +1544,9 @@ def _validate_input_rows(
     protocol_value: Mapping[str, Any],
     trusted_sources: Any,
     require_paths: bool,
+    protocol_request_materializer: Callable[
+        [Mapping[str, Any]], tuple[tuple[str, Mapping[str, Any]], ...]
+    ],
 ) -> dict[str, str]:
     source_value = _trusted_sources(
         scenario,
@@ -1334,6 +1591,7 @@ def _validate_input_rows(
         protocol_value=protocol_value,
         trusted_sources=source_value,
         require_paths=require_paths,
+        protocol_request_materializer=protocol_request_materializer,
     )
     if not require_paths:
         for actual_row, expected_row in zip(rows, expected, strict=True):
@@ -1362,6 +1620,9 @@ def _leaf_binding(
     trusted_sources: Mapping[str, Any],
     reviewed_origin: str | None,
     require_paths: bool,
+    protocol_request_materializer: Callable[
+        [Mapping[str, Any]], tuple[tuple[str, Mapping[str, Any]], ...]
+    ],
 ) -> dict[str, Any]:
     base = {
         "pointer": pointer,
@@ -1393,6 +1654,7 @@ def _leaf_binding(
                 root=root,
                 protocol_value=protocol_value,
                 trusted_sources=trusted_sources,
+                protocol_request_materializer=protocol_request_materializer,
             ).value
         )
         if not _json_equal(_json_pointer(expected_build, pointer), leaf):
@@ -1426,9 +1688,15 @@ def _leaf_binding(
             require_exists=require_paths,
         )
         if reviewed_origin:
-            source_leaf = _json_pointer(
-                trusted_sources if trusted_origin else protocol_value,
-                reviewed_origin,
+            source_leaf = (
+                _virtual_protocol_origin(
+                    scenario,
+                    protocol_value=protocol_value,
+                    pointer=reviewed_origin,
+                    protocol_request_materializer=protocol_request_materializer,
+                )
+                if not trusted_origin
+                else _json_pointer(trusted_sources, reviewed_origin)
             )
             if not _json_equal(source_leaf, leaf):
                 projection_exception = (
@@ -1454,9 +1722,15 @@ def _leaf_binding(
         )
         return base
     if reviewed_origin:
-        source_leaf = _json_pointer(
-            trusted_sources if trusted_origin else protocol_value,
-            reviewed_origin,
+        source_leaf = (
+            _virtual_protocol_origin(
+                scenario,
+                protocol_value=protocol_value,
+                pointer=reviewed_origin,
+                protocol_request_materializer=protocol_request_materializer,
+            )
+            if not trusted_origin
+            else _json_pointer(trusted_sources, reviewed_origin)
         )
         if not _json_equal(source_leaf, leaf):
             raise PromptProvenanceError(
@@ -1476,6 +1750,41 @@ def _leaf_binding(
     )
 
 
+def _virtual_protocol_origin(
+    scenario: OnlineScenario,
+    *,
+    protocol_value: Mapping[str, Any],
+    pointer: str,
+    protocol_request_materializer: Callable[
+        [Mapping[str, Any]], tuple[tuple[str, Mapping[str, Any]], ...]
+    ],
+) -> Any:
+    """Resolve literal protocol fields or a recomputed typed materialization.
+
+    Typed commands intentionally contain no caller-authored request document.
+    Provenance paths under ``/composer/<preview>`` therefore name a virtual,
+    independently replayed canonical request rather than hidden JSON stored in
+    the transcript.
+    """
+
+    if not pointer.startswith("/composer/"):
+        return _json_pointer(protocol_value, pointer)
+    versions = tuple(getattr(scenario, "versions", ()))
+    if len(versions) != 1:
+        raise PromptProvenanceError(
+            "typed materialization origin requires one exact scenario version"
+        )
+    for base, request in protocol_request_materializer(protocol_value):
+        if pointer == base:
+            return request
+        prefix = base + "/"
+        if pointer.startswith(prefix):
+            return _json_pointer(request, pointer[len(base) :])
+    raise PromptProvenanceError(
+        f"typed materialization origin does not resolve: {pointer}"
+    )
+
+
 def _derive_input(
     scenario: OnlineScenario,
     *,
@@ -1483,6 +1792,9 @@ def _derive_input(
     root: Path,
     protocol_value: Mapping[str, Any],
     trusted_sources: Mapping[str, Any],
+    protocol_request_materializer: Callable[
+        [Mapping[str, Any]], tuple[tuple[str, Mapping[str, Any]], ...]
+    ],
 ) -> _DerivedInput:
     """Apply the closed reviewed input mapping, never a value search."""
 
@@ -1496,10 +1808,7 @@ def _derive_input(
         )
 
     scenario_versions = tuple(getattr(scenario, "versions", ()))
-    requests = _protocol_requests(
-        protocol_value,
-        version=(scenario_versions[0] if len(scenario_versions) == 1 else None),
-    )
+    requests = protocol_request_materializer(protocol_value)
     api = scenario.api
     if api in {
         "ak.wwise.core.object.get",
@@ -1754,211 +2063,27 @@ def _protocol_requests(
     *,
     version: str | None = None,
 ) -> tuple[tuple[str, Mapping[str, Any]], ...]:
-    steps = protocol_value.get("steps")
-    if not isinstance(steps, list):
-        raise PromptProvenanceError("protocol steps are unavailable")
-    result: list[tuple[str, Mapping[str, Any]]] = []
-    for step_index, step in enumerate(steps):
-        if not isinstance(step, Mapping) or step.get("subcommand") != "preview":
-            continue
-        arguments = step.get("arguments")
-        if not isinstance(arguments, list):
-            raise PromptProvenanceError("preview request argument topology drifted")
-        if (
-            len(arguments) == 3
-            and arguments[0] == {"kind": "literal", "value": "--apply"}
-            and arguments[1]
-            == {"kind": "literal", "value": "--request-json"}
-        ):
-            semantic_index = 2
-        elif (
-            len(arguments) == 2
-            and arguments[0]
-            == {"kind": "literal", "value": "--request-json"}
-        ):
-            semantic_index = 1
-        else:
-            raise PromptProvenanceError("preview request flag drifted")
-        semantic = arguments[semantic_index]
-        if not isinstance(semantic, Mapping):
-            raise PromptProvenanceError("preview request manifest is invalid")
-        semantic_kind = semantic.get("kind")
-        if semantic_kind == "metadata_bound_json":
-            expected_keys = {
-                "kind",
-                "value",
-                "sha256",
-                "equivalence",
-                "metadata_step",
-                "object_type",
-                "required_tokens",
-                "expected_required_token_projection",
-                "gateway_derived_reference_activations",
-            }
-            legacy_expected_keys = expected_keys - {
-                "gateway_derived_reference_activations"
-            }
-            projection = semantic.get("expected_required_token_projection")
-            if (
-                set(semantic) not in (expected_keys, legacy_expected_keys)
-                or semantic.get("equivalence")
-                not in {
-                    "wire_exact",
-                    "audio_import_v1",
-                    "audio_import_tab_v1",
-                    "object_set_v1",
-                    "object_set_rtpc_v1",
-                }
-                or not isinstance(semantic.get("metadata_step"), str)
-                or not semantic.get("metadata_step")
-                or not isinstance(semantic.get("object_type"), str)
-                or not semantic.get("object_type")
-                or not isinstance(semantic.get("required_tokens"), list)
-                or not semantic.get("required_tokens")
-                or projection is not None
-                and not isinstance(projection, list)
-                or not isinstance(
-                    semantic.get(
-                        "gateway_derived_reference_activations",
-                        [],
-                    ),
-                    list,
-                )
-            ):
-                raise PromptProvenanceError(
-                    "metadata-bound preview request manifest is invalid"
-                )
-        elif semantic_kind == _SEALED_QUERY_IDENTITY_JSON_KIND:
-            if (
-                set(semantic)
-                != {
-                    "kind",
-                    "value",
-                    "sha256",
-                    "source_step",
-                    "target_pointers",
-                }
-                or not isinstance(semantic.get("source_step"), str)
-                or not semantic.get("source_step")
-                or not isinstance(semantic.get("target_pointers"), list)
-                or len(semantic["target_pointers"]) != 2
-                or any(
-                    not isinstance(pointer, str)
-                    for pointer in semantic["target_pointers"]
-                )
-            ):
-                raise PromptProvenanceError(
-                    "sealed-query-identity preview request manifest is invalid"
-                )
-        elif (
-            semantic_kind not in _SEMANTIC_JSON_EQUIVALENCE_BY_KIND
-            or set(semantic) != {"kind", "value", "sha256"}
-        ):
-            raise PromptProvenanceError("preview request manifest is invalid")
-        if (
-            semantic.get("sha256") != _sha256_json(semantic.get("value"))
-            or not isinstance(semantic.get("value"), Mapping)
-        ):
-            raise PromptProvenanceError("preview request manifest is invalid")
-        request = semantic["value"]
-        if set(request) != {"contract", "version", "operation", "arguments"}:
-            raise PromptProvenanceError("operation request envelope is not closed")
-        request_operation = request.get("operation")
-        if semantic_kind == "metadata_bound_json":
-            equivalence = semantic.get("equivalence")
-            if (
-                equivalence == "audio_import_v1"
-                and request.get("operation") != "audio.import"
-            ):
-                raise PromptProvenanceError(
-                    "metadata-bound request JSON equivalence contract is invalid"
-                )
-            if (
-                equivalence == "audio_import_tab_v1"
-                and request.get("operation")
-                != "audio.importTabDelimited"
-            ):
-                raise PromptProvenanceError(
-                    "metadata-bound request JSON equivalence contract is invalid"
-                )
-            if (
-                equivalence == "object_set_v1"
-                and request.get("operation") != "object.set"
-            ):
-                raise PromptProvenanceError(
-                    "metadata-bound request JSON equivalence contract is invalid"
-                )
-            if (
-                equivalence == "object_set_rtpc_v1"
-                and request.get("operation") != "object.setRTPC"
-            ):
-                raise PromptProvenanceError(
-                    "metadata-bound request JSON equivalence contract is invalid"
-                )
-        elif semantic_kind == _SEALED_QUERY_IDENTITY_JSON_KIND:
-            if request.get("operation") != "object.set":
-                raise PromptProvenanceError(
-                    "sealed-query-identity request must be object.set"
-                )
-        else:
-            equivalence = _SEMANTIC_JSON_EQUIVALENCE_BY_KIND[
-                str(semantic_kind)
-            ]
-            if (
-                equivalence != "wire_exact"
-                and equivalence
-                != operation_request_equivalence(str(request_operation))
-                and not (
-                    request_operation == "audio.import"
-                    and equivalence
-                    == "audio_import_default_operation_v1"
-                )
-            ):
-                raise PromptProvenanceError(
-                    "operation request JSON equivalence contract is invalid"
-                )
-        result.append(
-            (
-                f"/steps/{step_index}/arguments/{semantic_index}/value",
-                request,
-            )
-        )
-    if result:
-        return tuple(result)
-    protocol = deserialize_protocol(protocol_value)
-    starts = [
-        (index, step)
-        for index, step in enumerate(protocol.steps)
-        if step.subcommand == "draft-start"
-        and step.arguments == ("audio.import",)
-    ]
-    previews = [
-        (index, step)
-        for index, step in enumerate(protocol.steps)
-        if step.subcommand == "preview-from-draft"
-    ]
-    if not starts and not previews:
-        return ()
-    if version is None or len(starts) != 1 or len(previews) != 1:
+    """Replay only the current typed V3 protocol into canonical requests.
+
+    Historical raw-preview manifests are decoded exclusively by the offline
+    archive codec.  Accepting them here would make the normal provenance reader
+    a second production parser for the retired JSON grammar.
+    """
+
+    if version is None:
         raise PromptProvenanceError(
-            "Composer preview request topology or version binding drifted"
+            "current typed protocol materialization requires one exact version"
         )
-    start_index, _start = starts[0]
-    preview_index, preview = previews[0]
-    if start_index >= preview_index:
-        raise PromptProvenanceError("Composer preview precedes its draft start")
+    protocol = deserialize_protocol(protocol_value)
     try:
-        request = materialize_audio_import_composer_protocol_request(
+        return materialize_typed_transaction_protocol_requests(
             protocol,
             version=version,
         )
     except V3ProtocolError as exc:
         raise PromptProvenanceError(
-            "audio.import Composer provenance cannot materialize its request"
+            "current typed protocol cannot materialize its request"
         ) from exc
-    return ((f"/composer/{preview.name}", request),)
-
-
 def _audio_import_composer_row_origins(
     protocol_value: Mapping[str, Any],
     rows: Sequence[Any],
@@ -1981,7 +2106,7 @@ def _audio_import_composer_row_origins(
         for argument_index, argument in enumerate(arguments):
             if (
                 not isinstance(argument, Mapping)
-                or argument.get("kind") != "draft_action_json"
+                or argument.get("kind") != "draft_typed_action"
                 or argument.get("operation") != "audio.import"
             ):
                 continue
@@ -3103,7 +3228,11 @@ def _expected_prompts(
             )
         expected = (request, *explicit_follow_ups)
     else:
-        policy = _modification_policy_for_protocol(protocol)
+        versions = tuple(getattr(scenario, "versions", ()))
+        policy = _modification_policy_for_protocol(
+            protocol,
+            version=versions[0] if len(versions) == 1 else None,
+        )
         if policy == "read_only":
             from tests.semantic.support.codex_modification_policy_v3 import (
                 READ_ONLY_FOLLOW_UP_PROMPT,
@@ -3161,43 +3290,42 @@ def _nonempty_prompt_sequence(
 
 def _modification_policy_for_protocol(
     protocol: V3GatewayProtocol,
+    *,
+    version: str | None,
 ) -> str | None:
-    previews = tuple(
-        step for step in protocol.steps if step.subcommand == "preview"
+    if (
+        protocol.turn_prefix_counts == (1, 1)
+        and protocol.allowed_turn_prefix_counts == ((1,), (1,))
+        and protocol.terminal_prefix_counts == (1,)
+        and len(protocol.steps) == 1
+        and protocol.steps[0].subcommand == "operation-schema"
+    ):
+        return "read_only"
+    preview_steps = tuple(
+        step
+        for step in protocol.steps
+        if step.subcommand in {"typed-operation", "preview-from-draft"}
     )
-    if not previews:
-        if (
-            protocol.turn_prefix_counts == (1, 1)
-            and protocol.allowed_turn_prefix_counts == ((1,), (1,))
-            and protocol.terminal_prefix_counts == (1,)
-            and len(protocol.steps) == 1
-            and protocol.steps[0].subcommand == "operation-schema"
-        ):
-            return "read_only"
+    if len(preview_steps) != 1:
         return None
-    if len(previews) != 1 or previews[0].arguments[:1] != ("--apply",):
-        return None
-    preview = previews[0]
-    if (
-        len(preview.arguments) == 3
-        and preview.arguments[1] == "--request-json"
-        and isinstance(preview.arguments[2], MetadataBoundJsonArgument)
+    # Metadata/query-enriched protocols are ordinary scenario contracts, not
+    # the closed three-policy evaluation topology.
+    if any(
+        step.subcommand in {"metadata", "query-object"}
+        for step in protocol.steps
     ):
-        # A metadata-bound transaction is an ordinary ask-before-changes
-        # protocol with one supporting read.  It is not one of the special
-        # modification-policy topologies rederived below.
         return None
-    if (
-        len(preview.arguments) != 3
-        or preview.arguments[1] != "--request-json"
-        or not isinstance(preview.arguments[2], SemanticJsonArgument)
-        or not isinstance(preview.arguments[2].expected, Mapping)
-    ):
-        raise PromptProvenanceError(
-            "modification-policy preview request topology is invalid"
-        )
+    if version is None:
+        return None
     try:
-        base = build_transaction_protocol([preview.arguments[2].expected])
+        typed_requests = materialize_typed_transaction_protocol_requests(
+            protocol,
+            version=version,
+        )
+        if len(typed_requests) != 1:
+            return None
+        request = typed_requests[0][1]
+        base = build_transaction_protocol([request])
         matches = tuple(
             policy
             for policy in ("ask_before_changes", "allow_changes")

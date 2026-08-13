@@ -10,8 +10,7 @@ from typing import Mapping
 import pytest
 
 from tests.semantic.support.codex_gateway_broker import (
-    DraftActionJsonArgument,
-    MetadataBoundJsonArgument,
+    DraftTypedActionArgument,
     MetadataTokenProjection,
 )
 from tests.semantic.support.codex_integration_weather_runtime_v1 import (
@@ -447,7 +446,7 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
     ]
     assert import_actions
     assert all(
-        isinstance(argument, DraftActionJsonArgument)
+        isinstance(argument, DraftTypedActionArgument)
         and argument.operation == "audio.import"
         for argument in import_actions
     )
@@ -472,7 +471,7 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
     assert len(action_steps) == 5
     assert all(step.subcommand == "draft-apply" for step in action_steps)
     assert all(
-        isinstance(step.arguments[-1], DraftActionJsonArgument)
+        isinstance(step.arguments[-1], DraftTypedActionArgument)
         for step in action_steps
     )
     assert all(
@@ -530,19 +529,35 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         for index, step in enumerate(protocol.steps)
         if step.name == "tx03.operation-schema"
     )
-    assert protocol.steps[rtpc_schema_index + 1].name == "tx03.preview"
-    rtpc_preview = protocol.steps[rtpc_schema_index + 1]
-    assert isinstance(rtpc_preview.arguments[2], MetadataBoundJsonArgument)
-    assert rtpc_preview.arguments[2].metadata_step == "tx01.metadata"
-    assert rtpc_preview.arguments[2].object_type == "Sound"
-    assert rtpc_preview.arguments[2].required_tokens == ("Volume",)
-    assert tuple(
-        item.name
-        for item in (
-            rtpc_preview.arguments[2].expected_required_token_projection or ()
+    rtpc_steps = [
+        step for step in protocol.steps if step.name.startswith("tx03.")
+    ]
+    assert rtpc_steps[1].name == "tx03.draft-start"
+    rtpc_preview = next(step for step in rtpc_steps if step.name == "tx03.preview")
+    assert rtpc_preview.subcommand == "preview-from-draft"
+    rtpc_actions = [
+        step.arguments[-1]
+        for step in rtpc_steps
+        if step.subcommand == "draft-apply"
+    ]
+    assert rtpc_actions
+    bound_rtpc_actions = [
+        argument
+        for argument in rtpc_actions
+        if argument.metadata_binding is not None
+    ]
+    assert bound_rtpc_actions
+    assert all(
+        argument.metadata_binding.step == "tx01.metadata"
+        and argument.metadata_binding.object_type == "Sound"
+        and argument.metadata_binding.required_tokens == ("Volume",)
+        and tuple(
+            item.name
+            for item in (argument.metadata_binding.expected_projection or ())
         )
-    ) == ("Volume",)
-    assert rtpc_preview.arguments[2].equivalence == "object_set_rtpc_v1"
+        == ("Volume",)
+        for argument in bound_rtpc_actions
+    )
     serialized = serialize_protocol(protocol)
     serialized_action_steps = [
         step
@@ -550,7 +565,7 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         if step["name"].startswith("tx02.action.")
     ]
     assert all(
-        step["arguments"][-1]["kind"] == "draft_action_json"
+        step["arguments"][-1]["kind"] == "draft_typed_action"
         for step in serialized_action_steps
     )
     assert deserialize_protocol(serialized) == protocol

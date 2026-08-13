@@ -30,6 +30,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_transaction_protocol,
     call_step,
     query_object_step,
+    typed_read_draft_steps,
 )
 from tests.semantic.support.codex_media_pool_runtime_v3 import (
     MEDIA_POOL_GET_FIELDS_URI,
@@ -289,16 +290,17 @@ def validate_audio_media_business_plan_archive(
             raise AudioMediaBusinessPlanError(
                 "archived media request shape is not closed"
             )
-        steps = [
-            call_step("media.get-fields", MEDIA_POOL_GET_FIELDS_URI),
-            call_step(
-                "media.get",
+        steps = [call_step("media.get-fields", MEDIA_POOL_GET_FIELDS_URI, version=MEDIA_VERSION)]
+        steps.extend(
+            typed_read_draft_steps(
+                "media",
                 MEDIA_POOL_GET_URI,
+                version=MEDIA_VERSION,
                 args=request["args"],
                 options=request["options"],
                 post_filter=request["post_filter"],
-            ),
-        ]
+            )
+        )
         expected_verification = ["media.get-fields"]
         if static["association_expectations"] is not None:
             steps.append(
@@ -1943,16 +1945,17 @@ def _validate_media_inputs(
 
 
 def _expected_media_protocol(case: MaterializedMediaPoolCase, oracle: SealedMediaPoolOracle) -> V3GatewayProtocol:
-    steps = [
-        call_step("media.get-fields", MEDIA_POOL_GET_FIELDS_URI),
-        call_step(
-            "media.get",
+    steps = [call_step("media.get-fields", MEDIA_POOL_GET_FIELDS_URI, version=MEDIA_VERSION)]
+    steps.extend(
+        typed_read_draft_steps(
+            "media",
             MEDIA_POOL_GET_URI,
+            version=MEDIA_VERSION,
             args=oracle.request.args,
             options=oracle.request.options,
             post_filter=oracle.request.post_filter,
-        ),
-    ]
+        )
+    )
     if case.association_expectations is not None:
         steps.append(
             query_object_step(

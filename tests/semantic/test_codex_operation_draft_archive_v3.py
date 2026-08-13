@@ -9,7 +9,7 @@ from typing import Any, Mapping
 import pytest
 
 from tests.semantic.support.codex_gateway_broker import (
-    DraftActionJsonArgument,
+    DraftTypedActionArgument,
     DraftActionResponseBinding,
     ExpectedGatewayStep,
     ResponseBinding,
@@ -381,7 +381,7 @@ def _sealed_archive(
             "--expected-revision",
             ResponseBinding("draft.start", "/draft/revision"),
             "--action-json",
-            DraftActionJsonArgument(add_action),
+            DraftTypedActionArgument(add_action),
         ),
     )
     property_step = ExpectedGatewayStep(
@@ -394,7 +394,7 @@ def _sealed_archive(
             "--expected-revision",
             ResponseBinding("draft.target", "/draft/revision"),
             "--action-json",
-            DraftActionJsonArgument(
+            DraftTypedActionArgument(
                 {
                     key: value
                     for key, value in property_action.items()
@@ -804,7 +804,7 @@ def test_composer_archive_replays_compact_action_evidence(
         (*target_step.arguments[:5], "--compact", *target_step.arguments[5:]),
     )
     property_argument = property_step.arguments[-1]
-    assert isinstance(property_argument, DraftActionJsonArgument)
+    assert isinstance(property_argument, DraftTypedActionArgument)
     compact_property_step = ExpectedGatewayStep(
         property_step.name,
         property_step.subcommand,
@@ -812,7 +812,7 @@ def test_composer_archive_replays_compact_action_evidence(
             *property_step.arguments[:5],
             "--compact",
             "--action-json",
-            DraftActionJsonArgument(
+            DraftTypedActionArgument(
                 property_argument.expected,
                 response_bindings=(
                     DraftActionResponseBinding(

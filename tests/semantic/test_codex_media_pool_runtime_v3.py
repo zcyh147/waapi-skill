@@ -8,6 +8,7 @@ import uuid
 from dataclasses import replace
 from pathlib import Path, PureWindowsPath
 from types import SimpleNamespace
+from typing import Mapping
 
 import pytest
 
@@ -53,7 +54,6 @@ from tests.semantic.support.codex_media_pool_runtime_v3 import (
     custom_database_round_trip_evidence,
     expected_macos_wine_prefix,
     fingerprint_tree,
-    get_fields_gateway_argv,
     host_directory_to_wine_z_path,
     materialize_media_pool_case,
     media_pool_preflight,
@@ -75,6 +75,14 @@ from tests.semantic.support.codex_media_pool_runtime_v3 import (
     _parse_native_windows_absolute_path,
     _typed_audio_import_path,
 )
+
+
+def _plain(value):
+    if isinstance(value, Mapping):
+        return {str(key): _plain(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_plain(item) for item in value]
+    return value
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -131,9 +139,16 @@ def _public_request(tmp_path: Path, index: int, *, ixml: bool = False):
         case,
         bind_media_pool_fields(case, _fields(ixml=ixml)),
     )
-    argv = request.gateway_argv()
-    post_filter = json.loads(argv[7]) if len(argv) == 8 else None
-    return scenario, json.loads(argv[3]), json.loads(argv[5]), post_filter
+    return (
+        scenario,
+        _plain(request.args),
+        _plain(request.options),
+        (
+            None
+            if request.post_filter is None
+            else _plain(request.post_filter)
+        ),
+    )
 
 
 def _assert_public_media_mapping_is_documented() -> None:
@@ -480,7 +495,7 @@ def test_getfields_binding_is_exact_case_and_fails_closed_for_ixml(
         "BWFXML/USER/SCENE",
         "BWFXML/USER/TAKE",
     )
-    assert "{media_pool_fields." not in " ".join(request.gateway_argv())
+    assert "{media_pool_fields." not in repr((request.args, request.options))
 
     with pytest.raises(MediaPoolRuntimeError, match="not unique"):
         bind_media_pool_fields(
@@ -502,14 +517,6 @@ def test_case_01_public_prompt_reaches_exact_short_footstep_request(
     assert all(
         token in scenario.prompt
         for token in (r"\Databases\Project Originals", "小写 `footstep`", "0.8", "20")
-    )
-    assert get_fields_gateway_argv() == (
-        "call",
-        "ak.wwise.core.mediaPool.getFields",
-        "--args-json",
-        "{}",
-        "--options-json",
-        "{}",
     )
     assert args == {
         "databases": [r"\Databases\Project Originals"],
@@ -1075,7 +1082,7 @@ def test_bound_probe_index_and_business_oracle_are_exact(tmp_path: Path) -> None
         ordered_keys=tuple(reversed(oracle.semantic_answer.ordered_keys)),
     ).ok
 
-    narrowed_args = json.loads(request.gateway_argv()[3])
+    narrowed_args = _plain(request.args)
     narrowed_args["filters"][-1]["value"] = 1.5
     narrowed = BoundMediaPoolRequest(
         scenario_id=request.scenario_id,

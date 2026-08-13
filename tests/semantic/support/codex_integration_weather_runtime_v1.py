@@ -28,12 +28,11 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     DraftActionMetadataBinding,
+    DraftTypedActionArgument,
     ExpectedGatewayStep,
     GatewayDerivedReferenceActivationAllowance,
-    MetadataBoundJsonArgument,
     MetadataQueryArgument,
     MetadataTokenProjection,
-    SemanticJsonArgument,
     project_required_metadata_tokens,
 )
 from tests.semantic.support.codex_filesystem_security import path_is_link_or_reparse
@@ -1267,52 +1266,36 @@ def _build_metadata_workflow_protocol(
             else:
                 steps.extend((metadata_step, step))
             continue
-        if step.subcommand == "preview":
-            if (
-                len(step.arguments) != 3
-                or step.arguments[:2] != ("--apply", "--request-json")
-                or not isinstance(step.arguments[2], SemanticJsonArgument)
-            ):
-                raise IntegrationWeatherRuntimeError(
-                    "weather transaction preview topology drifted"
-                )
-            metadata_row = metadata_by_tx[prefix]
-            if metadata_row is not None:
-                (
-                    object_type,
-                    _queries,
-                    tokens,
-                    projection,
-                    equivalence,
-                ) = metadata_row
-                step = replace(
-                    step,
-                    arguments=(
-                        "--apply",
-                        "--request-json",
-                        MetadataBoundJsonArgument(
-                            expected=step.arguments[2].expected,
-                            metadata_step=(
-                                f"{reused_metadata_steps[prefix]}.metadata"
-                                if prefix in reused_metadata_steps
-                                else f"{prefix}.metadata"
-                            ),
-                            object_type=object_type,
-                            required_tokens=tuple(tokens),
-                            expected_required_token_projection=tuple(projection),
-                            equivalence=equivalence,
-                            gateway_derived_reference_activations=tuple(
-                                gateway_derived_reference_activations[
-                                    int(prefix[2:]) - 1
-                                ]
-                            ),
-                        ),
-                    ),
-                )
-            else:
-                raise IntegrationWeatherRuntimeError(
-                    "weather legacy preview is missing its explicit metadata step"
-                )
+        metadata_row = metadata_by_tx[prefix]
+        if metadata_row is not None and any(
+            isinstance(argument, DraftTypedActionArgument)
+            for argument in step.arguments
+        ):
+            object_type, _queries, tokens, projection, _equivalence = metadata_row
+            binding = DraftActionMetadataBinding(
+                step=(
+                    f"{reused_metadata_steps[prefix]}.metadata"
+                    if prefix in reused_metadata_steps
+                    else f"{prefix}.metadata"
+                ),
+                object_type=object_type,
+                required_tokens=tuple(tokens),
+                expected_projection=tuple(projection),
+            )
+            step = replace(
+                step,
+                arguments=tuple(
+                    replace(argument, metadata_binding=binding)
+                    if isinstance(argument, DraftTypedActionArgument)
+                    and argument.metadata_binding is None
+                    and any(
+                        token in _string_facts(argument.expected)
+                        for token in tokens
+                    )
+                    else argument
+                    for argument in step.arguments
+                ),
+            )
         steps.append(step)
     prefixes = tuple(
         next(
@@ -1335,6 +1318,14 @@ def _build_metadata_workflow_protocol(
             ("tx02.operation-schema", "tx02.metadata"),
         ),
     )
+
+
+def _string_facts(value: Any) -> set[str]:
+    if isinstance(value, Mapping):
+        return set().union(*(_string_facts(item) for item in value.values()), set())
+    if isinstance(value, (list, tuple)):
+        return set().union(*(_string_facts(item) for item in value), set())
+    return {value} if isinstance(value, str) else set()
 
 
 def _weather_plan_transactions() -> tuple[Mapping[str, Any], ...]:
@@ -1375,11 +1366,14 @@ def _workflow_plan_steps(
     result: list[Mapping[str, Any]] = []
     kind_by_subcommand = {
         "operation-schema": "operation_schema",
+        "request-array-item": "operation_compose",
+        "request-map-container": "operation_compose",
         "draft-start": "operation_compose",
         "draft-apply": "operation_compose",
         "draft-check": "operation_compose_check",
         "preview-from-draft": "preview",
         "preview": "preview",
+        "typed-operation": "preview",
         "transaction-show": "transaction_show",
         "confirm": "confirm",
         "execute": "execute",

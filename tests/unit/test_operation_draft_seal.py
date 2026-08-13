@@ -13,6 +13,8 @@ from typing import Any, Mapping, Sequence
 
 import pytest
 
+from wwise_waapi.operation_composer import typed_action_cli_arguments
+
 from wwise_waapi.operation_drafts import (  # pyright: ignore[reportMissingImports]
     OperationDraftSealReplayMismatch,
     OperationDraftState,
@@ -527,8 +529,8 @@ def apply_action(
         authority,
         "--expected-revision",
         str(revision),
-        "--action-json",
-        json.dumps(
+        "--facts",
+        *typed_action_cli_arguments(
             {
                 "contract": "waapi-skill.operation-draft-action/v1",
                 **dict(action),

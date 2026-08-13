@@ -192,8 +192,11 @@ def test_every_generated_inline_lane_is_either_generic_or_exactly_isolated() -> 
             generic.append((row["version"], row["uri"]))
 
     assert len(inline_rows) == 463
-    assert len(generic) == 275
-    assert len(isolated) == 188
+    # Isolated typed routes joined the same schema compiler in #44; only
+    # dedicated exact-operation lanes remain intentionally unavailable through
+    # generic request-schema.
+    assert len(generic) == 364
+    assert len(isolated) == 99
     assert ("2025.1", "ak.wwise.core.object.setName") in isolated
     assert ("2025.1", "ak.wwise.core.log.get") in generic
 

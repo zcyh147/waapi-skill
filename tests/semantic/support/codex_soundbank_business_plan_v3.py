@@ -270,7 +270,7 @@ def _validate_inputs(materialized: MaterializedSoundBankCase, before: SoundBankS
             raise SoundBankBusinessPlanError("topic must have only a closed topic plan")
         topic = materialized.topic_plan
         expected = build_direct_protocol([
-            wait_topic_step("soundbank.generated.wait", topic.topic, event_count=topic.event_count, match=topic.match, options=topic.options),
+            wait_topic_step("soundbank.generated.wait", topic.topic, version=blueprint.version, event_count=topic.event_count, match=topic.match, options=topic.options),
         ])
     elif materialized.topic_plan is not None or not materialized.operation_requests:
         raise SoundBankBusinessPlanError("function/refusal materialization has invalid request topology")
@@ -281,7 +281,14 @@ def _validate_inputs(materialized: MaterializedSoundBankCase, before: SoundBankS
             raise SoundBankBusinessPlanError("zero-dispatch refusal must retain its one refused request")
         expected = build_transaction_protocol(
             materialized.operation_requests,
-            refusal=StructuredRefusal(blueprint.zero_dispatch_error_code) if blueprint.expected_primary_dispatch_count == 0 else None,
+            refusal=(
+                StructuredRefusal(
+                    blueprint.zero_dispatch_error_code,
+                    result_command="typed-operation",
+                )
+                if blueprint.expected_primary_dispatch_count == 0
+                else None
+            ),
         )
     if blueprint.expected_primary_dispatch_count == 0:
         if blueprint.zero_dispatch_error_code != PROCESS_REFUSAL_ERROR_CODE:
@@ -382,12 +389,12 @@ def _refusal_archive_delta(static: Mapping[str, Any], live: Mapping[str, Any]) -
 def _expected_protocol_archive(static: Mapping[str, Any], live: Mapping[str, Any], protocol: V3GatewayProtocol) -> dict[str, Any]:
     if static["api"] == SOUNDBANK_TOPIC:
         topic = live["topic"]
-        return _protocol(build_direct_protocol([wait_topic_step("soundbank.generated.wait", topic["topic"], event_count=topic["event_count"], match=topic["match"], options=topic["options"])]))
+        return _protocol(build_direct_protocol([wait_topic_step("soundbank.generated.wait", topic["topic"], version=str(static["version"]), event_count=topic["event_count"], match=topic["match"], options=topic["options"])]))
     return _protocol(build_transaction_protocol(static["operation_requests"], refusal=None if static["zero_dispatch_error_code"] is None else _refusal(static["zero_dispatch_error_code"])))
 
 
 def _refusal(code: str):
-    return StructuredRefusal(code)
+    return StructuredRefusal(code, result_command="typed-operation")
 
 
 def _sections(kind: str, primary: Sequence[str], verify: Sequence[str], assertions: Sequence[str], static: Mapping[str, Any], live: Mapping[str, Any], rules: Sequence[Mapping[str, Any]]) -> SoundBankBusinessPlanSections:

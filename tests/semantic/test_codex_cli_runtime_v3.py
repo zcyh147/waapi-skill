@@ -538,26 +538,35 @@ def test_all_twenty_cases_materialize_exact_waapi_call_and_three_phase_contract(
     assert schema_result.uri == case.api
     assert schema_result.version == "2022.1"
     protocol = runtime.gateway_protocol()
+    construction_count = next(
+        index
+        for index, step in enumerate(protocol.steps, start=1)
+        if step.subcommand == "typed-call"
+    )
     if runtime.plan.business_disconnect_may_occur:
-        assert protocol.turn_prefix_counts == (2, 5)
-        assert [step.subcommand for step in protocol.steps] == [
-            "operation-schema",
-            "preview",
+        assert protocol.turn_prefix_counts == (
+            construction_count,
+            len(protocol.steps),
+        )
+        assert [step.subcommand for step in protocol.steps[-3:]] == [
             "transaction-show",
             "confirm",
             "execute",
         ]
         assert protocol.steps[-1].terminal_execute is True
     else:
-        assert protocol.turn_prefix_counts == (2, 6)
-        assert [step.subcommand for step in protocol.steps] == [
-            "operation-schema",
-            "preview",
+        assert protocol.turn_prefix_counts == (
+            construction_count,
+            len(protocol.steps),
+        )
+        assert [step.subcommand for step in protocol.steps[-4:]] == [
             "transaction-show",
             "confirm",
             "execute",
             "verify",
         ]
+    assert protocol.steps[0].subcommand == "request-schema"
+    assert protocol.steps[construction_count - 1].subcommand == "typed-call"
     assert runtime.render_prompt() == case.render_prompt(runtime.visible_values)
 
     assert lifecycle.business.project_path == str(plan.business_server_project_path)
@@ -791,7 +800,7 @@ def test_single_platform_convert_provenance_binds_visible_root_to_pair_value(
     assert binding["pointer"] == ""
     assert binding["origin_kind"] == "owned_path"
     assert binding["origin_pointer"] == (
-        "/steps/1/arguments/2/value/arguments/args/output/1"
+        "/composer/tx01.preview/arguments/args/output/1"
     )
     assert binding["path_kind"] == "directory"
     assert binding["owned_relative_path"].endswith("/cli-io/output")

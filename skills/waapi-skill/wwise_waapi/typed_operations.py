@@ -496,6 +496,159 @@ def materialize_inline_operation_request(
     return request
 
 
+def inline_operation_cli_arguments(request: Mapping[str, Any]) -> tuple[str, ...]:
+    """Serialize one canonical inline operation into its only public argv form."""
+
+    if not isinstance(request, Mapping):
+        raise TypedOperationInputError("Inline operation request must be an object")
+    operation = request.get("operation")
+    version = request.get("version")
+    arguments = request.get("arguments")
+    if (
+        not isinstance(operation, str)
+        or not isinstance(version, str)
+        or not isinstance(arguments, Mapping)
+    ):
+        raise TypedOperationInputError("Inline operation request is incomplete")
+    if operation not in INLINE_OPERATIONS:
+        raise TypedOperationInputError("Inline operation is not supported")
+    result: list[str] = [
+        operation,
+        "--schema-digest",
+        operation_request_schema_digest(operation, version),
+        "--apply",
+    ]
+
+    def selector_tokens(value: Any) -> tuple[str, ...]:
+        if not isinstance(value, Mapping):
+            raise TypedOperationInputError("Inline selector is not an object")
+        kind = value.get("kind")
+        if kind in {"id", "path"}:
+            raw = value.get("value")
+            token = (
+                "id-integer"
+                if kind == "id" and isinstance(raw, int) and not isinstance(raw, bool)
+                else "id-string"
+                if kind == "id"
+                else "path"
+            )
+            return (token, str(raw))
+        if kind == "exact-type-name":
+            return (kind, str(value.get("type")), str(value.get("name")))
+        if kind == "direct-child":
+            return (kind, str(value.get("type")), *selector_tokens(value.get("parent")))
+        if kind == "scoped-name":
+            return (
+                kind,
+                str(value.get("type")),
+                str(value.get("name")),
+                *selector_tokens(value.get("parent")),
+            )
+        raise TypedOperationInputError("Inline selector kind is unsupported")
+
+    def scalar_tokens(value: Any) -> tuple[str, str]:
+        value_type = (
+            "boolean"
+            if isinstance(value, bool)
+            else "integer"
+            if isinstance(value, int)
+            else "number"
+            if isinstance(value, float)
+            else "string"
+        )
+        return value_type, (
+            "true" if value is True else "false" if value is False else str(value)
+        )
+
+    if operation in {"debug.restartWaapiServers", "debug.testAssert", "debug.testCrash"}:
+        pass
+    elif operation in {"debug.setAsserts", "debug.setAutomationMode"}:
+        result.extend(("--enable", scalar_tokens(arguments["enable"])[1]))
+    elif operation == "audio.importTabDelimited":
+        result.extend(("--import-file", str(arguments["import_file"])))
+        result.extend(("--import-location", *selector_tokens(arguments["import_location"])))
+        result.extend(("--import-language", str(arguments["import_language"])))
+        for name, flag in (
+            ("import_operation", "--import-operation"),
+            ("auto_add_to_source_control", "--auto-add"),
+            ("auto_check_out_to_source_control", "--auto-check-out"),
+        ):
+            if name in arguments:
+                result.extend((flag, scalar_tokens(arguments[name])[1]))
+    elif operation == "soundbank.processDefinitionFiles":
+        for path in arguments["files"]:
+            result.extend(("--file", str(path)))
+        result.extend(("--io-root", str(arguments["io_root"])))
+    elif operation in {"switchContainer.addAssignment", "switchContainer.removeAssignment"}:
+        for name, flag in (
+            ("switch_container", "--switch-container"),
+            ("child", "--child"),
+            ("state_or_switch", "--state-or-switch"),
+        ):
+            result.extend((flag, *selector_tokens(arguments[name])))
+    elif operation in {"object.setName", "object.setNotes"}:
+        result.extend(("--object", *selector_tokens(arguments["object"])))
+        result.extend(("--text", str(arguments["value"])))
+    elif operation in {"object.delete", "object.copy", "object.move"}:
+        result.extend(("--object", *selector_tokens(arguments["object"])))
+        if "parent" in arguments:
+            result.extend(("--parent", *selector_tokens(arguments["parent"])))
+        for name, flag in (
+            ("on_name_conflict", "--on-name-conflict"),
+            ("auto_add_to_source_control", "--auto-add"),
+            ("auto_check_out_to_source_control", "--auto-check-out"),
+        ):
+            if name in arguments:
+                result.extend((flag, scalar_tokens(arguments[name])[1]))
+    elif operation == "object.setProperty":
+        result.extend(("--object", *selector_tokens(arguments["object"])))
+        result.extend(("--property", str(arguments["property"])))
+        value_type, value = scalar_tokens(arguments["value"])
+        result.extend(("--value", value_type, value))
+        if "platform" in arguments:
+            result.extend(("--platform", str(arguments["platform"])))
+    elif operation == "object.setReference":
+        result.extend(("--object", *selector_tokens(arguments["object"])))
+        result.extend(("--reference", str(arguments["reference"])))
+        if arguments["target"] is None:
+            result.append("--clear")
+        else:
+            result.extend(("--target", *selector_tokens(arguments["target"])))
+        if "platform" in arguments:
+            result.extend(("--platform", str(arguments["platform"])))
+    elif operation == "object.setLinked":
+        result.extend(("--object", *selector_tokens(arguments["object"])))
+        result.extend(("--property", str(arguments["property"])))
+        result.extend(("--platform", str(arguments["platform"])))
+        result.extend(("--linked", scalar_tokens(arguments["linked"])[1]))
+    elif operation == "ui.captureScreen":
+        if "view_name" in arguments:
+            result.extend(("--view-name", str(arguments["view_name"])))
+        if "view_channel" in arguments:
+            result.extend(("--view-channel", str(arguments["view_channel"])))
+        if "rect" in arguments:
+            result.extend(
+                ("--rect", *(str(arguments["rect"][key]) for key in ("x", "y", "width", "height")))
+            )
+    elif operation == "ui.commands.execute":
+        result.extend(("--command", str(arguments["command"])))
+        for name, flag in (("objects", "--command-object"), ("platforms", "--command-platform"), ("files", "--file")):
+            for value in arguments.get(name, ()):
+                result.extend((flag, str(value)))
+        if "value" in arguments:
+            value_type, value = scalar_tokens(arguments["value"])
+            result.extend(("--value", value_type, value))
+    else:
+        raise TypedOperationInputError("Inline operation serializer is incomplete")
+    # Re-run the strict materializer through the equivalent values indirectly by
+    # requiring the canonical parser before returning the stable argv.
+    try:
+        parse_operation_request(request, expected_version=version)
+    except OperationContractError as exc:
+        raise TypedOperationInputError(str(exc)) from exc
+    return tuple(result)
+
+
 def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
     """Return one concise, exact-version continuation for public discovery."""
 
@@ -665,7 +818,15 @@ def draft_operation_request_contract(operation: str, version: str) -> TypedReque
     if operation not in DRAFT_TYPED_OPERATIONS:
         raise TypedOperationInputError(f"No typed Draft adapter exists for {operation!r}")
     machine = operation_request_machine_contract(operation, version)
-    arguments = deepcopy(machine["argument_contract"])
+    # Registry owns semantic leaf truth. Project its intentionally
+    # metadata-narrowed scalar leaves into the finite Typed Core exactly as
+    # compound children do; live metadata still revalidates the chosen scalar
+    # during Preview preparation.
+    arguments = _compound_child_typed_schema(
+        deepcopy(machine["argument_contract"])
+    )
+    if not isinstance(arguments, dict):
+        raise TypedOperationInputError("Typed Draft argument contract is malformed")
     if operation == "waapi.undoGroup":
         return compile_typed_request_contract(
             version=version,
@@ -865,4 +1026,5 @@ __all__ = [
     "compound_child_operations",
     "compound_child_request_contract",
     "materialize_inline_operation_request",
+    "inline_operation_cli_arguments",
 ]

@@ -13,6 +13,7 @@ from wwise_waapi.typed_requests import (
     compile_typed_request_contract,
     materialize_typed_request,
     request_contract,
+    typed_request_construction_for_values,
 )
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
 
@@ -320,4 +321,152 @@ def test_materialization_rejects_contract_tampering() -> None:
                     "set", handles["voicePipelineID"], "integer", "1"
                 ),
             ),
+        )
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_inverse_encoder_round_trips_scalar_branch_and_array_values(
+    version: str,
+) -> None:
+    contract = request_contract(version, TYPED_REQUEST_TRACER_URI)
+    args = {
+        "time": 1200,
+        "voicePipelineID": 17,
+        "bussesPipelineID": [3, 5],
+    }
+
+    construction = typed_request_construction_for_values(
+        contract,
+        args=args,
+        options={},
+    )
+    materialized = materialize_typed_request(
+        contract,
+        schema_digest=contract.schema_digest,
+        facts=construction.facts,
+    )
+
+    assert materialized.args == args
+    assert materialized.options == {}
+    assert construction.disclosures == ()
+
+
+def test_inverse_encoder_round_trips_nested_dynamic_containers_and_open_map() -> None:
+    schema = {
+        "argsSchema": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["rows", "payload"],
+            "properties": {
+                "rows": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": ["kind", "value"],
+                        "properties": {
+                            "kind": {"const": "id", "type": "string"},
+                            "value": {
+                                "oneOf": [
+                                    {"type": "string"},
+                                    {"type": "integer"},
+                                ]
+                            },
+                        },
+                    },
+                },
+                "payload": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "oneOf": [
+                            {"type": "null"},
+                            {"type": "boolean"},
+                            {"type": "number"},
+                            {"type": "string"},
+                        ]
+                    },
+                },
+            },
+        },
+        "optionsSchema": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "return": {"type": "array", "items": {"type": "string"}}
+            },
+        },
+    }
+    contract = compile_typed_request_contract(
+        version="2025.1",
+        uri="ak.example.inverse-complex",
+        schema=schema,
+        graph=load_definition_graph("2025.1"),
+    )
+    args = {
+        "rows": [{"kind": "id", "value": 42}],
+        "payload": {"empty": None, "enabled": True, "gain": -1.5, "name": "x"},
+    }
+    options = {"return": []}
+
+    construction = typed_request_construction_for_values(
+        contract,
+        args=args,
+        options=options,
+    )
+    materialized = materialize_typed_request(
+        contract,
+        schema_digest=contract.schema_digest,
+        facts=construction.facts,
+    )
+
+    assert materialized.args == args
+    assert materialized.options == options
+    assert construction.disclosures
+    disclosed_handles = {item.child_handle for item in construction.disclosures}
+    assert all(
+        fact.value in disclosed_handles
+        for fact in construction.facts
+        if fact.value_type in {"object", "array"}
+    )
+
+
+def test_inverse_encoder_rejects_unknown_and_ambiguous_values() -> None:
+    contract = request_contract("2025.1", TYPED_REQUEST_TRACER_URI)
+    with pytest.raises(TypedRequestError, match="outside the disclosed contract"):
+        typed_request_construction_for_values(
+            contract,
+            args={"time": 1, "voicePipelineID": 2, "invented": True},
+            options={},
+        )
+
+    ambiguous = compile_typed_request_contract(
+        version="2025.1",
+        uri="ak.example.inverse-ambiguous",
+        schema={
+            "argsSchema": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["value"],
+                "properties": {
+                    "value": {
+                        "oneOf": [
+                            {"type": "string"},
+                            {"type": "string", "minLength": 1},
+                        ]
+                    }
+                },
+            },
+            "optionsSchema": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {},
+            },
+        },
+        graph=load_definition_graph("2025.1"),
+    )
+    with pytest.raises(TypedRequestError):
+        typed_request_construction_for_values(
+            ambiguous,
+            args={"value": "x"},
+            options={},
         )

@@ -124,8 +124,33 @@ def _manifest(tmp_path: Path, *, version: str = "2022.1") -> BaselineManifest:
 
 def _protocol(unit: WorkflowUnit) -> V3GatewayProtocol:
     def fixture_arguments(operation: str, index: int) -> dict[str, Any]:
+        if operation == "audio.import":
+            return {
+                "imports": [
+                    {
+                        "object_path": (
+                            rf"\Actor-Mixer Hierarchy\Default Work Unit\Fixture{index}"
+                        ),
+                        "object_type": "ActorMixer",
+                    }
+                ]
+            }
+        if operation == "object.set":
+            return {
+                "objects": [
+                    {
+                        "object": {
+                            "kind": "path",
+                            "value": (
+                                rf"\Actor-Mixer Hierarchy\Default Work Unit\Fixture{index}"
+                            ),
+                        },
+                        "notes": "integration harness fixture",
+                    }
+                ]
+            }
         if operation != "switchContainer.removeAssignment":
-            return {"test_fixture": index}
+            raise AssertionError(f"unreviewed integration fixture operation {operation}")
         switch_container = {
             "kind": "path",
             "value": r"\Actor-Mixer Hierarchy\Fixture\Player_Footsteps",

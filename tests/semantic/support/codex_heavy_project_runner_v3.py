@@ -57,6 +57,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_transaction_protocol,
     call_step,
     query_object_step,
+    typed_read_draft_steps,
     wait_topic_step,
 )
 from tests.semantic.support.codex_gateway_broker import (
@@ -2599,15 +2600,18 @@ def _prepare_media_pool_case(
         oracle=oracle,
     )
     steps: list[ExpectedGatewayStep] = [
-        call_step("media.get-fields", MEDIA_POOL_GET_FIELDS_URI),
-        call_step(
-            "media.get",
+        call_step("media.get-fields", MEDIA_POOL_GET_FIELDS_URI, version=runtime.version),
+    ]
+    steps.extend(
+        typed_read_draft_steps(
+            "media",
             MEDIA_POOL_GET_URI,
+            version=runtime.version,
             args=request.args,
             options=request.options,
             post_filter=request.post_filter,
-        ),
-    ]
+        )
+    )
     if reference_read is not None:
         steps.append(
             query_object_step(
@@ -3935,11 +3939,14 @@ def _compile_integration_workflow_plan(
     }
     kind_by_subcommand = {
         "operation-schema": "operation_schema",
+        "request-array-item": "operation_compose",
+        "request-map-container": "operation_compose",
         "draft-start": "operation_compose",
         "draft-apply": "operation_compose",
         "draft-check": "operation_compose_check",
         "preview": "preview",
         "preview-from-draft": "preview",
+        "typed-operation": "preview",
         "transaction-show": "transaction_show",
         "confirm": "confirm",
         "execute": "execute",
@@ -4483,6 +4490,7 @@ def _prepare_case(
                 wait_topic_step(
                     step_name,
                     topic.topic,
+                    version=runtime.version,
                     event_count=topic.event_count,
                     match=topic.match,
                     options=topic.options,

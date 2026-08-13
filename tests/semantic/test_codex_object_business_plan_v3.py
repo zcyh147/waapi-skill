@@ -14,14 +14,13 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_metadata_transaction_protocol,
     build_schema_query_transaction_protocol,
     build_transaction_protocol,
-    call_step,
     query_object_step,
 )
 from tests.semantic.support.codex_compound_heavy_v1 import (
     load_compound_heavy_profile,
 )
 from tests.semantic.support.codex_gateway_broker import (
-    MetadataBoundJsonArgument,
+    DraftActionMetadataBinding,
     MetadataTokenProjection,
 )
 from tests.semantic.support.codex_object_business_plan_v3 import (
@@ -367,15 +366,20 @@ def test_compound_object_metadata_protocol_is_archived_and_revalidated(
     assert archived.writer_kwargs() == sections.writer_kwargs()
     assert sections.payload_bindings["primary_steps"] == ["tx01.execute"]
     assert "metadata.discover" in sections.payload_bindings["verification_steps"]
-    preview = next(
-        step for step in protocol.steps if step.subcommand == "preview"
+    metadata_binding = next(
+        binding
+        for step in protocol.steps
+        for binding in (
+            step.metadata_binding,
+            *(
+                getattr(argument, "metadata_binding", None)
+                for argument in step.arguments
+            ),
+        )
+        if isinstance(binding, DraftActionMetadataBinding)
     )
-    argument = preview.arguments[2]
-    assert isinstance(argument, MetadataBoundJsonArgument)
-    assert argument.equivalence == (
-        "object_set_v1"
-        if recipe.request.operation == "object.set"
-        else "wire_exact"
+    assert metadata_binding.expected_projection == (
+        MetadataTokenProjection("Volume", "property", "Real32"),
     )
 
 
@@ -605,7 +609,7 @@ def test_object_rejects_cross_bound_or_incomplete_protocol(tmp_path: Path) -> No
         manifest,
     )
     wrong_protocol = build_direct_protocol(
-        [call_step("object.get", "ak.wwise.core.object.get")]
+        [query_object_step("object.get", ("query-object", "--from", "project", "--take", "1"))]
     )
     with pytest.raises(ObjectBusinessPlanError, match="protocol"):
         validate_archived_object_business_plan(

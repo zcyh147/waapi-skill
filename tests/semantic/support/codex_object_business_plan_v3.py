@@ -37,9 +37,7 @@ from tests.semantic.support.codex_filesystem_security import (
     CodexFileSecurityError,
     read_bounded_exclusive_regular_file,
 )
-from tests.semantic.support.codex_gateway_broker import (
-    MetadataBoundJsonArgument,
-)
+from tests.semantic.support.codex_gateway_broker import DraftActionMetadataBinding
 from tests.semantic.support.codex_object_heavy_v3 import (
     ObjectHeavyRecipe,
     OperationRequestSpec,
@@ -1566,16 +1564,22 @@ def _compound_metadata_protocol(
         raise ObjectBusinessPlanError(
             "compound object metadata binding differs from the reviewed profile"
         )
-    metadata_arguments = tuple(
-        argument
+    metadata_bindings = tuple(
+        binding
         for step in protocol.steps
-        if step.subcommand == "preview"
-        for argument in step.arguments
-        if isinstance(argument, MetadataBoundJsonArgument)
+        for binding in (
+            step.metadata_binding,
+            *(
+                getattr(argument, "metadata_binding", None)
+                for argument in step.arguments
+            ),
+        )
+        if isinstance(binding, DraftActionMetadataBinding)
     )
+    metadata_arguments = tuple(dict.fromkeys(metadata_bindings))
     if (
         len(metadata_arguments) != 1
-        or metadata_arguments[0].expected_required_token_projection is None
+        or metadata_arguments[0].expected_projection is None
     ):
         raise ObjectBusinessPlanError(
             "compound object protocol omits its trusted live metadata projection"
@@ -1589,7 +1593,7 @@ def _compound_metadata_protocol(
         metadata_queries=("volume",),
         required_tokens=("Volume",),
         expected_required_token_projection=(
-            metadata_arguments[0].expected_required_token_projection
+            metadata_arguments[0].expected_projection
         ),
         equivalence=(
             "object_set_v1"

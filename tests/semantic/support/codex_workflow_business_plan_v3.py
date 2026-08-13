@@ -21,6 +21,8 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Mapping, Sequence
 
+from wwise_waapi.operation_registry import COMPOSER_INPUT_MODE, operation_input_mode
+
 
 WORKFLOW_BUSINESS_PLAN_SCHEMA = "waapi-skill.workflow-business-plan/v1"
 WORKFLOW_FIXTURE_KIND = "workflow_materialized_v1"
@@ -501,10 +503,12 @@ def _matches_transaction_step_sequence(
     ]
     if actual == legacy:
         return True
-    if (
-        transaction.get("operation") not in {"object.set", "audio.import"}
-        or len(actual) < 9
-    ):
+    if operation_input_mode(
+        str(transaction.get("operation")),
+        str(transaction.get("version", "2022.1")),
+    ) != COMPOSER_INPUT_MODE:
+        return False
+    if len(actual) < 9:
         return False
     if actual[:2] != [
         (f"{transaction_id}.operation-schema", "operation_schema"),
@@ -517,11 +521,19 @@ def _matches_transaction_step_sequence(
     ]
     if actual[-len(tail) :] != tail:
         return False
-    actions = actual[2 : -len(tail)]
-    return actions == [
-        (f"{transaction_id}.action.{index:03d}", "operation_compose")
-        for index in range(1, len(actions) + 1)
-    ]
+    construction = actual[2 : -len(tail)]
+    counters = {"action": 0, "disclose": 0}
+    for name, kind in construction:
+        if kind != "operation_compose":
+            return False
+        prefix = name.removeprefix(f"{transaction_id}.")
+        family, separator, raw_index = prefix.partition(".")
+        if family not in counters or separator != "." or not raw_index.isdigit():
+            return False
+        counters[family] += 1
+        if raw_index != f"{counters[family]:03d}":
+            return False
+    return bool(construction)
 
 
 def _validate_diagnostic_evidence(

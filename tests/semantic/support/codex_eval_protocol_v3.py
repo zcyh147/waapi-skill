@@ -14,17 +14,19 @@ from dataclasses import dataclass, replace
 from typing import Any, Mapping, Sequence
 
 from tests.semantic.support.codex_gateway_broker import (
-    DraftActionJsonArgument,
+    DraftTypedActionArgument,
     DraftActionMetadataBinding,
     DraftActionQueryIdentityBinding,
     DraftActionResponseBinding,
     ExpectedGatewayStep,
+    InlineTypedOperationArgument,
     MetadataBoundJsonArgument,
     MetadataQueryArgument,
     MetadataTokenProjection,
     OBJECT_SET_SCHEMA_DEFAULTS,
     ResponseBinding,
     SemanticJsonArgument,
+    TypedRequestFactsArgument,
     validate_commutative_composer_setup_step_groups,
     validate_commutative_read_only_step_groups,
     validate_operation_draft_protocol_steps,
@@ -36,13 +38,61 @@ from wwise_waapi.operation_composer import (
     new_composition,
 )
 from wwise_waapi.operation_registry import (
+    COMPOSER_INPUT_MODE,
+    INLINE_TYPED_INPUT_MODE,
     OperationContractError,
+    operation_input_mode,
     parse_operation_request,
+)
+from wwise_waapi.typed_operations import (
+    INLINE_OPERATIONS,
+    draft_operation_request_contract,
+    inline_operation_cli_arguments,
+)
+from wwise_waapi.typed_topics import topic_match_contract, topic_options_contract
+from wwise_waapi.typed_requests import (
+    TypedRequestFact,
+    request_contract,
+    typed_request_construction_for_values,
+    typed_request_facts_for_values,
 )
 
 
 OPERATION_REQUEST_CONTRACT = "waapi-skill.operation-request/v1"
 OPERATION_DRAFT_ACTION_CONTRACT = "waapi-skill.operation-draft-action/v1"
+
+
+def _typed_fact_cli_arguments(
+    facts: Sequence[TypedRequestFact],
+    *,
+    prefix: str = "",
+) -> tuple[str, ...]:
+    flag_prefix = f"{prefix}-" if prefix else ""
+    values: list[str] = []
+    for fact in facts:
+        flag = f"--{flag_prefix}{fact.action}"
+        values.append(flag)
+        if fact.action in {"set", "append"}:
+            values.extend((fact.handle, fact.value_type, fact.value))
+        elif fact.action == "present":
+            values.append(fact.handle)
+        elif fact.action == "choose":
+            values.extend((fact.handle, fact.value))
+        elif fact.action == "choose-dynamic":
+            if fact.key is None:
+                raise V3ProtocolError("typed dynamic branch is missing its key")
+            values.extend((fact.handle, fact.key, fact.value))
+        elif fact.action in {"map-put", "map-correct"}:
+            if fact.key is None:
+                raise V3ProtocolError("typed map fact is missing its key")
+            values.extend((fact.handle, fact.key, fact.value_type, fact.value))
+        elif fact.action == "map-remove":
+            if fact.key is None:
+                raise V3ProtocolError("typed map removal is missing its key")
+            values.extend((fact.handle, fact.key))
+        else:
+            raise V3ProtocolError(f"unsupported typed fact action {fact.action!r}")
+    return tuple(values)
 
 
 class V3ProtocolError(ValueError):
@@ -136,6 +186,7 @@ def build_object_set_composer_transaction_steps(
                 action[field_name] = raw_target[field_name]
         properties = raw_target.get("properties", [])
         references = raw_target.get("references", [])
+        children = raw_target.get("children", [])
         unsupported = set(raw_target) - {
             "object",
             "name",
@@ -145,11 +196,13 @@ def build_object_set_composer_transaction_steps(
             "on_name_conflict",
             "properties",
             "references",
+            "children",
         }
         if (
             unsupported
             or not isinstance(properties, list)
             or not isinstance(references, list)
+            or not isinstance(children, list)
         ):
             raise V3ProtocolError("object.set Composer target fields are not supported")
         for row in properties:
@@ -178,6 +231,40 @@ def build_object_set_composer_transaction_steps(
             action["references"] = [dict(row) for row in references]
         action_specs.append((action, tuple(identity_bindings)))
 
+        def append_children(
+            rows: Sequence[Any],
+            *,
+            parent_action_index: int,
+        ) -> None:
+            for row in rows:
+                if (
+                    not isinstance(row, Mapping)
+                    or not isinstance(row.get("type"), str)
+                    or not isinstance(row.get("name"), str)
+                ):
+                    raise V3ProtocolError("object.set Composer child is invalid")
+                nested = row.get("children", [])
+                unsupported_child = set(row) - {"type", "name", "children"}
+                if unsupported_child or not isinstance(nested, list):
+                    raise V3ProtocolError(
+                        "object.set Composer child fields are not supported"
+                    )
+                action_specs.append(
+                    (
+                        {
+                            "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+                            "action": "add_child",
+                            "parent_handle": f"@action:{parent_action_index}",
+                            "type": row["type"],
+                            "name": row["name"],
+                        },
+                        (),
+                    )
+                )
+                append_children(nested, parent_action_index=len(action_specs))
+
+        append_children(children, parent_action_index=len(action_specs))
+
     steps: list[ExpectedGatewayStep] = [
         ExpectedGatewayStep(
             name=f"{label}.operation-schema",
@@ -191,11 +278,28 @@ def build_object_set_composer_transaction_steps(
         ),
     ]
     latest_revision_step = f"{label}.draft-start"
+    issued_handle_steps: dict[int, str] = {}
     for index, (action, identity_bindings) in enumerate(
         action_specs,
         start=1,
     ):
         action_name = f"{label}.action.{index:03d}"
+        action = dict(action)
+        response_bindings: tuple[DraftActionResponseBinding, ...] = ()
+        parent_handle = action.get("parent_handle")
+        if isinstance(parent_handle, str) and parent_handle.startswith("@action:"):
+            parent_index = int(parent_handle.removeprefix("@action:"))
+            parent_step = issued_handle_steps.get(parent_index)
+            if parent_step is None:
+                raise V3ProtocolError("object.set Composer child parent is unavailable")
+            action.pop("parent_handle")
+            response_bindings = (
+                DraftActionResponseBinding(
+                    "/parent_handle",
+                    parent_step,
+                    "/draft/action_result/created_handles/0",
+                ),
+            )
         steps.append(
             ExpectedGatewayStep(
                 name=action_name,
@@ -208,8 +312,9 @@ def build_object_set_composer_transaction_steps(
                     ResponseBinding(latest_revision_step, "/draft/revision"),
                     "--compact",
                     "--facts",
-                    DraftActionJsonArgument(
+                    DraftTypedActionArgument(
                         expected=action,
+                        response_bindings=response_bindings,
                         query_identity_bindings=identity_bindings,
                         metadata_binding=(
                             metadata_binding
@@ -224,6 +329,8 @@ def build_object_set_composer_transaction_steps(
                 ),
             )
         )
+        if action.get("action") in {"add_target", "add_child"}:
+            issued_handle_steps[index] = action_name
         latest_revision_step = action_name
     check_name = f"{label}.check"
     preview_name = f"{label}.preview"
@@ -468,7 +575,7 @@ def build_audio_import_composer_transaction_steps(
                     ResponseBinding(latest_revision_step, "/draft/revision"),
                     "--compact",
                     "--facts",
-                    DraftActionJsonArgument(
+                    DraftTypedActionArgument(
                         expected=action,
                         response_bindings=response_bindings,
                         operation="audio.import",
@@ -638,7 +745,7 @@ def materialize_audio_import_composer_protocol_request(
             continue
         argument = step.arguments[-1] if step.arguments else None
         if (
-            not isinstance(argument, DraftActionJsonArgument)
+            not isinstance(argument, DraftTypedActionArgument)
             or argument.operation != "audio.import"
             or argument.query_identity_bindings
         ):
@@ -657,6 +764,194 @@ def materialize_audio_import_composer_protocol_request(
         raise V3ProtocolError(
             "audio.import Composer protocol cannot materialize its request"
         ) from exc
+
+
+def materialize_typed_transaction_protocol_requests(
+    protocol: V3GatewayProtocol,
+    *,
+    version: str,
+) -> tuple[tuple[str, Mapping[str, Any]], ...]:
+    """Replay every current typed transaction to its canonical request.
+
+    This is the current-evidence inverse used by prompt provenance and
+    semantic oracles. It accepts only the normal typed protocol objects that
+    were already validated when ``V3GatewayProtocol`` was constructed; legacy
+    JSON preview decoding stays in the offline archive codec.
+    """
+
+    results: list[tuple[str, Mapping[str, Any]]] = []
+    for step in protocol.steps:
+        if step.subcommand == "typed-call":
+            witness = step.arguments[-1] if step.arguments else None
+            if not isinstance(witness, TypedRequestFactsArgument):
+                raise V3ProtocolError(
+                    "typed-call transaction lacks its canonical facts witness"
+                )
+            if witness.io_root is None:
+                continue
+            results.append(
+                (
+                    f"/composer/{step.name}",
+                    {
+                        "contract": OPERATION_REQUEST_CONTRACT,
+                        "version": version,
+                        "operation": "waapi.call",
+                        "arguments": {
+                            "api": witness.contract.uri,
+                            "args": dict(witness.expected_args),
+                            "options": dict(witness.expected_options),
+                            "io_root": witness.io_root,
+                        },
+                    },
+                )
+            )
+            continue
+        if step.subcommand != "typed-operation":
+            continue
+        witness = step.arguments[-1] if step.arguments else None
+        if not isinstance(witness, InlineTypedOperationArgument):
+            raise V3ProtocolError(
+                "inline typed transaction lacks its canonical materialization witness"
+            )
+        results.append(
+            (
+                f"/composer/{step.name}",
+                json.loads(
+                    json.dumps(
+                        dict(witness.expected),
+                        ensure_ascii=False,
+                        allow_nan=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    )
+                ),
+            )
+        )
+    starts = tuple(
+        (index, step)
+        for index, step in enumerate(protocol.steps)
+        if step.subcommand == "draft-start"
+    )
+    for start_index, start in starts:
+        operation = str(start.arguments[0])
+        next_start_index = next(
+            (
+                index
+                for index in range(start_index + 1, len(protocol.steps))
+                if protocol.steps[index].subcommand == "draft-start"
+            ),
+            len(protocol.steps),
+        )
+        # A mutating Draft is represented by its immutable Preview handoff.
+        # Read-only Drafts have no Preview and terminate at draft-check.  Pick
+        # the lifecycle-specific terminal rather than whichever command occurs
+        # first, otherwise every mutation would be mislabeled as a read and an
+        # audio.import replay would be truncated before preview-from-draft.
+        terminal_index = next(
+            (
+                index
+                for index in range(start_index + 1, next_start_index)
+                if protocol.steps[index].subcommand == "preview-from-draft"
+            ),
+            None,
+        )
+        if terminal_index is None:
+            terminal_index = next(
+                (
+                    index
+                    for index in range(start_index + 1, next_start_index)
+                    if protocol.steps[index].subcommand == "draft-check"
+                ),
+                None,
+            )
+        if terminal_index is None:
+            continue
+        if operation == "audio.import":
+            segment_start = start_index
+            while segment_start > 0 and protocol.steps[segment_start - 1].subcommand in {
+                "metadata",
+                "query-object",
+                "operation-schema",
+            }:
+                segment_start -= 1
+            request = materialize_audio_import_composer_protocol_request(
+                V3GatewayProtocol(
+                    tuple(protocol.steps[segment_start : terminal_index + 1]),
+                    (terminal_index - segment_start + 1,),
+                ),
+                version=version,
+            )
+        else:
+            composition = new_composition(operation, version)
+            issued_handles: dict[str, str] = {}
+
+            def composition_handles(value: Any) -> set[str]:
+                if isinstance(value, Mapping):
+                    result = {
+                        item
+                        for key, item in value.items()
+                        if key == "handle" and isinstance(item, str)
+                    }
+                    for item in value.values():
+                        result.update(composition_handles(item))
+                    return result
+                if isinstance(value, list):
+                    result: set[str] = set()
+                    for item in value:
+                        result.update(composition_handles(item))
+                    return result
+                return set()
+
+            for step in protocol.steps[start_index + 1 : terminal_index]:
+                if step.subcommand != "draft-apply":
+                    continue
+                argument = step.arguments[-1] if step.arguments else None
+                if not isinstance(argument, DraftTypedActionArgument):
+                    raise V3ProtocolError(
+                        "typed transaction contains a non-typed Draft action"
+                    )
+                # Handles issued by the shared Typed Core are deterministic for
+                # the exact version/schema/field lineage.  The expected action
+                # therefore already contains the value that the public
+                # disclosure response must bind at runtime.  Query-identity
+                # bindings likewise retain the reviewed path form in evidence;
+                # the Broker separately proves the live GUID/path equivalence.
+                action = dict(argument.expected)
+                for binding in argument.response_bindings:
+                    bound = issued_handles.get(binding.step)
+                    if bound is not None:
+                        action[binding.pointer.removeprefix("/")] = bound
+                prior_handles = composition_handles(composition)
+                try:
+                    composition, _ = apply_composer_action(
+                        operation,
+                        version,
+                        composition,
+                        action,
+                    )
+                except OperationComposerError as exc:
+                    raise V3ProtocolError(
+                        "typed transaction action cannot be replayed"
+                    ) from exc
+                created = sorted(composition_handles(composition) - prior_handles)
+                if created:
+                    if len(created) != 1:
+                        raise V3ProtocolError(
+                            "typed transaction action created ambiguous handles"
+                        )
+                    issued_handles[step.name] = created[0]
+            try:
+                request = materialize_operation_request(
+                    operation,
+                    version,
+                    composition,
+                )
+            except OperationComposerError as exc:
+                raise V3ProtocolError(
+                    "typed transaction cannot materialize its request"
+                ) from exc
+        results.append((f"/composer/{protocol.steps[terminal_index].name}", request))
+    return tuple(results)
 
 
 def build_audio_import_composer_protocol(
@@ -698,6 +993,331 @@ def build_audio_import_composer_protocol(
         turn_prefix_counts=(preview_indexes[0], len(steps)),
         commutative_read_only_step_groups=commutative_groups,
     )
+
+
+def _build_generic_typed_draft_transaction_steps(
+    request: Mapping[str, Any],
+    *,
+    label: str,
+    refusal: "StructuredRefusal | None" = None,
+    direct_read: bool = False,
+    post_filter: Mapping[str, Any] | None = None,
+    request_options: Mapping[str, Any] | None = None,
+) -> tuple[ExpectedGatewayStep, ...]:
+    operation = str(request["operation"])
+    version = str(request["version"])
+    arguments = request["arguments"]
+    if not isinstance(arguments, Mapping):
+        raise V3ProtocolError("typed Draft request arguments must be an object")
+    try:
+        contract = (
+            request_contract(version, operation)
+            if operation.startswith("ak.")
+            else draft_operation_request_contract(operation, version)
+        )
+        if direct_read != (operation.startswith("ak.") and contract.effect == "read"):
+            raise V3ProtocolError("typed Draft lifecycle does not match its operation effect")
+        construction = typed_request_construction_for_values(
+            contract,
+            args=arguments,
+            options=(
+                {}
+                if request_options is None
+                else _normalize_json_object(request_options, field="typed Draft options")
+            ),
+        )
+    except (TypeError, ValueError) as exc:
+        raise V3ProtocolError(
+            f"typed Draft request for {operation!r} is not constructible: {exc}"
+        ) from exc
+    steps: list[ExpectedGatewayStep] = [
+        ExpectedGatewayStep(
+            f"{label}.operation-schema",
+            "request-schema" if operation.startswith("ak.") else "operation-schema",
+            (operation,),
+        ),
+        ExpectedGatewayStep(
+            f"{label}.draft-start",
+            "draft-start",
+            (operation,),
+        ),
+    ]
+    revision_step = f"{label}.draft-start"
+    disclosure_by_child: dict[str, str] = {}
+    disclosed_handle_bindings: dict[str, tuple[str, str]] = {}
+    disclosure_steps: list[ExpectedGatewayStep] = []
+    for disclosure_index, disclosure in enumerate(
+        construction.disclosures,
+        start=1,
+    ):
+        base_name = f"{label}.disclose.{disclosure_index:03d}"
+        parent_argument: Any = disclosure.parent_handle
+        parent_token_arguments: tuple[Any, ...] = ()
+        if disclosure.parent_child_handle is not None:
+            parent_source = disclosure_by_child.get(disclosure.parent_child_handle)
+            if parent_source is None:
+                raise V3ProtocolError("typed Draft disclosure parent is unavailable")
+            parent_argument = ResponseBinding(parent_source, "/handle")
+            parent_token_arguments = (
+                "--parent-schema-token",
+                ResponseBinding(parent_source, "/schema_lineage_token"),
+            )
+        command_arguments: list[Any] = [
+            operation,
+            "--schema-digest",
+            contract.schema_digest,
+            (
+                "--array-handle"
+                if disclosure.command == "request-array-item"
+                else "--map-handle"
+            ),
+            parent_argument,
+            (
+                "--index"
+                if disclosure.command == "request-array-item"
+                else "--key"
+            ),
+            disclosure.key,
+            "--shape",
+            disclosure.shape,
+            *parent_token_arguments,
+        ]
+        if disclosure.choice_handle is not None:
+            choice_name = f"{base_name}.choices"
+            disclosure_steps.append(
+                ExpectedGatewayStep(
+                    choice_name,
+                    disclosure.command,
+                    tuple(command_arguments),
+                )
+            )
+            disclosed_handle_bindings[disclosure.choice_handle] = (
+                choice_name,
+                f"/choices/{disclosure.choice_index}/handle",
+            )
+            if disclosure.choice_index is None:
+                raise V3ProtocolError("typed Draft disclosure choice is unindexed")
+            command_arguments.extend(
+                (
+                    "--choice-handle",
+                    ResponseBinding(
+                        choice_name,
+                        f"/choices/{disclosure.choice_index}/handle",
+                    ),
+                )
+            )
+        disclosure_steps.append(
+            ExpectedGatewayStep(base_name, disclosure.command, tuple(command_arguments))
+        )
+        disclosure_by_child[disclosure.child_handle] = base_name
+        disclosed_handle_bindings[disclosure.child_handle] = (base_name, "/handle")
+    steps.extend(disclosure_steps)
+    for index, fact in enumerate(construction.facts, start=1):
+        response_bindings: list[DraftActionResponseBinding] = []
+        if fact.handle in disclosed_handle_bindings:
+            source_step, source_pointer = disclosed_handle_bindings[fact.handle]
+            response_bindings.append(
+                DraftActionResponseBinding(
+                    "/field_handle",
+                    source_step,
+                    source_pointer,
+                )
+            )
+        if fact.value in disclosed_handle_bindings:
+            source_step, source_pointer = disclosed_handle_bindings[fact.value]
+            response_bindings.append(
+                DraftActionResponseBinding(
+                    "/value",
+                    source_step,
+                    source_pointer,
+                )
+            )
+        action = {
+            "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+            "action": "add_typed_fact",
+            "fact_action": fact.action,
+            "field_handle": fact.handle,
+            **(
+                {"value_type": fact.value_type, "value": fact.value}
+                if fact.action in {"set", "append", "map-put"}
+                else {"value": fact.value}
+                if fact.action == "choose"
+                else {"key": fact.key, "value": fact.value}
+                if fact.action == "choose-dynamic"
+                else {}
+            ),
+            **(
+                {"key": fact.key}
+                if fact.action == "map-put" and fact.key is not None
+                else {}
+            ),
+        }
+        step_name = f"{label}.action.{index:03d}"
+        steps.append(
+            ExpectedGatewayStep(
+                step_name,
+                "draft-apply",
+                (
+                    ResponseBinding(f"{label}.draft-start", "/draft/draft_id"),
+                    "--task-authority",
+                    ResponseBinding(f"{label}.draft-start", "/task_authority"),
+                    "--expected-revision",
+                    ResponseBinding(revision_step, "/draft/revision"),
+                    "--compact",
+                    "--facts",
+                    DraftTypedActionArgument(
+                        action,
+                        response_bindings=tuple(response_bindings),
+                        operation=operation,
+                    ),
+                ),
+            )
+        )
+        revision_step = step_name
+    check_name = f"{label}.check"
+    check_trailing: tuple[Any, ...] = ()
+    if post_filter is not None:
+        normalized_filter = _normalize_json_object(post_filter, field="typed read post filter")
+        if (
+            operation != "ak.wwise.core.mediaPool.get"
+            or set(normalized_filter) != {"field", "operator", "value", "limit"}
+            or normalized_filter["field"] != "Filename"
+            or normalized_filter["operator"] != "containsCaseSensitive"
+        ):
+            raise V3ProtocolError("typed read post filter is outside its closed contract")
+        check_trailing = (
+            "--post-filter-value",
+            str(normalized_filter["value"]),
+            "--post-filter-limit",
+            str(normalized_filter["limit"]),
+        )
+    steps.append(
+        ExpectedGatewayStep(
+            check_name,
+            "draft-check",
+            (
+                ResponseBinding(f"{label}.draft-start", "/draft/draft_id"),
+                "--task-authority",
+                ResponseBinding(f"{label}.draft-start", "/task_authority"),
+                "--expected-revision",
+                ResponseBinding(revision_step, "/draft/revision"),
+                *check_trailing,
+            ),
+        )
+    )
+    if direct_read:
+        return tuple(steps)
+    steps.append(
+        ExpectedGatewayStep(
+            f"{label}.preview",
+            "preview-from-draft",
+            (
+                ResponseBinding(f"{label}.draft-start", "/draft/draft_id"),
+                "--task-authority",
+                ResponseBinding(f"{label}.draft-start", "/task_authority"),
+                "--expected-revision",
+                ResponseBinding(check_name, "/draft/revision"),
+                "--apply",
+            ),
+            allowed_exit_codes=(2,) if refusal is not None else (0,),
+            expected_error_code=refusal.error_code if refusal is not None else "",
+            expected_result_command=refusal.result_command if refusal is not None else "",
+        )
+    )
+    return tuple(steps)
+
+
+def _typed_disclosure_protocol_steps(
+    disclosures: Sequence[Any],
+    *,
+    operation: str,
+    schema_digest: str,
+    label: str,
+) -> tuple[ExpectedGatewayStep, ...]:
+    """Bind every opaque nested handle before one inline typed-call."""
+
+    steps: list[ExpectedGatewayStep] = []
+    disclosure_by_child: dict[str, str] = {}
+    for disclosure_index, disclosure in enumerate(disclosures, start=1):
+        base_name = f"{label}.disclose.{disclosure_index:03d}"
+        parent_argument: Any = disclosure.parent_handle
+        parent_token_arguments: tuple[Any, ...] = ()
+        if disclosure.parent_child_handle is not None:
+            parent_source = disclosure_by_child.get(disclosure.parent_child_handle)
+            if parent_source is None:
+                raise V3ProtocolError("typed request disclosure parent is unavailable")
+            parent_argument = ResponseBinding(parent_source, "/handle")
+            parent_token_arguments = (
+                "--parent-schema-token",
+                ResponseBinding(parent_source, "/schema_lineage_token"),
+            )
+        command_arguments: list[Any] = [
+            operation,
+            "--schema-digest",
+            schema_digest,
+            (
+                "--array-handle"
+                if disclosure.command == "request-array-item"
+                else "--map-handle"
+            ),
+            parent_argument,
+            "--index" if disclosure.command == "request-array-item" else "--key",
+            disclosure.key,
+            "--shape",
+            disclosure.shape,
+            *parent_token_arguments,
+        ]
+        if disclosure.choice_handle is not None:
+            if disclosure.choice_index is None:
+                raise V3ProtocolError("typed request disclosure choice is unindexed")
+            choice_name = f"{base_name}.choices"
+            steps.append(
+                ExpectedGatewayStep(
+                    choice_name,
+                    disclosure.command,
+                    tuple(command_arguments),
+                )
+            )
+            command_arguments.extend(
+                (
+                    "--choice-handle",
+                    ResponseBinding(
+                        choice_name,
+                        f"/choices/{disclosure.choice_index}/handle",
+                    ),
+                )
+            )
+        steps.append(
+            ExpectedGatewayStep(base_name, disclosure.command, tuple(command_arguments))
+        )
+        disclosure_by_child[disclosure.child_handle] = base_name
+    return tuple(steps)
+
+
+def typed_read_draft_steps(
+    name: str,
+    api: str,
+    *,
+    version: str,
+    args: Mapping[str, Any],
+    options: Mapping[str, Any],
+    post_filter: Mapping[str, Any] | None = None,
+) -> tuple[ExpectedGatewayStep, ...]:
+    """Build one exact complex read through the shared typed Draft lifecycle."""
+
+    request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": version,
+        "operation": api,
+        "arguments": _normalize_json_object(args, field="typed read args"),
+    }
+    return _build_generic_typed_draft_transaction_steps(
+            request,
+            label=name,
+            direct_read=True,
+            post_filter=post_filter,
+            request_options=options,
+        )
 
 
 def metadata_candidate_limit(queries: Sequence[str]) -> int:
@@ -922,6 +1542,121 @@ def build_transaction_protocol(
     ):
         label = f"tx{index:02d}"
         operation = str(request["operation"])
+        if operation == "waapi.call":
+            call_arguments = request["arguments"]
+            if not isinstance(call_arguments, Mapping):
+                raise V3ProtocolError("waapi.call arguments must be an object")
+            api = call_arguments.get("api")
+            raw_args = call_arguments.get("args")
+            raw_options = call_arguments.get("options")
+            if (
+                not isinstance(api, str)
+                or not isinstance(raw_args, Mapping)
+                or not isinstance(raw_options, Mapping)
+            ):
+                raise V3ProtocolError("typed waapi.call request is incomplete")
+            try:
+                contract = request_contract(str(request["version"]), api)
+                construction = typed_request_construction_for_values(
+                    contract,
+                    args=raw_args,
+                    options=raw_options,
+                )
+            except (TypeError, ValueError) as exc:
+                raise V3ProtocolError(
+                    f"typed waapi.call request for {api!r} is not constructible: {exc}"
+                ) from exc
+            if contract.route != "isolated_transaction":
+                raise V3ProtocolError(
+                    "waapi.call semantic protocol is reserved for isolated typed routes"
+                )
+            io_root = call_arguments.get("io_root")
+            if not isinstance(io_root, str) or not io_root:
+                raise V3ProtocolError("isolated typed call requires one io_root")
+            steps.append(
+                ExpectedGatewayStep(
+                    name=f"{label}.request-schema",
+                    subcommand="request-schema",
+                    arguments=(api,),
+                )
+            )
+            disclosure_steps = _typed_disclosure_protocol_steps(
+                construction.disclosures,
+                operation=api,
+                schema_digest=contract.schema_digest,
+                label=label,
+            )
+            steps.extend(disclosure_steps)
+            steps.append(
+                ExpectedGatewayStep(
+                    name=f"{label}.preview",
+                    subcommand="typed-call",
+                    arguments=(
+                        api,
+                        "--schema-digest",
+                        contract.schema_digest,
+                        "--apply",
+                        "--io-root",
+                        io_root,
+                        TypedRequestFactsArgument(
+                            contract=contract,
+                            expected_args=dict(raw_args),
+                            expected_options=dict(raw_options),
+                            io_root=io_root,
+                        ),
+                    ),
+                )
+            )
+            prefixes.append(len(steps))
+            preview_name = f"{label}.preview"
+            if refusal is not None:
+                steps[-1] = replace(
+                    steps[-1],
+                    allowed_exit_codes=(2,),
+                    expected_error_code=refusal.error_code,
+                    expected_result_command=refusal.result_command,
+                )
+                continue
+            preview_transaction_id = ResponseBinding(preview_name, "/transaction_id")
+            show_name = f"{label}.transaction-show"
+            confirm_name = f"{label}.confirm"
+            execute_name = f"{label}.execute"
+            steps.extend(
+                (
+                    ExpectedGatewayStep(
+                        name=show_name,
+                        subcommand="transaction-show",
+                        arguments=(preview_transaction_id, "--summary-only"),
+                    ),
+                    ExpectedGatewayStep(
+                        name=confirm_name,
+                        subcommand="confirm",
+                        arguments=(
+                            ResponseBinding(show_name, "/transaction_id"),
+                            "--confirmation-token",
+                            ResponseBinding(show_name, "/confirmation/token"),
+                        ),
+                    ),
+                    ExpectedGatewayStep(
+                        name=execute_name,
+                        subcommand="execute",
+                        arguments=(ResponseBinding(confirm_name, "/transaction_id"),),
+                        allowed_exit_codes=(0, 2),
+                        terminal_execute=terminal_execute,
+                    ),
+                )
+            )
+            if not terminal_execute:
+                steps.append(
+                    ExpectedGatewayStep(
+                        name=f"{label}.verify",
+                        subcommand="verify",
+                        arguments=(ResponseBinding(execute_name, "/transaction_id"),),
+                    )
+                )
+            if index == len(normalized):
+                prefixes.append(len(steps))
+            continue
         steps.append(
             ExpectedGatewayStep(
                 name=f"{label}.operation-schema",
@@ -930,27 +1665,74 @@ def build_transaction_protocol(
             )
         )
         preview_name = f"{label}.preview"
-        steps.append(
-            ExpectedGatewayStep(
-                name=preview_name,
-                subcommand="preview",
-                arguments=(
-                    "--apply",
-                    "--request-json",
-                    SemanticJsonArgument(
-                        request,
-                        equivalence=request_equivalence,
+        input_mode = operation_input_mode(operation, str(request["version"]))
+        if input_mode == INLINE_TYPED_INPUT_MODE:
+            inline_argv = inline_operation_cli_arguments(request)
+            steps.append(
+                ExpectedGatewayStep(
+                    name=preview_name,
+                    subcommand="typed-operation",
+                    arguments=(
+                        inline_argv[0],
+                        InlineTypedOperationArgument(request, operation=operation),
                     ),
-                ),
-                allowed_exit_codes=(2,) if refusal is not None else (0,),
-                expected_error_code=refusal.error_code if refusal is not None else "",
-                expected_result_command=(
-                    refusal.result_command if refusal is not None else ""
-                ),
+                    allowed_exit_codes=(2,) if refusal is not None else (0,),
+                    expected_error_code=refusal.error_code if refusal is not None else "",
+                    expected_result_command=(
+                        refusal.result_command if refusal is not None else ""
+                    ),
+                )
             )
-        )
-        if index == 1:
-            prefixes.append(len(steps))
+        elif input_mode == COMPOSER_INPUT_MODE:
+            if operation == "object.set":
+                operation_steps = build_object_set_composer_transaction_steps(
+                    request,
+                    label=label,
+                )
+            elif operation == "audio.import":
+                operation_steps = build_audio_import_composer_transaction_steps(
+                    request,
+                    label=label,
+                )
+            else:
+                operation_steps = _build_generic_typed_draft_transaction_steps(
+                    request,
+                    label=label,
+                    refusal=refusal,
+                )
+            preview_index = next(
+                (
+                    position
+                    for position, item in enumerate(operation_steps)
+                    if item.subcommand == "preview-from-draft"
+                ),
+                None,
+            )
+            if preview_index is None:
+                raise V3ProtocolError(
+                    f"operation {operation!r} typed Draft has no Preview handoff"
+                )
+            construction = list(operation_steps[1 : preview_index + 1])
+            if refusal is not None:
+                construction[-1] = replace(
+                    construction[-1],
+                    allowed_exit_codes=(2,),
+                    expected_error_code=refusal.error_code,
+                    expected_result_command=refusal.result_command,
+                )
+            # The typed builders own schema through Preview. The schema step
+            # already appended above is identical, so retain only their tail.
+            steps.extend(construction)
+            preview_name = f"{label}.preview"
+        else:
+            raise V3ProtocolError(
+                f"operation {operation!r} has no typed semantic input mode"
+            )
+        # Construction of every next Preview belongs to the preceding
+        # confirmation turn. Record the cumulative boundary only after that
+        # operation's actual typed construction (which may contain many Draft
+        # actions), never from a fixed two-step assumption.
+        prefixes.append(len(steps))
         if refusal is not None:
             continue
 
@@ -1008,19 +1790,6 @@ def build_transaction_protocol(
 
     if refusal is not None:
         prefixes = [len(steps)]
-    elif terminal_execute:
-        prefixes = [2, 5]
-    elif len(normalized) > 1:
-        # Reconstruct the exact cumulative boundary after every confirmation:
-        # initial schema+preview, then four continuation steps plus the next
-        # schema+preview, with the final turn ending after four steps.
-        prefixes = [2]
-        consumed = 2
-        for index in range(len(normalized)):
-            consumed += 4
-            if index + 1 < len(normalized):
-                consumed += 2
-            prefixes.append(consumed)
     return V3GatewayProtocol(tuple(steps), tuple(prefixes))
 
 
@@ -1208,54 +1977,111 @@ def build_metadata_transaction_protocol(
             schema_first=True,
         )
     base = build_transaction_protocol(requests)
+    if not any(
+        step.subcommand in {"typed-operation", "preview-from-draft"}
+        for step in base.steps
+    ):
+        raise V3ProtocolError("typed transaction lacks its Preview-producing step")
     if schema_first:
         if (
-            len(base.steps) < 2
+            not base.steps
             or base.steps[0].subcommand != "operation-schema"
-            or base.steps[1].subcommand != "preview"
         ):
             raise V3ProtocolError(
-                "schema-first metadata requires one ordinary transaction prefix"
+                "schema-first metadata requires one typed transaction prefix"
             )
         steps = [base.steps[0], metadata_step, *base.steps[1:]]
     else:
         steps = [metadata_step, *base.steps]
+    binding = DraftActionMetadataBinding(
+        step=metadata_step_name,
+        object_type=object_type,
+        required_tokens=tuple(tokens),
+        expected_projection=projection,
+    )
+    bound = False
     for index, step in enumerate(steps):
-        if step.subcommand != "preview":
-            continue
-        if (
-            len(step.arguments) != 3
-            or step.arguments[:2] != ("--apply", "--request-json")
-            or not isinstance(step.arguments[2], SemanticJsonArgument)
-        ):
-            raise V3ProtocolError(
-                "base transaction preview differs from the reviewed shape"
+        arguments = list(step.arguments)
+        changed = False
+        for argument_index, argument in enumerate(arguments):
+            if isinstance(argument, DraftTypedActionArgument):
+                action_tokens = _tokens_from_typed_action(argument.expected)
+                if action_tokens & set(tokens):
+                    arguments[argument_index] = replace(
+                        argument,
+                        metadata_binding=binding,
+                    )
+                    changed = True
+                    bound = True
+            elif isinstance(argument, TypedRequestFactsArgument):
+                arguments[argument_index] = replace(
+                    argument,
+                    metadata_binding=binding,
+                )
+                changed = True
+                bound = True
+        if changed:
+            steps[index] = replace(step, arguments=tuple(arguments))
+    # Inline typed operations carry fixed argv rather than a variable fact
+    # sentinel. Bind their Preview-producing step directly to the same sealed
+    # metadata response so discovery is evidence, not merely ordering.
+    if not bound:
+        inline_indexes = tuple(
+            index
+            for index, step in enumerate(steps)
+            if step.subcommand == "typed-operation"
+        )
+        if len(inline_indexes) == 1:
+            inline_index = inline_indexes[0]
+            steps[inline_index] = replace(
+                steps[inline_index],
+                metadata_binding=binding,
             )
-        try:
-            bound_argument = MetadataBoundJsonArgument(
-                expected=step.arguments[2].expected,
-                metadata_step=metadata_step_name,
-                object_type=object_type,
-                required_tokens=tokens,
-                expected_required_token_projection=projection,
-                equivalence=equivalence,
+            bound = True
+    # Generic schema-derived Draft facts describe values by opaque field
+    # handles, so token names are not repeated in each action witness. Bind the
+    # live metadata projection to the immutable Preview handoff instead; the
+    # Broker then proves the exact discovery response before accepting the
+    # materialized request.
+    if not bound:
+        preview_indexes = tuple(
+            index
+            for index, step in enumerate(steps)
+            if step.subcommand == "preview-from-draft"
+        )
+        if len(preview_indexes) == 1:
+            preview_index = preview_indexes[0]
+            steps[preview_index] = replace(
+                steps[preview_index],
+                metadata_binding=binding,
             )
-        except (TypeError, ValueError) as exc:
-            raise V3ProtocolError(
-                f"metadata-bound request equivalence is invalid: {exc}"
-            ) from exc
-        steps[index] = replace(
-            step,
-            arguments=(
-                "--apply",
-                "--request-json",
-                bound_argument,
-            ),
+            bound = True
+    if not bound:
+        raise V3ProtocolError(
+            "metadata-bound typed transaction has no token-bearing input"
         )
     return V3GatewayProtocol(
         steps=tuple(steps),
         turn_prefix_counts=tuple(value + 1 for value in base.turn_prefix_counts),
     )
+
+
+def _tokens_from_typed_action(value: Any) -> set[str]:
+    if isinstance(value, Mapping):
+        found = {
+            str(value["name"])
+            for _key in (0,)
+            if isinstance(value.get("name"), str)
+        }
+        for nested in value.values():
+            found.update(_tokens_from_typed_action(nested))
+        return found
+    if isinstance(value, list):
+        found: set[str] = set()
+        for nested in value:
+            found.update(_tokens_from_typed_action(nested))
+        return found
+    return set()
 
 
 def build_schema_query_transaction_protocol(
@@ -1283,13 +2109,9 @@ def build_schema_query_transaction_protocol(
             "schema-query transaction requires one exact query-object step"
         )
     base = build_transaction_protocol(requests)
-    if (
-        len(base.steps) < 2
-        or base.steps[0].subcommand != "operation-schema"
-        or base.steps[1].subcommand != "preview"
-    ):
+    if not base.steps or base.steps[0].subcommand != "operation-schema":
         raise V3ProtocolError(
-            "schema-query transaction requires one ordinary transaction prefix"
+            "schema-query transaction requires one typed transaction prefix"
         )
     return V3GatewayProtocol(
         steps=(base.steps[0], query_step, *base.steps[1:]),
@@ -1326,29 +2148,22 @@ def build_modification_policy_protocol(
         raise V3ProtocolError(
             "modification policy must be read_only, ask_before_changes, or allow_changes"
         )
-    if base.turn_prefix_counts != (2, 6) or len(base.steps) != 6:
+    if len(base.turn_prefix_counts) != 2 or len(base.steps) < 6:
         raise V3ProtocolError(
-            "modification-policy evaluation requires one ordinary transaction"
+            "modification-policy evaluation requires one typed transaction"
         )
-    (
-        operation_schema,
-        preview,
-        transaction_show,
-        confirm,
-        execute,
-        verify,
-    ) = base.steps
+    operation_schema = base.steps[0]
+    transaction_show, confirm, execute, verify = base.steps[-4:]
+    construction = base.steps[:-4]
+    preview = construction[-1]
     if (
         operation_schema.subcommand != "operation-schema"
-        or preview.subcommand != "preview"
+        or preview.subcommand not in {"typed-operation", "preview-from-draft"}
         or transaction_show.subcommand != "transaction-show"
         or confirm.subcommand != "confirm"
         or execute.subcommand != "execute"
         or verify.subcommand != "verify"
         or preview.allowed_exit_codes != (0,)
-        or len(preview.arguments) != 3
-        or preview.arguments[:2] != ("--apply", "--request-json")
-        or not isinstance(preview.arguments[2], SemanticJsonArgument)
     ):
         raise V3ProtocolError(
             "base transaction protocol differs from the reviewed six-step shape"
@@ -1373,12 +2188,11 @@ def build_modification_policy_protocol(
     )
     return V3GatewayProtocol(
         steps=(
-            operation_schema,
-            preview,
+            *construction,
             direct_execute,
             direct_verify,
         ),
-        turn_prefix_counts=(4,),
+        turn_prefix_counts=(len(construction) + 2,),
     )
 
 
@@ -1386,6 +2200,7 @@ def call_step(
     name: str,
     api: str,
     *,
+    version: str,
     args: Mapping[str, Any] | None = None,
     options: Mapping[str, Any] | None = None,
     post_filter: Mapping[str, Any] | None = None,
@@ -1398,13 +2213,39 @@ def call_step(
         {} if options is None else options,
         field="call options",
     )
+    try:
+        contract = request_contract(version, api)
+        facts = typed_request_facts_for_values(
+            contract,
+            args=argument_values,
+            options=option_values,
+        )
+    except (TypeError, ValueError) as exc:
+        raise V3ProtocolError(
+            f"call request for {api!r} cannot use the typed contract: {exc}"
+        ) from exc
+    payload = contract.as_gateway_payload()
+    input_shape = payload.get("input_shape")
+    if input_shape == "draft":
+        raise V3ProtocolError(
+            f"call request for {api!r} requires the typed Draft lifecycle"
+        )
+    subcommand = "typed-zero-call" if not contract.fields else "typed-call"
     gateway_arguments: tuple[Any, ...] = (
         api,
-        "--args-json",
-        SemanticJsonArgument(argument_values),
-        "--options-json",
-        SemanticJsonArgument(option_values),
+        "--schema-digest",
+        contract.schema_digest,
+        *(("--apply",) if contract.effect != "read" else ()),
     )
+    if facts:
+        gateway_arguments = (
+            *gateway_arguments,
+            TypedRequestFactsArgument(
+                contract=contract,
+                expected_args=argument_values,
+                expected_options=option_values,
+            ),
+        )
     if post_filter is not None:
         post_filter_value = _normalize_json_object(
             post_filter,
@@ -1412,18 +2253,23 @@ def call_step(
         )
         if not post_filter_value:
             raise V3ProtocolError("call post filter must not be empty")
+        if api != "ak.wwise.core.mediaPool.get":
+            raise V3ProtocolError("typed post filter is supported only for Media Pool")
+        filter_value = post_filter_value.get("value")
+        filter_limit = post_filter_value.get("limit")
+        if set(post_filter_value) != {"value", "limit"}:
+            raise V3ProtocolError("typed Media Pool post filter has an invalid shape")
         gateway_arguments = (
             *gateway_arguments,
-            "--post-filter-json",
-            SemanticJsonArgument(post_filter_value),
+            "--post-filter-value",
+            str(filter_value),
+            "--post-filter-limit",
+            str(filter_limit),
         )
     return ExpectedGatewayStep(
         name=name,
-        subcommand="call",
+        subcommand=subcommand,
         arguments=gateway_arguments,
-        allow_omitted_empty_json_objects=(
-            not argument_values and not option_values and post_filter is None
-        ),
     )
 
 
@@ -1441,6 +2287,7 @@ def wait_topic_step(
     name: str,
     topic: str,
     *,
+    version: str,
     event_count: int,
     match: Mapping[str, Any] | None = None,
     options: Mapping[str, Any] | None = None,
@@ -1450,26 +2297,41 @@ def wait_topic_step(
         raise V3ProtocolError("wait-topic event_count must be an integer from 1 through 64")
     if timeout_seconds <= 0:
         raise V3ProtocolError("wait-topic timeout must be positive")
-    arguments: list[Any] = [topic]
-    if options is not None:
-        arguments.extend(
-            (
-                "--options-json",
-                SemanticJsonArgument(
-                    _normalize_json_object(options, field="wait-topic options")
-                ),
-            )
+    option_values = _normalize_json_object(
+        {} if options is None else options,
+        field="wait-topic options",
+    )
+    match_values = _normalize_json_object(
+        {} if match is None else match,
+        field="wait-topic match",
+    )
+    try:
+        options_contract = topic_options_contract(version, topic)
+        match_contract = topic_match_contract(version, topic)
+        option_facts = typed_request_facts_for_values(
+            options_contract,
+            args={},
+            options=option_values,
         )
+        match_facts = typed_request_facts_for_values(
+            match_contract,
+            args=match_values,
+            options={},
+        )
+    except (TypeError, ValueError) as exc:
+        raise V3ProtocolError(
+            f"Topic {topic!r} cannot use its typed protocol: {exc}"
+        ) from exc
+    arguments: list[Any] = [
+        topic,
+        "--options-schema-digest",
+        options_contract.schema_digest,
+        "--match-schema-digest",
+        match_contract.schema_digest,
+        *(_typed_fact_cli_arguments(option_facts, prefix="option")),
+        *(_typed_fact_cli_arguments(match_facts, prefix="match")),
+    ]
     arguments.extend(("--event-count", str(event_count)))
-    if match is not None:
-        arguments.extend(
-            (
-                "--match-json",
-                SemanticJsonArgument(
-                    _normalize_json_object(match, field="wait-topic match")
-                ),
-            )
-        )
     return ExpectedGatewayStep(
         name=name,
         subcommand="wait-topic",
@@ -1602,6 +2464,7 @@ __all__ = [
     "call_step",
     "metadata_candidate_limit",
     "materialize_audio_import_composer_protocol_request",
+    "materialize_typed_transaction_protocol_requests",
     "operation_request_equivalence",
     "query_object_step",
     "wait_topic_step",

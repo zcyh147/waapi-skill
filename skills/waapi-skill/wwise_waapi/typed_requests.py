@@ -201,7 +201,11 @@ class TypedRequestContract:
                     "map_correct": "--map-correct <map_handle> <key> <type> <value>",
                     "map_remove": "--map-remove <map_handle> <key>",
                 }
-            if flat_inline or self.uri == TYPED_REQUEST_COMPLEX_TRACER_URI:
+            if (
+                flat_inline
+                or self.uri == TYPED_REQUEST_COMPLEX_TRACER_URI
+                or self.route == "isolated_transaction"
+            ):
                 continuation = {
                     "subcommand": "typed-call",
                     "uri": self.uri,
@@ -214,6 +218,10 @@ class TypedRequestContract:
                         "map_value": "request-map-container",
                         "array_item": "request-array-item",
                     }
+                if self.route == "isolated_transaction":
+                    continuation["io_root_flag"] = (
+                        "--io-root <absolute-allowed-root>"
+                    )
                 input_shape = "inline"
             else:
                 continuation = {
@@ -293,6 +301,26 @@ class TypedRequestFact:
 
 
 @dataclass(frozen=True, slots=True)
+class TypedRequestDisclosure:
+    """One public dynamic-container capability needed by a typed fact stream."""
+
+    command: str
+    parent_handle: str
+    key: str
+    shape: str
+    child_handle: str
+    choice_handle: str | None = None
+    choice_index: int | None = None
+    parent_child_handle: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TypedRequestConstruction:
+    facts: tuple[TypedRequestFact, ...]
+    disclosures: tuple[TypedRequestDisclosure, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class MaterializedTypedRequest:
     version: str
     uri: str
@@ -363,8 +391,7 @@ def request_contract(version: str, uri: str) -> TypedRequestContract:
 
 def _generic_typed_contract_is_public(capability: Any) -> bool:
     return (
-        capability.execution_contract["route"]
-        not in {"compound_transaction_member", "isolated_transaction"}
+        capability.execution_contract["route"] != "compound_transaction_member"
         and not capability.transaction_boundaries
         and (
             capability.preferred_route == "manifest_dispatch"
@@ -1596,7 +1623,11 @@ def materialize_typed_request(
     args: dict[str, Any] = {}
     options: dict[str, Any] = {}
     materialized_containers: set[str] = set()
-    for field in sorted(contract.fields, key=lambda item: len(item.path)):
+    ordered_fields = sorted(contract.fields, key=lambda item: len(item.path))
+    # Fixed members must materialize before a same-path patterned overlay so
+    # the overlay augments the object instead of being overwritten by it.
+    ordered_fields.sort(key=lambda item: item.overlay)
+    for field in ordered_fields:
         parent_present = (
             field.parent_handle is None
             or field.parent_handle in materialized_containers
@@ -1673,6 +1704,933 @@ def materialize_typed_request(
     return request
 
 
+def typed_request_facts_for_values(
+    contract: TypedRequestContract,
+    *,
+    args: Mapping[str, Any],
+    options: Mapping[str, Any],
+) -> tuple[TypedRequestFact, ...]:
+    """Encode one exact materialized request back into its typed fact stream.
+
+    This is the deterministic inverse of :func:`materialize_typed_request`.
+    It is used by trusted protocol compilers and evidence validators that
+    already own a canonical request.  It never accepts a caller-authored
+    schema, and verifies the generated stream by rematerializing it before
+    returning.
+    """
+
+    return typed_request_construction_for_values(
+        contract,
+        args=args,
+        options=options,
+    ).facts
+
+
+def typed_request_construction_for_values(
+    contract: TypedRequestContract,
+    *,
+    args: Mapping[str, Any],
+    options: Mapping[str, Any],
+) -> TypedRequestConstruction:
+    """Return exact facts plus every public dynamic-handle disclosure."""
+
+    if not isinstance(args, Mapping) or not isinstance(options, Mapping):
+        raise TypedRequestError("Typed request values must be args/options objects")
+    expected_sections = {"args": dict(args), "options": dict(options)}
+    facts: list[TypedRequestFact] = []
+    disclosures: list[TypedRequestDisclosure] = []
+    top_level = tuple(
+        field for field in contract.fields if field.parent_handle is None
+    )
+    for section in ("args", "options"):
+        values = expected_sections[section]
+        schema = _expanded_schema(
+            contract.schema_roots[section],
+            root_schema=contract.schema_roots[section],
+            graph=contract.definition_graph,
+        )
+        properties = schema.get("properties", {})
+        if not isinstance(properties, Mapping):
+            raise TypedRequestError("Typed request root properties are malformed")
+        known = {
+            field.path[0]
+            for field in top_level
+            if field.section == section and field.path
+        }
+        overlay_fields = tuple(
+            field
+            for field in contract.fields
+            if field.section == section
+            and field.parent_handle is None
+            and field.overlay
+        )
+        overlay_keys = {
+            key
+            for key in values
+            if any(
+                _map_key_is_authorized(field, key)
+                for field in overlay_fields
+            )
+        }
+        unknown = set(values) - known - overlay_keys
+        if unknown:
+            raise TypedRequestError(
+                "Typed request values contain fields outside the disclosed contract"
+            )
+        for name, value in values.items():
+            field = next(
+                (
+                    item
+                    for item in top_level
+                    if item.section == section
+                    and item.path == (name,)
+                    and not item.overlay
+                ),
+                None,
+            )
+            node = properties.get(name)
+            if field is None and name in overlay_keys:
+                field = next(
+                    item
+                    for item in overlay_fields
+                    if _map_key_is_authorized(item, name)
+                )
+                node = schema
+                _append_dynamic_object_members(
+                    contract,
+                    facts,
+                    handle=field.handle,
+                    value={name: value},
+                    schema=node,
+                    section=section,
+                    disclosures=disclosures,
+                )
+                continue
+            if field is not None and field.shape == "map" and field.overlay:
+                _append_dynamic_object_members(
+                    contract,
+                    facts,
+                    handle=field.handle,
+                    value={name: value},
+                    schema=schema,
+                    section=section,
+                    disclosures=disclosures,
+                )
+                continue
+            if field is None or not isinstance(node, Mapping):
+                raise TypedRequestError(
+                    f"Typed request field {name!r} is not disclosed"
+                )
+            _append_value_facts(
+                contract,
+                facts,
+                field=field,
+                value=value,
+                schema=node,
+                section=section,
+                disclosures=disclosures,
+            )
+    generated = tuple(facts)
+    materialized = materialize_typed_request(
+        contract,
+        schema_digest=contract.schema_digest,
+        facts=generated,
+    )
+    if materialized.args != dict(args) or materialized.options != dict(options):
+        raise TypedRequestError(
+            "Typed request facts do not replay to the canonical request values"
+        )
+    return TypedRequestConstruction(generated, tuple(disclosures))
+
+
+def _map_key_is_authorized(field: TypedFieldContract, key: str) -> bool:
+    try:
+        _map_key_variants(field, key)
+    except TypedRequestError:
+        return False
+    return True
+
+
+def _typed_value_type(value: Any) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, int):
+        return "integer"
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise TypedRequestError("Typed request number must be finite")
+        return "number"
+    if isinstance(value, str):
+        return "string"
+    if isinstance(value, Mapping):
+        return "object"
+    if isinstance(value, list):
+        return "array"
+    raise TypedRequestError("Typed request value has no supported fact type")
+
+
+def _typed_value_text(value: Any, value_type: str) -> str:
+    if value_type == "null":
+        return "null"
+    if value_type == "boolean":
+        return "true" if value else "false"
+    return str(value)
+
+
+def _schema_variant_matches_value(
+    schema: Mapping[str, Any],
+    value: Any,
+    *,
+    root_schema: Mapping[str, Any],
+    graph: DefinitionGraph,
+) -> bool:
+    try:
+        return _value_matches_schema(
+            value,
+            schema,
+            root_schema=root_schema,
+            graph=graph,
+            depth=0,
+        )
+    except (RecursionError, TypedRequestError):
+        return False
+
+
+def _preferred_matching_variants(
+    variants: Sequence[Mapping[str, Any]],
+    value: Any,
+    *,
+    root_schema: Mapping[str, Any],
+    graph: DefinitionGraph,
+) -> tuple[int, ...]:
+    """Select the most specific reflected branch for one exact value."""
+
+    matches = tuple(
+        index
+        for index, variant in enumerate(variants)
+        if _schema_variant_matches_value(
+            variant,
+            value,
+            root_schema=root_schema,
+            graph=graph,
+        )
+    )
+    if len(matches) <= 1:
+        return matches
+
+    def specificity(variant: Mapping[str, Any]) -> int:
+        expanded = _expanded_schema(
+            variant,
+            root_schema=root_schema,
+            graph=graph,
+        )
+        return (
+            4
+            if "const" in expanded
+            else 3
+            if "enum" in expanded
+            else 2
+            if "pattern" in expanded
+            else 1
+            if "required" in expanded
+            else 0
+        )
+
+    highest = max(specificity(variants[index]) for index in matches)
+    preferred = tuple(
+        index for index in matches if specificity(variants[index]) == highest
+    )
+    if len(preferred) > 1:
+        canonical = {
+            canonical_json_bytes(
+                {
+                    key: value
+                    for key, value in variants[index].items()
+                    if key not in {"description", "synopsis"}
+                }
+            ): index
+            for index in preferred
+        }
+        if len(canonical) == 1:
+            return (preferred[0],)
+    return preferred
+
+
+def _value_matches_schema(
+    value: Any,
+    schema: Mapping[str, Any],
+    *,
+    root_schema: Mapping[str, Any],
+    graph: DefinitionGraph,
+    depth: int,
+) -> bool:
+    if depth > MAX_TYPED_SCHEMA_DEPTH:
+        raise TypedRequestError("Typed request value exceeds its schema depth")
+    expanded = _expanded_schema(schema, root_schema=root_schema, graph=graph)
+    for keyword in ("oneOf", "anyOf"):
+        branches = expanded.get(keyword)
+        if isinstance(branches, list):
+            matches = sum(
+                isinstance(branch, Mapping)
+                and _value_matches_schema(
+                    value,
+                    branch,
+                    root_schema=root_schema,
+                    graph=graph,
+                    depth=depth + 1,
+                )
+                for branch in branches
+            )
+            return matches == 1 if keyword == "oneOf" else matches >= 1
+    value_type = _typed_value_type(value)
+    declared = expanded.get("type")
+    allowed_types = (
+        tuple(declared) if isinstance(declared, list) else (declared,)
+    )
+    if declared is not None and value_type not in allowed_types and not (
+        value_type == "integer" and "number" in allowed_types
+    ):
+        return False
+    if value_type not in {"object", "array"}:
+        inferred = dict(expanded)
+        inferred.setdefault("type", value_type)
+        return _scalar_matches_variant(value, inferred)
+    if value_type == "array":
+        minimum = expanded.get("minItems")
+        maximum = expanded.get("maxItems")
+        if isinstance(minimum, int) and len(value) < minimum:
+            return False
+        if isinstance(maximum, int) and len(value) > maximum:
+            return False
+        items = expanded.get("items")
+        return not isinstance(items, Mapping) or all(
+            _value_matches_schema(
+                item,
+                items,
+                root_schema=root_schema,
+                graph=graph,
+                depth=depth + 1,
+            )
+            for item in value
+        )
+    assert isinstance(value, Mapping)
+    properties = expanded.get("properties", {})
+    patterns = expanded.get("patternProperties", {})
+    required = expanded.get("required", [])
+    if (
+        not isinstance(properties, Mapping)
+        or not isinstance(patterns, Mapping)
+        or not isinstance(required, list)
+        or not set(required).issubset(value)
+    ):
+        return False
+    additional = expanded.get("additionalProperties", True)
+    for key, item in value.items():
+        if not isinstance(key, str):
+            return False
+        fixed = properties.get(key)
+        if isinstance(fixed, Mapping) and not _value_matches_schema(
+            item,
+            fixed,
+            root_schema=root_schema,
+            graph=graph,
+            depth=depth + 1,
+        ):
+            return False
+        matched = False
+        for pattern, pattern_schema in patterns.items():
+            if (
+                isinstance(pattern, str)
+                and isinstance(pattern_schema, Mapping)
+                and re.search(pattern, key) is not None
+            ):
+                matched = True
+                if not _value_matches_schema(
+                    item,
+                    pattern_schema,
+                    root_schema=root_schema,
+                    graph=graph,
+                    depth=depth + 1,
+                ):
+                    return False
+        if fixed is None and not matched:
+            if additional is False:
+                return False
+            if isinstance(additional, Mapping) and not _value_matches_schema(
+                item,
+                additional,
+                root_schema=root_schema,
+                graph=graph,
+                depth=depth + 1,
+            ):
+                return False
+    return True
+
+
+def _select_branch_child(
+    contract: TypedRequestContract,
+    field: TypedFieldContract,
+    value: Any,
+) -> TypedFieldContract:
+    children = tuple(
+        child for child in contract.fields if child.parent_handle == field.handle
+    )
+    child_schemas = tuple(
+        _branch_child_schema(contract, child=child, section=field.section)
+        for child in children
+    )
+    selected = _preferred_matching_variants(
+        child_schemas,
+        value,
+        root_schema=contract.schema_roots[field.section],
+        graph=contract.definition_graph,
+    )
+    candidates: list[TypedFieldContract] = []
+    for index, child in enumerate(children):
+        child_schema = _branch_child_schema(
+            contract,
+            child=child,
+            section=field.section,
+        )
+        if index in selected:
+            candidates.append(child)
+    if len(candidates) != 1:
+        raise TypedRequestError(
+            f"Typed request branch {field.name!r} is ambiguous for its value"
+        )
+    return candidates[0]
+
+
+def _branch_child_schema(
+    contract: TypedRequestContract,
+    *,
+    child: TypedFieldContract,
+    section: str,
+) -> Mapping[str, Any]:
+    node: Mapping[str, Any] = contract.schema_roots[section]
+    for part in child.path:
+        expanded = _expanded_schema(
+            node,
+            root_schema=contract.schema_roots[section],
+            graph=contract.definition_graph,
+        )
+        properties = expanded.get("properties", {})
+        if not isinstance(properties, Mapping) or not isinstance(
+            properties.get(part), Mapping
+        ):
+            raise TypedRequestError("Typed request branch path is malformed")
+        node = properties[part]
+    variants = _structural_variants(
+        node,
+        root_schema=contract.schema_roots[section],
+        graph=contract.definition_graph,
+    )
+    try:
+        index = int(child.name.rsplit(":", 1)[1])
+    except (IndexError, ValueError):
+        # Static scalar branch children are disclosed by their type name
+        # (for example ``integer`` / ``string``), whereas structural branch
+        # children carry an explicit ``branch:N`` name. Resolve the former
+        # from the exact child variant instead of inventing an index.
+        matches = tuple(
+            index
+            for index, variant in enumerate(variants)
+            if canonical_json_bytes(variant)
+            == canonical_json_bytes(child.variants[0])
+        ) if len(child.variants) == 1 else ()
+        if len(matches) != 1:
+            raise TypedRequestError("Typed request branch child is malformed")
+        index = matches[0]
+    if not 0 <= index < len(variants):
+        raise TypedRequestError("Typed request branch child is stale")
+    return variants[index]
+
+
+def _append_value_facts(
+    contract: TypedRequestContract,
+    facts: list[TypedRequestFact],
+    *,
+    field: TypedFieldContract,
+    value: Any,
+    schema: Mapping[str, Any],
+    section: str,
+    disclosures: list[TypedRequestDisclosure],
+) -> None:
+    if field.shape == "branch":
+        child = _select_branch_child(contract, field, value)
+        facts.append(TypedRequestFact("choose", field.handle, "branch", child.handle))
+        child_schema = _branch_child_schema(contract, child=child, section=section)
+        if child.shape == "object":
+            _append_static_object_facts(
+                contract,
+                facts,
+                parent=child,
+                value=value,
+                schema=child_schema,
+                section=section,
+                disclosures=disclosures,
+            )
+            return
+        _append_value_facts(
+            contract,
+            facts,
+            field=child,
+            value=value,
+            schema=child_schema,
+            section=section,
+            disclosures=disclosures,
+        )
+        return
+    if field.shape == "scalar":
+        value_type = _typed_value_type(value)
+        facts.append(
+            TypedRequestFact(
+                "set",
+                field.handle,
+                value_type,
+                _typed_value_text(value, value_type),
+            )
+        )
+        return
+    if field.shape == "array":
+        if not isinstance(value, list):
+            raise TypedRequestError(f"Typed request field {field.name!r} must be an array")
+        if not value:
+            facts.append(TypedRequestFact("present", field.handle, "null", "null"))
+            return
+        item_schema = _expanded_schema(
+            schema,
+            root_schema=contract.schema_roots[section],
+            graph=contract.definition_graph,
+        ).get("items")
+        if not isinstance(item_schema, Mapping):
+            raise TypedRequestError("Typed request array item schema is missing")
+        for index, item in enumerate(value):
+            item_type = _typed_value_type(item)
+            if item_type in {"object", "array"}:
+                choices = dynamic_array_item_choices(
+                    contract,
+                    array_handle=field.handle,
+                    index=index,
+                    shape=item_type,
+                )
+                matching = [
+                    (choice, variant)
+                    for choice, _variant_index, variant in choices
+                    if _schema_variant_matches_value(
+                        variant,
+                        item,
+                        root_schema=contract.schema_roots[section],
+                        graph=contract.definition_graph,
+                    )
+                ]
+                if len(matching) != 1:
+                    raise TypedRequestError(
+                        f"Typed request array {field.name!r} has an ambiguous item"
+                    )
+                choice = matching[0][0] if len(choices) > 1 else None
+                handle = dynamic_array_item_handle(
+                    contract,
+                    array_handle=field.handle,
+                    index=index,
+                    shape=item_type,
+                    choice_handle=choice,
+                )
+                disclosures.append(
+                    TypedRequestDisclosure(
+                        command="request-array-item",
+                        parent_handle=field.handle,
+                        key=str(index),
+                        shape=item_type,
+                        child_handle=handle,
+                        choice_handle=choice,
+                        choice_index=(
+                            next(
+                                choice_index
+                                for choice_index, (candidate, _variant_index, _variant) in enumerate(choices)
+                                if candidate == choice
+                            )
+                            if choice is not None
+                            else None
+                        ),
+                    )
+                )
+                facts.append(TypedRequestFact("append", field.handle, item_type, handle))
+                disclosure = dynamic_container_disclosure(
+                    contract,
+                    parent_handle=field.handle,
+                    key=str(index),
+                    shape=item_type,
+                    child_handle=handle,
+                    choice_handle=choice,
+                )
+                _append_dynamic_container_facts(
+                    contract,
+                    facts,
+                    handle=handle,
+                    value=item,
+                    schema=disclosure["schema_lineage"],
+                    section=section,
+                    disclosures=disclosures,
+                )
+            else:
+                facts.append(
+                    TypedRequestFact(
+                        "append",
+                        field.handle,
+                        item_type,
+                        _typed_value_text(item, item_type),
+                    )
+                )
+        return
+    if field.shape in {"object", "map"}:
+        if not isinstance(value, Mapping):
+            raise TypedRequestError(f"Typed request field {field.name!r} must be an object")
+        if field.shape == "object":
+            _append_static_object_facts(
+                contract,
+                facts,
+                parent=field,
+                value=value,
+                schema=schema,
+                section=section,
+                disclosures=disclosures,
+            )
+        else:
+            if not value:
+                facts.append(TypedRequestFact("present", field.handle, "null", "null"))
+            _append_dynamic_object_members(
+                contract,
+                facts,
+                handle=field.handle,
+                value=value,
+                schema=schema,
+                section=section,
+                disclosures=disclosures,
+            )
+        return
+    raise TypedRequestError(f"Typed request field {field.name!r} has an unsupported shape")
+
+
+def _append_static_object_facts(
+    contract: TypedRequestContract,
+    facts: list[TypedRequestFact],
+    *,
+    parent: TypedFieldContract,
+    value: Any,
+    schema: Mapping[str, Any],
+    section: str,
+    disclosures: list[TypedRequestDisclosure],
+) -> None:
+    if not isinstance(value, Mapping):
+        raise TypedRequestError("Typed request branch object value must be an object")
+    children = {
+        child.name: child
+        for child in contract.fields
+        if child.parent_handle == parent.handle and not child.overlay
+    }
+    expanded = _expanded_schema(
+        schema,
+        root_schema=contract.schema_roots[section],
+        graph=contract.definition_graph,
+    )
+    properties = expanded.get("properties", {})
+    if not isinstance(properties, Mapping):
+        raise TypedRequestError("Typed request object properties are malformed")
+    if not value:
+        facts.append(TypedRequestFact("present", parent.handle, "null", "null"))
+    for key, item in value.items():
+        child = children.get(key)
+        child_schema = properties.get(key)
+        if child is None or not isinstance(child_schema, Mapping):
+            raise TypedRequestError(f"Typed request object key {key!r} is not disclosed")
+        _append_value_facts(
+            contract,
+            facts,
+            field=child,
+            value=item,
+            schema=child_schema,
+            section=section,
+            disclosures=disclosures,
+        )
+
+
+def _append_dynamic_container_facts(
+    contract: TypedRequestContract,
+    facts: list[TypedRequestFact],
+    *,
+    handle: str,
+    value: Any,
+    schema: Mapping[str, Any],
+    section: str,
+    disclosures: list[TypedRequestDisclosure],
+) -> None:
+    if isinstance(value, Mapping):
+        _append_dynamic_object_members(
+            contract,
+            facts,
+            handle=handle,
+            value=value,
+            schema=schema,
+            section=section,
+            disclosures=disclosures,
+        )
+        return
+    if isinstance(value, list):
+        dynamic = _dynamic_container_contract(
+            handle=handle,
+            name="dynamic-array",
+            shape="array",
+            schema=schema,
+            root_schema=contract.schema_roots[section],
+            graph=contract.definition_graph,
+            section=section,
+        )
+        if not value:
+            return
+        for index, item in enumerate(value):
+            item_type = _typed_value_type(item)
+            if item_type in {"object", "array"}:
+                choices = dynamic_array_item_choices(
+                    contract,
+                    array_handle=handle,
+                    index=index,
+                    shape=item_type,
+                    parent_schema=schema,
+                    parent_section=section,
+                )
+                matching = [
+                    (choice, variant)
+                    for choice, _variant_index, variant in choices
+                    if _schema_variant_matches_value(
+                        variant,
+                        item,
+                        root_schema=contract.schema_roots[section],
+                        graph=contract.definition_graph,
+                    )
+                ]
+                if len(matching) != 1:
+                    raise TypedRequestError("Typed dynamic array item is ambiguous")
+                choice = matching[0][0] if len(choices) > 1 else None
+                child = dynamic_array_item_handle(
+                    contract,
+                    array_handle=handle,
+                    index=index,
+                    shape=item_type,
+                    choice_handle=choice,
+                    parent_schema=schema,
+                    parent_section=section,
+                )
+                disclosures.append(
+                    TypedRequestDisclosure(
+                        command="request-array-item",
+                        parent_handle=handle,
+                        key=str(index),
+                        shape=item_type,
+                        child_handle=child,
+                        choice_handle=choice,
+                        choice_index=(
+                            next(
+                                choice_index
+                                for choice_index, (candidate, _variant_index, _variant) in enumerate(choices)
+                                if candidate == choice
+                            )
+                            if choice is not None
+                            else None
+                        ),
+                        parent_child_handle=handle,
+                    )
+                )
+                facts.append(TypedRequestFact("append", handle, item_type, child))
+                disclosure = dynamic_container_disclosure(
+                    contract,
+                    parent_handle=handle,
+                    key=str(index),
+                    shape=item_type,
+                    child_handle=child,
+                    parent_schema=schema,
+                    parent_section=section,
+                    choice_handle=choice,
+                )
+                _append_dynamic_container_facts(
+                    contract,
+                    facts,
+                    handle=child,
+                    value=item,
+                    schema=disclosure["schema_lineage"],
+                    section=section,
+                    disclosures=disclosures,
+                )
+            else:
+                facts.append(
+                    TypedRequestFact(
+                        "append",
+                        handle,
+                        item_type,
+                        _typed_value_text(item, item_type),
+                    )
+                )
+        return
+    raise TypedRequestError("Typed dynamic container value is malformed")
+
+
+def _append_dynamic_object_members(
+    contract: TypedRequestContract,
+    facts: list[TypedRequestFact],
+    *,
+    handle: str,
+    value: Mapping[str, Any],
+    schema: Mapping[str, Any],
+    section: str,
+    disclosures: list[TypedRequestDisclosure],
+) -> None:
+    dynamic = _dynamic_container_contract(
+        handle=handle,
+        name="dynamic-object",
+        shape="object",
+        schema=schema,
+        root_schema=contract.schema_roots[section],
+        graph=contract.definition_graph,
+        section=section,
+    )
+    for key, item in value.items():
+        item_type = _typed_value_type(item)
+        variants = _map_key_variants(dynamic, key)
+        selected_indexes = _preferred_matching_variants(
+            variants,
+            item,
+            root_schema=contract.schema_roots[section],
+            graph=contract.definition_graph,
+        )
+        if not selected_indexes:
+            raise TypedRequestError(f"Typed map key {key!r} has no matching value schema")
+        choice_handle: str | None = None
+        explicit_choice = any(
+            len(group) > 1
+            for pattern, group in dynamic.map_patterns
+            if re.search(pattern, key) is not None
+        ) or len(dynamic.additional_variants) > 1
+        if explicit_choice:
+            choices = dynamic_branch_choices(
+                contract,
+                object_handle=handle,
+                key=key,
+                value_schema={"oneOf": list(variants)},
+            )
+            preferred = _preferred_matching_variants(
+                tuple(variant for _choice, variant in choices),
+                item,
+                root_schema=contract.schema_roots[section],
+                graph=contract.definition_graph,
+            )
+            selected = [choices[index][0] for index in preferred]
+            if len(selected) != 1:
+                raise TypedRequestError(f"Typed map key {key!r} has an ambiguous branch")
+            choice_handle = selected[0]
+            facts.append(
+                TypedRequestFact(
+                    "choose-dynamic", handle, "choice", choice_handle, key=key
+                )
+            )
+        if item_type in {"object", "array"}:
+            child = dynamic_map_entry_handle(
+                contract,
+                map_handle=handle,
+                key=key,
+                shape=item_type,
+                choice_handle=choice_handle,
+                parent_schema=schema,
+                parent_section=section,
+            )
+            disclosures.append(
+                TypedRequestDisclosure(
+                    command="request-map-container",
+                    parent_handle=handle,
+                    key=key,
+                    shape=item_type,
+                    child_handle=child,
+                    choice_handle=choice_handle,
+                    choice_index=(
+                        next(
+                            choice_index
+                            for choice_index, (candidate, _variant) in enumerate(choices)
+                            if candidate == choice_handle
+                        )
+                        if choice_handle is not None
+                        else None
+                    ),
+                    parent_child_handle=(
+                        handle if handle not in contract.fields_by_handle else None
+                    ),
+                )
+            )
+            facts.append(TypedRequestFact("map-put", handle, item_type, child, key=key))
+            disclosure = dynamic_container_disclosure(
+                contract,
+                parent_handle=handle,
+                key=key,
+                shape=item_type,
+                child_handle=child,
+                parent_schema=schema,
+                parent_section=section,
+                choice_handle=choice_handle,
+            )
+            _append_dynamic_container_facts(
+                contract,
+                facts,
+                handle=child,
+                value=item,
+                schema=disclosure["schema_lineage"],
+                section=section,
+                disclosures=disclosures,
+            )
+        else:
+            facts.append(
+                TypedRequestFact(
+                    "map-put",
+                    handle,
+                    item_type,
+                    _typed_value_text(item, item_type),
+                    key=key,
+                )
+            )
+
+
+def _flatten_structural_branch_nodes(
+    branches: Sequence[Any],
+    *,
+    root_schema: Mapping[str, Any],
+    graph: DefinitionGraph,
+) -> tuple[Mapping[str, Any], ...]:
+    """Resolve nested reflected oneOf/anyOf wrappers into concrete branches."""
+
+    flattened: list[Mapping[str, Any]] = []
+    for raw_branch in branches:
+        if not isinstance(raw_branch, Mapping):
+            raise TypedRequestError("Typed request branch must be an object")
+        branch = _expanded_schema(
+            raw_branch,
+            root_schema=root_schema,
+            graph=graph,
+        )
+        nested = branch.get("oneOf", branch.get("anyOf"))
+        if isinstance(nested, list) and set(branch).issubset(
+            {"oneOf", "anyOf", "description", "synopsis"}
+        ):
+            flattened.extend(
+                _flatten_structural_branch_nodes(
+                    nested,
+                    root_schema=root_schema,
+                    graph=graph,
+                )
+            )
+        else:
+            flattened.append(branch)
+    return tuple(flattened)
+
+
 def _collect_object_fields(
     node: Mapping[str, Any],
     *,
@@ -1743,7 +2701,30 @@ def _collect_object_fields(
         ), name)
         child = _expanded_schema(raw_child, root_schema=root_schema, graph=graph)
         branch_nodes = child.get("oneOf", child.get("anyOf"))
+        if isinstance(branch_nodes, list):
+            branch_nodes = list(
+                _flatten_structural_branch_nodes(
+                    branch_nodes,
+                    root_schema=root_schema,
+                    graph=graph,
+                )
+            )
         child_type = child.get("type")
+        # Some reflected CLI definitions express an array shape solely through
+        # oneOf/anyOf branches (for example one tuple versus an array of
+        # tuples). Do not misclassify those structural branches as scalars.
+        if isinstance(branch_nodes, list) and child_type is None:
+            branch_types = {
+                _expanded_schema(
+                    branch,
+                    root_schema=root_schema,
+                    graph=graph,
+                ).get("type")
+                for branch in branch_nodes
+                if isinstance(branch, Mapping)
+            }
+            if len(branch_types) == 1:
+                child_type = next(iter(branch_types))
         handle = TYPED_REQUEST_HANDLE_PREFIX + canonical_sha256(
             {
                 "schema_digest": schema_digest,

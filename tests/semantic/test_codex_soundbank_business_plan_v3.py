@@ -65,8 +65,21 @@ APIS = (
 IDS = tuple(f"O22-SB-{kind}-{index:02d}" for kind in ("GENERATE", "PROCESS-DEF", "CONVERT-EXT", "SET-INCLUSIONS", "GENERATED") for index in range(1, 6))
 
 
-def _request(api: str) -> MappingProxyType:
-    return MappingProxyType({"contract": OPERATION_REQUEST_CONTRACT, "version": "2022.1", "operation": "waapi.call", "arguments": {"api": api, "args": {}, "options": {}}})
+def _request(api: str, arguments: MappingProxyType | dict[str, object]) -> MappingProxyType:
+    operations = {
+        "ak.wwise.core.soundbank.generate": "soundbank.generate",
+        "ak.wwise.core.soundbank.processDefinitionFiles": "soundbank.processDefinitionFiles",
+        "ak.wwise.core.soundbank.convertExternalSources": "soundbank.convertExternalSources",
+        "ak.wwise.core.soundbank.setInclusions": "soundbank.setInclusions",
+    }
+    return MappingProxyType(
+        {
+            "contract": OPERATION_REQUEST_CONTRACT,
+            "version": "2022.1",
+            "operation": operations[api],
+            "arguments": dict(arguments),
+        }
+    )
 
 
 def _case(api: str, scenario_id: str, root: Path, *, refusal: bool = False, topic: bool = False):
@@ -86,11 +99,58 @@ def _case(api: str, scenario_id: str, root: Path, *, refusal: bool = False, topi
     reviewed = MappingProxyType({"id": scenario_id, "api": api, "asset_spec": asset_spec})
     blue = SoundBankBlueprint(scenario_id, api, "2022.1", SimpleNamespace(fixture=reviewed), root / "p.wproj", root, root, root, root, asset_spec, (event_fixture,), (), (bank,), (definition,), (external,), count, PROCESS_REFUSAL_ERROR_CODE if refusal else None)
     topic_plan = None
-    requests = (_request(api),)
+    operation_arguments: dict[str, object]
+    if api in {APIS[0], SOUNDBANK_TOPIC}:
+        operation_arguments = {
+            "soundbanks": [
+                {"name": "Bank", "artifact_expectation": "nonlocalized"}
+            ],
+            "platforms": ["Windows"],
+            "skip_languages": True,
+            "write_to_disk": True,
+            "io_root": str(root),
+        }
+    elif api == APIS[1]:
+        operation_arguments = {
+            "files": [str(source)],
+            "io_root": str(root),
+        }
+    elif api == APIS[2]:
+        operation_arguments = {
+            "sources": [
+                {
+                    "input": str(source),
+                    "platform": "Windows",
+                    "output": str(root / "external.wem"),
+                }
+            ],
+            "io_root": str(root),
+        }
+    else:
+        operation_arguments = {
+            "soundbank": {"kind": "path", "value": bank.path},
+            "mode": "replace",
+            "inclusions": [
+                {
+                    "object": {"kind": "path", "value": event_fixture.path},
+                    "filters": ["events"],
+                }
+            ],
+        }
+    requests = () if topic else (_request(api, operation_arguments),)
     if topic:
         events = tuple(TopicExpectedEvent("Bank", "Windows", "SFX", f"{{00000000-0000-0000-0000-{i:012x}}}", f"{{00000000-0000-0000-0001-{i:012x}}}", f"{{00000000-0000-0000-0002-{i:012x}}}") for i in range(1, topic_count + 1))
-        topic_plan = TopicPlan(api, topic_count, MappingProxyType({}), MappingProxyType({}), events, (TopicPublisher(_request("ak.wwise.core.soundbank.generate"), events),), True, True, True)
-        requests = ()
+        topic_plan = TopicPlan(
+            api,
+            topic_count,
+            MappingProxyType({}),
+            MappingProxyType({}),
+            events,
+            (TopicPublisher(_request(APIS[0], operation_arguments), events),),
+            True,
+            True,
+            True,
+        )
     dynamic_roots = (
         ((root / "io" / "cache").resolve(strict=False),)
         if api in {APIS[0], SOUNDBANK_TOPIC}
@@ -99,9 +159,30 @@ def _case(api: str, scenario_id: str, root: Path, *, refusal: bool = False, topi
     materialized = MaterializedSoundBankCase(blue, MappingProxyType({}), MappingProxyType({}), requests, topic_plan, (proof,), (artifact,), dynamic_roots, MappingProxyType({"bank:Bank": "{00000000-0000-0000-0000-000000000010}", "event": "{00000000-0000-0000-0000-000000000040}"}), MappingProxyType({"bank:Bank": 1}), MappingProxyType({}), MappingProxyType({"Windows": "{00000000-0000-0000-0000-000000000020}"}), MappingProxyType({"SFX": "{00000000-0000-0000-0000-000000000030}"}))
     snapshot = SoundBankSnapshot(scenario_id, (ObjectState("event", "{00000000-0000-0000-0000-000000000040}", r"\Events\Default Work Unit\Hero", "Event"),), (BankState("Bank", "{00000000-0000-0000-0000-000000000010}", (("{00000000-0000-0000-0000-000000000040}", ()),)),), (), (proof,), (tree,))
     if topic:
-        protocol = build_direct_protocol([wait_topic_step("soundbank.generated.wait", api, event_count=topic_count, match={}, options={})])
+        protocol = build_direct_protocol(
+            [
+                wait_topic_step(
+                    "soundbank.generated.wait",
+                    api,
+                    version="2022.1",
+                    event_count=topic_count,
+                    match={},
+                    options={},
+                )
+            ]
+        )
     else:
-        protocol = build_transaction_protocol(requests, refusal=StructuredRefusal(PROCESS_REFUSAL_ERROR_CODE) if refusal else None)
+        protocol = build_transaction_protocol(
+            requests,
+            refusal=(
+                StructuredRefusal(
+                    PROCESS_REFUSAL_ERROR_CODE,
+                    result_command="typed-operation",
+                )
+                if refusal
+                else None
+            ),
+        )
     return materialized, snapshot, protocol
 
 
