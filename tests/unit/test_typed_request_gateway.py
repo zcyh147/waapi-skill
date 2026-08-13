@@ -380,6 +380,45 @@ def test_zero_input_mutation_cannot_bypass_preview_before_connection(
     assert "requires --apply" in payload["message"]
 
 
+def test_zero_input_reflection_read_preserves_bounded_inventory_projection(
+    tmp_path: Path,
+) -> None:
+    version = "2022.1"
+    api = "ak.wwise.waapi.getFunctions"
+    exit_code, contract = waapi_gateway.execute_gateway(
+        ["request-schema", api],
+        env=_env(tmp_path, version),
+        client_factory=lambda _url: pytest.fail("discovery must remain offline"),
+    )
+    assert exit_code == 0
+
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": _live_info(version),
+            api: {"functions": [api, "ak.wwise.core.getInfo"]},
+        }
+    )
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "typed-zero-call",
+            api,
+            "--schema-digest",
+            contract["schema_digest"],
+        ],
+        env=_env(tmp_path, version),
+        client_factory=lambda _url: client,
+    )
+
+    assert exit_code == 0, payload
+    assert payload["inventory"]["kind"] == "function"
+    assert payload["inventory"]["uris"] == [
+        "ak.wwise.core.getInfo",
+        api,
+    ]
+    assert payload["agent_result"] == payload["inventory"]
+    assert list(payload)[-1] == "agent_result"
+
+
 def test_zero_input_call_rejects_stale_digest_before_connection(tmp_path: Path) -> None:
     exit_code, payload = waapi_gateway.execute_gateway(
         [

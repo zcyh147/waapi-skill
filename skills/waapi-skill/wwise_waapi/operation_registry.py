@@ -11706,13 +11706,23 @@ def _import_target_return_fields(
     *,
     version: str,
 ) -> list[str]:
-    fields = [
-        *IDENTITY_RETURN_FIELDS,
-        "activeSource",
-        "originalFilePath",
-        "sound:originalWavFilePath",
-        "audioSource:language",
-    ]
+    fields = [*IDENTITY_RETURN_FIELDS]
+    # Wwise 2021.1 rejects the otherwise useful ``activeSource`` and
+    # ``originalFilePath`` accessors on the imported Sound object.  Its import
+    # result still returns the created AudioFileSource, so the verifier binds
+    # that child directly and uses the older Sound accessors for language/path.
+    fields.extend(
+        (
+            ("sound:originalWavFilePath", "audioSource:language")
+            if version == "2021.1"
+            else (
+                "activeSource",
+                "originalFilePath",
+                "sound:originalWavFilePath",
+                "audioSource:language",
+            )
+        )
+    )
     for key in ("validated_properties", "validated_references"):
         descriptors = target.get(key)
         if not isinstance(descriptors, list):
@@ -11735,9 +11745,10 @@ def _import_audio_source_return_fields(*, version: str) -> list[str]:
         "type",
         "path",
         "notes",
-        "originalFilePath",
         "audioSource:language",
     ]
+    if version != "2021.1":
+        fields.insert(-1, "originalFilePath")
     return fields
 
 
@@ -17798,7 +17809,11 @@ def verify_prepared_operation(
                         {"expected": before_notes, "actual": live_row.get("notes")},
                     )
 
-                active_source_id = _reference_identity(_field_value(live_row, "activeSource"))
+                active_source_id = _reference_identity(
+                    _field_value(live_row, "activeSource")
+                )
+                if version == "2021.1" and active_source_id is None:
+                    active_source_id = returned_source_id
                 if len(returned_source_matches) == 1:
                     returned_source = returned_source_matches[0]
                     returned_parent_id = _reference_identity(

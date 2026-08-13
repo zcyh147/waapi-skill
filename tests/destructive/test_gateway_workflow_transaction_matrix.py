@@ -27,6 +27,10 @@ from tests.destructive.support.live_environment import (  # pyright: ignore[repo
     path_is_under,
     resolve_sample_project_source,
 )
+from tests.destructive.support.category_evidence import (  # pyright: ignore[reportMissingImports]  # noqa: E402
+    append_category_evidence,
+    exact_git_candidate,
+)
 from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[reportMissingImports]  # noqa: E402
     DEFAULT_SANDBOX_ROOT,
     LiveSandboxLock,
@@ -41,6 +45,9 @@ from tests.destructive.support.workflow_evidence import (  # pyright: ignore[rep
     validate_audio_import_business_evidence,
     validate_soundbank_inclusions_business_evidence,
     validate_switch_assignment_business_evidence,
+)
+from tests.destructive.support.typed_gateway_input import (  # pyright: ignore[reportMissingImports]  # noqa: E402
+    create_typed_transaction_preview,
 )
 from wwise_waapi.headless import HeadlessLifecycle  # pyright: ignore[reportMissingImports]  # noqa: E402
 from wwise_waapi.operation_registry import OPERATION_REQUEST_CONTRACT  # pyright: ignore[reportMissingImports]  # noqa: E402
@@ -71,6 +78,8 @@ class _WorkflowSandboxRuntime:
     lifecycle: HeadlessLifecycle
     state_dir: Path
     env: dict[str, str]
+    candidate: str
+    category_results: list[dict[str, Any]]
 
     @property
     def port(self) -> int:
@@ -92,7 +101,7 @@ class _WorkflowSandboxRuntime:
             *command,
         ]
         exit_code, payload = waapi_gateway.execute_gateway(argv, env=self.env)
-        assert exit_code == 0, payload
+        assert exit_code == 0, json.dumps(payload, ensure_ascii=False, sort_keys=True)
         assert payload["ok"] is True, payload
         if live:
             assert payload["endpoint"] == {
@@ -153,9 +162,13 @@ def workflow_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterat
     lifecycle: HeadlessLifecycle | None = None
     source_hash_before: tuple[str, int, int] | None = None
     source_tree_before: tuple[str, int] | None = None
+    source_hash_after: tuple[str, int, int] | None = None
+    source_tree_after: tuple[str, int] | None = None
     deferred_error: BaseException | None = None
     task_root = tmp_path_factory.mktemp(f"gateway-workflows-{version.replace('.', '-')}")
     state_dir = task_root / "state"
+    candidate = exact_git_candidate(REPO_ROOT)
+    category_results: list[dict[str, Any]] = []
 
     lock.__enter__()
     try:
@@ -199,6 +212,8 @@ def workflow_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterat
             lifecycle=lifecycle,
             state_dir=state_dir,
             env=gateway_env,
+            candidate=candidate,
+            category_results=category_results,
         )
     finally:
         if lifecycle is not None and sandbox is not None:
@@ -231,6 +246,45 @@ def workflow_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterat
             except BaseException as exc:  # noqa: BLE001 - lock release must still run
                 deferred_error = deferred_error or exc
 
+        if sandbox is not None and lifecycle is not None:
+            if not any(item.get("category") == "authoring-ui" for item in category_results):
+                category_results.append(
+                    {
+                        "category": "authoring-ui",
+                        "status": "blocked",
+                        "verifier_strength": "host_unavailable",
+                        "reason": "configured matching host is WwiseConsole, not Wwise Authoring",
+                    }
+                )
+            try:
+                append_category_evidence(
+                    repo_root=REPO_ROOT,
+                    candidate=candidate,
+                    version=version,
+                    host={
+                        "display_name": sandbox.metadata.get_info_display_name,
+                        "is_command_line": True,
+                        "version": sandbox.metadata.get_info_version,
+                    },
+                    categories=category_results,
+                    source={
+                        "project": str(sandbox.source_project),
+                        "hash_before": source_hash_before[0] if source_hash_before else None,
+                        "hash_after": source_hash_after[0] if source_hash_after else None,
+                        "tree_metadata_before": source_tree_before[0] if source_tree_before else None,
+                        "tree_metadata_after": source_tree_after[0] if source_tree_after else None,
+                    },
+                    residual_state={
+                        "sandbox": "deleted" if not sandbox.sandbox_path.exists() else "retained",
+                        "process_cleanup": sandbox.metadata.process_cleanup_result,
+                        "residual_processes": (
+                            sandbox.metadata.process_cleanup_details or {}
+                        ).get("residual_processes", []),
+                    },
+                )
+            except BaseException as exc:  # noqa: BLE001 - evidence is part of the gate
+                deferred_error = deferred_error or exc
+
         try:
             lock.__exit__(None, None, None)
         except BaseException as exc:  # noqa: BLE001 - preserve the first teardown failure
@@ -261,6 +315,8 @@ def test_closed_gateway_workflows_across_selected_version(
 
     try:
         runtime.packaged_status()
+        if runtime.version == "2021.1":
+            _save_legacy_sandbox_project(runtime)
         import_name = f"WAAPI_GATEWAY_AUDIO_{runtime.version.replace('.', '_')}_{unique_suffix}"
         audio_file = _write_fixture_wav(runtime.sandbox.sandbox_path / "GatewayWorkflowAudio", import_name)
         assert path_is_under(audio_file.resolve(strict=True), runtime.sandbox.sandbox_path.resolve(strict=True))
@@ -275,6 +331,7 @@ def test_closed_gateway_workflows_across_selected_version(
                         "object_path": requested_object_path,
                         "audio_file": str(audio_file),
                         "object_type": "Sound",
+                        "import_language": "SFX",
                         "notes": import_notes,
                     }
                 ]
@@ -511,6 +568,14 @@ def test_closed_gateway_workflows_across_selected_version(
             state_or_switch_id=switch_id,
             should_exist=False,
         )
+        runtime.category_results.extend(
+            [
+                {"category": "object-topology", "status": "PASS", "verifier_strength": "operation_specific_readback"},
+                {"category": "scalar-reference-link", "status": "PASS", "verifier_strength": "operation_specific_readback"},
+                {"category": "relationship", "status": "PASS", "verifier_strength": "operation_specific_readback"},
+                {"category": "soundbank-file-artifact", "status": "PASS", "verifier_strength": "operation_specific_readback"},
+            ]
+        )
     finally:
         active_error = sys.exc_info()[1]
         cleanup_errors: list[str] = []
@@ -541,6 +606,198 @@ def test_closed_gateway_workflows_across_selected_version(
                 raise AssertionError(message)
 
 
+@pytest.mark.live
+@pytest.mark.destructive
+def test_soundengine_call_is_result_schema_only_or_explicitly_host_blocked(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    """Exercise one CLI/SoundEngine category without overstating its effect."""
+
+    runtime = workflow_sandbox_runtime
+    api = "ak.soundengine.postMsgMonitor"
+    schema = runtime.gateway(["request-schema", api], live=False)
+    digest = schema.get("schema_digest")
+    fields = schema.get("fields")
+    assert isinstance(digest, str) and digest, schema
+    assert isinstance(fields, list), schema
+    message_field = next(
+        field
+        for field in fields
+        if isinstance(field, Mapping) and field.get("name") == "message"
+    )
+    message_handle = message_field.get("handle")
+    assert isinstance(message_handle, str) and message_handle, schema
+    preview = runtime.gateway(
+        [
+            "typed-call",
+            api,
+            "--schema-digest",
+            digest,
+            "--apply",
+            "--set",
+            message_handle,
+            "string",
+            f"waapi-skill result-schema probe {runtime.version}",
+        ],
+        live=True,
+    )
+    transaction_id = preview.get("transaction_id")
+    assert isinstance(transaction_id, str) and transaction_id, preview
+    shown = runtime.gateway(
+        ["transaction-show", transaction_id, "--summary-only"],
+        live=False,
+    )
+    confirmation = shown.get("confirmation")
+    assert isinstance(confirmation, Mapping), shown
+    token = confirmation.get("token")
+    assert isinstance(token, str) and token, shown
+    runtime.gateway(
+        ["confirm", transaction_id, "--confirmation-token", token],
+        live=False,
+    )
+    execute_argv = [
+        "--host",
+        runtime.lifecycle.host,
+        "--port",
+        str(runtime.port),
+        "--version",
+        runtime.version,
+        "--timeout",
+        "30",
+        "--state-dir",
+        str(runtime.state_dir),
+        "execute",
+        transaction_id,
+    ]
+    execute_code, executed = waapi_gateway.execute_gateway(
+        execute_argv,
+        env=runtime.env,
+    )
+    if execute_code == 2:
+        dispatch_result = executed.get("dispatch_result")
+        assert isinstance(dispatch_result, Mapping), executed
+        assert dispatch_result["waapi_error_uri"] == "ak.wwise.unavailable", executed
+        assert executed["state"] == TransactionState.INDETERMINATE.value, executed
+        assert executed["automatic_retry"] is False, executed
+        runtime.category_results.append(
+            {
+                "category": "cli-soundengine",
+                "status": "blocked",
+                "verifier_strength": "host_unavailable",
+                "reason": "WwiseConsole returned ak.wwise.unavailable",
+            }
+        )
+        return
+    assert execute_code == 0, json.dumps(executed, ensure_ascii=False, sort_keys=True)
+    assert executed["state"] == TransactionState.EXECUTED_UNVERIFIED.value, executed
+    verified = runtime.gateway(["verify", transaction_id], live=True)
+    assert verified["state"] == TransactionState.RESULT_SCHEMA_CHECKED.value, verified
+    assert verified["verified"] is False, verified
+    verification = verified.get("verification")
+    assert isinstance(verification, Mapping), verified
+    assert verification["business_state_verified"] is False, verification
+    assert verification["verification_strength"] in {
+        "result_schema_only",
+        "complete_reflected_schema",
+        "partial_reflected_schema",
+    }, verification
+    runtime.category_results.append(
+        {"category": "cli-soundengine", "status": "PASS", "verifier_strength": "result_schema_only"}
+    )
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_exact_inline_lua_is_result_schema_only_or_explicitly_host_blocked(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    """Exercise the closed 2025 inline-code route without claiming its side effects."""
+
+    runtime = workflow_sandbox_runtime
+    if runtime.version != "2025.1":
+        pytest.skip("lua.executeCoreInline is reflected only in Wwise 2025.1")
+    request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": runtime.version,
+        "operation": "lua.executeCoreInline",
+        "arguments": {
+            "lua_code": "return { waapi_skill_probe = 'ok' }\n",
+            "io_root": str(runtime.sandbox.sandbox_path),
+            "source_authority": "user_supplied_verbatim",
+        },
+    }
+    preview = create_typed_transaction_preview(
+        lambda command: runtime.gateway(
+            command,
+            live=command[0] in {"draft-check", "preview-from-draft"},
+        ),
+        request,
+    )
+    transaction_id = preview.get("transaction_id")
+    assert isinstance(transaction_id, str) and transaction_id, preview
+    shown = runtime.gateway(
+        ["transaction-show", transaction_id, "--summary-only"],
+        live=False,
+    )
+    confirmation = shown.get("confirmation")
+    assert isinstance(confirmation, Mapping), shown
+    token = confirmation.get("token")
+    assert isinstance(token, str) and token, shown
+    runtime.gateway(
+        ["confirm", transaction_id, "--confirmation-token", token],
+        live=False,
+    )
+    execute_argv = [
+        "--host",
+        runtime.lifecycle.host,
+        "--port",
+        str(runtime.port),
+        "--version",
+        runtime.version,
+        "--timeout",
+        "30",
+        "--state-dir",
+        str(runtime.state_dir),
+        "execute",
+        transaction_id,
+    ]
+    execute_code, executed = waapi_gateway.execute_gateway(
+        execute_argv,
+        env=runtime.env,
+    )
+    if execute_code == 2:
+        dispatch_result = executed.get("dispatch_result")
+        assert isinstance(dispatch_result, Mapping), executed
+        assert dispatch_result["waapi_error_uri"] == "ak.wwise.unavailable", executed
+        assert executed["state"] == TransactionState.INDETERMINATE.value, executed
+        assert executed["automatic_retry"] is False, executed
+        runtime.category_results.append(
+            {
+                "category": "lua-code",
+                "status": "blocked",
+                "verifier_strength": "host_unavailable",
+                "reason": "matching WwiseConsole returned ak.wwise.unavailable",
+            }
+        )
+        return
+    assert execute_code == 0, json.dumps(executed, ensure_ascii=False, sort_keys=True)
+    assert executed["state"] == TransactionState.EXECUTED_UNVERIFIED.value, executed
+    verified = runtime.gateway(["verify", transaction_id], live=True)
+    assert verified["state"] == TransactionState.RESULT_SCHEMA_CHECKED.value, verified
+    assert verified["verified"] is False, verified
+    verification = verified.get("verification")
+    assert isinstance(verification, Mapping), verified
+    assert verification["business_state_verified"] is False, verification
+    assert verification["verification_strength"] in {
+        "result_schema_only",
+        "complete_reflected_schema",
+        "partial_reflected_schema",
+    }, verification
+    runtime.category_results.append(
+        {"category": "lua-code", "status": "PASS", "verifier_strength": "result_schema_only"}
+    )
+
+
 def _complete_transaction(
     runtime: _WorkflowSandboxRuntime,
     *,
@@ -553,13 +810,27 @@ def _complete_transaction(
         "operation": operation,
         "arguments": dict(arguments),
     }
-    preview = runtime.gateway(
-        ["preview", "--request-json", json.dumps(request, ensure_ascii=False), "--ttl", "900"],
-        live=True,
+    preview = create_typed_transaction_preview(
+        lambda command: runtime.gateway(
+            command,
+            live=command[0]
+            in {"draft-check", "preview-from-draft", "typed-call", "typed-operation"},
+        ),
+        request,
     )
     assert preview["status"] == TransactionState.AWAITING_CONFIRMATION.value
     assert preview["state"] == TransactionState.AWAITING_CONFIRMATION.value
-    assert preview["preview_summary"]["request"] == request
+    preview_request = preview["preview_summary"]["request"]
+    if operation == "audio.import":
+        assert preview_request == {
+            **request,
+            "arguments": {
+                **request["arguments"],
+                "import_operation": "createNew",
+            },
+        }
+    else:
+        assert preview_request == request
     assert preview["preview_summary"]["dispatch"]["uri"].startswith("ak.wwise.")
     assert preview["executed"] is False
     assert preview["verified"] is False
@@ -569,8 +840,16 @@ def _complete_transaction(
     assert isinstance(transaction_id, str) and transaction_id
     assert isinstance(artifact_hash, str) and len(artifact_hash) == 64
 
+    shown = runtime.gateway(
+        ["transaction-show", transaction_id, "--summary-only"],
+        live=False,
+    )
+    confirmation = shown.get("confirmation")
+    assert isinstance(confirmation, Mapping), shown
+    confirmation_token = confirmation.get("token")
+    assert isinstance(confirmation_token, str) and confirmation_token, shown
     confirmed = runtime.gateway(
-        ["confirm", transaction_id, "--artifact-hash", artifact_hash],
+        ["confirm", transaction_id, "--confirmation-token", confirmation_token],
         live=False,
     )
     assert confirmed["offline"] is True
@@ -665,6 +944,40 @@ def _complete_transaction(
         "verify": verified,
         "verification_evidence": verification_evidence,
     }
+
+
+def _save_legacy_sandbox_project(runtime: _WorkflowSandboxRuntime) -> None:
+    """Make Wwise 2021.1's on-disk language list authoritative for import."""
+
+    api = "ak.wwise.core.project.save"
+    schema = runtime.gateway(["request-schema", api], live=False)
+    digest = schema.get("schema_digest")
+    assert isinstance(digest, str) and digest, schema
+    preview = runtime.gateway(
+        ["typed-zero-call", api, "--schema-digest", digest, "--apply"],
+        live=True,
+    )
+    transaction_id = preview.get("transaction_id")
+    assert isinstance(transaction_id, str) and transaction_id, preview
+    shown = runtime.gateway(
+        ["transaction-show", transaction_id, "--summary-only"],
+        live=False,
+    )
+    confirmation = shown.get("confirmation")
+    assert isinstance(confirmation, Mapping), shown
+    token = confirmation.get("token")
+    assert isinstance(token, str) and token, shown
+    runtime.gateway(
+        ["confirm", transaction_id, "--confirmation-token", token],
+        live=False,
+    )
+    executed = runtime.gateway(["execute", transaction_id], live=True)
+    assert executed["state"] == TransactionState.EXECUTED_UNVERIFIED.value, executed
+    verified = runtime.gateway(["verify", transaction_id], live=True)
+    assert verified["state"] in {
+        TransactionState.VERIFIED.value,
+        TransactionState.RESULT_SCHEMA_CHECKED.value,
+    }, verified
 
 
 def _create_object(

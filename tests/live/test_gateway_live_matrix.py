@@ -151,14 +151,28 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                     version=version,
                 )
 
+                functions_schema = _require_offline_schema_success(
+                    _invoke_gateway(
+                        common,
+                        ("request-schema", "ak.wwise.waapi.getFunctions"),
+                        env=env,
+                    ),
+                    command="request-schema ak.wwise.waapi.getFunctions",
+                    version=version,
+                )
                 functions_result, command_durations["reflection_functions"] = _invoke_gateway_timed(
                     common,
-                    ("call", "ak.wwise.waapi.getFunctions"),
+                    (
+                        "typed-zero-call",
+                        "ak.wwise.waapi.getFunctions",
+                        "--schema-digest",
+                        str(functions_schema["schema_digest"]),
+                    ),
                     env=env,
                 )
                 functions = _require_gateway_success(
                     functions_result,
-                    command="call ak.wwise.waapi.getFunctions",
+                    command="typed-zero-call ak.wwise.waapi.getFunctions",
                     version=version,
                 )
                 _assert_reflection_functions(functions)
@@ -169,16 +183,25 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                     evidence_dir=evidence_dir,
                     timeout=0.5,
                 )
+                topic_schema = _require_offline_schema_success(
+                    _invoke_gateway(
+                        common,
+                        ("topic-schema", "ak.wwise.core.object.created"),
+                        env=env,
+                    ),
+                    command="topic-schema ak.wwise.core.object.created",
+                    version=version,
+                )
                 topic_timeout_result, command_durations["wait_topic_timeout_cleanup"] = (
                     _invoke_gateway_timed(
                         topic_timeout_common,
                         (
                             "wait-topic",
                             "ak.wwise.core.object.created",
-                            "--options-json",
-                            '{"return":["id"]}',
-                            "--match-json",
-                            '{"object":{"id":"{FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF}"}}',
+                            "--options-schema-digest",
+                            str(topic_schema["options"]["schema_digest"]),
+                            "--match-schema-digest",
+                            str(topic_schema["event_match"]["schema_digest"]),
                         ),
                         env=env,
                     )
@@ -320,19 +343,18 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                             "query-object",
                             "--type",
                             "Project",
-                            "--where-json",
-                            json.dumps(
-                                {"field": "name", "operator": "=", "value": project_name},
-                                ensure_ascii=False,
-                                separators=(",", ":"),
-                            ),
+                            "--where",
+                            "name",
+                            "=",
+                            "string",
+                            project_name,
                             "--take",
                             "1",
                             "--detail",
                         ),
                         env=env,
                     ),
-                    command="query-object --type --where-json --take",
+                    command="query-object --type --where --take",
                     version=version,
                 )
                 _assert_query_preview(
@@ -348,15 +370,18 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                             "query-object",
                             "--search",
                             "Default Work Unit",
-                            "--where-json",
-                            '{"field":"name","operator":"=","value":"Default Work Unit"}',
+                            "--where",
+                            "name",
+                            "=",
+                            "string",
+                            "Default Work Unit",
                             "--take",
                             "1",
                             "--detail",
                         ),
                         env=env,
                     ),
-                    command="query-object --search --where-json --take",
+                    command="query-object --search --where --take",
                     version=version,
                 )
                 _assert_query_preview(
@@ -430,8 +455,11 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                             "query-object",
                             "--type",
                             "Query",
-                            "--where-json",
-                            '{"field":"name","operator":"=","value":"Sound = SFX"}',
+                            "--where",
+                            "name",
+                            "=",
+                            "string",
+                            "Sound = SFX",
                             "--take",
                             "1",
                             "--detail",
@@ -721,6 +749,23 @@ def _require_gateway_success(
     return payload
 
 
+def _require_offline_schema_success(
+    result: tuple[int, dict[str, Any]],
+    *,
+    command: str,
+    version: str,
+) -> dict[str, Any]:
+    exit_code, payload = result
+    assert exit_code == 0, (
+        f"gateway {command} failed: "
+        f"{json.dumps(payload, ensure_ascii=False, sort_keys=True)}"
+    )
+    assert payload.get("ok") is True
+    assert payload.get("status") == "ok"
+    assert payload.get("version") == version
+    return payload
+
+
 def _assert_status(payload: Mapping[str, Any], *, version: str, port: int) -> None:
     assert payload["command"] == "status"
     assert payload["endpoint"]["host"] == "127.0.0.1"
@@ -767,7 +812,7 @@ def _assert_headless_selection_boundary(
 
 
 def _assert_reflection_functions(payload: Mapping[str, Any]) -> None:
-    assert payload["command"] == "call"
+    assert payload["command"] == "typed-zero-call"
     inventory = payload.get("inventory")
     assert isinstance(inventory, Mapping)
     assert inventory.get("kind") == "function"

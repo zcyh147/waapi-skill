@@ -467,6 +467,45 @@ def test_create_new_accepts_bound_sound_and_audio_file_source_rows(
     }
 
 
+def test_2021_import_verifier_uses_result_bound_source_without_unsupported_accessor(
+    tmp_path: Path,
+) -> None:
+    source = _media(tmp_path, "legacy-source.wav", b"RIFF-legacy-WAVE")
+    copied = _media(
+        tmp_path,
+        "Originals/SFX/Legacy/legacy-source.wav",
+        b"RIFF-legacy-WAVE",
+    )
+    path = OLD_ROOT + r"\Legacy"
+    target = _target(source, path, requested_object_type="Sound")
+    live = _object_row(path, copied)
+    live.pop("activeSource", None)
+    audio_source = {
+        "id": SOURCE_GUID,
+        "name": "legacy-source",
+        "type": "AudioFileSource",
+        "path": path + r"\legacy-source",
+        "parent": {"id": NEW_GUID, "name": "Legacy"},
+        "notes": "",
+        "originalFilePath": str(copied.resolve()),
+    }
+    reader = ScriptedReader([{"return": [live]}, {"return": [audio_source]}])
+
+    verified = verify_prepared_operation(
+        _prepared(version="2021.1", targets=[target]),
+        execution_result=_result("2021.1", [audio_source, live], [copied]),
+        read_call=reader,
+    )
+
+    assert verified.status == "verified"
+    target_return = reader.calls[0][2]["return"]
+    assert "activeSource" not in target_return
+    assert "originalFilePath" not in target_return
+    assert target_return[-2:] == ["sound:originalWavFilePath", "audioSource:language"]
+    source_return = reader.calls[1][2]["return"]
+    assert "originalFilePath" not in source_return
+
+
 @pytest.mark.parametrize(
     ("post_source_id", "expected_status", "expected_preserved"),
     [

@@ -6035,6 +6035,15 @@ def dispatch_command(
             if result.get("ok")
             else None
         )
+        inventory = (
+            normalize_reflection_inventory_result(
+                typed_request.uri,
+                result,
+                version=detected_version,
+            )
+            if result.get("ok") and typed_request.uri in REFLECTION_INVENTORY_CALLS
+            else None
+        )
         return {
             "ok": bool(result.get("ok")),
             "status": "ok" if result.get("ok") else "error",
@@ -6050,7 +6059,12 @@ def dispatch_command(
                 "request": request_validation.as_dict(),
                 "result": result_validation.as_dict() if result_validation else None,
             },
-            "agent_result": result.get("result") if result.get("ok") else None,
+            "inventory": inventory,
+            "agent_result": (
+                inventory
+                if inventory is not None
+                else result.get("result") if result.get("ok") else None
+            ),
         }
     if args.command == "profiler-game-objects":
         request = build_profiler_game_objects_request(

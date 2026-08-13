@@ -20,6 +20,10 @@ from tests.destructive.support.live_environment import (  # pyright: ignore[repo
     path_is_under,
     resolve_sample_project_source,
 )
+from tests.destructive.support.category_evidence import (  # pyright: ignore[reportMissingImports]
+    append_category_evidence,
+    exact_git_candidate,
+)
 from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[reportMissingImports]
     DEFAULT_SANDBOX_ROOT,
     LiveSandboxLock,
@@ -29,6 +33,10 @@ from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[repor
     launch_sandboxed_wwise,
     prepare_sample_project_sandbox,
     shutdown_sandboxed_wwise,
+)
+from tests.destructive.support.typed_gateway_input import (  # pyright: ignore[reportMissingImports]
+    create_typed_transaction_preview,
+    typed_wait_topic_command,
 )
 from tests.semantic.support.codex_harness import (  # pyright: ignore[reportMissingImports]
     force_kill_and_reap_process,
@@ -80,6 +88,8 @@ class _GatewaySandboxRuntime:
     lifecycle: HeadlessLifecycle
     state_dir: Path
     env: dict[str, str]
+    candidate: str
+    category_results: list[dict[str, Any]]
 
     @property
     def port(self) -> int:
@@ -251,9 +261,14 @@ def gateway_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterato
     sandbox: SandboxProject | None = None
     lifecycle: HeadlessLifecycle | None = None
     source_hash_before: tuple[str, int, int] | None = None
+    source_tree_before: tuple[str, int] | None = None
+    source_hash_after: tuple[str, int, int] | None = None
+    source_tree_after: tuple[str, int] | None = None
     deferred_error: BaseException | None = None
     task_root = tmp_path_factory.mktemp(f"gateway-transaction-{version.replace('.', '-')}")
     state_dir = task_root / "state"
+    candidate = exact_git_candidate(REPO_ROOT)
+    category_results: list[dict[str, Any]] = []
 
     lock.__enter__()
     try:
@@ -263,6 +278,7 @@ def gateway_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterato
             hash_strategy="bounded",
         )
         source_hash_before = _hash_mutation_bearing_project_files(sandbox.source_root)
+        source_tree_before = _source_tree_inventory(sandbox.source_root)
         assert source_hash_before[1] > 0, "immutable SampleProject source has no .wproj/.wwu files to hash"
         lifecycle = launch_sandboxed_wwise(sandbox, env)
         assert lifecycle.port is not None
@@ -300,6 +316,8 @@ def gateway_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterato
             lifecycle=lifecycle,
             state_dir=state_dir,
             env=gateway_env,
+            candidate=candidate,
+            category_results=category_results,
         )
     finally:
         if lifecycle is not None and sandbox is not None:
@@ -316,6 +334,14 @@ def gateway_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterato
                         "immutable SampleProject source hash changed during gateway transaction test: "
                         f"before={source_hash_before[0]} after={source_hash_after[0]}"
                     )
+                if source_tree_before is not None:
+                    source_tree_after = _source_tree_inventory(sandbox.source_root)
+                    if source_tree_after != source_tree_before:
+                        raise AssertionError(
+                            "immutable SampleProject source tree metadata changed during "
+                            f"gateway transaction test: before={source_tree_before} "
+                            f"after={source_tree_after}"
+                        )
             except BaseException as exc:  # noqa: BLE001 - sandbox cleanup still has to run
                 deferred_error = deferred_error or exc
 
@@ -323,6 +349,36 @@ def gateway_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterato
             try:
                 cleanup_sandbox(sandbox, keep=False, failed=False)
             except BaseException as exc:  # noqa: BLE001 - lock release must still run
+                deferred_error = deferred_error or exc
+
+        if sandbox is not None and lifecycle is not None:
+            try:
+                append_category_evidence(
+                    repo_root=REPO_ROOT,
+                    candidate=candidate,
+                    version=version,
+                    host={
+                        "display_name": sandbox.metadata.get_info_display_name,
+                        "is_command_line": True,
+                        "version": sandbox.metadata.get_info_version,
+                    },
+                    categories=category_results,
+                    source={
+                        "project": str(sandbox.source_project),
+                        "hash_before": source_hash_before[0] if source_hash_before else None,
+                        "hash_after": source_hash_after[0] if source_hash_after else None,
+                        "tree_metadata_before": source_tree_before[0] if source_tree_before else None,
+                        "tree_metadata_after": source_tree_after[0] if source_tree_after else None,
+                    },
+                    residual_state={
+                        "sandbox": "deleted" if not sandbox.sandbox_path.exists() else "retained",
+                        "process_cleanup": sandbox.metadata.process_cleanup_result,
+                        "residual_processes": (
+                            sandbox.metadata.process_cleanup_details or {}
+                        ).get("residual_processes", []),
+                    },
+                )
+            except BaseException as exc:  # noqa: BLE001 - evidence is part of the gate
                 deferred_error = deferred_error or exc
 
         try:
@@ -453,17 +509,14 @@ def test_gateway_wait_topic_matches_runner_owned_object_create_and_unsubscribes(
     created_id: str | None = None
     topic_wait = _start_packaged_topic_wait(
         runtime,
-        [
-            "wait-topic",
-            topic_uri,
-            "--options-json",
-            '{"return":["id","name","type","path"]}',
-            "--match-json",
-            json.dumps(
-                {"object": {"type": event_object_type}},
-                separators=(",", ":"),
-            ),
-        ],
+        typed_wait_topic_command(
+            name="destructive.gateway.wait-topic",
+            topic=topic_uri,
+            version=runtime.version,
+            event_count=1,
+            options={"return": ["id", "name", "type", "path"]},
+            match={"object": {"type": event_object_type}},
+        ),
         topic=topic_uri,
     )
     try:
@@ -500,6 +553,9 @@ def test_gateway_wait_topic_matches_runner_owned_object_create_and_unsubscribes(
         assert isinstance(event_object, Mapping), event
         assert event_object.get("type") == event_object_type, event_object
         assert str(event_object.get("id", "")).casefold() == created_id.casefold(), event_object
+        runtime.category_results.append(
+            {"category": "topic", "status": "PASS", "verifier_strength": "exact_event_and_cleanup"}
+        )
     finally:
         topic_wait.close()
         if created_id is not None:
@@ -703,9 +759,13 @@ def _complete_transaction(
         "operation": operation,
         "arguments": dict(arguments),
     }
-    preview = runtime.gateway(
-        ["preview", "--request-json", json.dumps(request, ensure_ascii=False), "--ttl", "900"],
-        live=True,
+    preview = create_typed_transaction_preview(
+        lambda command: runtime.gateway(
+            command,
+            live=command[0]
+            in {"draft-check", "preview-from-draft", "typed-call", "typed-operation"},
+        ),
+        request,
     )
     assert preview["status"] == TransactionState.AWAITING_CONFIRMATION.value
     assert preview["state"] == TransactionState.AWAITING_CONFIRMATION.value
@@ -719,8 +779,16 @@ def _complete_transaction(
     assert isinstance(transaction_id, str) and transaction_id
     assert isinstance(artifact_hash, str) and len(artifact_hash) == 64
 
+    shown = runtime.gateway(
+        ["transaction-show", transaction_id, "--summary-only"],
+        live=False,
+    )
+    confirmation = shown.get("confirmation")
+    assert isinstance(confirmation, Mapping), shown
+    confirmation_token = confirmation.get("token")
+    assert isinstance(confirmation_token, str) and confirmation_token, shown
     confirmed = runtime.gateway(
-        ["confirm", transaction_id, "--artifact-hash", artifact_hash],
+        ["confirm", transaction_id, "--confirmation-token", confirmation_token],
         live=False,
     )
     assert confirmed["offline"] is True
@@ -841,3 +909,22 @@ def _hash_mutation_bearing_project_files(root: Path) -> tuple[str, int, int]:
         digest.update(b"\0")
         bytes_hashed += len(data)
     return digest.hexdigest(), len(files), bytes_hashed
+
+
+def _source_tree_inventory(root: Path) -> tuple[str, int]:
+    digest = hashlib.sha256()
+    paths = sorted(root.rglob("*"))
+    for path in paths:
+        metadata = path.lstat()
+        digest.update(path.relative_to(root).as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(str(metadata.st_mode).encode("ascii"))
+        digest.update(b"\0")
+        digest.update(str(metadata.st_size).encode("ascii"))
+        digest.update(b"\0")
+        digest.update(str(metadata.st_mtime_ns).encode("ascii"))
+        digest.update(b"\0")
+        if path.is_symlink():
+            digest.update(os.readlink(path).encode("utf-8"))
+            digest.update(b"\0")
+    return digest.hexdigest(), len(paths)

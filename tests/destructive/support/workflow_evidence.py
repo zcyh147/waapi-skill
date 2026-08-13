@@ -139,6 +139,16 @@ def validate_audio_import_business_evidence(
     active_source_id = _reference_id(
         _first_present(target, "activeSource", "@activeSource")
     )
+    if version == "2021.1" and not _is_guid(active_source_id):
+        result_sources = [
+            row
+            for row in objects
+            if _type_token(row.get("type")) == "audiofilesource"
+            and row.get("path") == expected_source_path
+            and _same_id(_reference_id(row.get("parent")), expected_target_id)
+        ]
+        if len(result_sources) == 1:
+            active_source_id = _reference_id(result_sources[0].get("id"))
     if not _is_guid(active_source_id):
         raise WorkflowEvidenceError(
             "audio.import target activeSource is not a canonical GUID"
