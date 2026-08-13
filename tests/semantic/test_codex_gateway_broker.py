@@ -5794,6 +5794,7 @@ def test_native_windows_powershell_shim_preserves_public_typed_container_facts(
         expected_steps=steps,
         expected_wwise_version="2025.1",
         transport="tcp",
+        working_root=tmp_path / "broker-root",
     ) as broker:
         assert json.loads(broker.config_path.read_text(encoding="utf-8"))[
             "wwise_version"
@@ -5838,7 +5839,11 @@ def test_native_windows_powershell_shim_preserves_public_typed_container_facts(
                 timeout=30,
                 check=False,
             )
-            assert result.returncode == 0, result.stderr
+            assert result.returncode == 0, {
+                "stderr": result.stderr,
+                "stdout": result.stdout,
+                "evidence": broker.evidence().as_dict(include_output=True),
+            }
             payload = json.loads(result.stdout[result.stdout.index("{") :])
             payloads[step.name] = payload
             observed.append(full_argv)
