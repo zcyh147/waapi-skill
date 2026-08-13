@@ -3814,6 +3814,11 @@ def operation_composer_input_contract(
                 else {}
             ),
         },
+        "dynamic_container_commands": {
+            "map_value": "request-map-container",
+            "array_item": "request-array-item",
+            "schema_digest": contract.get("typed_request_schema_digest"),
+        },
         "apply": {
             "subcommand": "draft-apply",
             "action_flag": "--action",

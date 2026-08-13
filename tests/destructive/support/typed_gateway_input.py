@@ -42,12 +42,17 @@ def create_typed_transaction_preview(
     responses: dict[str, Mapping[str, Any]] = {}
     preview: dict[str, Any] | None = None
     previous: tuple[ExpectedGatewayStep, Mapping[str, Any]] | None = None
+    operation_schema: Mapping[str, Any] | None = None
     for step in protocol.steps:
         command = [step.subcommand, *_render_step_arguments(step, responses)]
-        if previous is not None:
+        if command[0] in {"request-map-container", "request-array-item"}:
+            _require_container_disclosure(operation_schema, command)
+        elif previous is not None:
             _require_disclosed_continuation(previous[0], previous[1], command)
         payload = dict(gateway(command))
         responses[step.name] = payload
+        if step.subcommand == "operation-schema":
+            operation_schema = payload
         if step.name == "tx01.preview":
             _require_preview_continuation(payload)
             preview = payload
@@ -58,12 +63,45 @@ def create_typed_transaction_preview(
     return preview
 
 
+def _require_container_disclosure(
+    operation_schema: Mapping[str, Any] | None,
+    command: Sequence[str],
+) -> None:
+    composer = operation_schema.get("composer") if isinstance(operation_schema, Mapping) else None
+    dynamic = composer.get("dynamic_container_commands") if isinstance(composer, Mapping) else None
+    expected = (
+        dynamic.get("map_value")
+        if command[0] == "request-map-container" and isinstance(dynamic, Mapping)
+        else dynamic.get("array_item")
+        if isinstance(dynamic, Mapping)
+        else None
+    )
+    if expected != command[0] or dynamic.get("schema_digest") != command[3]:
+        raise AssertionError("operation-schema did not disclose exact dynamic container construction")
+
+
 def _require_disclosed_continuation(
     previous_step: ExpectedGatewayStep,
     payload: Mapping[str, Any],
     command: Sequence[str],
 ) -> None:
     """Prove each real command follows the preceding public Gateway result."""
+
+    if previous_step.subcommand in {"request-map-container", "request-array-item"}:
+        continuation = payload.get("continuation")
+        action_argv = continuation.get("action_argv") if isinstance(continuation, Mapping) else None
+        try:
+            action_offset = command.index("--action")
+        except ValueError as exc:
+            raise AssertionError("container continuation was not applied as a typed action") from exc
+        expected_action = (
+            [payload.get("handle") if value == "<child_handle>" else value for value in action_argv]
+            if isinstance(action_argv, list)
+            else None
+        )
+        if not isinstance(expected_action, list) or list(command[action_offset:]) != expected_action:
+            raise AssertionError("container response did not disclose its exact typed action")
+        return
 
     if previous_step.subcommand == "operation-schema":
         if command[0] == "typed-operation":
