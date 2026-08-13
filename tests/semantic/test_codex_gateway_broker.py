@@ -65,13 +65,16 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
 from .support.codex_eval_protocol_v3 import (  # pyright: ignore[reportMissingImports]
     build_audio_import_composer_transaction_steps,
     build_object_set_composer_transaction_steps,
+    build_transaction_protocol,
 )
 from wwise_waapi.operation_composer import (
     apply_composer_action,
     composition_projection,
+    materialize_operation_request,
     new_composition,
     typed_action_cli_arguments,
 )
+from wwise_waapi.operation_drafts import OperationDraftStore
 from wwise_waapi.transactions import confirmation_token_for
 from wwise_waapi.platform_commands import (
     PlatformCommandError,
@@ -5731,6 +5734,140 @@ def test_native_windows_powershell_shim_preserves_hostile_json(
         )
         assert record.normalized_model_argv[0] == interpreter_name
         assert record.succeeded is True
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows PowerShell resolution")
+def test_native_windows_powershell_shim_preserves_public_typed_container_facts(
+    tmp_path: Path,
+) -> None:
+    """Prove the current typed path through pwsh, the PS1 relay, and Broker.
+
+    This deliberately stops before ``draft-check`` so the test remains offline.
+    The durable Draft is then materialized by the same authoritative Composer
+    seam used before Preview.
+    """
+
+    pwsh = native_pwsh_73_or_skip()
+    skill = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
+    hostile_bank = r'\SoundBanks\雪 & "Quoted"; $not_expanded | %TEMP% ` tail'
+    hostile_event = (
+        "\\Events\\空 间 & 'apostrophe'; $(not-run) | %TEMP% ` "
+        '\\"tail'
+    )
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2025.1",
+        "operation": "soundbank.setInclusions",
+        "arguments": {
+            "soundbank": {"kind": "path", "value": hostile_bank},
+            "mode": "replace",
+            "inclusions": [
+                {
+                    "object": {"kind": "path", "value": hostile_event},
+                    "filters": ["events", "media"],
+                }
+            ],
+        },
+    }
+    protocol = build_transaction_protocol((request,))
+    final_action_index = max(
+        index
+        for index, step in enumerate(protocol.steps)
+        if step.subcommand == "draft-apply"
+    )
+    steps = protocol.steps[: final_action_index + 1]
+
+    def pointer(payload: object, value: str) -> object:
+        current = payload
+        for token in value.removeprefix("/").split("/"):
+            assert isinstance(current, (dict, list))
+            current = current[int(token)] if isinstance(current, list) else current[token]
+        return current
+
+    def quote(value: str) -> str:
+        return "'" + value.replace("'", "''") + "'"
+
+    payloads: dict[str, dict[str, object]] = {}
+    observed: list[tuple[str, ...]] = []
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        expected_wwise_version="2025.1",
+        transport="tcp",
+    ) as broker:
+        for step in steps:
+            argv: list[str] = ["--version", "2025.1", step.subcommand]
+            for argument in step.arguments:
+                if isinstance(argument, ResponseBinding):
+                    argv.append(str(pointer(payloads[argument.step], argument.pointer)))
+                    continue
+                if isinstance(argument, DraftTypedActionArgument):
+                    action = dict(argument.expected)
+                    for binding in argument.response_bindings:
+                        action[binding.pointer.removeprefix("/")] = pointer(
+                            payloads[binding.step], binding.response_pointer
+                        )
+                    argv.extend(typed_action_cli_arguments(action))
+                    continue
+                assert isinstance(argument, str)
+                argv.append(argument)
+
+            full_argv = (
+                "python",
+                str(broker.invocation_runner_path),
+                "gateway.py",
+                *argv,
+            )
+            command_script = " ".join(quote(value) for value in full_argv)
+            result = subprocess.run(
+                [
+                    pwsh,
+                    "-NoLogo",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-Command",
+                    command_script,
+                ],
+                env=broker.model_environment(os.environ),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=30,
+                check=False,
+            )
+            assert result.returncode == 0, result.stderr
+            payload = json.loads(result.stdout[result.stdout.index("{") :])
+            payloads[step.name] = payload
+            observed.append(full_argv)
+
+        start = payloads["tx01.draft-start"]
+        draft_id = str(pointer(start, "/draft/draft_id"))
+        authority = str(pointer(start, "/task_authority"))
+        stored = OperationDraftStore(broker.state_directory).inspect(
+            draft_id,
+            task_authority=authority,
+        )
+        materialized = materialize_operation_request(
+            "soundbank.setInclusions",
+            "2025.1",
+            stored.composition,
+        )
+
+        assert materialized == request
+        assert broker.evidence().complete is True
+        assert broker.reconcile(observed).passed is True
+        assert any(
+            record.payload is not None
+            and record.payload.get("command") == "request-array-item"
+            for record in broker.evidence().records
+        )
+        transported = tuple(
+            value
+            for record in broker.evidence().records
+            for value in record.model_argv
+        )
+        assert hostile_bank in transported
+        assert hostile_event in transported
 
 
 @pytest.mark.skipif(os.name != "nt", reason="native Windows PowerShell resolution")
