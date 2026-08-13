@@ -22,6 +22,7 @@ import secrets
 import stat
 import threading
 import time
+import xml.etree.ElementTree as ET
 from dataclasses import asdict, dataclass, field, fields, is_dataclass
 from pathlib import Path
 from types import MappingProxyType
@@ -52,6 +53,7 @@ from tests.semantic.support.codex_filesystem_security import (
     read_bounded_exclusive_regular_file,
     write_utf8_text_bytes,
 )
+from wwise_waapi.host_paths import HostPathError, localize_waapi_host_path
 from tests.semantic.support.codex_eval_protocol_v3 import (
     StructuredRefusal,
     V3GatewayProtocol,
@@ -3280,6 +3282,42 @@ def _exact_wwise_build(value: Any) -> str:
     return ".".join(str(item) for item in fields)
 
 
+def _status_project_identity(
+    project_path: Path,
+    *,
+    version: str,
+) -> dict[str, str]:
+    path = Path(project_path).resolve(strict=True)
+    try:
+        root = ET.parse(path).getroot()
+    except (ET.ParseError, OSError) as exc:
+        raise HeavyProjectRunnerError(
+            "sandbox project identity document is unreadable"
+        ) from exc
+    project = root.find("./ProjectInfo/Project")
+    if project is None:
+        raise HeavyProjectRunnerError("sandbox project identity is missing")
+    name = project.get("Name")
+    project_id = project.get("ID")
+    if (
+        not isinstance(name, str)
+        or not name
+        or not isinstance(project_id, str)
+        or re.fullmatch(
+            r"\{[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}",
+            project_id,
+        )
+        is None
+    ):
+        raise HeavyProjectRunnerError("sandbox project identity is invalid")
+    return {
+        "id": project_id.upper(),
+        "name": name,
+        "type": "Project",
+        "path": "\\" if version == "2021.1" else path.name,
+    }
+
+
 def _agent_result_mapping(
     payload: Mapping[str, Any],
     *,
@@ -4191,8 +4229,21 @@ def _prepare_case(
             raise HeavyProjectRunnerError(
                 "getInfo process identity differs from lifecycle readiness proof"
             )
+        status_project = _status_project_identity(
+            runtime.sandbox.sandbox_project,
+            version=runtime.version,
+        )
+        status_binding = {
+            "wwise_build": expected_build,
+            "process_id": process_id,
+            "project": status_project,
+        }
         protocol = build_direct_protocol(
             [
+                ExpectedGatewayStep(
+                    "host.status",
+                    "status",
+                ),
                 ExpectedGatewayStep(
                     "host.get-info.schema",
                     "request-schema",
@@ -4217,6 +4268,7 @@ def _prepare_case(
                 "session_id": baseline_result.get("sessionId"),
                 "result_sha256": _json_sha256(baseline_result),
                 "project_digest": project_digest,
+                "status": status_binding,
             },
             verification_boundary="exact_host_identity",
         )
@@ -4236,9 +4288,47 @@ def _prepare_case(
                 "session_id": baseline_result.get("sessionId"),
                 "result_sha256": _json_sha256(baseline_result),
                 "project_digest": project_digest,
+                "status": status_binding,
             },
             verification_boundary="exact_host_identity",
         )
+
+        status_observed = False
+
+        def observe_get_info(
+            step: ExpectedGatewayStep,
+            payload: Mapping[str, Any],
+        ) -> None:
+            nonlocal status_observed
+            if step.name != "host.status":
+                return
+            wwise = payload.get("wwise")
+            project = payload.get("project")
+            normalized_project: dict[str, Any] | None = None
+            if isinstance(project, Mapping):
+                normalized_project = {
+                    key: project.get(key)
+                    for key in ("id", "name", "type", "path")
+                }
+                if runtime.version != "2021.1":
+                    try:
+                        localized = Path(
+                            localize_waapi_host_path(project.get("path"))
+                        ).resolve(strict=True)
+                    except (HostPathError, OSError, RuntimeError, TypeError):
+                        localized = None
+                    if localized == runtime.sandbox.sandbox_project.resolve(strict=True):
+                        normalized_project["path"] = status_project["path"]
+            if (
+                not isinstance(wwise, Mapping)
+                or _exact_wwise_build(wwise) != expected_build
+                or wwise.get("processId") != process_id
+                or normalized_project != status_project
+            ):
+                raise HeavyProjectRunnerError(
+                    "Gateway status differs from the sealed Wwise/project identity"
+                )
+            status_observed = True
 
         def snapshot_get_info() -> str:
             return _project_document_digest(runtime.sandbox.sandbox_path)
@@ -4248,6 +4338,8 @@ def _prepare_case(
             result: CodexRunResult,
         ) -> _DirectSemanticVerification:
             failures: list[str] = []
+            if not status_observed:
+                failures.append("Gateway status identity was not observed")
             actual: Mapping[str, Any] | None = None
             if payload is None:
                 failures.append("getInfo gateway payload is missing")
@@ -4287,6 +4379,7 @@ def _prepare_case(
             required_reference="references/waapi-query.md",
             snapshot=snapshot_get_info,
             verify_final=verify_get_info,
+            observe_payload=observe_get_info,
             typed_sections=typed_sections,
         )
 

@@ -12,6 +12,7 @@ import pytest  # pyright: ignore[reportMissingImports]
 from tests.semantic.support.codex_object_heavy_v3 import (
     OBJECT_CREATE_CASE_IDS,
     OBJECT_COMPOUND_CROSS_VERSION_CASE_IDS,
+    OBJECT_COMPOUND_CROSS_VERSION_CASE_VERSIONS,
     OBJECT_GET_CASE_IDS,
     OBJECT_HEAVY_CASE_IDS,
     OBJECT_SET_CASE_IDS,
@@ -185,7 +186,14 @@ def test_mutation_requests_parse_through_the_production_closed_contract() -> Non
     }
 
 
-@pytest.mark.parametrize("case_id", OBJECT_COMPOUND_CROSS_VERSION_CASE_IDS)
+@pytest.mark.parametrize(
+    "case_id",
+    (
+        case_id
+        for case_id, versions in OBJECT_COMPOUND_CROSS_VERSION_CASE_VERSIONS.items()
+        if "2025.1" in versions
+    ),
+)
 def test_compound_object_recipe_translates_paths_and_reflected_types_for_2025(
     case_id: str,
 ) -> None:
@@ -239,8 +247,43 @@ def test_compound_object_recipe_translates_paths_and_reflected_types_for_2025(
 def test_unreviewed_object_cases_and_layout_versions_fail_closed() -> None:
     with pytest.raises(ObjectHeavyRecipeError, match="not approved"):
         build_object_heavy_v3_recipe("OBJ22-F-GET-01", "2025.1")
-    with pytest.raises(ObjectHeavyRecipeError, match="unsupported"):
+    with pytest.raises(ObjectHeavyRecipeError, match="not approved"):
         build_object_heavy_v3_recipe("OBJ22-F-CREATE-02", "2024.1")
+
+
+@pytest.mark.parametrize(
+    ("case_id", "version"),
+    tuple(
+        (case_id, version)
+        for case_id, versions in OBJECT_COMPOUND_CROSS_VERSION_CASE_VERSIONS.items()
+        for version in versions
+        if version != "2025.1"
+    ),
+)
+def test_profile_object_recipe_translates_to_each_reviewed_legacy_lane(
+    case_id: str,
+    version: str,
+) -> None:
+    recipe = build_object_heavy_v3_recipe(case_id, version)
+
+    assert recipe.version == version
+    assert all(
+        not isinstance(value, str) or "2022.1" not in value
+        for value in _walk(recipe.request)
+    )
+    if isinstance(recipe.request, QueryObjectRequestSpec):
+        assert recipe.request.argv[:4] == (
+            "gateway.py",
+            "--version",
+            version,
+            "query-object",
+        )
+    else:
+        parsed = parse_operation_request(
+            recipe.request.as_dict(version=version),
+            expected_version=version,
+        )
+        assert parsed.operation == recipe.request.operation
 
 
 def test_set_03_uses_raw_pitch_cents_and_exact_bus_references() -> None:

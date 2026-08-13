@@ -78,8 +78,13 @@ def test_layouts_are_immutable_and_unknown_versions_fail_closed() -> None:
 
     with pytest.raises(FrozenInstanceError):
         layout.containers_root = r"\Injected"  # type: ignore[misc]
+    assert (
+        get_version_layout("2021.1").containers_root
+        == get_version_layout("2024.1").containers_root
+        == r"\Actor-Mixer Hierarchy"
+    )
     with pytest.raises(CodexVersionLayoutError, match="unsupported"):
-        get_version_layout("2024.1")
+        get_version_layout("2020.1")
 
 
 def test_object_compound_data_is_closed_and_cross_version() -> None:

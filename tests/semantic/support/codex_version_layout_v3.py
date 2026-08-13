@@ -13,7 +13,13 @@ from types import MappingProxyType
 from typing import Final
 
 
-SUPPORTED_LAYOUT_VERSIONS: Final = ("2022.1", "2025.1")
+SUPPORTED_LAYOUT_VERSIONS: Final = (
+    "2021.1",
+    "2022.1",
+    "2023.1",
+    "2024.1",
+    "2025.1",
+)
 
 
 class CodexVersionLayoutError(ValueError):
@@ -89,10 +95,9 @@ class CodexVersionLayoutV3:
         return value
 
 
-_LAYOUTS = MappingProxyType(
-    {
-        "2022.1": CodexVersionLayoutV3(
-            version="2022.1",
+def _legacy_layout(version: str) -> CodexVersionLayoutV3:
+    return CodexVersionLayoutV3(
+            version=version,
             containers_root=r"\Actor-Mixer Hierarchy",
             containers_dwu=r"\Actor-Mixer Hierarchy\Default Work Unit",
             busses_root=r"\Master-Mixer Hierarchy",
@@ -102,7 +107,15 @@ _LAYOUTS = MappingProxyType(
             ),
             requested_actor_mixer="ActorMixer",
             reflected_actor_mixer="ActorMixer",
-        ),
+        )
+
+
+_LAYOUTS = MappingProxyType(
+    {
+        version: _legacy_layout(version)
+        for version in SUPPORTED_LAYOUT_VERSIONS[:-1]
+    }
+    | {
         "2025.1": CodexVersionLayoutV3(
             version="2025.1",
             containers_root=r"\Containers",

@@ -201,6 +201,10 @@ def test_campaign_reader_independently_accepts_exact_direct_plan() -> None:
     protocol = build_direct_protocol(
         (
             ExpectedGatewayStep(
+                "host.status",
+                "status",
+            ),
+            ExpectedGatewayStep(
                 "host.get-info.schema",
                 "request-schema",
                 ("ak.wwise.core.getInfo",),
@@ -220,6 +224,16 @@ def test_campaign_reader_independently_accepts_exact_direct_plan() -> None:
         "session_id": "session",
         "result_sha256": "a" * 64,
         "project_digest": "b" * 64,
+        "status": {
+            "wwise_build": "2021.1.8100.0",
+            "process_id": 42,
+            "project": {
+                "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+                "name": "SampleProject",
+                "type": "Project",
+                "path": "\\",
+            },
+        },
     }
     sections = compile_direct_business_plan(
         scenario_id="O22-GET-INFO-01",
@@ -299,11 +313,18 @@ def test_full_archive_dispatcher_terminates_after_direct_typed_validation(
     verification_boundary: str,
     verification: dict,
     label: str,
+    tmp_path: Path,
 ) -> None:
     scenario_id = "O22-GET-INFO-01" if api.endswith("getInfo") else "LUA23-CORE-FILE-02"
     version = "2021.1" if api.endswith("getInfo") else "2025.1"
     steps = (
-        {"name": "direct.execute", "subcommand": "typed-zero-call"},
+        (
+            {"name": "host.status", "subcommand": "status"},
+            {"name": "host.get-info.schema", "subcommand": "request-schema"},
+            {"name": "host.get-info", "subcommand": "typed-zero-call"},
+        )
+        if api.endswith("getInfo")
+        else ({"name": "direct.execute", "subcommand": "typed-zero-call"},)
     )
     bindings = (
         {
@@ -314,6 +335,16 @@ def test_full_archive_dispatcher_terminates_after_direct_typed_validation(
             "session_id": "session",
             "result_sha256": "a" * 64,
             "project_digest": "b" * 64,
+            "status": {
+                "wwise_build": "2021.1.8100.0",
+                "process_id": 42,
+                "project": {
+                    "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+                    "name": "SampleProject",
+                    "type": "Project",
+                    "path": "\\",
+                },
+            },
         }
         if api.endswith("getInfo")
         else {
@@ -346,6 +377,46 @@ def test_full_archive_dispatcher_terminates_after_direct_typed_validation(
         "business_oracle_plan_sha256": plan_sha,
         "verification": verification,
     }
+    task_root = tmp_path / "codex-task"
+    task_root.mkdir()
+    if api.endswith("getInfo"):
+        sandbox_project = tmp_path / "SampleProject.wproj"
+        sandbox_project.write_text("<Project/>\n", encoding="utf-8")
+        (tmp_path / "start.json").write_text(
+            json.dumps({"sandbox_project": str(sandbox_project)}),
+            encoding="utf-8",
+        )
+        (task_root / "task-result.json").write_text(
+            json.dumps(
+                {
+                    "broker": {
+                        "records": [
+                            {
+                                "step_name": "host.status",
+                                "payload": {
+                                    "wwise": {
+                                        "processId": 42,
+                                        "version": {
+                                            "year": 2021,
+                                            "major": 1,
+                                            "minor": 8100,
+                                            "build": 0,
+                                        },
+                                    },
+                                    "project": {
+                                        "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+                                        "name": "SampleProject",
+                                        "type": "Project",
+                                        "path": "\\",
+                                    },
+                                },
+                            }
+                        ]
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
 
     campaign._validate_heavy_v3_archived_verification(
         envelope,
@@ -354,7 +425,7 @@ def test_full_archive_dispatcher_terminates_after_direct_typed_validation(
         version=version,
         runner="project",
         primary_count=1,
-        task_root=Path("."),
+        task_root=task_root,
         prompt_evidence=prompt_evidence,
         scenario_fixture={},
         label=label,

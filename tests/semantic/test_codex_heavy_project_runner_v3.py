@@ -898,6 +898,14 @@ def test_prepare_get_info_case_binds_exact_live_process_and_result(
         scenario_id="O22-GET-INFO-01",
     )
     scenario.prompt = "确认当前连接的 Wwise 实例与进程身份。"
+    project = tmp_path / "SampleProject.wproj"
+    project.write_text(
+        '<?xml version="1.0"?><WwiseDocument><ProjectInfo>'
+        '<Project Name="SampleProject" '
+        'ID="{16164796-C6E6-491A-8799-C42A33110A84}"/>'
+        '</ProjectInfo></WwiseDocument>',
+        encoding="utf-8",
+    )
     prepared = runner._prepare_case(
         scenario,
         runtime=SimpleNamespace(
@@ -906,7 +914,10 @@ def test_prepare_get_info_case_binds_exact_live_process_and_result(
                 process=SimpleNamespace(pid=4200),
                 ready_result=baseline,
             ),
-            sandbox=SimpleNamespace(sandbox_path=tmp_path),
+            sandbox=SimpleNamespace(
+                sandbox_path=tmp_path,
+                sandbox_project=project,
+            ),
         ),
         direct=direct,
         media_holder={},
@@ -915,11 +926,34 @@ def test_prepare_get_info_case_binds_exact_live_process_and_result(
 
     assert calls == [(runner.GET_INFO_URI, {}, {})]
     assert [step.subcommand for step in prepared.protocol.steps] == [
+        "status",
         "request-schema",
         "typed-zero-call",
     ]
     assert prepared.typed_sections.static_expectation["verification_boundary"] == (
         "exact_host_identity"
+    )
+    omitted_status = prepared.verify_final(
+        {"agent_result": baseline},
+        SimpleNamespace(final_response="Wwise 2021.1.14.8108，进程 4242。"),
+    )
+    assert omitted_status.passed is False
+    assert "Gateway status identity was not observed" in omitted_status.failures
+    prepared.observe_payload(
+        prepared.protocol.steps[0],
+        {
+            "wwise": baseline,
+            "project": {
+                "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+                "name": "SampleProject",
+                "type": "Project",
+                "path": "\\",
+                "displayTitle": "SampleProject",
+                "isDirty": False,
+                "currentLanguageId": "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}",
+                "currentPlatformId": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}",
+            },
+        },
     )
     verification = prepared.verify_final(
         {"agent_result": baseline},
@@ -931,6 +965,76 @@ def test_prepare_get_info_case_binds_exact_live_process_and_result(
         SimpleNamespace(final_response="Wwise 2021.1，进程 4242。"),
     )
     assert incomplete.passed is False
+
+
+def test_prepare_get_info_rejects_status_for_a_different_project(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    baseline = {
+        "processId": 4242,
+        "sessionId": "session",
+        "version": {"year": 2025, "major": 1, "minor": 0, "build": 9000},
+    }
+    monkeypatch.setattr(runner, "_project_document_digest", lambda _path: "d" * 64)
+    scenario = _scenario(runner.GET_INFO_URI, scenario_id="O22-GET-INFO-01")
+    scenario.prompt = "确认当前连接的 Wwise 实例与进程身份。"
+    project = tmp_path / "SampleProject.wproj"
+    project.write_text(
+        '<?xml version="1.0"?><WwiseDocument><ProjectInfo>'
+        '<Project Name="SampleProject" '
+        'ID="{16164796-C6E6-491A-8799-C42A33110A84}"/>'
+        '</ProjectInfo></WwiseDocument>',
+        encoding="utf-8",
+    )
+    prepared = runner._prepare_case(
+        scenario,
+        runtime=SimpleNamespace(
+            version="2025.1",
+            lifecycle=SimpleNamespace(
+                process=SimpleNamespace(pid=4200),
+                ready_result=baseline,
+            ),
+            sandbox=SimpleNamespace(
+                sandbox_path=tmp_path,
+                sandbox_project=project,
+            ),
+        ),
+        direct=lambda *_args: baseline,
+        media_holder={},
+        unit=SimpleNamespace(unit_id="TYP25-ZERO-GET-INFO"),
+    )
+
+    prepared.observe_payload(
+        prepared.protocol.steps[0],
+        {
+            "wwise": baseline,
+            "project": {
+                "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+                "name": "SampleProject",
+                "type": "Project",
+                "path": str(project),
+                "displayTitle": "SampleProject",
+                "isDirty": False,
+                "currentLanguageId": "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}",
+                "currentPlatformId": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}",
+            },
+        },
+    )
+
+    with pytest.raises(runner.HeavyProjectRunnerError, match="sealed Wwise/project"):
+        prepared.observe_payload(
+            prepared.protocol.steps[0],
+            {
+                "wwise": baseline,
+                "project": {
+                    "id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+                    "name": "OtherProject",
+                    "type": "Project",
+                    "path": str(tmp_path / "OtherProject.wproj"),
+                },
+            },
+        )
 
 
 def test_prepare_get_info_rejects_process_drift_from_readiness_proof(
@@ -946,6 +1050,14 @@ def test_prepare_get_info_rejects_process_drift_from_readiness_proof(
     monkeypatch.setattr(runner, "_project_document_digest", lambda _path: "d" * 64)
     scenario = _scenario(runner.GET_INFO_URI, scenario_id="O22-GET-INFO-01")
     scenario.prompt = "确认当前连接的 Wwise 实例与进程身份。"
+    project = tmp_path / "SampleProject.wproj"
+    project.write_text(
+        '<?xml version="1.0"?><WwiseDocument><ProjectInfo>'
+        '<Project Name="SampleProject" '
+        'ID="{16164796-C6E6-491A-8799-C42A33110A84}"/>'
+        '</ProjectInfo></WwiseDocument>',
+        encoding="utf-8",
+    )
 
     with pytest.raises(runner.HeavyProjectRunnerError, match="readiness proof"):
         runner._prepare_case(
@@ -956,7 +1068,10 @@ def test_prepare_get_info_rejects_process_drift_from_readiness_proof(
                     process=SimpleNamespace(pid=4200),
                     ready_result=ready,
                 ),
-                sandbox=SimpleNamespace(sandbox_path=tmp_path),
+                sandbox=SimpleNamespace(
+                    sandbox_path=tmp_path,
+                    sandbox_project=project,
+                ),
             ),
             direct=lambda *_args: drifted,
             media_holder={},

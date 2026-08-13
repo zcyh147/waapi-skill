@@ -16,6 +16,18 @@ from tests.semantic.support.codex_typed_input_profile import (
     load_typed_input_profile,
 )
 from tests.semantic.support.codex_heavy_project_runner_v3 import PROJECT_RUNNER_APIS
+from tests.semantic.support.codex_import_runtime_v3 import (
+    COMPOUND_SUPPORTED_VERSIONS as IMPORT_COMPOUND_VERSIONS,
+    PROFILE_CROSS_VERSION_SCENARIOS as IMPORT_PROFILE_VERSIONS,
+    SUPPORTED_VERSION as IMPORT_BASE_VERSION,
+)
+from tests.semantic.support.codex_object_heavy_v3 import (
+    OBJECT_COMPOUND_CROSS_VERSION_CASE_VERSIONS,
+)
+from tests.semantic.support.codex_soundbank_runtime_v3 import (
+    PROFILE_CROSS_VERSION_SCENARIOS as SOUNDBANK_PROFILE_VERSIONS,
+    SUPPORTED_VERSIONS as SOUNDBANK_BASE_VERSIONS,
+)
 
 
 PROFILE_PATH = (
@@ -97,3 +109,30 @@ def test_every_typed_input_task_has_an_existing_closed_runner_adapter() -> None:
         for unit in profile.units
         if not unit.scenario.api.startswith("ak.wwise.cli.")
     }.issubset(PROJECT_RUNNER_APIS)
+
+
+def test_every_typed_input_task_uses_a_reviewed_runtime_version_lane() -> None:
+    profile = load_typed_input_profile(PROFILE_PATH)
+
+    for unit in profile.units:
+        api = unit.scenario.api
+        if api.startswith("ak.wwise.core.object."):
+            assert unit.version == "2022.1" or unit.version in (
+                OBJECT_COMPOUND_CROSS_VERSION_CASE_VERSIONS.get(
+                    unit.base_scenario_id,
+                    (),
+                )
+            ), unit.unit_id
+        elif api.startswith("ak.wwise.core.audio.import"):
+            assert (
+                unit.version == IMPORT_BASE_VERSION
+                or unit.version in IMPORT_COMPOUND_VERSIONS
+                or unit.version
+                in IMPORT_PROFILE_VERSIONS.get(unit.base_scenario_id, ())
+            ), unit.unit_id
+        elif api.startswith("ak.wwise.core.soundbank."):
+            assert (
+                unit.version in SOUNDBANK_BASE_VERSIONS
+                or unit.version
+                in SOUNDBANK_PROFILE_VERSIONS.get(unit.base_scenario_id, ())
+            ), unit.unit_id

@@ -92,6 +92,14 @@ COMPOUND_CROSS_VERSION_SOUNDBANK_APIS = frozenset(
         "ak.wwise.core.soundbank.setInclusions",
     }
 )
+PROFILE_CROSS_VERSION_SCENARIOS = MappingProxyType(
+    {
+        "O22-SB-GENERATED-01": ("2021.1",),
+        "O22-SB-GENERATED-02": ("2023.1",),
+        "O22-SB-GENERATED-03": ("2024.1",),
+        "O22-SB-GENERATE-01": ("2024.1",),
+    }
+)
 EXPECTED_SCENARIO_COUNT = 25
 PROJECT_INFO_OBSERVER_MAX_PLATFORM_ROWS = 32
 PROCESS_REFUSAL_ID = "O22-SB-PROCESS-DEF-05"
@@ -108,6 +116,25 @@ DEFINITION_IDENTITY_MATERIALIZATION = MappingProxyType(
         "hexadecimal_short_id": "runner_queries_hexadecimal_short_id",
     }
 )
+
+
+def soundbank_scenario_supports_version(
+    scenario_id: str,
+    api: str,
+    version: str,
+) -> bool:
+    """Return whether one exact SoundBank scenario lane was reviewed.
+
+    The established 2022.1/2025.1 runtime remains available to its existing
+    suite scenarios.  Additional typed-profile lanes are deliberately bound to
+    the exact scenario id and version instead of broadening an API globally.
+    """
+
+    if api not in SOUNDBANK_APIS:
+        return False
+    if version in SUPPORTED_VERSIONS:
+        return True
+    return version in PROFILE_CROSS_VERSION_SCENARIOS.get(scenario_id, ())
 
 ACTOR_DWU = r"\Actor-Mixer Hierarchy\Default Work Unit"
 EVENT_DWU = r"\Events\Default Work Unit"
@@ -944,7 +971,10 @@ def build_soundbank_blueprint(
 
     if scenario.api not in SOUNDBANK_APIS:
         raise SoundBankRuntimeError(f"unsupported SoundBank scenario API: {scenario.api}")
-    if version not in SUPPORTED_VERSIONS or version not in scenario.versions:
+    if (
+        not soundbank_scenario_supports_version(scenario.id, scenario.api, version)
+        or version not in scenario.versions
+    ):
         raise SoundBankRuntimeError(
             f"{scenario.id} SoundBank runtime supports only "
             f"{tuple(sorted(SUPPORTED_VERSIONS))!r}"
@@ -952,6 +982,7 @@ def build_soundbank_blueprint(
     if (
         version != SUPPORTED_VERSION
         and scenario.api not in COMPOUND_CROSS_VERSION_SOUNDBANK_APIS
+        and version not in PROFILE_CROSS_VERSION_SCENARIOS.get(scenario.id, ())
     ):
         raise SoundBankRuntimeError(
             f"{scenario.api} is not reviewed for the Wwise {version} "
@@ -4735,10 +4766,13 @@ __all__ = [
     "PreparedSoundBankRuntime",
     "PROCESS_REFUSAL_ERROR_CODE",
     "PROCESS_REFUSAL_ID",
+    "PROFILE_CROSS_VERSION_SCENARIOS",
     "SOUNDBANK_APIS",
     "SOUNDBANK_RUNTIME_CONTRACT",
     "SOUNDBANK_TOPIC",
     "SOUNDBANK_TOPIC_RETURN_FIELDS",
+    "SUPPORTED_VERSIONS",
+    "soundbank_scenario_supports_version",
     "SoundBankBlueprint",
     "SoundBankFixture",
     "SoundBankRuntimeBackend",

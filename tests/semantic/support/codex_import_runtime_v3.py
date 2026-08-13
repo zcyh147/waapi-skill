@@ -60,6 +60,12 @@ IMPORT_APIS = frozenset(
 )
 SUPPORTED_VERSION = "2022.1"
 COMPOUND_SUPPORTED_VERSIONS = ("2022.1", "2025.1")
+PROFILE_CROSS_VERSION_SCENARIOS = MappingProxyType(
+    {
+        "O22-AUDIO-IMPORT-02": ("2021.1",),
+        "O22-AUDIO-TAB-04": ("2025.1",),
+    }
+)
 ACTOR_DWU = r"\Actor-Mixer Hierarchy\Default Work Unit"
 EVENTS_DWU = r"\Events\Default Work Unit"
 GUID_RE = re.compile(
@@ -1407,9 +1413,11 @@ def build_import_runtime_plan(
         raise ImportRuntimeError("import runtime requires one exact Wwise version")
     version = scenario.versions[0]
     compound = materialized.compound_spec is not None
-    if not compound and version != SUPPORTED_VERSION:
+    if not compound and version != SUPPORTED_VERSION and version not in (
+        PROFILE_CROSS_VERSION_SCENARIOS.get(scenario.id, ())
+    ):
         raise ImportRuntimeError(
-            f"core import runtime is pinned to Wwise {SUPPORTED_VERSION}"
+            f"{scenario.id} import runtime does not support Wwise {version}"
         )
     if compound and version not in COMPOUND_SUPPORTED_VERSIONS:
         raise ImportRuntimeError(
@@ -3318,6 +3326,7 @@ def _sha256(path: Path) -> str:
 
 __all__ = [
     "COMPOUND_SUPPORTED_VERSIONS",
+    "PROFILE_CROSS_VERSION_SCENARIOS",
     "ClosedDirectWaapiBackend",
     "FileProof",
     "ImportAudioSourceState",

@@ -35,10 +35,10 @@ from tests.semantic.support.codex_soundbank_runtime_v3 import (
     PROCESS_REFUSAL_ERROR_CODE,
     SOUNDBANK_APIS,
     SOUNDBANK_TOPIC,
-    SUPPORTED_VERSIONS,
     MaterializedSoundBankCase,
     SoundBankSnapshot,
     TopicPlan,
+    soundbank_scenario_supports_version,
 )
 
 
@@ -263,7 +263,14 @@ def _validate_inputs(materialized: MaterializedSoundBankCase, before: SoundBankS
     if not isinstance(materialized, MaterializedSoundBankCase) or not isinstance(before, SoundBankSnapshot):
         raise SoundBankBusinessPlanError("compiler requires materialized SoundBank case and snapshot")
     blueprint = materialized.blueprint
-    if blueprint.version not in SUPPORTED_VERSIONS or blueprint.api not in SOUNDBANK_APIS or before.scenario_id != blueprint.scenario_id:
+    if (
+        not soundbank_scenario_supports_version(
+            blueprint.scenario_id,
+            blueprint.api,
+            blueprint.version,
+        )
+        or before.scenario_id != blueprint.scenario_id
+    ):
         raise SoundBankBusinessPlanError("SoundBank materialization identity is invalid")
     if blueprint.api == SOUNDBANK_TOPIC:
         if materialized.topic_plan is None or materialized.operation_requests or materialized.topic_plan.event_count != blueprint.expected_primary_dispatch_count:

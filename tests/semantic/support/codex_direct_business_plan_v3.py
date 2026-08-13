@@ -6,8 +6,17 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Mapping, Sequence
+
+from tests.semantic.support.codex_archive_paths import (
+    ArchiveRelativePathError,
+    archive_absolute_names_equal,
+    parse_archive_absolute_path,
+    parse_archive_relative_path,
+)
+from wwise_waapi.host_paths import HostPathError, localize_waapi_host_path
 
 
 DIRECT_BUSINESS_PLAN_SCHEMA = "waapi-skill.direct-business-plan/v1"
@@ -185,6 +194,8 @@ def validate_direct_business_plan_archive(
     api: str,
     version: str,
     protocol_steps: Sequence[Mapping[str, Any]],
+    status_payload: Mapping[str, Any] | None = None,
+    sandbox_project: str | None = None,
 ) -> DirectBusinessPlanSections:
     """Independently bind a persisted direct plan to reviewed protocol truth."""
 
@@ -216,6 +227,14 @@ def validate_direct_business_plan_archive(
     if not isinstance(bindings, Mapping) or bindings.get("version") != version:
         raise DirectBusinessPlanError("direct archive version binding is invalid")
     _validate_live_bindings(api, bindings, version=version)
+    if api == "ak.wwise.core.getInfo" and (
+        status_payload is not None or sandbox_project is not None
+    ):
+        validate_direct_status_archive_binding(
+            sections,
+            status_payload=status_payload,
+            sandbox_project=sandbox_project,
+        )
     expected = compile_direct_business_plan(
         scenario_id=scenario_id,
         api=api,
@@ -228,6 +247,108 @@ def validate_direct_business_plan_archive(
             "direct archive digest or derived bindings are invalid"
         )
     return sections
+
+
+def validate_direct_status_archive_binding(
+    sections: DirectBusinessPlanSections,
+    *,
+    status_payload: Mapping[str, Any] | None,
+    sandbox_project: str | None,
+) -> None:
+    """Join archived getInfo identity to broker status and lifecycle start.
+
+    Modern project paths are persisted only as the portable project filename;
+    the broker and lifecycle may retain host-absolute POSIX, Wine-drive, or
+    native-Windows spellings.  Their basenames must agree under the owning path
+    flavor while the canonical project GUID/name/type remain exact.
+    """
+
+    static = sections.static_expectation
+    bindings = sections.live_binding.get("bindings")
+    if static.get("api") != "ak.wwise.core.getInfo" or not isinstance(
+        bindings, Mapping
+    ):
+        raise DirectBusinessPlanError("status archive binding requires getInfo")
+    expected = bindings.get("status")
+    if (
+        not isinstance(expected, Mapping)
+        or not isinstance(status_payload, Mapping)
+        or not isinstance(sandbox_project, str)
+        or not sandbox_project
+    ):
+        raise DirectBusinessPlanError(
+            "getInfo archive lacks broker status or lifecycle project evidence"
+        )
+    wwise = status_payload.get("wwise")
+    project = status_payload.get("project")
+    if not isinstance(wwise, Mapping) or not isinstance(project, Mapping):
+        raise DirectBusinessPlanError("broker status identity is incomplete")
+    build = _wwise_build(wwise)
+    projected = {key: project.get(key) for key in ("id", "name", "type", "path")}
+    version = bindings.get("version")
+    if version == "2021.1":
+        try:
+            start_path = parse_archive_absolute_path(sandbox_project)
+        except ArchiveRelativePathError as exc:
+            raise DirectBusinessPlanError(
+                "lifecycle project path identity is invalid"
+            ) from exc
+        if (
+            project.get("path") != "\\"
+            or not _archive_name_matches(
+                start_path,
+                f"{expected.get('project', {}).get('name')}.wproj",
+            )
+        ):
+            raise DirectBusinessPlanError("legacy broker project path is invalid")
+    else:
+        try:
+            status_path = parse_archive_absolute_path(str(project.get("path")))
+            start_path = parse_archive_absolute_path(sandbox_project)
+            expected_name = str(expected.get("project", {}).get("path"))
+            portable = parse_archive_relative_path(expected_name)
+            localized_status = Path(
+                localize_waapi_host_path(str(project.get("path")))
+            )
+            native_start = Path(sandbox_project)
+            if (
+                portable.canonical != expected_name
+                or len(portable.parts) != 1
+                or not _archive_name_matches(start_path, expected_name)
+                or not _archive_name_matches(status_path, expected_name)
+                or not archive_absolute_names_equal(
+                    str(project.get("path")), sandbox_project
+                )
+                or localized_status.parent != native_start.parent
+            ):
+                raise DirectBusinessPlanError(
+                    "broker status project differs from lifecycle sandbox"
+                )
+            projected["path"] = expected_name
+        except (ArchiveRelativePathError, HostPathError) as exc:
+            raise DirectBusinessPlanError(
+                "broker/lifecycle project path identity is invalid"
+            ) from exc
+    if (
+        build != bindings.get("build")
+        or wwise.get("processId") != bindings.get("process_id")
+        or projected != expected.get("project")
+        or expected.get("wwise_build") != build
+        or expected.get("process_id") != wwise.get("processId")
+    ):
+        raise DirectBusinessPlanError(
+            "broker status differs from the archived getInfo identity"
+        )
+
+
+def _wwise_build(value: Mapping[str, Any]) -> str:
+    version = value.get("version")
+    if not isinstance(version, Mapping):
+        raise DirectBusinessPlanError("broker status lacks Wwise version")
+    fields = tuple(version.get(key) for key in ("year", "major", "minor", "build"))
+    if not all(type(item) is int and item >= 0 for item in fields):
+        raise DirectBusinessPlanError("broker status Wwise version is incomplete")
+    return ".".join(str(item) for item in fields)
 
 
 def validate_direct_archived_verification(
@@ -312,6 +433,7 @@ def _validate_live_bindings(
             "session_id",
             "result_sha256",
             "project_digest",
+            "status",
         }:
             raise DirectBusinessPlanError("getInfo live binding is not closed")
         if (
@@ -322,6 +444,12 @@ def _validate_live_bindings(
             or type(bindings.get("launch_process_id")) is not int
             or bindings["launch_process_id"] <= 0
             or not isinstance(bindings.get("session_id"), str)
+            or not _valid_status_binding(
+                bindings.get("status"),
+                version=version,
+                build=bindings.get("build"),
+                process_id=bindings.get("process_id"),
+            )
         ):
             raise DirectBusinessPlanError("getInfo live identity is invalid")
     else:
@@ -351,6 +479,62 @@ def _validate_live_bindings(
         for field in sha_fields
     ):
         raise DirectBusinessPlanError("direct live digest is invalid")
+
+
+def _valid_status_binding(
+    value: Any,
+    *,
+    version: str,
+    build: Any,
+    process_id: Any,
+) -> bool:
+    if not isinstance(value, Mapping) or set(value) != {
+        "wwise_build",
+        "process_id",
+        "project",
+    }:
+        return False
+    project = value.get("project")
+    return bool(
+        value.get("wwise_build") == build
+        and value.get("process_id") == process_id
+        and isinstance(project, Mapping)
+        and set(project) == {"id", "name", "type", "path"}
+        and isinstance(project.get("id"), str)
+        and re.fullmatch(
+            r"\{[0-9A-F]{8}(?:-[0-9A-F]{4}){3}-[0-9A-F]{12}\}",
+            project["id"],
+        )
+        is not None
+        and isinstance(project.get("name"), str)
+        and bool(project["name"])
+        and project.get("type") == "Project"
+        and isinstance(project.get("path"), str)
+        and bool(project["path"])
+        and (
+            project["path"] == "\\"
+            if version == "2021.1"
+            else _valid_portable_project_name(project["path"])
+        )
+    )
+
+
+def _valid_portable_project_name(value: Any) -> bool:
+    try:
+        parsed = parse_archive_relative_path(value)
+    except ArchiveRelativePathError:
+        return False
+    return (
+        parsed.canonical == value
+        and len(parsed.parts) == 1
+        and parsed.parts[0].casefold().endswith(".wproj")
+    )
+
+
+def _archive_name_matches(path: Any, expected_name: str) -> bool:
+    if path.source_flavor == "windows":
+        return path.name.casefold() == expected_name.casefold()
+    return path.name == expected_name
 
 
 def _step(value: Mapping[str, Any], *, index: int) -> dict[str, str]:
@@ -410,4 +594,5 @@ __all__ = [
     "validate_direct_archived_verification",
     "validate_direct_business_plan",
     "validate_direct_business_plan_archive",
+    "validate_direct_status_archive_binding",
 ]

@@ -164,6 +164,7 @@ from tests.semantic.support.codex_direct_business_plan_v3 import (  # noqa: E402
     parse_direct_business_plan_sections,
     validate_direct_archived_verification,
     validate_direct_business_plan_archive,
+    validate_direct_status_archive_binding,
 )
 from tests.semantic.support.codex_typed_draft_evidence_v3 import (  # noqa: E402
     TYPED_DRAFT_EVIDENCE_CONTRACT,
@@ -6147,6 +6148,8 @@ def _validate_heavy_v3_typed_business_plan(
     *,
     expected_unit: Any,
     provenance: PromptProvenanceEvidence,
+    direct_status_payload: Mapping[str, Any] | None = None,
+    direct_sandbox_project: str | None = None,
 ) -> (
     ObjectBusinessPlanSections
     | ImportBusinessPlanSections
@@ -6195,6 +6198,8 @@ def _validate_heavy_v3_typed_business_plan(
                 {"name": step.name, "subcommand": step.subcommand}
                 for step in protocol.steps
             ),
+            status_payload=direct_status_payload,
+            sandbox_project=direct_sandbox_project,
         )
         return sections
     if api in {
@@ -7105,6 +7110,29 @@ def _validate_heavy_v3_archived_verification(
         task_root=task_root,
         label=label,
     )
+    if (
+        isinstance(prompt_evidence.typed_sections, DirectBusinessPlanSections)
+        and api == "ak.wwise.core.getInfo"
+    ):
+        start = load_strict_regular_json(task_root.parent / "start.json")
+        sandbox_project = (
+            start.get("sandbox_project") if isinstance(start, Mapping) else None
+        )
+        try:
+            validate_direct_status_archive_binding(
+                prompt_evidence.typed_sections,
+                status_payload=_heavy_v3_broker_step_payload(
+                    task_root,
+                    step_name="host.status",
+                ),
+                sandbox_project=(
+                    sandbox_project if isinstance(sandbox_project, str) else None
+                ),
+            )
+        except DirectBusinessPlanError as exc:
+            raise CampaignEvidenceError(
+                f"{label} getInfo status/lifecycle binding is invalid: {exc}"
+            ) from exc
     if isinstance(
         prompt_evidence.typed_sections,
         (WorkflowBusinessPlanSections, DirectBusinessPlanSections),

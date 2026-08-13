@@ -22,6 +22,9 @@ from tests.semantic.support.codex_eval_bundle_v3 import (
 from tests.semantic.support.codex_compound_heavy_v1 import (
     load_compound_heavy_profile,
 )
+from tests.semantic.support.codex_typed_input_profile import (
+    load_typed_input_profile,
+)
 from tests.semantic.support.codex_import_assets_v3 import (
     MaterializedImportCase,
     bind_import_live_metadata,
@@ -60,10 +63,65 @@ COMPOUND_PROFILE = (
     / "compound-heavy-v1"
     / "profile.json"
 )
+TYPED_PROFILE = (
+    REPO_ROOT / "tests" / "semantic" / "data" / "typed-input-v1" / "profile.json"
+)
 IMPORT_APIS = {
     "ak.wwise.core.audio.import",
     "ak.wwise.core.audio.importTabDelimited",
 }
+
+
+def test_ordinary_import_runtime_accepts_the_reviewed_2021_profile_lane(
+    tmp_path: Path,
+) -> None:
+    version = "2021.1"
+    profile = load_typed_input_profile(TYPED_PROFILE)
+    unit = next(
+        item
+        for item in profile.units
+        if item.unit_id == "TYP21-FILE-AUDIO-IMPORT"
+    )
+    scenario = unit.scenario
+    materialized = materialize_import_case(
+        scenario,
+        version=version,
+        asset_root=tmp_path / version,
+    )
+    project = tmp_path / "SampleProject.wproj"
+    project.write_text("<WwiseDocument/>", encoding="utf-8")
+
+    plan = build_import_runtime_plan(
+        scenario,
+        materialized,
+        sandbox_project=project,
+    )
+
+    assert plan.version == version
+
+
+def test_ordinary_import_runtime_rejects_unreviewed_cross_version_scenario(
+    tmp_path: Path,
+) -> None:
+    bundle = load_eval_bundle_v3(SUITE_V3)
+    scenario = replace(
+        bundle.scenario("O22-AUDIO-IMPORT-01"),
+        versions=("2024.1",),
+    )
+    materialized = materialize_import_case(
+        scenario,
+        version="2024.1",
+        asset_root=tmp_path / "unreviewed",
+    )
+    project = tmp_path / "SampleProject.wproj"
+    project.write_text("<WwiseDocument/>", encoding="utf-8")
+
+    with pytest.raises(ImportRuntimeError, match="does not support Wwise 2024.1"):
+        build_import_runtime_plan(
+            scenario,
+            materialized,
+            sandbox_project=project,
+        )
 
 
 def _guid(number: int) -> str:

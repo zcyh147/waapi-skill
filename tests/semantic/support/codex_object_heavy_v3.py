@@ -39,7 +39,7 @@ from tests.semantic.support.codex_version_layout_v3 import (
 
 
 VERSION = "2022.1"
-COMPOUND_VERSIONS = ("2022.1", "2025.1")
+COMPOUND_VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
 OPERATION_REQUEST_CONTRACT = "waapi-skill.operation-request/v1"
 OBJECT_CREATE_URI = "ak.wwise.core.object.create"
 OBJECT_GET_URI = "ak.wwise.core.object.get"
@@ -56,11 +56,18 @@ OBJECT_CREATE_CASE_IDS = tuple(f"OBJ22-F-CREATE-{index:02d}" for index in range(
 OBJECT_GET_CASE_IDS = tuple(f"OBJ22-F-GET-{index:02d}" for index in range(1, 6))
 OBJECT_SET_CASE_IDS = tuple(f"OBJ22-F-SET-{index:02d}" for index in range(1, 6))
 OBJECT_HEAVY_CASE_IDS = OBJECT_CREATE_CASE_IDS + OBJECT_GET_CASE_IDS + OBJECT_SET_CASE_IDS
-OBJECT_COMPOUND_CROSS_VERSION_CASE_IDS = (
-    "OBJ22-F-CREATE-02",
-    "OBJ22-F-CREATE-03",
-    "OBJ22-F-SET-01",
-    "OBJ22-F-SET-02",
+OBJECT_COMPOUND_CROSS_VERSION_CASE_VERSIONS = MappingProxyType(
+    {
+        "OBJ22-F-GET-01": ("2021.1",),
+        "OBJ22-F-GET-02": ("2023.1",),
+        "OBJ22-F-CREATE-02": ("2021.1", "2025.1"),
+        "OBJ22-F-CREATE-03": ("2023.1", "2025.1"),
+        "OBJ22-F-SET-01": ("2024.1", "2025.1"),
+        "OBJ22-F-SET-02": ("2025.1",),
+    }
+)
+OBJECT_COMPOUND_CROSS_VERSION_CASE_IDS = tuple(
+    OBJECT_COMPOUND_CROSS_VERSION_CASE_VERSIONS
 )
 
 Scalar: TypeAlias = str | int | float | bool | None
@@ -468,10 +475,23 @@ def _translate_object_recipe(
             f"{recipe.scenario_id} is not approved for Wwise {layout.version}"
         )
     request = recipe.request
-    if not isinstance(request, OperationRequestSpec):
-        raise ObjectHeavyRecipeError(
-            f"{recipe.scenario_id} cross-version compound case must be a mutation"
+    if isinstance(request, OperationRequestSpec):
+        translated_request: AllowedRequest = replace(
+            request,
+            arguments=_translate_frozen_json(request.arguments, layout),
         )
+    elif isinstance(request, QueryObjectRequestSpec):
+        translated_request = replace(
+            request,
+            argv=tuple(
+                layout.version
+                if index == 2
+                else layout.translate_2022_path(value)
+                for index, value in enumerate(request.argv)
+            ),
+        )
+    else:  # pragma: no cover - static union plus constructor coverage.
+        raise ObjectHeavyRecipeError("cross-version object request is unsupported")
     translated = replace(
         recipe,
         version=layout.version,
@@ -493,10 +513,7 @@ def _translate_object_recipe(
                 for parent, prefix in recipe.fixture.absent_sibling_prefixes
             ),
         ),
-        request=replace(
-            request,
-            arguments=_translate_frozen_json(request.arguments, layout),
-        ),
+        request=translated_request,
         oracle=replace(
             recipe.oracle,
             expected_objects=tuple(
@@ -2377,9 +2394,8 @@ _CROSS_VERSION_RECIPES: Mapping[tuple[str, str], ObjectHeavyRecipe] = (
                 _RECIPES[scenario_id],
                 get_codex_version_layout_v3(version),
             )
-            for scenario_id in OBJECT_COMPOUND_CROSS_VERSION_CASE_IDS
-            for version in COMPOUND_VERSIONS
-            if version != VERSION
+            for scenario_id, versions in OBJECT_COMPOUND_CROSS_VERSION_CASE_VERSIONS.items()
+            for version in versions
         }
     )
 )
@@ -2423,6 +2439,7 @@ __all__ = [
     "COMPOUND_VERSIONS",
     "MASTER_DWU",
     "OBJECT_COMPOUND_CROSS_VERSION_CASE_IDS",
+    "OBJECT_COMPOUND_CROSS_VERSION_CASE_VERSIONS",
     "OBJECT_CREATE_CASE_IDS",
     "OBJECT_GET_CASE_IDS",
     "OBJECT_HEAVY_CASE_IDS",

@@ -7,6 +7,7 @@ import uuid
 import wave
 import xml.etree.ElementTree as ET
 from collections import Counter
+from dataclasses import replace
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from types import SimpleNamespace
 from typing import Any, Mapping, Sequence
@@ -18,6 +19,7 @@ from tests.semantic.support.codex_eval_bundle_v3 import load_eval_bundle_v3
 from tests.semantic.support.codex_compound_heavy_v1 import (
     load_compound_heavy_profile,
 )
+from tests.semantic.support.codex_typed_input_profile import load_typed_input_profile
 from tests.semantic.support.codex_soundbank_business_plan_v3 import (
     compile_soundbank_business_plan,
     validate_soundbank_business_plan,
@@ -63,6 +65,9 @@ COMPOUND_PROFILE = (
     / "data"
     / "compound-heavy-v1"
     / "profile.json"
+)
+TYPED_PROFILE = (
+    REPO_ROOT / "tests" / "semantic" / "data" / "typed-input-v1" / "profile.json"
 )
 QUERY_REFERENCE = (
     REPO_ROOT / "skills" / "waapi-skill" / "references" / "waapi-query.md"
@@ -555,6 +560,68 @@ def _compound_scenario(base_scenario_id: str, version: str) -> Any:
         for row in profile.units
         if row.base_scenario_id == base_scenario_id and row.version == version
     )
+
+
+def _typed_scenario(unit_id: str) -> Any:
+    profile = load_typed_input_profile(TYPED_PROFILE)
+    return next(row.scenario for row in profile.units if row.unit_id == unit_id)
+
+
+@pytest.mark.parametrize(
+    "unit_id",
+    (
+        "TYP21-TOPIC-SOUNDBANK-GENERATED",
+        "TYP23-TOPIC-SOUNDBANK-GENERATED",
+        "TYP24-TOPIC-SOUNDBANK-GENERATED",
+        "TYP24-DRAFT-SOUNDBANK-GENERATE",
+    ),
+)
+def test_typed_profile_soundbank_runtime_accepts_exact_cross_version_lane(
+    tmp_path: Path,
+    unit_id: str,
+) -> None:
+    scenario = _typed_scenario(unit_id)
+    runtime, _backend = _unprepared_runtime(
+        tmp_path / unit_id,
+        scenario,
+        version=scenario.versions[0],
+    )
+
+    assert runtime.blueprint.version == scenario.versions[0]
+
+
+def test_typed_profile_2024_generate_compiles_the_closed_business_plan(
+    tmp_path: Path,
+) -> None:
+    scenario = _typed_scenario("TYP24-DRAFT-SOUNDBANK-GENERATE")
+    runtime, backend = _unprepared_runtime(
+        tmp_path / "typed-2024-generate",
+        scenario,
+        version="2024.1",
+    )
+    cache_root = runtime.blueprint.io_root / "io" / "cache"
+    cache_root.mkdir(parents=True, exist_ok=True)
+    backend.project_info["directories"]["cache"] = str(cache_root)
+    case = runtime.prepare()
+    before = runtime.hidden_before
+    assert before is not None
+    protocol = build_transaction_protocol(case.operation_requests)
+
+    sections = compile_soundbank_business_plan(case, before, protocol)
+
+    assert sections.static_expectation["version"] == "2024.1"
+
+
+def test_soundbank_runtime_rejects_unreviewed_cross_version_scenario(
+    tmp_path: Path,
+) -> None:
+    scenario = replace(
+        next(row for row in _scenarios() if row.id == "O22-SB-SET-INCLUSIONS-05"),
+        versions=("2023.1",),
+    )
+
+    with pytest.raises(SoundBankRuntimeError, match="supports only"):
+        _unprepared_runtime(tmp_path, scenario, version="2023.1")
 
 
 def test_dirty_fixture_normalization_never_saves_a_different_live_project(
