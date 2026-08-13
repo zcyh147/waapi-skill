@@ -60,7 +60,9 @@ def create_typed_transaction_preview(
         if step.subcommand == "operation-schema":
             operation_schema = payload
         if step.subcommand in {"request-map-container", "request-array-item"}:
-            pending_container_actions.append(_container_action(payload))
+            action = _container_action(payload)
+            if action is not None:
+                pending_container_actions.append(action)
         if step.name == "tx01.preview":
             if pending_container_actions:
                 raise AssertionError("not every disclosed container fact was consumed")
@@ -163,10 +165,12 @@ def _require_disclosed_continuation(
         )
 
 
-def _container_action(payload: Mapping[str, Any]) -> list[str]:
+def _container_action(payload: Mapping[str, Any]) -> list[str] | None:
     continuation = payload.get("continuation")
     action_argv = continuation.get("action_argv") if isinstance(continuation, Mapping) else None
     if not isinstance(action_argv, list):
+        if payload.get("status") == "choice_required":
+            return None
         raise AssertionError("container response did not disclose a typed action")
     return [payload.get("handle") if value == "<child_handle>" else value for value in action_argv]
 
