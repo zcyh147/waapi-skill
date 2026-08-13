@@ -8,14 +8,12 @@ Require the unique terminal sentinel required by `SKILL.md` and no truncation or
 ## Boundaries and routing
 
 - Use only the Skill-local Gateway; return its structured evidence or blocker.
-- Use fixed `status`, `buses`, `selected`, `query-schema`,
-  `query-object`, `object-types`, `metadata`, `wait-topic`, and `stream-topic`
-  directly. Public shapes are offline `gateway.py query-schema`, simple
-  `gateway.py query-object` flags or `--request-json`, progressive
-  `gateway.py query-schema --advanced` plus
-  `gateway.py query-object --advanced-request-json`, and
-  `gateway.py wait-topic`/`gateway.py stream-topic`. Topic observation never
-  authorizes its publishing change.
+- Use fixed `status`, `buses`, `selected`, `query-schema`, `query-object`,
+  `object-types`, `metadata`, `request-schema`, `topic-schema`, `wait-topic`,
+  and `stream-topic` directly. Simple queries use concise typed flags;
+  structured and advanced queries use the sole continuation returned by
+  `query-schema`; reflected functions use `request-schema`; Topic facts use
+  `topic-schema`. Topic observation never authorizes its publishing change.
 - For a broad catalog question start with
   `gateway.py capabilities --all-versions --summary-only`, then narrow with
   `--query`, `--category`, `--item-type`, `--family`, or `--route`.
@@ -25,33 +23,25 @@ Require the unique terminal sentinel required by `SKILL.md` and no truncation or
 - For a known URI's route, version, schema, or boundary use
   `gateway.py describe <uri>`. Add `--full-schema` only when the complete
   reflected args/options/result schema is required.
-- The generic shape is
-  `gateway.py call <uri> --args-json '<object>' --options-json '<object>'`.
-  It is not an open raw-call surface: only current-version
-  `preferred_route: manifest_dispatch` rows dispatch after recursive schema,
-  time, and size validation. An empty-args/options request for
-  `ak.wwise.waapi.getFunctions` or `ak.wwise.waapi.getTopics` is a reviewed
-  fast route: run that one `call` directly without `describe` or `capabilities`.
-  Other bounded reads need `describe` route proof.
+- For any reflected function URI, run `gateway.py request-schema <uri>` and
+  follow its sole typed continuation. Zero-input reads dispatch without facts;
+  inline and Draft shapes are selected by the Gateway, never by the Agent.
 - Fixed functions return `FIXED_COMMAND_REQUIRED`;
   `ak.wwise.core.object.get` returns `QUERY_OBJECT_REQUIRED`; Topics return
   `WAIT_TOPIC_REQUIRED`; broader reads return `TRANSACTION_REQUIRED` rather than being inferred safe from a `get`-shaped name.
   `API_NOT_FOUND`, `MANIFEST_NOT_FOUND`, catalog route
   `unsupported_by_skill_interface`, `UNSUPPORTED_BY_SKILL_INTERFACE`, connection
   errors, and invalid responses are boundaries: report them and stop.
-- Global `--version`, `--timeout`, and `--evidence-dir` precede `call`;
-  `--args-json`, `--options-json`, `--dry-run`, and compatibility-only
-  `--allow-destructive` follow the URI. Neither those flags nor
-  `WWISE_DESTRUCTIVE=1` can broaden the route. JSON inputs reject duplicate
-  keys, non-finite numbers, invalid Unicode, and excessive size, depth, or nodes.
+- The configured exact Wwise version selects every schema. Typed values and
+  Gateway-issued handles remain bounded by that schema; a rejected continuation
+  is a boundary, not permission to try another input language.
 
 ## Wwise 2025.1 Media Pool
 
 `ak.wwise.core.mediaPool.getFields` and `.get` form one closed two-call read.
-Do not run `describe` or `capabilities`: call `getFields` with empty
-args/options, bind only returned strings, then issue exactly one
-`gateway.py --version 2025.1 call ak.wwise.core.mediaPool.get`. There is no
-`mediaPool.get` subcommand; users need not know internal field names.
+Use `request-schema` for each URI and follow only its typed continuation. Bind
+field names solely from the first live result; the `.get` contract owns its
+nested typed facts and optional closed result filter.
 
 1. Exact standard bindings are name/file -> `Filename`, duration ->
    `WAV/Duration`, sample rate -> `WAV/Sample Rate`, bit depth ->
@@ -69,13 +59,10 @@ args/options, bind only returned strings, then issue exactly one
    inclusive. Convert kHz to integer Hz, mono/stereo to `1`/`2`, bit depth to an
    integer, and seconds to JSON numbers (`8.0` when whole). Do not add
    search, paging, sort, description, or similarity args.
-3. Use the user's `maxResults`, else `100`; range is 1–200, with at most 16
-   filters and 8 databases. Case-sensitive `Filename` substring matching is the
-   sole exception: use a matching `contains` candidate, raw `maxResults:200`,
-   and add `--post-filter-json` exactly as
-   `{"field":<bound field>,"operator":"containsCaseSensitive","value":<same literal>,"limit":<user maximum or 100>}`.
-   The Gateway returns the filtered terminal `agent_result`; do not filter it
-   yourself. A saturated candidate set fails with
+3. Use the user's maximum, else `100`; range is 1–200, with at most 16 filters
+   and 8 databases. For the case-sensitive `Filename` exception, use the
+   `result_filter` fields disclosed by `request-schema`; the Gateway returns the
+   filtered terminal `agent_result`. A saturated candidate set fails with
    `MEDIA_POOL_POST_FILTER_INCOMPLETE`.
 4. `options.return` starts, unchanged and in order, with `Path`, `FileId`, `Db`,
    `Filename`, `WAV/Duration`, `WAV/Sample Rate`, `WAV/Bit Depth`,
@@ -84,13 +71,8 @@ args/options, bind only returned strings, then issue exactly one
    Append only non-standard bound fields needed by explicit filtering,
    grouping, sorting, or reporting, in first-mention order, without duplicates;
    the complete projection has at most 32 fields.
-5. Invoke:
-
-   ```bash
-   python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version 2025.1 call ak.wwise.core.mediaPool.get --args-json '<args>' --options-json '<options>'
-   ```
-
-   Add `--post-filter-json` only for rule 3. Preserve each returned `Db` and
+5. Start with `request-schema ak.wwise.core.mediaPool.get` and follow every
+   returned handle/continuation exactly. Preserve each returned `Db` and
    complete `Path`; never shorten a path or guess a host translation; never run
    the old unfiltered 1000-row AudioFileSource projection; never perform this join in model-authored code.
 
@@ -115,7 +97,7 @@ This is a Wwise `2025.1`-only follow-up to a successful Media Pool read.
   python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version 2025.1 query-object --type AudioFileSource --take 1000 --match-original-file-path '<first-complete-returned-Path>' --match-original-file-path '<second-complete-returned-Path>'
   ```
 
-  Do not add `--where-json`, `--select`, `--all-results`, or `--return-field`.
+  Do not add `--where`, `--select`, `--all-results`, or `--return-field`.
   The Gateway owns the fixed `id,path,originalFilePath` projection, validates
   rows and duplicate ids, performs the complete normalized join, and emits no
   raw AudioFileSource inventory.
@@ -166,15 +148,9 @@ For a complex query, first run the offline, version-aware schema command:
 python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version <supported-version> query-schema
 ```
 
-Use its `waapi-skill.object-query/v1` JSON Schema to construct only the
-structured fields it exposes, and then invoke:
-
-```bash
-python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version <supported-version> query-object --request-json '<waapi-skill.object-query/v1-json>'
-```
-
-The strict request has `contract`, one structured `source`, ordered
-`transforms`, and explicit `return`. Its schema alone defines the closed
+Follow its typed structured-query continuation, using only Gateway-disclosed
+field, branch, and dynamic-container handles. The contract defines one
+structured `source`, ordered `transforms`, and explicit `return`; it alone defines the closed
 sources; `select`, `where`, and `take`; and `compare`, `truthy`, nested
 `all`/`any`, or `not`. Do not add `waql`, `raw`, `expression`, or another escape
 field, or infer absent grammar.
@@ -193,7 +169,7 @@ is rejected; keep those four fields explicit for an exact path/GUID identity loo
 
 ```bash
 python scripts/run.py gateway.py query-object --path '\Events\Default Work Unit' --return-field id --return-field name --return-field type --return-field path
-python scripts/run.py gateway.py query-object --search 'ExactName' --where-json '{"field":"name","operator":"=","value":"ExactName"}' --take 1 --return-field id --return-field name --return-field type --return-field path
+python scripts/run.py gateway.py query-object --search 'ExactName' --where name = string ExactName --take 1 --return-field id --return-field name --return-field type --return-field path
 ```
 
 Ordinary `query-object` success defaults to compact business fields, sufficient for
@@ -238,7 +214,7 @@ Construct exactly the returned `waapi-skill.advanced-object-query/v1` shape and
 invoke:
 
 ```bash
-python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version <supported-version> query-object --advanced-request-json '<advanced-object-query-v1-json>'
+python /absolute/path/to/waapi-skill/scripts/run.py gateway.py query-object --typed-advanced --schema-digest <digest> --waql '<bounded-single-line-waql>' --advanced-return '<expression>' --max-results <1..1000>
 ```
 
 That document has `contract`, native `waql`, native `return`, and `max_results`
@@ -287,10 +263,10 @@ apply presentation logic only to its complete result.
   Volume, notes” is exactly
   `id`, `name`, `type`, `path`, `parent`, `audioSource:language`, `@Volume`,
   `notes`.
-- A predicate array means AND only on the simple route. Words such as
+- Repeated `--where FIELD OPERATOR TYPE VALUE` facts mean AND on the simple route. Words such as
   "simultaneously", "all of the following conditions", or “同时满足” introduce
-  a pure AND. Put every supported conjunct into one `--where-json` array,
-  preserving the user's condition order. Do not submit only the type predicate
+  a pure AND. Repeat `--where` for every supported conjunct, preserving the
+  user's condition order. Do not submit only the type predicate
   when Volume, notes, inclusion, child-count, or path is also a requested
   server-side condition. When the live result selection itself requires
   `A and (B or C)` or another nested boolean, switch to the structured route:
@@ -338,25 +314,25 @@ For example, a bounded descendant inventory of Sound candidates remains a
 simple flag query:
 
 ```bash
-python scripts/run.py gateway.py query-object --path '\Actor-Mixer Hierarchy\Default Work Unit\Combat' --select descendants --where-json '{"field":"type","operator":"=","value":"Sound"}' --take 24 --return-field id --return-field name --return-field type --return-field path --return-field '@Volume' --return-field notes --return-field OutputBus
+python scripts/run.py gateway.py query-object --path '\Actor-Mixer Hierarchy\Default Work Unit\Combat' --select descendants --where type = string Sound --take 24 --return-field id --return-field name --return-field type --return-field path --return-field '@Volume' --return-field notes --return-field OutputBus
 ```
 
 Pure AND; `isIncluded` is appended last because it is filter-only:
 
 ```bash
-python scripts/run.py gateway.py query-object --path '\Actor-Mixer Hierarchy\Default Work Unit\CombatMix' --select descendants --where-json '[{"field":"type","operator":"=","value":"Sound"},{"field":"@Volume","operator":"<=","value":-6.0},{"field":"notes","operator":":","value":"mix-review"},{"field":"isIncluded","operator":"=","value":true}]' --take 12 --return-field id --return-field name --return-field type --return-field path --return-field '@Volume' --return-field notes --return-field audioSource:language --return-field OutputBus --return-field isIncluded
+python scripts/run.py gateway.py query-object --path '\Actor-Mixer Hierarchy\Default Work Unit\CombatMix' --select descendants --where type = string Sound --where '@Volume' '<=' number -6.0 --where notes : string mix-review --where isIncluded = boolean true --take 12 --return-field id --return-field name --return-field type --return-field path --return-field '@Volume' --return-field notes --return-field audioSource:language --return-field OutputBus --return-field isIncluded
 ```
 
 Direct parents:
 
 ```bash
-python scripts/run.py gateway.py query-object --type Sound --select parent --where-json '[{"field":"path","operator":":","value":"\\Actor-Mixer Hierarchy\\Default Work Unit\\ParentReview"},{"field":"type","operator":"=","value":"RandomSequenceContainer"},{"field":"childrenCount","operator":">=","value":3},{"field":"notes","operator":":","value":"parent-review"}]' --take 10 --return-field id --return-field name --return-field type --return-field path --return-field childrenCount --return-field notes --return-field OutputBus
+python scripts/run.py gateway.py query-object --type Sound --select parent --where path : string '\Actor-Mixer Hierarchy\Default Work Unit\ParentReview' --where type = string RandomSequenceContainer --where childrenCount '>=' integer 3 --where notes : string parent-review --take 10 --return-field id --return-field name --return-field type --return-field path --return-field childrenCount --return-field notes --return-field OutputBus
 ```
 
 Eight-level non-Project ownership:
 
 ```bash
-python scripts/run.py gateway.py query-object --path '\Actor-Mixer Hierarchy\Default Work Unit\Player\Movement\Footstep_Run' --select ancestors --where-json '{"field":"type","operator":"!=","value":"Project"}' --take 8 --return-field id --return-field name --return-field type --return-field path --return-field childrenCount --return-field notes
+python scripts/run.py gateway.py query-object --path '\Actor-Mixer Hierarchy\Default Work Unit\Player\Movement\Footstep_Run' --select ancestors --where type '!=' string Project --take 8 --return-field id --return-field name --return-field type --return-field path --return-field childrenCount --return-field notes
 ```
 
 When the live result selection itself, rather than a report over a complete
@@ -364,7 +340,8 @@ small inventory, contains nested OR/NOT logic, run the offline schema call and
 use the structured request:
 
 ```bash
-python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version 2022.1 query-object --request-json '{"contract":"waapi-skill.object-query/v1","source":{"kind":"object","objects":[{"kind":"path","value":"\\Actor-Mixer Hierarchy\\Default Work Unit\\CombatMix"}]},"transforms":[{"kind":"select","expressions":[["descendants"]]},{"kind":"where","predicate":{"kind":"all","operands":[{"kind":"compare","path":["type"],"operator":"=","value":"Sound"},{"kind":"compare","path":["@Volume"],"operator":"<=","value":-6.0},{"kind":"any","operands":[{"kind":"compare","path":["notes"],"operator":":","value":"mix-review"},{"kind":"not","operand":{"kind":"truthy","path":["isIncluded"]}}]}]}},{"kind":"take","value":12}],"return":["id","name","type","path","@Volume","notes","audioSource:language","OutputBus","isIncluded"]}'
+python /absolute/path/to/waapi-skill/scripts/run.py gateway.py query-schema
+# Follow the returned typed-structured continuation and Gateway-issued handles.
 ```
 
 The versioned structured Builder is a core subset. Program tests prove its
@@ -493,8 +470,9 @@ runtime allowlists; mutations require fresh live `getCommands`.
 
 `debug-wal-tree` is the sole `ak.wwise.debug.getWalTree` route (2023.1–2025.1):
 it takes 1–256, validates/sorts nodes, and returns bounded `agent_result`.
-`debug-validate-call` (2024.1–2025.1) validates without executing one reflected
-request. Both may be unavailable in non-Debug builds.
+Exact `ak.wwise.debug.validateCall` typed construction (2024.1–2025.1) validates
+without executing one reflected request. Both debug routes may be unavailable in
+non-Debug builds.
 
 ## Selection and result boundary
 

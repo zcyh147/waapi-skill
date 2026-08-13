@@ -1,10 +1,15 @@
 # ADR 0001: Gateway-owned composition for complex mutations
 
-- Status: Accepted
+- Status: Superseded in part by ADR 0002
 - Date: 2026-08-11
 - Scope: model-facing complex named mutations
 
 ## Context
+
+ADR 0002 supersedes this record's decision to retain a model-facing Legacy JSON
+Adapter and its compatibility commands. The Composer lifecycle, canonical
+request representation, immutable Preview, and business-orchestration boundary
+remain in force.
 
 The packaged mutation layer already validates closed, versioned operation
 requests and compiles them into native WAAPI payloads behind immutable Preview,

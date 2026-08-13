@@ -328,33 +328,3 @@ def test_typed_topic_rejects_stale_digest_before_connecting(tmp_path: Path) -> N
     assert code == 2
     assert called is False
     assert "digest" in payload["message"].lower()
-
-
-@pytest.mark.parametrize("command", ["wait-topic", "stream-topic"])
-def test_typed_topic_rejects_json_peer_input_before_connecting(
-    tmp_path: Path,
-    command: str,
-) -> None:
-    called = False
-
-    def client_factory(url: str):
-        nonlocal called
-        called = True
-        raise AssertionError(url)
-
-    argv = [
-        command, "ak.wwise.core.object.created",
-        "--options-json", '{"return":["id"]}',
-        "--options-schema-digest", "typed",
-        "--match-schema-digest", "typed",
-    ]
-    code, payload = gateway.execute_gateway(
-        argv,
-        env=_env(tmp_path, "2025.1"),
-        client_factory=client_factory,
-        stream_sink=(lambda row: None) if command == "stream-topic" else None,
-    )
-
-    assert code == 2
-    assert called is False
-    assert "cannot be combined" in payload["message"]

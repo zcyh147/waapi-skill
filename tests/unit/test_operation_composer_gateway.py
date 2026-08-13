@@ -23,7 +23,7 @@ from wwise_waapi.operation_composer import (  # pyright: ignore[reportMissingImp
 )
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     COMPOSER_INPUT_MODE,
-    LEGACY_JSON_INPUT_MODE,
+    INTERNAL_CANONICAL_INPUT_MODE,
     list_operation_specs,
     operation_input_mode,
     operation_request_schema_digest,

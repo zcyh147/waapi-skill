@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 import pytest
+from tests.support.canonical_preview import bind_canonical_preview_fixture
 
 from wwise_waapi.operation_composer import (  # pyright: ignore[reportMissingImports]
     OperationComposerError,
@@ -26,7 +27,7 @@ from wwise_waapi.operation_drafts import (  # pyright: ignore[reportMissingImpor
 )
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     COMPOSER_INPUT_MODE,
-    LEGACY_JSON_INPUT_MODE,
+    INTERNAL_CANONICAL_INPUT_MODE,
     operation_input_mode,
     operation_request_schema_digest,
 )
@@ -48,6 +49,7 @@ assert SPEC is not None and SPEC.loader is not None
 waapi_gateway = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = waapi_gateway
 SPEC.loader.exec_module(waapi_gateway)
+waapi_gateway.execute_gateway = bind_canonical_preview_fixture(waapi_gateway)
 
 
 ACTION_CONTRACT = "waapi-skill.operation-draft-action/v1"
@@ -1795,7 +1797,7 @@ def test_base_audio_import_adapter_is_the_only_disclosed_normal_input_after_cuto
 
     assert schema_code == 0
     assert schema["operation"]["input_mode"] == COMPOSER_INPUT_MODE
-    assert schema["request_envelope"] is None
+    assert "request_envelope" not in schema
     assert schema["composer"]["start"]["gateway_argv"] == [
         "draft-start",
         "audio.import",

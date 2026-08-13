@@ -325,7 +325,8 @@ def test_public_lua_draft_runs_once_and_finishes_at_result_schema_only(
         [
             "--version", "2025.1", "--state-dir", str(state_dir),
             "confirm", previewed["transaction_id"],
-            "--artifact-hash", previewed["artifact_hash"],
+            "--confirmation-token",
+            store.load_snapshot(previewed["transaction_id"]).confirmation_token,
         ],
         env=_env(tmp_path, "2025.1"),
         client_factory=lambda url: pytest.fail(f"confirm connected to {url}"),
@@ -371,11 +372,13 @@ def test_public_lua_draft_rejects_source_drift_before_dispatch(tmp_path: Path) -
     state_dir, _started, _checked_revision, previewed, script = (
         _preview_public_cli_lua_file(tmp_path, state_name="lua-drift-state")
     )
+    store = TransactionStore(state_dir)
     confirm_code, confirmed = gateway.execute_gateway(
         [
             "--version", "2025.1", "--state-dir", str(state_dir),
             "confirm", previewed["transaction_id"],
-            "--artifact-hash", previewed["artifact_hash"],
+            "--confirmation-token",
+            store.load_snapshot(previewed["transaction_id"]).confirmation_token,
         ],
         env=_env(tmp_path, "2025.1"),
         client_factory=lambda url: pytest.fail(f"confirm connected to {url}"),

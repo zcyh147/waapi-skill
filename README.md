@@ -147,10 +147,10 @@ Inspect either packaged profile offline with
 cannot override the profile detected from a live host.
 
 The complete five-version public Function audit contains 167 unique URIs.
-Of those, 118 use the generic reflected-schema route without a URI-specific
+Of those, 118 use the shared reflected-schema typed compiler without a URI-specific
 restriction; 49 use a fixed command, dedicated transaction, or one of six
-generic routes with an explicit field/value/combination restriction. Common
-time, size, result, and safety ceilings still apply to every generic call. The
+typed routes with an explicit field/value/combination restriction. Common
+time, size, result, and safety ceilings apply to every route. The
 packaged native-surface policy pins that complete 118/49 partition and gives selector-level
 classifications for the 15 high-risk URIs whose public request shape differs
 materially from reflection. A normalized equivalent—such as a typed
@@ -172,7 +172,7 @@ build/schema/session/process, project, and packaged catalog digest all still
 match. Mutable object path/name scopes remain local to one wrapper, while
 dynamic enablement and curve state are never cached.
 
-Both profiles route APIs through fixed commands, bounded direct calls, bounded
+Both profiles route APIs through fixed commands, bounded typed reads, bounded
 topic waits, policy-gated transactions, isolated I/O transactions, or the
 same-connection Undo Group composite. Lua file routes accept only an existing
 `.lua` file whose path, size, and hash are rebound, while Wwise 2025.1 also has
@@ -182,7 +182,7 @@ repairs, or wraps Lua. Private debug APIs use bounded reads/topics or explicit
 non-retry transactions, with restart/assert/crash terminating in an
 indeterminate lifecycle result.
 
-The named operation layer also provides closed, version-aware business contracts for object creation and mutation, plug-in creation, RTPC/platform-link editing, audio import, SoundBank workflows, Lua/debug operations, screenshots, and Authoring UI command execution/registration/unregistration. Direct `audio.import` now accepts defaults, per-row import locations, file or bounded WAV base64 sources, structure-only rows, properties, references, Event/Dialogue Event/Switch directives, and source-control options; the tab-delimited lane recognizes the corresponding native columns and repeated Event fields. When a setting is described in natural language, one bounded live metadata-discovery command retrieves exact property/reference candidates and their dependencies without object-specific presets; session/project-bound class and canonical-object metadata is cached for the later immutable preview. The chosen live names are validated and folded into the same import transaction, avoiding both model guesses and a second mutation. `object.create` and `object.set` expose their reviewed platform, list, rename, source-control, recursive child, property, reference, plug-in, and RTPC forms through closed descriptors with drift-aware readback. In particular, recursive `object.set` platform/language fields are available from `2022.1`, and its per-object audio-import descriptors—including file/Base64 source, Originals subfolder, language, and live-resolved source type—are available from `2023.1`, matching the reflected version boundaries. `object.createPlugin` accepts only an exact class ID and a closed Source/Effect descriptor, uses fixed Effect references in `2022.1` or an appended EffectSlot in later versions, and verifies the created plug-in through live readback. UI command execution verifies only the reflected empty result—not the arbitrary GUI or project effect—while registration and unregistration additionally verify live command-ID membership. For `soundbank.generate`, Wwise `2021.1` derives its project and output context from the live Project object's `filePath` and `workunitIsDirty` accessors plus a contained, hashed, strictly parsed `.wproj`; no caller-authored project layout is accepted. Later versions bind the reflected `core.getProjectInfo` result. These routes bind an immutable preview to explicit confirmation or durable `allow_changes` authority and use the strongest available operation-specific readback instead of trusting only a successful WAAPI response. Once a URI has an implemented dedicated operation, the generic `waapi.call` fallback is rejected with `DEDICATED_OPERATION_REQUIRED` so raw payloads cannot bypass that contract.
+The named operation layer also provides closed, version-aware business contracts for object creation and mutation, plug-in creation, RTPC/platform-link editing, audio import, SoundBank workflows, Lua/debug operations, screenshots, and Authoring UI command execution/registration/unregistration. Direct `audio.import` now accepts defaults, per-row import locations, file or bounded WAV base64 sources, structure-only rows, properties, references, Event/Dialogue Event/Switch directives, and source-control options; the tab-delimited lane recognizes the corresponding native columns and repeated Event fields. When a setting is described in natural language, one bounded live metadata-discovery command retrieves exact property/reference candidates and their dependencies without object-specific presets; session/project-bound class and canonical-object metadata is cached for the later immutable preview. The chosen live names are validated and folded into the same import transaction, avoiding both model guesses and a second mutation. `object.create` and `object.set` expose their reviewed platform, list, rename, source-control, recursive child, property, reference, plug-in, and RTPC forms through closed descriptors with drift-aware readback. In particular, recursive `object.set` platform/language fields are available from `2022.1`, and its per-object audio-import descriptors—including file/Base64 source, Originals subfolder, language, and live-resolved source type—are available from `2023.1`, matching the reflected version boundaries. `object.createPlugin` accepts only an exact class ID and a closed Source/Effect descriptor, uses fixed Effect references in `2022.1` or an appended EffectSlot in later versions, and verifies the created plug-in through live readback. UI command execution verifies only the reflected empty result—not the arbitrary GUI or project effect—while registration and unregistration additionally verify live command-ID membership. For `soundbank.generate`, Wwise `2021.1` derives its project and output context from the live Project object's `filePath` and `workunitIsDirty` accessors plus a contained, hashed, strictly parsed `.wproj`; no caller-authored project layout is accepted. Later versions bind the reflected `core.getProjectInfo` result. These routes bind an immutable preview to explicit confirmation or durable `allow_changes` authority and use the strongest available operation-specific readback instead of trusting only a successful WAAPI response. The internal canonical `waapi.call` representation is never a public input, so raw payloads cannot bypass a dedicated contract.
 
 The focused code-only gate currently reports **2833 passing program tests on macOS**, plus two native-Windows checks (the fixed encoded-shell proof and NTFS-junction behavior), including one packaged-route-contract case for every covered default-profile version/API row, the separate Authoring overlay/UI-command contracts, the five-version structured-query compiler, and the progressively disclosed advanced-WAQL fixed-route, final-cap, framing, result, and mutation-isolation matrix. It also covers bounded live-metadata discovery and cache contracts, business-intent selection guidance for overlapping operations, configurable finite or explicitly no-timeout event-count-bounded Topic waits plus continuous `stream-topic`, the three modification-policy branches (including catalog-proven read transactions under `read_only`), the gateway-owned conversation-context contract, the cross-platform transaction-lock contract, named-operation contract/verifier matrices, the closed `SwitchGroup -> Switch` and `StateGroup -> State` creation relationships, structured real-workflow evidence oracles, and a policy that keeps live/destructive tests independent of verifier display names. Five context/read optimizations are covered explicitly: compact default query replies, opt-in `--detail` diagnostics, direct hops through canonical relationship GUIDs, request/preview-local reuse of identical identity resolutions and property-metadata reads, and deduplicated bounded multi-ID prepared-role revalidation. This proves packaged routing, schema handling, safety boundaries, I/O confinement, transaction behavior, fake-dispatch execution, and deterministic onboarding facts; it is not a claim that all 808 rows have been exercised against a real Wwise process, nor that native advanced WAQL constructs have been accepted there. The memory-off `modification_policy_9-c7` campaign historically passed all nine Wwise 2022.1 tasks on its exact frozen candidate: three isolated repetitions each of `read_only`, question-style `ask_before_changes`, and same-turn `allow_changes`. Its six authorized write tasks each created and verified seven objects through 46 business assertions, while all source-project hashes remained unchanged and every sandbox was cleaned. The earlier memory-off `h80-release-c38` campaign separately passed all 80 approved real-Wwise heavy-API scenarios (70 on 2022.1, five on 2024.1, and five on 2025.1). Those historical campaigns apply only to their sealed candidates and scenarios; neither is fresh semantic validation of this later structured/advanced-query and closed-selector candidate. See [the detailed five-version coverage contract](./skills/waapi-skill/references/waapi-coverage.md).
 
@@ -318,17 +318,13 @@ python scripts/run.py gateway.py query-object \
   --return-field id --return-field name --return-field type --return-field path
 ```
 
-Simple lookups keep the compact flags above. Only when those flags cannot
-express the required nested boolean logic or ordered relationship chain,
-inspect `query-schema`, construct a closed `waapi-skill.object-query/v1`
-request that conforms to the returned JSON Schema, and pass that request to
-`query-object --request-json`.
-The Python Builder compiles that structure into bounded WAQL. If its returned
-schema still cannot express a required read-only construct, inspect
-`query-schema --advanced` and pass the exact
-`waapi-skill.advanced-object-query/v1` document to
-`query-object --advanced-request-json`. That third layer accepts native WAQL
-and advanced return expressions, but fixes the API to read-only `object.get`,
+Simple lookups keep the compact flags above. When those flags cannot express
+the required nested boolean logic or ordered relationship chain, inspect
+`query-schema` and follow its typed structured continuation. The Python Builder
+materializes those Gateway-owned facts into bounded WAQL. If that schema still
+cannot express a required read-only construct, inspect `query-schema --advanced`
+and follow its typed advanced continuation. That third layer accepts one bounded
+WAQL scalar and typed return expressions, but fixes the API to read-only `object.get`,
 appends a final row cap, preserves timeout/byte limits, and lets the connected
 Wwise version validate the syntax. Mutation selectors never accept raw WAQL;
 advanced results are read-only candidates, not proof of target uniqueness. A
@@ -341,8 +337,9 @@ no comments, semicolons, or unclosed string/regex literals.
 
 ### 4. Use the closed transaction lane for project changes
 
-Inspect the packaged request contract first. For an actual change,
-`preview --apply` returns an immutable transaction id and full artifact hash.
+Inspect the packaged operation contract first and follow its sole typed
+continuation. For an actual change, the resulting Preview returns an immutable
+transaction id and full artifact hash.
 Under `ask_before_changes`, it stops at `awaiting_confirmation`; explain the
 expected result and ask the user. A later `transaction-show --summary-only`
 returns the state-bound confirmation token. Under `allow_changes`, the preview
@@ -352,8 +349,7 @@ agent gives notice and continues in the same user turn. `read_only` blocks
 
 ```bash
 python scripts/run.py gateway.py operation-schema object.setNotes
-python scripts/run.py gateway.py preview --apply \
-  --request-json '{"contract":"waapi-skill.operation-request/v1","version":"2022.1","operation":"object.setNotes","arguments":{"object":{"kind":"path","value":"\\Events\\Default Work Unit\\Target"},"value":"Reviewed"}}'
+python scripts/run.py gateway.py typed-operation object.setNotes --apply --object path '\Events\Default Work Unit\Target' --text Reviewed
 python scripts/run.py gateway.py transaction-show <transaction-id> --summary-only
 python scripts/run.py gateway.py confirm <transaction-id> --confirmation-token <confirmation-token>
 python scripts/run.py gateway.py execute <transaction-id>
@@ -363,14 +359,12 @@ python scripts/run.py gateway.py verify <transaction-id>
 Run each returned phase separately and use only the complete field named by
 `next_command.copy_instruction.source_field` rather than rebuilding it. The `transaction-show`
 and `confirm` commands apply to `ask_before_changes`; `allow_changes` moves from
-`policy_authorized` directly to `execute`. The alternative
-`confirm <transaction-id> --artifact-hash <full-artifact-hash>` spelling remains
-available only for legacy transactions and programmatic compatibility; new
-agent workflows should use the token returned by `transaction-show`.
+`policy_authorized` directly to `execute`. The public Gateway accepts only the
+state-bound confirmation token returned by `transaction-show`.
 
 The gateway is the public interface. Do not import internal runtime modules, construct a `WaapiClient`, create a one-off helper script, or use inline Python to complete a Wwise task. If the gateway reports no packaged route, return that unsupported boundary instead of synthesizing code.
 
-Manifest reflection is discovery, not permission. The generic `call` route exposes only an immutable reviewed set of recursively validated, result-bounded reads; the two zero-input reflection inventories are merely fast paths within that set. Wwise 2025.1 Media Pool queries first discover exact field names through `mediaPool.getFields`, then call `mediaPool.get` with enforced limits of 200 results, 16 filters, 8 databases, and 32 unique return fields. Broader reads require an authorized transaction, while fixed commands and topic waits remain exact allowlists. New or unreviewed functions and topics fail closed regardless of names such as `get`, `verify`, or `dump`; `--dry-run` cannot bypass a fixed, transaction, topic, or unsupported route boundary.
+Manifest reflection is discovery, not permission. `request-schema` exposes only reviewed exact-version typed routes with bounded results; zero-input rows use a shorter continuation within the same system. Wwise 2025.1 Media Pool queries first discover exact field names through `mediaPool.getFields`, then compose `mediaPool.get` through its typed Draft with enforced limits of 200 results, 16 filters, 8 databases, and 32 unique return fields. Fixed commands and Topic waits remain exact allowlists. New or unreviewed functions and Topics fail closed regardless of names such as `get`, `verify`, or `dump`.
 
 ---
 

@@ -195,8 +195,10 @@ FIXED_COMMANDS_BY_URI: Mapping[str, tuple[str, ...]] = MappingProxyType(
             "typed-call",
         ),
         "ak.wwise.debug.getWalTree": ("debug-wal-tree",),
+        # This Debug-only API validates a described call but never invokes the
+        # target URI. Keep its established read-only lifecycle while exposing
+        # only the shared typed construction path.
         "ak.wwise.debug.validateCall": (
-            "debug-validate-call",
             "request-schema",
             "request-map-container",
             "request-array-item",
@@ -672,7 +674,7 @@ class ExecutionContractRegistry:
                 item_type=item_type,
                 route="bounded_call",
                 effect="read",
-                gateway_commands=("call",),
+                gateway_commands=("request-schema",),
                 timeout_seconds=10.0,
                 result_limit_bytes=256 * 1024,
                 verification_strategy="result_schema",
@@ -708,7 +710,7 @@ class ExecutionContractRegistry:
             item_type=item_type,
             route=route,
             effect=effect,
-            gateway_commands=("preview", "confirm", "execute", "verify"),
+            gateway_commands=("request-schema",),
             timeout_seconds=120.0 if route == "isolated_transaction" else 30.0,
             result_limit_bytes=1024 * 1024,
             verification_strategy=(
@@ -772,7 +774,7 @@ def _build_authoring_ui_execution_contract(
             item_type=item_type,
             route="bounded_call",
             effect="read",
-            gateway_commands=("call",),
+            gateway_commands=("request-schema",),
             timeout_seconds=10.0,
             result_limit_bytes=256 * 1024,
             verification_strategy="result_schema",
@@ -804,7 +806,7 @@ def _build_authoring_ui_execution_contract(
         item_type=item_type,
         route="managed_transaction",
         effect="runtime_mutation",
-        gateway_commands=("preview", "confirm", "execute", "verify"),
+        gateway_commands=("operation-schema",),
         timeout_seconds=30.0,
         result_limit_bytes=1024 * 1024,
         verification_strategy=verification_strategy,

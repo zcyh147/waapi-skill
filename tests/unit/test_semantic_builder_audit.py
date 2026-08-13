@@ -96,7 +96,7 @@ def test_skill_docs_route_builders_through_packaged_transaction_runtime_only() -
     assert "Do not import builders or planners from inline Python" in text
     assert "SemanticPlanner" not in text
     assert "XML editing" not in text
-    assert "preview --apply --request-json" in text
+    assert "Every normal input is typed" in text
     assert "`next_command.copy_instruction.source_field`" in text
     assert "copy that entire string verbatim as one shell tool call" in text
     assert "one complete terminal `verify` result ends the transaction" in text

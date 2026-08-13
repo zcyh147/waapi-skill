@@ -196,10 +196,7 @@ def test_route_families_have_explicit_program_cleanup_or_confirmation_contracts(
 
     transactions = [entry for entry in executable if entry.route in TRANSACTION_ROUTES]
     assert transactions
-    assert all(
-        entry.gateway_commands == ("preview", "confirm", "execute", "verify")
-        for entry in transactions
-    )
+    assert all(entry.gateway_commands == ("request-schema",) for entry in transactions)
     assert all(entry.requires_authorization for entry in transactions)
 
 

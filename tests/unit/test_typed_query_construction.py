@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+import wwise_waapi.dispatcher as dispatcher_module
 from wwise_waapi.builders.query import ADVANCED_QUERY_CONTRACT
 from wwise_waapi.builders.query import STRUCTURED_QUERY_CONTRACT
 from wwise_waapi.typed_queries import (
@@ -571,6 +572,82 @@ def test_public_advanced_query_typed_scalars_dispatch_builder_owned_request(
     assert list(payload)[-1] == "agent_result"
 
 
+def test_public_typed_advanced_query_dispatches_invalid_waql_once(
+    tmp_path: Path,
+) -> None:
+    class InvalidQueryClient(_AdvancedQueryClient):
+        def call(self, uri: str, args=None, options=None):  # type: ignore[no-untyped-def]
+            if uri == "ak.wwise.core.getInfo":
+                return super().call(uri, args, options)
+            self.calls.append((uri, dict(args or {}), dict(options or {})))
+            raise RuntimeError("invalid WAQL")
+
+    env = _env(tmp_path, "2025.1")
+    code, schema = gateway.execute_gateway(["query-schema", "--advanced"], env=env)
+    assert code == 0
+    client = InvalidQueryClient("2025.1")
+
+    code, payload = gateway.execute_gateway(
+        [
+            "query-object",
+            "--typed-advanced",
+            "--schema-digest",
+            schema["schema_digest"],
+            "--waql",
+            "from project",
+            "--advanced-return",
+            "id",
+            "--max-results",
+            "3",
+        ],
+        env=env,
+        client_factory=lambda _url: client,
+    )
+
+    assert code == 2
+    assert payload["call"]["error_code"] == "RuntimeError"
+    assert [call[0] for call in client.calls] == ["ak.wwise.core.object.get"]
+
+
+def test_public_typed_advanced_query_keeps_result_byte_ceiling(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class OversizedQueryClient(_AdvancedQueryClient):
+        def call(self, uri: str, args=None, options=None):  # type: ignore[no-untyped-def]
+            if uri == "ak.wwise.core.getInfo":
+                return super().call(uri, args, options)
+            self.calls.append((uri, dict(args or {}), dict(options or {})))
+            return {"return": [{"id": "x", "name": "X" * 4096}]}
+
+    env = _env(tmp_path, "2025.1")
+    code, schema = gateway.execute_gateway(["query-schema", "--advanced"], env=env)
+    assert code == 0
+    client = OversizedQueryClient("2025.1")
+    monkeypatch.setattr(dispatcher_module, "MAX_LIVE_RESULT_JSON_BYTES", 2048)
+
+    code, payload = gateway.execute_gateway(
+        [
+            "query-object",
+            "--typed-advanced",
+            "--schema-digest",
+            schema["schema_digest"],
+            "--waql",
+            "from project",
+            "--advanced-return",
+            "id",
+            "--max-results",
+            "3",
+        ],
+        env=env,
+        client_factory=lambda _url: client,
+    )
+
+    assert code == 2
+    assert payload["call"]["error_code"] == "RESULT_TOO_LARGE"
+    assert "X" * 512 not in json.dumps(payload)
+
+
 def test_structured_query_dispatches_directly_after_gateway_owned_handle_choices(
     tmp_path: Path,
 ) -> None:
@@ -801,49 +878,3 @@ def test_simple_query_typed_predicate_preserves_short_gateway_route(
             {"return": ["id", "name", "type", "path"]},
         )
     ]
-
-
-def test_media_pool_typed_post_filter_matches_closed_filter_without_json(
-    tmp_path: Path,
-) -> None:
-    rows = [
-        {"Filename": "footstep_gravel.wav", "FileId": "first"},
-        {"Filename": "Footstep_decoy.wav", "FileId": "second"},
-        {"Filename": "footstep_wood.wav", "FileId": "third"},
-    ]
-
-    class Client(_AdvancedQueryClient):
-        def call(self, uri: str, args=None, options=None):  # type: ignore[no-untyped-def]
-            if uri == "ak.wwise.core.getInfo":
-                return super().call(uri, args=args, options=options)
-            self.calls.append((uri, dict(args or {}), dict(options or {})))
-            return {"return": rows}
-
-    client = Client("2025.1")
-    code, payload = gateway.execute_gateway(
-        [
-            "call", "ak.wwise.core.mediaPool.get",
-            "--args-json",
-            json.dumps(
-                {
-                    "databases": [r"\Databases\Project Originals"],
-                    "filters": [
-                        {
-                            "type": "field", "field": "Filename",
-                            "operator": "contains", "value": "footstep",
-                        }
-                    ],
-                    "maxResults": 5,
-                }
-            ),
-            "--options-json", json.dumps({"return": ["Filename", "FileId"]}),
-            "--post-filter-value", "footstep",
-            "--post-filter-limit", "2",
-        ],
-        env=_env(tmp_path, "2025.1"),
-        client_factory=lambda _url: client,
-    )
-
-    assert code == 0, payload
-    assert payload["agent_result"] == {"return": [rows[0], rows[2]]}
-    assert payload["post_filter"]["operator"] == "containsCaseSensitive"

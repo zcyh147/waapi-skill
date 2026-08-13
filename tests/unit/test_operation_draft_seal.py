@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 import pytest
+from tests.support.canonical_preview import bind_canonical_preview_fixture
 
 from wwise_waapi.operation_composer import typed_action_cli_arguments
 
@@ -47,6 +48,7 @@ assert SPEC is not None and SPEC.loader is not None
 waapi_gateway = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = waapi_gateway
 SPEC.loader.exec_module(waapi_gateway)
+waapi_gateway.execute_gateway = bind_canonical_preview_fixture(waapi_gateway)
 
 
 OBJECT_GUID = "{11111111-1111-1111-1111-111111111111}"

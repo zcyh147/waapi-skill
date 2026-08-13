@@ -65,7 +65,7 @@ def test_catalog_separates_route_safety_and_evidence_without_overclaiming() -> N
     assert read.safety.requires_destructive_gate is False
     assert closed_mutation.preferred_route == "transaction_operation"
     assert closed_mutation.transaction_operations == ("object.create",)
-    assert closed_mutation.gateway_commands == ("preview", "confirm", "execute", "verify")
+    assert closed_mutation.gateway_commands == ("operation-schema",)
     assert closed_mutation.safety.interface_status == "available_via_transaction"
     assert mutation.semantic_family == "soundbank"
     assert mutation.safety.requires_destructive_gate is True
@@ -202,7 +202,7 @@ def test_2025_media_pool_reads_use_the_bounded_direct_route() -> None:
     ):
         capability = catalog.describe("2025.1", uri)
         assert capability.preferred_route == "manifest_dispatch"
-        assert capability.gateway_commands == ("call",)
+        assert capability.gateway_commands == ("request-schema",)
         assert capability.safety.read_only is True
         assert capability.safety.requires_authorization is False
 
@@ -234,7 +234,7 @@ def test_catalog_keeps_specific_builder_boundaries_and_hides_generic_bypass() ->
     assert tab_import.transaction_boundaries == ()
     for generic in (batch, copy, tab_import):
         assert generic.preferred_route == "transaction_operation"
-        assert generic.gateway_commands == ("preview", "confirm", "execute", "verify")
+        assert generic.gateway_commands == ("operation-schema",)
         assert generic.safety.interface_status == "available_via_transaction"
         assert generic.safety.requires_authorization is True
 
@@ -279,7 +279,7 @@ def test_semantic_inventory_is_version_aware_and_bounded_reads_are_public() -> N
     assert linked.safety.read_only is True
     assert linked.safety.interface_status == "available"
     assert linked.preferred_route == "manifest_dispatch"
-    assert linked.gateway_commands == ("call",)
+    assert linked.gateway_commands == ("request-schema",)
     assert linked.execution_contract["timeout_seconds"] == 10.0
     assert linked.execution_contract["result_limit_bytes"] == 256 * 1024
 
@@ -354,7 +354,7 @@ def test_all_semantic_read_records_resolve_to_public_gateway_routes() -> None:
         "metadata discover",
     )
     assert imported.gateway_commands == ("wait-topic", "stream-topic")
-    assert inclusions.gateway_commands == ("preview", "confirm", "execute", "verify")
+    assert inclusions.gateway_commands == ("request-schema",)
     assert inclusions.preferred_route == "transaction_operation"
     assert inclusions.transaction_operations == ("waapi.call",)
     assert inclusions.safety.read_only is True
@@ -397,7 +397,7 @@ def test_public_manifest_dispatch_is_exactly_the_immutable_reviewed_call_allowli
     assert public_topics == REVIEWED_TOPIC_URIS
     assert frozenset(FIXED_COMMANDS_BY_URI) == REVIEWED_FIXED_FUNCTION_URIS
     assert all(
-        entry.gateway_commands == ("call",)
+        entry.gateway_commands == ("request-schema",)
         for entry in entries
         if entry.preferred_route == "manifest_dispatch"
     )
@@ -539,7 +539,7 @@ def test_dump_objects_external_file_write_is_an_isolated_authorized_transaction(
     assert record.safety.requires_authorization is True
     assert record.preferred_route == "transaction_operation"
     assert record.execution_mode == "isolated_transaction"
-    assert record.gateway_commands == ("preview", "confirm", "execute", "verify")
+    assert record.gateway_commands == ("request-schema",)
     assert record.transaction_operations == ("waapi.call",)
     assert record.execution_contract["timeout_seconds"] == 120.0
     assert record.execution_contract["result_limit_bytes"] == 1024 * 1024

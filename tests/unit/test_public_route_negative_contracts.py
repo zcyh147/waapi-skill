@@ -86,56 +86,37 @@ def test_bounded_call_returns_validated_business_result_to_agent(tmp_path: Path)
         }
     )
 
+    schema_code, schema = waapi_gateway.execute_gateway(
+        ["request-schema", "ak.soundengine.getState"],
+        env=_env(tmp_path),
+        client_factory=lambda url: pytest.fail(f"schema connected to {url}"),
+    )
+    assert schema_code == 0, schema
+    state_group = next(
+        field for field in schema["fields"]
+        if field["name"] == "stateGroup" and field["shape"] == "branch"
+    )
+    typed_state_group = next(
+        field for field in schema["fields"]
+        if field.get("parent_handle") == state_group["handle"]
+        and field.get("patterns", [""])[0].startswith("^(StateGroup")
+    )
     exit_code, payload = waapi_gateway.execute_gateway(
         [
-            "call",
+            "typed-call",
             "ak.soundengine.getState",
-            "--args-json",
-            '{"stateGroup":"Gameplay"}',
+            "--schema-digest", schema["schema_digest"],
+            "--choose", state_group["handle"], typed_state_group["handle"],
+            "--set", typed_state_group["handle"], "string", "StateGroup:Gameplay",
         ],
         env=_env(tmp_path),
         client_factory=lambda url: client,
     )
 
-    assert exit_code == 0, payload
+    assert exit_code == 0, json.dumps(payload, indent=2)
     assert payload["agent_result"] == state_result
-    assert payload["result_validation"]["section"] == "result"
-    assert payload["result_validation"]["unresolved_refs"]
+    assert payload["typed_request"]["schema_digest"] == schema["schema_digest"]
     assert [call[0] for call in client.calls] == ["ak.wwise.core.getInfo", "ak.soundengine.getState"]
-
-
-@pytest.mark.parametrize(
-    "api, expected_status",
-    (
-        ("ak.wwise.core.project.save", "transaction_required"),
-        ("ak.wwise.debug.testCrash", "transaction_required"),
-        ("ak.wwise.ui.commands.register", "transaction_required"),
-        ("ak.wwise.ui.commands.execute", "transaction_required"),
-        ("ak.wwise.ui.commands.unregister", "transaction_required"),
-    ),
-)
-def test_call_cannot_bypass_transaction_or_exclusion_even_with_destructive_env(
-    tmp_path: Path,
-    api: str,
-    expected_status: str,
-) -> None:
-    connected = False
-
-    def factory(url: str) -> FakeClient:
-        nonlocal connected
-        connected = True
-        raise AssertionError(f"preflight boundary must not connect to {url}")
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["call", api, "--dry-run"],
-        env=_env(tmp_path),
-        client_factory=factory,
-    )
-
-    assert exit_code == 2
-    assert payload["status"] == expected_status
-    assert payload["executed"] is False
-    assert connected is False
 
 
 @pytest.mark.parametrize("api", ("ak.wwise.core.getInfo", "ak.wwise.debug.testCrash"))
@@ -374,9 +355,6 @@ def test_unresolved_result_ref_is_reported_as_partial_schema_check_not_business_
 
 def test_transaction_default_deadline_preserves_isolated_contract_timeout(tmp_path: Path) -> None:
     env = _env(tmp_path)
-    preview_args = waapi_gateway.build_parser().parse_args(
-        ["preview", "--request-json", "{}"]
-    )
     draft_preview_args = waapi_gateway.build_parser().parse_args(
         [
             "preview-from-draft",
@@ -392,7 +370,6 @@ def test_transaction_default_deadline_preserves_isolated_contract_timeout(tmp_pa
         ["--timeout", "5", "execute", "tx-example"]
     )
 
-    preview_connection = waapi_gateway.resolve_connection(preview_args, env=env)
     draft_preview_connection = waapi_gateway.resolve_connection(
         draft_preview_args,
         env=env,
@@ -400,8 +377,7 @@ def test_transaction_default_deadline_preserves_isolated_contract_timeout(tmp_pa
     status_connection = waapi_gateway.resolve_connection(status_args, env=env)
     explicit_connection = waapi_gateway.resolve_connection(explicit_args, env=env)
 
-    assert preview_connection.timeout == waapi_gateway.DEFAULT_TRANSACTION_TIMEOUT == 150.0
-    assert draft_preview_connection.timeout == waapi_gateway.DEFAULT_TRANSACTION_TIMEOUT
-    assert preview_connection.timeout > 120.0
+    assert draft_preview_connection.timeout == waapi_gateway.DEFAULT_TRANSACTION_TIMEOUT == 150.0
+    assert draft_preview_connection.timeout > 120.0
     assert status_connection.timeout == waapi_gateway.DEFAULT_TIMEOUT == 10.0
     assert explicit_connection.timeout == 5.0

@@ -230,13 +230,8 @@ def test_unsupported_restart_lane_discloses_only_the_version_boundary(
     )
 
     assert code == 0, payload
-    assert payload["request_envelope"] is None
-    assert payload["request_envelope_policy"] == {
-        "status": "unsupported_version",
-        "requested_version": version,
-        "supported_versions": ["2023.1", "2024.1", "2025.1"],
-        "complete_request_authored_by_gateway": True,
-    }
+    assert "request_envelope" not in payload
+    assert "request_envelope_policy" not in payload
     assert payload["operation"]["availability"] == {
         "status": "unsupported_version",
         "requested_version": version,

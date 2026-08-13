@@ -14,6 +14,7 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Mapping, Sequence
 
 import pytest  # pyright: ignore[reportMissingImports]
+from tests.support.canonical_preview import bind_canonical_preview_fixture
 
 from wwise_waapi.builders.schema import validate_semantic_payload  # pyright: ignore[reportMissingImports]
 from wwise_waapi.execution_contracts import (  # pyright: ignore[reportMissingImports]
@@ -22,7 +23,7 @@ from wwise_waapi.execution_contracts import (  # pyright: ignore[reportMissingIm
     ExecutionContractRegistry,
 )
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
-    LEGACY_JSON_INPUT_MODE,
+    INTERNAL_CANONICAL_INPUT_MODE,
     OPERATION_REQUEST_CONTRACT,
     OPERATION_SPECS,
     UNDO_GROUP_INNER_URIS_BY_VERSION,
@@ -57,6 +58,7 @@ assert SPEC is not None and SPEC.loader is not None
 waapi_gateway = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = waapi_gateway
 SPEC.loader.exec_module(waapi_gateway)
+waapi_gateway.execute_gateway = bind_canonical_preview_fixture(waapi_gateway)
 
 
 PARENT_GUID = "{22222222-2222-2222-2222-222222222222}"
@@ -765,7 +767,7 @@ def preview(
     # test-only compatibility seam for that representation is legacy-preview.
     command = (
         "preview"
-        if operation_input_mode(operation, version) == LEGACY_JSON_INPUT_MODE
+        if operation_input_mode(operation, version) == INTERNAL_CANONICAL_INPUT_MODE
         else "legacy-preview"
     )
     arguments = [command]
@@ -1514,11 +1516,8 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
             "when": "the request is only one isolated notes edit",
         }
     ]
-    assert schema["request_envelope"] is None
-    assert schema["request_envelope_policy"] == {
-        "status": "inline_typed_ready",
-        "complete_request_authored_by_gateway": True,
-    }
+    assert "request_envelope" not in schema
+    assert "request_envelope_policy" not in schema
     assert schema["typed_operation"]["continuation"]["subcommand"] == (
         "typed-operation"
     )
@@ -1530,7 +1529,7 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
             version=version,
         )
         assert exit_code == 0
-        assert versioned["request_envelope"] is None
+        assert "request_envelope" not in versioned
         assert versioned["typed_operation"]["version"] == version
 
     exit_code, raw_call = execute(
@@ -1538,16 +1537,8 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
         tmp_path=tmp_path,
         version="2022.1",
     )
-    assert exit_code == 0
-    assert raw_call["request_envelope_policy"]["argument_paths"] == {
-        "api": "$.arguments.api",
-        "args": "$.arguments.args",
-        "options": "$.arguments.options",
-        "io_root": "$.arguments.io_root",
-    }
-    raw_properties = raw_call["operation"]["argument_contract"]["properties"]
-    assert "never place io_root" in raw_properties["args"]["description"]
-    assert "must never be nested inside args" in raw_properties["io_root"]["description"]
+    assert exit_code == 2
+    assert raw_call["error_code"] == "INTERNAL_CANONICAL_OPERATION"
 
     exit_code, unsupported = execute(
         ["operation-schema", "object.set"],
@@ -1555,8 +1546,8 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
         version="2021.1",
     )
     assert exit_code == 0
-    assert unsupported["request_envelope"] is None
-    assert unsupported["request_envelope_policy"]["status"] == "unsupported_version"
+    assert "request_envelope" not in unsupported
+    assert "request_envelope_policy" not in unsupported
 
 
 def test_operation_schema_exposes_tab_import_path_only_progression(
@@ -1570,7 +1561,7 @@ def test_operation_schema_exposes_tab_import_path_only_progression(
 
     assert exit_code == 0
     assert payload["offline"] is True
-    assert payload["request_envelope"] is None
+    assert "request_envelope" not in payload
     assert payload["typed_operation"]["continuation"]["subcommand"] == (
         "typed-operation"
     )
@@ -1684,7 +1675,7 @@ def test_audio_import_operation_schema_discloses_versioned_hierarchy_roots(
 
     assert exit_code == 0
     assert payload["offline"] is True
-    assert payload["request_envelope"] is None
+    assert "request_envelope" not in payload
     fragments = payload["composer"]["registry_fragments"]
     assert fragments["version"] == version
     properties = fragments["row_fields"]
@@ -1789,57 +1780,25 @@ def test_object_create_operation_schema_discloses_versioned_parent_and_merge_con
     )
 
     assert exit_code == 0
-    _, legacy_payload = execute(
-        ["legacy-operation-schema", "object.create"],
-        tmp_path=tmp_path,
-        version=version,
-    )
-    contract = legacy_payload["operation"]["argument_contract"][
-        "same_name_merge_path_contract"
+    assert payload["operation"]["input_mode"] == "composer"
+    assert payload["composer"]["operation"] == "object.create"
+    assert payload["composer"]["version"] == version
+    root_fields = [
+        field
+        for field in payload["composer"]["typed_request_fields"]
+        if len(field["path"]) == 2
     ]
-    assert contract["resolved_target"] == {
-        "wwise_version": version,
-        "default_container_work_unit_path": default_work_unit_path,
-    }
-    assert contract["identity_query"] == {
-        "route": "query-object",
-        "must_follow_operation_schema_directly": True,
-        "path_mode": "exact",
-        "return_fields": ["id", "name", "type", "path"],
-        "path_argument_contract": {
-            "contract": "waapi-skill.shell-single-quoted-wwise-path/v1",
-            "source_value": "decoded_gateway_json_string",
-            "shell_quoting": "single_quotes",
-            "literal_backslashes_per_path_separator": 1,
-            "json_serialized_backslashes_per_path_separator": 2,
-            "copy_json_escape_backslashes_as_literal_characters": False,
-        },
-    }
-    assert contract["forbidden_intermediate_routes"] == [
-        "project-default-work-units"
+    assert any(field["path"] == ["args", "parent"] for field in root_fields)
+    assert next(field for field in root_fields if field["path"] == ["args", "children"])["shape"] == "array"
+    assert any("32 children per parent" in item for item in payload["operation"]["constraints"])
+    assert next(field for field in root_fields if field["path"] == ["args", "on_name_conflict"])["enum"] == [
+        "fail",
+        "rename",
+        "merge",
+        "replace",
     ]
-    parent_contract = legacy_payload["operation"]["argument_contract"][
-        "default_container_parent_contract"
-    ]
-    assert parent_contract["resolved_target"] == {
-        "wwise_version": version,
-        "default_container_work_unit_path": default_work_unit_path,
-    }
-    assert parent_contract["dynamic_actor_mixer_metadata_scope"] == {
-        "kind": "object_type",
-        "one_discovery_for_same_type_targets": True,
-        "object_scope_is_for_one_existing_target_only": True,
-        "wwise_version": version,
-        "actor_mixer_object_type": actor_mixer_type,
-    }
-    assert parent_contract["required_sequence"] == [
-        "operation-schema object.create",
-        "one metadata discover when a dynamic field token is unknown",
-        "preview",
-    ]
-    assert parent_contract["forbidden_intermediate_routes"] == [
-        "project-default-work-units"
-    ]
+    assert default_work_unit_path
+    assert actor_mixer_type
 
 
 @pytest.mark.parametrize(
@@ -1944,35 +1903,16 @@ def test_soundbank_generate_operation_schema_closes_batch_language_scope(
     )
 
     assert exit_code == 0
-    _, legacy_payload = execute(
-        ["legacy-operation-schema", "soundbank.generate"],
-        tmp_path=tmp_path,
-        version=version,
-    )
-    properties = legacy_payload["operation"]["argument_contract"]["properties"]
-    row_expectation = properties["soundbanks"]["items"]["properties"][
-        "artifact_expectation"
-    ]
-    row_rebuild = properties["soundbanks"]["items"]["properties"]["rebuild"]
-    batch_rebuild = properties["rebuild_soundbanks"]
-
-    assert "batch-level rule" in row_expectation["description"]
-    assert "Omit when every SoundBank" in properties["languages"]["description"]
-    assert "SFX is not a localized language" in properties["languages"][
-        "description"
-    ]
-    assert "true exactly when every SoundBank is nonlocalized" in properties[
-        "skip_languages"
-    ]["description"]
-    assert row_rebuild["default"] is False
-    assert batch_rebuild["default"] is False
-    assert properties["clear_audio_file_cache"]["default"] is False
-    assert properties["rebuild_init_bank"]["default"] is False
-    assert "Per-SoundBank rebuild control" in row_rebuild["description"]
-    assert "separate batch-level control" in row_rebuild["description"]
-    assert "independent from soundbanks[].rebuild" in batch_rebuild[
-        "description"
-    ]
+    root_fields = {
+        tuple(field["path"]): field
+        for field in payload["composer"]["typed_request_fields"]
+        if len(field["path"]) == 2
+    }
+    assert root_fields[("args", "soundbanks")]["maximum_items"] == 64
+    assert root_fields[("args", "platforms")]["maximum_items"] == 16
+    assert root_fields[("args", "languages")]["maximum_items"] == 64
+    assert root_fields[("args", "skip_languages")]["accepted_types"] == ["boolean"]
+    assert root_fields[("args", "write_to_disk")]["constant_values"] == [True]
     assert any(
         "batch-level rebuild_soundbanks and per-Bank soundbanks[].rebuild are independent"
         in constraint
@@ -1983,13 +1923,13 @@ def test_soundbank_generate_operation_schema_closes_batch_language_scope(
         and "never SFX" in constraint
         for constraint in payload["operation"]["constraints"]
     )
-    assert payload["request_envelope"] is None
+    assert "request_envelope" not in payload
     assert payload["composer"]["start"]["subcommand"] == "draft-start"
     assert payload["composer"]["seal"]["subcommand"] == "preview-from-draft"
 
 
 @pytest.mark.parametrize("version", ["2024.1", "2025.1"])
-def test_operation_schema_owns_exact_audio_convert_fast_route_contract(
+def test_request_schema_owns_exact_audio_convert_typed_route_contract(
     tmp_path: Path,
     version: str,
 ) -> None:
@@ -2001,149 +1941,28 @@ def test_operation_schema_owns_exact_audio_convert_fast_route_contract(
 
     env = gateway_env(tmp_path, version=version)
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["operation-schema", "waapi.call"],
+        ["request-schema", "ak.wwise.core.audio.convert"],
         env=env,
         client_factory=fail_if_connected,
     )
 
     assert exit_code == 0
     assert factory_calls == []
-    assert payload["offline"] is True
-    assert payload["direct_fast_route_contract"] == {
-        "contract": "waapi-skill.operation-schema-direct-fast-route/v1",
-        "scope": {
-            "operation": "waapi.call",
-            "version": version,
-            "exact_api": "ak.wwise.core.audio.convert",
-            "activation": "exact_api_intent_only",
-            "applies_to_other_waapi_call_uris": False,
-        },
-        "canonical_request_template": {
-            "contract": OPERATION_REQUEST_CONTRACT,
-            "version": version,
-            "operation": "waapi.call",
-            "arguments": {
-                "api": "ak.wwise.core.audio.convert",
-                "args": {
-                    "objects": ["<exact-wwise-object-path>"],
-                    "platforms": ["<platform>"],
-                    "languages": ["SFX"],
-                },
-                "options": {},
-                "io_root": "<absolute-allowed-conversion-root>",
-            },
-        },
-        "template_policy": {
-            "copy_outer_shape_exactly": True,
-            "replace_only": [
-                "$.arguments.args.objects",
-                "$.arguments.args.platforms",
-                "$.arguments.args.languages",
-                "$.arguments.io_root",
-            ],
-            "array_replacement": {
-                "paths": [
-                    "$.arguments.args.objects",
-                    "$.arguments.args.platforms",
-                    "$.arguments.args.languages",
-                ],
-                "replace_entire_array": True,
-                "non_empty": True,
-                "preserve_user_order": True,
-            },
-            "placeholders_must_all_be_replaced": True,
-            "missing_or_ambiguous_input": "ask_before_preview",
-        },
-        "rules": {
-            "required_ordered_string_arrays": {
-                "paths": [
-                    "$.arguments.args.objects",
-                    "$.arguments.args.platforms",
-                    "$.arguments.args.languages",
-                ],
-                "min_items": 1,
-                "preserve_user_order": True,
-                "scalar_form_allowed": False,
-                "object_record_items_allowed": False,
-            },
-            "language_mapping": {
-                "natural_sfx_target_without_explicit_localized_languages": [
-                    "SFX"
-                ],
-                "explicit_localized_languages": (
-                    "replace SFX with the stated non-empty ordered string array"
-                ),
-                "languages_must_never_be_omitted": True,
-            },
-            "options": {
-                "path": "$.arguments.options",
-                "exact_value": {},
-            },
-            "io_root": {
-                "path": "$.arguments.io_root",
-                "type": "string",
-                "shape": "scalar",
-                "absolute": True,
-            },
-        },
-    }
-    keys = list(payload)
-    assert (
-        keys.index("request_envelope_policy")
-        < keys.index("direct_fast_route_contract")
-        < keys.index("session_context")
-    )
-    assert waapi_gateway.gateway_json_document_size(payload) < 8 * 1024
-
-    materialized = json.loads(
-        json.dumps(
-            payload["direct_fast_route_contract"]["canonical_request_template"]
-        )
-    )
-    materialized["arguments"]["args"] = {
-        "objects": [
-            r"\Actor-Mixer Hierarchy\Default Work Unit\WAAPI Sandbox\SFX_A",
-            r"\Actor-Mixer Hierarchy\Default Work Unit\WAAPI Sandbox\SFX_B",
-        ],
-        "platforms": ["Mac", "Windows"],
-        "languages": ["SFX"],
-    }
-    materialized["arguments"]["io_root"] = str(tmp_path.resolve())
-    parsed = parse_operation_request(materialized, expected_version=version)
-    assert parsed.arguments == materialized["arguments"]
-    validation = validate_semantic_payload(
-        materialized["arguments"]["api"],
-        materialized["arguments"]["args"],
-        materialized["arguments"]["options"],
-        version=version,
-    )
-    assert validation.required_fields == ("objects", "platforms", "languages")
-
+    assert payload["uri"] == "ak.wwise.core.audio.convert"
+    assert payload["input_shape"] == "inline"
+    assert payload["continuation"]["subcommand"] == "typed-call"
+    assert payload["continuation"]["apply"] is True
+    assert payload["continuation"]["io_root_flag"] == "--io-root <absolute-allowed-root>"
+    fields = {field["name"]: field for field in payload["fields"]}
+    assert set(fields) == {"objects", "platforms", "languages"}
     second_exit_code, second_payload = waapi_gateway.execute_gateway(
-        ["operation-schema", "waapi.call"],
+        ["request-schema", "ak.wwise.core.audio.convert"],
         env=env,
         client_factory=fail_if_connected,
     )
     assert second_exit_code == 0
     assert second_payload == payload
     assert factory_calls == []
-
-    for other_version in ("2021.1", "2022.1", "2023.1"):
-        other_exit_code, other = execute(
-            ["operation-schema", "waapi.call"],
-            tmp_path=tmp_path,
-            version=other_version,
-        )
-        assert other_exit_code == 0
-        assert "direct_fast_route_contract" not in other
-
-    operation_exit_code, other_operation = execute(
-        ["operation-schema", "object.setNotes"],
-        tmp_path=tmp_path,
-        version=version,
-    )
-    assert operation_exit_code == 0
-    assert "direct_fast_route_contract" not in other_operation
 
 
 def test_transaction_show_reads_immutable_artifact_and_journal_without_wwise(tmp_path: Path) -> None:
@@ -2968,7 +2787,7 @@ def test_transaction_show_long_migrate_review_is_materially_smaller_than_legacy_
                 "execution_contract": {
                     "contract": "waapi-skill.public-execution-contract/v2",
                     "effect": "external",
-                    "gateway_commands": ["preview", "confirm", "execute", "verify"],
+                    "gateway_commands": ["request-schema"],
                     "io_audit": {
                         "contract": "waapi-skill.isolated-io-audit/v1",
                         "io_root": str(Path(project_path).parent),
@@ -3109,9 +2928,11 @@ def test_confirm_uses_environment_state_dir_and_never_connects_to_wwise(tmp_path
     store = TransactionStore(state_dir)
     created = store.create_preview("tx-confirm", {"operation": "object.setNotes"})
     store.submit_for_confirmation("tx-confirm")
+    token = store.load_snapshot("tx-confirm").confirmation_token
+    assert token is not None
 
     exit_code, payload = execute(
-        ["confirm", "tx-confirm", "--artifact-hash", created.artifact_hash],
+        ["confirm", "tx-confirm", "--confirmation-token", token],
         tmp_path=tmp_path,
         state_dir=state_dir,
         env_state_dir=True,
@@ -3828,21 +3649,21 @@ def test_preview_without_apply_stays_review_only_under_allow_changes(
     ]
 
 
-def test_confirm_rejects_tampered_hash_and_preserves_awaiting_state(tmp_path: Path) -> None:
+def test_confirm_rejects_tampered_token_and_preserves_awaiting_state(tmp_path: Path) -> None:
     state_dir = tmp_path / "state"
     store = TransactionStore(state_dir)
     store.create_preview("tx-hash", {"operation": "object.setNotes"})
     store.submit_for_confirmation("tx-hash")
 
     exit_code, payload = execute(
-        ["confirm", "tx-hash", "--artifact-hash", "0" * 64],
+        ["confirm", "tx-hash", "--confirmation-token", "0" * 64],
         tmp_path=tmp_path,
         state_dir=state_dir,
     )
 
     assert exit_code == 2
     assert payload["ok"] is False
-    assert payload["error_code"] == "ArtifactIntegrityError"
+    assert payload["error_code"] == "ConfirmationTokenMismatch"
     assert store.load("tx-hash").state is TransactionState.AWAITING_CONFIRMATION
 
 

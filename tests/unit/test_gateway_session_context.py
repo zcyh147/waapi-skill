@@ -290,16 +290,14 @@ def test_explicit_gateway_flags_override_saved_session_context_without_connectin
             "31337",
             "--version",
             "2024.1",
-            "call",
-            "ak.wwise.core.object.get",
+            "query-schema",
         ],
         env=configured_env(tmp_path),
         client_factory=fail_if_connected,
     )
 
-    assert exit_code == 2
+    assert exit_code == 0
     assert called is False
-    assert payload["error_code"] == "QUERY_OBJECT_REQUIRED"
     assert payload["session_context"] == expected_context(
         version="2024.1",
         host="localhost",

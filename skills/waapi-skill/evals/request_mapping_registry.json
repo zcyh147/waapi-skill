@@ -46,7 +46,7 @@
         "validate only without dispatching the target function"
       ],
       "evidence": [
-        "the fixed debug-validate-call route resolves only reflected function IDs through CapabilityCatalog",
+        "the typed request-schema route resolves only reflected function IDs through CapabilityCatalog",
         "the two target request shapes are closed by the packaged 2024.1 schemas before live validation"
       ]
     },

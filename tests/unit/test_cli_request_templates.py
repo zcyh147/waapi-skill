@@ -195,86 +195,8 @@ def test_cli_request_template_fails_closed_on_manifest_contract_drift(
         )
 
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
-def test_operation_schema_exposes_all_four_versioned_cli_templates_offline(
-    tmp_path: Path,
-    version: str,
-) -> None:
-    connections: list[str] = []
-
-    def fail_if_connected(url: str) -> None:
-        connections.append(url)
-        raise AssertionError(url)
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["operation-schema", "waapi.call"],
-        env=_gateway_env(tmp_path, version=version),
-        client_factory=fail_if_connected,
-    )
-
-    assert exit_code == 0
-    assert connections == []
-    template_set = payload["cli_request_templates"]
-    assert template_set["contract"] == CLI_REQUEST_TEMPLATE_SET_CONTRACT
-    assert template_set["status"] == "ready"
-    assert template_set["version"] == version
-    assert list(template_set["templates"]) == list(CLI_REQUEST_TEMPLATE_URIS)
-    assert template_set["policy"] == {
-        "directly_executable": False,
-        "detail": "run describe for the exact API",
-    }
-    for uri, compact in template_set["templates"].items():
-        detailed = _template(version, uri)
-        assert compact["required"] == detailed["args_constraints"]["required_fields"]
-        assert compact["blocked"] == detailed["args_constraints"]["blocked_fields"]
-        assert compact["version_delta_fields"] == {
-            **{
-                field: True
-                for field in detailed["version_delta_fields"]["available"]
-            },
-            **{
-                field: False
-                for field in detailed["version_delta_fields"]["absent"]
-            },
-        }
-
-
-def test_operation_schema_does_not_emit_unpinned_cli_templates(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    resolution = ResolvedSkillConfig(
-        config=SkillConfig(waapi_gateway.SKILL_ROOT),
-        source="defaults",
-        external_path=tmp_path / "config.json",
-        legacy_path=tmp_path / "legacy.json",
-        legacy_fallback_used=False,
-    )
-    monkeypatch.setattr(
-        waapi_gateway,
-        "load_gateway_config",
-        lambda env: resolution,
-    )
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["operation-schema", "waapi.call"],
-        env=_gateway_env(tmp_path, version=None),
-        client_factory=lambda url: (_ for _ in ()).throw(AssertionError(url)),
-    )
-
-    assert exit_code == 0
-    assert payload["request_envelope"] is None
-    assert payload["request_envelope_policy"]["status"] == "version_required"
-    assert payload["cli_request_templates"] == {
-        "contract": CLI_REQUEST_TEMPLATE_SET_CONTRACT,
-        "status": "version_required",
-        "version": None,
-        "apis": list(CLI_REQUEST_TEMPLATE_URIS),
-        "templates": {},
-    }
-
-
 @pytest.mark.parametrize("uri", CLI_REQUEST_TEMPLATE_URIS)
-def test_describe_exposes_the_template_for_each_requested_version_offline(
+def test_describe_keeps_internal_cli_templates_out_of_public_discovery(
     tmp_path: Path,
     uri: str,
 ) -> None:
@@ -286,11 +208,6 @@ def test_describe_exposes_the_template_for_each_requested_version_offline(
 
     assert exit_code == 0
     assert payload["versions"] == list(SUPPORTED_WWISE_VERSION_KEYS)
-    for version, row in payload["availability"].items():
+    for row in payload["availability"].values():
         assert row["available"] is True
-        assert row["request_template"]["version"] == version
-        assert row["request_template"]["api"] == uri
-        assert (
-            row["request_template"]["args_constraints"]["reflected_fields"]
-            == row["capability"]["schema"]["args"]["properties"]
-        )
+        assert "request_template" not in row

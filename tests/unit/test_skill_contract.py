@@ -33,7 +33,7 @@ def test_skill_contract_documents_fixed_runner_and_versioned_runtime() -> None:
 def test_skill_contract_documents_gateway_inputs_outputs_and_failure_boundary() -> None:
     text = doc_text("SKILL.md", "references/waapi-query.md")
 
-    for required in ("<uri>", "--args-json", "--options-json", "--timeout", "--dry-run", "--allow-destructive"):
+    for required in ("<uri>", "request-schema", "typed-call", "--timeout", "--apply", "read_only"):
         assert required in text
     for required in ("API_NOT_FOUND", "MANIFEST_NOT_FOUND", "TRANSACTION_REQUIRED", "unsupported_by_skill_interface"):
         assert required in text

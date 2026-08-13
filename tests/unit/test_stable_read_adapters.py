@@ -494,34 +494,6 @@ def test_gateway_project_defaults_reports_real_2025_values(
     assert payload["agent_result"]["default_work_units"]["value"]["Events"] == work_unit
 
 
-def test_fixed_profiler_uri_rejects_generic_call_before_connect(
-    tmp_path: Path,
-) -> None:
-    factory_called = False
-
-    def factory(url: str) -> FakeClient:
-        nonlocal factory_called
-        factory_called = True
-        raise AssertionError("generic fixed-route boundary must not connect")
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "call",
-            GET_GAME_OBJECTS_URI,
-            "--args-json",
-            '{"time":"capture"}',
-            "--options-json",
-            "{}",
-        ],
-        env=_gateway_env(tmp_path, "2022.1"),
-        client_factory=factory,
-    )
-    assert exit_code == 2
-    assert payload["error_code"] == "FIXED_COMMAND_REQUIRED"
-    assert payload["required_command"] == "profiler-game-objects"
-    assert factory_called is False
-
-
 def test_invalid_profiler_input_fails_before_connect(tmp_path: Path) -> None:
     factory_called = False
 

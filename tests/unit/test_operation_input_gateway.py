@@ -14,7 +14,7 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     COMPOSER_INPUT_MODE,
-    LEGACY_JSON_INPUT_MODE,
+    INTERNAL_CANONICAL_INPUT_MODE,
     OPERATION_INPUT_MODE_LANES,
     OPERATION_REQUEST_CONTRACT,
     OperationInputModeLane,
@@ -213,7 +213,7 @@ def test_inline_operation_schema_exposes_one_typed_continuation(tmp_path: Path) 
     )
 
     assert code == 0
-    assert payload["request_envelope"] is None
+    assert "request_envelope" not in payload
     assert payload["operation"]["input_mode"] == "inline_typed"
     assert payload["typed_operation"]["continuation"]["subcommand"] == "typed-operation"
     assert "request-json" not in json.dumps(payload["typed_operation"])
@@ -396,13 +396,6 @@ def _without_route_specific_schema_fields(payload: Mapping[str, Any]) -> dict[st
     if isinstance(operation, dict):
         operation.pop("summary", None)
         operation.pop("selection_guidance", None)
-    invocation = result.get("request_envelope_policy", {}).get(
-        "preview_invocation", {}
-    )
-    if isinstance(invocation, dict):
-        intended = invocation.get("intended_change")
-        if isinstance(intended, dict):
-            intended.pop("subcommand", None)
     return result
 
 
@@ -430,11 +423,8 @@ def test_normal_object_set_schema_and_detail_expose_only_composer_input(
     rows = {row["name"]: row for row in detail["operations"]}
     assert rows["object.set"]["input_modes_by_version"] == expected_modes
     assert "input_mode" not in rows["object.set"]
-    assert schema["request_envelope"] is None
-    assert schema["request_envelope_policy"] == {
-        "status": "composer_ready",
-        "complete_request_authored_by_gateway": True,
-    }
+    assert "request_envelope" not in schema
+    assert "request_envelope_policy" not in schema
     assert schema["composer"]["contract"] == "waapi-skill.operation-composer/v1"
     assert schema["composer"]["action_shapes"]["add_target"] == {
         "fixed_fields": {
@@ -575,11 +565,8 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
 
     assert schema_code == detail_code == tab_code == 0
     assert schema["operation"]["input_mode"] == COMPOSER_INPUT_MODE
-    assert schema["request_envelope"] is None
-    assert schema["request_envelope_policy"] == {
-        "status": "composer_ready",
-        "complete_request_authored_by_gateway": True,
-    }
+    assert "request_envelope" not in schema
+    assert "request_envelope_policy" not in schema
     assert schema["composer"]["operation"] == "audio.import"
     assert schema["composer"]["start"]["gateway_argv"] == [
         "draft-start",
@@ -662,7 +649,7 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         "2025.1",
     }
     assert tab_schema["operation"]["input_mode"] == "inline_typed"
-    assert tab_schema["request_envelope"] is None
+    assert "request_envelope" not in tab_schema
     assert tab_schema["typed_operation"]["operation"] == "audio.importTabDelimited"
     assert "composer" not in tab_schema
     normal_surfaces = json.dumps({"schema": schema, "detail": detail})
@@ -731,110 +718,6 @@ def test_structurally_distinct_adapters_share_one_public_lifecycle(
     assert set(object_set["actions"]) != set(audio_import["actions"])
 
 
-def test_legacy_schema_is_explicit_deprecated_and_uses_the_same_registry_contract(
-    tmp_path: Path,
-) -> None:
-    normal_code, normal = offline_execute(
-        tmp_path,
-        "--version",
-        "2022.1",
-        "operation-schema",
-        "object.setNotes",
-    )
-    legacy_code, legacy = offline_execute(
-        tmp_path,
-        "--version",
-        "2022.1",
-        "legacy-operation-schema",
-        "object.setNotes",
-    )
-
-    assert normal_code == legacy_code == 0
-    assert legacy["compatibility"] == {
-        "contract": "waapi-skill.legacy-operation-json-adapter/v1",
-        "deprecation_status": "deprecated",
-        "input_mode": LEGACY_JSON_INPUT_MODE,
-        "submit_command": "legacy-preview",
-    }
-    assert legacy["operation"]["input_mode"] == LEGACY_JSON_INPUT_MODE
-    assert normal["operation"]["input_mode"] == "inline_typed"
-    assert normal["typed_operation"]["schema_digest"] == (
-        waapi_gateway.operation_request_schema_digest("object.setNotes", "2022.1")
-    )
-    assert legacy["operation"]["argument_contract"] == (
-        describe_operation("object.setNotes").as_dict(version="2022.1")[
-            "argument_contract"
-        ]
-    )
-    assert normal["request_envelope"] is None
-    assert legacy["request_envelope"] == set_notes_request() | {"arguments": {}}
-    assert legacy["request_envelope_policy"]["preview_invocation"][
-        "intended_change"
-    ]["subcommand"] == "legacy-preview"
-    assert "\n" not in waapi_gateway.gateway_stdout_json_encoder(legacy).encode(
-        legacy
-    )
-
-
-def test_object_set_legacy_schema_retains_only_the_explicit_compatibility_contract(
-    tmp_path: Path,
-) -> None:
-    normal_code, normal = offline_execute(
-        tmp_path,
-        "--version",
-        "2022.1",
-        "operation-schema",
-        "object.set",
-    )
-    legacy_code, legacy = offline_execute(
-        tmp_path,
-        "--version",
-        "2022.1",
-        "legacy-operation-schema",
-        "object.set",
-    )
-
-    assert normal_code == legacy_code == 0
-    assert normal["operation"]["input_mode"] == COMPOSER_INPUT_MODE
-    assert normal["request_envelope"] is None
-    assert "request_contract" not in normal["operation"]
-    assert legacy["compatibility"]["input_mode"] == LEGACY_JSON_INPUT_MODE
-    assert legacy["compatibility"]["submit_command"] == "legacy-preview"
-    assert legacy["operation"]["input_mode"] == LEGACY_JSON_INPUT_MODE
-    assert legacy["request_envelope"]["operation"] == "object.set"
-    expected_operation = describe_operation("object.set").as_dict(version="2022.1")
-    expected_operation.pop("summary", None)
-    expected_operation.pop("selection_guidance", None)
-    expected_operation["input_mode"] = LEGACY_JSON_INPUT_MODE
-    assert legacy["operation"] == expected_operation
-
-
-def test_all_legacy_operation_schemas_fit_the_existing_compact_output_budget(
-    tmp_path: Path,
-) -> None:
-    for version in waapi_gateway.SUPPORTED_WWISE_VERSION_KEYS:
-        for spec in waapi_gateway.list_operation_specs():
-            exit_code, payload = offline_execute(
-                tmp_path / version.replace(".", "-"),
-                "--version",
-                version,
-                "legacy-operation-schema",
-                spec.name,
-                version=version,
-            )
-            encoded = (
-                waapi_gateway.gateway_stdout_json_encoder(payload).encode(payload)
-                + "\n"
-            )
-
-            assert exit_code == 0, (version, spec.name)
-            assert len(encoded.encode("utf-8")) < 32 * 1024, (
-                version,
-                spec.name,
-                len(encoded.encode("utf-8")),
-            )
-
-
 def test_schema_input_mode_projection_is_isolated_by_exact_operation_key(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -878,401 +761,3 @@ def test_schema_input_mode_projection_is_isolated_by_exact_operation_key(
 
         assert exit_code == 0
         assert payload["operation"]["input_mode"] == expected
-
-
-@pytest.mark.parametrize(
-    ("operation", "version", "expected_status"),
-    [
-        ("object.set", "2021.1", "ok"),
-    ],
-)
-def test_schema_routes_keep_unimplemented_and_unsupported_version_results_equivalent(
-    tmp_path: Path,
-    operation: str,
-    version: str,
-    expected_status: str,
-) -> None:
-    normal_code, normal = offline_execute(
-        tmp_path,
-        "--version",
-        version,
-        "operation-schema",
-        operation,
-        version=version,
-    )
-    legacy_code, legacy = offline_execute(
-        tmp_path,
-        "--version",
-        version,
-        "legacy-operation-schema",
-        operation,
-        version=version,
-    )
-
-    assert normal_code == legacy_code == 0
-    assert normal["status"] == legacy["status"] == expected_status
-    assert {
-        key: value
-        for key, value in normal["operation"].items()
-        if key not in {"summary", "selection_guidance"}
-    } == legacy["operation"]
-    assert legacy["request_envelope"] == normal["request_envelope"]
-    assert legacy["request_envelope_policy"]["status"] == normal[
-        "request_envelope_policy"
-    ]["status"]
-
-
-def test_schema_routes_keep_unknown_operation_errors_equivalent(tmp_path: Path) -> None:
-    normal_code, normal = offline_execute(
-        tmp_path,
-        "operation-schema",
-        "missing.operation",
-    )
-    legacy_code, legacy = offline_execute(
-        tmp_path,
-        "legacy-operation-schema",
-        "missing.operation",
-    )
-
-    assert normal_code == legacy_code == 2
-    assert normal["error_code"] == legacy["error_code"] == "UNKNOWN_OPERATION"
-    assert normal["message"] == legacy["message"]
-    assert normal["details"] == legacy["details"]
-
-
-@pytest.mark.parametrize(
-    "document",
-    [
-        '{"contract":"first","contract":"second"}',
-        json.dumps({"nested": [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]}),
-        json.dumps({"value": "x" * (384 * 1024)}),
-    ],
-    ids=("duplicate-key", "depth", "bytes"),
-)
-def test_preview_routes_share_duplicate_depth_and_byte_strict_json_rejection(
-    tmp_path: Path,
-    document: str,
-) -> None:
-    results: list[tuple[int, dict[str, Any]]] = []
-    connections: list[str] = []
-    for command in ("preview", "legacy-preview"):
-        results.append(
-            waapi_gateway.execute_gateway(
-                [command, "--request-json", document],
-                env=gateway_env(tmp_path),
-                client_factory=lambda url: connections.append(url),
-            )
-        )
-
-    assert connections == []
-    assert results[0][0] == results[1][0] == 2
-    assert results[0][1]["error_code"] == results[1][1]["error_code"]
-    assert results[0][1]["message"] == results[1][1]["message"]
-
-
-def test_legacy_preview_apply_uses_the_same_preconnection_policy_gate(
-    tmp_path: Path,
-) -> None:
-    request_json = json.dumps(set_notes_request())
-    results: list[tuple[int, dict[str, Any]]] = []
-    connections: list[str] = []
-    for command in ("preview", "legacy-preview"):
-        results.append(
-            waapi_gateway.execute_gateway(
-                [command, "--apply", "--request-json", request_json],
-                env=gateway_env(tmp_path, policy="read_only"),
-                client_factory=lambda url: connections.append(url),
-            )
-        )
-
-    assert connections == []
-    assert results[0][0] == results[1][0] == 2
-    assert results[0][1]["error_code"] == results[1][1]["error_code"]
-    assert results[0][1]["message"] == results[1][1]["message"]
-
-
-def test_preview_routes_share_transaction_timeout_and_live_dispatch_set(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    observed: list[tuple[str, float]] = []
-
-    def fake_dispatch_transaction_command(
-        args: Any,
-        *,
-        connection: Any,
-        common: Mapping[str, Any],
-        **_kwargs: Any,
-    ) -> dict[str, Any]:
-        observed.append((args.command, connection.timeout))
-        return {"ok": True, "status": "ok", **dict(common)}
-
-    monkeypatch.setattr(
-        waapi_gateway,
-        "dispatch_transaction_command",
-        fake_dispatch_transaction_command,
-    )
-    request_json = json.dumps(set_notes_request())
-    for command in ("legacy-preview",):
-        client = FakeClient({"ak.wwise.core.getInfo": [live_info()]})
-        exit_code, payload = waapi_gateway.execute_gateway(
-            [command, "--request-json", request_json],
-            env=gateway_env(tmp_path),
-            client_factory=lambda _url, client=client: client,
-        )
-
-        assert exit_code == 0
-        assert payload["command"] == command
-
-    assert observed == [
-        ("legacy-preview", waapi_gateway.DEFAULT_TRANSACTION_TIMEOUT),
-    ]
-
-
-def test_legacy_preview_preserves_the_canonical_artifact_after_normal_migration(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    original_builder = waapi_gateway.build_transaction_preview_artifact
-    fixed_now = datetime(2026, 8, 10, 12, 0, tzinfo=timezone.utc)
-
-    def deterministic_builder(*args: Any, **kwargs: Any) -> Any:
-        kwargs["now"] = fixed_now
-        return original_builder(*args, **kwargs)
-
-    monkeypatch.setattr(
-        waapi_gateway,
-        "build_transaction_preview_artifact",
-        deterministic_builder,
-    )
-    request = set_notes_request()
-    request_json = json.dumps(request, ensure_ascii=False)
-    results: dict[str, tuple[dict[str, Any], dict[str, Any], FakeClient]] = {}
-    for command in ("legacy-preview",):
-        state_dir = tmp_path / command
-        client = preview_client()
-        exit_code, payload = waapi_gateway.execute_gateway(
-            [
-                "--state-dir",
-                str(state_dir),
-                command,
-                "--request-json",
-                request_json,
-            ],
-            env=gateway_env(tmp_path),
-            client_factory=lambda _url, client=client: client,
-        )
-        assert exit_code == 0, payload
-        artifact = TransactionStore(state_dir).load_preview(
-            payload["transaction_id"]
-        ).artifact
-        results[command] = (payload, artifact, client)
-
-    legacy_payload, legacy_artifact, legacy_client = results["legacy-preview"]
-    assert legacy_payload["artifact_hash"]
-    assert legacy_artifact["request"] == request
-    assert legacy_client.calls
-
-
-def test_legacy_preview_keeps_its_truthful_command_on_early_live_boundaries(
-    tmp_path: Path,
-) -> None:
-    request_payload = {
-        "contract": OPERATION_REQUEST_CONTRACT,
-        "version": "2022.1",
-        "operation": "ui.commands.execute",
-        "arguments": {},
-    }
-
-    for command in ("legacy-preview",):
-        client = FakeClient({"ak.wwise.core.getInfo": [live_info()]})
-        exit_code, payload = waapi_gateway.execute_gateway(
-            [command, "--request-json", json.dumps(request_payload)],
-            env=gateway_env(tmp_path),
-            client_factory=lambda _url, client=client: client,
-        )
-
-        assert exit_code == 2
-        assert payload["error_code"] == "AUTHORING_HOST_REQUIRED"
-        assert payload["command"] == command
-
-
-def test_normal_preview_enforces_the_exact_operation_version_input_mode(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    import wwise_waapi.operation_registry as registry
-
-    migrated_lanes = tuple(
-        OperationInputModeLane(
-            operation=lane.operation,
-            version=lane.version,
-            input_mode=(
-                COMPOSER_INPUT_MODE
-                if lane.operation == "object.setNotes" and lane.version == "2022.1"
-                else lane.input_mode
-            ),
-        )
-        for lane in OPERATION_INPUT_MODE_LANES
-    )
-    monkeypatch.setattr(registry, "OPERATION_INPUT_MODE_LANES", migrated_lanes)
-    connections: list[str] = []
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["preview", "--request-json", json.dumps(set_notes_request())],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: connections.append(url),
-    )
-
-    assert exit_code == 2
-    assert payload["error_code"] == "INPUT_MODE_MISMATCH"
-    assert payload["details"] == {
-        "operation": "object.setNotes",
-        "version": "2022.1",
-        "required_input_mode": COMPOSER_INPUT_MODE,
-        "submitted_input_mode": LEGACY_JSON_INPUT_MODE,
-    }
-    assert connections == []
-
-    state_dir = tmp_path / "legacy-after-migration"
-    client = preview_client()
-    legacy_code, legacy = waapi_gateway.execute_gateway(
-        [
-            "--state-dir",
-            str(state_dir),
-            "legacy-preview",
-            "--request-json",
-            json.dumps(set_notes_request()),
-        ],
-        env=gateway_env(tmp_path),
-        client_factory=lambda _url: client,
-    )
-
-    assert legacy_code == 0, legacy
-    stored = TransactionStore(state_dir).load_preview(legacy["transaction_id"])
-    assert stored.artifact["request"] == set_notes_request()
-
-
-def test_object_set_json_submission_requires_the_explicit_legacy_surface(
-    tmp_path: Path,
-) -> None:
-    request = object_set_request()
-    connections: list[str] = []
-
-    normal_code, normal = waapi_gateway.execute_gateway(
-        ["preview", "--request-json", json.dumps(request)],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: connections.append(url),
-    )
-
-    assert normal_code == 2
-    assert normal["error_code"] == "INPUT_MODE_MISMATCH"
-    assert normal["details"] == {
-        "operation": "object.set",
-        "version": "2022.1",
-        "required_input_mode": COMPOSER_INPUT_MODE,
-        "submitted_input_mode": LEGACY_JSON_INPUT_MODE,
-    }
-    assert connections == []
-
-    state_dir = tmp_path / "object-set-legacy"
-    client = preview_client()
-    legacy_code, legacy = waapi_gateway.execute_gateway(
-        [
-            "--state-dir",
-            str(state_dir),
-            "legacy-preview",
-            "--request-json",
-            json.dumps(request),
-        ],
-        env=gateway_env(tmp_path),
-        client_factory=lambda _url: client,
-    )
-
-    assert legacy_code == 0, legacy
-    stored = TransactionStore(state_dir).load_preview(legacy["transaction_id"])
-    assert stored.artifact["request"] == request
-
-
-def test_audio_import_json_submission_requires_the_explicit_legacy_surface(
-    tmp_path: Path,
-) -> None:
-    request = {
-        "contract": OPERATION_REQUEST_CONTRACT,
-        "version": "2022.1",
-        "operation": "audio.import",
-        "arguments": {
-            "imports": [
-                {
-                    "object_path": (
-                        r"\Actor-Mixer Hierarchy\Default Work Unit\Target"
-                    ),
-                    "object_type": "Sound",
-                }
-            ]
-        },
-    }
-    connections: list[str] = []
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["preview", "--request-json", json.dumps(request)],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: connections.append(url),
-    )
-
-    assert exit_code == 2
-    assert payload["error_code"] == "INPUT_MODE_MISMATCH"
-    assert payload["details"] == {
-        "operation": "audio.import",
-        "version": "2022.1",
-        "required_input_mode": COMPOSER_INPUT_MODE,
-        "submitted_input_mode": LEGACY_JSON_INPUT_MODE,
-    }
-    assert connections == []
-
-
-@pytest.mark.parametrize(
-    "request_payload",
-    [
-        {
-            "contract": OPERATION_REQUEST_CONTRACT,
-            "version": "2022.1",
-            "operation": "object.copy",
-            "arguments": {},
-        },
-        set_notes_request(version="2025.1"),
-    ],
-)
-def test_preview_routes_keep_boundary_and_live_version_mismatch_errors_equivalent(
-    tmp_path: Path,
-    request_payload: Mapping[str, Any],
-) -> None:
-    results: list[tuple[int, dict[str, Any]]] = []
-    for command in ("preview", "legacy-preview"):
-        client = FakeClient(
-            {
-                "ak.wwise.core.getInfo": [live_info()],
-                "ak.wwise.core.getProjectInfo": [project_row()],
-            }
-        )
-        results.append(
-            waapi_gateway.execute_gateway(
-                [
-                    "--state-dir",
-                    str(tmp_path / command),
-                    command,
-                    "--request-json",
-                    json.dumps(request_payload),
-                ],
-                env=gateway_env(tmp_path),
-                client_factory=lambda _url, client=client: client,
-            )
-        )
-
-    assert results[0][0] == results[1][0] == 2
-    if request_payload["operation"] == "object.setNotes":
-        assert results[0][1]["error_code"] == "INPUT_MODE_MISMATCH"
-        assert results[1][1]["error_code"] == "VERSION_MISMATCH"
-    else:
-        assert results[0][1]["error_code"] == "INPUT_MODE_MISMATCH"
-        assert results[1][1]["error_code"] == "INVALID_REQUEST"

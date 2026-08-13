@@ -16,6 +16,9 @@ DOMAIN_CONTEXT = (REPO_ROOT / "CONTEXT.md").read_text(encoding="utf-8")
 COMPOSER_ADR = (
     REPO_ROOT / "docs" / "adr" / "0001-gateway-owned-operation-composition.md"
 ).read_text(encoding="utf-8")
+TYPED_INPUT_ADR = (
+    REPO_ROOT / "docs" / "adr" / "0002-single-model-facing-typed-input.md"
+).read_text(encoding="utf-8")
 
 
 def test_composer_domain_terms_and_architecture_decision_are_frozen() -> None:
@@ -36,20 +39,12 @@ def test_composer_domain_terms_and_architecture_decision_are_frozen() -> None:
         assert term in DOMAIN_CONTEXT
     assert "Legacy JSON Adapter" not in DOMAIN_CONTEXT
     assert "Legacy JSON Adapter" in COMPOSER_ADR
-    assert "Status: Accepted" in COMPOSER_ADR
+    assert "Status: Superseded in part" in COMPOSER_ADR
     assert "a Legacy lane cannot start a new Operation Draft" in COMPOSER_ADR
     assert "no planner model is embedded" in COMPOSER_ADR
     assert "Normal user-facing prose describes objects" in COMPOSER_ADR
-
-
-def _structured_query_example_request() -> dict[str, object]:
-    section = QUERY.split(
-        "contains nested OR/NOT logic, run the offline schema call", 1
-    )[1].split("```bash", 1)[1].split("```", 1)[0]
-    request_json = section.split("--request-json '", 1)[1].rsplit("'", 1)[0]
-    payload = json.loads(request_json)
-    assert isinstance(payload, dict)
-    return payload
+    assert "Status: Accepted" in TYPED_INPUT_ADR
+    assert "one model-facing typed input system" in TYPED_INPUT_ADR
 
 
 def test_common_reads_use_closed_gateway_before_optional_references() -> None:
@@ -98,7 +93,7 @@ def test_media_pool_reference_classification_uses_one_closed_versioned_query() -
     assert "Do not pre-normalize or de-duplicate" in section_flat
     assert "normalizes slash spelling and drive/UNC case" in section_flat
     assert "keeps POSIX case significant" in section_flat
-    assert "Do not add `--where-json`, `--select`, `--all-results`, or `--return-field`" in section_flat
+    assert "Do not add `--where`, `--select`, `--all-results`, or `--return-field`" in section_flat
     assert "fixed `id,path,originalFilePath` projection" in section_flat
     assert "emits no raw AudioFileSource inventory" in section_flat
     assert "never perform this join in model-authored code" in QUERY
@@ -373,13 +368,13 @@ def test_complex_query_guidance_preserves_tokens_pushdown_and_user_bounds() -> N
         "exactly one returned `AudioFileSource` has `parent.id` exactly equal to that Sound's `id`",
         "Do not report the language as missing when this exact child-source evidence exists",
         "do not associate by row position, similar names, or path prefixes",
-        "A predicate array means AND only",
+        "Repeated `--where FIELD OPERATOR TYPE VALUE` facts mean AND",
         "When the live result selection itself requires `A and (B or C)` or another nested boolean, switch to the structured route",
         "copy that exact number to `--take`",
         "ask for a limit instead of inventing one",
     ):
         assert phrase in query_flat
-    assert "--where-json '{\"field\":\"type\",\"operator\":\"=\",\"value\":\"Sound\"}' --take 24" in query_flat
+    assert "--where type = string Sound --take 24" in query_flat
     assert "--return-field '@Volume' --return-field notes --return-field OutputBus" in query_flat
 
 
@@ -387,7 +382,7 @@ def test_pure_and_query_pushes_every_supported_conjunct_in_canonical_order() -> 
     query_flat = " ".join(QUERY.split())
     for phrase in (
         'Words such as "simultaneously", "all of the following conditions", or “同时满足” introduce a pure AND',
-        "Put every supported conjunct into one `--where-json` array",
+        "Repeat `--where` for every supported conjunct",
         "preserving the user's condition order",
         "Do not submit only the type predicate",
         "report, grouping, or sorting in their first-mention order",
@@ -396,10 +391,8 @@ def test_pure_and_query_pushes_every_supported_conjunct_in_canonical_order() -> 
     ):
         assert phrase in query_flat
     assert (
-        "--where-json '[{\"field\":\"type\",\"operator\":\"=\",\"value\":\"Sound\"},"
-        "{\"field\":\"@Volume\",\"operator\":\"<=\",\"value\":-6.0},"
-        "{\"field\":\"notes\",\"operator\":\":\",\"value\":\"mix-review\"},"
-        "{\"field\":\"isIncluded\",\"operator\":\"=\",\"value\":true}]' --take 12"
+        "--where type = string Sound --where '@Volume' '<=' number -6.0 "
+        "--where notes : string mix-review --where isIncluded = boolean true --take 12"
     ) in query_flat
     assert (
         "--return-field '@Volume' --return-field notes "
@@ -424,24 +417,13 @@ def test_nested_boolean_query_uses_the_closed_structured_contract() -> None:
     query_flat = " ".join(QUERY.split())
     for phrase in (
         "offline, version-aware schema command",
-        "`waapi-skill.object-query/v1` JSON Schema",
+        "typed structured-query continuation",
         "nested `all`/`any`, or `not`",
         "Do not add `waql`, `raw`, `expression`",
         "structured route: use one `where` transform with `all`, `any`, and `not`",
     ):
         assert phrase in query_flat
-    request = _structured_query_example_request()
-    assert request["contract"] == "waapi-skill.object-query/v1"
-    assert request["transforms"][-1] == {"kind": "take", "value": 12}
-    where = request["transforms"][1]
-    assert where["kind"] == "where"
-    predicate = where["predicate"]
-    assert predicate["kind"] == "all"
-    assert [item["path"] for item in predicate["operands"][:2]] == [
-        ["type"],
-        ["@Volume"],
-    ]
-    assert predicate["operands"][2]["kind"] == "any"
+    assert "Follow the returned typed-structured continuation" in QUERY
 
 
 def test_reverse_direct_parent_query_uses_the_parent_transform() -> None:
@@ -455,11 +437,9 @@ def test_reverse_direct_parent_query_uses_the_parent_transform() -> None:
     ):
         assert phrase in query_flat
     assert (
-        "query-object --type Sound --select parent --where-json "
-        "'[{\"field\":\"path\",\"operator\":\":\",\"value\":\"\\\\Actor-Mixer Hierarchy\\\\Default Work Unit\\\\ParentReview\"},"
-        "{\"field\":\"type\",\"operator\":\"=\",\"value\":\"RandomSequenceContainer\"},"
-        "{\"field\":\"childrenCount\",\"operator\":\">=\",\"value\":3},"
-        "{\"field\":\"notes\",\"operator\":\":\",\"value\":\"parent-review\"}]' --take 10"
+        "query-object --type Sound --select parent --where path : string "
+        "'\\Actor-Mixer Hierarchy\\Default Work Unit\\ParentReview' "
+        "--where type = string RandomSequenceContainer"
     ) in query_flat
     assert (
         "--return-field childrenCount --return-field notes "
@@ -467,17 +447,14 @@ def test_reverse_direct_parent_query_uses_the_parent_transform() -> None:
     ) in query_flat
 
 
-def test_reverse_direct_parent_example_contains_valid_path_json() -> None:
+def test_reverse_direct_parent_example_contains_exact_typed_path() -> None:
     example = QUERY.split("Direct parents:", 1)[1].split("```bash", 1)[1].split(
         "```", 1
     )[0]
-    where_json = example.split("--where-json '", 1)[1].split("' --take", 1)[0]
-
-    predicates = json.loads(where_json)
-
-    assert predicates[0]["value"] == (
-        r"\Actor-Mixer Hierarchy\Default Work Unit\ParentReview"
-    )
+    assert (
+        "--where path : string "
+        r"'\Actor-Mixer Hierarchy\Default Work Unit\ParentReview'"
+    ) in example
 
 
 def test_reverse_parent_coverage_counts_raw_source_rows_not_children_count() -> None:
@@ -504,8 +481,7 @@ def test_ancestor_ownership_query_keeps_the_explicit_project_exclusion() -> None
     ):
         assert phrase in query_flat
     assert (
-        "--select ancestors --where-json "
-        "'{\"field\":\"type\",\"operator\":\"!=\",\"value\":\"Project\"}' --take 8"
+        "--select ancestors --where type '!=' string Project --take 8"
     ) in query_flat
     assert (
         "--return-field childrenCount --return-field notes"
@@ -716,7 +692,7 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     compact = " ".join(OPERATE.split())
     assert "An existing transaction continuation always outranks operation selection" in OPERATE
     assert "transaction-show <transaction-id> --summary-only" in OPERATE
-    assert "Do not call `operations`, `operation-schema`, or `preview` first" in OPERATE
+    assert "Do not call `operations`, `operation-schema`, or `request-schema` first" in OPERATE
     assert "`object.set` or `audio.import`" in OPERATE
     assert "run one metadata discovery next, then Composer actions" in OPERATE
     assert "`operation-schema object.create` first" in OPERATE
@@ -737,7 +713,7 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "Composer `draft-check` revalidates them and dependencies" in skill_compact
     assert "only an explicit unknown dynamic property/reference token needs" in skill_compact
     assert "A known native URI without a named route" in OPERATE
-    assert "`describe <uri>`" in OPERATE
+    assert "`request-schema <uri>`" in OPERATE
     assert "No schema-to-preview shortcut" in compact
     assert "gateway.py operation-schema <operation-name>" not in OPERATE
     assert "Follow the schema's sole `input_mode`" in OPERATE
@@ -749,16 +725,12 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "`--assignment switch VALUE` only when requested" in OPERATE
     assert "run its `preview-from-draft` unchanged" in OPERATE
     assert "`--apply` marks a preview, not execution" in OPERATE
-    assert "For `legacy_json`, replace only its envelope's `arguments`" in OPERATE
-    assert "hide Legacy from normal use" in OPERATE
+    assert "Exact reflected URIs use `request-schema`" in OPERATE
+    assert "follow its sole typed continuation" in OPERATE
     assert "Unknown fields fail" in OPERATE
-    assert "serialize every JSON string exactly once" in OPERATE
-    assert "Operation requests use only closed selectors, never raw WAQL" in OPERATE
+    assert "there is no caller-authored request document" in OPERATE
+    assert "Public mutation identities are closed" in OPERATE
     assert "`exact-type-name`" in OPERATE
-    assert r"Raw JSON spells each Wwise separator `\\`" in OPERATE
-    assert r"decoding yields `\`" in OPERATE
-    assert r"A raw `\` is invalid or escape-changing" in OPERATE
-    assert "never paste a decoded/displayed Wwise path" in OPERATE
     assert (
         "Each later intended change still creates its own executable preview"
         in OPERATE
@@ -979,8 +951,8 @@ def test_operate_cli_and_authoring_fast_routes_keep_unstructured_materialization
         "ak.wwise.cli.migrate",
     ):
         assert f"`{api}`" in OPERATE
-    assert "`operation-schema waapi.call` as the first Gateway command" in compact
-    assert "do not reuse 2022-only materialization rules" in compact
+    assert "`request-schema <exact-uri>`" in compact
+    assert "never reuse them for another lane" in compact
     assert "not yet represented structurally" in OPERATE
     for phrase in (
         "`platform` is always an array",
@@ -997,10 +969,8 @@ def test_operate_cli_and_authoring_fast_routes_keep_unstructured_materialization
         "caller-owned reopened-project oracle",
     ):
         assert phrase in compact
-    assert "`direct_fast_route_contract.canonical_request_template`" in compact
-    assert "user's stated absolute `io_root` unchanged" in compact
-    assert "explicitly supplied parent plus named direct children" in compact
-    assert "never search recursively or add unnamed descendants" in compact
+    assert "`request-schema ak.wwise.core.audio.convert`" in compact
+    assert "user's exact absolute `io_root`" in compact
 
 
 def test_operate_policy_and_gateway_owned_continuation_are_closed() -> None:
@@ -1098,7 +1068,8 @@ def test_five_version_coverage_reference_reports_executable_registry_not_boundar
     assert "A hard boundary is never counted as routed coverage" in COVERAGE
     assert "still require a live Authoring host" in coverage_flat
     assert "`AUTHORING_HOST_REQUIRED` before business" in coverage_flat
-    assert "manifest-registered `waapi.call` operation" in COVERAGE
+    assert "`operation-schema` or exact-URI `request-schema` typed route" in COVERAGE
+    assert "representation is never a caller or model input" in COVERAGE
     assert "Lua file operations are executable only from an existing `.lua` file" in COVERAGE
     assert "Hidden/model-authored source and unrestricted loader fields remain closed" in coverage_flat
     assert "program-tested packaged coverage" in COVERAGE

@@ -25,7 +25,7 @@ The first Gateway command is:
 python /absolute/path/to/waapi-skill/scripts/run.py gateway.py transaction-show <transaction-id> --summary-only
 ```
 
-This is a mandatory safety gate. Do not call `operations`, `operation-schema`, or `preview` first. If its complete JSON is not visible, stop without a later transaction command, even with exit code `0` or a previously known id/hash.
+This is a mandatory safety gate. Do not call `operations`, `operation-schema`, or `request-schema` first. If its complete JSON is not visible, stop without a later transaction command, even with exit code `0` or a previously known id/hash.
 
 ### New transaction
 
@@ -39,11 +39,11 @@ After any required selected-subset identity gate, choose exactly one of these fi
 | `object.set` or `audio.import` | its named `operation-schema` first; for naturally described dynamic properties/references, run one metadata discovery next, then Composer actions. |
 | Any other operation with an explicitly requested unknown dynamic property/reference token | one metadata discovery first, then its named `operation-schema` |
 | A named operation using only closed schema fields and side effects | its named `operation-schema` directly |
-| A known native URI without a named route | `describe <uri>` and obey only the returned `transaction_operations`, except for the reviewed fast routes below |
+| A known native URI without a named route | `request-schema <uri>` and follow its sole typed continuation |
 
-For direct `audio.import`, schema owns fixed fields and Event/Switch Assignation; metadata selects dynamic tokens and `draft-check` revalidates them. Table imports start `operation-schema audio.importTabDelimited`; dynamic columns stay metadata-first. Use `operations` only for inventory. Dedicated operations own their URIs; uncataloged `waapi.call` is rejected. Undo Group uses only `waapi.undoGroup`.
+For direct `audio.import`, schema owns fixed fields and Event/Switch Assignation; metadata selects dynamic tokens and `draft-check` revalidates them. Table imports start `operation-schema audio.importTabDelimited`; dynamic columns stay metadata-first. Use `operations` only for inventory. Dedicated operations own their URIs; exact reflected routes start with `request-schema`. Undo Group uses only `waapi.undoGroup`.
 
-Follow the schema's sole `input_mode`. No schema-to-preview shortcut. Reuse evidence-bound live property/reference accessors: remove one leading `@` (`@Foo` becomes `Foo`); `OutputBus` remains `OutputBus`; never infer a token. For `inline_typed`, run only the returned `typed-operation` continuation; Gateway owns the complete request and Preview. For `composer`, run `composer.start.gateway_argv`, then only the selected `action_argv`; Gateway serializes and `draft-check` validates metadata. Start `object.set` rows with `add_target --target ...`. Start every `audio.import` row with one `add_import_row`: include `--assignment none`, or `--assignment switch VALUE` only when requested. Corrections keep the same draft; run its `preview-from-draft` unchanged. `--apply` marks a preview, not execution. For `legacy_json`, replace only its envelope's `arguments`; hide Legacy from normal use.
+Follow the schema's sole `input_mode`. No schema-to-preview shortcut. Reuse evidence-bound live property/reference accessors: remove one leading `@` (`@Foo` becomes `Foo`); `OutputBus` remains `OutputBus`; never infer a token. For `inline_typed`, run only the returned `typed-operation` continuation; Gateway owns the complete request and Preview. For `composer`, run `composer.start.gateway_argv`, then only the selected `action_argv`; Gateway serializes and `draft-check` validates metadata. Start `object.set` rows with `add_target --target ...`. Start every `audio.import` row with one `add_import_row`: include `--assignment none`, or `--assignment switch VALUE` only when requested. Corrections keep the same draft; run its `preview-from-draft` unchanged. `--apply` marks a preview, not execution. Exact reflected URIs use `request-schema`; follow its sole typed continuation.
 
 Public mutation identities are closed to `id`, `path`, `exact-type-name`,
 `direct-child`, and `scoped-name`. Use a schema-fitting selector directly in
@@ -60,8 +60,7 @@ The Gateway owns quoting, the two-row ambiguity ceiling, exact type validation,
 and the applicable parent or name checks.
 
 If the target can be described only by a complex filter, first follow the query
-lane's offline `query-schema` plus structured
-`query-object --request-json '<waapi-skill.object-query/v1-json>'` flow. Proceed
+lane's offline `query-schema` plus its returned typed structured-query flow. Proceed
 to a mutation only when that read returns exactly one verified GUID, then use
 `{"kind":"id","value":"<returned GUID>"}`. Zero, multiple, truncated, or
 otherwise incomplete query results do not identify a mutation target.
@@ -140,18 +139,18 @@ For direct imports, discover only requested dynamic `properties[]`/`references[]
 
 Only explicit WwiseConsole, CLI, command-line, or 命令行 wording selects an `ak.wwise.cli.*` route. A `.wproj` path, JSON `project` field, project-copy description, or output/cache path alone does not establish CLI intent.
 
-Without explicit CLI wording, use the connected Authoring operations: `soundbank.generate`, `soundbank.convertExternalSources`, `soundbank.processDefinitionFiles`, and `audio.importTabDelimited`. When the earlier metadata-bound branch does not apply, their first Gateway command is the named `operation-schema`; otherwise complete that branch's one discovery first and then read the same schema. Do not probe `waapi.call`, `describe`, or a same-named CLI API first. The singular CLI `convertExternalSource`, CLI `generateSoundbank`, and CLI `tabDelimitedImport` are not their connected `ak.wwise.core.*` counterparts.
+Without explicit CLI wording, use the connected Authoring operations: `soundbank.generate`, `soundbank.convertExternalSources`, `soundbank.processDefinitionFiles`, and `audio.importTabDelimited`. When the earlier metadata-bound branch does not apply, their first Gateway command is the named `operation-schema`; otherwise complete that branch's one discovery first and then read the same schema. Do not probe a same-named CLI API first. The singular CLI `convertExternalSource`, CLI `generateSoundbank`, and CLI `tabDelimitedImport` are not their connected `ak.wwise.core.*` counterparts.
 
-### Reviewed CLI fast routes
+### Reviewed CLI typed routes
 
-For these four exact CLI APIs in Wwise `2022.1`, use `operation-schema waapi.call` as the first Gateway command without `describe`/`capabilities`:
+For these four exact CLI APIs, use `request-schema <exact-uri>` and follow its sole typed continuation:
 
 - `ak.wwise.cli.convertExternalSource`
 - `ak.wwise.cli.generateSoundbank`
 - `ak.wwise.cli.tabDelimitedImport`
 - `ak.wwise.cli.migrate`
 
-If the version was initially unknown, apply the rules below only when that schema result's `session_context` reports `2022.1`; on another version do not preview and use `describe <exact-uri>`. For any other already-known version, begin with `describe` and do not reuse 2022-only materialization rules. `operation-schema`/`describe` own the accepted/blocked fields, reflected types, version deltas, request envelope, and `io_root` policy. Never invent a hidden flag or default Boolean; include a true Boolean only for behavior explicitly requested by the user. `options` is `{}`.
+Apply the 2022-specific reminders below only when the configured schema version is `2022.1`; never reuse them for another lane. `request-schema` owns accepted and blocked fields, reflected types, version deltas, typed handles, and `io_root` policy. Never invent a hidden flag or default Boolean; include a true Boolean only for behavior explicitly requested by the user.
 
 Version-delta reminders that must agree with the returned schema:
 
@@ -170,28 +169,20 @@ Compact 2022 materialization rules not yet represented structurally:
 - `tabDelimitedImport` uses the stated project, caller TSV, Wwise language, and explicit `createNew`/`useExisting`/`replaceExisting`; `io_root` is the case-owned project directory. Optional true flags are never inferred.
 - `migrate` maps only the case-owned project and its containing `io_root`. `abort-on-load-issues` is included only when explicitly requested; warning summaries do not imply `verbose`. A normal control-server disconnect or continued reachability does not authorize replay; never replay execution, and defer success to the caller-owned reopened-project oracle.
 
-### Reviewed Authoring audio-convert fast route
+### Authoring audio conversion
 
-For exact `ak.wwise.core.audio.convert` in `2024.1`/`2025.1`, use `operation-schema waapi.call` first without `describe`/`capabilities`. Apply it only after the result proves one of those versions. Copy `direct_fast_route_contract.canonical_request_template` and replace only its listed values: non-empty ordered string arrays for exact object paths, platforms, and languages, plus the user's stated absolute `io_root` unchanged. An exact object path may be formed only from an explicitly supplied parent plus named direct children, in user order; never search recursively or add unnamed descendants. Explicit SFX targets use `languages:["SFX"]`; explicit localized languages replace it. Ask when a required input remains ambiguous.
+For exact `ak.wwise.core.audio.convert` in `2024.1`/`2025.1`, run `request-schema ak.wwise.core.audio.convert` and follow its typed continuation. Append non-empty ordered object identities, platforms, and languages through the returned handles, and pass the user's exact absolute `io_root`. Explicit SFX targets use `SFX`; explicit localized languages replace it. Ask when a required input remains ambiguous.
 
 ## Closed input, preview, and policy
 
 The successful schema is the sole authority for fields, identities, constraints, version support, and paths. Unknown fields fail. Runtime identity evidence, metadata records, dispatcher args/options, and raw `@Property` members are not model inputs.
 
-Legacy JSON uses one standalone command:
-
-```bash
-python /absolute/path/to/waapi-skill/scripts/run.py gateway.py preview --apply --request-json '<closed-request-json>'
-```
-
-Single-quote its compact request and serialize every JSON string exactly once. Raw JSON spells each Wwise separator `\\`; decoding yields `\`. A raw `\` is invalid or escape-changing; never paste a decoded/displayed Wwise path. Operation requests use only closed selectors, never raw WAQL. Invalid JSON stops before preview; do not repair or retry that turn.
-
-Under `ask_before_changes`, a user asking to see the preview before confirming an intended change still uses `preview --apply`: that flag creates the durable confirmation-bound preview and does not execute the change. Omit `--apply` only for a hypothetical, design-only, or explicitly non-executable preview.
+Every normal input is typed. Use only `operation-schema` or `request-schema` output and its returned continuation; there is no caller-authored request document. Under `ask_before_changes`, `--apply` creates the durable confirmation-bound Preview and does not execute the change. Omit `--apply` only for a hypothetical, design-only, or explicitly non-executable Preview.
 In ordinary use omit `--state-dir`: the Gateway owns the external runtime state root. Pass it only when a trusted caller explicitly supplied an absolute override, then reuse that path unchanged.
 
 A rejected or incomplete preview is a hard same-turn boundary. Do not repair JSON, change an operation, or retry preview in that turn. A changed target/value requires a new preview.
 
-Filesystem proofs are local to the Gateway host. File-backed imports, SoundBank I/O, Lua, file-bearing UI commands, recursive object imports, and isolated `waapi.call` require a loopback WAAPI endpoint as reported by their schema/boundary. On `LOCAL_WAAPI_HOST_REQUIRED`, report and stop; never treat a local file proof as evidence about a remote host.
+Filesystem proofs are local to the Gateway host. File-backed imports, SoundBank I/O, Lua, file-bearing UI commands, recursive object imports, and isolated exact-URI typed routes require a loopback WAAPI endpoint as reported by their schema/boundary. On `LOCAL_WAAPI_HOST_REQUIRED`, report and stop; never treat a local file proof as evidence about a remote host.
 
 Policy behavior:
 

@@ -23,12 +23,12 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
         "python scripts/run.py gateway.py capabilities --all-versions --summary-only",
         "python scripts/run.py gateway.py capabilities --all-versions --query object.get --limit 20",
         "python scripts/run.py gateway.py describe <uri> --all-versions",
-        "python scripts/run.py gateway.py --version <supported-version> call ak.wwise.waapi.getFunctions --args-json '{}' --options-json '{}'",
-        "python scripts/run.py gateway.py --version <supported-version> call ak.wwise.waapi.getTopics --args-json '{}' --options-json '{}'",
+        "python scripts/run.py gateway.py request-schema ak.wwise.waapi.getFunctions",
+        "python scripts/run.py gateway.py request-schema ak.wwise.waapi.getTopics",
         "python scripts/run.py gateway.py query-object --path '<exact-object-path>' --return-field id --return-field name --return-field type --return-field path",
         "python scripts/run.py gateway.py query-object --type Event --take 100",
         "python scripts/run.py gateway.py --version <supported-version> query-schema [--advanced]",
-        "python scripts/run.py gateway.py --version <supported-version> query-object (--request-json '<object-query-v1-json>' | --advanced-request-json '<advanced-object-query-v1-json>')",
+        "python scripts/run.py gateway.py --version <supported-version> query-object (--typed-structured <typed-facts-from-query-schema> | --typed-advanced --waql '<bounded-single-line-waql>' <typed-fields-from-query-schema>)",
         "python scripts/run.py gateway.py metadata types --summary-only",
         "python scripts/run.py gateway.py wait-topic <topic-uri>",
         "python scripts/run.py gateway.py topic-schema <topic-uri>",
@@ -38,7 +38,7 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
         "python scripts/run.py gateway.py --timeout <positive-finite-seconds> stream-topic <topic-uri>",
         "python scripts/run.py gateway.py operations",
         "python scripts/run.py gateway.py operation-schema object.create",
-        "python scripts/run.py gateway.py operation-schema waapi.call",
+        "python scripts/run.py gateway.py operation-schema object.set",
         "python scripts/run.py gateway.py operation-schema waapi.undoGroup",
         "python scripts/run.py gateway.py --version 2022.1 operation-schema object.copy",
     ):
@@ -50,23 +50,18 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
     assert "808 packaged route rows" in coverage
     assert "require a live Authoring host" in coverage
     assert "824" in coverage
-    assert (
-        "each `transaction_operation` row requires immutable preview plus "
-        "confirmation or policy authorization through exactly one declared closed lane"
-    ) in skill
-    assert "`waapi.undoGroup` for the three Undo members, and `waapi.call` only when the catalog explicitly lists it" in skill
+    assert "Mutations always require immutable Preview plus confirmation or policy authorization" in skill
+    assert "Closed transaction operations include `waapi.undoGroup`" in skill
     assert "FIXED_COMMAND_REQUIRED" in skill
     assert "WAIT_TOPIC_REQUIRED" in skill
-    assert "--dry-run" in skill
     assert "describe <uri> --full-schema" in skill
     assert "The list defaults to at most 50 compact rows" in skill
     assert "operations --detail" in skill
     assert "do not read the query reference before or after it" in skill
     assert "do not retry a rejected or failed gateway invocation" in skill
     assert "Do not run `describe` or `capabilities` first" in skill
-    assert "run exactly one matching `call` command" in skill
-    assert "replacing `<supported-version>` with the exact requested or connected Wwise version" in skill
-    assert "except for an explicit exact reflection call or a reviewed direct `waapi.call` fast route" in skill
+    assert "run `request-schema` and follow its sole typed continuation" in skill
+    assert "The configured exact Wwise version selects every schema" in (SKILL_ROOT / "references" / "waapi-query.md").read_text(encoding="utf-8")
     assert "Read each later named lane reference exactly once in its own shell call" in skill
     assert "native Windows uses `Get-Content -Raw -Encoding UTF8 '<reference>'`" in skill
     assert ".agents\\skills\\waapi-skill\\references\\<file>.md" in skill
@@ -103,48 +98,35 @@ def test_query_reference_has_no_raw_client_fallback() -> None:
     query_flat = " ".join(query_reference.split())
 
     assert "There is no raw-client fallback" in query_reference
-    assert "gateway.py call <uri>" in query_reference
+    assert "request-schema <uri>" in query_reference
     assert "TRANSACTION_REQUIRED" in query_reference
     assert "FIXED_COMMAND_REQUIRED" in query_reference
     assert "WAIT_TOPIC_REQUIRED" in query_reference
     assert "UNSUPPORTED_BY_SKILL_INTERFACE" in query_reference
-    assert "preferred_route: manifest_dispatch" in query_reference
-    assert "broader reads return `TRANSACTION_REQUIRED` rather than being inferred safe from a `get`-shaped name" in query_reference
-    assert "not an open raw-call surface" in query_reference
     assert "gateway.py query-object" in query_reference
-    assert "gateway.py wait-topic" in query_reference
-    assert "gateway.py stream-topic" in query_reference
     assert "`--query` means an existing Wwise Query Editor object" in query_reference
-    assert "bounded native WAQL fallback" in query_reference
     assert "query-schema --advanced" in query_reference
-    assert "query-object --advanced-request-json" in query_reference
+    assert "query-object --typed-advanced" in query_reference
     assert "do not write Python" in query_reference
     assert "Raw WAQL itself is never a mutation identity" in query_flat
     assert "never alias another advanced expression onto" in query_flat
     assert "The exact-ID readback must match" in query_flat
-    assert "`owner` remain outside the packaged boundary" in query_reference
-    assert "existing `--take N` or explicit user-requested `--all-results` rule" in query_reference
     assert "`--all-results`" in query_reference
-    assert "`all`, `全部`, or `都列出来`" in query_flat
     assert "between `0` and `1000`" in query_reference
     assert "`QUERY_OBJECT_REQUIRED`" in query_reference
-    assert "`buses` response above 1000 is protocol drift" in query_reference
     assert "gateway.py --version <supported-version> query-schema" in query_reference
-    assert "query-object --request-json" in query_reference
-    assert "response shape is a structured error" in query_reference
+    assert "typed-structured continuation" in query_reference
     assert "Add `--full-schema` only when" in query_reference
     assert "at most 50 compact rows by default" in query_reference
     assert "Use `--limit 0` only when" in query_reference
     assert "--path '\\Events\\Default Work Unit'" in query_reference
     assert "--path '\\\\Events\\\\Default Work Unit'" not in query_reference
-    assert "--search 'ExactName' --where-json '{\"field\":\"name\",\"operator\":\"=\",\"value\":\"ExactName\"}' --take 1" in query_reference
+    assert "--search 'ExactName' --where name = string ExactName --take 1" in query_reference
     assert "`=` is exact equality" in query_reference
     assert "`:` is" in query_reference and "a contains/match predicate" in query_reference
-    assert "run that one `call` directly without `describe` or `capabilities`" in query_reference
-    assert "only when `describe` reports" not in query_reference
+    assert "Use `request-schema` for each URI and follow only its typed continuation" in query_reference
     assert "metadata types --summary-only" in query_reference
     assert "compact-serialize that object exactly" in query_reference
-    assert "repeat the metadata command after success" in query_reference
 
 
 def test_topic_wait_policy_is_consistent_across_skill_reference_and_readmes() -> None:
@@ -227,7 +209,7 @@ def test_query_reference_exposes_only_the_closed_original_file_match_surface() -
     assert "Each path is limited to 1024 UTF-8 bytes" in query_flat
     assert "candidate-limit boundary" in query_flat
     assert "do not silently truncate" in query_flat
-    assert "Do not add `--where-json`, `--select`, `--all-results`, or `--return-field`" in query_flat
+    assert "Do not add `--where`, `--select`, `--all-results`, or `--return-field`" in query_flat
     assert "never run the old unfiltered 1000-row AudioFileSource projection" in query_flat
     assert "--return-field originalFilePath" not in query_reference
     assert "A 1000-row scan returns `ORIGINAL_FILE_REFERENCE_SCAN_INCOMPLETE`" in query_flat
@@ -242,11 +224,11 @@ def test_existing_transaction_continuation_precedes_named_operation_schema() -> 
     assert "it requires the transaction id" in skill
     assert "an artifact hash alone is not a transaction lookup key" in skill
     assert "run `transaction-show <transaction-id> --summary-only` first" in skill
-    assert "skip `operation-schema` and `preview`; start with `transaction-show`" in skill
+    assert "skip schema discovery and start with `transaction-show`" in skill
     assert "An existing transaction continuation always outranks operation selection" in operate
     assert "an artifact hash is not a lookup key" in operate
     assert "transaction-show <transaction-id> --summary-only" in operate
-    assert "Do not call `operations`, `operation-schema`, or `preview` first" in operate
+    assert "Do not call `operations`, `operation-schema`, or `request-schema` first" in operate
     assert "execute only the field named by `next_command.copy_instruction.source_field`" in operate
     assert "copy that entire string verbatim as one shell tool call" in operate
     assert "normally selects the short `model_command`" in operate
@@ -288,15 +270,15 @@ def test_public_readmes_route_users_only_through_the_packaged_gateway() -> None:
             "python scripts/run.py gateway.py status",
             "python scripts/run.py gateway.py query-object",
             "python scripts/run.py gateway.py operation-schema object.setNotes",
-            "python scripts/run.py gateway.py preview",
+            "python scripts/run.py gateway.py typed-operation object.setNotes --apply",
             "python scripts/run.py gateway.py transaction-show <transaction-id> --summary-only",
             "python scripts/run.py gateway.py confirm <transaction-id> --confirmation-token <confirmation-token>",
             "python scripts/run.py gateway.py execute <transaction-id>",
             "python scripts/run.py gateway.py verify <transaction-id>",
         ):
             assert command in readme
-        assert "confirm <transaction-id> --artifact-hash <full-artifact-hash>" in readme
-        assert readme.index("python scripts/run.py gateway.py preview") < readme.index(
+        assert "state-bound confirmation token" in readme or "与当前状态绑定的确认 token" in readme
+        assert readme.index("python scripts/run.py gateway.py typed-operation object.setNotes --apply") < readme.index(
             "python scripts/run.py gateway.py transaction-show <transaction-id> --summary-only"
         )
         assert readme.index(
@@ -311,14 +293,11 @@ def test_public_readmes_route_users_only_through_the_packaged_gateway() -> None:
             assert internal_route not in readme
         assert "inline Python" in readme
         assert "helper script" in readme
-        assert "--dry-run" in readme
 
     assert "Manifest reflection is discovery, not permission" in readmes[0]
-    assert "immutable reviewed set" in readmes[0]
-    assert "only for legacy transactions and programmatic compatibility" in readmes[0]
+    assert "request-schema` exposes only reviewed exact-version typed routes" in readmes[0]
     assert "Manifest 反射只用于发现能力，不等于授权执行" in readmes[1]
-    assert "经过 immutable review" in readmes[1]
-    assert "只作为旧 transaction 和程序兼容入口保留" in readmes[1]
+    assert "request-schema` 只开放经过审核、精确版本绑定且结果有界的 typed route" in readmes[1]
 
 
 def test_public_readmes_publish_exact_five_version_api_coverage() -> None:

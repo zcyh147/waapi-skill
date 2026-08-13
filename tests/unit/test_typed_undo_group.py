@@ -558,7 +558,8 @@ def test_public_undo_draft_seals_executes_once_and_replays_one_preview(
     confirm_code, confirmed = gateway.execute_gateway(
         [
             "--state-dir", str(state_dir), "confirm", previewed["transaction_id"],
-            "--artifact-hash", previewed["artifact_hash"],
+            "--confirmation-token",
+            store.load_snapshot(previewed["transaction_id"]).confirmation_token,
         ],
         env=_env(tmp_path), client_factory=offline,
     )

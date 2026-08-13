@@ -5,10 +5,10 @@
     "registry_version_lanes": 153,
     "composer_version_lanes": 58,
     "inline_typed_version_lanes": 90,
-    "legacy_json_version_lanes": 5,
-    "lane_inventory_sha256": "b869d4078b4a4674e5f3a5da685adb8e50725538d8a866acc913a91dfc98ad0b",
+    "internal_canonical_version_lanes": 5,
+    "lane_inventory_sha256": "d42e5238d486a832df3b0dd9e3c2fdbdbc6f3fd4ce14d74cdd97d4256d8c44b5",
     "version_rule": "Every supported version lane inherits the disposition of its exact Registry operation name.",
-    "normal_input_rule": "The Operation Registry exposes one normal input mode per operation and version. The Agent never chooses between Composer and Legacy JSON for one normal request.",
+    "normal_input_rule": "The Operation Registry exposes one typed normal input mode per public operation and version. Internal canonical transaction representations are not model-facing operations.",
     "native_uri_rule": "A shared native URI never implies a shared migration decision. Isolation is keyed by exact operation name and version."
   },
   "waves": [
@@ -250,24 +250,24 @@
       "minimum_real_evidence": "Successful and reviewed cancellation/failure shapes on matching real Wwise versions, then macOS and native-Windows fresh-Agent evidence for one representative compound outcome."
     }
   ],
-  "exceptions": [
+  "internal_representations": [
     {
-      "id": "exception-guarded-generic-call",
+      "id": "canonical-generic-call",
       "operations": [
         "waapi.call"
       ],
-      "reason": "This manifest-registered compatibility substrate spans heterogeneous reviewed functions. A generic Composer would recreate raw args/options composition and conflict with operation-specific Adapters."
+      "reason": "Exact reflected URI contracts materialize this canonical transaction form internally. It is absent from public operation discovery and accepts no model-authored request document."
     }
   ],
   "exclusions": [],
-  "legacy_exit_gates": [
+  "cutover_gates": [
     {
       "id": "all-lanes-decided",
-      "requirement": "Every Registry operation/version lane is Composer-complete, covered by an approved exception decision, or remains an explicit unimplemented exclusion."
+      "requirement": "Every public Registry operation/version lane is typed-complete; internal canonical representations are explicitly non-public."
     },
     {
       "id": "normal-surface-single-entry",
-      "requirement": "Normal schema, detail, Skill guidance, and semantic protocols expose exactly one Registry-selected input mode; compatibility commands are never presented as an Agent choice."
+      "requirement": "Normal schema, detail, Skill guidance, and semantic protocols expose exactly one Registry-selected typed input mode."
     },
     {
       "id": "consumer-inventory",
@@ -282,8 +282,8 @@
       "requirement": "The final frozen Skill and semantic harness pass the complete public integration profile on macOS and native Windows; cumulative or failed roots remain reported as such."
     },
     {
-      "id": "explicit-removal-decision",
-      "requirement": "A later decision ticket reviews actual consumer evidence and chooses retain or remove. This inventory neither authorizes removal nor creates a deletion implementation ticket."
+      "id": "single-typed-input-decision",
+      "requirement": "ADR 0002 authorizes the unreleased breaking cutover and keeps historical replay outside the production parser."
     }
   ],
   "second_round_ticketing": {
@@ -295,6 +295,6 @@
       "focused program and non-live gates",
       "matching real-host and fresh-Agent evidence"
     ],
-    "dependency_rule": "Cutover depends on Adapter and semantic support; real evidence depends on program and non-live gates. Legacy removal depends on every wave or approved exception plus every exit gate."
+    "dependency_rule": "Cutover depends on Adapter and semantic support; real evidence depends on program and non-live gates."
   }
 }

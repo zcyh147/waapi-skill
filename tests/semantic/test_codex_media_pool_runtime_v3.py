@@ -154,13 +154,13 @@ def _public_request(tmp_path: Path, index: int, *, ixml: bool = False):
 def _assert_public_media_mapping_is_documented() -> None:
     text = " ".join(QUERY_REFERENCE.read_text(encoding="utf-8").split())
     for required in (
-        "Do not run `describe` or `capabilities`",
+        "Use `request-schema` for each URI and follow only its typed continuation",
         '`{"type":"field","field":<bound field>,"operator":<operator>,"value":<value>}`',
         "Preserve database and predicate order",
-        "add `--post-filter-json`",
+        "use the `result_filter` fields disclosed by `request-schema`",
         "Between/from A to B",
         "Path`, `FileId`, `Db`, `Filename`, `WAV/Duration`, `WAV/Sample Rate`, `WAV/Bit Depth`, `WAV/Channels",
-        "query-object --type AudioFileSource --take 1000",
+        "never run the old unfiltered 1000-row AudioFileSource projection",
     ):
         assert required in text
 

@@ -25,7 +25,7 @@ from wwise_waapi.typed_operations import (  # pyright: ignore[reportMissingImpor
 )
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     COMPOSER_INPUT_MODE,
-    LEGACY_JSON_INPUT_MODE,
+    INTERNAL_CANONICAL_INPUT_MODE,
     OPERATION_INPUT_MODE_LANES,
     OPERATION_REQUEST_CONTRACT,
     UNDO_GROUP_INNER_URIS_BY_VERSION,
@@ -173,7 +173,7 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                     "ui.commands.execute",
                     "audio.importTabDelimited",
                 }
-            else LEGACY_JSON_INPUT_MODE
+            else INTERNAL_CANONICAL_INPUT_MODE
         )
         assert operation_input_modes_by_version(name) == {
             version: expected_mode
@@ -201,7 +201,7 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                 OperationInputModeLane(
                     operation="missing.operation",
                     version="2022.1",
-                    input_mode=LEGACY_JSON_INPUT_MODE,
+                    input_mode=INTERNAL_CANONICAL_INPUT_MODE,
                 ),
             ),
             "unknown operation",
@@ -212,7 +212,7 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                 OperationInputModeLane(
                     operation="object.set",
                     version="2021.1",
-                    input_mode=LEGACY_JSON_INPUT_MODE,
+                    input_mode=INTERNAL_CANONICAL_INPUT_MODE,
                 ),
             ),
             "unsupported version lane",

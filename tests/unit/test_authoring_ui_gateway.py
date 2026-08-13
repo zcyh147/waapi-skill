@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 import pytest  # pyright: ignore[reportMissingImports]
+from tests.support.canonical_preview import bind_canonical_preview_fixture
 
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     OPERATION_REQUEST_CONTRACT,
@@ -43,6 +44,7 @@ assert SPEC is not None and SPEC.loader is not None
 gateway = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = gateway
 SPEC.loader.exec_module(gateway)
+gateway.execute_gateway = bind_canonical_preview_fixture(gateway)
 
 
 PROJECT_GUID = "{11111111-1111-1111-1111-111111111111}"
@@ -381,6 +383,12 @@ def test_get_commands_uses_authoring_overlay_and_schema(
     tmp_path: Path,
     version: str,
 ) -> None:
+    schema_code, schema = execute(
+        ["request-schema", GET_COMMANDS_URI],
+        tmp_path=tmp_path,
+        version=version,
+    )
+    assert schema_code == 0, schema
     client = FakeClient(
         {
             GET_INFO_URI: [live_info(year=int(version[:4]))],
@@ -389,12 +397,10 @@ def test_get_commands_uses_authoring_overlay_and_schema(
     )
     code, payload = execute(
         [
-            "call",
+            "typed-zero-call",
             GET_COMMANDS_URI,
-            "--args-json",
-            "{}",
-            "--options-json",
-            "{}",
+            "--schema-digest",
+            schema["schema_digest"],
         ],
         tmp_path=tmp_path,
         version=version,
@@ -404,7 +410,8 @@ def test_get_commands_uses_authoring_overlay_and_schema(
     assert code == 0, payload
     assert payload["ok"] is True
     assert payload["call"]["api"] == GET_COMMANDS_URI
-    assert payload["result_validation"]["uri"] == GET_COMMANDS_URI
+    assert payload["typed_request"]["schema_digest"] == schema["schema_digest"]
+    assert payload["agent_result"] == {"commands": ["Copy", "SaveProject"]}
     assert [row[0] for row in client.calls] == [
         GET_INFO_URI,
         GET_COMMANDS_URI,
@@ -414,11 +421,20 @@ def test_get_commands_uses_authoring_overlay_and_schema(
 def test_get_commands_console_boundary_dispatches_only_get_info(
     tmp_path: Path,
 ) -> None:
+    schema_code, schema = execute(
+        ["request-schema", GET_COMMANDS_URI],
+        tmp_path=tmp_path,
+        version="2024.1",
+    )
+    assert schema_code == 0, schema
     client = FakeClient(
         {GET_INFO_URI: [live_info(command_line=True)]}
     )
     code, payload = execute(
-        ["call", GET_COMMANDS_URI, "--args-json", "{}", "--options-json", "{}"],
+        [
+            "typed-zero-call", GET_COMMANDS_URI,
+            "--schema-digest", schema["schema_digest"],
+        ],
         tmp_path=tmp_path,
         version="2024.1",
         client=client,
@@ -483,13 +499,24 @@ def test_typed_zero_get_commands_is_discoverable_and_host_attested(
 def test_executed_topic_uses_authoring_overlay_and_unsubscribes(
     tmp_path: Path,
 ) -> None:
+    schema_code, schema = execute(
+        ["topic-schema", EXECUTED_TOPIC],
+        tmp_path=tmp_path,
+        version="2024.1",
+    )
+    assert schema_code == 0, schema
+    bind = schema["continuation"]["bind"]
     event = {"command": "SaveProject", "objects": [], "platforms": []}
     client = FakeClient(
         {GET_INFO_URI: [live_info()]},
         subscription_events={EXECUTED_TOPIC: [event]},
     )
     code, payload = execute(
-        ["--timeout", "5", "wait-topic", EXECUTED_TOPIC],
+        [
+            "--timeout", "5", "wait-topic", EXECUTED_TOPIC,
+            "--options-schema-digest", bind["--options-schema-digest"],
+            "--match-schema-digest", bind["--match-schema-digest"],
+        ],
         tmp_path=tmp_path,
         version="2024.1",
         client=client,
@@ -506,11 +533,22 @@ def test_executed_topic_uses_authoring_overlay_and_unsubscribes(
 def test_executed_topic_console_boundary_never_subscribes(
     tmp_path: Path,
 ) -> None:
+    schema_code, schema = execute(
+        ["topic-schema", EXECUTED_TOPIC],
+        tmp_path=tmp_path,
+        version="2024.1",
+    )
+    assert schema_code == 0, schema
+    bind = schema["continuation"]["bind"]
     client = FakeClient(
         {GET_INFO_URI: [live_info(command_line=True)]}
     )
     code, payload = execute(
-        ["wait-topic", EXECUTED_TOPIC],
+        [
+            "wait-topic", EXECUTED_TOPIC,
+            "--options-schema-digest", bind["--options-schema-digest"],
+            "--match-schema-digest", bind["--match-schema-digest"],
+        ],
         tmp_path=tmp_path,
         version="2024.1",
         client=client,

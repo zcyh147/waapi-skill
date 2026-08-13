@@ -12,10 +12,10 @@ native URI. `object.set`, `object.setRTPC`, and `object.createPlugin` all use
 `ak.wwise.core.object.set`, but they retain separate contracts and migration
 decisions.
 
-Each exact operation/version exposes one normal input mode. A later migration
-changes that lane only after its typed Adapter, semantic protocol, archive
-replay, and evidence gates complete. The Agent never chooses between Composer
-and Legacy JSON. Explicit Legacy commands remain compatibility-only.
+Each exact operation/version exposes one normal typed input mode. The Agent
+never chooses between typed construction and a caller-authored canonical
+document. Canonical JSON remains only an internal materialization and frozen
+archive representation, never a packaged product ingress.
 
 ## Exact operation inventory
 
@@ -56,7 +56,7 @@ planning; the Registry remains authoritative during implementation.
 | `ui.commands.execute` | 2021.1–2025.1 | Inline typed | command; optional targets/values/files | fresh command inventory | wave 05 complete |
 | `ui.commands.register` | 2021.1–2025.1 | Composer | descriptors; optional authority | ownership and registration readback | wave 05 complete |
 | `ui.commands.unregister` | 2021.1–2025.1 | Composer | descriptors or acknowledged IDs | ownership cannot be inferred | wave 05 complete |
-| `waapi.call` | 2021.1–2025.1 | Legacy | manifest API; optional args/options/root | heterogeneous compatibility | exception candidate |
+| `waapi.call` | 2021.1–2025.1 | Internal canonical | Gateway-materialized exact URI request | heterogeneous internal transaction representation | not model-facing |
 | `waapi.undoGroup` | 2021.1–2025.1 | Composer | name and ordered typed child handles | nested routes and cancellation journal | wave 06 complete |
 
 ## Migration order
@@ -72,19 +72,19 @@ Each operation owns its action vocabulary and verifier. A wave reuses deep
 Draft, canonical parsing, and Preview modules without inventing a generic
 business schema.
 
-Debug/host controls and guarded generic `waapi.call` are exception candidates
-requiring later retain-or-migrate decisions. `object.copy` and `object.move` now have closed typed inputs and
-operation-specific identity, parent, and path verification.
+Debug/host controls use their closed typed operations. Generic `waapi.call` is
+an internal canonical transaction representation produced only after an exact
+typed request has been validated and materialized. `object.copy` and
+`object.move` have closed typed inputs and operation-specific identity, parent,
+and path verification.
 
-## Legacy exit decision
+## Single typed input decision
 
-This inventory does not remove or pre-authorize removal of Legacy JSON. A later
-decision must show that every Registry lane is migrated or approved as an
-exception; all normal Agent surfaces still expose one input; real repository,
-external, and archive consumers are inventoried; history remains replayable;
-and one frozen Skill/harness has complete public integration evidence on both
-macOS and native Windows. Only an explicit `remove` decision may create a
-separate deletion ticket.
+ADR 0002 completed the product cutover: every normal model-facing lane uses
+Gateway-owned typed construction, while historical JSON and action grammars
+exist only in versioned offline replay codecs. Pre-cutover pending Drafts and
+Previews fail with a bounded recreate instruction instead of executing through
+compatibility code.
 
 Failed, skipped, cumulative, or cross-candidate semantic roots remain reported
 as such and do not satisfy that final release gate.

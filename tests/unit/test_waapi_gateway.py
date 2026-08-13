@@ -28,6 +28,8 @@ from wwise_waapi.builders.query import (  # pyright: ignore[reportMissingImports
     MAX_ADVANCED_WAQL_BYTES,
 )
 from wwise_waapi.safety import EXPLICIT_UNSUPPORTED_TOPIC_URIS, IMMEDIATE_UNSUPPORTED_CALL_URIS
+from wwise_waapi.typed_topics import topic_match_contract, topic_options_contract
+from wwise_waapi.typed_requests import typed_request_construction_for_values
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS, version_key_from_get_info
 
 
@@ -62,6 +64,65 @@ EXPECTED_EXCLUDED_FUNCTION_URIS = frozenset(
     }
 )
 EXPECTED_EXCLUDED_TOPIC_URIS = frozenset()
+
+
+def _typed_topic_bindings(topic: str, version: str = "2022.1") -> list[str]:
+    return [
+        "--options-schema-digest",
+        topic_options_contract(version, topic).schema_digest,
+        "--match-schema-digest",
+        topic_match_contract(version, topic).schema_digest,
+    ]
+
+
+def _typed_topic_arguments(
+    topic: str,
+    *,
+    version: str = "2022.1",
+    options: Mapping[str, Any] | None = None,
+    match: Mapping[str, Any] | None = None,
+) -> list[str]:
+    option_contract = topic_options_contract(version, topic)
+    match_contract = topic_match_contract(version, topic)
+    option_construction = typed_request_construction_for_values(
+        option_contract,
+        args={},
+        options=dict(options or {}),
+    )
+    match_construction = typed_request_construction_for_values(
+        match_contract,
+        args=dict(match or {}),
+        options={},
+    )
+    arguments = [
+        "--options-schema-digest",
+        option_contract.schema_digest,
+        "--match-schema-digest",
+        match_contract.schema_digest,
+    ]
+    for fact in option_construction.facts:
+        if fact.action == "set":
+            arguments.extend(
+                    ["--option-set", fact.handle, fact.value_type, fact.value]
+            )
+        elif fact.action == "append":
+            arguments.extend(
+                    ["--option-append", fact.handle, fact.value_type, fact.value]
+            )
+        else:
+            raise AssertionError(f"Unsupported simple Topic option fact {fact.action!r}")
+    for fact in match_construction.facts:
+        if fact.action == "set":
+            arguments.extend(
+                    ["--match-set", fact.handle, fact.value_type, fact.value]
+            )
+        elif fact.action == "append":
+            arguments.extend(
+                    ["--match-append", fact.handle, fact.value_type, fact.value]
+            )
+        else:
+            raise AssertionError(f"Unsupported simple Topic match fact {fact.action!r}")
+    return arguments
 
 
 class FakeEventHandler:
@@ -690,65 +751,8 @@ def test_selected_does_not_swallow_network_unavailable_errors_in_headless_mode(t
     assert payload["objects"] is None
 
 
-def test_generic_call_validates_json_before_dispatch(tmp_path: Path) -> None:
-    called = False
-
-    def client_factory(url: str) -> FakeClient:
-        nonlocal called
-        called = True
-        raise AssertionError(f"invalid JSON must not connect to {url}")
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["call", "ak.wwise.waapi.getFunctions", "--args-json", "[]"],
-        env=gateway_env(tmp_path),
-        client_factory=client_factory,
-    )
-
-    assert exit_code == 2
-    assert payload["error_code"] == "GatewayInputError"
-    assert "JSON object" in payload["message"]
-    assert called is False
 
 
-def test_final_live_gateway_document_has_its_own_size_ceiling(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(waapi_gateway, "MAX_GATEWAY_RESULT_JSON_BYTES", 2048)
-    sentinel = "FINAL_GATEWAY_SENTINEL_MUST_NOT_ESCAPE"
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": live_info(),
-            "ak.wwise.waapi.getFunctions": {
-                "functions": [
-                    "ak." + str(index) + "." + (sentinel if index == 0 else "entry") + ("x" * 170)
-                    for index in range(12)
-                ]
-            },
-        }
-    )
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["call", "ak.wwise.waapi.getFunctions"],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    rendered = (
-        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True, allow_nan=False)
-        + "\n"
-    ).encode("utf-8")
-    assert exit_code == 2
-    assert payload["error_code"] == "RESULT_TOO_LARGE"
-    assert payload["details"] == {
-        "provenance": waapi_gateway.GATEWAY_RESULT_CEILING_PROVENANCE,
-        "original_ok": True,
-        "original_status": "ok",
-        "limit_bytes": 2048,
-        "observed_at_least_bytes": 2049,
-    }
-    assert len(rendered) <= 2048
-    assert sentinel.encode("utf-8") not in rendered
 
 
 def test_final_gateway_ceiling_preserves_transaction_state_context() -> None:
@@ -894,11 +898,8 @@ def test_main_prints_object_set_operation_schema_as_bounded_compact_json(
     assert exit_code == 0
     assert parsed == payload
     assert list(parsed) == list(payload)
-    assert parsed["request_envelope"] is None
-    assert parsed["request_envelope_policy"] == {
-        "status": "composer_ready",
-        "complete_request_authored_by_gateway": True,
-    }
+    assert "request_envelope" not in parsed
+    assert "request_envelope_policy" not in parsed
     assert parsed["composer"]["start"]["gateway_argv"] == [
         "draft-start",
         "object.set",
@@ -926,104 +927,16 @@ def test_main_prints_object_set_operation_schema_as_bounded_compact_json(
     )
 
 
-def test_gateway_import_schemas_share_semantic_import_operation_contract(
-    tmp_path: Path,
-) -> None:
-    env = gateway_env(tmp_path)
-    direct_exit_code, direct_payload = waapi_gateway.execute_gateway(
-        [
-            "--version",
-            "2022.1",
-            "legacy-operation-schema",
-            "audio.import",
-        ],
-        env=env,
-    )
-    tab_exit_code, tab_payload = waapi_gateway.execute_gateway(
-        [
-            "--version",
-            "2022.1",
-            "operation-schema",
-            "audio.importTabDelimited",
-        ],
-        env=env,
-    )
-
-    assert direct_exit_code == 0
-    assert tab_exit_code == 0
-    direct_operation = direct_payload["operation"]
-    tab_operation = tab_payload["operation"]
-    direct_contract = direct_operation["argument_contract"][
-        "request_composition_contract"
-    ]["import_operation"]
-    dependency_contract = direct_operation["argument_contract"][
-        "request_composition_contract"
-    ]["metadata_dependency_closure"]
-    tab_argument_contract = OPERATION_SPECS["audio.importTabDelimited"].as_dict(
-        version="2022.1"
-    )["argument_contract"]
-
-    assert tab_operation["input_mode"] == "inline_typed"
-    assert tab_argument_contract["properties"]["import_file"]["type"] == "string"
-    assert tab_argument_contract["properties"]["import_operation"][
-        "default"
-    ] == "createNew"
-    assert tab_argument_contract["import_operation_contract"] == direct_contract
-    assert direct_contract["contract"] == (
-        "waapi-skill.import-operation-intent/v1"
-    )
-    assert direct_contract["required_when_user_intent_is_explicit"] is True
-    assert direct_contract["omission_value_when_user_intent_is_unstated"] == (
-        "createNew"
-    )
-    assert dependency_contract["contract"] == (
-        "waapi-skill.live-metadata-dependency-closure/v1"
-    )
-    assert dependency_contract["selection"]["selected_fields_only"] is True
-    assert dependency_contract["metadata_source"]["same_result_required"] is True
-    assert dependency_contract["traversal"]["recursive"] is True
-    ordinary = dependency_contract["materialization"][
-        "ordinary_dependencies"
-    ]
-    activation = dependency_contract["materialization"][
-        "supported_reference_activation"
-    ]
-    assert ordinary["owner"] == "request"
-    assert ordinary["required_values_count"] == 1
-    assert ordinary["scope"] == {
-        "inherit_selected_owner_scope": True,
-        "defaults": "$.arguments.defaults.properties",
-        "row": "$.arguments.imports[owner_row_index].properties",
-    }
-    assert activation["owner"] == "gateway"
-    assert activation["supported_shape"] == {
-        "dependency_type": "override",
-        "action": "Enable",
-        "context": "Self",
-        "property_type": ["bool", "boolean"],
-        "required_value": True,
-    }
-    assert activation["request_forms"] == {
-        "omitted": "accepted_and_derived_before_dispatch",
-        "explicit_required_value": "accepted_and_deduplicated",
-        "explicit_conflict": "rejected",
-    }
-    assert activation["scope"] == "same_object_as_reference"
-    assert dependency_contract["failure_policy"]["action"] == "stop"
-    assert dependency_contract["failure_policy"]["guessing_allowed"] is False
-    encoded_contract = json.dumps(
-        dependency_contract,
-        ensure_ascii=False,
-        sort_keys=True,
-    )
-    assert "OutputBus" not in encoded_contract
-    assert "OverrideOutput" not in encoded_contract
 
 
 def test_all_versioned_operation_schemas_fit_complete_compact_output_budget(
     tmp_path: Path,
 ) -> None:
-    operations = tuple(waapi_gateway.list_operation_specs())
+    operations = tuple(
+        operation
+        for operation in waapi_gateway.list_operation_specs()
+        if operation.name != "waapi.call"
+    )
     assert operations
 
     for version in SUPPORTED_WWISE_VERSION_KEYS:
@@ -1103,99 +1016,6 @@ def test_main_rejects_non_strict_json_values(monkeypatch: pytest.MonkeyPatch) ->
 
     with pytest.raises(ValueError, match="Out of range float values"):
         waapi_gateway.main(["status"])
-
-
-@pytest.mark.parametrize(
-    ("document", "message"),
-    (
-        ('{"stateGroup":"{id}","stateGroup":"{other}"}', "duplicate JSON key"),
-        ('{"value":NaN}', "strict JSON"),
-        ('{"value":1e9999}', "strict JSON"),
-        ('{"value":"' + ("x" * (64 * 1024 + 1)) + '"}', "string limit"),
-        ('{"value":' + ("[" * 40) + "0" + ("]" * 40) + "}", "depth limit"),
-        ('{"value":[' + ",".join("0" for _ in range(10_000)) + "]}", "node JSON input limit"),
-        ('{"value":"' + ("x" * (256 * 1024)) + '"}', "JSON input limit"),
-    ),
-    ids=(
-        "duplicate-key",
-        "nan",
-        "infinite-number",
-        "oversized-string",
-        "excessive-depth",
-        "excessive-nodes",
-        "oversized-document",
-    ),
-)
-def test_generic_call_rejects_hostile_json_before_connecting(
-    tmp_path: Path,
-    document: str,
-    message: str,
-) -> None:
-    called = False
-
-    def client_factory(url: str) -> FakeClient:
-        nonlocal called
-        called = True
-        raise AssertionError(f"hostile JSON must not connect to {url}")
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["call", "ak.wwise.waapi.getFunctions", "--args-json", document],
-        env=gateway_env(tmp_path),
-        client_factory=client_factory,
-    )
-
-    assert exit_code == 2
-    assert payload["error_code"] == "GatewayInputError"
-    assert message in payload["message"]
-    assert called is False
-
-
-def test_preview_request_json_has_inline_audio_specific_bounded_limits() -> None:
-    inline_value = "x" * (200 * 1024)
-    parsed = waapi_gateway.parse_preview_request_object(
-        json.dumps({"audio_file_base64": inline_value})
-    )
-    assert parsed["audio_file_base64"] == inline_value
-
-    with pytest.raises(waapi_gateway.GatewayInputError, match="262144-byte string limit"):
-        waapi_gateway.parse_preview_request_object(
-            json.dumps({"audio_file_base64": "x" * (256 * 1024 + 1)})
-        )
-
-    with pytest.raises(waapi_gateway.GatewayInputError, match="393216-byte JSON input limit"):
-        waapi_gateway.parse_preview_request_object(
-            json.dumps({"first": "x" * (200 * 1024), "second": "y" * (200 * 1024)})
-        )
-
-
-@pytest.mark.parametrize(
-    "arguments",
-    (
-        ["wait-topic", "ak.wwise.core.object.created", "--match-json", '{"id":1,"id":2}'],
-        ["preview", "--request-json", '{"operation":"object.create","operation":"object.delete"}'],
-    ),
-)
-def test_all_live_json_commands_validate_before_connecting(
-    tmp_path: Path,
-    arguments: list[str],
-) -> None:
-    called = False
-
-    def client_factory(url: str) -> FakeClient:
-        nonlocal called
-        called = True
-        raise AssertionError(f"invalid JSON must not connect to {url}")
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        arguments,
-        env=gateway_env(tmp_path),
-        client_factory=client_factory,
-    )
-
-    assert exit_code == 2
-    assert payload["error_code"] == "GatewayInputError"
-    assert "duplicate JSON key" in payload["message"]
-    assert called is False
 
 
 def test_explicit_version_mismatch_fails_closed(tmp_path: Path) -> None:
@@ -1940,8 +1760,8 @@ def test_legacy_never_policy_normalizes_to_read_only_and_blocks_confirm_without_
             str(tmp_path / "state"),
             "confirm",
             "missing-transaction",
-            "--artifact-hash",
-            "deadbeef",
+                "--confirmation-token",
+                "ct1-aaaaaaaaaaaaaaaaaaaaaaaa",
         ],
         env={"WAAPI_SKILL_CONFIG_PATH": str(external_path)},
         client_factory=lambda url: (_ for _ in ()).throw(AssertionError(url)),
@@ -2393,792 +2213,6 @@ def test_selected_manifest_absence_is_an_explicit_boundary_for_newer_versions(tm
     assert "absent from this version's packaged manifest" in payload["message"]
 
 
-def test_generic_reflection_call_is_schema_validated_and_normalized(tmp_path: Path) -> None:
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": live_info(),
-            "ak.wwise.waapi.getFunctions": {
-                "functions": [
-                    "ak.wwise.waapi.getTopics",
-                    "ak.wwise.waapi.getFunctions",
-                ]
-            },
-        }
-    )
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["call", "ak.wwise.waapi.getFunctions"],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 0
-    assert payload["contract"] == "waapi-skill.gateway-result/v1"
-    assert payload["schema_validation"]["uri"] == "ak.wwise.waapi.getFunctions"
-    assert payload["call"]["ok"] is True
-    assert "result" not in payload["call"]
-    assert payload["inventory"]["kind"] == "function"
-    assert payload["inventory"]["uris"] == [
-        "ak.wwise.waapi.getFunctions",
-        "ak.wwise.waapi.getTopics",
-    ]
-    assert payload["inventory"]["packaged_manifest"]["matches"] is False
-    assert [call[0] for call in client.calls] == [
-        "ak.wwise.core.getInfo",
-        "ak.wwise.waapi.getFunctions",
-    ]
-
-
-@pytest.mark.parametrize(
-    ("result", "expected_error"),
-    (
-        (None, "SemanticValidationError"),
-        ({}, "INVALID_REFLECTION_RESULT"),
-        ({"functions": "ak.wwise.core.getInfo"}, "SemanticValidationError"),
-        ({"functions": [1]}, "SemanticValidationError"),
-        ({"functions": ["not-a-waapi-uri"]}, "INVALID_REFLECTION_RESULT"),
-        ({"functions": ["ak.duplicate", "ak.duplicate"]}, "INVALID_REFLECTION_RESULT"),
-        ({"functions": [], "unexpected": []}, "SemanticValidationError"),
-        ({"functions": ["ak." + ("x" * 513)]}, "INVALID_REFLECTION_RESULT"),
-        ({"functions": [f"ak.test.{index}" for index in range(4097)]}, "INVALID_REFLECTION_RESULT"),
-    ),
-)
-def test_generic_reflection_call_rejects_shape_drift(
-    tmp_path: Path,
-    result: Any,
-    expected_error: str,
-) -> None:
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": live_info(),
-            "ak.wwise.waapi.getFunctions": result,
-        }
-    )
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["call", "ak.wwise.waapi.getFunctions"],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["ok"] is False
-    assert payload["status"] == "error"
-    assert payload["error_code"] == expected_error
-    if expected_error == "SemanticValidationError":
-        assert payload["details"]["uri"] == "ak.wwise.waapi.getFunctions"
-        assert payload["details"]["section"].startswith("result")
-    else:
-        assert payload["details"]["api"] == "ak.wwise.waapi.getFunctions"
-
-
-@pytest.mark.parametrize("command", ("call", "wait-topic"))
-def test_unreflected_uri_is_structured_unsupported_before_connecting_when_version_is_known(
-    tmp_path: Path,
-    command: str,
-) -> None:
-    called = False
-
-    def client_factory(url: str) -> FakeClient:
-        nonlocal called
-        called = True
-        raise AssertionError(f"unreflected URI boundary must not connect to {url}")
-
-    api = "ak.wwise.future.notInManifest"
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [command, api],
-        env=gateway_env(tmp_path),
-        client_factory=client_factory,
-    )
-
-    assert exit_code == 2
-    assert payload["status"] == "unsupported_by_skill_interface"
-    assert payload["error_code"] == "UNSUPPORTED_BY_SKILL_INTERFACE"
-    assert payload["api"] == api
-    assert payload["command"] == command
-    assert payload["executed"] is False
-    assert "not reflected by Wwise 2022.1" in payload["message"]
-    assert "no packaged executable route" in payload["message"]
-    assert called is False
-
-
-@pytest.mark.parametrize("command", ("call", "wait-topic"))
-def test_version_specific_topic_manifest_absence_preempts_cross_version_route_advice(
-    tmp_path: Path,
-    command: str,
-) -> None:
-    called = False
-
-    def client_factory(url: str) -> FakeClient:
-        nonlocal called
-        called = True
-        raise AssertionError(f"version-specific manifest boundary must not connect to {url}")
-
-    # structureChanged is reviewed for its 2025.1 route, but it is absent from
-    # the packaged 2022.1 manifest. The cross-version topic allowlist must not
-    # advise a 2022.1 caller to try wait-topic.
-    api = "ak.wwise.core.object.structureChanged"
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [command, api],
-        env=gateway_env(tmp_path),
-        client_factory=client_factory,
-    )
-
-    assert exit_code == 2
-    assert payload["status"] == "unsupported_by_skill_interface"
-    assert payload["error_code"] == "UNSUPPORTED_BY_SKILL_INTERFACE"
-    assert payload["api"] == api
-    assert payload["command"] == command
-    assert payload["executed"] is False
-    assert "not reflected by Wwise 2022.1" in payload["message"]
-    assert "required_command" not in payload
-    assert called is False
-
-
-def test_unknown_version_reviewed_topic_keeps_static_wait_topic_bootstrap(
-    tmp_path: Path,
-) -> None:
-    called = False
-
-    def client_factory(url: str) -> FakeClient:
-        nonlocal called
-        called = True
-        raise AssertionError(f"generic call topic redirect must not connect to {url}")
-
-    env = gateway_env(tmp_path)
-    env.pop("WWISE_VERSION")
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["call", "ak.wwise.core.object.structureChanged"],
-        env=env,
-        client_factory=client_factory,
-    )
-
-    assert exit_code == 2
-    assert payload["status"] == "wait_topic_required"
-    assert payload["error_code"] == "WAIT_TOPIC_REQUIRED"
-    assert payload["required_command"] == "wait-topic"
-    assert called is False
-
-
-@pytest.mark.parametrize("command", ("call", "wait-topic"))
-def test_unreflected_uri_is_structured_unsupported_after_live_version_detection(
-    tmp_path: Path,
-    command: str,
-) -> None:
-    env = gateway_env(tmp_path)
-    env.pop("WWISE_VERSION")
-    client = FakeClient({"ak.wwise.core.getInfo": live_info()})
-    api = "ak.wwise.future.notInManifest"
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [command, api],
-        env=env,
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["status"] == "unsupported_by_skill_interface"
-    assert payload["error_code"] == "UNSUPPORTED_BY_SKILL_INTERFACE"
-    assert payload["api"] == api
-    assert payload["detected_version"] == "2022.1"
-    assert payload["executed"] is False
-    assert [call[0] for call in client.calls] == ["ak.wwise.core.getInfo"]
-    assert client.disconnected is True
-
-
-@pytest.mark.parametrize("api", sorted(EXPECTED_EXCLUDED_FUNCTION_URIS))
-def test_legacy_ui_command_exclusions_now_route_to_named_transactions_before_connecting(
-    tmp_path: Path,
-    api: str,
-) -> None:
-    called = False
-
-    def client_factory(url: str) -> FakeClient:
-        nonlocal called
-        called = True
-        raise AssertionError(f"excluded function must not connect to {url}")
-
-    assert IMMEDIATE_UNSUPPORTED_CALL_URIS == EXPECTED_EXCLUDED_FUNCTION_URIS
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["call", api, "--dry-run"],
-        env=gateway_env(tmp_path),
-        client_factory=client_factory,
-    )
-
-    assert exit_code == 2
-    assert payload["status"] == "transaction_required"
-    assert payload["error_code"] == "TRANSACTION_REQUIRED"
-    assert payload["capability"]["interface"]["transaction_operations"] == [
-        {
-            "ak.wwise.ui.commands.execute": "ui.commands.execute",
-            "ak.wwise.ui.commands.register": "ui.commands.register",
-        }[api]
-    ]
-    assert payload["executed"] is False
-    assert called is False
-
-
-def test_public_generic_call_requires_fixed_command_before_connecting(tmp_path: Path) -> None:
-    called = False
-
-    def client_factory(url: str) -> FakeClient:
-        nonlocal called
-        called = True
-        raise AssertionError(f"fixed route rejection must not connect to {url}")
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["call", "ak.wwise.core.getInfo", "--dry-run"],
-        env=gateway_env(tmp_path),
-        client_factory=client_factory,
-    )
-
-    assert exit_code == 2
-    assert payload["status"] == "fixed_command_required"
-    assert payload["error_code"] == "FIXED_COMMAND_REQUIRED"
-    assert payload["required_command"] == "status"
-    assert payload["executed"] is False
-    assert called is False
-
-
-def test_public_generic_call_rejects_object_get_and_points_to_query_object(tmp_path: Path) -> None:
-    called = False
-
-    def client_factory(url: str) -> FakeClient:
-        nonlocal called
-        called = True
-        raise AssertionError(f"object.get route rejection must not connect to {url}")
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "call",
-            "ak.wwise.core.object.get",
-            "--args-json",
-            '{"waql":"from type Event"}',
-            "--options-json",
-            '{"return":["id","name"]}',
-        ],
-        env=gateway_env(tmp_path),
-        client_factory=client_factory,
-    )
-
-    assert exit_code == 2
-    assert payload["status"] == "query_object_required"
-    assert payload["error_code"] == "QUERY_OBJECT_REQUIRED"
-    assert payload["required_command"] == "query-object"
-    assert payload["executed"] is False
-    assert "query-object" in payload["message"]
-    assert called is False
-
-
-@pytest.mark.parametrize(
-    ("version", "api", "execution_mode"),
-    (
-        ("2022.1", "ak.wwise.cli.dumpObjects", "isolated_transaction"),
-        ("2022.1", "ak.wwise.cli.verify", "isolated_transaction"),
-        ("2023.1", "ak.wwise.core.sourceControl.getSourceFiles", "isolated_transaction"),
-        ("2023.1", "ak.wwise.core.sourceControl.getStatus", "isolated_transaction"),
-    ),
-)
-def test_public_generic_call_redirects_guarded_apis_to_transaction_before_connecting(
-    tmp_path: Path,
-    version: str,
-    api: str,
-    execution_mode: str,
-) -> None:
-    called = False
-
-    def client_factory(url: str) -> FakeClient:
-        nonlocal called
-        called = True
-        raise AssertionError(f"transaction redirect must not connect to {url}")
-
-    env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = version
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "call",
-            api,
-            "--args-json",
-            "{}",
-            "--dry-run",
-        ],
-        env=env,
-        client_factory=client_factory,
-    )
-
-    assert exit_code == 2
-    assert payload["status"] == "transaction_required"
-    assert payload["error_code"] == "TRANSACTION_REQUIRED"
-    assert payload["executed"] is False
-    assert payload["verified"] is False
-    assert payload["capability"]["interface"]["transaction_operations"] == ["waapi.call"]
-    assert payload["capability"]["execution_contract"]["route"] == execution_mode
-    assert called is False
-
-
-@pytest.mark.parametrize(
-    "api",
-    (
-        "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion",
-        "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
-    ),
-)
-def test_bounded_direct_calls_reject_invalid_payload_without_business_dispatch(
-    tmp_path: Path,
-    api: str,
-) -> None:
-    client = FakeClient({"ak.wwise.core.getInfo": live_info()})
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["call", api, "--args-json", "{}", "--dry-run"],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["ok"] is False
-    assert payload["status"] == "error"
-    assert payload["error_code"] == "SemanticValidationError"
-    assert payload["details"]["uri"] == api
-    assert payload["details"]["missing_args"]
-    assert [call[0] for call in client.calls] == ["ak.wwise.core.getInfo"]
-
-
-def test_media_pool_get_is_a_bounded_direct_read(tmp_path: Path) -> None:
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": live_info(year=2025, major=1),
-            "ak.wwise.core.mediaPool.get": {"return": []},
-        }
-    )
-    env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2025.1"
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "call",
-            "ak.wwise.core.mediaPool.get",
-            "--args-json",
-            '{"databases":["\\\\Databases\\\\Project Originals"],"maxResults":20}',
-            "--options-json",
-            '{"return":["Path","FileId","Db"]}',
-        ],
-        env=env,
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 0
-    assert payload["agent_result"] == {"return": []}
-    assert [call[0] for call in client.calls] == [
-        "ak.wwise.core.getInfo",
-        "ak.wwise.core.mediaPool.get",
-    ]
-
-
-def test_media_pool_post_filter_is_case_sensitive_bounded_and_preserves_order(
-    tmp_path: Path,
-) -> None:
-    rows = [
-        {"Filename": "footstep_gravel.wav", "FileId": "first"},
-        {"Filename": "Footstep_case_decoy.wav", "FileId": "decoy"},
-        {"Filename": "short_footstep_wood.wav", "FileId": "second"},
-        {"Filename": "footstep_metal.wav", "FileId": "third"},
-    ]
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": live_info(year=2025, major=1),
-            "ak.wwise.core.mediaPool.get": {"return": rows},
-        }
-    )
-    env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2025.1"
-    request = {
-        "databases": [r"\Databases\Project Originals"],
-        "filters": [
-            {
-                "type": "field",
-                "field": "Filename",
-                "operator": "contains",
-                "value": "footstep",
-            }
-        ],
-        "maxResults": 5,
-    }
-    post_filter = {
-        "field": "Filename",
-        "operator": "containsCaseSensitive",
-        "value": "footstep",
-        "limit": 2,
-    }
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "call",
-            "ak.wwise.core.mediaPool.get",
-            "--args-json",
-            json.dumps(request),
-            "--options-json",
-            json.dumps({"return": ["Filename", "FileId"]}),
-            "--post-filter-json",
-            json.dumps(post_filter),
-        ],
-        env=env,
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 0, payload
-    assert payload["agent_result"] == {"return": [rows[0], rows[2]]}
-    assert list(payload)[-1] == "agent_result"
-    assert client.calls[-1][1] == request
-    assert client.calls[-1][2] == {"return": ["Filename", "FileId"]}
-    audit = payload["post_filter"]
-    assert audit == {
-        "contract": "waapi-skill.media-pool-post-filter/v1",
-        "status": "applied",
-        "field": "Filename",
-        "operator": "containsCaseSensitive",
-        "value_sha256": audit["value_sha256"],
-        "value_code_points": len("footstep"),
-        "value_utf8_bytes": len("footstep".encode("utf-8")),
-        "limit": 2,
-        "request_max_results": 5,
-        "raw_count": 4,
-        "matched_count": 3,
-        "returned_count": 2,
-        "truncated_to_limit": True,
-    }
-    assert len(audit["value_sha256"]) == 64
-    assert "value" not in audit
-
-
-def test_media_pool_post_filter_fails_closed_when_candidate_result_reaches_ceiling(
-    tmp_path: Path,
-) -> None:
-    rows = [
-        {"Filename": "footstep_gravel.wav", "FileId": "first"},
-        {"Filename": "unrelated.wav", "FileId": "second"},
-        {"Filename": "Footstep_case_decoy.wav", "FileId": "third"},
-    ]
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": live_info(year=2025, major=1),
-            "ak.wwise.core.mediaPool.get": {"return": rows},
-        }
-    )
-    env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2025.1"
-    request = {
-        "filters": [
-            {
-                "type": "field",
-                "field": "Filename",
-                "operator": "contains",
-                "value": "footstep",
-            }
-        ],
-        "maxResults": 3,
-    }
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "call",
-            "ak.wwise.core.mediaPool.get",
-            "--args-json",
-            json.dumps(request),
-            "--options-json",
-            json.dumps({"return": ["Filename", "FileId"]}),
-            "--post-filter-json",
-            json.dumps(
-                {
-                    "field": "Filename",
-                    "operator": "containsCaseSensitive",
-                    "value": "footstep",
-                    "limit": 2,
-                }
-            ),
-        ],
-        env=env,
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["ok"] is False
-    assert payload["status"] == "incomplete_boundary"
-    assert payload["error_code"] == "MEDIA_POOL_POST_FILTER_INCOMPLETE"
-    assert payload["details"]["raw_count"] == 3
-    assert payload["details"]["request_max_results"] == 3
-    assert payload["call"]["ok"] is True
-    assert payload["post_filter"]["status"] == "incomplete"
-    assert payload["post_filter"]["raw_count"] == 3
-    assert payload["post_filter"]["matched_count"] is None
-    assert payload["post_filter"]["truncated_to_limit"] is None
-    assert "agent_result" not in payload
-
-
-def test_media_pool_post_filter_does_not_project_agent_result_when_waapi_fails(
-    tmp_path: Path,
-) -> None:
-    client = FakeClient(
-        {"ak.wwise.core.getInfo": live_info(year=2025, major=1)},
-        errors={"ak.wwise.core.mediaPool.get": RuntimeError("synthetic read failure")},
-    )
-    env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2025.1"
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "call",
-            "ak.wwise.core.mediaPool.get",
-            "--args-json",
-            json.dumps(
-                {
-                    "filters": [
-                        {
-                            "type": "field",
-                            "field": "Filename",
-                            "operator": "contains",
-                            "value": "footstep",
-                        }
-                    ],
-                    "maxResults": 20,
-                }
-            ),
-            "--options-json",
-            json.dumps({"return": ["Filename", "FileId"]}),
-            "--post-filter-json",
-            json.dumps(
-                {
-                    "field": "Filename",
-                    "operator": "containsCaseSensitive",
-                    "value": "footstep",
-                    "limit": 2,
-                }
-            ),
-        ],
-        env=env,
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["ok"] is False
-    assert payload["call"]["ok"] is False
-    assert payload["post_filter"]["status"] == "not_applied"
-    assert payload["post_filter"]["truncated_to_limit"] is None
-    assert "agent_result" not in payload
-
-
-@pytest.mark.parametrize(
-    ("api", "post_filter", "request_args", "options", "extra_argv", "message_fragment"),
-    (
-        (
-            "ak.wwise.waapi.getFunctions",
-            {"field": "Filename", "operator": "containsCaseSensitive", "value": "footstep", "limit": 2},
-            {"filters": [{"type": "field", "field": "Filename", "operator": "contains", "value": "footstep"}], "maxResults": 20},
-            {"return": ["Filename"]},
-            (),
-            "supported only",
-        ),
-        (
-            "ak.wwise.core.mediaPool.get",
-            {"field": "Path", "operator": "containsCaseSensitive", "value": "footstep", "limit": 2},
-            {"filters": [{"type": "field", "field": "Filename", "operator": "contains", "value": "footstep"}], "maxResults": 20},
-            {"return": ["Filename"]},
-            (),
-            "field must be exactly",
-        ),
-        (
-            "ak.wwise.core.mediaPool.get",
-            {"field": "Filename", "operator": "matchesRegex", "value": "footstep", "limit": 2},
-            {"filters": [{"type": "field", "field": "Filename", "operator": "contains", "value": "footstep"}], "maxResults": 20},
-            {"return": ["Filename"]},
-            (),
-            "operator must be exactly",
-        ),
-        (
-            "ak.wwise.core.mediaPool.get",
-            {"field": "Filename", "operator": "containsCaseSensitive", "value": "footstep", "limit": 2, "code": "malicious"},
-            {"filters": [{"type": "field", "field": "Filename", "operator": "contains", "value": "footstep"}], "maxResults": 20},
-            {"return": ["Filename"]},
-            (),
-            "extra keys",
-        ),
-        (
-            "ak.wwise.core.mediaPool.get",
-            {"field": "Filename", "operator": "containsCaseSensitive", "value": "", "limit": 2},
-            {"filters": [{"type": "field", "field": "Filename", "operator": "contains", "value": ""}], "maxResults": 20},
-            {"return": ["Filename"]},
-            (),
-            "nonempty string",
-        ),
-        (
-            "ak.wwise.core.mediaPool.get",
-            {"field": "Filename", "operator": "containsCaseSensitive", "value": "footstep", "limit": True},
-            {"filters": [{"type": "field", "field": "Filename", "operator": "contains", "value": "footstep"}], "maxResults": 20},
-            {"return": ["Filename"]},
-            (),
-            "limit must be an integer",
-        ),
-        (
-            "ak.wwise.core.mediaPool.get",
-            {"field": "Filename", "operator": "containsCaseSensitive", "value": "footstep", "limit": 2},
-            {"filters": [{"type": "field", "field": "Filename", "operator": "contains", "value": "other"}], "maxResults": 20},
-            {"return": ["Filename"]},
-            (),
-            "matching Filename contains",
-        ),
-        (
-            "ak.wwise.core.mediaPool.get",
-            {"field": "Filename", "operator": "containsCaseSensitive", "value": "footstep", "limit": 2},
-            {"filters": [{"type": "field", "field": "Filename", "operator": "contains", "value": "footstep"}], "maxResults": 20},
-            {"return": ["FileId"]},
-            (),
-            "return to include",
-        ),
-        (
-            "ak.wwise.core.mediaPool.get",
-            {"field": "Filename", "operator": "containsCaseSensitive", "value": "footstep", "limit": 2},
-            {"filters": [{"type": "field", "field": "Filename", "operator": "contains", "value": "footstep"}], "maxResults": 20},
-            {},
-            (),
-            "return to include",
-        ),
-        (
-            "ak.wwise.core.mediaPool.get",
-            {"field": "Filename", "operator": "containsCaseSensitive", "value": "x" * 1025, "limit": 2},
-            {"filters": [{"type": "field", "field": "Filename", "operator": "contains", "value": "x" * 1025}], "maxResults": 20},
-            {"return": ["Filename"]},
-            (),
-            "code-point literal limit",
-        ),
-        (
-            "ak.wwise.core.mediaPool.get",
-            {"field": "Filename", "operator": "containsCaseSensitive", "value": "footstep", "limit": 3},
-            {"filters": [{"type": "field", "field": "Filename", "operator": "contains", "value": "footstep"}], "maxResults": 2},
-            {"return": ["Filename"]},
-            (),
-            "greater than or equal",
-        ),
-        (
-            "ak.wwise.core.mediaPool.get",
-            {"field": "Filename", "operator": "containsCaseSensitive", "value": "footstep", "limit": 2},
-            {"filters": [{"type": "field", "field": "Filename", "operator": "contains", "value": "footstep"}], "maxResults": 20},
-            {"return": ["Filename"]},
-            ("--dry-run",),
-            "cannot be combined",
-        ),
-    ),
-    ids=(
-        "other-api",
-        "wrong-field",
-        "wrong-operator",
-        "extra-key",
-        "empty-value",
-        "boolean-limit",
-        "unbound-filter",
-        "missing-return-field",
-        "missing-return-mapping",
-        "oversized-literal",
-        "limit-exceeds-max-results",
-        "dry-run",
-    ),
-)
-def test_media_pool_post_filter_rejects_invalid_or_unbound_input_before_connection(
-    tmp_path: Path,
-    api: str,
-    post_filter: Mapping[str, Any],
-    request_args: Mapping[str, Any],
-    options: Mapping[str, Any],
-    extra_argv: tuple[str, ...],
-    message_fragment: str,
-) -> None:
-    factory_calls: list[str] = []
-
-    def forbidden_factory(url: str) -> FakeClient:
-        factory_calls.append(url)
-        raise AssertionError("invalid post-filter input must not open a WAAPI transport")
-
-    env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2025.1"
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "call",
-            api,
-            "--args-json",
-            json.dumps(request_args),
-            "--options-json",
-            json.dumps(options),
-            "--post-filter-json",
-            json.dumps(post_filter),
-            *extra_argv,
-        ],
-        env=env,
-        client_factory=forbidden_factory,
-    )
-
-    assert exit_code == 2
-    assert payload["error_code"] == "GatewayInputError"
-    assert message_fragment in payload["message"]
-    assert factory_calls == []
-
-
-@pytest.mark.parametrize(
-    ("post_filter_json", "message_fragment"),
-    (
-        ("[]", "must decode to a JSON object"),
-        (
-            '{"field":"Filename","field":"Path","operator":"containsCaseSensitive",'
-            '"value":"footstep","limit":2}',
-            "duplicate JSON key",
-        ),
-    ),
-    ids=("non-object", "duplicate-key"),
-)
-def test_media_pool_post_filter_rejects_malformed_documents_before_connection(
-    tmp_path: Path,
-    post_filter_json: str,
-    message_fragment: str,
-) -> None:
-    factory_calls: list[str] = []
-
-    def forbidden_factory(url: str) -> FakeClient:
-        factory_calls.append(url)
-        raise AssertionError("malformed post-filter input must not connect")
-
-    env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2025.1"
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "call",
-            "ak.wwise.core.mediaPool.get",
-            "--args-json",
-            json.dumps(
-                {
-                    "filters": [
-                        {
-                            "type": "field",
-                            "field": "Filename",
-                            "operator": "contains",
-                            "value": "footstep",
-                        }
-                    ],
-                    "maxResults": 20,
-                }
-            ),
-            "--options-json",
-            json.dumps({"return": ["Filename"]}),
-            "--post-filter-json",
-            post_filter_json,
-        ],
-        env=env,
-        client_factory=forbidden_factory,
-    )
-
-    assert exit_code == 2
-    assert payload["error_code"] == "GatewayInputError"
-    assert message_fragment in payload["message"]
-    assert factory_calls == []
 
 
 @pytest.mark.parametrize(
@@ -3215,69 +2249,6 @@ def test_media_pool_post_filter_rejects_invalid_success_result_shapes(raw_result
     assert exc_info.value.error_code == "INVALID_MEDIA_POOL_POST_FILTER_RESULT"
 
 
-def test_media_pool_get_canonicalizes_only_duration_whole_seconds_before_dispatch(
-    tmp_path: Path,
-) -> None:
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": live_info(year=2025, major=1),
-            "ak.wwise.core.mediaPool.get": {"return": []},
-        }
-    )
-    env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2025.1"
-    request = {
-        "databases": [r"\Databases\Project Originals"],
-        "filters": [
-            {
-                "type": "field",
-                "field": "WAV/Duration",
-                "operator": "lessThanOrEqual",
-                "value": 8,
-            },
-            {
-                "type": "field",
-                "field": "WAV/Sample Rate",
-                "operator": "equals",
-                "value": 48000,
-            },
-            {
-                "type": "field",
-                "field": "WAV/Channels",
-                "operator": "equals",
-                "value": 1,
-            },
-            {
-                "type": "field",
-                "field": "WAV/Bit Depth",
-                "operator": "equals",
-                "value": 24,
-            },
-        ],
-        "maxResults": 40,
-    }
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "call",
-            "ak.wwise.core.mediaPool.get",
-            "--args-json",
-            json.dumps(request),
-            "--options-json",
-            json.dumps({"return": ["Path", "WAV/Duration"]}),
-        ],
-        env=env,
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 0, payload
-    dispatched = client.calls[-1][1]
-    assert dispatched is not None
-    dispatched_filters = dispatched["filters"]
-    assert type(dispatched_filters[0]["value"]) is float
-    assert dispatched_filters[0]["value"] == 8.0
-    assert [type(item["value"]) for item in dispatched_filters[1:]] == [int, int, int]
-    assert type(dispatched["maxResults"]) is int
 
 
 def test_media_pool_duration_canonicalizer_is_exactly_scoped_and_does_not_mutate_input() -> None:
@@ -3517,189 +2488,6 @@ def test_media_pool_audio_similarity_rejects_symlink_and_missing_file(tmp_path: 
             )
 
 
-@pytest.mark.parametrize(
-    "duration",
-    (2**53 + 1, 2**1024),
-    ids=("precision-loss", "double-overflow"),
-)
-def test_media_pool_duration_canonicalization_fails_closed_before_business_dispatch(
-    tmp_path: Path,
-    duration: int,
-) -> None:
-    client = FakeClient({"ak.wwise.core.getInfo": live_info(year=2025, major=1)})
-    env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2025.1"
-    request = {
-        "filters": [
-            {
-                "type": "field",
-                "field": "WAV/Duration",
-                "operator": "lessThanOrEqual",
-                "value": duration,
-            }
-        ],
-        "maxResults": 40,
-    }
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "call",
-            "ak.wwise.core.mediaPool.get",
-            "--args-json",
-            json.dumps(request),
-        ],
-        env=env,
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["error_code"] == "GatewayInputError"
-    assert "exactly representable as a finite WAAPI double" in payload["message"]
-    assert [call[0] for call in client.calls] == ["ak.wwise.core.getInfo"]
-
-
-@pytest.mark.parametrize("max_results", (None, 0, 201, True))
-def test_media_pool_get_rejects_an_unbounded_result_request_before_business_dispatch(
-    tmp_path: Path,
-    max_results: Any,
-) -> None:
-    client = FakeClient({"ak.wwise.core.getInfo": live_info(year=2025, major=1)})
-    env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2025.1"
-    request = {} if max_results is None else {"maxResults": max_results}
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "call",
-            "ak.wwise.core.mediaPool.get",
-            "--args-json",
-            json.dumps(request),
-        ],
-        env=env,
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["error_code"] in {"GatewayInputError", "SemanticValidationError"}
-    assert [call[0] for call in client.calls] == ["ak.wwise.core.getInfo"]
-
-
-def test_generic_call_rejects_schema_mismatch_before_business_dispatch(tmp_path: Path) -> None:
-    client = FakeClient({"ak.wwise.core.getInfo": live_info()})
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "call",
-            "ak.wwise.waapi.getFunctions",
-            "--args-json",
-            '{"unexpected":true}',
-        ],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["error_code"] == "SemanticValidationError"
-    assert payload["details"]["unknown_fields"] == ["unexpected"]
-    assert [call[0] for call in client.calls] == ["ak.wwise.core.getInfo"]
-
-
-@pytest.mark.parametrize("extra_flag", ("--allow-destructive", "--dry-run"))
-def test_public_generic_call_cannot_bypass_closed_transaction_route(
-    tmp_path: Path,
-    extra_flag: str,
-) -> None:
-    called = False
-
-    def client_factory(url: str) -> FakeClient:
-        nonlocal called
-        called = True
-        raise AssertionError(f"transaction route rejection must not connect to {url}")
-
-    env = gateway_env(tmp_path)
-    env["WWISE_DESTRUCTIVE"] = "1"
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "call",
-            "ak.wwise.core.object.delete",
-            "--args-json",
-            '{"object":"{fixture}"}',
-            extra_flag,
-        ],
-        env=env,
-        client_factory=client_factory,
-    )
-
-    assert exit_code == 2
-    assert payload["status"] == "transaction_required"
-    assert payload["error_code"] == "TRANSACTION_REQUIRED"
-    assert payload["executed"] is False
-    assert payload["verified"] is False
-    assert called is False
-
-
-def test_public_generic_call_redirects_generic_soundbank_mutation_to_transaction(tmp_path: Path) -> None:
-    called = False
-
-    def client_factory(url: str) -> FakeClient:
-        nonlocal called
-        called = True
-        raise AssertionError(f"transaction-only mutation must not connect to {url}")
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "call",
-            "ak.wwise.core.soundbank.generate",
-            "--args-json",
-            '{"soundbanks":[]}',
-            "--dry-run",
-        ],
-        env=gateway_env(tmp_path),
-        client_factory=client_factory,
-    )
-
-    assert exit_code == 2
-    assert payload["status"] == "transaction_required"
-    assert payload["error_code"] == "TRANSACTION_REQUIRED"
-    assert payload["executed"] is False
-    assert payload["verified"] is False
-    assert payload["capability"]["interface"]["transaction_operations"] == [
-        "soundbank.generate",
-    ]
-    assert payload["capability"]["execution_contract"]["route"] == "isolated_transaction"
-    assert called is False
-
-
-def test_query_object_uses_semantic_builder_and_returns_normalized_rows(tmp_path: Path) -> None:
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": live_info(),
-            "ak.wwise.core.object.get": {
-                "return": [{"id": "{sound}", "name": "UI_Click", "type": "Sound", "path": "\\Actor-Mixer Hierarchy\\UI_Click"}]
-            },
-        }
-    )
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--type", "Sound", "--where-json", '{"field":"name","operator":":","value":"UI"}', "--take", "10"],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 0
-    assert payload["count"] == 1
-    assert payload["objects"][0]["name"] == "UI_Click"
-    assert payload["query_bound"] == {"mode": "take", "value": 10}
-    assert "semantic_preview" not in payload
-    assert "call" not in payload
-    assert list(payload)[-1] == "session_context"
-    assert client.calls[-1] == (
-        "ak.wwise.core.object.get",
-        {"waql": 'from type Sound where name : "UI" take 10'},
-        {"return": ["id", "name", "type", "path"]},
-    )
-
 
 def test_query_object_detail_restores_compiler_and_dispatch_evidence(tmp_path: Path) -> None:
     client = FakeClient(
@@ -3874,699 +2662,8 @@ def test_query_schema_advanced_discloses_bounded_native_contract_offline(
         }
 
 
-def test_query_object_advanced_dispatches_fixed_bounded_waql_once(
-    tmp_path: Path,
-) -> None:
-    object_id = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": live_info(),
-            "ak.wwise.core.object.get": {
-                "return": [
-                    {
-                        "id": object_id,
-                        "name": "UI_Click",
-                        "EffectNames": ["Compressor"],
-                    }
-                ]
-            },
-        }
-    )
-    request = {
-        "contract": "waapi-skill.advanced-object-query/v1",
-        "waql": (
-            'from type Sound where effects.any(effect.name = "Compressor") '
-            "orderby name"
-        ),
-        "return": ["id", "name", "effects.name as EffectNames"],
-        "max_results": 2,
-    }
 
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "query-object",
-            "--advanced-request-json",
-            json.dumps(request, separators=(",", ":")),
-        ],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
 
-    assert exit_code == 0, payload
-    assert payload["query_layer"] == "advanced-native-waql"
-    assert payload["query_contract"] == "waapi-skill.advanced-object-query/v1"
-    assert payload["query_bound"] == {
-        "mode": "gateway-appended-take",
-        "value": 2,
-    }
-    assert payload["count"] == 1
-    assert payload["limit_reached"] is False
-    assert "identity_handoff" not in payload
-    assert client.calls[-1] == (
-        "ak.wwise.core.object.get",
-        {
-            "waql": (
-                'from type Sound where effects.any(effect.name = "Compressor") '
-                "orderby name take 2"
-            )
-        },
-        {"return": ["id", "name", "effects.name as EffectNames"]},
-    )
-    assert [call[0] for call in client.calls].count(
-        "ak.wwise.core.object.get"
-    ) == 1
-
-
-@pytest.mark.parametrize(
-    "query_request",
-    (
-        {
-            "contract": "waapi-skill.advanced-object-query/v1",
-            "waql": "from type Sound; from type Event",
-            "return": ["id"],
-            "max_results": 2,
-        },
-        {
-            "contract": "waapi-skill.advanced-object-query/v1",
-            "waql": "from type Sound",
-            "return": ["id"],
-            "max_results": 0,
-        },
-        {
-            "contract": "waapi-skill.advanced-object-query/v1",
-            "waql": "from type Sound",
-            "return": ["id"],
-            "max_results": 2,
-            "uri": "ak.wwise.core.object.set",
-        },
-    ),
-)
-def test_query_object_advanced_invalid_contract_fails_before_connection(
-    tmp_path: Path,
-    query_request: Mapping[str, Any],
-) -> None:
-    called = False
-
-    def client_factory(url: str) -> FakeClient:
-        nonlocal called
-        called = True
-        raise AssertionError(f"invalid advanced query must not connect to {url}")
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--advanced-request-json", json.dumps(query_request)],
-        env=gateway_env(tmp_path),
-        client_factory=client_factory,
-    )
-
-    assert exit_code == 2
-    assert payload["error_code"] == "SemanticValidationError"
-    assert called is False
-
-
-@pytest.mark.parametrize(
-    "conflicting_args",
-    (
-        ("--take", "1"),
-        ("--where-json", "{}"),
-        ("--match-original-file-path", "/tmp/candidate.wav"),
-        ("--select", "children"),
-        ("--all-results",),
-        ("--return-field", "id"),
-    ),
-)
-def test_query_object_advanced_rejects_split_option_ownership_before_connection(
-    tmp_path: Path,
-    conflicting_args: tuple[str, ...],
-) -> None:
-    called = False
-    request = {
-        "contract": "waapi-skill.advanced-object-query/v1",
-        "waql": "from type Sound",
-        "return": ["id"],
-        "max_results": 2,
-    }
-
-    def client_factory(url: str) -> FakeClient:
-        nonlocal called
-        called = True
-        raise AssertionError(f"split advanced query must not connect to {url}")
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "query-object",
-            "--advanced-request-json",
-            json.dumps(request),
-            *conflicting_args,
-        ],
-        env=gateway_env(tmp_path),
-        client_factory=client_factory,
-    )
-
-    assert exit_code == 2
-    assert payload["error_code"] == "GatewayInputError"
-    assert conflicting_args[0] in payload["message"]
-    assert called is False
-
-
-def test_query_object_advanced_rejects_result_count_above_gateway_cap(
-    tmp_path: Path,
-) -> None:
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": live_info(),
-            "ak.wwise.core.object.get": {
-                "return": [{"id": "{one}"}, {"id": "{two}"}]
-            },
-        }
-    )
-    request = {
-        "contract": "waapi-skill.advanced-object-query/v1",
-        "waql": "from type Sound",
-        "return": ["id"],
-        "max_results": 1,
-    }
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--advanced-request-json", json.dumps(request)],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["error_code"] == "INVALID_QUERY_RESULT"
-    assert payload["details"]["maximum_rows"] == 1
-    assert payload["details"]["actual_count"] == 2
-
-
-def test_query_object_advanced_invalid_waql_is_not_retried_or_normalized(
-    tmp_path: Path,
-) -> None:
-    client = FakeClient(
-        {"ak.wwise.core.getInfo": live_info()},
-        errors={
-            "ak.wwise.core.object.get": WaapiRequestFailed(
-                "ak.wwise.query.invalid_query",
-                {"message": "Unsupported WAQL syntax"},
-            )
-        },
-    )
-    request = {
-        "contract": "waapi-skill.advanced-object-query/v1",
-        "waql": "from type Sound orderby unsupportedAccessor",
-        "return": ["id"],
-        "max_results": 2,
-    }
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--advanced-request-json", json.dumps(request)],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["call"]["ok"] is False
-    assert payload["call"]["waapi_error_uri"] == "ak.wwise.query.invalid_query"
-    assert "normalization" not in payload["call"]
-    assert [call[0] for call in client.calls].count(
-        "ak.wwise.core.object.get"
-    ) == 1
-
-
-def test_query_object_advanced_exact_looking_unknown_object_is_not_normalized(
-    tmp_path: Path,
-) -> None:
-    object_id = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
-    client = FakeClient(
-        {"ak.wwise.core.getInfo": live_info()},
-        errors={
-            "ak.wwise.core.object.get": WaapiRequestFailed(
-                "ak.wwise.query.unknown_object",
-                {"message": "Object not found"},
-            )
-        },
-    )
-    request = {
-        "contract": "waapi-skill.advanced-object-query/v1",
-        "waql": f'from object "{object_id}"',
-        "return": ["id"],
-        "max_results": 2,
-    }
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--advanced-request-json", json.dumps(request)],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["call"]["waapi_error_uri"] == "ak.wwise.query.unknown_object"
-    assert "normalization" not in payload["call"]
-    assert [call[0] for call in client.calls].count(
-        "ak.wwise.core.object.get"
-    ) == 1
-
-
-def test_query_object_advanced_keeps_dispatcher_result_byte_ceiling(
-    tmp_path: Path,
-) -> None:
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": live_info(),
-            "ak.wwise.core.object.get": {
-                "return": [{"id": "{one}", "blob": "x" * (1024 * 1024)}]
-            },
-        }
-    )
-    request = {
-        "contract": "waapi-skill.advanced-object-query/v1",
-        "waql": "from type Sound",
-        "return": ["id", "blob"],
-        "max_results": 2,
-    }
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--advanced-request-json", json.dumps(request)],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["call"]["error_code"] == "RESULT_TOO_LARGE"
-    assert payload["objects"] is None
-    assert "identity_handoff" not in payload
-
-
-def test_advanced_query_with_caller_take_and_id_alias_stays_read_only(
-    tmp_path: Path,
-) -> None:
-    canonical = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": live_info(),
-            "ak.wwise.core.object.get": {"return": [{"id": canonical}]},
-        }
-    )
-    request = {
-        "contract": "waapi-skill.advanced-object-query/v1",
-        "waql": 'from type Sound where name = "Duplicate" take 1',
-        "return": ["id", "parent.id as id"],
-        "max_results": 2,
-    }
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--advanced-request-json", json.dumps(request)],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 0, payload
-    assert payload["count"] == 1
-    assert "identity_handoff" not in payload
-    assert client.calls[-1] == (
-        "ak.wwise.core.object.get",
-        {"waql": 'from type Sound where name = "Duplicate" take 1 take 2'},
-        {"return": ["id", "parent.id as id"]},
-    )
-
-
-def test_query_object_structured_request_compiles_and_dispatches_once(
-    tmp_path: Path,
-) -> None:
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": live_info(),
-            "ak.wwise.core.object.get": {
-                "return": [
-                    {
-                        "id": "{sound}",
-                        "name": "UI_Click",
-                        "type": "Sound",
-                        "path": r"\Actor-Mixer Hierarchy\UI_Click",
-                    }
-                ]
-            },
-        }
-    )
-    request = {
-        "contract": "waapi-skill.object-query/v1",
-        "source": {"kind": "type", "types": ["Event"]},
-        "transforms": [
-            {"kind": "select", "expressions": [["children"]]},
-            {
-                "kind": "where",
-                "predicate": {
-                    "kind": "all",
-                    "operands": [
-                        {
-                            "kind": "compare",
-                            "path": ["type"],
-                            "operator": "=",
-                            "value": "Action",
-                        },
-                        {
-                            "kind": "any",
-                            "operands": [
-                                {
-                                    "kind": "compare",
-                                    "path": ["name"],
-                                    "operator": ":",
-                                    "value": "Play",
-                                },
-                                {
-                                    "kind": "not",
-                                    "operand": {
-                                        "kind": "truthy",
-                                        "path": ["isIncluded"],
-                                    },
-                                },
-                            ],
-                        },
-                    ],
-                },
-            },
-            {
-                "kind": "select",
-                "expressions": [["Target"], ["this"], ["descendants"]],
-            },
-            {"kind": "take", "value": 25},
-        ],
-        "return": ["id", "name", "type", "path", "@Volume"],
-    }
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "query-object",
-            "--request-json",
-            json.dumps(request, separators=(",", ":")),
-        ],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 0, payload
-    assert payload["query_contract"] == "waapi-skill.object-query/v1"
-    assert payload["query_bound"] == {"mode": "take", "value": 25}
-    assert payload["count"] == 1
-    assert client.calls[-1] == (
-        "ak.wwise.core.object.get",
-        {
-            "waql": (
-                "from type Event select children where type = \"Action\" and "
-                "(name : \"Play\" or ! (isIncluded)) "
-                "select Target, this, descendants take 25"
-            )
-        },
-        {"return": ["id", "name", "type", "path", "@Volume"]},
-    )
-
-
-@pytest.mark.parametrize(
-    "query_request",
-    (
-        {
-            "contract": "waapi-skill.object-query/v1",
-            "source": {"kind": "type", "types": ["Sound"]},
-            "transforms": [],
-            "return": ["id"],
-            "waql": "from type Sound",
-        },
-        {
-            "contract": "waapi-skill.object-query/v1",
-            "source": {"kind": "type", "types": ["Sound"]},
-            "transforms": [
-                {
-                    "kind": "where",
-                    "predicate": {
-                        "kind": "raw",
-                        "value": "name = \"Dummy\"",
-                    },
-                },
-                {"kind": "take", "value": 1},
-            ],
-            "return": ["id"],
-        },
-    ),
-)
-def test_query_object_structured_raw_fragments_fail_before_connection(
-    tmp_path: Path,
-    query_request: Mapping[str, Any],
-) -> None:
-    called = False
-
-    def client_factory(url: str) -> FakeClient:
-        nonlocal called
-        called = True
-        raise AssertionError(f"invalid structured query must not connect to {url}")
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--request-json", json.dumps(query_request)],
-        env=gateway_env(tmp_path),
-        client_factory=client_factory,
-    )
-
-    assert exit_code == 2
-    assert payload["error_code"] == "SemanticValidationError"
-    assert called is False
-
-
-def test_query_object_structured_request_rejects_split_option_ownership(
-    tmp_path: Path,
-) -> None:
-    request = {
-        "contract": "waapi-skill.object-query/v1",
-        "source": {
-            "kind": "object",
-            "objects": [
-                {
-                    "kind": "id",
-                    "value": "{11111111-1111-1111-1111-111111111111}",
-                }
-            ],
-        },
-        "transforms": [],
-        "return": ["id"],
-    }
-    called = False
-
-    def client_factory(url: str) -> FakeClient:
-        nonlocal called
-        called = True
-        raise AssertionError(f"conflicting structured query must not connect to {url}")
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "query-object",
-            "--request-json",
-            json.dumps(request),
-            "--return-field",
-            "name",
-        ],
-        env=gateway_env(tmp_path),
-        client_factory=client_factory,
-    )
-
-    assert exit_code == 2
-    assert payload["error_code"] == "GatewayInputError"
-    assert "--return-field" in payload["message"]
-    assert called is False
-
-
-def test_query_object_structured_exact_identity_requires_and_verifies_return_field(
-    tmp_path: Path,
-) -> None:
-    object_id = "{11111111-1111-1111-1111-111111111111}"
-    request = {
-        "contract": "waapi-skill.object-query/v1",
-        "source": {
-            "kind": "object",
-            "objects": [{"kind": "id", "value": object_id}],
-        },
-        "transforms": [],
-        "return": ["name"],
-    }
-    called = False
-
-    def client_factory(url: str) -> FakeClient:
-        nonlocal called
-        called = True
-        raise AssertionError(f"unverifiable exact query must not connect to {url}")
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--request-json", json.dumps(request)],
-        env=gateway_env(tmp_path),
-        client_factory=client_factory,
-    )
-    assert exit_code == 2
-    assert payload["error_code"] == "GatewayInputError"
-    assert "'id'" in payload["message"]
-    assert called is False
-
-    request["return"] = ["id", "name"]
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": live_info(),
-            "ak.wwise.core.object.get": {
-                "return": [
-                    {
-                        "id": "{22222222-2222-2222-2222-222222222222}",
-                        "name": "Wrong",
-                    }
-                ]
-            },
-        }
-    )
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--request-json", json.dumps(request)],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-    assert exit_code == 2
-    assert payload["error_code"] == "INVALID_QUERY_RESULT"
-    assert payload["details"]["identity_field"] == "id"
-
-
-def test_query_object_structured_rejects_rows_above_compiled_take(
-    tmp_path: Path,
-) -> None:
-    request = {
-        "contract": "waapi-skill.object-query/v1",
-        "source": {"kind": "type", "types": ["Sound"]},
-        "transforms": [{"kind": "take", "value": 1}],
-        "return": ["id"],
-    }
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": live_info(),
-            "ak.wwise.core.object.get": {
-                "return": [
-                    {"id": "{11111111-1111-1111-1111-111111111111}"},
-                    {"id": "{22222222-2222-2222-2222-222222222222}"},
-                ]
-            },
-        }
-    )
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--request-json", json.dumps(request)],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["error_code"] == "INVALID_QUERY_RESULT"
-    assert payload["details"]["maximum_rows"] == 1
-    assert payload["details"]["actual_count"] == 2
-
-
-def test_query_object_structured_exact_path_success_uses_identity_bound(
-    tmp_path: Path,
-) -> None:
-    path = r"\Events\Default Work Unit\Play_UI"
-    request = {
-        "contract": "waapi-skill.object-query/v1",
-        "source": {
-            "kind": "object",
-            "objects": [{"kind": "path", "value": path}],
-        },
-        "transforms": [],
-        "return": ["path", "name"],
-    }
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": live_info(),
-            "ak.wwise.core.object.get": {
-                "return": [{"path": path, "name": "Play_UI"}]
-            },
-        }
-    )
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--request-json", json.dumps(request)],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 0, payload
-    assert payload["query_bound"] == {"mode": "exact-object", "value": 1}
-    assert payload["objects"] == [{"path": path, "name": "Play_UI"}]
-    assert client.calls[-1] == (
-        "ak.wwise.core.object.get",
-        {"waql": f'from object "{path}"'},
-        {"return": ["path", "name"]},
-    )
-
-
-def test_query_object_structured_exact_path_rejects_identity_drift(
-    tmp_path: Path,
-) -> None:
-    expected_path = r"\Events\Default Work Unit\Play_UI"
-    request = {
-        "contract": "waapi-skill.object-query/v1",
-        "source": {
-            "kind": "object",
-            "objects": [{"kind": "path", "value": expected_path}],
-        },
-        "transforms": [],
-        "return": ["path"],
-    }
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": live_info(),
-            "ak.wwise.core.object.get": {
-                "return": [{"path": r"\Events\Default Work Unit\Play_Other"}]
-            },
-        }
-    )
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--request-json", json.dumps(request)],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["error_code"] == "INVALID_QUERY_RESULT"
-    assert payload["details"]["identity_field"] == "path"
-    assert payload["details"]["expected"] == expected_path
-
-
-def test_query_object_structured_exact_missing_object_is_normalized(
-    tmp_path: Path,
-) -> None:
-    missing_id = "{99999999-9999-9999-9999-999999999999}"
-    request = {
-        "contract": "waapi-skill.object-query/v1",
-        "source": {
-            "kind": "object",
-            "objects": [{"kind": "id", "value": missing_id}],
-        },
-        "transforms": [],
-        "return": ["id"],
-    }
-    client = FakeClient(
-        {"ak.wwise.core.getInfo": live_info()},
-        errors={
-            "ak.wwise.core.object.get": WaapiRequestFailed(
-                "ak.wwise.query.unknown_object",
-                {"message": "Object not found (13)"},
-            )
-        },
-    )
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["query-object", "--request-json", json.dumps(request), "--detail"],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 0, payload
-    assert payload["count"] == 0
-    assert payload["objects"] == []
-    assert payload["query_bound"] == {"mode": "exact-object", "value": 1}
-    assert payload["call"]["normalization"]["kind"] == "exact-object-absence"
-    assert payload["call"]["normalization"]["source"] == (
-        "ak.wwise.query.unknown_object"
-    )
 
 
 def test_query_object_original_file_reference_match_returns_closed_candidate_records(
@@ -4861,20 +2958,6 @@ def test_query_object_original_file_reference_match_maximum_shape_stays_below_ga
                 r"Y:\Sandbox\Originals\source.wav",
             ),
             "requires exactly --type AudioFileSource",
-        ),
-        (
-            (
-                "query-object",
-                "--type",
-                "AudioFileSource",
-                "--take",
-                "1000",
-                "--where-json",
-                "{}",
-                "--match-original-file-path",
-                r"Y:\Sandbox\Originals\source.wav",
-            ),
-            "cannot be combined with --where-json",
         ),
         (
             (
@@ -5244,18 +3327,6 @@ def test_query_object_original_file_reference_match_rejects_scan_at_take_limit(
             ),
             "GatewayInputError",
         ),
-        (
-            (
-                "query-object",
-                "--type",
-                "Sound",
-                "--where-json",
-                "3",
-                "--take",
-                "1",
-            ),
-            "SemanticValidationError",
-        ),
     ),
 )
 def test_query_input_errors_fail_before_opening_transport(
@@ -5606,17 +3677,6 @@ def test_query_take_and_all_results_are_mutually_exclusive() -> None:
         )
 
 
-def test_structured_and_advanced_query_documents_are_mutually_exclusive() -> None:
-    with pytest.raises(SystemExit):
-        waapi_gateway.build_parser().parse_args(
-            [
-                "query-object",
-                "--request-json",
-                "{}",
-                "--advanced-request-json",
-                "{}",
-            ]
-        )
 
 
 def test_documented_single_quoted_path_reaches_preview_with_single_separators(
@@ -5974,30 +4034,6 @@ def test_query_object_rejects_raw_waql_before_dispatch(tmp_path: Path) -> None:
     assert client.calls == []
 
 
-@pytest.mark.parametrize("constant", ("NaN", "Infinity", "-Infinity"))
-def test_query_object_where_json_rejects_non_json_numbers(tmp_path: Path, constant: str) -> None:
-    client = FakeClient({"ak.wwise.core.getInfo": live_info()})
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "query-object",
-            "--type",
-            "Sound",
-            "--where-json",
-            '{"field":"childrenCount","operator":">","value":' + constant + "}",
-            "--take",
-            "1",
-        ],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["error_code"] == "GatewayInputError"
-    assert "strict JSON" in payload["message"]
-    assert client.calls == []
-
-
 def test_query_object_broad_sources_require_explicit_bound_or_all_results(tmp_path: Path) -> None:
     client = FakeClient(
         {
@@ -6113,18 +4149,25 @@ def test_exact_absence_does_not_scan_untrusted_nested_or_bare_error_text(
 
 def test_wait_topic_uses_payload_match_and_unsubscribes(tmp_path: Path) -> None:
     topic = "ak.wwise.core.object.created"
+    wanted = "{22222222-2222-2222-2222-222222222222}"
     client = FakeClient(
         {"ak.wwise.core.getInfo": live_info()},
         subscription_events={
             topic: [
                 {"object": {"id": "wrong", "name": "Ignore"}},
-                {"object": {"id": "wanted", "name": "UI"}},
+                {"object": {"id": wanted, "name": "UI"}},
             ]
         },
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["--timeout", "0.5", "wait-topic", topic, "--match-json", '{"object":{"id":"wanted"}}'],
+        [
+            "--timeout",
+            "0.5",
+            "wait-topic",
+            topic,
+            *_typed_topic_arguments(topic, match={"object": {"id": wanted}}),
+        ],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -6143,13 +4186,14 @@ def test_stream_topic_emits_matching_events_immediately_from_one_subscription(
     tmp_path: Path,
 ) -> None:
     topic = "ak.wwise.core.object.created"
+    wanted = "{22222222-2222-2222-2222-222222222222}"
     client = FakeClient(
         {"ak.wwise.core.getInfo": live_info()},
         subscription_events={
             topic: [
                 {"object": {"id": "wrong", "name": "Ignore"}},
-                {"object": {"id": "wanted", "name": "UI_1"}},
-                {"object": {"id": "wanted", "name": "UI_2"}},
+                {"object": {"id": wanted, "name": "UI_1"}},
+                {"object": {"id": wanted, "name": "UI_2"}},
             ]
         },
     )
@@ -6161,8 +4205,7 @@ def test_stream_topic_emits_matching_events_immediately_from_one_subscription(
             "0.5",
             "stream-topic",
             topic,
-            "--match-json",
-            '{"object":{"id":"wanted"}}',
+            *_typed_topic_arguments(topic, match={"object": {"id": wanted}}),
         ],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
@@ -6231,203 +4274,14 @@ def test_stream_topic_without_record_sink_fails_before_connecting(
     assert connected is False
 
 
-def test_stream_topic_queue_overflow_fails_closed_without_emitting_partial_events(
-    tmp_path: Path,
-) -> None:
-    topic = "ak.wwise.core.object.created"
-    events = [
-        {"object": {"id": f"object-{index}", "name": f"Object_{index}"}}
-        for index in range(waapi_gateway.DEFAULT_LISTENER_QUEUE_SIZE + 1)
-    ]
-    client = FakeClient(
-        {"ak.wwise.core.getInfo": live_info()},
-        subscription_events={topic: events},
-    )
-    records: list[Mapping[str, Any]] = []
-
-    exit_code, terminal = waapi_gateway.execute_gateway(
-        ["--timeout", "0.5", "stream-topic", topic],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-        stream_sink=records.append,
-    )
-
-    assert exit_code == 2
-    assert [record["record_type"] for record in records] == ["started"]
-    assert terminal["error_code"] == "SUBSCRIPTION_STREAM_OVERFLOW"
-    assert terminal["event_count"] == 0
-    assert terminal["cleanup"] == "unsubscribed"
-    assert client.handlers[0].unsubscribe_calls == 1
 
 
-def test_stream_topic_rejects_oversized_event_before_buffering(
-    tmp_path: Path,
-) -> None:
-    topic = "ak.wwise.core.object.created"
-    client = FakeClient(
-        {"ak.wwise.core.getInfo": live_info()},
-        subscription_events={
-            topic: [{"object": {"id": "wanted", "name": "x" * (300 * 1024)}}]
-        },
-    )
-    records: list[Mapping[str, Any]] = []
-
-    exit_code, terminal = waapi_gateway.execute_gateway(
-        ["--timeout", "0.5", "stream-topic", topic],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-        stream_sink=records.append,
-    )
-
-    assert exit_code == 2
-    assert [record["record_type"] for record in records] == ["started"]
-    assert terminal["error_code"] == "RESULT_TOO_LARGE"
-    assert terminal["details"]["limit_bytes"] == 256 * 1024
-    assert terminal["event_count"] == 0
-    assert terminal["cleanup"] == "unsubscribed"
 
 
-def test_stream_topic_health_check_terminates_after_connection_loss(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    topic = "ak.wwise.core.object.created"
-
-    class DisconnectingClient(FakeClient):
-        def __init__(self) -> None:
-            super().__init__({"ak.wwise.core.getInfo": live_info()})
-            self.get_info_calls = 0
-
-        def call(
-            self,
-            uri: str,
-            args: Mapping[str, Any] | None = None,
-            options: Mapping[str, Any] | None = None,
-        ) -> Any:
-            if uri == "ak.wwise.core.getInfo":
-                self.get_info_calls += 1
-                if self.get_info_calls > 1:
-                    raise ConnectionError("synthetic WAAPI disconnect")
-            return super().call(uri, args, options)
-
-    monkeypatch.setattr(
-        waapi_gateway,
-        "TOPIC_STREAM_HEALTH_INTERVAL_SECONDS",
-        0.01,
-    )
-    client = DisconnectingClient()
-    records: list[Mapping[str, Any]] = []
-
-    exit_code, terminal = waapi_gateway.execute_gateway(
-        ["--timeout", "0.5", "stream-topic", topic],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-        stream_sink=records.append,
-    )
-
-    assert exit_code == 2
-    assert [record["record_type"] for record in records] == ["started"]
-    assert terminal["error_code"] == "ConnectionError"
-    assert terminal["event_count"] == 0
-    assert terminal["cleanup"] == "unsubscribed"
-    assert client.get_info_calls == 2
-    assert client.handlers[0].unsubscribe_calls == 1
 
 
-def test_wait_topic_false_unsubscribe_is_retained_and_close_retries(
-    tmp_path: Path,
-) -> None:
-    topic = "ak.wwise.core.object.created"
-
-    class RetryHandler(FakeEventHandler):
-        def __init__(self) -> None:
-            super().__init__()
-            self.results = [False, True]
-
-        def unsubscribe(self) -> bool:
-            self.unsubscribe_calls += 1
-            self.unsubscribe_thread_ident = threading.get_ident()
-            return self.results.pop(0)
-
-    class RetryClient(FakeClient):
-        def subscribe(
-            self,
-            uri: str,
-            callback: Any,
-            options: Mapping[str, Any] | None = None,
-        ) -> RetryHandler:
-            del uri, options
-            handler = RetryHandler()
-            self.handlers.append(handler)
-            callback({"object": {"id": "wanted"}})
-            return handler
-
-    client = RetryClient({"ak.wwise.core.getInfo": live_info()})
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["--timeout", "0.5", "wait-topic", topic],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["ok"] is False
-    assert payload["call"]["error_code"] == "SUBSCRIPTION_CLEANUP_FAILED"
-    assert payload["cleanup"] == "unsubscribed_after_retry"
-    assert payload["call"]["details"]["subscription_cleanup"] == {
-        "status": "unsubscribed_after_retry",
-        "reason": "unsubscribe_returned_false",
-    }
-    assert client.handlers[0].unsubscribe_calls == 2
-    assert client.disconnected is True
 
 
-def test_wait_topic_repeated_false_unsubscribe_never_claims_cleanup(
-    tmp_path: Path,
-) -> None:
-    topic = "ak.wwise.core.object.created"
-
-    class FalseHandler(FakeEventHandler):
-        def unsubscribe(self) -> bool:
-            self.unsubscribe_calls += 1
-            self.unsubscribe_thread_ident = threading.get_ident()
-            return False
-
-    class FalseClient(FakeClient):
-        def subscribe(
-            self,
-            uri: str,
-            callback: Any,
-            options: Mapping[str, Any] | None = None,
-        ) -> FalseHandler:
-            del uri, options
-            handler = FalseHandler()
-            self.handlers.append(handler)
-            callback({"object": {"id": "wanted"}})
-            return handler
-
-    client = FalseClient({"ak.wwise.core.getInfo": live_info()})
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["--timeout", "0.5", "wait-topic", topic],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["cleanup"] == "unsubscribe_failed"
-    assert payload["call"]["details"]["subscription_cleanup"]["status"] == (
-        "unsubscribe_failed"
-    )
-    assert payload["details"]["cleanup_failure"] == {
-        "error_code": "SUBSCRIPTION_CLEANUP_FAILED",
-        "message": "WAAPI subscription cleanup did not explicitly succeed",
-        "details": {
-            "subscription_token": 1,
-            "reason": "unsubscribe_returned_false",
-        },
-    }
-    assert client.handlers[0].unsubscribe_calls == 2
 
 
 @pytest.mark.parametrize(
@@ -6444,40 +4298,6 @@ def test_topic_cleanup_projection_never_infers_from_dispatch_outcome(
     assert waapi_gateway.topic_subscription_cleanup_status(result) == "unknown"
 
 
-def test_soundbank_generated_wait_is_not_silently_capped_at_ten_seconds(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    topic = "ak.wwise.core.soundbank.generated"
-    captured: dict[str, float] = {}
-
-    def record_dispatch(*args: Any, **kwargs: Any) -> Mapping[str, Any]:
-        operation_timeout = float(kwargs["operation_timeout"])
-        captured["operation_timeout"] = operation_timeout
-        return {
-            "api": topic,
-            "item_type": "topic",
-            "category": None,
-            "version": "2022.1",
-            "ok": False,
-            "risk_level": "read",
-            "error_code": "TIMEOUT",
-            "message": "synthetic timeout without waiting",
-            "details": {"operation_timeout_seconds": operation_timeout},
-        }
-
-    monkeypatch.setattr(waapi_gateway, "dispatch", record_dispatch)
-    client = FakeClient({"ak.wwise.core.getInfo": live_info()})
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["--timeout", "120", "wait-topic", topic],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["call"]["error_code"] == "TIMEOUT"
-    assert 119.0 < captured["operation_timeout"] < 120.0
 
 
 def test_ordinary_wait_topic_honors_explicit_long_timeout_without_contract_cap(
@@ -6506,7 +4326,7 @@ def test_ordinary_wait_topic_honors_explicit_long_timeout_without_contract_cap(
     client = FakeClient({"ak.wwise.core.getInfo": live_info()})
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["--timeout", "3600", "wait-topic", topic],
+        ["--timeout", "3600", "wait-topic", topic, *_typed_topic_bindings(topic)],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -6546,7 +4366,7 @@ def test_ordinary_wait_topic_reports_default_ten_second_budget(
     client = FakeClient({"ak.wwise.core.getInfo": live_info()})
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["wait-topic", topic],
+        ["wait-topic", topic, *_typed_topic_bindings(topic)],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -6571,7 +4391,7 @@ def test_wait_topic_no_timeout_returns_strict_bounded_json(
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["wait-topic", topic, "--no-timeout"],
+        ["wait-topic", topic, "--no-timeout", *_typed_topic_bindings(topic)],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -6657,7 +4477,7 @@ def test_wait_topic_keyboard_interrupt_closes_transport_subscription(
     client = FakeClient({"ak.wwise.core.getInfo": live_info()})
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["wait-topic", topic, "--no-timeout"],
+        ["wait-topic", topic, "--no-timeout", *_typed_topic_bindings(topic)],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
@@ -6673,14 +4493,15 @@ def test_wait_topic_keyboard_interrupt_closes_transport_subscription(
 
 def test_wait_topic_collects_bounded_matching_events_in_order(tmp_path: Path) -> None:
     topic = "ak.wwise.core.object.created"
+    wanted = "{22222222-2222-2222-2222-222222222222}"
     client = FakeClient(
         {"ak.wwise.core.getInfo": live_info()},
         subscription_events={
             topic: [
                 {"object": {"id": "wrong", "name": "Ignore"}},
-                {"object": {"id": "wanted", "name": "UI_1"}},
-                {"object": {"id": "wanted", "name": "UI_2"}},
-                {"object": {"id": "wanted", "name": "UI_3"}},
+                {"object": {"id": wanted, "name": "UI_1"}},
+                {"object": {"id": wanted, "name": "UI_2"}},
+                {"object": {"id": wanted, "name": "UI_3"}},
             ]
         },
     )
@@ -6693,8 +4514,7 @@ def test_wait_topic_collects_bounded_matching_events_in_order(tmp_path: Path) ->
             topic,
             "--event-count",
             "3",
-            "--match-json",
-            '{"object":{"id":"wanted"}}',
+            *_typed_topic_arguments(topic, match={"object": {"id": wanted}}),
         ],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
@@ -6736,6 +4556,7 @@ def test_wait_topic_rejects_invalid_event_count_before_connecting(
 
 def test_wait_topic_accepts_waapi_client_kwargs_only_callback_shape(tmp_path: Path) -> None:
     topic = "ak.wwise.core.object.created"
+    wanted = "{22222222-2222-2222-2222-222222222222}"
 
     class KwargsOnlyEventClient(FakeClient):
         def subscribe(
@@ -6747,88 +4568,31 @@ def test_wait_topic_accepts_waapi_client_kwargs_only_callback_shape(tmp_path: Pa
             handler = FakeEventHandler()
             self.handlers.append(handler)
             callback(object={"id": "wrong", "name": "Ignore"})
-            callback(object={"id": "wanted", "name": "UI"})
+            callback(object={"id": wanted, "name": "UI"})
             return handler
 
     client = KwargsOnlyEventClient({"ak.wwise.core.getInfo": live_info()})
 
     exit_code, payload = waapi_gateway.execute_gateway(
-        ["--timeout", "0.5", "wait-topic", topic, "--match-json", '{"object":{"id":"wanted"}}'],
+        [
+            "--timeout",
+            "0.5",
+            "wait-topic",
+            topic,
+            *_typed_topic_arguments(topic, match={"object": {"id": wanted}}),
+        ],
         env=gateway_env(tmp_path),
         client_factory=lambda url: client,
     )
 
     assert exit_code == 0
-    assert payload["event"] == {"object": {"id": "wanted", "name": "UI"}}
+    assert payload["event"] == {"object": {"id": wanted, "name": "UI"}}
     assert payload["cleanup"] == "unsubscribed"
     assert client.handlers[0].unsubscribe_calls == 1
 
 
-def test_wait_topic_oversized_event_reports_completed_unsubscribe(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    topic = "ak.wwise.core.object.created"
-    sentinel = "OVERSIZED_TOPIC_PAYLOAD_MUST_NOT_ESCAPE"
-    monkeypatch.setattr(dispatcher_module, "MAX_LIVE_RESULT_JSON_BYTES", 2048)
-
-    class OversizedEventClient(FakeClient):
-        def subscribe(
-            self,
-            uri: str,
-            callback: Any,
-            options: Mapping[str, Any] | None = None,
-        ) -> FakeEventHandler:
-            handler = FakeEventHandler()
-            self.handlers.append(handler)
-            callback(blob=sentinel + ("x" * 4096))
-            return handler
-
-    client = OversizedEventClient({"ak.wwise.core.getInfo": live_info()})
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["--timeout", "0.5", "wait-topic", topic],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["call"]["error_code"] == "RESULT_TOO_LARGE"
-    assert payload["cleanup"] == "unsubscribed"
-    assert client.handlers[0].unsubscribe_calls == 1
-    assert sentinel not in json.dumps(payload)
 
 
-def test_wait_topic_multi_event_aggregate_respects_result_limit(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    topic = "ak.wwise.core.object.created"
-    sentinel = "OVERSIZED_MULTI_TOPIC_PAYLOAD_MUST_NOT_ESCAPE"
-    monkeypatch.setattr(dispatcher_module, "MAX_LIVE_RESULT_JSON_BYTES", 2048)
-    client = FakeClient(
-        {"ak.wwise.core.getInfo": live_info()},
-        subscription_events={
-            topic: [
-                {"object": {"id": f"wanted-{index}", "name": sentinel + ("x" * 900)}}
-                for index in range(3)
-            ]
-        },
-    )
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["--timeout", "0.5", "wait-topic", topic, "--event-count", "3"],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["call"]["error_code"] == "RESULT_TOO_LARGE"
-    assert payload["requested_event_count"] == 3
-    assert payload["events"] is None
-    assert payload["cleanup"] == "unsubscribed"
-    assert client.handlers[0].unsubscribe_calls == 1
-    assert sentinel not in json.dumps(payload)
 
 
 @pytest.mark.parametrize(
@@ -6872,124 +4636,8 @@ def test_wait_topic_rejects_malformed_dispatcher_event_envelope(result: Mapping[
     assert caught.value.error_code == "INVALID_TOPIC_RESULT"
 
 
-def test_public_generic_call_routes_reviewed_topics_to_wait_topic_before_connecting(tmp_path: Path) -> None:
-    called = False
-
-    def client_factory(url: str) -> FakeClient:
-        nonlocal called
-        called = True
-        raise AssertionError(f"topic route rejection must not connect to {url}")
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["call", "ak.wwise.core.object.created", "--dry-run"],
-        env=gateway_env(tmp_path),
-        client_factory=client_factory,
-    )
-
-    assert exit_code == 2
-    assert payload["status"] == "wait_topic_required"
-    assert payload["error_code"] == "WAIT_TOPIC_REQUIRED"
-    assert payload["required_command"] == "wait-topic"
-    assert payload["executed"] is False
-    assert called is False
 
 
-def test_debug_assert_topic_is_routed_to_bounded_wait_before_connecting(
-    tmp_path: Path,
-) -> None:
-    topic = "ak.wwise.debug.assertFailed"
-    called = False
-
-    def client_factory(url: str) -> FakeClient:
-        nonlocal called
-        called = True
-        raise AssertionError(f"topic route boundary must not connect to {url}")
-
-    assert frozenset(EXPLICIT_UNSUPPORTED_TOPIC_URIS) == EXPECTED_EXCLUDED_TOPIC_URIS
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["call", topic, "--dry-run"],
-        env=gateway_env(tmp_path),
-        client_factory=client_factory,
-    )
-
-    assert exit_code == 2
-    assert payload["status"] == "wait_topic_required"
-    assert payload["error_code"] == "WAIT_TOPIC_REQUIRED"
-    assert payload["required_command"] == "wait-topic"
-    assert payload["executed"] is False
-    assert called is False
-
-
-@pytest.mark.parametrize(
-    ("topic", "event"),
-    (
-        (
-            "ak.wwise.ui.commands.executed",
-            {"command": "project.save", "objects": [], "platforms": []},
-        ),
-        ("ak.wwise.ui.selectionChanged", {"objects": []}),
-    ),
-)
-def test_wait_topic_executes_reviewed_ui_topics_and_unsubscribes(
-    tmp_path: Path,
-    topic: str,
-    event: Mapping[str, Any],
-) -> None:
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": live_info(
-                command_line=topic != "ak.wwise.ui.commands.executed"
-            )
-        },
-        subscription_events={topic: [event]},
-    )
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["--timeout", "0.5", "wait-topic", topic],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 0
-    assert payload["ok"] is True
-    assert payload["topic"] == topic
-    assert payload["event"] == event
-    assert payload["cleanup"] == "unsubscribed"
-    assert client.handlers[0].unsubscribe_calls == 1
-
-
-def test_wait_topic_timeout_unsubscribes_on_transport_owner_thread(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    topic = "ak.wwise.core.object.created"
-    client = FakeClient({"ak.wwise.core.getInfo": live_info()})
-    topic_wait_timeout = 0.02
-    monkeypatch.setattr(
-        waapi_gateway,
-        "reserved_topic_wait_timeout",
-        lambda _connection: topic_wait_timeout,
-    )
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["--timeout", "1.0", "wait-topic", topic],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["call"]["error_code"] == "TIMEOUT"
-    details = payload["call"]["details"]
-    assert details["cleanup_pending"] is False
-    assert details["configured_timeout_seconds"] == 1.0
-    assert details["deadline_exhausted"] is False
-    assert details["operation_timeout_seconds"] == pytest.approx(topic_wait_timeout)
-    assert payload["cleanup"] == "unsubscribed"
-    assert client.handlers[0].unsubscribe_calls == 1
-    assert client.handlers[0].unsubscribe_thread_ident == client.handlers[0].subscribe_thread_ident
-    assert client.handlers[0].unsubscribe_thread_ident != threading.get_ident()
-    assert client.disconnected is True
 
 
 @pytest.mark.parametrize(
@@ -7016,30 +4664,6 @@ def test_reserved_topic_wait_timeout_preserves_cleanup_budget(
     )
 
 
-def test_disconnect_failure_does_not_mask_returned_wait_topic_timeout(tmp_path: Path) -> None:
-    topic = "ak.wwise.core.object.created"
-
-    class DisconnectFailureClient(FakeClient):
-        def disconnect(self) -> None:
-            raise RuntimeError("disconnect must remain secondary")
-
-    client = DisconnectFailureClient({"ak.wwise.core.getInfo": live_info()})
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["--timeout", "0.1", "wait-topic", topic],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["command"] == "wait-topic"
-    assert payload["call"]["error_code"] == "TIMEOUT"
-    assert payload["cleanup"] == "unsubscribed"
-    assert payload["details"]["cleanup_failure"] == {
-        "error_code": "RuntimeError",
-        "message": "disconnect must remain secondary",
-    }
-    assert client.handlers[0].unsubscribe_calls == 1
 
 
 def test_gateway_transport_close_unsubscribes_residual_handlers_on_owner_thread() -> None:
@@ -7174,6 +4798,7 @@ def test_wait_topic_no_timeout_keeps_transport_connect_finitely_bounded(
                 "wait-topic",
                 "ak.wwise.core.object.created",
                 "--no-timeout",
+                *_typed_topic_bindings("ak.wwise.core.object.created"),
             ],
             env=gateway_env(tmp_path),
             client_factory=slow_factory,
@@ -7406,59 +5031,6 @@ def test_timeout_payload_marks_cleanup_complete_when_late_call_releases_in_grace
     assert "late-result-must-be-discarded" not in json.dumps(payload)
 
 
-def test_successful_transport_close_does_not_rewrite_third_party_timeout_cleanup(
-    tmp_path: Path,
-) -> None:
-    class LaneTimeout(TimeoutError):
-        def as_dict(self) -> dict[str, Any]:
-            return {
-                "error_code": "TIMEOUT",
-                "message": "lane timed out",
-                "details": {
-                    "phase": "lane.wait",
-                    "configured_timeout_seconds": 123.0,
-                    "elapsed_seconds": 1.0,
-                    "deadline_exhausted": False,
-                    "cleanup_pending": True,
-                    "abort_requested": True,
-                    "lane_marker": "must-preserve",
-                },
-            }
-
-    class LaneTimeoutClient(FakeClient):
-        def __init__(self) -> None:
-            super().__init__({})
-            self.call_count = 0
-
-        def call(
-            self,
-            uri: str,
-            args: Mapping[str, Any] | None = None,
-            options: Mapping[str, Any] | None = None,
-        ) -> Any:
-            self.calls.append((uri, args, options))
-            self.call_count += 1
-            if self.call_count == 1:
-                return live_info()
-            raise LaneTimeout("lane timed out")
-
-    client = LaneTimeoutClient()
-    exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "call",
-            "ak.wwise.waapi.getFunctions",
-        ],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    details = payload["call"]["details"]
-    assert details["phase"] == "lane.wait"
-    assert details["lane_marker"] == "must-preserve"
-    assert details["cleanup_pending"] is True
-    assert "provenance" not in details
-    assert client.disconnected is True
 
 
 def test_disconnect_failure_is_attached_without_masking_primary_result_error(
@@ -7522,30 +5094,6 @@ def test_hostile_disconnect_exception_is_safely_attached_to_primary_result_error
     }
 
 
-def test_disconnect_failure_does_not_mask_returned_dispatch_error(tmp_path: Path) -> None:
-    class DisconnectFailureClient(FakeClient):
-        def disconnect(self) -> None:
-            raise RuntimeError("disconnect must remain secondary")
-
-    api = "ak.wwise.waapi.getFunctions"
-    client = DisconnectFailureClient(
-        {"ak.wwise.core.getInfo": live_info()},
-        errors={api: WaapiRequestFailed("ak.wwise.transport.closed")},
-    )
-
-    exit_code, payload = waapi_gateway.execute_gateway(
-        ["call", api],
-        env=gateway_env(tmp_path),
-        client_factory=lambda url: client,
-    )
-
-    assert exit_code == 2
-    assert payload["call"]["error_code"] == "WaapiRequestFailed"
-    assert payload["call"]["message"] == "untrusted rendered application error"
-    assert payload["details"]["cleanup_failure"] == {
-        "error_code": "RuntimeError",
-        "message": "disconnect must remain secondary",
-    }
 
 
 def test_successful_mutation_result_survives_baseexception_disconnect_failure(

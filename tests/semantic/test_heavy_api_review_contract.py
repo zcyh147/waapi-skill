@@ -123,16 +123,15 @@ def test_audio_convert_request_is_reconstructible_from_prompt_and_progressive_sc
             assert platform in case.prompt
         for language in request["languages"]:
             assert language in case.prompt
-    assert "### Reviewed Authoring audio-convert fast route" in reference
+    assert "### Authoring audio conversion" in reference
     assert "`ak.wwise.core.audio.convert`" in reference
     assert "`2024.1`/`2025.1`" in reference
-    assert "`operation-schema waapi.call`" in reference
-    assert "`direct_fast_route_contract.canonical_request_template`" in reference
+    assert "`request-schema ak.wwise.core.audio.convert`" in reference
     for token in (
-        "exact object paths",
+        "object identities",
         "platforms",
         "languages",
-        "absolute `io_root` unchanged",
+        "absolute `io_root`",
     ):
         assert token in reference
 

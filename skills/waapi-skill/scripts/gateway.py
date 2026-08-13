@@ -43,12 +43,6 @@ from wwise_waapi.builders.common import (  # noqa: E402  # pyright: ignore[repor
     SemanticPreview,
     SemanticValidationError,
 )
-from wwise_waapi.builders.cli_request_templates import (  # noqa: E402  # pyright: ignore[reportMissingImports]
-    CLI_REQUEST_TEMPLATE_URIS,
-    build_cli_request_template,
-    build_cli_request_template_set,
-    is_cli_request_template_uri,
-)
 from wwise_waapi.builders.debug_lua import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     DebugLuaContractError,
     MAX_WAL_TREE_NODES,
@@ -187,8 +181,6 @@ from wwise_waapi.execution_contracts import (  # noqa: E402  # pyright: ignore[r
 )
 from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     COMPOSER_INPUT_MODE,
-    FORBIDDEN_MODEL_AUTHORED_COMMAND_FIELDS,
-    LEGACY_JSON_INPUT_MODE,
     INLINE_TYPED_INPUT_MODE,
     OPERATION_REQUEST_CONTRACT,
     PACKAGED_TRANSACTION_READBACK_URIS,
@@ -306,7 +298,6 @@ OFFLINE_COMMANDS = frozenset(
         "operations",
         "operation-schema",
         "undo-child-schema",
-        "legacy-operation-schema",
         "request-schema",
         "request-map-container",
         "request-array-item",
@@ -329,12 +320,6 @@ TOPIC_STREAM_RECORD_CONTRACT = "waapi-skill.topic-stream/v1"
 GATEWAY_CONFIG_CONTRACT = "waapi-skill.config/v2"
 GATEWAY_SESSION_CONTEXT_CONTRACT = "waapi-skill.session-context/v2"
 GATEWAY_SESSION_INTRODUCTION_CONTRACT = "waapi-skill.session-introduction/v2"
-GATEWAY_OPERATION_SCHEMA_DIRECT_FAST_ROUTE_CONTRACT = (
-    "waapi-skill.operation-schema-direct-fast-route/v1"
-)
-LEGACY_OPERATION_JSON_ADAPTER_CONTRACT = (
-    "waapi-skill.legacy-operation-json-adapter/v1"
-)
 GATEWAY_DEADLINE_PROVENANCE = "waapi-skill.gateway-deadline/v1"
 GATEWAY_RESULT_CEILING_PROVENANCE = "waapi-skill.gateway-live-result-json-ceiling/v1"
 MEDIA_POOL_POST_FILTER_CONTRACT = "waapi-skill.media-pool-post-filter/v1"
@@ -1303,18 +1288,6 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
-    debug_validate_call = subparsers.add_parser(
-        "debug-validate-call",
-        help="Validate bounded args/options/result documents without invoking the target function",
-    )
-    debug_validate_call.add_argument(
-        "api",
-        help="Exact reflected WAAPI function URI to validate",
-    )
-    debug_validate_call.add_argument("--args-json")
-    debug_validate_call.add_argument("--options-json")
-    debug_validate_call.add_argument("--result-json")
-
     query_object = subparsers.add_parser(
         "query-object",
         help="Run a source-grounded read-only object query without composing WAAPI code",
@@ -1330,23 +1303,6 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Query Editor object specifier: canonical {GUID} or absolute "
             r"\Queries\... path; raw WAQL is not accepted"
-        ),
-    )
-    query_source.add_argument(
-        "--request-json",
-        metavar="OBJECT_QUERY_JSON",
-        help=(
-            "Closed waapi-skill.object-query/v1 document obtained from "
-            "query-schema; raw WAQL and expression strings are not accepted"
-        ),
-    )
-    query_source.add_argument(
-        "--advanced-request-json",
-        metavar="ADVANCED_OBJECT_QUERY_JSON",
-        help=(
-            "Bounded waapi-skill.advanced-object-query/v1 document obtained "
-            "from query-schema --advanced; available only when the closed "
-            "structured query contract cannot express the requested read"
         ),
     )
     query_source.add_argument(
@@ -1418,7 +1374,6 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         dest="typed_query_map_remove",
     )
-    query_object.add_argument("--where-json")
     query_object.add_argument(
         "--where",
         nargs=4,
@@ -1538,8 +1493,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Collect a bounded count of manifest topic events, with optional payload match and guaranteed cleanup",
     )
     wait_topic.add_argument("api")
-    wait_topic.add_argument("--options-json", default="{}")
-    wait_topic.add_argument("--match-json", default="{}")
     add_typed_topic_input_arguments(wait_topic)
     wait_topic.add_argument(
         "--event-count",
@@ -1569,8 +1522,6 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     stream_topic.add_argument("api")
-    stream_topic.add_argument("--options-json", default="{}")
-    stream_topic.add_argument("--match-json", default="{}")
     add_typed_topic_input_arguments(stream_topic)
 
     topic_schema = subparsers.add_parser(
@@ -1665,15 +1616,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Describe one approved exact-version typed Undo Group child offline",
     )
     undo_child_schema.add_argument("child_operation")
-    legacy_operation_schema = subparsers.add_parser(
-        "legacy-operation-schema",
-        help=(
-            "Compatibility-only description of the deprecated full-JSON "
-            "operation request adapter"
-        ),
-    )
-    legacy_operation_schema.add_argument("operation")
-
     query_schema = subparsers.add_parser(
         "query-schema",
         help=(
@@ -1842,51 +1784,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Bind explicit confirmation to one immutable preview without connecting to Wwise",
     )
     confirm.add_argument("transaction_id")
-    confirmation_binding = confirm.add_mutually_exclusive_group(required=True)
-    confirmation_binding.add_argument("--confirmation-token")
-    confirmation_binding.add_argument(
-        "--artifact-hash",
-        help="Legacy compatibility spelling using the complete immutable preview hash",
-    )
+    confirm.add_argument("--confirmation-token", required=True)
 
     reject = subparsers.add_parser("reject", help="Reject one awaiting transaction without connecting to Wwise")
     reject.add_argument("transaction_id")
     reject.add_argument("--reason", default="rejected by user")
-
-    for preview_command, preview_help in (
-        (
-            "preview",
-            "Live-resolve the operation's sole normal input mode and persist "
-            "an immutable preview",
-        ),
-        (
-            "legacy-preview",
-            "Compatibility-only submission of one deprecated full-JSON "
-            "operation request to the canonical preview ingress",
-        ),
-    ):
-        preview = subparsers.add_parser(
-            preview_command,
-            help=(
-                f"{preview_help}; --apply marks an explicit request to carry "
-                "out the change under the configured project modification policy"
-            ),
-        )
-        preview.add_argument(
-            "--apply",
-            action="store_true",
-            help=(
-                "Mark this as an explicit change request. read_only blocks it, "
-                "ask_before_changes waits for later confirmation, and allow_changes "
-                "policy-authorizes the immutable preview for same-turn execution."
-            ),
-        )
-        preview.add_argument("--request-json", required=True)
-        preview.add_argument(
-            "--ttl",
-            type=int,
-            default=DEFAULT_PREVIEW_TTL_SECONDS,
-        )
 
     execute = subparsers.add_parser(
         "execute",
@@ -1903,33 +1805,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     verify.add_argument("transaction_id")
 
-    call = subparsers.add_parser(
-        "call",
-        help="Dispatch one reviewed manifest-dispatch read-only WAAPI function",
-    )
-    call.add_argument("api")
-    call.add_argument("--args-json", default="{}")
-    call.add_argument("--options-json", default="{}")
-    call.add_argument(
-        "--post-filter-json",
-        help=(
-            "Apply the closed Media Pool Filename case-sensitive contains "
-            "post-filter after a complete bounded candidate read"
-        ),
-    )
-    call.add_argument(
-        "--post-filter-value",
-        help="Typed Media Pool Filename case-sensitive contains literal",
-    )
-    call.add_argument(
-        "--post-filter-limit",
-        type=int,
-        help="Typed Media Pool post-filter result limit",
-    )
-    call.add_argument("--dry-run", action="store_true")
-    call.add_argument("--allow-destructive", action="store_true", help=argparse.SUPPRESS)
-    call.add_argument("--topic-mode", default="wait")
-    call.add_argument("--live-behavior", action="store_true")
     return parser
 
 
@@ -2063,8 +1938,6 @@ def _execute_gateway_unconstrained(
         if args.command == "execute":
             require_transaction_preconnection_policy(args, env=source_env)
         elif args.command in {
-            "preview",
-            "legacy-preview",
             "preview-from-draft",
             "typed-zero-call",
             "typed-call",
@@ -2099,7 +1972,7 @@ def _execute_gateway_unconstrained(
             preflight_typed_operation_input(args, env=source_env)
         if args.command == "typed-zero-call":
             preflight_typed_zero_input(args, env=source_env)
-        if args.command in {"debug-wal-tree", "debug-validate-call"}:
+        if args.command == "debug-wal-tree":
             preflight_debug_read_input(args)
         if args.command in OFFLINE_COMMANDS:
             payload = dispatch_offline_command(args, env=source_env)
@@ -2382,8 +2255,7 @@ def gateway_stdout_json_encoder(value: Any | None = None) -> json.JSONEncoder:
     }
     if (
         isinstance(value, Mapping)
-        and value.get("command")
-        in {"operation-schema", "legacy-operation-schema", "query-schema"}
+        and value.get("command") in {"operation-schema", "query-schema"}
     ):
         options["separators"] = (",", ":")
     else:
@@ -2901,7 +2773,7 @@ def preflight_public_route(
 ) -> dict[str, Any] | None:
     """Fail closed before connecting when the requested public route is already known."""
 
-    if args.command not in {"call", "wait-topic", "stream-topic"}:
+    if args.command not in {"wait-topic", "stream-topic"}:
         return None
     api = args.api
 
@@ -2926,15 +2798,7 @@ def preflight_public_route(
                 else catalog.describe(str(version), api)
             )
         except CapabilityNotFoundError:
-            safety_context = None
-            if args.command == "call":
-                safety_context = (
-                    EXPLICIT_UNSUPPORTED_LIVE_URIS.get(api)
-                    or BOUNDED_CALL_CANDIDATES.get(api)
-                    or EXPLICIT_UNSUPPORTED_TOPIC_URIS.get(api)
-                )
-            elif args.command in {"wait-topic", "stream-topic"}:
-                safety_context = EXPLICIT_UNSUPPORTED_TOPIC_URIS.get(api)
+            safety_context = EXPLICIT_UNSUPPORTED_TOPIC_URIS.get(api)
             return unreflected_interface_payload(
                 api,
                 str(version),
@@ -2952,39 +2816,13 @@ def preflight_public_route(
             capability,
             command=args.command,
         )
-    if args.command == "call":
-        if api == OBJECT_GET_URI:
-            return query_object_required_payload()
-        fixed_commands = FIXED_COMMANDS_BY_URI.get(api)
-        if fixed_commands is not None:
-            return fixed_command_required_payload(api, fixed_commands)
-        explicit_function_boundary = (
-            EXPLICIT_UNSUPPORTED_LIVE_URIS.get(api)
-            or BOUNDED_CALL_CANDIDATES.get(api)
+    explicit_topic_boundary = EXPLICIT_UNSUPPORTED_TOPIC_URIS.get(api)
+    if explicit_topic_boundary is not None:
+        return unsupported_interface_payload(
+            api,
+            explicit_topic_boundary,
+            command=args.command,
         )
-        if explicit_function_boundary is not None:
-            return unsupported_interface_payload(
-                api,
-                explicit_function_boundary,
-                command="call",
-            )
-        if api in REVIEWED_TOPIC_URIS:
-            return wait_topic_required_payload(api)
-        explicit_topic_boundary = EXPLICIT_UNSUPPORTED_TOPIC_URIS.get(api)
-        if explicit_topic_boundary is not None:
-            return unsupported_interface_payload(
-                api,
-                explicit_topic_boundary,
-                command="call",
-            )
-    else:
-        explicit_topic_boundary = EXPLICIT_UNSUPPORTED_TOPIC_URIS.get(api)
-        if explicit_topic_boundary is not None:
-            return unsupported_interface_payload(
-                api,
-                explicit_topic_boundary,
-                command=args.command,
-            )
     return None
 
 
@@ -3342,30 +3180,6 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
         raise GatewayInputError(
             "structured typed fact flags require query-object --typed-structured"
         )
-    if advanced_query_requested(args):
-        _require_advanced_query_option_exclusivity(args)
-        request = parse_json_object(
-            args.advanced_request_json,
-            "--advanced-request-json",
-        )
-        (preflight_version,) = resolve_catalog_versions(args, env=env)
-        build_advanced_object_get_query(
-            request,
-            version=preflight_version,
-        )
-        return
-
-    if structured_query_requested(args):
-        _require_structured_query_option_exclusivity(args)
-        request = parse_json_object(args.request_json, "--request-json")
-        (preflight_version,) = resolve_catalog_versions(args, env=env)
-        preview = build_structured_object_get_query(
-            request,
-            version=preflight_version,
-        )
-        _require_structured_exact_identity_return_field(preview)
-        return
-
     if original_file_reference_match_requested(args):
         (preflight_version,) = resolve_catalog_versions(args, env=env)
         validate_original_file_reference_match_input(
@@ -3435,9 +3249,9 @@ def validate_original_file_reference_match_input(
             "--match-original-file-path requires exactly "
             f"--type {ORIGINAL_FILE_REFERENCE_MATCH_TYPE}"
         )
-    if args.where_json is not None or args.where:
+    if args.where:
         raise GatewayInputError(
-            "--match-original-file-path cannot be combined with --where-json"
+            "--match-original-file-path cannot be combined with --where"
         )
     if args.select:
         raise GatewayInputError(
@@ -3663,37 +3477,12 @@ def preflight_debug_read_input(args: argparse.Namespace) -> None:
                 f"debug-wal-tree --take must be between 1 and {MAX_WAL_TREE_NODES}"
             )
         return
-    if args.command == "debug-validate-call":
-        if not isinstance(args.api, str) or not args.api.startswith("ak."):
-            raise GatewayInputError(
-                "debug-validate-call api must be an exact reflected ak.* function URI"
-            )
 
 
 def preflight_json_inputs(args: argparse.Namespace) -> None:
-    """Validate every command-line JSON document before opening WAAPI."""
+    """Validate the remaining typed command-line documents before WAAPI."""
 
-    if args.command == "call":
-        request_args = parse_json_object(args.args_json, "--args-json")
-        request_options = parse_json_object(args.options_json, "--options-json")
-        post_filter = media_pool_post_filter_spec_from_args(args)
-        if post_filter is not None:
-            validate_media_pool_post_filter_request(
-                api=args.api,
-                spec=post_filter,
-                request_args=request_args,
-                request_options=request_options,
-                dry_run=args.dry_run,
-            )
-    elif args.command in {"wait-topic", "stream-topic"}:
-        if topic_typed_input_requested(args):
-            if args.options_json != "{}" or args.match_json != "{}":
-                raise GatewayInputError(
-                    "Typed Topic input cannot be combined with options or match JSON"
-                )
-        else:
-            parse_json_object(args.options_json, "--options-json")
-            parse_json_object(args.match_json, "--match-json")
+    if args.command in {"wait-topic", "stream-topic"}:
         if (
             args.command == "wait-topic"
             and args.no_timeout
@@ -3711,19 +3500,6 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
             )
     elif args.command == "draft-apply":
         parse_operation_draft_cli_action(args)
-    elif args.command in {"preview", "legacy-preview"}:
-        request_payload = parse_preview_request_object(args.request_json)
-        if args.command == "preview":
-            require_normal_legacy_preview_input_mode(request_payload)
-    elif args.command == "debug-validate-call":
-        for field_name, option_name in (
-            ("args_json", "--args-json"),
-            ("options_json", "--options-json"),
-            ("result_json", "--result-json"),
-        ):
-            value = getattr(args, field_name)
-            if value is not None:
-                parse_json_object(value, option_name)
 
 
 def topic_typed_input_requested(args: argparse.Namespace) -> bool:
@@ -3786,9 +3562,6 @@ def preflight_typed_topic_input(
 ) -> None:
     """Materialize exact Topic options and subset match before connecting."""
 
-    if not topic_typed_input_requested(args):
-        args.typed_topic_input = None
-        return
     if not isinstance(args.options_schema_digest, str) or not isinstance(
         args.match_schema_digest, str
     ):
@@ -4716,16 +4489,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     "available": True,
                     "capability": entry.as_dict(detail=bool(args.full_schema)),
                 }
-                if is_cli_request_template_uri(args.api):
-                    version_row["request_template"] = build_cli_request_template(
-                        version=version,
-                        uri=args.api,
-                        schema=entry.schema,
-                        forbidden_fields=FORBIDDEN_MODEL_AUTHORED_COMMAND_FIELDS.get(
-                            args.api,
-                            (),
-                        ),
-                    )
                 availability[version] = version_row
         if found == 0:
             raise CapabilityNotFoundError(
@@ -4898,6 +4661,8 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
     if args.command == "operations":
         operations: list[dict[str, Any]] = []
         for spec in list_operation_specs():
+            if spec.name == "waapi.call":
+                continue
             if not args.detail:
                 operations.append(spec.as_compact_dict())
                 continue
@@ -4954,45 +4719,26 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 "remove_child_typed_fact",
             ],
         }
-    if args.command in {"operation-schema", "legacy-operation-schema"}:
-        legacy_compatibility = args.command == "legacy-operation-schema"
+    if args.command == "operation-schema":
+        if args.operation == "waapi.call":
+            raise OperationContractError(
+                "INTERNAL_CANONICAL_OPERATION",
+                "waapi.call is an internal canonical transaction representation; "
+                "use request-schema with the exact reflected WAAPI URI.",
+                details={
+                    "operation": "waapi.call",
+                    "next_command": "request-schema <exact-waapi-uri>",
+                },
+            )
         spec = describe_operation(args.operation)
         request_version = resolve_operation_schema_version(args, env=env)
-        direct_fast_route_contract = build_operation_schema_direct_fast_route_contract(
-            operation=spec.name,
-            version=request_version,
-        )
-        argument_names = list(
-            dict.fromkeys((*spec.required_arguments, *spec.optional_arguments))
-        )
-        if not spec.implemented:
-            request_envelope = None
-            request_envelope_status = "operation_not_implemented"
-        elif request_version is None:
-            request_envelope = None
-            request_envelope_status = "version_required"
-        elif request_version not in spec.supported_versions:
-            request_envelope = None
-            request_envelope_status = "unsupported_version"
-        else:
-            request_envelope = {
-                "contract": OPERATION_REQUEST_CONTRACT,
-                "version": request_version,
-                "operation": spec.name,
-                "arguments": {},
-            }
-            request_envelope_status = "ready"
         input_mode = (
             operation_input_mode(spec.name, request_version)
             if request_version in spec.supported_versions
             else None
         )
-        normal_composer = (
-            not legacy_compatibility and input_mode == COMPOSER_INPUT_MODE
-        )
-        normal_inline = (
-            not legacy_compatibility and input_mode == INLINE_TYPED_INPUT_MODE
-        )
+        normal_composer = input_mode == COMPOSER_INPUT_MODE
+        normal_inline = input_mode == INLINE_TYPED_INPUT_MODE
         unsupported_version = (
             request_version is not None
             and request_version not in spec.supported_versions
@@ -5012,19 +4758,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 if normal_composer or normal_inline
                 else spec.as_dict(version=request_version)
             )
-        if legacy_compatibility:
-            # Compatibility automation needs the complete machine request
-            # shape, not duplicated normal-Agent routing prose.  Both
-            # projections still derive from this exact Registry spec.
-            operation_projection.pop("summary", None)
-            operation_projection.pop("selection_guidance", None)
-            if input_mode in {COMPOSER_INPUT_MODE, INLINE_TYPED_INPUT_MODE}:
-                operation_projection["input_mode"] = LEGACY_JSON_INPUT_MODE
-        if normal_composer or normal_inline:
-            request_envelope = None
-            request_envelope_status = (
-                "composer_ready" if normal_composer else "inline_typed_ready"
-            )
         payload = {
             "contract": GATEWAY_RESULT_CONTRACT,
             "ok": True,
@@ -5032,74 +4765,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "command": args.command,
             "offline": True,
             "operation": operation_projection,
-            "request_envelope": request_envelope,
-            "request_envelope_policy": (
-                {
-                    "status": "unsupported_version",
-                    "requested_version": request_version,
-                    "supported_versions": list(spec.supported_versions),
-                    "complete_request_authored_by_gateway": True,
-                }
-                if unsupported_version
-                else
-                {
-                    "status": request_envelope_status,
-                    "complete_request_authored_by_gateway": True,
-                }
-                if normal_composer or normal_inline
-                else {
-                    "status": request_envelope_status,
-                    "required_top_level_keys": [
-                        "contract",
-                        "version",
-                        "operation",
-                        "arguments",
-                    ],
-                    "copy_top_level_exactly": True,
-                    "replace_only": "arguments",
-                    "argument_container_path": "$.arguments",
-                    "argument_paths": {
-                        name: f"$.arguments.{name}" for name in argument_names
-                    },
-                    "shell_transport": {
-                        "outer_quoting": "single_quote_entire_compact_json",
-                        "json_string_serialization": "exactly_once",
-                        "decoded_value_rules": {
-                            "embedded_quotes": (
-                                "ordinary quotation marks with no preceding "
-                                "backslash"
-                            ),
-                            "wwise_path_separator": "one backslash",
-                        },
-                        "forbidden": [
-                            "double_escape_json_string_contents",
-                            "leave_json_escape_backslashes_in_decoded_values",
-                            "repair_or_retry_invalid_json_in_the_same_turn",
-                        ],
-                    },
-                    "preview_invocation": {
-                        "intended_change": {
-                            "subcommand": (
-                                "legacy-preview"
-                                if legacy_compatibility
-                                else "preview"
-                            ),
-                            "required_flag": "--apply",
-                            "effect": (
-                                "required even when the user asks to see only a "
-                                "preview; creates a durable confirmation-bound "
-                                "preview and does not execute the change"
-                            ),
-                            "includes_later_ordered_transactions": True,
-                        },
-                        "omit_apply_only_when": [
-                            "hypothetical",
-                            "design_only",
-                            "explicitly_non_executable",
-                        ],
-                    },
-                }
-            ),
         }
         if normal_composer and request_version is not None:
             payload["composer"] = operation_composer_input_contract(
@@ -5111,32 +4776,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             payload["typed_operation"] = inline_operation_contract(
                 spec.name,
                 request_version,
-            )
-        if legacy_compatibility:
-            payload["compatibility"] = {
-                "contract": LEGACY_OPERATION_JSON_ADAPTER_CONTRACT,
-                "deprecation_status": "deprecated",
-                "input_mode": LEGACY_JSON_INPUT_MODE,
-                "submit_command": "legacy-preview",
-            }
-        if direct_fast_route_contract is not None:
-            # Keep the version/API-specific product contract prominent at the
-            # end of the offline result.  ``finish`` appends only the bounded
-            # session context after it, so the Agent sees this exact template
-            # immediately before constructing the preview request.
-            payload["direct_fast_route_contract"] = direct_fast_route_contract
-        if spec.name == "waapi.call":
-            cli_schemas: dict[str, Mapping[str, Any]] | None = None
-            if request_version is not None:
-                cli_schemas = {
-                    entry.uri: entry.schema
-                    for entry in CapabilityCatalog().entries(request_version)
-                    if entry.uri in CLI_REQUEST_TEMPLATE_URIS
-                }
-            payload["cli_request_templates"] = build_cli_request_template_set(
-                version=request_version,
-                schemas=cli_schemas,
-                forbidden_fields_by_uri=FORBIDDEN_MODEL_AUTHORED_COMMAND_FIELDS,
             )
         return payload
     if args.command in {"transaction-show", "confirm", "reject"}:
@@ -5231,7 +4870,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             record = store.confirm(
                 transaction_id,
                 confirmation_token=args.confirmation_token,
-                artifact_hash=args.artifact_hash,
             )
             return transaction_state_payload("confirm", record, offline=True)
         record = store.reject(transaction_id, details={"reason": args.reason})
@@ -5756,96 +5394,6 @@ def resolve_operation_schema_version(
     return str(version)
 
 
-def build_operation_schema_direct_fast_route_contract(
-    *,
-    operation: str,
-    version: str | None,
-) -> dict[str, Any] | None:
-    """Return one exact version/API product contract, never a generic override."""
-
-    if operation != "waapi.call" or version not in {"2024.1", "2025.1"}:
-        return None
-
-    return {
-        "contract": GATEWAY_OPERATION_SCHEMA_DIRECT_FAST_ROUTE_CONTRACT,
-        "scope": {
-            "operation": "waapi.call",
-            "version": version,
-            "exact_api": "ak.wwise.core.audio.convert",
-            "activation": "exact_api_intent_only",
-            "applies_to_other_waapi_call_uris": False,
-        },
-        "canonical_request_template": {
-            "contract": OPERATION_REQUEST_CONTRACT,
-            "version": version,
-            "operation": "waapi.call",
-            "arguments": {
-                "api": "ak.wwise.core.audio.convert",
-                "args": {
-                    "objects": ["<exact-wwise-object-path>"],
-                    "platforms": ["<platform>"],
-                    "languages": ["SFX"],
-                },
-                "options": {},
-                "io_root": "<absolute-allowed-conversion-root>",
-            },
-        },
-        "template_policy": {
-            "copy_outer_shape_exactly": True,
-            "replace_only": [
-                "$.arguments.args.objects",
-                "$.arguments.args.platforms",
-                "$.arguments.args.languages",
-                "$.arguments.io_root",
-            ],
-            "array_replacement": {
-                "paths": [
-                    "$.arguments.args.objects",
-                    "$.arguments.args.platforms",
-                    "$.arguments.args.languages",
-                ],
-                "replace_entire_array": True,
-                "non_empty": True,
-                "preserve_user_order": True,
-            },
-            "placeholders_must_all_be_replaced": True,
-            "missing_or_ambiguous_input": "ask_before_preview",
-        },
-        "rules": {
-            "required_ordered_string_arrays": {
-                "paths": [
-                    "$.arguments.args.objects",
-                    "$.arguments.args.platforms",
-                    "$.arguments.args.languages",
-                ],
-                "min_items": 1,
-                "preserve_user_order": True,
-                "scalar_form_allowed": False,
-                "object_record_items_allowed": False,
-            },
-            "language_mapping": {
-                "natural_sfx_target_without_explicit_localized_languages": [
-                    "SFX"
-                ],
-                "explicit_localized_languages": (
-                    "replace SFX with the stated non-empty ordered string array"
-                ),
-                "languages_must_never_be_omitted": True,
-            },
-            "options": {
-                "path": "$.arguments.options",
-                "exact_value": {},
-            },
-            "io_root": {
-                "path": "$.arguments.io_root",
-                "type": "string",
-                "shape": "scalar",
-                "absolute": True,
-            },
-        },
-    }
-
-
 def resolve_catalog_versions(args: argparse.Namespace, *, env: Mapping[str, str]) -> tuple[str, ...]:
     if bool(getattr(args, "all_versions", False)):
         return tuple(SUPPORTED_WWISE_VERSION_KEYS)
@@ -5910,8 +5458,6 @@ def resolve_connection(args: argparse.Namespace, *, env: Mapping[str, str]) -> G
                 DEFAULT_TRANSACTION_TIMEOUT
                 if args.command
                 in {
-                    "preview",
-                    "legacy-preview",
                     "preview-from-draft",
                     "execute",
                     "verify",
@@ -6652,103 +6198,6 @@ def dispatch_command(
             },
             "agent_result": projection,
         }
-    if args.command == "debug-validate-call":
-        api = "ak.wwise.debug.validateCall"
-        try:
-            capability = CapabilityCatalog().describe(detected_version, api)
-        except CapabilityNotFoundError:
-            return unreflected_interface_payload(
-                api,
-                detected_version,
-                command=args.command,
-                common=common,
-            )
-        try:
-            target = CapabilityCatalog().describe(detected_version, args.api)
-        except CapabilityNotFoundError:
-            return unreflected_interface_payload(
-                args.api,
-                detected_version,
-                command=args.command,
-                common=common,
-            )
-        if target.item_type != "function":
-            raise GatewayInputError(
-                "debug-validate-call accepts only a reflected WAAPI function URI"
-            )
-        if (
-            capability.preferred_route != "fixed_command"
-            or args.command not in capability.fixed_commands
-        ):
-            raise GatewayInputError(
-                f"{api} is not bound to the packaged {args.command} route in Wwise {detected_version}"
-            )
-        call_args: dict[str, Any] = {"id": args.api}
-        supplied_sections: list[str] = []
-        for source, target_name, option_name in (
-            (args.args_json, "args", "--args-json"),
-            (args.options_json, "options", "--options-json"),
-            (args.result_json, "result", "--result-json"),
-        ):
-            if source is None:
-                continue
-            call_args[target_name] = parse_json_object(source, option_name)
-            supplied_sections.append(target_name)
-        request_validation = validate_semantic_payload(
-            api,
-            call_args,
-            {},
-            version=detected_version,
-        )
-        result = dispatch(
-            dispatcher,
-            api,
-            connection=connection,
-            version=detected_version,
-            args=call_args,
-            options={},
-            result_limit_bytes=int(
-                capability.execution_contract["result_limit_bytes"]
-            ),
-            operation_timeout=float(
-                capability.execution_contract["timeout_seconds"]
-            ),
-        )
-        result_validation = (
-            validate_semantic_result(
-                api,
-                result.get("result"),
-                version=detected_version,
-            )
-            if result.get("ok")
-            else None
-        )
-        return {
-            "ok": bool(result.get("ok")),
-            "status": "ok" if result.get("ok") else "error",
-            **common,
-            "api_attempted": api,
-            "validated_api": args.api,
-            "supplied_sections": supplied_sections,
-            "call": dispatch_call_summary(result),
-            "schema_validation": {
-                "request": request_validation.as_dict(),
-                "result": (
-                    result_validation.as_dict()
-                    if result_validation is not None
-                    else None
-                ),
-            },
-            "agent_result": (
-                {
-                    "validated_api": args.api,
-                    "supplied_sections": supplied_sections,
-                    "accepted_by_wwise": True,
-                }
-                if result.get("ok")
-                else None
-            ),
-        }
     if args.command == "buses":
         preview = build_object_get_query(
             type="Bus",
@@ -6988,101 +6437,6 @@ def dispatch_command(
                 "objects": rows if result.get("ok") else None,
                 "agent_result": rows if result.get("ok") else None,
             }
-        if advanced_query_requested(args):
-            _require_advanced_query_option_exclusivity(args)
-            request = parse_json_object(
-                args.advanced_request_json,
-                "--advanced-request-json",
-            )
-            preview = build_advanced_object_get_query(
-                request,
-                version=detected_version,
-            )
-            envelope = preview.envelope
-            query_bound = _advanced_query_bound(preview)
-            maximum_rows = query_bound["value"]
-            assert isinstance(maximum_rows, int) and not isinstance(maximum_rows, bool)
-            result = dispatch(
-                dispatcher,
-                envelope.uri,
-                connection=connection,
-                version=detected_version,
-                args=envelope.args,
-                options=envelope.options,
-                exact_object_lookup=False,
-            )
-            rows = (
-                strict_object_get_rows(
-                    result,
-                    command="query-object --advanced-request-json",
-                    maximum_rows=maximum_rows,
-                )
-                if result.get("ok")
-                else []
-            )
-            return {
-                "ok": bool(result.get("ok")),
-                "status": "ok" if result.get("ok") else "error",
-                **common,
-                "query_layer": "advanced-native-waql",
-                "query_contract": ADVANCED_QUERY_CONTRACT,
-                "semantic_preview": preview.as_dict(),
-                "query_bound": query_bound,
-                "call": dispatch_call_summary(result),
-                "count": len(rows) if result.get("ok") else None,
-                "limit_reached": (
-                    len(rows) == maximum_rows if result.get("ok") else None
-                ),
-                "objects": rows if result.get("ok") else None,
-            }
-        if structured_query_requested(args):
-            _require_structured_query_option_exclusivity(args)
-            request = parse_json_object(args.request_json, "--request-json")
-            preview = build_structured_object_get_query(
-                request,
-                version=detected_version,
-            )
-            _require_structured_exact_identity_return_field(preview)
-            envelope = preview.envelope
-            exact_identity = _structured_query_exact_identity(preview)
-            query_bound = _structured_query_bound(preview)
-            result = dispatch(
-                dispatcher,
-                envelope.uri,
-                connection=connection,
-                version=detected_version,
-                args=envelope.args,
-                options=envelope.options,
-                exact_object_lookup=exact_identity is not None,
-            )
-            rows = (
-                strict_object_get_rows(
-                    result,
-                    command="query-object",
-                    maximum_rows=_structured_query_result_maximum(
-                        query_bound,
-                        exact_identity=exact_identity,
-                    ),
-                )
-                if result.get("ok")
-                else []
-            )
-            if result.get("ok"):
-                validate_structured_exact_query_identity(
-                    exact_identity,
-                    rows,
-                )
-            return {
-                "ok": bool(result.get("ok")),
-                "status": "ok" if result.get("ok") else "error",
-                **common,
-                "query_contract": STRUCTURED_QUERY_CONTRACT,
-                "semantic_preview": preview.as_dict(),
-                "query_bound": query_bound,
-                "call": dispatch_call_summary(result),
-                "count": len(rows) if result.get("ok") else None,
-                "objects": rows if result.get("ok") else None,
-            }
         where = typed_query_predicates(args)
         return_fields = tuple(args.return_fields or ("id", "name", "type", "path"))
         _require_exact_identity_return_field(args, return_fields)
@@ -7238,17 +6592,9 @@ def dispatch_command(
             stream_sink=stream_sink,
         )
     if args.command == "wait-topic":
-        typed_topic_input = getattr(args, "typed_topic_input", None)
-        request_options = (
-            dict(typed_topic_input.options)
-            if typed_topic_input is not None
-            else parse_json_object(args.options_json, "--options-json")
-        )
-        match = (
-            dict(typed_topic_input.match)
-            if typed_topic_input is not None
-            else parse_json_object(args.match_json, "--match-json")
-        )
+        typed_topic_input = args.typed_topic_input
+        request_options = dict(typed_topic_input.options)
+        match = dict(typed_topic_input.match)
         authoring_boundary = live_authoring_api_boundary(
             args.api,
             command="wait-topic",
@@ -7356,7 +6702,7 @@ def dispatch_command(
         payload["event_validations"] = event_validations
         payload["cleanup"] = cleanup
         return payload
-    if args.command in {"preview", "legacy-preview", "execute", "verify"}:
+    if args.command in {"execute", "verify"}:
         return dispatch_transaction_command(
             args,
             env=env,
@@ -7366,162 +6712,6 @@ def dispatch_command(
             dispatcher=dispatcher,
             common=common,
         )
-    if args.command == "call":
-        request_args = parse_json_object(args.args_json, "--args-json")
-        request_options = parse_json_object(args.options_json, "--options-json")
-        post_filter = media_pool_post_filter_spec_from_args(args)
-        if post_filter is not None:
-            validate_media_pool_post_filter_request(
-                api=args.api,
-                spec=post_filter,
-                request_args=request_args,
-                request_options=request_options,
-                dry_run=args.dry_run,
-            )
-        authoring_boundary = live_authoring_api_boundary(
-            args.api,
-            command="call",
-            live_info=live_info,
-            common=common,
-        )
-        if authoring_boundary is not None:
-            return authoring_boundary
-        try:
-            capability = live_capability(
-                detected_version,
-                args.api,
-                live_info=live_info,
-            )
-        except CapabilityNotFoundError:
-            return unreflected_interface_payload(
-                args.api,
-                detected_version,
-                command="call",
-                common=common,
-            )
-        route_boundary = catalog_route_boundary_payload(
-            capability,
-            command="call",
-            common=common,
-        )
-        if route_boundary is not None:
-            return route_boundary
-        validation = validate_semantic_payload(
-            args.api,
-            request_args,
-            request_options,
-            version=detected_version,
-            authoring_ui_profile=live_info.get("isCommandLine") is False,
-        )
-        request_args = canonicalize_bounded_direct_call_request(
-            args.api,
-            detected_version,
-            request_args,
-        )
-        validate_bounded_direct_call_request(args.api, request_args, request_options)
-        result = dispatch(
-            dispatcher,
-            args.api,
-            connection=connection,
-            version=detected_version,
-            args=request_args,
-            options=request_options,
-            dry_run=args.dry_run,
-            allow_destructive=False,
-            topic_mode=args.topic_mode,
-            live_behavior=args.live_behavior,
-            operation_timeout=float(capability.execution_contract["timeout_seconds"]),
-            result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
-        )
-        result_validation = (
-            validate_semantic_result(
-                args.api,
-                result.get("result"),
-                version=detected_version,
-                authoring_ui_profile=live_info.get("isCommandLine") is False,
-            )
-            if result.get("ok") and not args.dry_run
-            else None
-        )
-        inventory = (
-            normalize_reflection_inventory_result(
-                args.api,
-                result,
-                version=detected_version,
-            )
-            if result.get("ok") and args.api in REFLECTION_INVENTORY_CALLS
-            else None
-        )
-        if post_filter is None:
-            return {
-                "ok": bool(result.get("ok")),
-                "status": "ok" if result.get("ok") else "error",
-                **common,
-                "call": dispatch_call_summary(result),
-                "schema_validation": validation.as_dict(),
-                "result_validation": result_validation.as_dict() if result_validation is not None else None,
-                "agent_result": inventory if inventory is not None else result.get("result"),
-                "inventory": inventory,
-            }
-
-        if not result.get("ok"):
-            return {
-                "ok": False,
-                "status": "error",
-                **common,
-                "call": dispatch_call_summary(result),
-                "schema_validation": validation.as_dict(),
-                "result_validation": None,
-                "post_filter": media_pool_post_filter_audit(
-                    post_filter,
-                    request_max_results=request_args["maxResults"],
-                    status="not_applied",
-                ),
-                "inventory": inventory,
-            }
-
-        filtered_result, post_filter_audit = apply_media_pool_post_filter(
-            result.get("result"),
-            spec=post_filter,
-            request_max_results=request_args["maxResults"],
-            evidence_path=result.get("evidence_path"),
-        )
-        if filtered_result is None:
-            return {
-                "ok": False,
-                "status": "incomplete_boundary",
-                **common,
-                "error_code": "MEDIA_POOL_POST_FILTER_INCOMPLETE",
-                "message": (
-                    "The Media Pool candidate response reached maxResults, so the "
-                    "case-sensitive post-filter cannot prove that its result is complete."
-                ),
-                "details": {
-                    "raw_count": post_filter_audit["raw_count"],
-                    "request_max_results": post_filter_audit["request_max_results"],
-                    "evidence_path": result.get("evidence_path"),
-                },
-                "call": dispatch_call_summary(result),
-                "schema_validation": validation.as_dict(),
-                "result_validation": (
-                    result_validation.as_dict() if result_validation is not None else None
-                ),
-                "post_filter": post_filter_audit,
-                "inventory": inventory,
-            }
-
-        payload = {
-            "ok": bool(result.get("ok")),
-            "status": "ok" if result.get("ok") else "error",
-            **common,
-            "call": dispatch_call_summary(result),
-            "schema_validation": validation.as_dict(),
-            "result_validation": result_validation.as_dict() if result_validation is not None else None,
-            "post_filter": post_filter_audit,
-            "inventory": inventory,
-        }
-        payload["agent_result"] = filtered_result
-        return payload
     raise GatewayInputError(f"unsupported command: {args.command}")
 
 
@@ -7538,17 +6728,9 @@ def dispatch_topic_stream(
 ) -> dict[str, Any]:
     """Keep one reviewed topic subscription open and publish events immediately."""
 
-    typed_topic_input = getattr(args, "typed_topic_input", None)
-    request_options = (
-        dict(typed_topic_input.options)
-        if typed_topic_input is not None
-        else parse_json_object(args.options_json, "--options-json")
-    )
-    match = (
-        dict(typed_topic_input.match)
-        if typed_topic_input is not None
-        else parse_json_object(args.match_json, "--match-json")
-    )
+    typed_topic_input = args.typed_topic_input
+    request_options = dict(typed_topic_input.options)
+    match = dict(typed_topic_input.match)
     authoring_boundary = live_authoring_api_boundary(
         args.api,
         command="stream-topic",
@@ -9051,19 +8233,6 @@ def dispatch_transaction_command(
     dispatcher: WwiseDispatcher,
     common: Mapping[str, Any],
 ) -> dict[str, Any]:
-    if args.command in {"preview", "legacy-preview"}:
-        request_payload = parse_preview_request_object(args.request_json)
-        return create_transaction_preview(
-            request_payload,
-            args=args,
-            env=env,
-            connection=connection,
-            detected_version=detected_version,
-            live_info=live_info,
-            dispatcher=dispatcher,
-            common=common,
-        )
-
     read_call = transaction_read_call(
         dispatcher,
         connection=connection,
@@ -10557,52 +9726,13 @@ def _single_exact_lookup(args: Mapping[str, Any] | None) -> bool:
     return _canonical_wwise_path(value)
 
 
-def structured_query_requested(args: argparse.Namespace) -> bool:
-    """Return whether query-object uses the closed structured request lane."""
-
-    return getattr(args, "request_json", None) is not None
-
-
-def advanced_query_requested(args: argparse.Namespace) -> bool:
-    """Return whether query-object uses the bounded native WAQL lane."""
-
-    return getattr(args, "advanced_request_json", None) is not None
-
-
-def _require_advanced_query_option_exclusivity(
-    args: argparse.Namespace,
-) -> None:
-    """Keep the advanced request document authoritative for the complete read."""
-
-    conflicting: list[str] = []
-    if args.where_json is not None or args.where:
-        conflicting.append("--where-json")
-    if args.match_original_file_paths:
-        conflicting.append("--match-original-file-path")
-    if args.select:
-        conflicting.append("--select")
-    if args.take is not None:
-        conflicting.append("--take")
-    if args.all_results:
-        conflicting.append("--all-results")
-    if args.return_fields:
-        conflicting.append("--return-field")
-    if conflicting:
-        raise GatewayInputError(
-            "query-object --advanced-request-json owns the native WAQL, return "
-            "expressions, and result bound; it cannot be combined with "
-            + ", ".join(conflicting)
-            + "."
-        )
-
-
 def _require_typed_advanced_query_option_exclusivity(
     args: argparse.Namespace,
 ) -> None:
     """Keep the short typed advanced continuation authoritative."""
 
     conflicting: list[str] = []
-    if args.where_json is not None or args.where:
+    if args.where:
         conflicting.append("--where")
     if args.match_original_file_paths:
         conflicting.append("--match-original-file-path")
@@ -10614,10 +9744,8 @@ def _require_typed_advanced_query_option_exclusivity(
         conflicting.append("--all-results")
     if args.return_fields:
         conflicting.append("--return-field")
-    if args.request_json is not None:
-        conflicting.append("--request-json")
-    if args.advanced_request_json is not None:
-        conflicting.append("--advanced-request-json")
+    if args.typed_structured:
+        conflicting.append("--typed-structured")
     if conflicting:
         raise GatewayInputError(
             "query-object --typed-advanced owns the WAQL scalar, return expressions, "
@@ -10634,14 +9762,12 @@ def _require_typed_structured_query_option_exclusivity(
 
     conflicting: list[str] = []
     for enabled, label in (
-        (args.where_json is not None or bool(args.where), "--where"),
+        (bool(args.where), "--where"),
         (bool(args.match_original_file_paths), "--match-original-file-path"),
         (bool(args.select), "--select"),
         (args.take is not None, "--take"),
         (bool(args.all_results), "--all-results"),
         (bool(args.return_fields), "--return-field"),
-        (args.request_json is not None, "--request-json"),
-        (args.advanced_request_json is not None, "--advanced-request-json"),
         (bool(args.typed_advanced), "--typed-advanced"),
     ):
         if enabled:
@@ -10660,7 +9786,7 @@ def _advanced_query_bound(preview: SemanticPreview) -> dict[str, Any]:
     if not isinstance(bound, Mapping) or set(bound) != {"mode", "value"}:
         raise GatewayResultShapeError(
             "Advanced query builder returned an invalid result-bound contract.",
-            details={"command": "query-object --advanced-request-json"},
+            details={"command": "query-object --typed-advanced"},
             error_code="INVALID_ADVANCED_QUERY_PLAN",
         )
     mode = bound.get("mode")
@@ -10674,40 +9800,13 @@ def _advanced_query_bound(preview: SemanticPreview) -> dict[str, Any]:
         raise GatewayResultShapeError(
             "Advanced query builder returned an invalid final row cap.",
             details={
-                "command": "query-object --advanced-request-json",
+                "command": "query-object --typed-advanced",
                 "mode": mode,
                 "value": value,
             },
             error_code="INVALID_ADVANCED_QUERY_PLAN",
         )
     return {"mode": mode, "value": value}
-
-
-def _require_structured_query_option_exclusivity(
-    args: argparse.Namespace,
-) -> None:
-    """Keep one structured document authoritative for the complete query."""
-
-    conflicting: list[str] = []
-    if args.where_json is not None or args.where:
-        conflicting.append("--where-json")
-    if args.match_original_file_paths:
-        conflicting.append("--match-original-file-path")
-    if args.select:
-        conflicting.append("--select")
-    if args.take is not None:
-        conflicting.append("--take")
-    if args.all_results:
-        conflicting.append("--all-results")
-    if args.return_fields:
-        conflicting.append("--return-field")
-    if conflicting:
-        raise GatewayInputError(
-            "query-object --request-json owns the source, transforms, return "
-            "fields, and result bound; it cannot be combined with "
-            + ", ".join(conflicting)
-            + "."
-        )
 
 
 def _structured_query_exact_identity(
@@ -10850,7 +9949,7 @@ def validate_structured_exact_query_identity(
 def _canonical_exact_query_request(args: argparse.Namespace) -> bool:
     """Trust exactness from parsed CLI fields, never by reparsing generated WAQL."""
 
-    if args.where_json is not None or args.where or args.select or args.take is not None:
+    if args.where or args.select or args.take is not None:
         return False
     if args.path is not None:
         return _canonical_wwise_path(args.path)
@@ -13835,17 +12934,6 @@ def parse_json_object(
     return payload
 
 
-def parse_preview_request_object(text: str) -> dict[str, Any]:
-    """Parse the larger, still argv-safe preview envelope used by inline audio."""
-
-    return parse_json_object(
-        text,
-        "--request-json",
-        max_document_bytes=MAX_PREVIEW_JSON_INPUT_BYTES,
-        max_string_bytes=MAX_PREVIEW_JSON_STRING_BYTES,
-    )
-
-
 def parse_operation_draft_cli_action(args: argparse.Namespace) -> dict[str, Any]:
     """Build the sole production Draft action from typed facts."""
 
@@ -13857,42 +12945,6 @@ def parse_operation_draft_cli_action(args: argparse.Namespace) -> dict[str, Any]
         raise GatewayInputError(str(exc)) from exc
 
 
-def require_normal_legacy_preview_input_mode(
-    request_payload: Mapping[str, Any],
-) -> None:
-    """Keep raw full JSON on ``preview`` only while it is the normal mode.
-
-    Unknown, malformed, or version-unavailable requests continue to the
-    canonical parser so ``preview`` and ``legacy-preview`` retain identical
-    request-contract errors.  A valid exact lane whose normal mode migrated to
-    the Composer is rejected before connecting; only the explicit
-    compatibility command may then submit full JSON.
-    """
-
-    operation = request_payload.get("operation")
-    version = request_payload.get("version")
-    if not isinstance(operation, str) or not isinstance(version, str):
-        return
-    try:
-        input_mode = operation_input_mode(operation, version)
-    except OperationContractError as exc:
-        if exc.error_code in {"UNKNOWN_OPERATION", "UNAVAILABLE_IN_VERSION"}:
-            return
-        raise
-    if input_mode != LEGACY_JSON_INPUT_MODE:
-        raise OperationContractError(
-            "INPUT_MODE_MISMATCH",
-            "The normal preview route does not accept legacy full-JSON input "
-            "for this exact operation and Wwise version.",
-            details={
-                "operation": operation,
-                "version": version,
-                "required_input_mode": input_mode,
-                "submitted_input_mode": LEGACY_JSON_INPUT_MODE,
-            },
-        )
-
-
 def parse_optional_json(text: str | None, option_name: str) -> Any:
     if text is None:
         return None
@@ -13900,12 +12952,8 @@ def parse_optional_json(text: str | None, option_name: str) -> Any:
 
 
 def typed_query_predicates(args: argparse.Namespace) -> Any:
-    """Return the closed legacy predicate or repeated typed simple predicates."""
+    """Return repeated typed simple predicates."""
 
-    if args.where_json is not None and args.where:
-        raise GatewayInputError("--where cannot be combined with --where-json")
-    if args.where_json is not None:
-        return parse_optional_json(args.where_json, "--where-json")
     predicates: list[dict[str, Any]] = []
     for field, operator, value_type, raw_value in args.where:
         if value_type == "string":
@@ -13986,47 +13034,30 @@ def _parse_strict_json_float(token: str) -> float:
     return value
 
 
-def parse_media_pool_post_filter_spec(text: str | None) -> dict[str, Any] | None:
-    """Parse the one closed client-side Media Pool post-filter contract."""
+def media_pool_post_filter_spec(
+    value: Any,
+    limit: Any,
+) -> dict[str, Any]:
+    """Validate the one closed typed Media Pool post-filter contract."""
 
-    if text is None:
-        return None
-    spec = parse_json_object(text, "--post-filter-json")
-    expected_keys = {"field", "operator", "value", "limit"}
-    actual_keys = set(spec)
-    if actual_keys != expected_keys:
-        missing = sorted(expected_keys - actual_keys)
-        extra = sorted(actual_keys - expected_keys)
-        details: list[str] = []
-        if missing:
-            details.append(f"missing keys: {', '.join(missing)}")
-        if extra:
-            details.append(f"extra keys: {', '.join(extra)}")
-        raise GatewayInputError(
-            "--post-filter-json must contain exactly field, operator, value, and limit"
-            + (f" ({'; '.join(details)})" if details else "")
-        )
-    if spec["field"] != "Filename":
-        raise GatewayInputError("--post-filter-json field must be exactly 'Filename'")
-    if spec["operator"] != "containsCaseSensitive":
-        raise GatewayInputError(
-            "--post-filter-json operator must be exactly 'containsCaseSensitive'"
-        )
-    value = spec["value"]
     if not isinstance(value, str) or not value:
-        raise GatewayInputError("--post-filter-json value must be a nonempty string")
+        raise GatewayInputError("--post-filter-value must be a nonempty string")
     if len(value) > MAX_MEDIA_POOL_SEARCH_TEXT_CHARS:
         raise GatewayInputError(
-            "--post-filter-json value exceeds the reviewed "
+            "--post-filter-value exceeds the reviewed "
             f"{MAX_MEDIA_POOL_SEARCH_TEXT_CHARS}-code-point literal limit"
         )
-    limit = spec["limit"]
     if type(limit) is not int or not 1 <= limit <= MAX_MEDIA_POOL_RESULTS:
         raise GatewayInputError(
-            "--post-filter-json limit must be an integer between 1 and "
+            "--post-filter-limit must be an integer between 1 and "
             f"{MAX_MEDIA_POOL_RESULTS}"
         )
-    return spec
+    return {
+        "field": "Filename",
+        "operator": "containsCaseSensitive",
+        "value": value,
+        "limit": limit,
+    }
 
 
 def media_pool_post_filter_spec_from_args(
@@ -14036,33 +13067,13 @@ def media_pool_post_filter_spec_from_args(
 
     typed_value = getattr(args, "post_filter_value", None)
     typed_limit = getattr(args, "post_filter_limit", None)
-    legacy_json = getattr(args, "post_filter_json", None)
-    if legacy_json is not None and (
-        typed_value is not None or typed_limit is not None
-    ):
-        raise GatewayInputError(
-            "Typed Media Pool post-filter flags cannot be combined with --post-filter-json"
-        )
-    if legacy_json is not None:
-        return parse_media_pool_post_filter_spec(legacy_json)
     if typed_value is None and typed_limit is None:
         return None
     if typed_value is None or typed_limit is None:
         raise GatewayInputError(
             "Media Pool post-filter requires both --post-filter-value and --post-filter-limit"
         )
-    return parse_media_pool_post_filter_spec(
-        json.dumps(
-            {
-                "field": "Filename",
-                "operator": "containsCaseSensitive",
-                "value": typed_value,
-                "limit": typed_limit,
-            },
-            ensure_ascii=False,
-            separators=(",", ":"),
-        )
-    )
+    return media_pool_post_filter_spec(typed_value, typed_limit)
 
 
 def validate_media_pool_post_filter_request(
@@ -14077,11 +13088,11 @@ def validate_media_pool_post_filter_request(
 
     if api != MEDIA_POOL_GET_URI:
         raise GatewayInputError(
-            "--post-filter-json is supported only for ak.wwise.core.mediaPool.get"
+            "Typed post-filter fields are supported only for ak.wwise.core.mediaPool.get"
         )
     if dry_run:
         raise GatewayInputError(
-            "--post-filter-json requires a live result and cannot be combined with --dry-run"
+            "Typed post-filter fields require a live result and cannot be combined with --dry-run"
         )
     max_results = request_args.get("maxResults")
     if (
@@ -14108,7 +13119,7 @@ def validate_media_pool_post_filter_request(
     ):
         raise GatewayInputError(
             "A Media Pool post-filter requires a matching Filename contains field "
-            "filter with the same value in --args-json"
+            "filter with the same value in the typed request"
         )
     return_fields = request_options.get("return")
     if not isinstance(return_fields, list) or "Filename" not in return_fields:

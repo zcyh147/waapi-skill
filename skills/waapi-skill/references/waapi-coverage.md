@@ -52,22 +52,26 @@ inherited from the canonical Console manifest.
 ## Route meanings
 
 - `fixed_command`: a dedicated packaged gateway command.
-- `bounded_call`: a reviewed, read-only `call` route with recursive reflected
-  request/result validation, a timeout, and a result-size ceiling.
+- `bounded_call`: a reviewed read-only route selected by `request-schema`; its
+  typed continuation has recursive reflected request/result validation, a
+  timeout, and a result-size ceiling.
 - `bounded_topic_wait`: a configurable finite or explicitly no-timeout wait
   that remains event-count/result bounded and always unsubscribes. Explicit
   continuous requests use `stream-topic`, whose persistent subscription emits
   bounded records and also unsubscribes on termination.
-- `transaction`, `managed_transaction`, or `isolated_transaction`: the
-  manifest-registered `waapi.call` operation through immutable
-  preview -> accepted authorization -> execute once -> result verification.
+- `transaction`, `managed_transaction`, or `isolated_transaction`: a named
+  `operation-schema` or exact-URI `request-schema` typed route through immutable
+  Preview -> accepted authorization -> execute once -> result verification.
+  The materialized canonical request may use `waapi.call` internally, but that
+  representation is never a caller or model input.
   For project changes, `ask_before_changes` presents the expected result and
   waits for a later explicit confirmation, while `allow_changes` gives notice
   and may continue from durable policy authorization in the same user turn;
   `read_only` blocks the change.
 - `compound_transaction_member`: one Undo member row that remains executable
   only inside the closed `waapi.undoGroup` same-connection composite; it is
-  rejected from independent `waapi.call` execution.
+  not independently executable and is constructed only through the Undo
+  child typed contract.
 - `excluded`: no public execution route and no connection attempt.
 
 Every route is implemented in the Skill runtime. An agent must not replace a
@@ -187,7 +191,7 @@ isolated path confinement, and topic subscribe/event/unsubscribe behavior for
 configurable finite or explicitly no-timeout event-count-bounded waits plus
 continuous `stream-topic`. Separate negative tests cover exclusions,
 route bypass attempts, model-authored external command hooks, malformed nested
-payloads, and manifest drift. Direct and isolated generic transactions also run
+payloads, and manifest drift. Reflected and isolated typed transactions also run
 through complete preview/confirm/execute/verify program chains. Dedicated tests
 separately validate the 824-row Authoring overlay and its UI-command routes;
 this is not a second 824-row per-API fake-dispatch matrix. The query tests cover

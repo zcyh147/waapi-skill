@@ -23,6 +23,7 @@ from wwise_waapi.transactions import (
     StateCorruptionError,
     StateDirectoryNotConfigured,
     TransactionNotFound,
+    TransactionRecreateRequired,
     TransactionState,
     TransactionStore,
     UnsafeTransactionId,
@@ -714,7 +715,7 @@ def test_preview_artifact_tampering_is_detected_before_transition(tmp_path) -> N
 @pytest.mark.parametrize(
     ("field", "replacement", "error_type", "message"),
     [
-        ("schema_version", 999, StateCorruptionError, "Unsupported preview schema"),
+        ("schema_version", 999, TransactionRecreateRequired, "must be recreated"),
         ("transaction_id", "tx-other", ArtifactIntegrityError, "transaction id mismatch"),
         ("artifact", None, StateCorruptionError, "artifact fields are missing"),
         ("created_at", "", StateCorruptionError, "created_at is missing"),
@@ -739,7 +740,7 @@ def test_malformed_preview_envelopes_fail_closed(tmp_path, field, replacement, e
 @pytest.mark.parametrize(
     ("field", "replacement", "error_type", "message"),
     [
-        ("schema_version", 999, StateCorruptionError, "Unsupported transaction state schema"),
+        ("schema_version", 999, TransactionRecreateRequired, "must be recreated"),
         ("transaction_id", "tx-other", StateCorruptionError, "state id"),
         ("state", "unknown", StateCorruptionError, "recognized transaction state"),
         ("artifact_hash", "0" * 64, ArtifactIntegrityError, "does not match preview"),
