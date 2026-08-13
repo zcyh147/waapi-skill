@@ -5818,7 +5818,7 @@ def test_native_windows_powershell_shim_preserves_public_typed_container_facts(
                 "gateway.py",
                 *argv,
             )
-            command_script = " ".join(quote(value) for value in full_argv)
+            command_script = "& " + " ".join(quote(value) for value in full_argv)
             result = subprocess.run(
                 [
                     pwsh,
