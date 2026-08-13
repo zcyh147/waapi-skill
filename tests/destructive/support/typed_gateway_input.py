@@ -43,17 +43,27 @@ def create_typed_transaction_preview(
     preview: dict[str, Any] | None = None
     previous: tuple[ExpectedGatewayStep, Mapping[str, Any]] | None = None
     operation_schema: Mapping[str, Any] | None = None
+    pending_container_actions: list[list[str]] = []
     for step in protocol.steps:
         command = [step.subcommand, *_render_step_arguments(step, responses)]
         if command[0] in {"request-map-container", "request-array-item"}:
             _require_container_disclosure(operation_schema, command)
         elif previous is not None:
-            _require_disclosed_continuation(previous[0], previous[1], command)
+            _require_disclosed_continuation(
+                previous[0],
+                previous[1],
+                command,
+                pending_container_actions=pending_container_actions,
+            )
         payload = dict(gateway(command))
         responses[step.name] = payload
         if step.subcommand == "operation-schema":
             operation_schema = payload
+        if step.subcommand in {"request-map-container", "request-array-item"}:
+            pending_container_actions.append(_container_action(payload))
         if step.name == "tx01.preview":
+            if pending_container_actions:
+                raise AssertionError("not every disclosed container fact was consumed")
             _require_preview_continuation(payload)
             preview = payload
             break
@@ -84,27 +94,19 @@ def _require_disclosed_continuation(
     previous_step: ExpectedGatewayStep,
     payload: Mapping[str, Any],
     command: Sequence[str],
+    pending_container_actions: list[list[str]],
 ) -> None:
     """Prove each real command follows the preceding public Gateway result."""
 
-    if previous_step.subcommand in {"request-map-container", "request-array-item"}:
-        continuation = payload.get("continuation")
-        action_argv = continuation.get("action_argv") if isinstance(continuation, Mapping) else None
+    if command[0] == "draft-apply" and pending_container_actions:
         try:
             action_offset = command.index("--action")
         except ValueError as exc:
             raise AssertionError("container continuation was not applied as a typed action") from exc
-        expected_action = (
-            [payload.get("handle") if value == "<child_handle>" else value for value in action_argv]
-            if isinstance(action_argv, list)
-            else None
-        )
-        if (
-            not isinstance(expected_action, list)
-            or command[action_offset : action_offset + len(expected_action)] != expected_action
-        ):
-            raise AssertionError("container response did not disclose its exact typed action")
-        return
+        for index, expected_action in enumerate(pending_container_actions):
+            if command[action_offset : action_offset + len(expected_action)] == expected_action:
+                pending_container_actions.pop(index)
+                break
 
     if previous_step.subcommand == "operation-schema":
         if command[0] == "typed-operation":
@@ -159,6 +161,14 @@ def _require_disclosed_continuation(
         raise AssertionError(
             f"{previous_step.subcommand} did not disclose exact continuation {list(command)!r}"
         )
+
+
+def _container_action(payload: Mapping[str, Any]) -> list[str]:
+    continuation = payload.get("continuation")
+    action_argv = continuation.get("action_argv") if isinstance(continuation, Mapping) else None
+    if not isinstance(action_argv, list):
+        raise AssertionError("container response did not disclose a typed action")
+    return [payload.get("handle") if value == "<child_handle>" else value for value in action_argv]
 
 
 def _require_preview_continuation(payload: Mapping[str, Any]) -> None:
