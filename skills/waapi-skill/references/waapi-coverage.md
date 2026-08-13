@@ -180,9 +180,15 @@ The catalog and execution registry are tied to an immutable per-version
 inventory digest. A URI addition, removal, or same-count substitution fails
 closed until the packaged contract is reviewed and updated.
 
+The deterministic [full-surface release report](../../../docs/full-surface-release-report.json)
+binds the exact 824-lane inventory digest to its zero/inline/draft/Topic
+construction totals, host overlays, execution routes, public continuations,
+blocked fields, duplicate-lane audit, schema keywords, and references. It is a
+code-only construction report, not real-host or Fresh Agent evidence.
+
 ## Verification scope
 
-The focused program gate currently contains 2833 passing tests and exercises
+The focused program gate currently contains 3332 passing tests and exercises
 all 808 packaged route-contract version/API rows with
 in-process fake clients. It validates exact URI dispatch, reflected request and
 result/event schemas, timeout/result ceilings, all three modification-policy

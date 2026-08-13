@@ -127,6 +127,7 @@ tests/unit/test_transaction_gateway.py::test_undo_group_phase_exception_best_eff
 tests/unit/test_transaction_gateway.py::test_undo_group_accumulated_result_limit_stops_inner_and_attempts_cancel
 tests/unit/test_public_route_registry_integrity.py
 tests/unit/test_typed_request_surface_inventory.py
+tests/unit/test_full_surface_release_report.py
 tests/unit/test_typed_request_gateway.py
 tests/unit/test_typed_request_core.py
 tests/unit/test_typed_request_complex_core.py
