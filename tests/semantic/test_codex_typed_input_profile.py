@@ -86,6 +86,24 @@ def test_typed_input_profile_filters_only_after_validating_the_complete_contract
         load_typed_input_profile(PROFILE_PATH, unit_ids=("TYP25-INVENTED",))
 
 
+def test_get_info_tasks_describe_the_business_result_without_gateway_commands() -> None:
+    profile = load_typed_input_profile(PROFILE_PATH)
+
+    prompts = {
+        unit.version: unit.scenario.prompt
+        for unit in profile.units
+        if unit.scenario.api == "ak.wwise.core.getInfo"
+    }
+
+    assert set(prompts) == {"2021.1", "2023.1", "2024.1", "2025.1"}
+    assert all("getInfo 的实时结果" in prompt for prompt in prompts.values())
+    assert all(
+        command not in prompt
+        for prompt in prompts.values()
+        for command in ("status", "request-schema", "typed-zero-call")
+    )
+
+
 def test_typed_input_profile_rejects_definition_drift_before_filtering(
     tmp_path: Path,
 ) -> None:

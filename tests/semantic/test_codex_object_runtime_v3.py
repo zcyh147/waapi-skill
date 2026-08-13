@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import wave
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -408,6 +409,94 @@ def test_get01_snapshot_accepts_closed_active_source_identity_shapes(
     snapshot = runtime.snapshot()
 
     assert snapshot.by_key()[sound.key].source_language == sound.source_language
+
+
+def test_get01_2021_snapshot_resolves_audio_source_without_active_source_accessor() -> None:
+    case_id = "OBJ22-F-GET-01"
+    recipe = build_object_heavy_v3_recipe(case_id, "2021.1")
+    objects = _fixture_objects(case_id, "2021.1")
+
+    class _LegacyBackend(_StateBackend):
+        def read_path(self, path, *, fields=(), language=None):
+            if not fields or "activeSource" in fields:
+                raise ObjectRuntimeError("Unknown accessor activeSource")
+            return super().read_path(path, fields=fields, language=language)
+
+        def read_children(self, object_id, *, fields=()):
+            if not fields or "activeSource" in fields:
+                raise ObjectRuntimeError("Unknown accessor activeSource")
+            rows = list(super().read_children(object_id, fields=fields))
+            source_id = self.active_source_ids.get(object_id)
+            if source_id is not None:
+                rows.append(self.rows_by_id[source_id])
+            return tuple(rows)
+
+    backend = _LegacyBackend(objects)
+    scenario = replace(_scenario(case_id), versions=("2021.1",))
+    runtime = PreparedObjectRuntime(
+        scenario=scenario,
+        recipe=recipe,
+        backend=backend,
+    )
+
+    snapshot = runtime.snapshot()
+
+    expected = {
+        item.key: item.source_language
+        for item in objects
+        if item.source_language is not None
+    }
+    assert {
+        item.key: item.source_language
+        for item in snapshot.objects
+        if item.source_language is not None
+    } == expected
+
+
+def test_get01_2021_snapshot_rejects_a_second_direct_audio_source() -> None:
+    case_id = "OBJ22-F-GET-01"
+    recipe = build_object_heavy_v3_recipe(case_id, "2021.1")
+    objects = _fixture_objects(case_id, "2021.1")
+
+    class _AmbiguousLegacyBackend(_StateBackend):
+        def read_path(self, path, *, fields=(), language=None):
+            if not fields or "activeSource" in fields:
+                raise ObjectRuntimeError("Unknown accessor activeSource")
+            return super().read_path(path, fields=fields, language=language)
+
+        def read_children(self, object_id, *, fields=()):
+            rows = list(super().read_children(object_id, fields=fields))
+            source_id = self.active_source_ids.get(object_id)
+            if source_id is not None:
+                rows.extend(
+                    (
+                        self.rows_by_id[source_id],
+                        {
+                            "id": _guid(99_998),
+                            "name": "Unexpected_Source",
+                            "type": "AudioFileSource",
+                            "path": next(
+                                item.path
+                                for item in self.objects
+                                if item.id == object_id
+                            )
+                            + r"\Unexpected_Source",
+                            "parent": {"id": object_id},
+                            "audioSource:language": "SFX",
+                        },
+                    )
+                )
+            return tuple(rows)
+
+    backend = _AmbiguousLegacyBackend(objects)
+    runtime = PreparedObjectRuntime(
+        scenario=replace(_scenario(case_id), versions=("2021.1",)),
+        recipe=recipe,
+        backend=backend,
+    )
+
+    with pytest.raises(ObjectRuntimeError, match="resolve exactly once"):
+        runtime.snapshot()
 
 
 @pytest.mark.parametrize(

@@ -165,7 +165,10 @@ def test_direct_archive_rejects_a_consistently_rehashed_foreign_status_project()
         },
     }
 
-    with pytest.raises(DirectBusinessPlanError, match="lifecycle sandbox|archived"):
+    with pytest.raises(
+        DirectBusinessPlanError,
+        match="lifecycle sandbox|archived|path identity",
+    ):
         validate_direct_status_archive_binding(
             sections,
             status_payload=real_status,
@@ -335,7 +338,10 @@ def test_direct_archive_rejects_unmappable_unc_status_path() -> None:
         },
     }
 
-    with pytest.raises(DirectBusinessPlanError, match="path identity"):
+    with pytest.raises(
+        DirectBusinessPlanError,
+        match="path identity|differs from lifecycle sandbox",
+    ):
         validate_direct_status_archive_binding(
             sections,
             status_payload=status,

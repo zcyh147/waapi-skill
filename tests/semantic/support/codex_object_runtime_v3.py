@@ -46,6 +46,9 @@ _READ_FIELDS = (
     "audioSource:language",
     "isIncluded",
 )
+_READ_FIELDS_2021 = tuple(
+    field for field in _READ_FIELDS if field != "activeSource"
+)
 _OUTPUT_BUS_OVERRIDE_TYPES = frozenset(
     {"ActorMixer", "PropertyContainer", "RandomSequenceContainer", "Sound"}
 )
@@ -331,6 +334,24 @@ class PreparedObjectRuntime:
         self._before_output_bus_overrides: dict[str, bool | None] | None = None
         self._last_snapshot_output_bus_overrides: dict[str, bool | None] = {}
 
+    @property
+    def _read_fields(self) -> tuple[str, ...]:
+        return _READ_FIELDS_2021 if self.recipe.version == "2021.1" else _READ_FIELDS
+
+    def _read_path(
+        self,
+        path: str,
+        *,
+        language: str | None = None,
+    ) -> tuple[Mapping[str, Any], ...]:
+        if language is None:
+            return self.backend.read_path(path, fields=self._read_fields)
+        return self.backend.read_path(
+            path,
+            fields=self._read_fields,
+            language=language,
+        )
+
     def render_prompt(self) -> str:
         return self.scenario.render_prompt({})
 
@@ -353,7 +374,7 @@ class PreparedObjectRuntime:
         ordered = sorted(self.recipe.fixture.objects, key=lambda item: (item.path.count("\\"), item.path))
         for item in ordered:
             language = self._fixture_language(item)
-            existing = self.backend.read_path(item.path, language=language) if language else self.backend.read_path(item.path)
+            existing = self._read_path(item.path, language=language)
             if item.role == "borrowed":
                 if len(existing) != 1:
                     raise ObjectRuntimeError(f"borrowed fixture path must exist exactly once: {item.path}")
@@ -383,7 +404,7 @@ class PreparedObjectRuntime:
                     object_type=requested_type,
                     name=item.name,
                 )
-            rows = self.backend.read_path(item.path, language=language) if language else self.backend.read_path(item.path)
+            rows = self._read_path(item.path, language=language)
             if len(rows) != 1 or str(rows[0].get("id")) != object_id:
                 raise ObjectRuntimeError(f"created fixture object did not resolve exactly: {item.path}")
             materialized[item.key] = self._materialize_fixture(item, rows[0])
@@ -458,15 +479,29 @@ class PreparedObjectRuntime:
         if language_context is None:
             return materialized
         active_source_id = _reference_id(row.get("activeSource"))
+        source_rows: tuple[Mapping[str, Any], ...] = ()
+        if self.recipe.version == "2021.1":
+            source_rows = tuple(
+                source
+                for source in self.backend.read_children(
+                    materialized.id,
+                    fields=_ACTIVE_SOURCE_FIELDS,
+                )
+                if str(source.get("type") or "").casefold() == "audiofilesource"
+                and _reference_id(source.get("parent")) == materialized.id
+            )
+            if len(source_rows) == 1:
+                active_source_id = _reference_id(source_rows[0].get("id"))
         if active_source_id is None:
             raise ObjectRuntimeError(
                 f"{item.key}: language-bound Sound is missing activeSource identity"
             )
-        source_rows = self.backend.read_id(
-            active_source_id,
-            fields=_ACTIVE_SOURCE_FIELDS,
-            language=language_context,
-        )
+        if self.recipe.version != "2021.1":
+            source_rows = self.backend.read_id(
+                active_source_id,
+                fields=_ACTIVE_SOURCE_FIELDS,
+                language=language_context,
+            )
         if len(source_rows) != 1:
             raise ObjectRuntimeError(
                 f"{item.key}: activeSource must resolve exactly once"
@@ -537,7 +572,7 @@ class PreparedObjectRuntime:
         absent: list[str] = []
         for item in self.recipe.fixture.objects:
             language = self._fixture_language(item)
-            rows = self.backend.read_path(item.path, language=language) if language else self.backend.read_path(item.path)
+            rows = self._read_path(item.path, language=language)
             if len(rows) > 1:
                 raise ObjectRuntimeError(f"fixture path resolved more than once: {item.path}")
             if rows:
@@ -635,7 +670,7 @@ class PreparedObjectRuntime:
 
         for expected in self.recipe.oracle.expected_objects:
             if expected.path is not None:
-                rows = self.backend.read_path(expected.path)
+                rows = self._read_path(expected.path)
             else:
                 parent = resolved.get(expected.parent_key or "") or before_by_key.get(expected.parent_key or "")
                 if parent is None and expected.parent_path:
@@ -644,7 +679,10 @@ class PreparedObjectRuntime:
                 if parent is None:
                     failures.append(f"{expected.key}: dynamic parent is unresolved")
                     continue
-                candidates = self.backend.read_children(parent.id)
+                candidates = self.backend.read_children(
+                    parent.id,
+                    fields=self._read_fields,
+                )
                 rows = tuple(
                     row
                     for row in candidates
@@ -688,7 +726,7 @@ class PreparedObjectRuntime:
                 failures.append(f"{key}: protected before-state missing")
                 continue
             protected_before[key] = asdict(old)
-            rows = self.backend.read_path(old.path)
+            rows = self._read_path(old.path)
             current = _materialize(key, rows[0]) if len(rows) == 1 else None
             protected_after[key] = asdict(current) if current is not None else None
             before_override = self._before_output_bus_override(key)
