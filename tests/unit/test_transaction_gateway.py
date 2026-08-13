@@ -37,6 +37,15 @@ from wwise_waapi.platform_commands import (  # pyright: ignore[reportMissingImpo
     encode_windows_powershell_argv,
 )
 from wwise_waapi.typed_requests import request_contract  # pyright: ignore[reportMissingImports]
+from wwise_waapi.operation_composer import (  # pyright: ignore[reportMissingImports]
+    OPERATION_DRAFT_ACTION_CONTRACT,
+    apply_composer_action,
+    materialize_operation_request,
+    new_composition,
+)
+from wwise_waapi.typed_operations import (  # pyright: ignore[reportMissingImports]
+    compound_child_request_contract,
+)
 from wwise_waapi.transactions import TransactionState, TransactionStore
 
 
@@ -592,21 +601,53 @@ def migrate_call_request(io_root: Path) -> dict[str, Any]:
 
 
 def undo_group_request(*, version: str = "2023.1") -> dict[str, Any]:
-    return {
-        "contract": OPERATION_REQUEST_CONTRACT,
-        "version": version,
-        "operation": "waapi.undoGroup",
-        "arguments": {
-            "display_name": "Program Undo Group",
-            "calls": [
-                {
-                    "api": "ak.wwise.core.object.setNotes",
-                    "args": {"object": OBJECT_GUID, "value": "after"},
-                    "options": {},
-                }
-            ],
-        },
-    }
+    composition = new_composition("waapi.undoGroup", version)
+    for action, handle in (
+        ({"action": "set_display_name", "display_name": "Program Undo Group"}, "unused"),
+        ({"action": "add_child_call", "child_operation": "object.setNotes"}, "uch1-111111111111111111111111"),
+    ):
+        composition, _ = apply_composer_action(
+            "waapi.undoGroup", version, composition,
+            {"contract": OPERATION_DRAFT_ACTION_CONTRACT, **action},
+            handle_factory=lambda value=handle: value,
+        )
+    child = compound_child_request_contract("object.setNotes", version)
+    branch = next(field for field in child.fields if field.path == ("object",) and field.shape == "branch")
+    id_object = next(
+        field for field in child.fields
+        if field.path == ("object",) and field.shape == "object"
+        and any(
+            nested.parent_handle == field.handle
+            and nested.path == ("object", "kind")
+            and any(variant.get("const") == "id" for variant in nested.variants)
+            for nested in child.fields
+        )
+    )
+    id_kind = next(field for field in child.fields if field.parent_handle == id_object.handle and field.path == ("object", "kind"))
+    id_value = next(field for field in child.fields if field.parent_handle == id_object.handle and field.path == ("object", "value"))
+    notes_value = next(field for field in child.fields if field.path == ("value",) and field.shape == "scalar")
+    facts = (
+        ("choose", branch.handle, None, id_object.handle),
+        ("set", id_kind.handle, "string", "id"),
+        ("set", id_value.handle, "string", OBJECT_GUID),
+        ("set", notes_value.handle, "string", "after"),
+    )
+    for index, (fact_action, field_handle, value_type, value) in enumerate(facts):
+        action = {
+            "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+            "action": "add_child_typed_fact",
+            "child_handle": "uch1-111111111111111111111111",
+            "fact_action": fact_action,
+            "field_handle": field_handle,
+            "value": value,
+        }
+        if value_type is not None:
+            action["value_type"] = value_type
+        composition, _ = apply_composer_action(
+            "waapi.undoGroup", version, composition, action,
+            handle_factory=lambda index=index: f"tdh1-{index + 1:024x}",
+        )
+    return materialize_operation_request("waapi.undoGroup", version, composition)
 
 
 def preview_and_confirm_undo_group(*, tmp_path: Path, state_dir: Path) -> dict[str, Any]:
@@ -618,6 +659,7 @@ def preview_and_confirm_undo_group(*, tmp_path: Path, state_dir: Path) -> dict[s
             {
                 "ak.wwise.core.getInfo": [live_info(year=2023)],
                 "ak.wwise.core.getProjectInfo": [project()],
+                "ak.wwise.core.object.get": [{"return": [object_row()]}],
             }
         ),
     )
@@ -739,6 +781,7 @@ def preview(
             "debug.setAutomationMode",
             "debug.testAssert",
             "debug.testCrash",
+            "waapi.undoGroup",
         }
         else "preview"
     )
@@ -1631,16 +1674,14 @@ def test_operation_schema_discloses_exact_undo_inner_contracts_offline(
     )
 
     assert exit_code == 0
-    api_schema = payload["operation"]["argument_contract"]["properties"][
-        "calls"
-    ]["items"]["properties"]["api"]
-    expected = sorted(UNDO_GROUP_INNER_URIS_BY_VERSION[version])
-    assert api_schema["enum"] == expected
-    assert [row["const"] for row in api_schema["value_contracts"]] == expected
+    composer = payload["composer"]
+    assert composer["operation"] == "waapi.undoGroup"
+    assert composer["typed_request_schema_digest"]
+    assert composer["child_operations"]
+    assert composer["child_contract_discovery"]["subcommand"] == "undo-child-schema"
     assert all(
-        row["schema_pointer"]["gateway_argv"]
-        == ["--version", version, "describe", row["const"], "--full-schema"]
-        for row in api_schema["value_contracts"]
+        not operation.startswith("ak.wwise.core.object.setNotes")
+        for operation in composer["child_operations"]
     )
 
 
@@ -7554,6 +7595,7 @@ def test_undo_group_success_uses_one_client_and_verifies_only_result_schemas(
         {
             "ak.wwise.core.getInfo": [live_info(year=2023)],
             "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [{"return": [object_row()]}],
             "ak.wwise.core.undo.beginGroup": [{}],
             "ak.wwise.core.object.setNotes": [{}],
             "ak.wwise.core.undo.endGroup": [{}],
@@ -7643,6 +7685,7 @@ def test_undo_group_success_keeps_one_phase_copy_below_the_final_gateway_ceiling
         {
             "ak.wwise.core.getInfo": [live_info(year=2023)],
             "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [{"return": [object_row()]}],
             "ak.wwise.core.undo.beginGroup": [{}],
             "ak.wwise.core.object.setNotes": [large_inner_result],
             "ak.wwise.core.undo.endGroup": [{}],
@@ -7696,6 +7739,7 @@ def test_undo_group_success_with_journal_failure_is_not_replayed(
         {
             "ak.wwise.core.getInfo": [live_info(year=2023)],
             "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [{"return": [object_row()]}],
             "ak.wwise.core.undo.beginGroup": [{}],
             "ak.wwise.core.object.setNotes": [{}],
             "ak.wwise.core.undo.endGroup": [{}],
@@ -7737,6 +7781,7 @@ def test_undo_group_inner_timeout_reserves_budget_cancels_and_never_retries(
         {
             "ak.wwise.core.getInfo": [live_info(year=2023)],
             "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [{"return": [object_row()]}],
             "ak.wwise.core.undo.beginGroup": [{}],
             "ak.wwise.core.undo.cancelGroup": [{}],
         },
@@ -7785,6 +7830,7 @@ def test_undo_group_cancel_failure_is_terminal_indeterminate(tmp_path: Path) -> 
         {
             "ak.wwise.core.getInfo": [live_info(year=2023)],
             "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [{"return": [object_row()]}],
             "ak.wwise.core.undo.beginGroup": [{}],
         },
         errors={
@@ -7821,6 +7867,7 @@ def test_undo_group_malformed_begin_result_best_effort_cancels_but_stays_indeter
         {
             "ak.wwise.core.getInfo": [live_info(year=2023)],
             "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [{"return": [object_row()]}],
             "ak.wwise.core.undo.beginGroup": [{"unexpected": True}],
             "ak.wwise.core.undo.cancelGroup": [{}],
         }
@@ -7853,6 +7900,7 @@ def test_undo_group_malformed_end_result_best_effort_cancels_but_stays_indetermi
         {
             "ak.wwise.core.getInfo": [live_info(year=2023)],
             "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [{"return": [object_row()]}],
             "ak.wwise.core.undo.beginGroup": [{}],
             "ak.wwise.core.object.setNotes": [{}],
             "ak.wwise.core.undo.endGroup": [{"unexpected": True}],
@@ -7898,6 +7946,7 @@ def test_undo_group_phase_exception_best_effort_cancels_and_remains_indeterminat
         {
             "ak.wwise.core.getInfo": [live_info(year=2023)],
             "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [{"return": [object_row()]}],
             "ak.wwise.core.undo.beginGroup": [{}],
             "ak.wwise.core.object.setNotes": [{}],
             "ak.wwise.core.undo.endGroup": [{}],
@@ -7955,6 +8004,7 @@ def test_undo_group_accumulated_result_limit_stops_inner_and_attempts_cancel(
         {
             "ak.wwise.core.getInfo": [live_info(year=2023)],
             "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.get": [{"return": [object_row()]}],
             "ak.wwise.core.undo.beginGroup": [{}],
             "ak.wwise.core.object.setNotes": [{"program_payload": "x" * 32_000}],
             "ak.wwise.core.undo.cancelGroup": [{}],

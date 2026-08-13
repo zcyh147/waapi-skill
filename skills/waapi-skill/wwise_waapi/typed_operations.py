@@ -15,11 +15,17 @@ from typing import Any, Mapping, Sequence
 
 from .canonical import canonical_json_bytes
 from .schema_inventory import load_definition_graph
-from .typed_requests import TypedRequestContract, compile_typed_request_contract
+from .typed_requests import (
+    TypedRequestContract,
+    compile_typed_request_contract,
+    request_contract,
+)
 from .operation_registry import (
     INLINE_TYPED_INPUT_MODE,
     OPERATION_REQUEST_CONTRACT,
+    UNDO_GROUP_INNER_URIS_BY_VERSION,
     OperationContractError,
+    list_operation_specs,
     operation_request_schema_digest,
     operation_request_machine_contract,
     parse_operation_request,
@@ -64,6 +70,7 @@ DRAFT_TYPED_OPERATIONS = frozenset(
         "lua.executeCliFile",
         "lua.executeCoreFile",
         "lua.executeCoreInline",
+        "waapi.undoGroup",
     }
 )
 _MAX_SELECTOR_DEPTH = 8
@@ -659,6 +666,37 @@ def draft_operation_request_contract(operation: str, version: str) -> TypedReque
         raise TypedOperationInputError(f"No typed Draft adapter exists for {operation!r}")
     machine = operation_request_machine_contract(operation, version)
     arguments = deepcopy(machine["argument_contract"])
+    if operation == "waapi.undoGroup":
+        return compile_typed_request_contract(
+            version=version,
+            uri=operation,
+            schema={
+                "argsSchema": {
+                    "type": "object",
+                    "required": ["display_name", "calls"],
+                    "additionalProperties": False,
+                    "properties": {
+                        "display_name": deepcopy(
+                            arguments["properties"]["display_name"]
+                        ),
+                        # Child calls are represented by Adapter-issued handles,
+                        # never by a caller-authored nested request document.
+                        "calls": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": arguments["properties"]["calls"]["maxItems"],
+                            "items": {"type": "string", "pattern": r"^uch1-[0-9a-f]{24}$"},
+                        },
+                    },
+                },
+                "optionsSchema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False,
+                },
+            },
+            graph=load_definition_graph(version),
+        )
     if operation != "object.create":
         return compile_typed_request_contract(
             version=version,
@@ -703,6 +741,117 @@ def draft_operation_request_contract(operation: str, version: str) -> TypedReque
     )
 
 
+def compound_child_operations(version: str) -> Mapping[str, str]:
+    """Map each permitted child input key to its exact native URI."""
+
+    allowed = UNDO_GROUP_INNER_URIS_BY_VERSION.get(version)
+    if allowed is None:
+        raise TypedOperationInputError(f"Unsupported Wwise version {version!r}")
+    by_uri: dict[str, list[str]] = {}
+    for spec in list_operation_specs():
+        if (
+            spec.name not in {"waapi.call", "waapi.undoGroup"}
+            and version in spec.supported_versions
+            and spec.uri in allowed
+        ):
+            by_uri.setdefault(spec.uri, []).append(spec.name)
+    result: dict[str, str] = {}
+    for uri in sorted(allowed):
+        named = by_uri.get(uri, [])
+        if len(named) > 1:
+            raise TypedOperationInputError(
+                f"Undo Group member {uri!r} has ambiguous dedicated operations"
+            )
+        result[named[0] if named else uri] = uri
+    return result
+
+
+def compound_child_request_contract(
+    child_operation: str,
+    version: str,
+) -> TypedRequestContract:
+    """Compile one exact allowed Undo child without a raw request seam."""
+
+    uri = compound_child_operations(version).get(child_operation)
+    if uri is None:
+        raise TypedOperationInputError(
+            f"{child_operation!r} is not an approved typed Undo Group child"
+        )
+    if child_operation.startswith("ak."):
+        return request_contract(version, uri)
+    machine = operation_request_machine_contract(child_operation, version)
+    arguments = _compound_child_typed_schema(
+        deepcopy(machine["argument_contract"])
+    )
+    return compile_typed_request_contract(
+        version=version,
+        uri=f"undo-child:{child_operation}",
+        schema={
+            "argsSchema": arguments,
+            "optionsSchema": {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": False,
+            },
+        },
+        graph=load_definition_graph(version),
+    )
+
+
+def _compound_child_typed_schema(value: object) -> object:
+    """Project Registry semantic leaves into the finite shared Typed Core."""
+
+    if not isinstance(value, dict):
+        return value
+    projected = deepcopy(value)
+    properties = projected.get("properties")
+    if isinstance(properties, dict):
+        projected["properties"] = {
+            key: _compound_child_typed_schema(item)
+            for key, item in properties.items()
+        }
+    items = projected.get("items")
+    if isinstance(items, dict):
+        projected["items"] = _compound_child_typed_schema(items)
+    for keyword in ("oneOf", "anyOf"):
+        branches = projected.get(keyword)
+        if isinstance(branches, list):
+            projected[keyword] = [
+                _compound_child_typed_schema(item) for item in branches
+            ]
+    branches = projected.get("oneOf")
+    if isinstance(branches, list):
+        flattened: list[object] = []
+        for branch in branches:
+            if isinstance(branch, dict) and set(branch).issubset(
+                {"oneOf", "description"}
+            ) and isinstance(branch.get("oneOf"), list):
+                flattened.extend(branch["oneOf"])
+            else:
+                flattened.append(branch)
+        projected["oneOf"] = flattened
+    if not any(
+        key in projected
+        for key in (
+            "type",
+            "oneOf",
+            "anyOf",
+            "const",
+            "properties",
+            "items",
+            "$ref",
+        )
+    ):
+        projected["oneOf"] = [
+            {"type": "string"},
+            {"type": "integer"},
+            {"type": "number"},
+            {"type": "boolean"},
+            {"type": "null"},
+        ]
+    return projected
+
+
 __all__ = [
     "INLINE_OPERATION_CONTRACT",
     "INLINE_OPERATIONS",
@@ -713,5 +862,7 @@ __all__ = [
     "TypedOperationInputError",
     "inline_operation_contract",
     "draft_operation_request_contract",
+    "compound_child_operations",
+    "compound_child_request_contract",
     "materialize_inline_operation_request",
 ]

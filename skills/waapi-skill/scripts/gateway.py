@@ -305,6 +305,7 @@ OFFLINE_COMMANDS = frozenset(
         "describe",
         "operations",
         "operation-schema",
+        "undo-child-schema",
         "legacy-operation-schema",
         "request-schema",
         "request-map-container",
@@ -1655,6 +1656,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Describe one closed operation request shape, versioned CLI templates when applicable, and its execution boundary offline",
     )
     operation_schema.add_argument("operation")
+    undo_child_schema = subparsers.add_parser(
+        "undo-child-schema",
+        help="Describe one approved exact-version typed Undo Group child offline",
+    )
+    undo_child_schema.add_argument("child_operation")
     legacy_operation_schema = subparsers.add_parser(
         "legacy-operation-schema",
         help=(
@@ -3970,6 +3976,24 @@ def operation_composer_input_contract(
             operation_name: generic_typed_action_argv
             for operation_name in DRAFT_TYPED_OPERATIONS
         },
+        "waapi.undoGroup": {
+            "set_display_name": ["--display-name", "VALUE"],
+            "add_child_call": ["--child-operation", "OPERATION"],
+            "add_child_typed_fact": [
+                "--child-handle", "HANDLE", "--fact-action", "ACTION",
+                "--field-handle", "HANDLE", "[--value-type TYPE]",
+                "[--fact-value VALUE]", "[--key KEY]",
+            ],
+            "correct_child_typed_fact": [
+                "--child-handle", "HANDLE", "--fact-handle", "HANDLE",
+                "--fact-action", "ACTION", "--field-handle", "HANDLE",
+                "[--value-type TYPE]", "[--fact-value VALUE]", "[--key KEY]",
+            ],
+            "remove_child_typed_fact": [
+                "--child-handle", "HANDLE", "--fact-handle", "HANDLE",
+            ],
+            "remove_child_call": ["--child-handle", "HANDLE"],
+        },
     }
     operation_argv = action_argv_by_operation[operation]
     if not set(contract["actions"]).issubset(operation_argv):
@@ -4100,6 +4124,12 @@ def public_typed_contract(version: str, api: str) -> Any:
         return topic_match_contract(
             version, api.removeprefix(TOPIC_MATCH_OPERATION_PREFIX)
         )
+    if api.startswith("undo-child:"):
+        from wwise_waapi.typed_operations import compound_child_request_contract
+
+        return compound_child_request_contract(
+            api.removeprefix("undo-child:"), version
+        )
     if api in DRAFT_TYPED_OPERATIONS:
         return draft_operation_request_contract(api, version)
     return request_contract(version, api)
@@ -4186,6 +4216,10 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         if len(versions) != 1:
             raise GatewayInputError(f"{args.command} requires one exact Wwise version")
         contract = public_typed_contract(versions[0], args.api)
+        if args.command == "request-schema" and args.api.startswith("undo-child:"):
+            raise GatewayInputError(
+                "Undo Group child contracts use undo-child-schema as their single schema entry."
+            )
         if args.command == "request-schema" and args.api in {
             STRUCTURED_TYPED_QUERY_OPERATION,
             ADVANCED_TYPED_QUERY_OPERATION,
@@ -4213,6 +4247,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         if args.command == "request-schema":
             return contract.as_gateway_payload()
         draft_shape = contract.as_gateway_payload()["input_shape"] == "draft"
+        undo_child_shape = args.api.startswith("undo-child:")
         query_shape = args.api in {
             STRUCTURED_TYPED_QUERY_OPERATION,
             ADVANCED_TYPED_QUERY_OPERATION,
@@ -4373,10 +4408,28 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     "query-object"
                     if query_shape
                     else "topic-input-fact" if topic_prefix is not None
+                    else "draft-apply" if undo_child_shape
                     else "draft-apply" if draft_shape else "typed-call"
                 ),
                 **(
                     {
+                        "action": "add_child_typed_fact",
+                        "action_argv": [
+                            "--action", "add_child_typed_fact",
+                            "--child-handle", "<child_handle>",
+                            "--fact-action", fact[0].removeprefix("--"),
+                            "--field-handle", str(fact[1]),
+                            "--value-type", str(fact[-2]),
+                            "--fact-value", str(fact[-1]),
+                            *(
+                                ["--key", str(fact[2])]
+                                if fact[0] == "--map-put"
+                                else []
+                            ),
+                        ],
+                    }
+                    if undo_child_shape
+                    else {
                         "action": "add_typed_fact",
                         "action_argv": [
                             "--action", "add_typed_fact",
@@ -4852,6 +4905,26 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "count": len(operations),
             "implemented_count": sum(item["implemented"] is True for item in operations),
             "operations": operations,
+        }
+    if args.command == "undo-child-schema":
+        (version,) = resolve_catalog_versions(args, env=env)
+        from wwise_waapi.typed_operations import compound_child_request_contract
+
+        contract = compound_child_request_contract(args.child_operation, version)
+        return {
+            "contract": GATEWAY_RESULT_CONTRACT,
+            "ok": True,
+            "status": "ok",
+            "command": "undo-child-schema",
+            "offline": True,
+            "child_operation": args.child_operation,
+            "version": version,
+            "typed_request": contract.as_gateway_payload(),
+            "fact_actions": [
+                "add_child_typed_fact",
+                "correct_child_typed_fact",
+                "remove_child_typed_fact",
+            ],
         }
     if args.command in {"operation-schema", "legacy-operation-schema"}:
         legacy_compatibility = args.command == "legacy-operation-schema"
@@ -9168,7 +9241,7 @@ def dispatch_transaction_command(
                     "INVALID_PREVIEW",
                     "Immutable waapi.undoGroup request lacks its arguments object.",
                 )
-            execution_plan = build_undo_group_execution_plan(
+            request_plan = build_undo_group_execution_plan(
                 detected_version,
                 request_arguments,
             )
@@ -9178,11 +9251,36 @@ def dispatch_transaction_command(
                 if isinstance(stored_pre_state, Mapping)
                 else None
             )
-            if stored_plan != execution_plan:
+            if not isinstance(stored_plan, Mapping):
+                raise OperationContractError(
+                    "PREVIEW_DISPATCH_MISMATCH",
+                    "Immutable waapi.undoGroup execution plan is missing.",
+                )
+            stored_calls = stored_plan.get("calls")
+            request_calls = request_plan.get("calls")
+            binding_keys = (
+                "child_operation", "child_request", "child_schema_digest", "api",
+                "timeout_seconds", "result_limit_bytes",
+            )
+            plan_bound = (
+                isinstance(stored_calls, list)
+                and isinstance(request_calls, list)
+                and len(stored_calls) == len(request_calls)
+                and stored_plan.get("begin") == request_plan.get("begin")
+                and stored_plan.get("end") == request_plan.get("end")
+                and stored_plan.get("cancel") == request_plan.get("cancel")
+                and all(
+                    isinstance(stored, Mapping)
+                    and all(stored.get(key) == requested.get(key) for key in binding_keys)
+                    for stored, requested in zip(stored_calls, request_calls, strict=True)
+                )
+            )
+            if not plan_bound:
                 raise OperationContractError(
                     "PREVIEW_DISPATCH_MISMATCH",
                     "Immutable waapi.undoGroup execution plan no longer matches its request.",
                 )
+            execution_plan = stored_plan
             role_validation_output = undo_group_role_validation_summary(role_validation)
             authorization = require_transaction_execution_authorization(
                 record=record,
@@ -9987,6 +10085,25 @@ def dispatch_undo_group_execution_plan(
             version=version,
         )
         capability = CapabilityCatalog().describe(version, uri_value)
+        sealed_timeout = phase.get("timeout_seconds")
+        sealed_result_limit = phase.get("result_limit_bytes")
+        current_timeout = float(capability.execution_contract["timeout_seconds"])
+        current_result_limit = int(
+            capability.execution_contract["result_limit_bytes"]
+        )
+        if (
+            not isinstance(sealed_timeout, (int, float))
+            or isinstance(sealed_timeout, bool)
+            or float(sealed_timeout) != current_timeout
+            or not isinstance(sealed_result_limit, int)
+            or isinstance(sealed_result_limit, bool)
+            or sealed_result_limit != current_result_limit
+        ):
+            raise OperationContractError(
+                "PREVIEW_DISPATCH_MISMATCH",
+                "Undo Group child execution limits no longer match the sealed contract.",
+                details={"index": index, "uri": uri_value},
+            )
         remaining = connection.deadline.require_remaining(
             f"Undo Group {phase_name} {uri_value}"
         )
@@ -10000,7 +10117,7 @@ def dispatch_undo_group_execution_plan(
                 ),
             )
         operation_timeout = min(
-            float(capability.execution_contract["timeout_seconds"]),
+            float(sealed_timeout),
             max(0.001, remaining - cancel_reserve),
         )
         result = dispatch(
@@ -10012,7 +10129,9 @@ def dispatch_undo_group_execution_plan(
             options=options_value,
             allow_destructive=True,
             operation_timeout=operation_timeout,
-            result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
+            result_limit_bytes=(
+                int(sealed_result_limit)
+            ),
         )
         row: dict[str, Any] = {
             "phase": phase_name,

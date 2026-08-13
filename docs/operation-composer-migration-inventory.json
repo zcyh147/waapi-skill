@@ -3,10 +3,10 @@
   "scope": {
     "registry_operations": 34,
     "registry_version_lanes": 153,
-    "composer_version_lanes": 53,
+    "composer_version_lanes": 58,
     "inline_typed_version_lanes": 90,
-    "legacy_json_version_lanes": 10,
-    "lane_inventory_sha256": "fb6673434d591a754bb530b232c3a3e652bee126d1efcef0514b087b34456667",
+    "legacy_json_version_lanes": 5,
+    "lane_inventory_sha256": "b869d4078b4a4674e5f3a5da685adb8e50725538d8a866acc913a91dfc98ad0b",
     "version_rule": "Every supported version lane inherits the disposition of its exact Registry operation name.",
     "normal_input_rule": "The Operation Registry exposes one normal input mode per operation and version. The Agent never chooses between Composer and Legacy JSON for one normal request.",
     "native_uri_rule": "A shared native URI never implies a shared migration decision. Isolation is keyed by exact operation name and version."
@@ -229,7 +229,7 @@
     },
     {
       "id": "wave-06-compound-undo",
-      "status": "planned",
+      "status": "complete",
       "purpose": "Migrate the bounded multi-call Undo Group after its intended child call families have stable typed inputs.",
       "operations": [
         "waapi.undoGroup"

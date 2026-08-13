@@ -1934,13 +1934,11 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     "minItems": 1,
                     "maxItems": UNDO_GROUP_MAX_CALLS,
                     "items": _object_contract(
-                        ("api", "args"),
+                        ("schema_digest", "request"),
                         {
-                            "api": {"type": "string", "pattern": r"^ak\.wwise\.core\."},
-                            "args": {"type": "object"},
-                            "options": {"type": "object"},
+                            "schema_digest": {"type": "string", "pattern": r"^[0-9a-f]{64}$"},
+                            "request": {"type": "object"},
                         },
-                        optional=("options",),
                     ),
                 },
             },
@@ -3521,7 +3519,7 @@ _OPERATION_INPUT_MODE_DECLARATIONS: tuple[
     ("ui.commands.register", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
     ("ui.commands.unregister", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
     ("waapi.call", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
-    ("waapi.undoGroup", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), LEGACY_JSON_INPUT_MODE),
+    ("waapi.undoGroup", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
 )
 
 OPERATION_INPUT_MODE_LANES: tuple[OperationInputModeLane, ...] = tuple(
@@ -4404,21 +4402,65 @@ def build_undo_group_execution_plan(
         )
     registry = ExecutionContractRegistry()
     calls: list[dict[str, Any]] = []
-    for index, raw_call in enumerate(raw_calls):
-        if not isinstance(raw_call, Mapping):
+    for index, raw_child_binding in enumerate(raw_calls):
+        if not isinstance(raw_child_binding, Mapping):
             raise OperationContractError(
                 "INVALID_ARGUMENT",
                 f"waapi.undoGroup calls[{index}] must be a JSON object.",
             )
         _require_exact_keys(
-            raw_call,
-            required=("api", "args"),
-            optional=("options",),
+            raw_child_binding,
+            required=("schema_digest", "request"),
             context=f"waapi.undoGroup calls[{index}]",
         )
-        api = raw_call.get("api")
-        args = raw_call.get("args")
-        options = raw_call.get("options", {})
+        child_payload = raw_child_binding.get("request")
+        if not isinstance(child_payload, Mapping):
+            raise OperationContractError(
+                "INVALID_ARGUMENT",
+                f"waapi.undoGroup calls[{index}].request must be an object.",
+            )
+        child = parse_operation_request(child_payload, expected_version=version)
+        if child.operation == "waapi.undoGroup":
+            raise OperationContractError(
+                "UNDO_GROUP_INNER_NOT_ALLOWED",
+                "Nested Undo Group child calls are not allowed.",
+                details={"index": index},
+            )
+        if child.operation == "waapi.call":
+            api_value = child.arguments.get("api")
+            if not isinstance(api_value, str):
+                raise OperationContractError(
+                    "INVALID_ARGUMENT", "Undo Group waapi.call child lacks its API."
+                )
+            from .typed_requests import request_contract
+
+            expected_child_schema_digest = request_contract(
+                version, api_value
+            ).schema_digest
+            api, args, options, _execution_contract = _public_call_arguments(
+                version, child.arguments
+            )
+            validation = validate_semantic_payload(
+                api, args, options, version=version
+            )
+        else:
+            child_spec = describe_operation(child.operation)
+            api = child_spec.uri
+            from .typed_operations import compound_child_request_contract
+
+            expected_child_schema_digest = compound_child_request_contract(
+                child.operation, version
+            ).schema_digest
+            # Dedicated children retain their closed semantic arguments here;
+            # live preparation below resolves them to the exact native call.
+            args = {}
+            options = {}
+        if raw_child_binding.get("schema_digest") != expected_child_schema_digest:
+            raise OperationContractError(
+                "UNDO_GROUP_CHILD_SCHEMA_MISMATCH",
+                "Undo Group child schema digest is stale or belongs to another contract.",
+                details={"index": index, "operation": child.operation},
+            )
         if not isinstance(api, str) or api not in allowed:
             raise OperationContractError(
                 "UNDO_GROUP_INNER_NOT_ALLOWED",
@@ -4429,11 +4471,6 @@ def build_undo_group_execution_plan(
                     "version": version,
                     "allowed": sorted(allowed),
                 },
-            )
-        if not isinstance(args, Mapping) or not isinstance(options, Mapping):
-            raise OperationContractError(
-                "INVALID_ARGUMENT",
-                f"waapi.undoGroup calls[{index}] args/options must be JSON objects.",
             )
         contract = registry.describe(version, api)
         if contract.route != "transaction" or contract.effect != "project_mutation":
@@ -4447,36 +4484,48 @@ def build_undo_group_execution_plan(
                     "effect": contract.effect,
                 },
             )
-        validation = validate_semantic_payload(api, args, options, version=version)
         calls.append(
             {
+                "child_operation": child.operation,
+                "child_request": child.as_dict(),
+                "child_schema_digest": expected_child_schema_digest,
                 "api": api,
                 "args": dict(args),
                 "options": dict(options),
-                "request_validation": validation.as_dict(),
-                "request_validation_strength": (
-                    "partial_reflected_schema"
-                    if validation.unresolved_refs
-                    else "complete_reflected_schema"
+                "timeout_seconds": contract.timeout_seconds,
+                "result_limit_bytes": contract.result_limit_bytes,
+                **(
+                    {
+                        "request_validation": validation.as_dict(),
+                        "request_validation_strength": (
+                            "partial_reflected_schema"
+                            if validation.unresolved_refs
+                            else "complete_reflected_schema"
+                        ),
+                    }
+                    if child.operation == "waapi.call"
+                    else {"request_validation_strength": "dedicated_operation_preparation"}
                 ),
             }
         )
     cancel_args = {} if version in {"2021.1", "2022.1"} else {"undo": True}
+    def phase(uri: str, args: Mapping[str, Any]) -> dict[str, Any]:
+        phase_contract = registry.describe(version, uri)
+        return {
+            "uri": uri,
+            "args": dict(args),
+            "options": {},
+            "timeout_seconds": phase_contract.timeout_seconds,
+            "result_limit_bytes": phase_contract.result_limit_bytes,
+        }
+
     plan = {
         "kind": "same_connection_undo_group",
         "version": version,
-        "begin": {"uri": UNDO_BEGIN_GROUP_URI, "args": {}, "options": {}},
+        "begin": phase(UNDO_BEGIN_GROUP_URI, {}),
         "calls": calls,
-        "end": {
-            "uri": UNDO_END_GROUP_URI,
-            "args": {"displayName": display_name},
-            "options": {},
-        },
-        "cancel": {
-            "uri": UNDO_CANCEL_GROUP_URI,
-            "args": cancel_args,
-            "options": {},
-        },
+        "end": phase(UNDO_END_GROUP_URI, {"displayName": display_name}),
+        "cancel": phase(UNDO_CANCEL_GROUP_URI, cancel_args),
         "same_connection_required": True,
         "automatic_retry": False,
     }
@@ -8443,6 +8492,46 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
 
     if request.operation == "waapi.undoGroup":
         execution_plan = build_undo_group_execution_plan(request.version, arguments)
+        prepared_children: list[Mapping[str, Any]] = []
+        for index, child_plan in enumerate(execution_plan["calls"]):
+            child_request = parse_operation_request(
+                child_plan["child_request"],
+                expected_version=request.version,
+            )
+            if child_request.operation == "waapi.call":
+                prepared_children.append(dict(child_plan))
+                continue
+            child_prepared = prepare_operation(child_request, read_call=read)
+            child_dispatch = child_prepared.semantic_preview.dispatch_payload()
+            if child_dispatch.get("uri") != child_plan["api"]:
+                raise OperationContractError(
+                    "UNDO_GROUP_INNER_ROUTE_MISMATCH",
+                    "Dedicated Undo child preparation changed its exact native URI.",
+                    details={"index": index, "operation": child_request.operation},
+                )
+            prepared_children.append(
+                {
+                    **dict(child_plan),
+                    "args": dict(child_dispatch.get("args", {})),
+                    "options": dict(child_dispatch.get("options", {})),
+                    "prepared_operation": child_prepared.as_dict(),
+                    "request_validation_strength": "dedicated_operation_preparation",
+                }
+            )
+        execution_plan = {
+            **execution_plan,
+            "calls": prepared_children,
+        }
+        prepared_plan_size = len(canonical_json_bytes(execution_plan))
+        if prepared_plan_size > UNDO_GROUP_MAX_PLAN_BYTES:
+            raise OperationContractError(
+                "UNDO_GROUP_PLAN_TOO_LARGE",
+                "waapi.undoGroup prepared execution plan exceeds the packaged byte limit.",
+                details={
+                    "size_bytes": prepared_plan_size,
+                    "limit_bytes": UNDO_GROUP_MAX_PLAN_BYTES,
+                },
+            )
         begin = execution_plan["begin"]
         preview = SemanticPreview(
             envelope=SemanticEnvelope(
@@ -12748,16 +12837,76 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 "INVALID_PREVIEW",
                 "waapi.undoGroup preview lacks versioned arguments.",
             )
-        expected_plan = build_undo_group_execution_plan(version, arguments)
-        expected_dispatch = expected_plan["begin"]
         actual_plan = pre_state.get("execution_plan")
-        passed = actual_plan == expected_plan and dict(dispatch_payload) == expected_dispatch
+        base_plan = build_undo_group_execution_plan(version, arguments)
+        expected_dispatch = {
+            key: base_plan["begin"][key] for key in ("uri", "args", "options")
+        }
+        passed = isinstance(actual_plan, Mapping)
+        child_assertions: list[Mapping[str, Any]] = []
+        child_readbacks: list[Mapping[str, Any]] = []
+        if passed:
+            actual_calls = actual_plan.get("calls")
+            base_calls = base_plan.get("calls")
+            passed = (
+                isinstance(actual_calls, list)
+                and isinstance(base_calls, list)
+                and len(actual_calls) == len(base_calls)
+                and actual_plan.get("begin") == base_plan.get("begin")
+                and actual_plan.get("end") == base_plan.get("end")
+                and actual_plan.get("cancel") == base_plan.get("cancel")
+                and dict(dispatch_payload) == expected_dispatch
+            )
+            if passed:
+                for index, (actual_child, base_child) in enumerate(
+                    zip(actual_calls, base_calls, strict=True)
+                ):
+                    if not isinstance(actual_child, Mapping):
+                        passed = False
+                        break
+                    binding_keys = (
+                        "child_operation",
+                        "child_request",
+                        "child_schema_digest",
+                        "api",
+                        "timeout_seconds",
+                        "result_limit_bytes",
+                    )
+                    binding_ok = all(
+                        actual_child.get(key) == base_child.get(key)
+                        for key in binding_keys
+                    )
+                    prepared_child = actual_child.get("prepared_operation")
+                    if isinstance(prepared_child, Mapping):
+                        child_validation = validate_prepared_roles(
+                            prepared_child, read_call=read_call
+                        )
+                        binding_ok = binding_ok and child_validation.get("ok") is True
+                        child_assertions.extend(
+                            {
+                                **dict(item),
+                                "name": f"child[{index}] {item.get('name', 'role validation')}",
+                            }
+                            for item in child_validation.get("assertions", [])
+                            if isinstance(item, Mapping)
+                        )
+                        child_readbacks.extend(
+                            item
+                            for item in child_validation.get("readbacks", [])
+                            if isinstance(item, Mapping)
+                        )
+                    else:
+                        binding_ok = binding_ok and all(
+                            actual_child.get(key) == base_child.get(key)
+                            for key in ("args", "options", "request_validation")
+                        )
+                    passed = passed and binding_ok
         assertions.append(
             {
                 "name": "waapi.undoGroup execution plan still matches the immutable reviewed composite",
                 "passed": passed,
                 "evidence": {
-                    "expected_plan": expected_plan,
+                    "expected_plan": base_plan,
                     "actual_plan": actual_plan,
                     "expected_dispatch": expected_dispatch,
                     "actual_dispatch": dict(dispatch_payload),
@@ -12769,8 +12918,10 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
             "operation": operation,
             "ok": passed,
             "status": "valid" if passed else "repreview_required",
-            "assertions": [_json_mapping(item) for item in assertions],
-            "readbacks": [],
+            "assertions": [
+                _json_mapping(item) for item in (*assertions, *child_assertions)
+            ],
+            "readbacks": [_json_mapping(item) for item in child_readbacks],
         }
     if operation == "waapi.call":
         request_payload = prepared.get("request")
@@ -20583,42 +20734,9 @@ def _operation_argument_contract(
             raise RuntimeError("Operation argument contract is unavailable in its own version lane")
         contract = projected
     if operation == "waapi.undoGroup":
-        try:
-            api_contract = contract["properties"]["calls"]["items"][
-                "properties"
-            ]["api"]
-        except (KeyError, TypeError) as exc:
-            raise RuntimeError(
-                "waapi.undoGroup schema no longer exposes calls[].api"
-            ) from exc
-        if version is None:
-            api_contract["allowed_values_by_version"] = {
-                lane: sorted(uris)
-                for lane, uris in UNDO_GROUP_INNER_URIS_BY_VERSION.items()
-            }
-        else:
-            allowed = sorted(UNDO_GROUP_INNER_URIS_BY_VERSION[version])
-            api_contract.pop("pattern", None)
-            api_contract["enum"] = allowed
-            api_contract["value_contracts"] = [
-                {
-                    "const": uri,
-                    "schema_pointer": {
-                        "gateway_argv": [
-                            "--version",
-                            version,
-                            "describe",
-                            uri,
-                            "--full-schema",
-                        ],
-                        "result_path": (
-                            f"$.availability.{version}."
-                            "capability.schema.full"
-                        ),
-                    },
-                }
-                for uri in allowed
-            ]
+        # The normal Composer owns child-operation discovery and typed facts.
+        # The canonical Registry records only Gateway-generated bound requests;
+        # it never exposes native URI/args/options as a public child grammar.
         return contract
     if operation == "object.create":
         contract["default_container_parent_contract"] = (

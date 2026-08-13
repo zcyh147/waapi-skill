@@ -15,6 +15,7 @@ import secrets
 from typing import Any, Callable, Mapping, Sequence
 
 from .canonical import canonical_json_bytes, canonical_sha256
+from .builders.common import SemanticValidationError
 from .operation_registry import (
     COMPOSER_INPUT_MODE,
     OperationContractError,
@@ -35,7 +36,12 @@ from .typed_requests import (
     materialize_typed_request,
     request_contract,
 )
-from .typed_operations import DRAFT_TYPED_OPERATIONS, draft_operation_request_contract
+from .typed_operations import (
+    DRAFT_TYPED_OPERATIONS,
+    compound_child_operations,
+    compound_child_request_contract,
+    draft_operation_request_contract,
+)
 
 
 OPERATION_DRAFT_ACTION_CONTRACT = "waapi-skill.operation-draft-action/v1"
@@ -51,6 +57,7 @@ MAX_TYPED_COMPOSER_ACTION_BYTES = 72 * 1024
 MAX_AUDIO_IMPORT_COMPOSER_ACTION_BYTES = 384 * 1024
 _TARGET_HANDLE_PATTERN = re.compile(r"^odh1-[0-9a-f]{24}$")
 _TYPED_FACT_HANDLE_PATTERN = re.compile(r"^tdh1-[0-9a-f]{24}$")
+_UNDO_CHILD_HANDLE_PATTERN = re.compile(r"^uch1-[0-9a-f]{24}$")
 _GENERIC_TYPED_ACTION_FIELDS: dict[
     str, tuple[tuple[str, ...], tuple[str, ...]]
 ] = {
@@ -67,6 +74,22 @@ _GENERIC_TYPED_ACTION_FIELDS: dict[
         ("value_type", "value", "key"),
     ),
     "remove_typed_fact": (("fact_handle",), ()),
+}
+_UNDO_GROUP_ACTION_FIELDS: dict[
+    str, tuple[tuple[str, ...], tuple[str, ...]]
+] = {
+    "set_display_name": (("display_name",), ()),
+    "add_child_call": (("child_operation",), ()),
+    "add_child_typed_fact": (
+        ("child_handle", "fact_action", "field_handle"),
+        ("value_type", "value", "key"),
+    ),
+    "correct_child_typed_fact": (
+        ("child_handle", "fact_handle", "fact_action", "field_handle"),
+        ("value_type", "value", "key"),
+    ),
+    "remove_child_typed_fact": (("child_handle", "fact_handle"), ()),
+    "remove_child_call": (("child_handle",), ()),
 }
 _BASE_ACTION_FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "set_request_option": (("name", "value"), ()),
@@ -312,6 +335,8 @@ def parse_typed_action_cli_arguments(
             "Typed action argv must start with --action ACTION."
         )
     action_name = arguments[1]
+    if action_name in _UNDO_GROUP_ACTION_FIELDS:
+        return _parse_undo_group_action_cli_arguments(arguments)
     if action_name in _GENERIC_TYPED_ACTION_FIELDS:
         return _parse_generic_typed_action_cli_arguments(arguments)
     index = 2
@@ -736,6 +761,30 @@ def typed_action_cli_arguments(action: Mapping[str, Any]) -> tuple[str, ...]:
     action_name = action.get("action")
     if not isinstance(action_name, str) or not action_name:
         raise OperationComposerError("Typed action has an invalid action name.")
+    if action_name in _UNDO_GROUP_ACTION_FIELDS:
+        required, optional = _UNDO_GROUP_ACTION_FIELDS[action_name]
+        _require_allowed_keys(
+            action,
+            required=("contract", "action", *required),
+            optional=optional,
+            label="Undo Group action",
+        )
+        flag_by_field = {
+            "display_name": "--display-name",
+            "child_operation": "--child-operation",
+            "child_handle": "--child-handle",
+            "fact_handle": "--fact-handle",
+            "fact_action": "--fact-action",
+            "field_handle": "--field-handle",
+            "value_type": "--value-type",
+            "value": "--fact-value",
+            "key": "--key",
+        }
+        result = ["--action", action_name]
+        for field in (*required, *optional):
+            if field in action:
+                result.extend((flag_by_field[field], str(action[field])))
+        return tuple(result)
     if action_name in _GENERIC_TYPED_ACTION_FIELDS:
         required, optional = _GENERIC_TYPED_ACTION_FIELDS[action_name]
         _require_allowed_keys(
@@ -902,6 +951,45 @@ def typed_action_cli_arguments(action: Mapping[str, Any]) -> tuple[str, ...]:
             else:
                 arguments.extend(("--value", field, value_type, raw_value))
     return tuple(arguments)
+
+
+def _parse_undo_group_action_cli_arguments(
+    arguments: Sequence[str],
+) -> dict[str, Any]:
+    action_name = arguments[1]
+    required, optional = _UNDO_GROUP_ACTION_FIELDS[action_name]
+    field_by_flag = {
+        "--display-name": "display_name",
+        "--child-operation": "child_operation",
+        "--child-handle": "child_handle",
+        "--fact-handle": "fact_handle",
+        "--fact-action": "fact_action",
+        "--field-handle": "field_handle",
+        "--value-type": "value_type",
+        "--fact-value": "value",
+        "--key": "key",
+    }
+    action: dict[str, Any] = {
+        "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+        "action": action_name,
+    }
+    index = 2
+    while index < len(arguments):
+        flag = arguments[index]
+        field = field_by_flag.get(flag)
+        if field is None or index + 1 >= len(arguments):
+            raise OperationComposerError("Undo Group typed action argv is invalid.")
+        if field in action:
+            raise OperationComposerError(f"{flag} may be supplied only once.")
+        action[field] = arguments[index + 1]
+        index += 2
+    _require_allowed_keys(
+        action,
+        required=("contract", "action", *required),
+        optional=optional,
+        label="Undo Group action",
+    )
+    return action
 
 
 def _specialized_typed_action_cli_arguments(
@@ -1243,6 +1331,47 @@ def _selector_cli_tokens(selector: Mapping[str, Any], *, depth: int = 0) -> tupl
 
 def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
     """Return one reviewed Adapter contract, derived from the Registry."""
+
+    if operation == "waapi.undoGroup":
+        typed = draft_operation_request_contract(operation, version)
+        child_operations = compound_child_operations(version)
+        return {
+            "contract": OPERATION_COMPOSER_CONTRACT,
+            "operation": operation,
+            "version": version,
+            "action_contract": OPERATION_DRAFT_ACTION_CONTRACT,
+            "composition_contract": OPERATION_COMPOSITION_CONTRACT,
+            "actions": list(_UNDO_GROUP_ACTION_FIELDS),
+            "action_shapes": {
+                name: {
+                    "fixed_fields": {
+                        "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+                        "action": name,
+                    },
+                    "required_fields": list(required),
+                    "optional_fields": list(optional),
+                }
+                for name, (required, optional) in _UNDO_GROUP_ACTION_FIELDS.items()
+            },
+            "child_operations": sorted(child_operations),
+            "child_contract_discovery": {
+                "subcommand": "undo-child-schema",
+                "gateway_argv": ["undo-child-schema", "CHILD_OPERATION"],
+                "operation_must_come_from": "child_operations",
+                "version": "configured_exact_version",
+            },
+            "typed_request_schema_digest": typed.schema_digest,
+            "limits": {
+                "calls": 32,
+                "display_name_characters": 256,
+                "child_facts": MAX_TYPED_REQUEST_FACTS,
+                "canonical_request_bytes": 128 * 1024,
+                "execution_plan_bytes": 256 * 1024,
+                "accumulated_result_bytes": 256 * 1024,
+                "action_bytes": MAX_TYPED_COMPOSER_ACTION_BYTES,
+            },
+            "complete_request_is_never_an_action": True,
+        }
 
     if operation.startswith("ak.") or operation in DRAFT_TYPED_OPERATIONS:
         typed = (
@@ -1698,6 +1827,334 @@ def _new_typed_fact_handle() -> str:
     return f"tdh1-{secrets.token_hex(12)}"
 
 
+def _new_undo_child_handle() -> str:
+    return f"uch1-{secrets.token_hex(12)}"
+
+
+def _normalize_undo_group_composition(
+    version: str,
+    composition: Mapping[str, Any],
+) -> dict[str, Any]:
+    _require_json_object(composition, label="composition")
+    _require_exact_keys(
+        composition,
+        required=("contract", "display_name", "calls"),
+        label="Undo Group composition",
+    )
+    if composition.get("contract") != OPERATION_COMPOSITION_CONTRACT:
+        raise OperationComposerError("Operation Draft composition contract is invalid.")
+    display_name = composition.get("display_name")
+    if display_name is not None and (
+        not isinstance(display_name, str)
+        or not display_name.strip()
+        or len(display_name) > 256
+    ):
+        raise OperationComposerError("Undo Group display name is invalid.")
+    raw_calls = composition.get("calls")
+    if not isinstance(raw_calls, list) or len(raw_calls) > 32:
+        raise OperationComposerError("Undo Group child-call count exceeds its ceiling.")
+    allowed = compound_child_operations(version)
+    calls: list[dict[str, Any]] = []
+    handles: set[str] = set()
+    for raw_child in raw_calls:
+        _require_json_object(raw_child, label="Undo Group child call")
+        _require_exact_keys(
+            raw_child,
+            required=("handle", "operation", "schema_digest", "facts"),
+            label="Undo Group child call",
+        )
+        handle = raw_child.get("handle")
+        operation = raw_child.get("operation")
+        if (
+            not isinstance(handle, str)
+            or _UNDO_CHILD_HANDLE_PATTERN.fullmatch(handle) is None
+            or handle in handles
+        ):
+            raise OperationComposerError("Undo Group child handle is invalid.")
+        if not isinstance(operation, str) or operation not in allowed:
+            raise OperationComposerError("Undo Group child operation is not approved.")
+        contract = compound_child_request_contract(operation, version)
+        if raw_child.get("schema_digest") != contract.schema_digest:
+            raise OperationComposerError("Undo Group child schema digest is stale.")
+        raw_facts = raw_child.get("facts")
+        if not isinstance(raw_facts, list) or len(raw_facts) > MAX_TYPED_REQUEST_FACTS:
+            raise OperationComposerError("Undo Group child fact count exceeds its ceiling.")
+        facts: list[dict[str, Any]] = []
+        fact_handles: set[str] = set()
+        for raw_fact in raw_facts:
+            _require_json_object(raw_fact, label="Undo Group child fact")
+            _require_allowed_keys(
+                raw_fact,
+                required=("handle", "fact_action", "field_handle", "value_type", "value"),
+                optional=("key",),
+                label="Undo Group child fact",
+            )
+            fact_handle = raw_fact.get("handle")
+            if (
+                not isinstance(fact_handle, str)
+                or _TYPED_FACT_HANDLE_PATTERN.fullmatch(fact_handle) is None
+                or fact_handle in fact_handles
+            ):
+                raise OperationComposerError("Undo Group child fact handle is invalid.")
+            normalized = dict(raw_fact)
+            if not all(
+                isinstance(normalized.get(name), str)
+                for name in ("fact_action", "field_handle", "value_type", "value")
+            ) or ("key" in normalized and not isinstance(normalized["key"], str)):
+                raise OperationComposerError("Undo Group child fact is invalid.")
+            fact_handles.add(fact_handle)
+            facts.append(normalized)
+        handles.add(handle)
+        calls.append(
+            {
+                "handle": handle,
+                "operation": operation,
+                "schema_digest": contract.schema_digest,
+                "facts": facts,
+            }
+        )
+    return {
+        "contract": OPERATION_COMPOSITION_CONTRACT,
+        "display_name": display_name,
+        "calls": calls,
+    }
+
+
+def _child_for_handle(composition: Mapping[str, Any], handle: object) -> dict[str, Any]:
+    matches = [child for child in composition["calls"] if child["handle"] == handle]
+    if len(matches) != 1:
+        raise OperationComposerError("child_handle does not name a current Undo child.")
+    return matches[0]
+
+
+def _undo_fact_action(action: Mapping[str, Any]) -> dict[str, str]:
+    payload = {
+        name: str(action[name])
+        for name in ("fact_action", "field_handle", "value_type", "value", "key")
+        if name in action
+    }
+    supplied = set(payload) - {"fact_action", "field_handle"}
+    required = {
+        "set": {"value_type", "value"},
+        "append": {"value_type", "value"},
+        "present": set(),
+        "choose": {"value"},
+        "choose-dynamic": {"key", "value"},
+        "map-put": {"key", "value_type", "value"},
+    }.get(payload.get("fact_action"))
+    if required is None or supplied != required:
+        raise OperationComposerError("Undo child fact fields do not match its action.")
+    if payload["fact_action"] == "present":
+        payload.update({"value_type": "null", "value": "null"})
+    elif payload["fact_action"] == "choose":
+        payload["value_type"] = "branch"
+    elif payload["fact_action"] == "choose-dynamic":
+        payload["value_type"] = "choice"
+    return payload
+
+
+def _materialize_undo_child(version: str, child: Mapping[str, Any]) -> dict[str, Any]:
+    contract = compound_child_request_contract(str(child["operation"]), version)
+    try:
+        materialized = materialize_typed_request(
+            contract,
+            schema_digest=str(child["schema_digest"]),
+            facts=tuple(
+                TypedRequestFact(
+                    fact["fact_action"],
+                    fact["field_handle"],
+                    fact["value_type"],
+                    fact["value"],
+                    key=fact.get("key"),
+                )
+                for fact in child["facts"]
+            ),
+        )
+    except TypedRequestError as exc:
+        raise OperationComposerError(
+            str(exc),
+            error_code=(
+                "OPERATION_DRAFT_INCOMPLETE"
+                if _typed_request_error_is_incomplete(str(exc))
+                else "OPERATION_DRAFT_ACTION_INVALID"
+            ),
+        ) from exc
+    operation = str(child["operation"])
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": version,
+        "operation": "waapi.call" if operation.startswith("ak.") else operation,
+        "arguments": (
+            {"api": operation, "args": dict(materialized.args), "options": dict(materialized.options)}
+            if operation.startswith("ak.")
+            else dict(materialized.args)
+        ),
+    }
+    try:
+        return parse_operation_request(request, expected_version=version).as_dict()
+    except (OperationContractError, SemanticValidationError) as exc:
+        raise OperationComposerError(
+            str(exc),
+            error_code=(
+                exc.error_code.value
+                if isinstance(exc, SemanticValidationError)
+                else exc.error_code
+            ),
+            details=exc.details,
+        ) from exc
+
+
+def _materialize_undo_group_request(
+    version: str,
+    composition: Mapping[str, Any],
+) -> dict[str, Any]:
+    if composition["display_name"] is None or not composition["calls"]:
+        raise OperationComposerError(
+            "Undo Group needs a display name and at least one complete child.",
+            error_code="OPERATION_DRAFT_INCOMPLETE",
+        )
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": version,
+        "operation": "waapi.undoGroup",
+        "arguments": {
+            "display_name": composition["display_name"],
+            "calls": [],
+        },
+    }
+    request["arguments"]["calls"] = [
+        {
+            "schema_digest": child["schema_digest"],
+            "request": _materialize_undo_child(version, child),
+        }
+        for child in composition["calls"]
+    ]
+    try:
+        return parse_operation_request(request, expected_version=version).as_dict()
+    except OperationContractError as exc:
+        raise OperationComposerError(
+            str(exc), error_code=exc.error_code, details=exc.details
+        ) from exc
+
+
+def _apply_undo_group_action(
+    version: str,
+    composition: Mapping[str, Any],
+    action: Mapping[str, Any],
+    *,
+    handle_factory: Callable[[], str] | None,
+) -> tuple[dict[str, Any], str]:
+    normalized = _normalize_undo_group_composition(version, composition)
+    _require_json_object(action, label="action")
+    try:
+        action_size = len(canonical_json_bytes(dict(action)))
+    except (RecursionError, TypeError, UnicodeError, ValueError) as exc:
+        raise OperationComposerError(
+            "Undo Group action must be strict JSON."
+        ) from exc
+    if action_size > MAX_TYPED_COMPOSER_ACTION_BYTES:
+        raise OperationComposerError(
+            "Undo Group action exceeds its fixed byte ceiling.",
+            details={
+                "size_bytes": action_size,
+                "limit_bytes": MAX_TYPED_COMPOSER_ACTION_BYTES,
+            },
+        )
+    if action.get("contract") != OPERATION_DRAFT_ACTION_CONTRACT:
+        raise OperationComposerError("action contract is invalid.")
+    action_name = action.get("action")
+    if action_name not in _UNDO_GROUP_ACTION_FIELDS:
+        raise OperationComposerError("Undo Group action is unsupported.")
+    required, optional = _UNDO_GROUP_ACTION_FIELDS[str(action_name)]
+    _require_allowed_keys(
+        action,
+        required=("contract", "action", *required),
+        optional=optional,
+        label="Undo Group action",
+    )
+    candidate = {
+        **normalized,
+        "calls": [
+            {**child, "facts": [dict(fact) for fact in child["facts"]]}
+            for child in normalized["calls"]
+        ],
+    }
+    if action_name == "set_display_name":
+        candidate["display_name"] = action["display_name"]
+    elif action_name == "add_child_call":
+        if len(candidate["calls"]) >= 32:
+            raise OperationComposerError("Undo Group child-call ceiling has been reached.")
+        operation = action["child_operation"]
+        if not isinstance(operation, str) or operation not in compound_child_operations(version):
+            raise OperationComposerError("Undo Group child operation is not approved.")
+        child_handle = handle_factory() if handle_factory is not None else _new_undo_child_handle()
+        if (
+            not isinstance(child_handle, str)
+            or _UNDO_CHILD_HANDLE_PATTERN.fullmatch(child_handle) is None
+            or any(child["handle"] == child_handle for child in candidate["calls"])
+        ):
+            raise OperationComposerError("Generated Undo Group child handle is invalid.")
+        child_contract = compound_child_request_contract(operation, version)
+        candidate["calls"].append(
+            {
+                "handle": child_handle,
+                "operation": operation,
+                "schema_digest": child_contract.schema_digest,
+                "facts": [],
+            }
+        )
+        candidate = _normalize_undo_group_composition(version, candidate)
+        return candidate, str(action_name)
+    elif action_name == "remove_child_call":
+        child = _child_for_handle(candidate, action["child_handle"])
+        candidate["calls"].remove(child)
+    else:
+        child = _child_for_handle(candidate, action["child_handle"])
+        if action_name == "remove_child_typed_fact":
+            matches = [fact for fact in child["facts"] if fact["handle"] == action["fact_handle"]]
+            if len(matches) != 1:
+                raise OperationComposerError("fact_handle does not name a current child fact.")
+            child["facts"].remove(matches[0])
+        else:
+            fact_payload = _undo_fact_action(action)
+            if action_name == "add_child_typed_fact":
+                fact_handle = handle_factory() if handle_factory is not None else _new_typed_fact_handle()
+                if (
+                    not isinstance(fact_handle, str)
+                    or _TYPED_FACT_HANDLE_PATTERN.fullmatch(fact_handle) is None
+                    or any(fact["handle"] == fact_handle for fact in child["facts"])
+                ):
+                    raise OperationComposerError("Generated child fact handle is invalid.")
+                child["facts"].append({"handle": fact_handle, **fact_payload})
+            else:
+                matches = [fact for fact in child["facts"] if fact["handle"] == action["fact_handle"]]
+                if len(matches) != 1:
+                    raise OperationComposerError("fact_handle does not name a current child fact.")
+                matches[0].clear()
+                matches[0].update({"handle": action["fact_handle"], **fact_payload})
+        try:
+            _materialize_undo_child(version, child)
+        except OperationComposerError as exc:
+            if exc.error_code not in {
+                "OPERATION_DRAFT_INCOMPLETE",
+                "SEMANTIC_INVALID_REQUEST",
+                "SEMANTIC_SCHEMA_MISMATCH",
+                "INVALID_ARGUMENT",
+            }:
+                raise
+    candidate = _normalize_undo_group_composition(version, candidate)
+    try:
+        _materialize_undo_group_request(version, candidate)
+    except OperationComposerError as exc:
+        if exc.error_code not in {
+            "OPERATION_DRAFT_INCOMPLETE",
+            "SEMANTIC_SCHEMA_MISMATCH",
+            "INVALID_ARGUMENT",
+        }:
+            raise
+    return candidate, str(action_name)
+
+
 def _normalize_generic_typed_composition(
     operation: str,
     version: str,
@@ -1883,6 +2340,12 @@ def _apply_generic_typed_action(
 
 def new_composition(operation: str, version: str) -> dict[str, Any]:
     contract = operation_composer_contract(operation, version)
+    if operation == "waapi.undoGroup":
+        return {
+            "contract": OPERATION_COMPOSITION_CONTRACT,
+            "display_name": None,
+            "calls": [],
+        }
     if operation.startswith("ak.") or operation in DRAFT_TYPED_OPERATIONS:
         return {
             "contract": OPERATION_COMPOSITION_CONTRACT,
@@ -1917,6 +2380,13 @@ def apply_composer_action(
     """Validate and apply one closed action without mutating the input mapping."""
 
     operation_composer_contract(operation, version)
+    if operation == "waapi.undoGroup":
+        return _apply_undo_group_action(
+            version,
+            composition,
+            action,
+            handle_factory=handle_factory,
+        )
     if operation.startswith("ak.") or operation in DRAFT_TYPED_OPERATIONS:
         return _apply_generic_typed_action(
             operation,
@@ -2581,6 +3051,8 @@ def materialize_operation_request(
     """Build and canonically reparse the complete operation request."""
 
     normalized = _normalize_composition(composition, operation=operation, version=version)
+    if operation == "waapi.undoGroup":
+        return _materialize_undo_group_request(version, normalized)
     if operation.startswith("ak.") or operation in DRAFT_TYPED_OPERATIONS:
         typed = (
             request_contract(version, operation)
@@ -2720,6 +3192,39 @@ def composition_projection(
     composition: Mapping[str, Any],
 ) -> dict[str, Any]:
     normalized = _normalize_composition(composition, operation=operation, version=version)
+    if operation == "waapi.undoGroup":
+        missing: list[str] = []
+        if normalized["display_name"] is None:
+            missing.append("display_name")
+        if not normalized["calls"]:
+            missing.append("child_call")
+        for child in normalized["calls"]:
+            try:
+                _materialize_undo_child(version, child)
+            except OperationComposerError as exc:
+                if exc.error_code != "OPERATION_DRAFT_INCOMPLETE":
+                    raise
+                missing.append(f"calls[{child['handle']}].complete_typed_request")
+        return {
+            "display_name": normalized["display_name"],
+            "current_facts": [
+                {
+                    "handle": child["handle"],
+                    "operation": child["operation"],
+                    "schema_digest": child["schema_digest"],
+                    "facts": [dict(fact) for fact in child["facts"]],
+                }
+                for child in normalized["calls"]
+            ],
+            "missing_fields": missing,
+            "missing_fields_status": "complete" if not missing else "incomplete",
+            "allowed_actions": [
+                *operation_composer_contract(operation, version)["actions"],
+                "check",
+                "inspect",
+                "cancel",
+            ],
+        }
     if operation.startswith("ak.") or operation in DRAFT_TYPED_OPERATIONS:
         missing: list[str] = []
         try:
@@ -2875,6 +3380,8 @@ def _normalize_composition(
     version: str,
 ) -> dict[str, Any]:
     operation_composer_contract(operation, version)
+    if operation == "waapi.undoGroup":
+        return _normalize_undo_group_composition(version, composition)
     if operation.startswith("ak.") or operation in DRAFT_TYPED_OPERATIONS:
         return _normalize_generic_typed_composition(
             operation, version, composition

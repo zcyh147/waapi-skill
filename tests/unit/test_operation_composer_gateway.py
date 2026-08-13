@@ -213,7 +213,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
 
     assert len(non_object_set_digests) == 149
     assert canonical_sha256(non_object_set_digests) == (
-        "a30a4eca5192ebab03cdd18758bb87586748131947ad9ab4f2a0b191f6ba3ef5"
+        "5eceea52244f8a0f7a827cf20e6b04452a11473b84ec187feed8f8aae7932067"
     )
     assert {
         version: operation_input_mode("object.set", version)
@@ -1477,6 +1477,7 @@ def test_registry_composer_lanes_and_real_adapters_are_one_to_one() -> None:
         "lua.executeCliFile",
         "lua.executeCoreFile",
         "lua.executeCoreInline",
+        "waapi.undoGroup",
     }
 
 

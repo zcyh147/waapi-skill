@@ -28,6 +28,14 @@ from wwise_waapi.operation_registry import (
     validate_prepared_roles,
     verify_prepared_operation,
 )
+from wwise_waapi.operation_composer import (
+    OPERATION_DRAFT_ACTION_CONTRACT,
+    apply_composer_action,
+    materialize_operation_request,
+    new_composition,
+)
+from wwise_waapi.typed_operations import compound_child_request_contract
+from wwise_waapi.typed_requests import TypedRequestFact
 from wwise_waapi.transaction_cleanup import CLEANUP_SPEC_CONTRACT
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
 
@@ -143,23 +151,55 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
                     "arguments": {"api": entry.uri, "args": args, "options": options},
                 }
             )
-        inner_uri = sorted(UNDO_GROUP_INNER_URIS_BY_VERSION[entry.version])[0]
+        inner_operation = "ak.wwise.core.object.setRandomizer"
+        inner_uri = inner_operation
         inner_capability = CATALOG.describe(entry.version, inner_uri)
-        inner_args, inner_options, inner_result = request_and_result_from_schema(
+        _inner_args, _inner_options, inner_result = request_and_result_from_schema(
             inner_capability.schema
         )
-        undo_request = parse_operation_request(
-            {
-                "contract": OPERATION_REQUEST_CONTRACT,
-                "version": entry.version,
-                "operation": "waapi.undoGroup",
-                "arguments": {
-                    "display_name": "Program probe",
-                    "calls": [
-                        {"api": inner_uri, "args": inner_args, "options": inner_options}
-                    ],
-                },
+        child_contract = compound_child_request_contract(
+            inner_operation, entry.version
+        )
+        # The reflected anyOf route is easiest to exercise with explicit
+        # object/property/enabled facts and its disclosed object branch.
+        object_field = next(
+            field for field in child_contract.fields
+            if field.path == ("object",) and field.shape == "scalar"
+            and any(variant.get("pattern") == r"^\\" for variant in field.variants)
+        )
+        child_facts = [
+            TypedRequestFact("choose", object_field.parent_handle, "branch", object_field.handle),
+            TypedRequestFact("set", object_field.handle, "string", r"\ProgramObject"),
+            TypedRequestFact("set", next(field.handle for field in child_contract.fields if field.path == ("property",) and field.shape == "scalar"), "string", "Volume"),
+            TypedRequestFact("set", next(field.handle for field in child_contract.fields if field.path == ("enabled",)), "boolean", "true"),
+        ]
+        composition = new_composition("waapi.undoGroup", entry.version)
+        for action, handle in (
+            ({"action": "set_display_name", "display_name": "Program probe"}, "unused"),
+            ({"action": "add_child_call", "child_operation": inner_operation}, "uch1-111111111111111111111111"),
+        ):
+            composition, _ = apply_composer_action(
+                "waapi.undoGroup", entry.version, composition,
+                {"contract": OPERATION_DRAFT_ACTION_CONTRACT, **action},
+                handle_factory=lambda value=handle: value,
+            )
+        for index, fact in enumerate(child_facts):
+            action = {
+                "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+                "action": "add_child_typed_fact",
+                "child_handle": "uch1-111111111111111111111111",
+                "fact_action": fact.action,
+                "field_handle": fact.handle,
+                "value": fact.value,
             }
+            if fact.action != "choose":
+                action["value_type"] = fact.value_type
+            composition, _ = apply_composer_action(
+                "waapi.undoGroup", entry.version, composition, action,
+                handle_factory=lambda index=index: f"tdh1-{index + 1:024x}",
+            )
+        undo_request = parse_operation_request(
+            materialize_operation_request("waapi.undoGroup", entry.version, composition)
         )
         undo_prepared = prepare_operation(
             undo_request,

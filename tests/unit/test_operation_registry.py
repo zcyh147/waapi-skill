@@ -13,6 +13,16 @@ from wwise_waapi.builders.common import SemanticValidationError  # pyright: igno
 from wwise_waapi.operation_import import (  # pyright: ignore[reportMissingImports]
     allowed_import_hierarchy_roots,
 )
+from wwise_waapi.operation_composer import (  # pyright: ignore[reportMissingImports]
+    OPERATION_DRAFT_ACTION_CONTRACT,
+    OperationComposerError,
+    apply_composer_action,
+    materialize_operation_request,
+    new_composition,
+)
+from wwise_waapi.typed_operations import (  # pyright: ignore[reportMissingImports]
+    compound_child_request_contract,
+)
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     COMPOSER_INPUT_MODE,
     LEGACY_JSON_INPUT_MODE,
@@ -71,6 +81,49 @@ EXPECTED_ACTOR_MIXER_METADATA_TYPES = {
 }
 
 
+def _typed_undo_group_request(version: str) -> dict[str, Any]:
+    composition = new_composition("waapi.undoGroup", version)
+    for action, handle in (
+        ({"action": "set_display_name", "display_name": "Batch edit"}, "unused"),
+        ({"action": "add_child_call", "child_operation": "ak.wwise.core.object.setRandomizer"}, "uch1-111111111111111111111111"),
+    ):
+        composition, _ = apply_composer_action(
+            "waapi.undoGroup", version, composition,
+            {"contract": OPERATION_DRAFT_ACTION_CONTRACT, **action},
+            handle_factory=lambda value=handle: value,
+        )
+    contract = compound_child_request_contract(
+        "ak.wwise.core.object.setRandomizer", version
+    )
+    object_field = next(
+        field for field in contract.fields
+        if field.path == ("object",) and field.shape == "scalar"
+        and any(variant.get("pattern") == r"^\\" for variant in field.variants)
+    )
+    facts = (
+        ("choose", object_field.parent_handle, None, object_field.handle),
+        ("set", object_field.handle, "string", r"\Actor-Mixer Hierarchy\A"),
+        ("set", next(field.handle for field in contract.fields if field.path == ("property",) and field.shape == "scalar"), "string", "Volume"),
+        ("set", next(field.handle for field in contract.fields if field.path == ("enabled",) and field.shape == "scalar"), "boolean", "true"),
+    )
+    for index, (fact_action, field_handle, value_type, value) in enumerate(facts):
+        action = {
+            "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+            "action": "add_child_typed_fact",
+            "child_handle": "uch1-111111111111111111111111",
+            "fact_action": fact_action,
+            "field_handle": field_handle,
+            "value": value,
+        }
+        if value_type is not None:
+            action["value_type"] = value_type
+        composition, _ = apply_composer_action(
+            "waapi.undoGroup", version, composition, action,
+            handle_factory=lambda index=index: f"tdh1-{index + 1:024x}",
+        )
+    return materialize_operation_request("waapi.undoGroup", version, composition)
+
+
 def test_every_supported_operation_version_has_one_explicit_normal_input_mode() -> None:
     specs = {spec.name: spec for spec in list_operation_specs()}
 
@@ -96,6 +149,7 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                 "lua.executeCliFile",
                 "lua.executeCoreFile",
                 "lua.executeCoreInline",
+                "waapi.undoGroup",
             }
                 else "inline_typed"
                 if name in {
@@ -1620,21 +1674,7 @@ def test_undo_group_builds_one_exact_versioned_immutable_plan(
     version: str,
     cancel_args: Mapping[str, Any],
 ) -> None:
-    parsed = parse_operation_request(
-        request(
-            "waapi.undoGroup",
-            {
-                "display_name": "Batch edit",
-                "calls": [
-                    {
-                        "api": "ak.wwise.core.object.setNotes",
-                        "args": {"object": GUID, "value": "after"},
-                    }
-                ],
-            },
-            version=version,
-        )
-    )
+    parsed = parse_operation_request(_typed_undo_group_request(version))
     prepared = prepare_operation(parsed, read_call=lambda *_: {}).as_dict()
     plan = prepared["pre_state"]["execution_plan"]
 
@@ -1644,7 +1684,7 @@ def test_undo_group_builds_one_exact_versioned_immutable_plan(
         "options": {},
     }
     assert plan["begin"]["uri"] == "ak.wwise.core.undo.beginGroup"
-    assert plan["calls"][0]["api"] == "ak.wwise.core.object.setNotes"
+    assert plan["calls"][0]["api"] == "ak.wwise.core.object.setRandomizer"
     assert plan["end"]["args"] == {"displayName": "Batch edit"}
     assert plan["cancel"]["args"] == cancel_args
     assert plan["same_connection_required"] is True
@@ -1662,23 +1702,18 @@ def test_undo_group_rejects_independent_members_version_drift_and_large_requests
     assert independent.value.error_code == "UNDO_GROUP_COMPOSITE_REQUIRED"
     assert independent.value.details["required_operation"] == "waapi.undoGroup"
 
-    with pytest.raises(OperationContractError) as version_drift:
-        parse_operation_request(
-            request(
-                "waapi.undoGroup",
-                {
-                    "display_name": "Not in 2022",
-                    "calls": [
-                        {
-                            "api": "ak.wwise.core.object.setStateGroups",
-                            "args": {},
-                        }
-                    ],
-                },
-                version="2022.1",
-            )
+    composition = new_composition("waapi.undoGroup", "2022.1")
+    with pytest.raises(OperationComposerError):
+        apply_composer_action(
+            "waapi.undoGroup",
+            "2022.1",
+            composition,
+            {
+                "contract": OPERATION_DRAFT_ACTION_CONTRACT,
+                "action": "add_child_call",
+                "child_operation": "ak.wwise.core.object.setStateGroups",
+            },
         )
-    assert version_drift.value.error_code == "UNDO_GROUP_INNER_NOT_ALLOWED"
 
     with pytest.raises(OperationContractError) as oversized:
         parse_operation_request(
@@ -1722,27 +1757,9 @@ def test_undo_group_public_schema_uses_the_runtime_version_allowlist(
     spec = next(
         item for item in list_operation_specs() if item.name == "waapi.undoGroup"
     ).as_dict(version=version)
-    api_schema = spec["argument_contract"]["properties"]["calls"]["items"][
-        "properties"
-    ]["api"]
-    expected = sorted(UNDO_GROUP_INNER_URIS_BY_VERSION[version])
-
-    assert api_schema["enum"] == expected
-    assert "pattern" not in api_schema
-    assert [row["const"] for row in api_schema["value_contracts"]] == expected
-    for row in api_schema["value_contracts"]:
-        assert row["schema_pointer"] == {
-            "gateway_argv": [
-                "--version",
-                version,
-                "describe",
-                row["const"],
-                "--full-schema",
-            ],
-            "result_path": (
-                f"$.availability.{version}.capability.schema.full"
-            ),
-        }
+    item_schema = spec["argument_contract"]["properties"]["calls"]["items"]
+    assert item_schema["required"] == ["schema_digest", "request"]
+    assert set(item_schema["properties"]) == {"schema_digest", "request"}
 
 
 def test_ui_command_descriptor_schema_is_closed_and_shared_by_both_operations() -> None:
