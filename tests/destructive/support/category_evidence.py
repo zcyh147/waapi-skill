@@ -1,19 +1,26 @@
-"""Durable, exact evidence rows for the #47 real macOS category gate."""
+"""Durable, exact evidence rows for the real host category gates."""
 
 from __future__ import annotations
 
 import json
 import os
 import subprocess
+import sys
 import time
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
 
-EVIDENCE_RELATIVE_PATH = Path(
-    ".waapi-skill-state/evidence/full-typed-input/macos-category-evidence.jsonl"
-)
+EVIDENCE_ROOT = Path(".waapi-skill-state/evidence/full-typed-input")
+
+
+def current_evidence_platform() -> str:
+    if sys.platform == "darwin":
+        return "macos"
+    if sys.platform == "win32":
+        return "windows"
+    raise AssertionError(f"real category evidence does not support host platform {sys.platform!r}")
 
 
 def exact_git_candidate(repo_root: Path) -> str:
@@ -49,9 +56,11 @@ def append_category_evidence(
             raise AssertionError("category evidence row is incomplete")
         if category["status"] not in {"PASS", "FAIL", "blocked"}:
             raise AssertionError("category evidence status is not closed")
+    platform_name = current_evidence_platform()
     payload = {
-        "contract": "waapi-skill.macos-category-evidence/v1",
+        "contract": "waapi-skill.host-category-evidence/v1",
         "recorded_at_unix": int(time.time()),
+        "platform": platform_name,
         "candidate": candidate,
         "version": version,
         "host": dict(host),
@@ -59,15 +68,18 @@ def append_category_evidence(
         "source": dict(source),
         "residual_state": dict(residual_state),
     }
-    configured = os.getenv("WWISE_MACOS_CATEGORY_EVIDENCE_PATH")
+    configured = os.getenv("WWISE_CATEGORY_EVIDENCE_PATH")
+    if configured is None and platform_name == "macos":
+        configured = os.getenv("WWISE_MACOS_CATEGORY_EVIDENCE_PATH")
+    default_path = EVIDENCE_ROOT / f"{platform_name}-category-evidence.jsonl"
     target = (
         Path(configured).expanduser().resolve(strict=False)
         if configured
-        else (repo_root / EVIDENCE_RELATIVE_PATH).resolve(strict=False)
+        else (repo_root / default_path).resolve(strict=False)
     )
     target.parent.mkdir(parents=True, exist_ok=True)
     with target.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
 
 
-__all__ = ["append_category_evidence", "exact_git_candidate"]
+__all__ = ["append_category_evidence", "current_evidence_platform", "exact_git_candidate"]
