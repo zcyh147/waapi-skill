@@ -47,7 +47,7 @@ _READ_FIELDS = (
     "isIncluded",
 )
 _READ_FIELDS_2021 = tuple(
-    field for field in _READ_FIELDS if field != "activeSource"
+    field for field in _READ_FIELDS if field not in {"activeSource", "isIncluded"}
 )
 _OUTPUT_BUS_OVERRIDE_TYPES = frozenset(
     {"ActorMixer", "PropertyContainer", "RandomSequenceContainer", "Sound"}

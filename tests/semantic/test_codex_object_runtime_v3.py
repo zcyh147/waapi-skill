@@ -418,8 +418,11 @@ def test_get01_2021_snapshot_resolves_audio_source_without_active_source_accesso
 
     class _LegacyBackend(_StateBackend):
         def read_path(self, path, *, fields=(), language=None):
-            if not fields or "activeSource" in fields:
-                raise ObjectRuntimeError("Unknown accessor activeSource")
+            unsupported = {"activeSource", "isIncluded"}.intersection(fields)
+            if not fields or unsupported:
+                raise ObjectRuntimeError(
+                    f"Unknown accessor {sorted(unsupported)[0]}"
+                )
             return super().read_path(path, fields=fields, language=language)
 
         def read_children(self, object_id, *, fields=()):
@@ -451,6 +454,22 @@ def test_get01_2021_snapshot_resolves_audio_source_without_active_source_accesso
         for item in snapshot.objects
         if item.source_language is not None
     } == expected
+
+
+def test_2021_snapshot_projection_excludes_unreflected_accessors() -> None:
+    definitions = json.loads(
+        Path(
+            "skills/waapi-skill/resources/manifest/2021.1/definitions.json"
+        ).read_text(encoding="utf-8")
+    )
+    return_expression = definitions["documents"]["waapi_definitions.json"][
+        "definitions"
+    ]["returnExpression"]
+    reflected = set(return_expression["items"]["anyOf"][0]["enum"])
+
+    assert "activeSource" not in reflected
+    assert "isIncluded" not in reflected
+    assert "audioSource:language" in reflected
 
 
 def test_get01_2021_snapshot_rejects_a_second_direct_audio_source() -> None:

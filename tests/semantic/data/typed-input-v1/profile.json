@@ -26,7 +26,7 @@
     "tasks_per_version": 5
   },
   "tasks": [
-    {"unit_id":"TYP21-ZERO-GET-INFO","base_scenario_id":"O22-GET-INFO-01","api":"ak.wwise.core.getInfo","version":"2021.1","categories":["zero","generic"],"prompt":"请读取 getInfo 的实时结果，给出当前连接的 Wwise 完整版本与进程身份，并核对它就是本次临时工程的进程；不要只报告配置值。"},
+    {"unit_id":"TYP21-ZERO-GET-INFO","base_scenario_id":"O22-GET-INFO-01","api":"ak.wwise.core.getInfo","version":"2021.1","categories":["zero","generic"],"prompt":"请独立读取 getInfo 的实时结果，不要把会话状态摘要当作该 API 的返回；给出当前连接的 Wwise 完整版本与进程身份，并核对它就是本次临时工程的进程。不要只报告配置值。"},
     {"unit_id":"TYP21-QUERY-OBJECT-GET","base_scenario_id":"OBJ22-F-GET-01","api":"ak.wwise.core.object.get","version":"2021.1","categories":["query","generic","draft"]},
     {"unit_id":"TYP21-DEDICATED-OBJECT-CREATE","base_scenario_id":"OBJ22-F-CREATE-02","api":"ak.wwise.core.object.create","version":"2021.1","categories":["dedicated","draft"]},
     {"unit_id":"TYP21-FILE-AUDIO-IMPORT","base_scenario_id":"O22-AUDIO-IMPORT-02","api":"ak.wwise.core.audio.import","version":"2021.1","categories":["file_code","dedicated","draft"]},
@@ -38,13 +38,13 @@
     {"unit_id":"TYP22-DRAFT-SOUNDBANK-INCLUSIONS","base_scenario_id":"O22-SB-SET-INCLUSIONS-01","api":"ak.wwise.core.soundbank.setInclusions","version":"2022.1","categories":["draft","dedicated"]},
     {"unit_id":"TYP22-INLINE-DEFINITION-FILES","base_scenario_id":"O22-SB-PROCESS-DEF-01","api":"ak.wwise.core.soundbank.processDefinitionFiles","version":"2022.1","categories":["inline","file_code","dedicated"]},
 
-    {"unit_id":"TYP23-ZERO-GET-INFO","base_scenario_id":"O22-GET-INFO-01","api":"ak.wwise.core.getInfo","version":"2023.1","categories":["zero","generic"],"prompt":"请读取 getInfo 的实时结果，给出当前连接的 Wwise 完整版本与进程身份，并核对它就是本次临时工程的进程；不要只报告配置值。"},
+    {"unit_id":"TYP23-ZERO-GET-INFO","base_scenario_id":"O22-GET-INFO-01","api":"ak.wwise.core.getInfo","version":"2023.1","categories":["zero","generic"],"prompt":"请独立读取 getInfo 的实时结果，不要把会话状态摘要当作该 API 的返回；给出当前连接的 Wwise 完整版本与进程身份，并核对它就是本次临时工程的进程。不要只报告配置值。"},
     {"unit_id":"TYP23-CODE-LUA-FILE","base_scenario_id":"LUA23-CORE-FILE-01","api":"ak.wwise.core.executeLuaScript","version":"2023.1","categories":["file_code","dedicated","draft","weak_verifier"],"prompt":"这是我逐字提供的现成 Lua 文件 {script_file}，隔离目录是 {io_root}。请保持源码不变，在当前 Wwise 中执行，传入 count=3；只报告脚本返回的 profile 与 count，并明确说明验证仅限返回结果结构，不能声称已验证脚本的全部业务副作用。","confirmation_prompt":"确认，按刚才唯一的 immutable Preview 执行这份文件，并按弱验证边界报告结果。"},
     {"unit_id":"TYP23-DEDICATED-OBJECT-CREATE","base_scenario_id":"OBJ22-F-CREATE-03","api":"ak.wwise.core.object.create","version":"2023.1","categories":["dedicated","draft"]},
     {"unit_id":"TYP23-TOPIC-SOUNDBANK-GENERATED","base_scenario_id":"O22-SB-GENERATED-02","api":"ak.wwise.core.soundbank.generated","version":"2023.1","categories":["topic","draft"]},
     {"unit_id":"TYP23-QUERY-OBJECT-GET","base_scenario_id":"OBJ22-F-GET-02","api":"ak.wwise.core.object.get","version":"2023.1","categories":["query","generic","draft"]},
 
-    {"unit_id":"TYP24-ZERO-GET-INFO","base_scenario_id":"O22-GET-INFO-01","api":"ak.wwise.core.getInfo","version":"2024.1","categories":["zero","generic"],"prompt":"请读取 getInfo 的实时结果，给出当前连接的 Wwise 完整版本与进程身份，并核对它就是本次临时工程的进程；不要只报告配置值。"},
+    {"unit_id":"TYP24-ZERO-GET-INFO","base_scenario_id":"O22-GET-INFO-01","api":"ak.wwise.core.getInfo","version":"2024.1","categories":["zero","generic"],"prompt":"请独立读取 getInfo 的实时结果，不要把会话状态摘要当作该 API 的返回；给出当前连接的 Wwise 完整版本与进程身份，并核对它就是本次临时工程的进程。不要只报告配置值。"},
     {"unit_id":"TYP24-INLINE-AUDIO-CONVERT","base_scenario_id":"VS24-F-AUDIO-CONVERT-03","api":"ak.wwise.core.audio.convert","version":"2024.1","categories":["inline","file_code","dedicated"]},
     {"unit_id":"TYP24-METADATA-OBJECT-SET","base_scenario_id":"OBJ22-F-SET-01","api":"ak.wwise.core.object.set","version":"2024.1","categories":["metadata","dedicated","draft"]},
     {"unit_id":"TYP24-DRAFT-SOUNDBANK-GENERATE","base_scenario_id":"O22-SB-GENERATE-01","api":"ak.wwise.core.soundbank.generate","version":"2024.1","categories":["draft","dedicated","file_code"]},
@@ -54,6 +54,6 @@
     {"unit_id":"TYP25-CODE-LUA-FILE","base_scenario_id":"LUA23-CORE-FILE-02","api":"ak.wwise.core.executeLuaScript","version":"2025.1","categories":["file_code","dedicated","draft","weak_verifier"],"prompt":"这是我逐字提供的现成 Lua 文件 {script_file}，隔离目录是 {io_root}。请保持源码不变，在当前 Wwise 中执行，传入 count=3；只报告脚本返回的 profile 与 count，并明确说明验证仅限返回结果结构，不能声称已验证脚本的全部业务副作用。","confirmation_prompt":"确认，按刚才唯一的 immutable Preview 执行这份文件，并按弱验证边界报告结果。"},
     {"unit_id":"TYP25-METADATA-OBJECT-SET","base_scenario_id":"OBJ22-F-SET-02","api":"ak.wwise.core.object.set","version":"2025.1","categories":["metadata","dedicated","draft"]},
     {"unit_id":"TYP25-INLINE-TAB-IMPORT","base_scenario_id":"O22-AUDIO-TAB-04","api":"ak.wwise.core.audio.importTabDelimited","version":"2025.1","categories":["inline","file_code","dedicated"]},
-    {"unit_id":"TYP25-ZERO-GET-INFO","base_scenario_id":"O22-GET-INFO-01","api":"ak.wwise.core.getInfo","version":"2025.1","categories":["zero","generic"],"prompt":"请读取 getInfo 的实时结果，给出当前连接的 Wwise 完整版本与进程身份，并核对它就是本次临时工程的进程；不要只报告配置值。"}
+    {"unit_id":"TYP25-ZERO-GET-INFO","base_scenario_id":"O22-GET-INFO-01","api":"ak.wwise.core.getInfo","version":"2025.1","categories":["zero","generic"],"prompt":"请独立读取 getInfo 的实时结果，不要把会话状态摘要当作该 API 的返回；给出当前连接的 Wwise 完整版本与进程身份，并核对它就是本次临时工程的进程。不要只报告配置值。"}
   ]
 }
