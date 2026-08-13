@@ -205,7 +205,10 @@ def test_public_integration_candidate_evidence_is_exact_and_host_scoped() -> Non
     assert "`ci\\test.bat --mode program -- -q -ra`" in inventory
     assert "2609 passed, 34 skipped in 167.50s; exit 0" in inventory
     assert "3322 passed, 15 skipped; exit 0" in inventory
-    assert "441 passed, 7 skipped; exit 0" in inventory
+    assert "442 passed, 7 skipped; exit 0" in inventory
+    assert "412a23b55822a70da2b26ec76971b23cf87bd9e8" in inventory
+    assert "ci\\test.bat --mode nonlive -- -q -ra" in inventory
+    assert "current public typed proof" in inventory
     assert "283d6199a3fa11ea06de38dd7971450c0445dce4" in inventory
     assert "windows-category-evidence.jsonl" in inventory
     assert "Live 20 passed; Destructive 46 passed / 4 version-bound Lua skips" in inventory
