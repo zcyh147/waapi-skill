@@ -5795,6 +5795,9 @@ def test_native_windows_powershell_shim_preserves_public_typed_container_facts(
         expected_wwise_version="2025.1",
         transport="tcp",
     ) as broker:
+        assert json.loads(broker.config_path.read_text(encoding="utf-8"))[
+            "wwise_version"
+        ] == "2025.1"
         for step in steps:
             argv: list[str] = ["--version", "2025.1", step.subcommand]
             for argument in step.arguments:
@@ -5852,7 +5855,6 @@ def test_native_windows_powershell_shim_preserves_public_typed_container_facts(
             "2025.1",
             stored.composition,
         )
-
         assert materialized == request
         assert broker.evidence().complete is True
         assert broker.reconcile(observed).passed is True

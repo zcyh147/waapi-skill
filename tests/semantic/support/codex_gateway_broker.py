@@ -6229,7 +6229,7 @@ class CodexGatewayBroker:
             self._config_path.write_text(
                 json.dumps(
                     {
-                        "wwise_version": None,
+                        "wwise_version": self.expected_wwise_version or None,
                         "waapi_host": "127.0.0.1",
                         "waapi_port": None,
                         "project_modification_policy": self.project_modification_policy,
