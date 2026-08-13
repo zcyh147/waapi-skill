@@ -99,7 +99,10 @@ def _require_disclosed_continuation(
             if isinstance(action_argv, list)
             else None
         )
-        if not isinstance(expected_action, list) or list(command[action_offset:]) != expected_action:
+        if (
+            not isinstance(expected_action, list)
+            or command[action_offset : action_offset + len(expected_action)] != expected_action
+        ):
             raise AssertionError("container response did not disclose its exact typed action")
         return
 
