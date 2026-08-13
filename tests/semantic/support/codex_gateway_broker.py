@@ -7620,7 +7620,7 @@ class CodexGatewayBroker:
                         bound = _json_pointer(source, binding.response_pointer)
                         if (
                             not isinstance(bound, str)
-                            or re.fullmatch(r"(?:odh1|tr[ma]1)-[0-9a-f]{24}", bound) is None
+                            or _DRAFT_HANDLE_RE.fullmatch(bound) is None
                         ):
                             raise GatewayInvocationError(
                                 f"step {step.name!r} Draft handle binding is invalid"

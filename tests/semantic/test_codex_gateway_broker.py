@@ -123,6 +123,11 @@ def test_broker_binds_each_typed_disclosure_to_its_public_response_contract(
     assert broker_module._gateway_payload_contracts(step) == frozenset(contracts)
 
 
+@pytest.mark.parametrize("prefix", ("odh1", "odn1", "trh1", "trm1", "trc1"))
+def test_broker_accepts_every_gateway_issued_draft_handle_family(prefix: str) -> None:
+    assert broker_module._DRAFT_HANDLE_RE.fullmatch(prefix + "-" + "a" * 24)
+
+
 def test_current_broker_rejects_historical_draft_action_json_protocol() -> None:
     start = ExpectedGatewayStep("draft.start", "draft-start", ("object.set",))
     historical = ExpectedGatewayStep(
