@@ -308,6 +308,7 @@ def _validate_live_bindings(
             "version",
             "build",
             "process_id",
+            "launch_process_id",
             "session_id",
             "result_sha256",
             "project_digest",
@@ -318,6 +319,8 @@ def _validate_live_bindings(
             or not bindings["build"].startswith(version + ".")
             or type(bindings.get("process_id")) is not int
             or bindings["process_id"] <= 0
+            or type(bindings.get("launch_process_id")) is not int
+            or bindings["launch_process_id"] <= 0
             or not isinstance(bindings.get("session_id"), str)
         ):
             raise DirectBusinessPlanError("getInfo live identity is invalid")

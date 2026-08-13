@@ -902,7 +902,10 @@ def test_prepare_get_info_case_binds_exact_live_process_and_result(
         scenario,
         runtime=SimpleNamespace(
             version="2021.1",
-            lifecycle=SimpleNamespace(process=SimpleNamespace(pid=4242)),
+            lifecycle=SimpleNamespace(
+                process=SimpleNamespace(pid=4200),
+                ready_result=baseline,
+            ),
             sandbox=SimpleNamespace(sandbox_path=tmp_path),
         ),
         direct=direct,
@@ -928,6 +931,37 @@ def test_prepare_get_info_case_binds_exact_live_process_and_result(
         SimpleNamespace(final_response="Wwise 2021.1，进程 4242。"),
     )
     assert incomplete.passed is False
+
+
+def test_prepare_get_info_rejects_process_drift_from_readiness_proof(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    ready = {
+        "processId": 4242,
+        "sessionId": "ready-session",
+        "version": {"year": 2021, "major": 1, "minor": 14, "build": 8108},
+    }
+    drifted = {**ready, "processId": 4243}
+    monkeypatch.setattr(runner, "_project_document_digest", lambda _path: "d" * 64)
+    scenario = _scenario(runner.GET_INFO_URI, scenario_id="O22-GET-INFO-01")
+    scenario.prompt = "确认当前连接的 Wwise 实例与进程身份。"
+
+    with pytest.raises(runner.HeavyProjectRunnerError, match="readiness proof"):
+        runner._prepare_case(
+            scenario,
+            runtime=SimpleNamespace(
+                version="2021.1",
+                lifecycle=SimpleNamespace(
+                    process=SimpleNamespace(pid=4200),
+                    ready_result=ready,
+                ),
+                sandbox=SimpleNamespace(sandbox_path=tmp_path),
+            ),
+            direct=lambda *_args: drifted,
+            media_holder={},
+            unit=SimpleNamespace(unit_id="TYP21-ZERO-GET-INFO"),
+        )
 
 
 def test_prepare_lua_case_seals_source_and_preserves_result_schema_only_boundary(

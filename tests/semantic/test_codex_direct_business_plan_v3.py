@@ -59,6 +59,7 @@ def test_direct_archive_recomputes_get_info_plan_and_rejects_tamper() -> None:
         "version": "2021.1",
         "build": "2021.1.8100.0",
         "process_id": 42,
+        "launch_process_id": 41,
         "session_id": "session",
         "result_sha256": "a" * 64,
         "project_digest": "b" * 64,

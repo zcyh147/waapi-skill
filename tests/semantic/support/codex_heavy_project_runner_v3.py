@@ -4175,14 +4175,21 @@ def _prepare_case(
                 "getInfo baseline differs from the exact scenario version"
             )
         process_id = baseline_result.get("processId")
+        ready_result = getattr(runtime.lifecycle, "ready_result", None)
+        ready_process_id = (
+            ready_result.get("processId")
+            if isinstance(ready_result, Mapping)
+            else None
+        )
         launch_process_id = getattr(runtime.lifecycle.process, "pid", None)
         if (
             type(process_id) is not int
+            or type(ready_process_id) is not int
             or type(launch_process_id) is not int
-            or process_id != launch_process_id
+            or process_id != ready_process_id
         ):
             raise HeavyProjectRunnerError(
-                "getInfo process identity differs from the owned Wwise process"
+                "getInfo process identity differs from lifecycle readiness proof"
             )
         protocol = build_direct_protocol(
             [
@@ -4206,6 +4213,7 @@ def _prepare_case(
                 "version": runtime.version,
                 "build": expected_build,
                 "process_id": process_id,
+                "launch_process_id": launch_process_id,
                 "session_id": baseline_result.get("sessionId"),
                 "result_sha256": _json_sha256(baseline_result),
                 "project_digest": project_digest,
@@ -4224,6 +4232,7 @@ def _prepare_case(
                 "version": runtime.version,
                 "build": expected_build,
                 "process_id": process_id,
+                "launch_process_id": launch_process_id,
                 "session_id": baseline_result.get("sessionId"),
                 "result_sha256": _json_sha256(baseline_result),
                 "project_digest": project_digest,
