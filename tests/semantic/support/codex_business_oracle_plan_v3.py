@@ -37,6 +37,7 @@ BUSINESS_FAMILIES = frozenset(
         "soundbank",
         "soundbank_topic",
         "cli",
+        "direct",
     }
 )
 
@@ -58,6 +59,8 @@ _API_FAMILIES = {
     "ak.wwise.cli.tabDelimitedImport": "cli",
     "ak.wwise.cli.convertExternalSource": "cli",
     "ak.wwise.cli.migrate": "cli",
+    "ak.wwise.core.getInfo": "direct",
+    "ak.wwise.core.executeLuaScript": "direct",
 }
 _TOP_LEVEL_KEYS = frozenset(
     {

@@ -22,7 +22,10 @@ named test documents plus closed adapter and request-mapping registries:
 - `adapter_registry.json` lists every fixture, topic publisher, independent
   oracle, and cleanup identifier referenced by the cases. The registry remains
   specification-only for the full V3 catalog; only the 16 heavy APIs named
-  below currently have closed executable adapters.
+  below currently have closed executable adapters in that review bundle. The
+  fixed `typed_input_cross_version_25` release profile additionally owns its
+  two direct representative seams (`getInfo` and Core Lua); it does not broaden
+  the heavy-profile API inventory.
 - `request_mapping_registry.json` records natural-language values and complex
   request shapes that the current packaged resources cannot yet map reliably.
   Any listed scenario is blocked from real execution until all of its entries
@@ -413,6 +416,7 @@ The separately approved V3 executable profiles are:
 | --- | ---: | ---: | --- |
 | `heavy_cross_version_80` | 80 | 145 | Real sandboxed business-oracle coverage for the 16 implemented heavy APIs |
 | `compound_heavy_cross_version_24` | 24 | 48 | Complex batch composition and real business assertions on Wwise 2022.1 and 2025.1 |
+| `typed_input_cross_version_25` | 25 | 39 | Fixed representative typed-input profile: five fresh tasks per Wwise version, no same-root retries, and one public Gateway continuation at each step |
 | `integration` | 12 | 36 | Six cross-operation workflows on Wwise 2022.1 and 2025.1; 20 previewed transactions and no additional per-API coverage credit |
 | `modification_policy_9` | 9 | 15 | Three isolated repetitions of each canonical project-modification policy on one reviewed object.create business case |
 
@@ -437,6 +441,7 @@ profile also supports the bounded pilot selection shown below:
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile heavy_cross_version_80 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-heavy-v3-terra
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile heavy_cross_version_80 --case-id OBJ22-F-GET-01 --version 2022.1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-heavy-v3-pilot-object-get
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile compound_heavy_cross_version_24 --suite tests/semantic/data/compound-heavy-v1/profile.json --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-compound-heavy-v1
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile typed_input_cross_version_25 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-typed-input-new-candidate-r1
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile integration --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-integration-new-candidate-r1
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile modification_policy_9 --campaign-root skills/waapi-skill-workspace/campaign-modification-policy-9
 ```
@@ -445,6 +450,14 @@ skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py -
 entrypoint rejects case and version filters. The matrix receives internal unit
 IDs only when the same sealed campaign resumes pending or proven-retryable
 work.
+
+`typed_input_cross_version_25` contains exactly five tasks for each supported
+Wwise version and covers zero, inline, Draft, generic, dedicated, query, Topic,
+metadata, file/code, and weak-verifier UX. It is fixed to Terra/medium/default,
+starts one memory-off Agent per task, and forbids same-root pre-action retries.
+Freeze ordinary semantic failures and repair them only in a new campaign root
+and candidate. A fully passing fresh root may receive identical
+`--resume --verify-only` replay; a failed root remains frozen without replay.
 
 Resume with the same profile, filters, candidate, model, reasoning, service
 tier, timeout, and retry policy plus `--resume`. Use `--resume --verify-only` to

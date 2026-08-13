@@ -430,6 +430,80 @@ def test_inverse_encoder_round_trips_nested_dynamic_containers_and_open_map() ->
     )
 
 
+def test_inverse_encoder_round_trips_open_map_overlay_inside_fixed_object() -> None:
+    contract = compile_typed_request_contract(
+        version="2025.1",
+        uri="ak.example.inverse-overlay",
+        schema={
+            "argsSchema": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["wa_args"],
+                "properties": {
+                    "wa_args": {
+                        "type": "object",
+                        "maxProperties": 4,
+                        "maximumBytes": 1024,
+                    }
+                },
+            },
+            "optionsSchema": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {},
+            },
+        },
+        graph=load_definition_graph("2025.1"),
+    )
+
+    construction = typed_request_construction_for_values(
+        contract,
+        args={"wa_args": {"count": 3, "enabled": True}},
+        options={},
+    )
+    materialized = materialize_typed_request(
+        contract,
+        schema_digest=contract.schema_digest,
+        facts=construction.facts,
+    )
+
+    assert materialized.args == {"wa_args": {"count": 3, "enabled": True}}
+
+
+def test_inverse_encoder_does_not_use_map_overlay_to_bypass_fixed_member_schema() -> None:
+    contract = compile_typed_request_contract(
+        version="2025.1",
+        uri="ak.example.inverse-fixed-overlay",
+        schema={
+            "argsSchema": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["payload"],
+                "properties": {
+                    "payload": {
+                        "type": "object",
+                        "additionalProperties": True,
+                        "properties": {"known": {"type": "string"}},
+                    }
+                },
+            },
+            "optionsSchema": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {},
+            },
+        },
+        graph=load_definition_graph("2025.1"),
+    )
+
+    with pytest.raises(TypedRequestError):
+        typed_request_construction_for_values(
+            contract,
+            args={"payload": {"known": 7}},
+            options={},
+        )
+
+
 def test_inverse_encoder_rejects_unknown_and_ambiguous_values() -> None:
     contract = request_contract("2025.1", TYPED_REQUEST_TRACER_URI)
     with pytest.raises(TypedRequestError, match="outside the disclosed contract"):

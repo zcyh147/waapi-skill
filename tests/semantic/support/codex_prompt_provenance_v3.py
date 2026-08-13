@@ -113,6 +113,8 @@ HEAVY_APIS = frozenset(
         "ak.wwise.core.soundbank.processDefinitionFiles",
         "ak.wwise.core.soundbank.convertExternalSources",
         "ak.wwise.core.soundbank.setInclusions",
+        "ak.wwise.core.getInfo",
+        "ak.wwise.core.executeLuaScript",
         "ak.wwise.cli.generateSoundbank",
         "ak.wwise.cli.tabDelimitedImport",
         "ak.wwise.cli.convertExternalSource",

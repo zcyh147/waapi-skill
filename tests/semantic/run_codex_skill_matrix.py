@@ -119,6 +119,9 @@ DEFAULT_MODIFICATION_POLICY_V3_SUITE = (
 DEFAULT_COMPOUND_HEAVY_V1_SUITE = (
     REPO_ROOT / "tests" / "semantic" / "data" / "compound-heavy-v1" / "profile.json"
 )
+DEFAULT_TYPED_INPUT_SUITE = (
+    REPO_ROOT / "tests" / "semantic" / "data" / "typed-input-v1" / "profile.json"
+)
 DEFAULT_INTEGRATION_WORKFLOWS_V1_SUITE = (
     REPO_ROOT
     / "tests"
@@ -152,6 +155,9 @@ DEFAULT_MODIFICATION_POLICY_V3_ITERATION_ROOT = (
 )
 DEFAULT_COMPOUND_HEAVY_V1_ITERATION_ROOT = (
     SKILL_ROOT.parent / "waapi-skill-workspace" / "compound-heavy-cross-version-24"
+)
+DEFAULT_TYPED_INPUT_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "typed-input-cross-version-25"
 )
 DEFAULT_INTEGRATION_WORKFLOWS_V1_ITERATION_ROOT = (
     SKILL_ROOT.parent
@@ -198,6 +204,7 @@ _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 HEAVY_V3_PROFILE_ID = "heavy_cross_version_80"
 MODIFICATION_POLICY_V3_PROFILE_ID = "modification_policy_9"
 COMPOUND_HEAVY_V1_PROFILE_ID = "compound_heavy_cross_version_24"
+TYPED_INPUT_PROFILE_ID = "typed_input_cross_version_25"
 INTEGRATION_WORKFLOWS_V1_PROFILE_ID = "integration_workflows_cross_version_6"
 INTEGRATION_WORKFLOWS_V2_PROFILE_ID = "integration_workflows_v2_cross_version_6"
 INTEGRATION_PROFILE_ID = "integration"
@@ -208,6 +215,7 @@ EXECUTABLE_V3_PROFILE_IDS = frozenset(
         HEAVY_V3_PROFILE_ID,
         MODIFICATION_POLICY_V3_PROFILE_ID,
         COMPOUND_HEAVY_V1_PROFILE_ID,
+        TYPED_INPUT_PROFILE_ID,
         INTEGRATION_WORKFLOWS_V1_PROFILE_ID,
         INTEGRATION_WORKFLOWS_V2_PROFILE_ID,
         INTEGRATION_PROFILE_ID,
@@ -443,6 +451,16 @@ def load_heavy_v3_units(options: RunnerOptions) -> tuple[Any, ...]:
             versions=options.versions,
         )
         return tuple(profile.units)
+    if options.profile == TYPED_INPUT_PROFILE_ID:
+        typed_input_module = importlib.import_module(
+            "tests.semantic.support.codex_typed_input_profile"
+        )
+        profile = typed_input_module.load_typed_input_profile(
+            options.suite_path,
+            unit_ids=options.case_ids,
+            versions=options.versions,
+        )
+        return tuple(profile.units)
     if options.profile == MODIFICATION_POLICY_V3_PROFILE_ID:
         policy_module = importlib.import_module(
             "tests.semantic.support.codex_modification_policy_v3"
@@ -537,7 +555,7 @@ def run_heavy_v3_matrix(
     run_errors: list[str] = []
     stop_reason = ""
     preflight_state = "pending"
-    policy_thread_ids: set[str] = set()
+    fresh_thread_ids: set[str] = set()
 
     def persist(*, terminal: bool) -> None:
         completed_at = utc_now() if terminal else None
@@ -613,21 +631,24 @@ def run_heavy_v3_matrix(
                 scenario_root=scenario_root,
                 options=options,
             )
-            if options.profile == MODIFICATION_POLICY_V3_PROFILE_ID:
+            if options.profile in {
+                MODIFICATION_POLICY_V3_PROFILE_ID,
+                TYPED_INPUT_PROFILE_ID,
+            }:
                 thread_id = getattr(outcome, "thread_id", None)
                 outcome_status = getattr(outcome, "status", None)
                 if outcome_status == "PASS" and (
                     not isinstance(thread_id, str) or not thread_id
                 ):
                     raise HeavyV3MatrixError(
-                        f"{scenario_id} policy outcome has no fresh thread identity"
+                        f"{scenario_id} outcome has no fresh thread identity"
                     )
-                if isinstance(thread_id, str) and thread_id in policy_thread_ids:
+                if isinstance(thread_id, str) and thread_id in fresh_thread_ids:
                     raise HeavyV3MatrixError(
-                        f"{scenario_id} reused a prior policy task thread identity"
+                        f"{scenario_id} reused a prior task thread identity"
                     )
                 if isinstance(thread_id, str) and thread_id:
-                    policy_thread_ids.add(thread_id)
+                    fresh_thread_ids.add(thread_id)
             record = _heavy_v3_case_record(
                 unit_row,
                 scenario_root=scenario_root,
@@ -3458,6 +3479,7 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     is_executable_v3 = args.profile in EXECUTABLE_V3_PROFILE_IDS
     is_policy_v3 = args.profile == MODIFICATION_POLICY_V3_PROFILE_ID
     is_compound_v1 = args.profile == COMPOUND_HEAVY_V1_PROFILE_ID
+    is_typed_input = args.profile == TYPED_INPUT_PROFILE_ID
     is_integration_v1 = args.profile == INTEGRATION_WORKFLOWS_V1_PROFILE_ID
     is_integration_v2 = args.profile == INTEGRATION_WORKFLOWS_V2_PROFILE_ID
     is_integration = args.profile == INTEGRATION_PROFILE_ID
@@ -3472,6 +3494,7 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     )
     is_terra_v3 = (
         is_policy_v3
+        or is_typed_input
         or is_compound_v1
         or is_integration_v1
         or is_integration_v2
@@ -3536,6 +3559,8 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         (
             DEFAULT_MODIFICATION_POLICY_V3_SUITE
             if is_policy_v3
+            else DEFAULT_TYPED_INPUT_SUITE
+            if is_typed_input
             else (
                 DEFAULT_INTEGRATION_SUITE
                 if is_integration
@@ -3557,6 +3582,8 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         (
             DEFAULT_MODIFICATION_POLICY_V3_ITERATION_ROOT
             if is_policy_v3
+            else DEFAULT_TYPED_INPUT_ITERATION_ROOT
+            if is_typed_input
             else (
                 DEFAULT_INTEGRATION_ITERATION_ROOT
                 if is_integration

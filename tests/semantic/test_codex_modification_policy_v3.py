@@ -375,7 +375,7 @@ def test_policy_matrix_rejects_reused_thread_identity(
     )
     assert summary["passed_unit_ids"] == [units[0].unit_id]
     assert summary["blocked_unit_ids"] == [units[1].unit_id]
-    assert "reused a prior policy task thread identity" in "\n".join(
+    assert "reused a prior task thread identity" in "\n".join(
         summary["run_errors"]
     )
 

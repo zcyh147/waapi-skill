@@ -571,11 +571,13 @@ def test_project_runner_api_union_is_exact_and_excludes_only_cli() -> None:
             *runner.OBJECT_APIS,
             *runner.INTEGRATION_PRIMARY_APIS,
             *runner.IMPORT_APIS,
-            *runner.SOUNDBANK_RUNTIME_APIS,
-            runner.AUDIO_CONVERT_URI,
-            runner.MEDIA_POOL_GET_URI,
-        }
-    )
+                *runner.SOUNDBANK_RUNTIME_APIS,
+                runner.AUDIO_CONVERT_URI,
+                runner.MEDIA_POOL_GET_URI,
+                runner.GET_INFO_URI,
+                runner.CORE_LUA_URI,
+            }
+        )
     assert runner.AUDIO_CONVERT_URI in runner.PROJECT_RUNNER_APIS
     assert not any(".cli." in api for api in runner.PROJECT_RUNNER_APIS)
     assert runner.PROJECT_RUNNER_MODEL_RESOLVED_REQUEST_FIELDS == {
@@ -861,6 +863,159 @@ def test_prepare_case_fails_closed_instead_of_falling_through_to_soundbank(
             direct=SimpleNamespace(),
             media_holder={},
         )
+
+
+def test_prepare_get_info_case_binds_exact_live_process_and_result(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    baseline = {
+        "displayName": "Wwise",
+        "isCommandLine": True,
+        "sessionId": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+        "processId": 4242,
+        "processPath": "/Applications/WwiseConsole",
+        "apiVersion": 1,
+        "platform": "macosx",
+        "configuration": "release",
+        "version": {
+            "year": 2021,
+            "major": 1,
+            "minor": 14,
+            "build": 8108,
+            "displayName": "v2021.1.14",
+        },
+    }
+    calls: list[tuple[str, dict, dict]] = []
+
+    def direct(api, args, options):
+        calls.append((api, args, options))
+        return baseline
+
+    monkeypatch.setattr(runner, "_project_document_digest", lambda _path: "d" * 64)
+    scenario = _scenario(
+        runner.GET_INFO_URI,
+        scenario_id="O22-GET-INFO-01",
+    )
+    scenario.prompt = "确认当前连接的 Wwise 实例与进程身份。"
+    prepared = runner._prepare_case(
+        scenario,
+        runtime=SimpleNamespace(
+            version="2021.1",
+            lifecycle=SimpleNamespace(process=SimpleNamespace(pid=4242)),
+            sandbox=SimpleNamespace(sandbox_path=tmp_path),
+        ),
+        direct=direct,
+        media_holder={},
+        unit=SimpleNamespace(unit_id="TYP21-ZERO-GET-INFO"),
+    )
+
+    assert calls == [(runner.GET_INFO_URI, {}, {})]
+    assert [step.subcommand for step in prepared.protocol.steps] == [
+        "request-schema",
+        "typed-zero-call",
+    ]
+    assert prepared.typed_sections.static_expectation["verification_boundary"] == (
+        "exact_host_identity"
+    )
+    verification = prepared.verify_final(
+        {"agent_result": baseline},
+        SimpleNamespace(final_response="Wwise 2021.1.14.8108，进程 4242。"),
+    )
+    assert verification.passed is True
+    incomplete = prepared.verify_final(
+        {"agent_result": baseline},
+        SimpleNamespace(final_response="Wwise 2021.1，进程 4242。"),
+    )
+    assert incomplete.passed is False
+
+
+def test_prepare_lua_case_seals_source_and_preserves_result_schema_only_boundary(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(runner, "_project_document_digest", lambda _path: "e" * 64)
+
+    def no_read(*_args, **_kwargs):
+        raise AssertionError("Lua preparation must not perform a live read")
+
+    scenario = _scenario(
+        runner.CORE_LUA_URI,
+        scenario_id="LUA23-CORE-FILE-02",
+        protocol="preview_confirm",
+    )
+    scenario.prompt = (
+        "执行现成文件 {script_file}，隔离目录 {io_root}，并报告弱验证边界。"
+    )
+    prepared = runner._prepare_case(
+        scenario,
+        runtime=SimpleNamespace(
+            version="2025.1",
+            asset_root=tmp_path / "assets",
+            sandbox=SimpleNamespace(sandbox_path=tmp_path),
+        ),
+        direct=no_read,
+        media_holder={},
+        unit=SimpleNamespace(unit_id="TYP25-CODE-LUA-FILE"),
+    )
+
+    assert prepared.typed_sections.static_expectation["verification_boundary"] == (
+        "result_schema_only"
+    )
+    assert prepared.visible_values["script_file"].endswith("user-script.lua")
+    execute_step = next(
+        step for step in prepared.protocol.steps if step.name.endswith(".execute")
+    )
+    prepared.observe_payload(
+        execute_step,
+        {
+            "dispatch_result": {
+                "result": {"return": {"profile": "typed_input", "count": 3}}
+            }
+        },
+    )
+    terminal = prepared.verify_final(
+        {
+            "status": "result_schema_checked",
+            "result_schema_checked": True,
+            "verified": False,
+            "verification_strength": "complete_reflected_schema",
+            "verification": {"business_state_verified": False},
+        },
+        SimpleNamespace(final_response="unused"),
+    )
+    assert terminal.passed is True
+    response = prepared.verify_turn(
+        2,
+        SimpleNamespace(
+            final_response=(
+                "脚本返回 profile=typed_input、count=3；验证仅限返回结果结构。"
+            )
+        ),
+    )
+    assert response.passed is True
+
+    broader_overclaim = prepared.verify_turn(
+        2,
+        SimpleNamespace(
+            final_response=(
+                "profile=typed_input，count=3；验证仅限返回结果结构；"
+                "另外已经确认所有业务状态正确。"
+            )
+        ),
+    )
+    assert broader_overclaim.passed is False
+
+    overclaim = prepared.verify_turn(
+        2,
+        SimpleNamespace(
+            final_response=(
+                "profile=typed_input，count=3；验证不仅限于结果结构，"
+                "已经验证全部业务副作用。"
+            )
+        ),
+    )
+    assert overclaim.passed is False
 
 
 def test_prepare_case_binds_2025_object_recipe_to_active_lifecycle(

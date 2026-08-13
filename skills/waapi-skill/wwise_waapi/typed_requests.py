@@ -2331,6 +2331,13 @@ def _append_static_object_facts(
         for child in contract.fields
         if child.parent_handle == parent.handle and not child.overlay
     }
+    overlays = tuple(
+        child
+        for child in contract.fields
+        if child.parent_handle == parent.handle and child.overlay
+    )
+    if len(overlays) > 1:
+        raise TypedRequestError("Typed request object has ambiguous map overlays")
     expanded = _expanded_schema(
         schema,
         root_schema=contract.schema_roots[section],
@@ -2344,17 +2351,36 @@ def _append_static_object_facts(
     for key, item in value.items():
         child = children.get(key)
         child_schema = properties.get(key)
-        if child is None or not isinstance(child_schema, Mapping):
-            raise TypedRequestError(f"Typed request object key {key!r} is not disclosed")
-        _append_value_facts(
-            contract,
-            facts,
-            field=child,
-            value=item,
-            schema=child_schema,
-            section=section,
-            disclosures=disclosures,
-        )
+        if key in properties:
+            if child is None or not isinstance(child_schema, Mapping):
+                raise TypedRequestError(
+                    f"Typed request object key {key!r} is not disclosed"
+                )
+            _append_value_facts(
+                contract,
+                facts,
+                field=child,
+                value=item,
+                schema=child_schema,
+                section=section,
+                disclosures=disclosures,
+            )
+            continue
+        else:
+            if not overlays:
+                raise TypedRequestError(
+                    f"Typed request object key {key!r} is not disclosed"
+                )
+            _append_dynamic_object_members(
+                contract,
+                facts,
+                handle=overlays[0].handle,
+                value={key: item},
+                schema=schema,
+                section=section,
+                disclosures=disclosures,
+            )
+            continue
 
 
 def _append_dynamic_container_facts(

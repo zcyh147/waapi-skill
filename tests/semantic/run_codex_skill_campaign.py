@@ -157,6 +157,14 @@ from tests.semantic.support.codex_object_business_plan_v3 import (  # noqa: E402
     validate_archived_object_business_plan,
     validate_object_archived_verification,
 )
+from tests.semantic.support.codex_direct_business_plan_v3 import (  # noqa: E402
+    DIRECT_FIXTURE_KIND,
+    DirectBusinessPlanError,
+    DirectBusinessPlanSections,
+    parse_direct_business_plan_sections,
+    validate_direct_archived_verification,
+    validate_direct_business_plan_archive,
+)
 from tests.semantic.support.codex_typed_draft_evidence_v3 import (  # noqa: E402
     TYPED_DRAFT_EVIDENCE_CONTRACT,
     TypedDraftEvidenceError,
@@ -285,6 +293,7 @@ EXIT_INTERRUPTED = 130
 HEAVY_V3_PROFILE_ID = matrix.HEAVY_V3_PROFILE_ID
 MODIFICATION_POLICY_V3_PROFILE_ID = matrix.MODIFICATION_POLICY_V3_PROFILE_ID
 COMPOUND_HEAVY_V1_PROFILE_ID = matrix.COMPOUND_HEAVY_V1_PROFILE_ID
+TYPED_INPUT_PROFILE_ID = matrix.TYPED_INPUT_PROFILE_ID
 INTEGRATION_WORKFLOWS_V1_PROFILE_ID = (
     matrix.INTEGRATION_WORKFLOWS_V1_PROFILE_ID
 )
@@ -317,6 +326,7 @@ TERRA_LOCKED_V3_PROFILE_IDS = frozenset(
     {
         MODIFICATION_POLICY_V3_PROFILE_ID,
         COMPOUND_HEAVY_V1_PROFILE_ID,
+        TYPED_INPUT_PROFILE_ID,
         INTEGRATION_WORKFLOWS_V1_PROFILE_ID,
         INTEGRATION_WORKFLOWS_V2_PROFILE_ID,
         INTEGRATION_PROFILE_ID,
@@ -437,6 +447,7 @@ class HeavyV3PromptEvidence:
         | SoundBankBusinessPlanSections
         | CliBusinessPlanSections
         | WorkflowBusinessPlanSections
+        | DirectBusinessPlanSections
         | None
     )
 
@@ -1009,7 +1020,10 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
             )
         consolidated = consolidate_units(required_units, manifests)
         write_consolidated(root, consolidated)
-        terminal = heavy_v3_consolidated_exit(consolidated)
+        terminal = heavy_v3_consolidated_exit(
+            consolidated,
+            freeze_retryable=options.profile == TYPED_INPUT_PROFILE_ID,
+        )
         if terminal is not None:
             return terminal
         if options.verify_only:
@@ -1200,7 +1214,10 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
             print_status(consolidated)
             if interrupts.requested:
                 return EXIT_INTERRUPTED
-            terminal = heavy_v3_consolidated_exit(consolidated)
+            terminal = heavy_v3_consolidated_exit(
+                consolidated,
+                freeze_retryable=options.profile == TYPED_INPUT_PROFILE_ID,
+            )
             return terminal if terminal is not None else EXIT_PENDING
 
 
@@ -1367,9 +1384,18 @@ def blocked_heavy_v3_validation(
     )
 
 
-def heavy_v3_consolidated_exit(consolidated: Mapping[str, Any]) -> int | None:
+def heavy_v3_consolidated_exit(
+    consolidated: Mapping[str, Any],
+    *,
+    freeze_retryable: bool = False,
+) -> int | None:
     if consolidated.get("blocked_unit_ids"):
         return EXIT_BLOCKED
+    if freeze_retryable and consolidated.get("retryable_unit_ids"):
+        # This release profile freezes every non-PASS root. Even a proven
+        # pre-action service failure may only be retried under a new candidate
+        # and campaign root; verify-only remains available after 25/25 PASS.
+        return EXIT_PENDING
     if consolidated.get("pending_unit_ids") or consolidated.get("retryable_unit_ids"):
         return None
     if consolidated.get("failed_unit_ids"):
@@ -4632,6 +4658,7 @@ def _validate_heavy_v3_prompt_materialization(
         CliBusinessPlanError,
         ImportBusinessPlanError,
         ObjectBusinessPlanError,
+        DirectBusinessPlanError,
         ObjectHeavyRecipeError,
         SoundBankBusinessPlanError,
         KeyError,
@@ -6040,6 +6067,8 @@ def _heavy_v3_business_plan_fixture_spec(
         "ak.wwise.core.object.set": "object_materialized_v1",
         "ak.wwise.core.audio.convert": "audio_conversion_materialized_v1",
         "ak.wwise.core.mediaPool.get": "media_pool_materialized_v1",
+        "ak.wwise.core.getInfo": DIRECT_FIXTURE_KIND,
+        "ak.wwise.core.executeLuaScript": DIRECT_FIXTURE_KIND,
     }
     import_apis = {
         "ak.wwise.core.audio.import",
@@ -6122,10 +6151,11 @@ def _validate_heavy_v3_typed_business_plan(
     ObjectBusinessPlanSections
     | ImportBusinessPlanSections
     | AudioMediaBusinessPlanSections
-        | SoundBankBusinessPlanSections
-        | CliBusinessPlanSections
-        | WorkflowBusinessPlanSections
-        | None
+    | SoundBankBusinessPlanSections
+    | CliBusinessPlanSections
+    | WorkflowBusinessPlanSections
+    | DirectBusinessPlanSections
+    | None
     ):
     """Parse and independently validate one supported family plan archive."""
 
@@ -6139,6 +6169,7 @@ def _validate_heavy_v3_typed_business_plan(
         | SoundBankBusinessPlanSections
         | CliBusinessPlanSections
         | WorkflowBusinessPlanSections
+        | DirectBusinessPlanSections
         | None
     )
     workflow_id = _heavy_v3_integration_workflow_id(expected_unit)
@@ -6148,6 +6179,22 @@ def _validate_heavy_v3_typed_business_plan(
             sections,
             expected_unit=expected_unit,
             provenance=provenance,
+        )
+        return sections
+    if api in {
+        "ak.wwise.core.getInfo",
+        "ak.wwise.core.executeLuaScript",
+    }:
+        sections = parse_direct_business_plan_sections(plan_value)
+        validate_direct_business_plan_archive(
+            sections,
+            scenario_id=_heavy_v3_base_scenario_id(expected_unit),
+            api=api,
+            version=str(getattr(expected_unit, "version", "")),
+            protocol_steps=tuple(
+                {"name": step.name, "subcommand": step.subcommand}
+                for step in protocol.steps
+            ),
         )
         return sections
     if api in {
@@ -6818,6 +6865,44 @@ def _validate_heavy_v3_pass_checks(
             label="topic oracle",
         )
         return
+    if api in {
+        "ak.wwise.core.getInfo",
+        "ak.wwise.core.executeLuaScript",
+    }:
+        if (
+            set(primary) != {"api", "dispatch_count"}
+            or primary.get("api") != api
+            or primary.get("dispatch_count") != primary_count
+        ):
+            raise CampaignEvidenceError(
+                "passing direct primary-dispatch proof is invalid"
+            )
+        if api == "ak.wwise.core.executeLuaScript":
+            _validate_heavy_v3_archived_verification(
+                checks.get("turn_02_workflow"),
+                api=api,
+                scenario_id=_heavy_v3_base_scenario_id(expected_unit),
+                version=str(expected_row["version"]),
+                runner=runner,
+                primary_count=primary_count,
+                task_root=task_root,
+                prompt_evidence=prompt_evidence,
+                scenario_fixture=getattr(scenario, "fixture", {}),
+                label="direct weak-verifier UX oracle",
+            )
+        _validate_heavy_v3_archived_verification(
+            checks.get("business_verification"),
+            api=api,
+            scenario_id=_heavy_v3_base_scenario_id(expected_unit),
+            version=str(expected_row["version"]),
+            runner=runner,
+            primary_count=primary_count,
+            task_root=task_root,
+            prompt_evidence=prompt_evidence,
+            scenario_fixture=getattr(scenario, "fixture", {}),
+            label="direct business oracle",
+        )
+        return
     if (
         set(primary) != {"api", "dispatch_count"}
         or primary.get("api") != api
@@ -7020,7 +7105,10 @@ def _validate_heavy_v3_archived_verification(
         task_root=task_root,
         label=label,
     )
-    if isinstance(prompt_evidence.typed_sections, WorkflowBusinessPlanSections):
+    if isinstance(
+        prompt_evidence.typed_sections,
+        (WorkflowBusinessPlanSections, DirectBusinessPlanSections),
+    ):
         return
 
     if api in {
@@ -7146,6 +7234,7 @@ def _validate_heavy_v3_typed_archived_verification(
         | SoundBankBusinessPlanSections
         | CliBusinessPlanSections
         | WorkflowBusinessPlanSections
+        | DirectBusinessPlanSections
         | None
     ),
     verification: Any,
@@ -7222,6 +7311,17 @@ def _validate_heavy_v3_typed_archived_verification(
                 label=label,
             )
             return
+        if isinstance(sections, DirectBusinessPlanSections):
+            if sections.static_expectation.get("api") != api:
+                raise CampaignEvidenceError(
+                    f"{label} direct typed plan is cross-bound to {api}"
+                )
+            validate_direct_archived_verification(
+                sections,
+                verification,
+                weak_report=label == "direct weak-verifier UX oracle",
+            )
+            return
         if api in {
             "ak.wwise.core.object.get",
             "ak.wwise.core.object.create",
@@ -7239,6 +7339,8 @@ def _validate_heavy_v3_typed_archived_verification(
             "ak.wwise.cli.tabDelimitedImport",
             "ak.wwise.cli.convertExternalSource",
             HEAVY_V3_MIGRATION_API,
+            "ak.wwise.core.getInfo",
+            "ak.wwise.core.executeLuaScript",
         }:
             raise CampaignEvidenceError(
                 f"{label} lacks required typed business-plan sections"
@@ -7248,6 +7350,7 @@ def _validate_heavy_v3_typed_archived_verification(
         CliBusinessPlanError,
         ImportBusinessPlanError,
         ObjectBusinessPlanError,
+        DirectBusinessPlanError,
         SoundBankBusinessPlanError,
         WorkflowBusinessPlanError,
     ) as exc:
@@ -13541,11 +13644,12 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     parser.add_argument("--pair-id", action="append", default=[])
     parser.add_argument("--offline-only", action="store_true")
     parser.add_argument("--lock-timeout", type=float, default=10.0)
-    parser.add_argument("--max-pre-action-retries", type=int, default=1)
+    parser.add_argument("--max-pre-action-retries", type=int)
     args = parser.parse_args(argv)
     is_executable_v3 = args.profile in EXECUTABLE_V3_PROFILE_IDS
     is_policy_v3 = args.profile == MODIFICATION_POLICY_V3_PROFILE_ID
     is_compound_v1 = args.profile == COMPOUND_HEAVY_V1_PROFILE_ID
+    is_typed_input = args.profile == TYPED_INPUT_PROFILE_ID
     is_integration_v1 = args.profile == INTEGRATION_WORKFLOWS_V1_PROFILE_ID
     is_integration_v2 = args.profile == INTEGRATION_WORKFLOWS_V2_PROFILE_ID
     is_integration = args.profile == INTEGRATION_PROFILE_ID
@@ -13563,8 +13667,19 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         parser.error("--verify-only requires --resume")
     if timeout_seconds <= 0 or args.lock_timeout <= 0:
         parser.error("--timeout and --lock-timeout must be greater than zero")
-    if args.max_pre_action_retries < 0:
+    max_pre_action_retries = (
+        0
+        if args.max_pre_action_retries is None and is_typed_input
+        else 1
+        if args.max_pre_action_retries is None
+        else int(args.max_pre_action_retries)
+    )
+    if max_pre_action_retries < 0:
         parser.error("--max-pre-action-retries must be zero or greater")
+    if is_typed_input and max_pre_action_retries != 0:
+        parser.error(
+            f"{TYPED_INPUT_PROFILE_ID} forbids same-root pre-action retries"
+        )
     for name, values in (
         ("--case-id", args.case_id),
         ("--version", args.version),
@@ -13621,6 +13736,8 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         (
             matrix.DEFAULT_MODIFICATION_POLICY_V3_SUITE
             if is_policy_v3
+            else matrix.DEFAULT_TYPED_INPUT_SUITE
+            if is_typed_input
             else (
                 matrix.DEFAULT_INTEGRATION_SUITE
                 if is_integration
@@ -13670,7 +13787,7 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         pair_ids=tuple(str(value) for value in args.pair_id),
         offline_only=bool(args.offline_only),
         lock_timeout_seconds=float(args.lock_timeout),
-        max_pre_action_retries=int(args.max_pre_action_retries),
+        max_pre_action_retries=max_pre_action_retries,
         windows_powershell_core_host=windows_powershell_core_host,
     )
 
