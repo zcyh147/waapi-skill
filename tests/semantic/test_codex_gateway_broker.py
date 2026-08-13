@@ -94,6 +94,35 @@ def _typed_draft_argv(action: dict[str, object]) -> tuple[str, ...]:
     return ("--compact", "--facts", *typed_action_cli_arguments(action))
 
 
+@pytest.mark.parametrize(
+    ("subcommand", "contracts"),
+    (
+        (
+            "request-map-container",
+            {
+                "waapi-skill.typed-container-handle/v1",
+                "waapi-skill.typed-map-container-choices/v1",
+            },
+        ),
+        (
+            "request-array-item",
+            {
+                "waapi-skill.typed-container-handle/v1",
+                "waapi-skill.typed-array-item-choices/v1",
+            },
+        ),
+        ("operation-schema", {"waapi-skill.gateway-result/v1"}),
+    ),
+)
+def test_broker_binds_each_typed_disclosure_to_its_public_response_contract(
+    subcommand: str,
+    contracts: set[str],
+) -> None:
+    step = ExpectedGatewayStep("typed-disclosure", subcommand)
+
+    assert broker_module._gateway_payload_contracts(step) == frozenset(contracts)
+
+
 def test_current_broker_rejects_historical_draft_action_json_protocol() -> None:
     start = ExpectedGatewayStep("draft.start", "draft-start", ("object.set",))
     historical = ExpectedGatewayStep(

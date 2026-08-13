@@ -67,6 +67,13 @@ from wwise_waapi.platform_commands import (
 
 
 GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
+TYPED_CONTAINER_HANDLE_CONTRACT = "waapi-skill.typed-container-handle/v1"
+TYPED_MAP_CONTAINER_CHOICES_CONTRACT = (
+    "waapi-skill.typed-map-container-choices/v1"
+)
+TYPED_ARRAY_ITEM_CHOICES_CONTRACT = (
+    "waapi-skill.typed-array-item-choices/v1"
+)
 TRANSACTION_NEXT_COMMAND_CONTRACT = "waapi-skill.gateway-next-command/v2"
 TRANSACTION_COPY_INSTRUCTION_CONTRACT = (
     "waapi-skill.gateway-command-copy-instruction/v2"
@@ -5450,6 +5457,20 @@ def _extract_payload(stdout: str, *, required_contract: str | None = None) -> Ma
     return payload
 
 
+def _gateway_payload_contracts(step: ExpectedGatewayStep) -> frozenset[str]:
+    """Return the exact public response envelopes allowed for one command."""
+
+    if step.subcommand == "request-map-container":
+        return frozenset(
+            {TYPED_CONTAINER_HANDLE_CONTRACT, TYPED_MAP_CONTAINER_CHOICES_CONTRACT}
+        )
+    if step.subcommand == "request-array-item":
+        return frozenset(
+            {TYPED_CONTAINER_HANDLE_CONTRACT, TYPED_ARRAY_ITEM_CHOICES_CONTRACT}
+        )
+    return frozenset({GATEWAY_RESULT_CONTRACT})
+
+
 def _project_next_command_runner(
     value: Mapping[str, Any],
     *,
@@ -8065,13 +8086,20 @@ class CodexGatewayBroker:
                 f"expected one of {step.allowed_exit_codes!r}"
             )
         try:
+            allowed_payload_contracts = _gateway_payload_contracts(step)
+            preferred_contract = (
+                self.required_contract
+                if self.required_contract in allowed_payload_contracts
+                else None
+            )
             payload, payload_start, payload_end = _extract_payload_span(
                 stdout,
-                required_contract=self.required_contract,
+                required_contract=preferred_contract,
             )
-            if payload.get("contract") != self.required_contract:
+            if payload.get("contract") not in allowed_payload_contracts:
                 raise GatewayInvocationError(
-                    f"gateway payload contract must be {self.required_contract!r}"
+                    "gateway payload contract must be one of the exact command contracts "
+                    f"{tuple(sorted(allowed_payload_contracts))!r}"
                 )
             confirmation_is_consumed_later = any(
                 isinstance(argument, ResponseBinding)
