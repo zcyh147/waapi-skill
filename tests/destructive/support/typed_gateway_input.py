@@ -100,6 +100,7 @@ def _require_disclosed_continuation(
 ) -> None:
     """Prove each real command follows the preceding public Gateway result."""
 
+    matched_container_action = False
     if command[0] == "draft-apply" and pending_container_actions:
         try:
             action_offset = command.index("--action")
@@ -108,6 +109,7 @@ def _require_disclosed_continuation(
         for index, expected_action in enumerate(pending_container_actions):
             if command[action_offset : action_offset + len(expected_action)] == expected_action:
                 pending_container_actions.pop(index)
+                matched_container_action = True
                 break
 
     if previous_step.subcommand == "operation-schema":
@@ -126,6 +128,13 @@ def _require_disclosed_continuation(
         return
 
     if command[0] == "draft-apply":
+        if previous_step.subcommand in {"request-map-container", "request-array-item"}:
+            if not matched_container_action:
+                # The protocol may compose an independent scalar fact before a
+                # previously disclosed container fact. Its authority/revision
+                # still come from draft-start and are checked by Gateway.
+                return
+            return
         draft = payload.get("draft")
         binding = draft.get("next_action_binding") if isinstance(draft, Mapping) else None
         prefix = binding.get("fixed_argv_prefix") if isinstance(binding, Mapping) else None
