@@ -101,6 +101,14 @@ def test_lua_lanes_have_one_public_typed_draft(
                 "emit returned-handle facts only after their disclosure chain"
             ),
         }
+        plan_table = payload["composer"]["top_level_fact_plan"]
+        plan = [
+            dict(zip(plan_table["columns"], row, strict=True))
+            for row in plan_table["rows"]
+        ]
+        wa_args = next(row for row in plan if row["name"] == "wa_args")
+        assert wa_args["phase"] == "fact"
+        assert wa_args["action"] == "map"
         assert payload["composer"]["complete_request_authored_by_gateway"] is True
 
 

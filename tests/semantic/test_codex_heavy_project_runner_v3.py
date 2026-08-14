@@ -1448,6 +1448,18 @@ def test_prepare_lua_case_seals_source_and_preserves_result_schema_only_boundary
     )
     assert response.passed is True
 
+    equivalent_boundary = prepared.verify_turn(
+        2,
+        SimpleNamespace(
+            final_response=(
+                "脚本已执行，返回 profile=typed_input、count=3。"
+                "验证仅确认返回结果符合预期结构；未验证、也不能据此声称"
+                "已验证脚本的全部业务副作用。"
+            )
+        ),
+    )
+    assert equivalent_boundary.passed is True
+
     broader_overclaim = prepared.verify_turn(
         2,
         SimpleNamespace(

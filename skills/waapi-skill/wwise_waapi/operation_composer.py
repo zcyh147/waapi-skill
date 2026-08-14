@@ -1386,6 +1386,11 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 details={"operation": operation, "version": version},
             )
         gateway_field_payloads = typed.gateway_field_payloads()
+        child_shapes_by_parent = {
+            field.get("parent_handle"): field.get("shape")
+            for field in gateway_field_payloads
+            if field.get("parent_handle") is not None
+        }
         field_payloads: list[dict[str, Any]] = []
         top_level_rows: list[list[Any]] = []
         for field in gateway_field_payloads:
@@ -1406,6 +1411,10 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 value in {"object", "array"} for value in accepted_types
             )
             shape = field.get("shape")
+            if shape == "object" and child_shapes_by_parent.get(
+                field.get("handle")
+            ) == "map":
+                shape = "map"
             fact_action = (
                 "set"
                 if shape == "scalar"

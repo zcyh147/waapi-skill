@@ -286,7 +286,8 @@ def test_topic_schema_discloses_one_typed_continuation_offline(tmp_path: Path) -
         "empty_container": "present",
         "branch_choice": "choose",
         "open_map_scalar": (
-            "map_put with one exact key; never set or present the map handle"
+            "map_put only without an exact static child row; use the listed child "
+            "handle otherwise"
         ),
         "complex_child": "follow the field's dynamic container continuation",
     }
@@ -386,6 +387,20 @@ def test_wait_topic_digests_bind_to_the_real_topic_schema_envelope(
         "complex_member_phase": "dynamic_disclosure",
         "complex_member_disclosure": "request-map-container",
     }
+    assert payload["continuation"]["fact_selection"]["open_map_scalar"] == (
+        "map_put only without an exact static child row; use the listed child "
+        "handle otherwise"
+    )
+    soundbank_map = next(
+        field
+        for field in _expand_compact_field_table(payload["event_match"]["fields"])
+        if field["name"] == "soundbank:map"
+    )
+    assert any(
+        field["name"] == "name"
+        and field.get("parent_handle") == soundbank_map["parent_handle"]
+        for field in _expand_compact_field_table(payload["event_match"]["fields"])
+    )
     encoded = gateway.gateway_stdout_json_encoder(payload).encode(payload)
     assert len(encoded.encode("utf-8")) < 32 * 1024
     assert "\n" not in encoded

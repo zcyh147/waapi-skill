@@ -3657,6 +3657,50 @@ def operation_composer_input_contract(
             "registry_source_schema_digest": source_schema_digest,
             "inspect_with": f"operation-schema {operation}",
         }
+    start_preconditions = contract.get("start_preconditions")
+    fragments = contract.get("registry_fragments")
+    if isinstance(start_preconditions, Mapping) and isinstance(fragments, Mapping):
+        default_container = next(
+            (
+                fragments.get(key)
+                for key in (
+                    "default_container_target_contract",
+                    "default_container_parent_contract",
+                )
+                if isinstance(fragments.get(key), Mapping)
+            ),
+            None,
+        )
+        metadata_scope = (
+            default_container.get("dynamic_actor_mixer_metadata_scope")
+            if isinstance(default_container, Mapping)
+            else None
+        )
+        actor_mixer_type = (
+            metadata_scope.get("actor_mixer_object_type")
+            if isinstance(metadata_scope, Mapping)
+            else None
+        )
+        if isinstance(actor_mixer_type, str) and actor_mixer_type:
+            exact_preconditions = dict(start_preconditions)
+            exact_preconditions["reviewed_default_container_metadata_argv"] = {
+                "applies_when": (
+                    "all requested targets use the Registry-resolved default "
+                    "Actor-Mixer container scope"
+                ),
+                "gateway_argv_template": [
+                    "metadata",
+                    "discover",
+                    "--object-type",
+                    actor_mixer_type,
+                    "--query",
+                    "<requested-field-name>",
+                    "--limit",
+                    "<1..8>",
+                ],
+                "replace_only": ["<requested-field-name>", "<1..8>"],
+            }
+            contract = {**contract, "start_preconditions": exact_preconditions}
     audio_import_option_names = (
         contract.get("action_shapes", {})
         .get("set_import_option", {})
@@ -4204,8 +4248,8 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     "empty_container": "present",
                     "branch_choice": "choose",
                     "open_map_scalar": (
-                        "map_put with one exact key; never set or present the map "
-                        "handle"
+                        "map_put only without an exact static child row; use the "
+                        "listed child handle otherwise"
                     ),
                     "complex_child": (
                         "follow the field's dynamic container continuation"
@@ -4381,13 +4425,13 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                             args.key,
                             "--shape",
                             args.shape,
-                            "--choice-handle",
-                            "<choice_handle_from_this_response>",
                             *(
                                 ["--parent-schema-token", args.parent_schema_token]
                                 if args.parent_schema_token is not None
                                 else []
                             ),
+                            "--choice-handle",
+                            "<choice_handle_from_this_response>",
                         ],
                     },
                 }
@@ -4450,13 +4494,13 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                             str(args.index),
                             "--shape",
                             args.shape,
-                            "--choice-handle",
-                            "<choice_handle_from_this_response>",
                             *(
                                 ["--parent-schema-token", args.parent_schema_token]
                                 if args.parent_schema_token is not None
                                 else []
                             ),
+                            "--choice-handle",
+                            "<choice_handle_from_this_response>",
                         ],
                     },
                 }
@@ -4522,6 +4566,15 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "child_contract": child_contract,
             "schema_lineage_token": lineage_token,
             "continuation": {
+                "request_wide_order": {
+                    "phase": "dynamic_disclosure",
+                    "finish_all_business_present_disclosures_first": True,
+                    "array_item_order": "ascending_index",
+                    "nested_member_order": "schema_property_order",
+                    "facts_using_returned_handles": "only_after_all_disclosures",
+                    "deferred_action_argv": "only_after_all_disclosures",
+                    "this_handle_is_not_a_complete_request": True,
+                },
                 "subcommand": (
                     "query-object"
                     if query_shape
@@ -11997,14 +12050,80 @@ def _operation_draft_compact_action_projection(
             if key.endswith("_handle") and isinstance(value, str)
         }
     )
+    action_result: dict[str, Any] = {
+        "contract": "waapi-skill.operation-draft-action-result/v1",
+        "action": action_name,
+        "created_handles": sorted(current_handles - prior_handles),
+        "affected_handles": affected_handles,
+    }
+    if action.get("fact_action") == "choose" and isinstance(
+        action.get("value"), str
+    ):
+        field_payloads = draft_operation_request_contract(
+            record.operation, record.version
+        ).gateway_field_payloads()
+        selected_handle = action["value"]
+        selected = next(
+            (
+                field
+                for field in field_payloads
+                if field.get("handle") == selected_handle
+            ),
+            None,
+        )
+        constants = (
+            selected.get("branch_choice_constants")
+            if isinstance(selected, Mapping)
+            else None
+        )
+        if isinstance(constants, Mapping) and constants:
+            required_followups: list[dict[str, Any]] = []
+            for field in field_payloads:
+                name = field.get("name")
+                if (
+                    field.get("parent_handle") != selected_handle
+                    or not isinstance(name, str)
+                    or name not in constants
+                ):
+                    continue
+                value = constants[name]
+                if isinstance(value, bool):
+                    value_type, value_text = "boolean", "true" if value else "false"
+                elif isinstance(value, int):
+                    value_type, value_text = "integer", str(value)
+                elif isinstance(value, float) and math.isfinite(value):
+                    value_type, value_text = (
+                        "number",
+                        json.dumps(value, ensure_ascii=False, allow_nan=False),
+                    )
+                elif isinstance(value, str):
+                    value_type, value_text = "string", value
+                else:
+                    raise GatewayInputError(
+                        "Selected branch constant has an unsupported typed value."
+                    )
+                required_followups.append(
+                    {
+                        "reason": "selected_branch_constant",
+                        "typed_fact_arguments": [
+                            "--action",
+                            "add_typed_fact",
+                            "--fact-action",
+                            "set",
+                            "--field-handle",
+                            field["handle"],
+                            "--value-type",
+                            value_type,
+                            "--fact-value",
+                            value_text,
+                        ],
+                    }
+                )
+            if required_followups:
+                action_result["required_followup_facts"] = required_followups
     return {
         "current_facts_summary": _operation_draft_facts_summary(current_facts),
-        "action_result": {
-            "contract": "waapi-skill.operation-draft-action-result/v1",
-            "action": action_name,
-            "created_handles": sorted(current_handles - prior_handles),
-            "affected_handles": affected_handles,
-        },
+        "action_result": action_result,
     }
 
 

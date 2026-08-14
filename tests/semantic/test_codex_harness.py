@@ -2847,6 +2847,49 @@ def test_command_classifier_requires_exact_typed_schema_envelope(
     assert rejected.unexpected_commands == (shlex.join(argv),)
 
 
+def test_command_classifier_accepts_exact_topic_schema_envelope(
+    tmp_path: Path,
+) -> None:
+    skill = tmp_path / "skill"
+    runner = skill / "scripts" / "run.py"
+    runner.parent.mkdir(parents=True)
+    runner.write_text("# packaged runner\n", encoding="utf-8")
+    argv = (
+        "python",
+        str(runner),
+        "gateway.py",
+        "topic-schema",
+        "ak.wwise.core.soundbank.generated",
+    )
+    record = CodexCommandRecord(
+        command=shlex.join(argv),
+        exit_code=0,
+        status="completed",
+        aggregated_output=json.dumps(
+            {
+                "contract": "waapi-skill.typed-topic-input/v1",
+                "ok": True,
+                "command": "topic-schema",
+            }
+        ),
+        argv=argv,
+        has_shell_operators=False,
+        parse_error="",
+        parser_kind="posix-native",
+    )
+
+    facts = classify_commands(
+        (record,),
+        skill_source=skill,
+        expected_gateway_subcommands=("topic-schema",),
+    )
+
+    assert facts.gateway_commands == (record.command,)
+    assert facts.gateway_attempt_commands == (record.command,)
+    assert facts.gateway_subcommands == ("topic-schema",)
+    assert facts.unexpected_commands == ()
+
+
 def test_command_classifier_accepts_packaged_query_schema_result() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     skill = repo_root / "skills" / "waapi-skill"

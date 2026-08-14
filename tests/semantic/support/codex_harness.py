@@ -102,6 +102,7 @@ GATEWAY_SUBCOMMANDS = frozenset(
         "query-schema",
         "query-object",
         "metadata",
+        "topic-schema",
         "wait-topic",
         "capabilities",
         "describe",

@@ -781,6 +781,113 @@ def test_public_composer_fields_bind_fact_action_before_disclosure(
     )
 
 
+def test_choose_response_discloses_the_selected_branch_constant_before_disclosure(
+    tmp_path: Path,
+) -> None:
+    code, schema = execute(
+        tmp_path,
+        "--version",
+        "2023.1",
+        "operation-schema",
+        "object.create",
+    )
+    assert code == 0, schema
+    parent = next(
+        field
+        for field in schema["composer"]["typed_request_fields"]
+        if field["path"] == ["args", "parent"] and field["shape"] == "branch"
+    )
+    path_choice = next(
+        field
+        for field in schema["composer"]["typed_request_fields"]
+        if field.get("parent_handle") == parent["handle"]
+        and field.get("branch_choice_constants") == {"kind": "path"}
+    )
+    kind = next(
+        field
+        for field in schema["composer"]["typed_request_fields"]
+        if field.get("parent_handle") == path_choice["handle"]
+        and field["name"] == "kind"
+    )
+
+    start_code, started = execute(
+        tmp_path,
+        "--version",
+        "2023.1",
+        "draft-start",
+        "object.create",
+    )
+    assert start_code == 0, started
+    apply_code, applied = execute(
+        tmp_path,
+        "--version",
+        "2023.1",
+        "draft-apply",
+        started["draft"]["draft_id"],
+        "--task-authority",
+        started["task_authority"],
+        "--expected-revision",
+        "1",
+        "--compact",
+        "--facts",
+        "--action",
+        "add_typed_fact",
+        "--fact-action",
+        "choose",
+        "--field-handle",
+        parent["handle"],
+        "--fact-value",
+        path_choice["handle"],
+    )
+
+    assert apply_code == 0, applied
+    assert applied["draft"]["action_result"]["required_followup_facts"] == [
+        {
+            "reason": "selected_branch_constant",
+            "typed_fact_arguments": [
+                "--action",
+                "add_typed_fact",
+                "--fact-action",
+                "set",
+                "--field-handle",
+                kind["handle"],
+                "--value-type",
+                "string",
+                "--fact-value",
+                "path",
+            ],
+        }
+    ]
+
+
+def test_public_object_set_schema_discloses_the_exact_default_container_metadata_scope(
+    tmp_path: Path,
+) -> None:
+    code, payload = execute(
+        tmp_path,
+        "--version",
+        "2025.1",
+        "operation-schema",
+        "object.set",
+    )
+
+    assert code == 0, payload
+    exact = payload["composer"]["start_preconditions"][
+        "reviewed_default_container_metadata_argv"
+    ]
+    assert exact["gateway_argv_template"] == [
+        "metadata",
+        "discover",
+        "--object-type",
+        "PropertyContainer",
+        "--query",
+        "<requested-field-name>",
+        "--limit",
+        "<1..8>",
+    ]
+    assert exact["replace_only"] == ["<requested-field-name>", "<1..8>"]
+
+
 def test_object_create_schema_puts_the_top_level_fact_plan_before_large_fields(
     tmp_path: Path,
 ) -> None:

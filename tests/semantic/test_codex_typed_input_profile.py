@@ -155,6 +155,28 @@ def test_2025_metadata_prompt_uses_the_exact_version_owned_container_path() -> N
         for command in ("operation-schema", "draft-start", "--fact-action")
     )
 
+
+def test_media_pool_prompt_separates_the_bounded_candidate_inventory_from_the_final_limit() -> None:
+    profile = load_typed_input_profile(PROFILE_PATH)
+    unit = next(
+        unit
+        for unit in profile.units
+        if unit.unit_id == "TYP25-GENERIC-MEDIA-POOL"
+    )
+
+    assert "最多 200 条候选" in unit.scenario.prompt
+    assert "从这份候选清单" in unit.scenario.prompt
+    assert "最终最多返回 20 条" in unit.scenario.prompt
+    assert all(
+        command not in unit.scenario.prompt
+        for command in (
+            "request-schema",
+            "typed-call",
+            "draft-start",
+            "maxResults",
+        )
+    )
+
 def test_typed_input_profile_rejects_definition_drift_before_filtering(
     tmp_path: Path,
 ) -> None:

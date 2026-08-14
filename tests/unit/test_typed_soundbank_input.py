@@ -463,6 +463,15 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
         "follow branch_disclosure first, then disclose every business-present "
         "member in this order before deferred_action_argv"
     )
+    assert item["continuation"]["request_wide_order"] == {
+        "phase": "dynamic_disclosure",
+        "finish_all_business_present_disclosures_first": True,
+        "array_item_order": "ascending_index",
+        "nested_member_order": "schema_property_order",
+        "facts_using_returned_handles": "only_after_all_disclosures",
+        "deferred_action_argv": "only_after_all_disclosures",
+        "this_handle_is_not_a_complete_request": True,
+    }
     assert item["continuation"]["deferred_action_argv"] == [
         "--action", "add_typed_fact", "--fact-action", "append",
         "--field-handle", inclusions["handle"], "--value-type", "object",
@@ -492,6 +501,9 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
         id_choice if token == "<choice_handle_from_this_response>" else token
         for token in branch["continuation"]["choice_argv"]
     ]
+    assert choice_argv.index("--parent-schema-token") < choice_argv.index(
+        "--choice-handle"
+    )
     identity_code, identity = gateway.execute_gateway(
         ["--version", "2025.1", *choice_argv],
         env=_env(tmp_path, "2025.1"),
