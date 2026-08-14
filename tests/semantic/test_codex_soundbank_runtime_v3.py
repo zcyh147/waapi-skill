@@ -588,7 +588,27 @@ def _unprepared_runtime(
     project_root = owned / "sandbox" / "SampleProject"
     project_root.mkdir(parents=True)
     project = project_root / "SampleProject.wproj"
-    project.write_text("<Project/>\n", encoding="utf-8")
+    if version == "2021.1":
+        (owned / "io" / "cache").mkdir(parents=True)
+        for platform in ("Windows", "Mac"):
+            (owned / "io" / "soundbanks" / platform).mkdir(parents=True)
+        project.write_text(
+            "<WwiseDocument><ProjectInfo><Project><PropertyList>"
+            "<Property Name='SoundBankPaths'><ValueList>"
+            "<Value Platform='Windows'>..\\..\\io\\soundbanks\\Windows</Value>"
+            "<Value Platform='Mac'>..\\..\\io\\soundbanks\\Mac</Value>"
+            "</ValueList></Property></PropertyList><MiscSettings>"
+            "<MiscSettingEntry Name='Cache'>..\\..\\io\\cache</MiscSettingEntry>"
+            "</MiscSettings></Project></ProjectInfo>"
+            "<SharedPropertyList><PropertyList>"
+            "<Property Name='SoundBankPaths'><ValueList>"
+            "<Value Platform='Windows'>ignored\\shared\\default</Value>"
+            "</ValueList></Property></PropertyList></SharedPropertyList>"
+            "</WwiseDocument>\n",
+            encoding="utf-8",
+        )
+    else:
+        project.write_text("<Project/>\n", encoding="utf-8")
     (project_root / "Default Work Unit.wwu").write_text("<WorkUnit/>\n", encoding="utf-8")
     blueprint = build_soundbank_blueprint(
         scenario,
@@ -598,6 +618,15 @@ def _unprepared_runtime(
         asset_root=owned / "assets" / scenario.id,
     )
     backend = FakeSoundBankBackend(blueprint)
+    if version == "2021.1":
+        backend.project_info["directories"]["cache"] = str(owned / "io" / "cache")
+        backend.project_info["directories"]["soundBankOutputRoot"] = str(
+            owned / "io" / "soundbanks"
+        )
+        for row in backend.project_info["platforms"]:
+            platform_root = owned / "io" / "soundbanks" / str(row["name"])
+            row["soundBankPath"] = str(platform_root)
+            row["copiedMediaPath"] = str(platform_root / "Media")
     runtime = PreparedSoundBankRuntime(blueprint, backend)
     return runtime, backend
 
@@ -765,6 +794,13 @@ def test_2021_topic_runtime_derives_reviewed_project_info_without_unavailable_ap
         row.platform_id is not None
         for row in materialized.topic_plan.expected_events
     )
+    output = runtime.blueprint.io_root / "io" / "soundbanks" / "Windows"
+    assert (output / "Init.bnk").is_file()
+    assert (output / "Test_Debug.bnk").is_file()
+    assert (output / "Frontend.bnk").is_file()
+    assert not tuple(
+        (runtime.blueprint.sandbox_root / "GeneratedSoundBanks").rglob("*.bnk")
+    )
 
 
 def test_2021_topic_runtime_rejects_ambiguous_direct_audio_sources(
@@ -864,7 +900,7 @@ def test_2021_topic_runtime_rejects_output_link_before_creating_external_rows(
     runtime, backend = _unprepared_runtime(tmp_path, scenario, version="2021.1")
     backend._insert(r"\Platforms\Windows", "Windows", "Platform")
     backend._insert(r"\Languages\SFX", "SFX", "Language")
-    generated = runtime.blueprint.sandbox_root / "GeneratedSoundBanks"
+    generated = runtime.blueprint.io_root / "io" / "soundbanks"
     shutil.rmtree(generated)
     outside = tmp_path / "outside-generated"
     outside.mkdir()
@@ -890,7 +926,7 @@ def test_2021_topic_runtime_rejects_output_reparse_before_creating_rows(
     runtime, backend = _unprepared_runtime(tmp_path, scenario, version="2021.1")
     backend._insert(r"\Platforms\Windows", "Windows", "Platform")
     backend._insert(r"\Languages\SFX", "SFX", "Language")
-    generated = runtime.blueprint.sandbox_root / "GeneratedSoundBanks"
+    generated = runtime.blueprint.io_root / "io" / "soundbanks"
     shutil.rmtree(generated)
     generated.mkdir()
     monkeypatch.setattr(
@@ -906,6 +942,77 @@ def test_2021_topic_runtime_rejects_output_reparse_before_creating_rows(
         runtime.prepare()
 
     assert list(generated.iterdir()) == []
+
+
+def test_2021_topic_runtime_rejects_noncanonical_project_output_traversal(
+    tmp_path: Path,
+) -> None:
+    scenario = replace(
+        next(row for row in _scenarios() if row.id == "O22-SB-GENERATED-01"),
+        versions=("2021.1",),
+    )
+    runtime, backend = _unprepared_runtime(tmp_path, scenario, version="2021.1")
+    backend._insert(r"\Platforms\Windows", "Windows", "Platform")
+    backend._insert(r"\Languages\SFX", "SFX", "Language")
+    document = ET.parse(runtime.blueprint.sandbox_project)
+    value = document.find(".//Property[@Name='SoundBankPaths']//Value[@Platform='Windows']")
+    assert value is not None
+    value.text = r"..\..\io\soundbanks\redirect\..\Windows"
+    document.write(
+        runtime.blueprint.sandbox_project,
+        encoding="utf-8",
+        xml_declaration=True,
+    )
+
+    with pytest.raises(SoundBankRuntimeError, match="traversal after a named component"):
+        runtime.prepare()
+
+
+@pytest.mark.parametrize(
+    "value",
+    (
+        r"..\.\..\io\soundbanks\Windows",
+        r"..\..\io\\soundbanks\Windows",
+        r"..\../io\soundbanks\Windows",
+        r"C:\owned\soundbanks\Windows",
+        r"\\server\share\soundbanks\Windows",
+        "..\\..\\io\\soundbanks\\Windows ",
+    ),
+)
+def test_2021_project_output_path_rejects_noncanonical_spelling(
+    tmp_path: Path,
+    value: str,
+) -> None:
+    scenario = replace(
+        next(row for row in _scenarios() if row.id == "O22-SB-GENERATED-01"),
+        versions=("2021.1",),
+    )
+    runtime, _backend = _unprepared_runtime(tmp_path, scenario, version="2021.1")
+
+    with pytest.raises(SoundBankRuntimeError):
+        soundbank_runtime._legacy_owned_project_directory(
+            value,
+            project=runtime.blueprint.sandbox_project,
+            io_root=runtime.blueprint.io_root,
+            field="SoundBankPaths[Windows]",
+        )
+
+
+def test_2021_project_output_path_accepts_one_wwise_trailing_separator(
+    tmp_path: Path,
+) -> None:
+    scenario = replace(
+        next(row for row in _scenarios() if row.id == "O22-SB-GENERATED-01"),
+        versions=("2021.1",),
+    )
+    runtime, _backend = _unprepared_runtime(tmp_path, scenario, version="2021.1")
+
+    assert soundbank_runtime._legacy_owned_project_directory(
+        "..\\..\\io\\soundbanks\\Windows\\",
+        project=runtime.blueprint.sandbox_project,
+        io_root=runtime.blueprint.io_root,
+        field="SoundBankPaths[Windows]",
+    ) == runtime.blueprint.io_root / "io" / "soundbanks" / "Windows"
 
 
 def _bounded_project_info_inventories(

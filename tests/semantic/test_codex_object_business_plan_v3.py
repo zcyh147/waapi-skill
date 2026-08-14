@@ -559,7 +559,11 @@ def test_typed_profile_merge_reads_the_exact_root_before_schema_continuation() -
         "--return-field",
         "path",
     )
-    assert "先核对现有 `Robot_VO` 的完整路径和类型" in unit.scenario.prompt
+    assert (
+        "先核对现有 `\\Actor-Mixer Hierarchy\\Default Work Unit"
+        "\\SemanticLab\\NPC\\Robot_VO` 的完整路径和类型"
+        in unit.scenario.prompt
+    )
 
 
 def test_object_archive_rejects_static_live_file_delta_and_extra_field_tamper(

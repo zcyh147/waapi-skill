@@ -52,6 +52,7 @@ from .codex_eval_bundle_v3 import OnlineScenario
 from .codex_host_paths import (
     ReflectedHostPathError,
     parse_posix_absolute_path,
+    parse_relative_host_path,
     parse_windows_drive_path,
 )
 from .codex_version_layout_v3 import (
@@ -3766,25 +3767,23 @@ def _normalize_2021_topic_project_info(
         return row
 
     root = blueprint.sandbox_root.resolve(strict=True)
-    cache = _resolve_owned_host_directory(
-        str(root / ".cache"),
-        "directories.cache",
-        io_root=blueprint.io_root,
+    platform_paths, cache = _legacy_project_output_paths(
+        blueprint,
+        platform_names=platform_names,
     )
-    generated = _resolve_owned_host_directory(
-        str(root / "GeneratedSoundBanks"),
-        "directories.soundBankOutputRoot",
-        io_root=blueprint.io_root,
-    )
+    output_roots = tuple(platform_paths.values())
+    output_parents = {path.parent for path in output_roots}
+    if len(output_parents) != 1:
+        raise SoundBankRuntimeError(
+            "2021 project SoundBank platform paths must share one output root"
+        )
+    common_output = next(iter(output_parents))
+    _require_under(common_output, blueprint.io_root, "directories.soundBankOutputRoot")
     platforms: list[dict[str, Any]] = []
     platform_directories: list[tuple[Path, Path]] = []
     for name in platform_names:
         row = dict(exact_identity("Platform", name))
-        soundbank_path = _resolve_owned_host_directory(
-            str(generated / name),
-            "platform.soundBankPath",
-            io_root=blueprint.io_root,
-        )
+        soundbank_path = platform_paths[name]
         copied_media_path = _resolve_owned_host_directory(
             str(soundbank_path / "Media"),
             "platform.copiedMediaPath",
@@ -3803,7 +3802,7 @@ def _normalize_2021_topic_project_info(
         dict(exact_identity("Language", name)) for name in language_names
     ]
     cache.mkdir(parents=True, exist_ok=True)
-    generated.mkdir(parents=True, exist_ok=True)
+    common_output.mkdir(parents=True, exist_ok=True)
     for soundbank_path, copied_media_path in platform_directories:
         soundbank_path.mkdir(parents=True, exist_ok=True)
         copied_media_path.mkdir(parents=True, exist_ok=True)
@@ -3817,11 +3816,133 @@ def _normalize_2021_topic_project_info(
             "directories": {
                 "root": str(root),
                 "cache": str(cache),
-                "soundBankOutputRoot": str(generated),
+                "soundBankOutputRoot": str(common_output),
             },
         },
         blueprint=blueprint,
     )
+
+
+def _legacy_project_output_paths(
+    blueprint: SoundBankBlueprint,
+    *,
+    platform_names: Sequence[str],
+) -> tuple[dict[str, Path], Path]:
+    """Read the prelaunch-owned 2021 output/cache paths from the saved project."""
+
+    project = blueprint.sandbox_project
+    before = _file_proof(project, blueprint.io_root)
+    try:
+        document = ET.parse(project).getroot()
+    except (ET.ParseError, OSError) as exc:
+        raise SoundBankRuntimeError(
+            f"cannot parse the scenario-owned Wwise project: {exc}"
+        ) from exc
+    after = _file_proof(project, blueprint.io_root)
+    if before != after:
+        raise SoundBankRuntimeError("Wwise project changed while output paths were read")
+
+    project_info = _legacy_exact_xml_child(document, "ProjectInfo")
+    project_element = _legacy_exact_xml_child(project_info, "Project")
+    property_list = _legacy_exact_xml_child(project_element, "PropertyList")
+    properties = tuple(
+        element
+        for element in property_list
+        if element.tag.rsplit("}", 1)[-1] == "Property"
+        and element.attrib.get("Name") == "SoundBankPaths"
+    )
+    if len(properties) != 1:
+        raise SoundBankRuntimeError(
+            "2021 project must contain exactly one SoundBankPaths property"
+        )
+    result: dict[str, Path] = {}
+    for name in platform_names:
+        values = tuple(
+            element
+            for element in properties[0].iter()
+            if element.tag.rsplit("}", 1)[-1] == "Value"
+            and element.attrib.get("Platform") == name
+        )
+        if len(values) != 1 or not isinstance(values[0].text, str):
+            raise SoundBankRuntimeError(
+                f"2021 project SoundBankPaths must bind platform exactly once: {name}"
+            )
+        result[name] = _legacy_owned_project_directory(
+            values[0].text,
+            project=project,
+            io_root=blueprint.io_root,
+            field=f"SoundBankPaths[{name}]",
+        )
+        if result[name].name.casefold() != name.casefold():
+            raise SoundBankRuntimeError(
+                f"2021 project SoundBank path does not end in its platform: {name}"
+            )
+
+    misc_settings = _legacy_exact_xml_child(project_element, "MiscSettings")
+    cache_rows = tuple(
+        element
+        for element in misc_settings
+        if element.tag.rsplit("}", 1)[-1] == "MiscSettingEntry"
+        and element.attrib.get("Name") == "Cache"
+    )
+    if len(cache_rows) != 1 or not isinstance(cache_rows[0].text, str):
+        raise SoundBankRuntimeError(
+            "2021 project must contain exactly one Cache directory setting"
+        )
+    cache = _legacy_owned_project_directory(
+        cache_rows[0].text,
+        project=project,
+        io_root=blueprint.io_root,
+        field="MiscSettings.Cache",
+    )
+    return result, cache
+
+
+def _legacy_exact_xml_child(parent: ET.Element, name: str) -> ET.Element:
+    rows = tuple(
+        child for child in parent if child.tag.rsplit("}", 1)[-1] == name
+    )
+    if len(rows) != 1:
+        raise SoundBankRuntimeError(
+            f"2021 project must contain exactly one direct {name} element"
+        )
+    return rows[0]
+
+
+def _legacy_owned_project_directory(
+    value: str,
+    *,
+    project: Path,
+    io_root: Path,
+    field: str,
+) -> Path:
+    try:
+        parsed = parse_relative_host_path(
+            value,
+            allow_parent_segments=True,
+            allow_trailing_separator=True,
+        )
+    except ReflectedHostPathError as exc:
+        raise SoundBankRuntimeError(f"{field} is not a canonical relative path") from exc
+    if "/" in value:
+        raise SoundBankRuntimeError(
+            f"{field} must use canonical Wwise backslash separators"
+        )
+    if len(parsed.relative_parts) > 32:
+        raise SoundBankRuntimeError(f"{field} has too many relative components")
+    candidate = project.parent
+    saw_named_component = False
+    for component in parsed.relative_parts:
+        if component == "..":
+            if saw_named_component:
+                raise SoundBankRuntimeError(
+                    f"{field} has traversal after a named component"
+                )
+            candidate = candidate.parent
+            continue
+        saw_named_component = True
+        candidate /= component
+    return _resolve_owned_host_directory(str(candidate), field, io_root=io_root)
 
 
 def _localize_wwise_host_path(

@@ -33,6 +33,7 @@ from types import MappingProxyType
 from typing import Any, Protocol
 
 from .codex_eval_bundle_v3 import OnlineScenario
+from .codex_filesystem_security import path_is_link_or_reparse
 from .codex_import_assets_v3 import (
     MaterializedFile,
     MaterializedImportCase,
@@ -1367,18 +1368,31 @@ class PreparedImportRuntime:
                     fields=AUDIO_SOURCE_FIELDS_2021,
                 )
                 if _object_type_matches(source.get("type"), "AudioFileSource")
+                and (
+                    _identity_value(source.get("parent")) is None
+                    or _identity_value(source.get("parent")) == object_id
+                )
+            )
+            active_source = _legacy_active_source_id_from_project(
+                object_id,
+                sandbox_root=self.plan.sandbox_root,
+            )
+            active_rows = tuple(
+                source
+                for source in direct_sources
+                if (
+                    (_identity_value(source.get("id")) or "").casefold()
+                    == active_source.casefold()
+                )
                 and _language_name(_field_value(source, "audioSource:language"))
                 == language
             )
-            if len(direct_sources) != 1:
+            if len(active_rows) != 1:
                 raise ImportRuntimeError(
-                    "2021 import target must have exactly one direct AudioFileSource "
-                    f"for {language}: {path}"
+                    "2021 persisted active Audio Source must bind exactly one "
+                    f"direct {language} AudioFileSource: {path}"
                 )
-            active_source = _required_guid(
-                direct_sources[0].get("id"),
-                "2021 direct Audio Source id",
-            )
+            direct_sources = active_rows
         if active_source is not None:
             source_rows = (
                 direct_sources
@@ -2849,16 +2863,122 @@ def _tree_proofs(
     include: Callable[[Path], bool],
     limit: int,
 ) -> tuple[FileProof, ...]:
+    candidate = root.expanduser()
+    try:
+        root_metadata = candidate.lstat()
+    except OSError as exc:
+        raise ImportRuntimeError(f"sandbox evidence root is unavailable: {candidate}") from exc
+    if path_is_link_or_reparse(candidate, metadata=root_metadata):
+        raise ImportRuntimeError(
+            f"sandbox evidence root is a symlink or reparse point: {candidate}"
+        )
+    resolved = candidate.resolve(strict=True)
+    if not resolved.is_dir():
+        raise ImportRuntimeError("sandbox evidence root must be a real directory")
     result: list[FileProof] = []
-    for path in sorted(root.rglob("*")):
-        if path.is_symlink():
-            raise ImportRuntimeError(f"sandbox evidence contains a symlink: {path}")
-        if not path.is_file() or not include(path):
-            continue
-        result.append(_regular_file_proof(path, relative_to=root, require_contained=True))
-        if len(result) > limit:
-            raise ImportRuntimeError("sandbox evidence file count exceeded its bound")
+    for current, directory_names, file_names in os.walk(resolved, followlinks=False):
+        directory_names.sort()
+        file_names.sort()
+        current_path = Path(current)
+        for name in directory_names:
+            path = current_path / name
+            metadata = path.lstat()
+            if path_is_link_or_reparse(path, metadata=metadata):
+                raise ImportRuntimeError(
+                    f"sandbox evidence contains a symlink or reparse directory: {path}"
+                )
+        for name in file_names:
+            path = current_path / name
+            metadata = path.lstat()
+            if path_is_link_or_reparse(path, metadata=metadata):
+                raise ImportRuntimeError(
+                    f"sandbox evidence contains a symlink or reparse file: {path}"
+                )
+            if not include(path):
+                continue
+            result.append(
+                _regular_file_proof(path, relative_to=resolved, require_contained=True)
+            )
+            if len(result) > limit:
+                raise ImportRuntimeError("sandbox evidence file count exceeded its bound")
     return tuple(result)
+
+
+def _legacy_active_source_id_from_project(
+    sound_id: str,
+    *,
+    sandbox_root: Path,
+) -> str:
+    """Read Wwise 2021's saved Linked ActiveSource for one exact Sound."""
+
+    expected_sound_id = _required_guid(sound_id, "2021 Sound id")
+    proofs = _tree_proofs(
+        sandbox_root,
+        include=lambda path: path.suffix.casefold() == ".wwu",
+        limit=MAX_PROJECT_XML_FILES,
+    )
+    matches: list[str] = []
+    for proof in proofs:
+        path = Path(proof.path)
+        current = _regular_file_proof(
+            path,
+            relative_to=sandbox_root,
+            require_contained=True,
+        )
+        if current != proof:
+            raise ImportRuntimeError(
+                f"saved Wwise XML changed before ActiveSource read: {path}"
+            )
+        try:
+            tree = ET.parse(path)
+        except (ET.ParseError, OSError) as exc:
+            raise ImportRuntimeError(
+                f"cannot parse saved Wwise XML {path}: {exc}"
+            ) from exc
+        after = _regular_file_proof(
+            path,
+            relative_to=sandbox_root,
+            require_contained=True,
+        )
+        if after != proof:
+            raise ImportRuntimeError(
+                f"saved Wwise XML changed during ActiveSource read: {path}"
+            )
+        for sound in tree.iter():
+            if sound.tag.rsplit("}", 1)[-1] != "Sound":
+                continue
+            if sound.attrib.get("ID", "").casefold() != expected_sound_id.casefold():
+                continue
+            lists = tuple(
+                child
+                for child in sound
+                if child.tag.rsplit("}", 1)[-1] == "ActiveSourceList"
+            )
+            if len(lists) != 1:
+                raise ImportRuntimeError(
+                    "persisted 2021 Sound must contain exactly one ActiveSourceList"
+                )
+            active_rows = tuple(
+                child
+                for child in lists[0]
+                if child.tag.rsplit("}", 1)[-1] == "ActiveSource"
+                and child.attrib.get("Platform", "").casefold() == "linked"
+            )
+            if len(active_rows) != 1:
+                raise ImportRuntimeError(
+                    "persisted 2021 Sound must contain exactly one Linked ActiveSource"
+                )
+            matches.append(
+                _required_guid(
+                    active_rows[0].attrib.get("ID"),
+                    "persisted 2021 ActiveSource id",
+                )
+            )
+    if len(matches) != 1:
+        raise ImportRuntimeError(
+            "persisted 2021 Sound GUID must resolve to exactly one ActiveSource"
+        )
+    return matches[0]
 
 
 def _is_originals_file(path: Path) -> bool:
@@ -2911,8 +3031,14 @@ def _regular_file_proof(
     if not isinstance(value, (str, os.PathLike)):
         raise ImportRuntimeError("file proof requires a path")
     candidate = Path(value).expanduser()
-    if candidate.is_symlink():
-        raise ImportRuntimeError(f"file proof refuses a symlink: {candidate}")
+    try:
+        candidate_metadata = candidate.lstat()
+    except OSError as exc:
+        raise ImportRuntimeError(f"file proof path is unavailable: {candidate}") from exc
+    if path_is_link_or_reparse(candidate, metadata=candidate_metadata):
+        raise ImportRuntimeError(
+            f"file proof refuses a symlink or reparse point: {candidate}"
+        )
     path = candidate.resolve(strict=True)
     if not path.is_file():
         raise ImportRuntimeError(f"file proof requires a regular file: {path}")
