@@ -153,6 +153,7 @@ from tests.semantic.support.codex_cli_runtime_v3 import (  # noqa: E402
 from tests.semantic.support.codex_object_business_plan_v3 import (  # noqa: E402
     ObjectBusinessPlanError,
     ObjectBusinessPlanSections,
+    TYPED_PROFILE_SET03_UNIT_ID,
     parse_object_business_plan_sections,
     validate_archived_object_business_plan,
     validate_object_archived_verification,
@@ -6231,6 +6232,12 @@ def _validate_heavy_v3_typed_business_plan(
             recipe=recipe,
             protocol=protocol,
             verify_files=False,
+            profile_unit_id=(
+                TYPED_PROFILE_SET03_UNIT_ID
+                if getattr(expected_unit, "unit_id", None)
+                == TYPED_PROFILE_SET03_UNIT_ID
+                else None
+            ),
         )
         if parsed.writer_kwargs() != sections.writer_kwargs():
             raise CampaignEvidenceError(

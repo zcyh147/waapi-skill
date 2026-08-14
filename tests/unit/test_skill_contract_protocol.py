@@ -1137,3 +1137,5 @@ def test_named_api_result_uses_status_only_as_preflight() -> None:
     assert "asks for the independent live result of a named API" in SKILL
     assert "status` only as the required host/project preflight" in SKILL
     assert "does not replace that independently requested API call" in SKILL
+    assert "needs only this `SKILL.md`" in SKILL
+    assert "do not read the setup or query reference" in SKILL

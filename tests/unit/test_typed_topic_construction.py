@@ -60,6 +60,54 @@ class _Handler:
         return True
 
 
+def _expand_compact_field_table(table: dict[str, object]) -> list[dict[str, object]]:
+    columns = list(table["columns"])
+    shapes = list(table["shape_codes"])
+    accepted_type_sets = list(table["accepted_type_sets"])
+    constraint_sets = list(table["constraint_sets"])
+    defaults = dict(table["constraint_defaults"])
+    rows = list(table["rows"])
+    handles = [str(table["handle_prefix"]) + str(row[0]) for row in rows]
+    expanded_fields: list[dict[str, object]] = []
+    assert columns == [
+        "handle_suffix",
+        "parent_row",
+        "name",
+        "shape_code",
+        "accepted_type_set",
+        "constraint_set",
+    ]
+    for handle, row in zip(handles, rows, strict=True):
+        parent_row = row[1]
+        shape = shapes[row[3]]
+        constraints = dict(constraint_sets[row[5]])
+        field: dict[str, object] = {
+            "handle": handle,
+            "section": table["section"],
+            "name": row[2],
+            "required": constraints.pop("required", defaults["required"]),
+            "shape": shape,
+            "accepted_types": accepted_type_sets[row[4]],
+            **constraints,
+        }
+        if parent_row is not None:
+            field["parent_handle"] = handles[parent_row]
+        if shape == "array":
+            field.setdefault("minimum_items", None)
+            field.setdefault("maximum_items", None)
+            field.setdefault("unique_items", defaults["array_unique_items"])
+        if shape == "map":
+            field.setdefault("maximum_properties", None)
+            field.setdefault("maximum_bytes", None)
+            field.setdefault("maximum_key_bytes", None)
+            map_payload = dict(field["map"])
+            for key, value in dict(defaults["map"]).items():
+                map_payload.setdefault(key, value)
+            field["map"] = map_payload
+        expanded_fields.append(field)
+    return expanded_fields
+
+
 class _TopicClient:
     def __init__(self, topic: str, events: list[dict[str, object]]) -> None:
         self.topic = topic
@@ -109,6 +157,38 @@ def test_all_maximum_profile_topic_lanes_compile_exact_typed_contracts() -> None
             lane_count += 1
 
     assert lane_count == 154
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_all_public_topic_schema_lanes_fit_the_final_visible_ceiling(
+    tmp_path: Path,
+    version: str,
+) -> None:
+    topics = [
+        row
+        for row in CapabilityCatalog().entries_for_profile(
+            version,
+            profile=AUTHORING_UI_EXECUTION_PROFILE,
+        )
+        if row.item_type == "topic"
+    ]
+
+    for topic in topics:
+        code, payload = gateway.execute_gateway(
+            ["topic-schema", topic.uri],
+            env=_env(tmp_path, version),
+            client_factory=lambda url: pytest.fail(
+                f"topic-schema connected to {url}"
+            ),
+        )
+
+        assert code == 0, (version, topic.uri, payload)
+        assert payload["topic"] == topic.uri
+        assert payload["bounds"]["stdout_utf8_bytes"] == 32 * 1024
+        assert gateway.gateway_json_document_size(payload) <= 32 * 1024
+        encoded = gateway.gateway_stdout_json_encoder(payload).encode(payload)
+        assert json.loads(encoded) == payload
+        assert encoded.index('"continuation"') < 4096
 
 
 def test_zero_topic_inputs_materialize_without_caller_authored_json() -> None:
@@ -198,6 +278,7 @@ def test_topic_schema_discloses_one_typed_continuation_offline(tmp_path: Path) -
     assert payload["topic"] == topic
     assert payload["options"]["schema_digest"]
     assert payload["event_match"]["schema_digest"]
+    assert payload["bounds"]["stdout_utf8_bytes"] == 32 * 1024
     assert payload["continuation"]["subcommands"] == ["wait-topic", "stream-topic"]
     assert payload["event_match"]["continuation"]["dynamic_container_commands"] == {
         "map_value": "request-map-container",
@@ -208,20 +289,22 @@ def test_topic_schema_discloses_one_typed_continuation_offline(tmp_path: Path) -
     assert "match-json" not in serialized
 
 
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
 def test_wait_topic_digests_bind_to_the_real_topic_schema_envelope(
     tmp_path: Path,
+    version: str,
 ) -> None:
     topic = "ak.wwise.core.soundbank.generated"
     code, payload = gateway.execute_gateway(
         ["topic-schema", topic],
-        env=_env(tmp_path, "2021.1"),
+        env=_env(tmp_path, version),
         client_factory=lambda url: pytest.fail(f"topic-schema connected to {url}"),
     )
     assert code == 0, payload
     step = wait_topic_step(
         "soundbank.generated.wait",
         topic,
-        version="2021.1",
+        version=version,
         event_count=1,
         schema_step_name="soundbank.generated.schema",
     )
@@ -240,6 +323,29 @@ def test_wait_topic_digests_bind_to_the_real_topic_schema_envelope(
     )
     assert payload["options"]["schema_digest"]
     assert payload["event_match"]["schema_digest"]
+    assert payload["options"]["fields"]["section"] == "options"
+    assert payload["event_match"]["fields"]["section"] == "args"
+    assert payload["options"]["continuation"]["request_key"] == (
+        f"topic.options:{topic}"
+    )
+    assert payload["event_match"]["continuation"]["request_key"] == (
+        f"topic.match:{topic}"
+    )
+    for contract, public_key in (
+        (topic_options_contract(version, topic), "options"),
+        (topic_match_contract(version, topic), "event_match"),
+    ):
+        full_fields = contract.gateway_field_payloads()
+        compact_fields = _expand_compact_field_table(payload[public_key]["fields"])
+        assert len(compact_fields) == len(full_fields)
+        for full, compact in zip(full_fields, compact_fields, strict=True):
+            expected = dict(full)
+            expected.pop("path")
+            assert compact == expected
+    encoded = gateway.gateway_stdout_json_encoder(payload).encode(payload)
+    assert len(encoded.encode("utf-8")) < 32 * 1024
+    assert "\n" not in encoded
+    assert encoded.index('"continuation"') < 4096
 
 
 def test_public_nested_topic_match_handle_is_lifecycle_neutral(tmp_path: Path) -> None:

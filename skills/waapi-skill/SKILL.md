@@ -93,7 +93,7 @@ Use the listed route for the corresponding intent:
 | explicitly stream topic events continuously | `stream-topic` |
 | inspect project-changing operation support | `operations` / `operation-schema` |
 
-`status` completes a connection/version/project request. When the user instead asks for the independent live result of a named API, including `getInfo`, use `status` only as the required host/project preflight, then run `request-schema <exact-uri>` and its sole typed continuation. The result embedded in `status` does not replace that independently requested API call.
+`status` completes a connection/version/project request. When the user instead asks for the independent live result of a named API, including `getInfo`, use `status` only as the required host/project preflight, then run `request-schema <exact-uri>` and its sole typed continuation. The result embedded in `status` does not replace that independently requested API call. This complete named-`getInfo` route needs only this `SKILL.md`; do not read the setup or query reference for it.
 
 Every command except `stream-topic` prints one JSON document; streaming prints compact flushed NDJSON event records and one terminal record. Summarize actual values; show full JSON only if asked. Every result includes bounded `session_context`; use it for the one-time introduction and never reconstruct it.
 

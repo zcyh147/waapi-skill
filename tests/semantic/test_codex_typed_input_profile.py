@@ -122,6 +122,21 @@ def test_bounded_query_prompt_keeps_boolean_filtering_in_the_returned_inventory(
     )
 
 
+def test_create_merge_prompt_keeps_the_existing_node_out_of_the_parent_role() -> None:
+    profile = load_typed_input_profile(PROFILE_PATH)
+    unit = next(
+        unit
+        for unit in profile.units
+        if unit.unit_id == "TYP21-DEDICATED-OBJECT-CREATE"
+    )
+
+    assert "在它当前的直接父级下按原名合并" in unit.scenario.prompt
+    assert "不要把 `Robot_VO` 自己当作新建父级" in unit.scenario.prompt
+    assert all(
+        command not in unit.scenario.prompt
+        for command in ("operation-schema", "draft-start", "--fact-action")
+    )
+
 def test_typed_input_profile_rejects_definition_drift_before_filtering(
     tmp_path: Path,
 ) -> None:

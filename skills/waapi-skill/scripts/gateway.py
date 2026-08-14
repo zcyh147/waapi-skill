@@ -341,6 +341,7 @@ PROJECT_IDENTITY_FIELDS = ("id", "name", "path")
 EXPANDING_QUERY_SELECTS = frozenset({"descendants", "ancestors", "referencesTo", "children"})
 MAX_GATEWAY_RESULT_JSON_BYTES = 1024 * 1024
 MAX_METADATA_DISCOVERY_GATEWAY_RESULT_BYTES = 32 * 1024
+MAX_TOPIC_SCHEMA_GATEWAY_RESULT_BYTES = 32 * 1024
 TOPIC_STREAM_POLL_SECONDS = 0.05
 TOPIC_STREAM_HEALTH_INTERVAL_SECONDS = 5.0
 MAX_GATEWAY_JSON_INPUT_BYTES = 256 * 1024
@@ -2242,9 +2243,8 @@ def gateway_json_document_size(
 def gateway_stdout_json_encoder(value: Any | None = None) -> json.JSONEncoder:
     """Build the strict, insertion-ordered encoder used for gateway stdout.
 
-    Named operation schemas retain their complete payload but use compact JSON
-    so the terminal document stays visible within bounded agent tool output.
-    Other gateway documents retain the existing pretty representation.
+    Schema-discovery payloads use compact JSON to reduce output size. Other
+    gateway documents retain the existing pretty representation.
     """
 
     options: dict[str, Any] = {
@@ -2255,7 +2255,8 @@ def gateway_stdout_json_encoder(value: Any | None = None) -> json.JSONEncoder:
     }
     if (
         isinstance(value, Mapping)
-        and value.get("command") in {"operation-schema", "query-schema"}
+        and value.get("command")
+        in {"operation-schema", "query-schema", "topic-schema"}
     ):
         options["separators"] = (",", ":")
     else:
@@ -3983,26 +3984,18 @@ def public_typed_contract(version: str, api: str) -> Any:
     return request_contract(version, api)
 
 
-def typed_topic_contract_payload(contract: Any, *, prefix: str) -> dict[str, Any]:
+def typed_topic_contract_payload(contract: Any) -> dict[str, Any]:
     """Project one shared Core contract with Topic-specific continuation names."""
 
     payload = contract.as_gateway_payload()
+    payload["fields"] = contract.gateway_field_table()
     payload["input_shape"] = "typed-facts"
     payload["continuation"] = {
         "dynamic_container_commands": {
             "map_value": "request-map-container",
             "array_item": "request-array-item",
         },
-        "facts": {
-            "set": f"--{prefix}-set <field_handle> <type> <value>",
-            "append": f"--{prefix}-append <field_handle> <type> <value>",
-            "present": f"--{prefix}-present <container_handle>",
-            "choose": f"--{prefix}-choose <branch_handle> <choice_handle>",
-            "choose_dynamic": (
-                f"--{prefix}-choose-dynamic <object_handle> <key> <choice_handle>"
-            ),
-            "map_put": f"--{prefix}-map-put <map_handle> <key> <type> <value>",
-        }
+        "request_key": contract.uri,
     }
     return payload
 
@@ -4014,7 +4007,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         (version,) = resolve_catalog_versions(args, env=env)
         options = topic_options_contract(version, args.api)
         match = topic_match_contract(version, args.api)
-        return {
+        payload = {
             "contract": "waapi-skill.typed-topic-input/v1",
             "ok": True,
             "status": "ok",
@@ -4022,8 +4015,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "offline": True,
             "version": version,
             "topic": args.api,
-            "options": typed_topic_contract_payload(options, prefix="option"),
-            "event_match": typed_topic_contract_payload(match, prefix="match"),
+            "bounds": {
+                "stdout_utf8_bytes": MAX_TOPIC_SCHEMA_GATEWAY_RESULT_BYTES,
+            },
             "continuation": {
                 "subcommands": ["wait-topic", "stream-topic"],
                 "bind": {
@@ -4058,7 +4052,23 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     ),
                 },
             },
+            "options": typed_topic_contract_payload(options),
+            "event_match": typed_topic_contract_payload(match),
         }
+        final_payload = attach_gateway_session_context(
+            payload,
+            args=args,
+            env=env,
+        )
+        observed = gateway_json_document_size(
+            final_payload,
+            stop_after_bytes=MAX_TOPIC_SCHEMA_GATEWAY_RESULT_BYTES,
+        )
+        if observed > MAX_TOPIC_SCHEMA_GATEWAY_RESULT_BYTES:
+            raise ValueError(
+                "Typed Topic schema exceeds its fixed 32 KiB public output ceiling"
+            )
+        return payload
     if args.command in {"request-schema", "request-map-container", "request-array-item"}:
         versions = resolve_catalog_versions(args, env=env)
         if len(versions) != 1:

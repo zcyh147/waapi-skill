@@ -179,6 +179,120 @@ class TypedRequestContract:
                 field_payload["branch_choice_constants"] = constants
         return field_payloads
 
+    def gateway_field_table(self) -> dict[str, Any]:
+        """Return a compact, lossless table for large discovery documents."""
+
+        fields = self.gateway_field_payloads()
+        sections = {field.section for field in self.fields}
+        if not sections:
+            section = "options" if self.uri.startswith("topic.options:") else "args"
+        elif len(sections) == 1:
+            section = next(iter(sections))
+        else:
+            raise TypedRequestError("Typed field table requires one request section")
+        handle_prefix = (
+            "trh1-"
+            if fields and all(str(field["handle"]).startswith("trh1-") for field in fields)
+            else ""
+        )
+        row_by_handle = {
+            str(field["handle"]): index for index, field in enumerate(fields)
+        }
+        shape_codes: list[str] = []
+        accepted_type_sets: list[list[str]] = []
+        constraint_sets: list[dict[str, Any]] = []
+        constraint_indexes: dict[str, int] = {}
+        rows: list[list[Any]] = []
+        for field in fields:
+            shape = str(field["shape"])
+            if shape not in shape_codes:
+                shape_codes.append(shape)
+            accepted_types = list(field["accepted_types"])
+            if accepted_types not in accepted_type_sets:
+                accepted_type_sets.append(accepted_types)
+            constraints = {
+                key: value
+                for key, value in field.items()
+                if key
+                not in {
+                    "handle",
+                    "parent_handle",
+                    "name",
+                    "shape",
+                    "accepted_types",
+                    "section",
+                    "path",
+                }
+                and not (key == "required" and value is False)
+                and not (
+                    key
+                    in {
+                        "minimum_items",
+                        "maximum_items",
+                        "maximum_properties",
+                        "maximum_bytes",
+                        "maximum_key_bytes",
+                    }
+                    and value is None
+                )
+                and not (key == "unique_items" and value is False)
+            }
+            map_payload = constraints.get("map")
+            if isinstance(map_payload, Mapping):
+                compact_map = dict(map_payload)
+                if compact_map.get("key_patterns") == []:
+                    compact_map.pop("key_patterns")
+                if compact_map.get("schema_authorized_additional_keys") is False:
+                    compact_map.pop("schema_authorized_additional_keys")
+                if compact_map.get("one_key_per_fact") is True:
+                    compact_map.pop("one_key_per_fact")
+                constraints["map"] = compact_map
+            constraint_key = canonical_json_bytes(constraints).decode("utf-8")
+            constraint_index = constraint_indexes.get(constraint_key)
+            if constraint_index is None:
+                constraint_index = len(constraint_sets)
+                constraint_indexes[constraint_key] = constraint_index
+                constraint_sets.append(constraints)
+            parent_handle = field.get("parent_handle")
+            rows.append(
+                [
+                    str(field["handle"]).removeprefix(handle_prefix),
+                    row_by_handle.get(str(parent_handle)) if parent_handle else None,
+                    field["name"],
+                    shape_codes.index(shape),
+                    accepted_type_sets.index(accepted_types),
+                    constraint_index,
+                ]
+            )
+        return {
+            "contract": "waapi-skill.compact-typed-field-table/v1",
+            "section": section,
+            "handle_prefix": handle_prefix,
+            "columns": [
+                "handle_suffix",
+                "parent_row",
+                "name",
+                "shape_code",
+                "accepted_type_set",
+                "constraint_set",
+            ],
+            "shape_codes": shape_codes,
+            "accepted_type_sets": accepted_type_sets,
+            "constraint_sets": constraint_sets,
+            "constraint_defaults": {
+                "required": False,
+                "null_limits": True,
+                "array_unique_items": False,
+                "map": {
+                    "key_patterns": [],
+                    "schema_authorized_additional_keys": False,
+                    "one_key_per_fact": True,
+                },
+            },
+            "path": "omitted; construct with handles and parent_row lineage",
+            "rows": rows,
+        }
+
     def as_gateway_payload(self) -> dict[str, Any]:
         if not self.fields:
             gateway_argv = [

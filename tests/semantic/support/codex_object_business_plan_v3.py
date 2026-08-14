@@ -60,6 +60,7 @@ OBJECT_APIS = frozenset(
         "ak.wwise.core.object.set",
     }
 )
+TYPED_PROFILE_SET03_UNIT_ID = "TYP22-METADATA-OBJECT-SET"
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _MAX_OBJECT_INPUT_FILE_BYTES = 256 * 1024 * 1024
 _GUID_RE = re.compile(
@@ -149,11 +150,18 @@ def compile_object_business_plan(
     protocol: V3GatewayProtocol,
     before: ObjectRuntimeSnapshot,
     input_file_manifest: Sequence[Mapping[str, Any]] = (),
+    *,
+    profile_unit_id: str | None = None,
 ) -> ObjectBusinessPlanSections:
     """Compile one exact object plan from reviewed and live runner inputs."""
 
     _validate_identity(scenario, recipe)
-    _validate_protocol(recipe, protocol, scenario=scenario)
+    _validate_protocol(
+        recipe,
+        protocol,
+        scenario=scenario,
+        profile_unit_id=profile_unit_id,
+    )
     before_value = _validate_before_snapshot(recipe, before)
     file_rows = _validate_input_manifest(
         input_file_manifest,
@@ -164,7 +172,11 @@ def compile_object_business_plan(
         },
         verify_files=True,
     )
-    static = _static_expectation(recipe, protocol)
+    static = _static_expectation(
+        recipe,
+        protocol,
+        profile_unit_id=profile_unit_id,
+    )
     live = _live_binding(before_value, file_rows)
     rules = _delta_rules(recipe, before_value)
     primary_steps, verification_steps = _step_partition(recipe, protocol)
@@ -239,6 +251,7 @@ def validate_object_business_plan(
     before: ObjectRuntimeSnapshot,
     input_file_manifest: Sequence[Mapping[str, Any]] = (),
     verify_files: bool = False,
+    profile_unit_id: str | None = None,
 ) -> None:
     """Recompile from live dataclasses and compare every persisted section."""
 
@@ -248,6 +261,7 @@ def validate_object_business_plan(
         protocol,
         before,
         input_file_manifest,
+        profile_unit_id=profile_unit_id,
     )
     if sections.writer_kwargs() != expected.writer_kwargs():
         raise ObjectBusinessPlanError(
@@ -268,13 +282,23 @@ def validate_archived_object_business_plan(
     recipe: ObjectHeavyRecipe,
     protocol: V3GatewayProtocol,
     verify_files: bool = False,
+    profile_unit_id: str | None = None,
 ) -> ObjectBusinessPlanSections:
     """Validate an archived plan after scenario-owned state may be removed."""
 
     _validate_identity(scenario, recipe)
-    _validate_protocol(recipe, protocol, scenario=scenario)
+    _validate_protocol(
+        recipe,
+        protocol,
+        scenario=scenario,
+        profile_unit_id=profile_unit_id,
+    )
     sections = parse_object_business_plan_sections(plan_payload)
-    static = _static_expectation(recipe, protocol)
+    static = _static_expectation(
+        recipe,
+        protocol,
+        profile_unit_id=profile_unit_id,
+    )
     if sections.static_expectation != static:
         raise ObjectBusinessPlanError(
             "object static expectation differs from reviewed recipe/protocol"
@@ -1539,7 +1563,25 @@ def _compound_metadata_protocol(
     scenario: Any,
     recipe: ObjectHeavyRecipe,
     protocol: V3GatewayProtocol,
+    *,
+    profile_unit_id: str | None,
 ) -> V3GatewayProtocol | None:
+    if profile_unit_id is not None:
+        if (
+            profile_unit_id != TYPED_PROFILE_SET03_UNIT_ID
+            or recipe.scenario_id != "OBJ22-F-SET-03"
+            or recipe.api != "ak.wwise.core.object.set"
+            or recipe.version != "2022.1"
+        ):
+            raise ObjectBusinessPlanError(
+                "object metadata profile unit is outside its reviewed lane"
+            )
+        metadata_queries = ("volume", "pitch", "notes", "output bus")
+        required_tokens = ("Volume", "Pitch", "OutputBus")
+    else:
+        metadata_queries = ()
+        required_tokens = ()
+
     fixture = getattr(scenario, "fixture", {})
     asset_spec = fixture.get("asset_spec") if isinstance(fixture, Mapping) else None
     value = (
@@ -1547,24 +1589,27 @@ def _compound_metadata_protocol(
         if isinstance(asset_spec, Mapping)
         else None
     )
-    if value is None:
+    if profile_unit_id is None and value is None:
         return None
-    if (
-        recipe.scenario_id
-        not in {
-            "OBJ22-F-CREATE-03",
-            "OBJ22-F-SET-01",
-            "OBJ22-F-SET-02",
-        }
-        or not isinstance(value, Mapping)
-        or set(value) != {"contract", "queries", "required_tokens"}
-        or value.get("contract") != "waapi-skill.compound-object-metadata/v1"
-        or value.get("queries") != ["volume"]
-        or value.get("required_tokens") != ["Volume"]
-    ):
-        raise ObjectBusinessPlanError(
-            "compound object metadata binding differs from the reviewed profile"
-        )
+    if profile_unit_id is None:
+        if (
+            recipe.scenario_id
+            not in {
+                "OBJ22-F-CREATE-03",
+                "OBJ22-F-SET-01",
+                "OBJ22-F-SET-02",
+            }
+            or not isinstance(value, Mapping)
+            or set(value) != {"contract", "queries", "required_tokens"}
+            or value.get("contract") != "waapi-skill.compound-object-metadata/v1"
+            or value.get("queries") != ["volume"]
+            or value.get("required_tokens") != ["Volume"]
+        ):
+            raise ObjectBusinessPlanError(
+                "compound object metadata binding differs from the reviewed profile"
+            )
+        metadata_queries = ("volume",)
+        required_tokens = ("Volume",)
     metadata_bindings = tuple(
         binding
         for step in protocol.steps
@@ -1591,8 +1636,8 @@ def _compound_metadata_protocol(
     return build_metadata_transaction_protocol(
         (recipe.request.as_dict(version=recipe.version),),
         object_type=object_type,
-        metadata_queries=("volume",),
-        required_tokens=("Volume",),
+        metadata_queries=metadata_queries,
+        required_tokens=required_tokens,
         expected_required_token_projection=(
             metadata_arguments[0].expected_projection
         ),
@@ -1689,6 +1734,7 @@ def _validate_protocol(
     protocol: V3GatewayProtocol,
     *,
     scenario: Any,
+    profile_unit_id: str | None,
 ) -> None:
     if not isinstance(protocol, V3GatewayProtocol):
         raise ObjectBusinessPlanError("object protocol must be V3GatewayProtocol")
@@ -1698,6 +1744,7 @@ def _validate_protocol(
             scenario,
             recipe,
             protocol,
+            profile_unit_id=profile_unit_id,
         )
         if metadata_protocol is not None:
             expected_protocols = (metadata_protocol,)
@@ -2054,10 +2101,12 @@ def _validate_input_manifest(
 def _static_expectation(
     recipe: ObjectHeavyRecipe,
     protocol: V3GatewayProtocol,
+    *,
+    profile_unit_id: str | None,
 ) -> dict[str, Any]:
     recipe_value = _json_value(recipe)
     request_value = _request_value(recipe)
-    return {
+    result = {
         "family_schema_version": OBJECT_BUSINESS_PLAN_SCHEMA,
         "family": "object",
         "api": recipe.api,
@@ -2069,6 +2118,9 @@ def _static_expectation(
         "request_sha256": _sha256_json(request_value),
         "protocol_projection_sha256": _sha256_json(serialize_protocol(protocol)),
     }
+    if profile_unit_id is not None:
+        result["profile_unit_id"] = profile_unit_id
+    return result
 
 
 def _request_value(recipe: ObjectHeavyRecipe) -> dict[str, Any]:

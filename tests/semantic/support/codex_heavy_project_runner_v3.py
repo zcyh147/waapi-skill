@@ -165,6 +165,7 @@ from tests.semantic.support.codex_object_heavy_v3 import (
 )
 from tests.semantic.support.codex_object_business_plan_v3 import (
     ObjectBusinessPlanSections,
+    TYPED_PROFILE_SET03_UNIT_ID,
     build_object_merge_query_protocol,
     compile_object_business_plan,
     seal_object_input_file_manifest,
@@ -3548,7 +3549,7 @@ def _compound_object_metadata_binding(
         scenario.id == "OBJ22-F-SET-03"
         and scenario.api == "ak.wwise.core.object.set"
         and version == "2022.1"
-        and profile_unit_id == "TYP22-METADATA-OBJECT-SET"
+        and profile_unit_id == TYPED_PROFILE_SET03_UNIT_ID
     ):
         return (
             get_codex_version_layout_v3(version).reflected_type("ActorMixer"),
@@ -4582,6 +4583,16 @@ def _prepare_case(
             typed_sections=typed_sections,
         )
     if scenario.api in OBJECT_APIS:
+        unit_id = (
+            unit.unit_id
+            if isinstance(getattr(unit, "unit_id", None), str)
+            else None
+        )
+        metadata_profile_unit_id = (
+            unit_id
+            if unit_id == TYPED_PROFILE_SET03_UNIT_ID
+            else None
+        )
         recipe = build_object_heavy_v3_recipe(
             scenario.id,
             version=runtime.version,
@@ -4606,11 +4617,7 @@ def _prepare_case(
             recipe=recipe,
             direct=direct,
             version=runtime.version,
-            profile_unit_id=(
-                unit.unit_id
-                if isinstance(getattr(unit, "unit_id", None), str)
-                else None
-            ),
+            profile_unit_id=metadata_profile_unit_id,
         )
         if protocol is None:
             protocol = build_object_merge_query_protocol(
@@ -4623,11 +4630,7 @@ def _prepare_case(
             if _compound_object_metadata_binding(
                 scenario,
                 version=runtime.version,
-                profile_unit_id=(
-                    unit.unit_id
-                    if isinstance(getattr(unit, "unit_id", None), str)
-                    else None
-                ),
+                profile_unit_id=metadata_profile_unit_id,
             ) is not None:
                 raise HeavyProjectRunnerError(
                     "compound object metadata cases do not run policy probes"
@@ -4650,6 +4653,7 @@ def _prepare_case(
             protocol,
             before,
             input_file_manifest,
+            profile_unit_id=metadata_profile_unit_id,
         )
         validate_object_business_plan(
             typed_sections,
@@ -4659,6 +4663,7 @@ def _prepare_case(
             before=before,
             input_file_manifest=input_file_manifest,
             verify_files=True,
+            profile_unit_id=metadata_profile_unit_id,
         )
 
         def verify(payload: Mapping[str, Any] | None, result: CodexRunResult) -> Any:

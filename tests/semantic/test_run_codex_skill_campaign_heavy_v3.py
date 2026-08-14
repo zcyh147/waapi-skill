@@ -56,6 +56,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
     build_audio_import_composer_protocol,
     build_direct_protocol,
+    build_metadata_transaction_protocol,
     build_object_set_composer_transaction_steps,
     build_transaction_protocol,
     query_object_step,
@@ -69,6 +70,7 @@ from tests.semantic.support.codex_gateway_broker import (
     ExpectedGatewayStep,
     InlineTypedOperationArgument,
     MetadataQueryArgument,
+    MetadataTokenProjection,
     ResponseBinding,
     SemanticJsonArgument,
     TypedRequestFactsArgument,
@@ -102,6 +104,7 @@ from tests.semantic.support.codex_prompt_provenance_v3 import (
     write_prompt_provenance,
 )
 from tests.semantic.support.codex_object_business_plan_v3 import (
+    ObjectBusinessPlanError,
     compile_object_business_plan,
     validate_object_archived_verification,
 )
@@ -7748,6 +7751,69 @@ def test_campaign_typed_compound_object_plan_binds_2025_recipe_lane() -> None:
         campaign._validate_heavy_v3_typed_business_plan(
             sections.writer_kwargs(),
             expected_unit=replace(unit, version="2022.1"),
+            provenance=SimpleNamespace(protocol=protocol),
+        )
+
+
+def test_campaign_typed_profile_set03_plan_binds_exact_unit_metadata_lane(
+    tmp_path: Path,
+) -> None:
+    from tests.semantic.support.codex_typed_input_profile import (
+        load_typed_input_profile,
+    )
+
+    profile = load_typed_input_profile(
+        Path(__file__).resolve().parent
+        / "data"
+        / "typed-input-v1"
+        / "profile.json"
+    )
+    unit = next(
+        row
+        for row in profile.units
+        if row.unit_id == "TYP22-METADATA-OBJECT-SET"
+    )
+    recipe = build_object_heavy_v3_recipe(
+        unit.base_scenario_id,
+        version=unit.version,
+    )
+    protocol = build_metadata_transaction_protocol(
+        (recipe.request.as_dict(version=recipe.version),),
+        object_type="ActorMixer",
+        metadata_queries=("volume", "pitch", "notes", "output bus"),
+        required_tokens=("Volume", "Pitch", "OutputBus"),
+        expected_required_token_projection=(
+            MetadataTokenProjection("Volume", "property", "Real32"),
+            MetadataTokenProjection("Pitch", "property", "Real32"),
+            MetadataTokenProjection("OutputBus", "reference", "Object"),
+        ),
+        equivalence="object_set_v1",
+        schema_first=True,
+    )
+    sections = compile_object_business_plan(
+        unit.scenario,
+        recipe,
+        protocol,
+        _synthetic_object_before(recipe),
+        (),
+        profile_unit_id=unit.unit_id,
+    )
+
+    parsed = campaign._validate_heavy_v3_typed_business_plan(
+        sections.writer_kwargs(),
+        expected_unit=unit,
+        provenance=SimpleNamespace(protocol=protocol),
+    )
+
+    assert parsed is not None
+    assert parsed.static_expectation["profile_unit_id"] == unit.unit_id
+    with pytest.raises(
+        ObjectBusinessPlanError,
+        match="exact reviewed request",
+    ):
+        campaign._validate_heavy_v3_typed_business_plan(
+            sections.writer_kwargs(),
+            expected_unit=replace(unit, unit_id="TYP22-UNREVIEWED-SET03"),
             provenance=SimpleNamespace(protocol=protocol),
         )
 

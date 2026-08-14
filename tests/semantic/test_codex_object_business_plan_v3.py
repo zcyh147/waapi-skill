@@ -239,6 +239,64 @@ def test_all_fifteen_object_cases_compile_and_archive_validate(
     )
 
 
+def test_typed_profile_set03_metadata_protocol_binds_exact_unit_in_archive(
+    tmp_path: Path,
+) -> None:
+    scenario, recipe, _base, before, manifest = _case(
+        "OBJ22-F-SET-03",
+        tmp_path,
+    )
+    protocol = build_metadata_transaction_protocol(
+        (recipe.request.as_dict(version=recipe.version),),
+        object_type="ActorMixer",
+        metadata_queries=("volume", "pitch", "notes", "output bus"),
+        required_tokens=("Volume", "Pitch", "OutputBus"),
+        expected_required_token_projection=(
+            MetadataTokenProjection("Volume", "property", "Real32"),
+            MetadataTokenProjection("Pitch", "property", "Real32"),
+            MetadataTokenProjection("OutputBus", "reference", "Object"),
+        ),
+        equivalence="object_set_v1",
+        schema_first=True,
+    )
+    unit_id = "TYP22-METADATA-OBJECT-SET"
+
+    sections = compile_object_business_plan(
+        scenario,
+        recipe,
+        protocol,
+        before,
+        manifest,
+        profile_unit_id=unit_id,
+    )
+    validate_object_business_plan(
+        sections,
+        scenario=scenario,
+        recipe=recipe,
+        protocol=protocol,
+        before=before,
+        input_file_manifest=manifest,
+        verify_files=True,
+        profile_unit_id=unit_id,
+    )
+    archived = validate_archived_object_business_plan(
+        sections.writer_kwargs(),
+        scenario=scenario,
+        recipe=recipe,
+        protocol=protocol,
+        verify_files=True,
+        profile_unit_id=unit_id,
+    )
+
+    assert archived.static_expectation["profile_unit_id"] == unit_id
+    with pytest.raises(ObjectBusinessPlanError, match="exact reviewed request"):
+        validate_archived_object_business_plan(
+            sections.writer_kwargs(),
+            scenario=scenario,
+            recipe=recipe,
+            protocol=protocol,
+            verify_files=False,
+        )
 @pytest.mark.parametrize(
     "case_id",
     (
