@@ -596,7 +596,9 @@ class ClosedDirectWaapiSoundBankBackend:
                 + json.dumps(_text(name, "name"), ensure_ascii=False)
                 + " take 2"
             }
-        options: dict[str, Any] = {"return": list(_fields(fields))}
+        options: dict[str, Any] = {
+            "return": list(_fields(fields, version=self._version))
+        }
         if language is not None:
             options["language"] = _canonical_language(language)
         result = self._call(
@@ -618,7 +620,7 @@ class ClosedDirectWaapiSoundBankBackend:
                 "from": {"id": [_guid(object_id, "object_id")]},
                 "transform": [{"select": ["children"]}],
             },
-            {"return": list(_fields(fields))},
+            {"return": list(_fields(fields, version=self._version))},
         )
         return _result_rows(result, "object.get children")
 
@@ -4866,13 +4868,18 @@ def _filters(value: Any) -> tuple[str, ...]:
     return tuple(rows)
 
 
-def _fields(value: Sequence[str]) -> tuple[str, ...]:
+def _fields(value: Sequence[str], *, version: str) -> tuple[str, ...]:
     result = tuple(value)
     if not result or len(result) != len(set(result)) or any(
         not isinstance(item, str) or not item for item in result
     ):
         raise SoundBankRuntimeError("WAAPI return fields are invalid")
-    allowed = {*MEDIA_OBJECT_FIELDS, *MEDIA_SOURCE_FIELDS}
+    if version == "2021.1":
+        allowed = {*MEDIA_OBJECT_FIELDS_2021, *MEDIA_SOURCE_FIELDS_2021}
+    elif version in {"2022.1", "2023.1", "2024.1", "2025.1"}:
+        allowed = {*MEDIA_OBJECT_FIELDS, *MEDIA_SOURCE_FIELDS}
+    else:
+        raise SoundBankRuntimeError(f"unsupported return-field version: {version}")
     if set(result) - allowed:
         raise SoundBankRuntimeError("WAAPI return fields escaped the closed set")
     return result

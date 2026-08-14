@@ -807,16 +807,21 @@ def test_operate_business_selection_and_execution_domains_remain_explicit() -> N
     assert "is not the request root" in compact
     assert "give each one an `objects[]` row" in compact
     assert "only genuinely new direct descendants" in compact
+    assert "use that preflight query for an `object.create`" in compact
     assert (
-        "follow the selected operation's returned versioned target contract"
-    ) in compact
-    assert "`object.create` same-name-root merge goes directly" in compact
-    assert (
-        "After its schema, exact-query that unchanged root before starting the Draft"
+        "first exact-query the unchanged root"
         in compact
     )
     assert (
-        "`object.set` uses its returned target base, live token discovery, "
+        "Then open `operation-schema object.create` and follow its sole continuation "
+        "directly into the Draft"
+        in compact
+    )
+    assert compact.index("first exact-query the unchanged root") < compact.index(
+        "Then open `operation-schema object.create`"
+    )
+    assert (
+        "`object.set` instead uses its returned target base, live token discovery, "
         "and Composer validation"
     ) in compact
     assert "Do not insert `project-default-work-units`" in compact

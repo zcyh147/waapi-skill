@@ -2099,11 +2099,13 @@ def build_schema_query_transaction_protocol(
     *,
     query_step: ExpectedGatewayStep,
 ) -> V3GatewayProtocol:
-    """Require one exact object lookup between schema and preview.
+    """Require one exact object lookup before the typed transaction begins.
 
     This narrow form is for a same-name merge whose natural request does not
     state the existing root's exact Wwise type.  The lookup remains a required,
-    auditable broker step; it is not an optional discovery allowance.
+    auditable broker step; it is not an optional discovery allowance.  It must
+    precede ``operation-schema`` so the schema's sole public continuation can
+    be followed directly without inserting an unrelated read in the middle.
     """
 
     if len(requests) != 1:
@@ -2124,7 +2126,7 @@ def build_schema_query_transaction_protocol(
             "schema-query transaction requires one typed transaction prefix"
         )
     return V3GatewayProtocol(
-        steps=(base.steps[0], query_step, *base.steps[1:]),
+        steps=(query_step, *base.steps),
         turn_prefix_counts=tuple(value + 1 for value in base.turn_prefix_counts),
     )
 

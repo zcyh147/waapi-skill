@@ -668,7 +668,7 @@ def test_schema_first_metadata_protocol_exposes_version_before_exact_scope() -> 
     assert argument.metadata_binding.object_type == "PropertyContainer"
 
 
-def test_schema_query_protocol_requires_one_exact_auditable_object_lookup() -> None:
+def test_schema_query_protocol_requires_one_exact_auditable_preflight_lookup() -> None:
     query = query_object_step(
         "object.merge-root",
         (
@@ -693,11 +693,11 @@ def test_schema_query_protocol_requires_one_exact_auditable_object_lookup() -> N
 
     assert protocol.turn_prefix_counts == (10, 14)
     assert tuple(step.subcommand for step in protocol.steps[:3]) == (
-        "operation-schema",
         "query-object",
+        "operation-schema",
         "draft-start",
     )
-    assert protocol.steps[1] == query
+    assert protocol.steps[0] == query
 
 
 def test_metadata_transaction_protocol_selects_closed_audio_import_equivalence() -> None:

@@ -525,7 +525,7 @@ def test_compound_merge_query_protocol_rejects_a_different_root(
         )
 
 
-def test_typed_profile_merge_discloses_the_exact_root_read_before_composition() -> None:
+def test_typed_profile_merge_reads_the_exact_root_before_schema_continuation() -> None:
     profile_path = (
         Path(__file__).resolve().parent
         / "data"
@@ -543,11 +543,11 @@ def test_typed_profile_merge_discloses_the_exact_root_read_before_composition() 
 
     assert protocol is not None
     assert tuple(step.subcommand for step in protocol.steps[:3]) == (
-        "operation-schema",
         "query-object",
+        "operation-schema",
         "draft-start",
     )
-    assert protocol.steps[1].arguments == (
+    assert protocol.steps[0].arguments == (
         "--path",
         r"\Actor-Mixer Hierarchy\Default Work Unit\SemanticLab\NPC\Robot_VO",
         "--return-field",
@@ -559,6 +559,7 @@ def test_typed_profile_merge_discloses_the_exact_root_read_before_composition() 
         "--return-field",
         "path",
     )
+    assert "先核对现有 `Robot_VO` 的完整路径和类型" in unit.scenario.prompt
 
 
 def test_object_archive_rejects_static_live_file_delta_and_extra_field_tamper(

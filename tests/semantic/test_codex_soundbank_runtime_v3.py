@@ -78,6 +78,24 @@ def _guid(label: str) -> str:
     return "{" + str(uuid.uuid5(uuid.NAMESPACE_URL, f"waapi-v3:{label}")).upper() + "}"
 
 
+def test_2021_media_source_fields_remain_inside_the_closed_return_projection() -> None:
+    assert soundbank_runtime._fields(
+        soundbank_runtime.MEDIA_SOURCE_FIELDS_2021,
+        version="2021.1",
+    ) == soundbank_runtime.MEDIA_SOURCE_FIELDS_2021
+
+    with pytest.raises(SoundBankRuntimeError, match="escaped the closed set"):
+        soundbank_runtime._fields(
+            (*soundbank_runtime.MEDIA_SOURCE_FIELDS_2021, "invented"),
+            version="2021.1",
+        )
+    with pytest.raises(SoundBankRuntimeError, match="escaped the closed set"):
+        soundbank_runtime._fields(
+            soundbank_runtime.MEDIA_SOURCE_FIELDS_2021,
+            version="2022.1",
+        )
+
+
 class FakeSoundBankBackend:
     def __init__(self, blueprint: SoundBankBlueprint) -> None:
         self.blueprint = blueprint

@@ -1605,10 +1605,10 @@ def test_compound_merge_requires_exact_existing_root_type_query(
         len(protocol.steps),
     )
     assert tuple(step.subcommand for step in protocol.steps[:2]) == (
-        "operation-schema",
         "query-object",
+        "operation-schema",
     )
-    assert protocol.steps[1].arguments == (
+    assert protocol.steps[0].arguments == (
         "--path",
         expected_path,
         "--return-field",

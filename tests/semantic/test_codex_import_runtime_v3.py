@@ -84,6 +84,9 @@ def test_ordinary_import_runtime_accepts_the_reviewed_2021_profile_lane(
     )
     scenario = unit.scenario
     assert "清单列出的六行就是完整范围" in scenario.prompt
+    assert "逐字使用" in scenario.prompt
+    assert "audio_file" in scenario.prompt
+    assert "不要重定位" in scenario.prompt
     materialized = materialize_import_case(
         scenario,
         version=version,

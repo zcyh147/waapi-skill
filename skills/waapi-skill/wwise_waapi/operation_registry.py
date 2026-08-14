@@ -2270,7 +2270,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         constraints=(
             "maximum depth 8, 128 nodes, and 32 children per parent",
             "one existing named root that only receives a recursive descendant merge remains an object.create request: identify its existing parent, repeat the root type/name, and use on_name_conflict=merge",
-            "when that existing merge root's exact type was not stated or already proven, operation-schema must be followed by one exact-path query-object returning id, name, type, and path before preview; Wwise 2025.1 PropertyContainer readback maps to the ActorMixer request token",
+            "when that existing merge root's exact type was not stated or already proven, perform one exact-path query-object returning id, name, type, and path before operation-schema so its sole continuation remains uninterrupted; Wwise 2025.1 PropertyContainer readback maps to the ActorMixer request token",
             "ordinary child creation requires one reviewed writable hierarchy parent; list creation requires a non-protected live owner and a canonical list token",
             "Game Sync hierarchy creation is closed to StateGroup -> State and SwitchGroup -> Switch, whether the live parent is a group or the group appears inside the recursive tree",
             "replace_owned_root is an explicit reviewed authorization boundary, not independently proven ownership; replace requires the collision strictly below that non-protected live root and a complete pre-state snapshot of at most 128 old subtree GUID/path rows",
