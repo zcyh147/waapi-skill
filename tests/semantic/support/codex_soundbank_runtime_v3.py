@@ -172,6 +172,9 @@ MEDIA_OBJECT_FIELDS = (
     "sound:originalWavFilePath",
     "audioSource:language",
 )
+MEDIA_OBJECT_FIELDS_2021 = tuple(
+    field for field in MEDIA_OBJECT_FIELDS if field != "activeSource"
+)
 # ``AudioFileSource`` rows have an Authoring GUID and a Media ID, but no Wwise
 # object Short ID (the persisted .wwu shape is ``MediaIDList/MediaID``).  The
 # ``mediaId`` WAAPI/WAQL accessor was added in Wwise 2022.1.9, before the pinned
@@ -183,6 +186,11 @@ MEDIA_SOURCE_FIELDS = (
     "originalFilePath",
     "audioSource:language",
 )
+MEDIA_SOURCE_FIELDS_2021 = tuple(
+    field
+    for field in MEDIA_SOURCE_FIELDS
+    if field not in {"mediaId", "originalFilePath"}
+) + ("originalWavFilePath",)
 
 
 class SoundBankRuntimeError(RuntimeError):
@@ -495,6 +503,15 @@ class SoundBankRuntimeBackend(Protocol):
         language: str | None = None,
     ) -> tuple[Mapping[str, Any], ...]: ...
 
+    def read_direct_children(
+        self,
+        object_id: str,
+        *,
+        fields: Sequence[str],
+    ) -> tuple[Mapping[str, Any], ...]: ...
+
+    def read_legacy_media_id(self, source_id: str, *, sandbox_root: Path) -> int: ...
+
     def create_object(self, fixture: ObjectFixture) -> str: ...
 
     def import_media(self, fixture: MediaFixture) -> tuple[str, ...]: ...
@@ -536,10 +553,13 @@ class ClosedDirectWaapiSoundBankBackend:
     )
     _TYPED_NAME_READ_TYPES = _CREATE_TYPES | frozenset({"Language", "Platform"})
 
-    def __init__(self, call: DirectWaapiCall) -> None:
+    def __init__(self, call: DirectWaapiCall, *, version: str = "2022.1") -> None:
         if not callable(call):
             raise TypeError("call must be callable")
         self._call = call
+        if version not in {"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"}:
+            raise SoundBankRuntimeError(f"unsupported SoundBank backend version: {version}")
+        self._version = version
 
     def get_project_info(self) -> Mapping[str, Any]:
         result = self._call("ak.wwise.core.getProjectInfo", {}, {})
@@ -585,6 +605,29 @@ class ClosedDirectWaapiSoundBankBackend:
             options,
         )
         return _result_rows(result, "object.get")
+
+    def read_direct_children(
+        self,
+        object_id: str,
+        *,
+        fields: Sequence[str],
+    ) -> tuple[Mapping[str, Any], ...]:
+        result = self._call(
+            "ak.wwise.core.object.get",
+            {
+                "from": {"id": [_guid(object_id, "object_id")]},
+                "transform": [{"select": ["children"]}],
+            },
+            {"return": list(_fields(fields))},
+        )
+        return _result_rows(result, "object.get children")
+
+    def read_legacy_media_id(self, source_id: str, *, sandbox_root: Path) -> int:
+        if self._version != "2021.1":
+            raise SoundBankRuntimeError(
+                "persisted MediaID fallback is restricted to Wwise 2021.1"
+            )
+        return _legacy_media_id_from_project(source_id, sandbox_root=sandbox_root)
 
     def create_object(self, fixture: ObjectFixture) -> str:
         if fixture.object_type not in self._CREATE_TYPES:
@@ -665,9 +708,19 @@ class ClosedDirectWaapiSoundBankBackend:
         else:
             logical_sound_path = _wwise_path(fixture.sound_path, "sound_path")
             wire_sound_path = logical_sound_path
+        media_object_fields = (
+            MEDIA_OBJECT_FIELDS_2021
+            if self._version == "2021.1"
+            else MEDIA_OBJECT_FIELDS
+        )
+        media_source_fields = (
+            MEDIA_SOURCE_FIELDS_2021
+            if self._version == "2021.1"
+            else MEDIA_SOURCE_FIELDS
+        )
         sound_rows_before = self.read_objects(
             path=logical_sound_path,
-            fields=MEDIA_OBJECT_FIELDS,
+            fields=media_object_fields,
         )
         event_rows = self.read_objects(
             path=fixture.event_path,
@@ -740,7 +793,7 @@ class ClosedDirectWaapiSoundBankBackend:
                 "imports": [import_row],
                 "autoAddToSourceControl": False,
             },
-            {"return": list(MEDIA_SOURCE_FIELDS)},
+            {"return": list(media_source_fields)},
         )
         rows = _result_rows(result, "audio.import", key="objects")
         ids = tuple(
@@ -748,11 +801,11 @@ class ClosedDirectWaapiSoundBankBackend:
             for row in rows
             if row.get("id") is not None
         )
-        if not ids:
+        if not ids and self._version != "2021.1":
             raise SoundBankRuntimeError("audio.import setup returned no identities")
         sounds = self.read_objects(
             path=logical_sound_path,
-            fields=MEDIA_OBJECT_FIELDS,
+            fields=media_object_fields,
             language=fixture.language,
         )
         busses = self.read_objects(
@@ -1718,9 +1771,19 @@ class PreparedSoundBankRuntime:
         for fixture in self.blueprint.media_fixtures:
             imported_ids = self.backend.import_media(fixture)
             self._created_ids.extend(imported_ids)
+            media_object_fields = (
+                MEDIA_OBJECT_FIELDS_2021
+                if self.blueprint.version == "2021.1"
+                else MEDIA_OBJECT_FIELDS
+            )
+            media_source_fields = (
+                MEDIA_SOURCE_FIELDS_2021
+                if self.blueprint.version == "2021.1"
+                else MEDIA_SOURCE_FIELDS
+            )
             sound_rows = self.backend.read_objects(
                 path=fixture.sound_path,
-                fields=MEDIA_OBJECT_FIELDS,
+                fields=media_object_fields,
                 language=fixture.language,
             )
             event_rows = self.backend.read_objects(
@@ -1792,34 +1855,63 @@ class PreparedSoundBankRuntime:
             ] = event_graph.action_ids[0]
 
             media_source_rows: list[Mapping[str, Any]] = []
-            for imported_id in imported_ids:
-                rows = self.backend.read_objects(
-                    object_id=imported_id,
-                    fields=MEDIA_SOURCE_FIELDS,
-                    language=fixture.language,
+            if self.blueprint.version == "2021.1":
+                media_source_rows.extend(
+                    row
+                    for row in self.backend.read_direct_children(
+                        sound_id,
+                        fields=media_source_fields,
+                    )
+                    if str(row.get("type", ""))
+                    in {"AudioFileSource", "Audio Source"}
+                    and _language_name(
+                        row.get("audioSource:language"),
+                        f"media source {fixture.key}.language",
+                    )
+                    == _canonical_language(fixture.language)
                 )
-                if len(rows) != 1:
-                    continue
-                row_type = str(rows[0].get("type", ""))
-                if row_type in {"AudioFileSource", "Audio Source"}:
-                    media_source_rows.append(rows[0])
+            else:
+                for imported_id in imported_ids:
+                    rows = self.backend.read_objects(
+                        object_id=imported_id,
+                        fields=media_source_fields,
+                        language=fixture.language,
+                    )
+                    if len(rows) != 1:
+                        continue
+                    row_type = str(rows[0].get("type", ""))
+                    if row_type in {"AudioFileSource", "Audio Source"}:
+                        media_source_rows.append(rows[0])
             if len(media_source_rows) != 1:
                 raise SoundBankRuntimeError(
                     f"media fixture {fixture.key} must bind exactly one imported "
                     f"AudioFileSource; got {len(media_source_rows)}"
                 )
             source_row = media_source_rows[0]
-            source_id, media_id = _row_media_identity(
-                source_row, f"media source {fixture.key}"
-            )
-            source_parent = _payload_identity(source_row.get("parent"))
-            if source_parent is None or not _same_identity(source_parent, sound_id):
-                raise SoundBankRuntimeError(
-                    f"media source {fixture.key} parent does not match imported Sound"
+            source_id = _guid(source_row.get("id"), f"media source {fixture.key}.id")
+            if self.blueprint.version == "2021.1":
+                # Wwise 2021.1 can return no object identities from audio.import,
+                # and its reflected object surface has no mediaId accessor.  The
+                # exact direct-child read proves ownership; save before reading
+                # the bounded persisted .wwu MediaID for that exact source GUID.
+                self.backend.save_project()
+                media_id = self.backend.read_legacy_media_id(
+                    source_id,
+                    sandbox_root=self.blueprint.sandbox_root,
                 )
+            else:
+                source_id, media_id = _row_media_identity(
+                    source_row, f"media source {fixture.key}"
+                )
+                source_parent = _payload_identity(source_row.get("parent"))
+                if source_parent is None or not _same_identity(source_parent, sound_id):
+                    raise SoundBankRuntimeError(
+                        f"media source {fixture.key} parent does not match imported Sound"
+                    )
             source_state = _read_media_source_state(
                 self.backend,
                 fixture,
+                version=self.blueprint.version,
                 sandbox_root=self.blueprint.sandbox_root,
             )
             if not _same_identity(source_state.sound_id, sound_id):
@@ -1961,6 +2053,7 @@ class PreparedSoundBankRuntime:
             source = _read_media_source_state(
                 self.backend,
                 fixture,
+                version=materialized.blueprint.version,
                 sandbox_root=materialized.blueprint.sandbox_root,
             )
             proof = source.copied_file
@@ -3909,14 +4002,21 @@ def _read_media_source_state(
     backend: SoundBankRuntimeBackend,
     fixture: MediaFixture,
     *,
+    version: str,
     sandbox_root: Path,
 ) -> MediaSourceState:
     """Resolve one language-scoped Sound to its exact active copied source."""
 
     requested_language = _canonical_language(fixture.language)
+    media_object_fields = (
+        MEDIA_OBJECT_FIELDS_2021 if version == "2021.1" else MEDIA_OBJECT_FIELDS
+    )
+    media_source_fields = (
+        MEDIA_SOURCE_FIELDS_2021 if version == "2021.1" else MEDIA_SOURCE_FIELDS
+    )
     sounds = backend.read_objects(
         path=fixture.sound_path,
-        fields=MEDIA_OBJECT_FIELDS,
+        fields=media_object_fields,
         language=requested_language,
     )
     if len(sounds) != 1:
@@ -3929,21 +4029,37 @@ def _read_media_source_state(
         sound,
         f"localized Sound {fixture.key} ({requested_language})",
     )
-    active_source = _payload_identity(sound.get("activeSource"))
-    if active_source is None:
-        raise SoundBankRuntimeError(
-            f"localized Sound lacks activeSource for {requested_language}: "
-            f"{fixture.sound_path}"
+    if version == "2021.1":
+        sources = tuple(
+            row
+            for row in backend.read_direct_children(
+                sound_id,
+                fields=media_source_fields,
+            )
+            if str(row.get("type", "")) in {"AudioFileSource", "Audio Source"}
+            and _language_name(
+                row.get("audioSource:language"),
+                f"media source {fixture.key}.language",
+            )
+            == requested_language
         )
-    active_source_id = _guid(
-        active_source,
-        f"localized Sound {fixture.key} activeSource",
-    )
-    sources = backend.read_objects(
-        object_id=active_source_id,
-        fields=MEDIA_SOURCE_FIELDS,
-        language=requested_language,
-    )
+        active_source_id = None
+    else:
+        active_source = _payload_identity(sound.get("activeSource"))
+        if active_source is None:
+            raise SoundBankRuntimeError(
+                f"localized Sound lacks activeSource for {requested_language}: "
+                f"{fixture.sound_path}"
+            )
+        active_source_id = _guid(
+            active_source,
+            f"localized Sound {fixture.key} activeSource",
+        )
+        sources = backend.read_objects(
+            object_id=active_source_id,
+            fields=media_source_fields,
+            language=requested_language,
+        )
     if len(sources) != 1:
         raise SoundBankRuntimeError(
             f"localized activeSource did not resolve exactly for {requested_language}: "
@@ -3954,16 +4070,23 @@ def _read_media_source_state(
         raise SoundBankRuntimeError(
             f"localized activeSource has the wrong type: {fixture.key}"
         )
-    source_id, media_id = _row_media_identity(
-        source,
-        f"localized activeSource {fixture.key}",
+    source_id = _guid(source.get("id"), f"localized source {fixture.key}.id")
+    media_id = (
+        backend.read_legacy_media_id(source_id, sandbox_root=sandbox_root)
+        if version == "2021.1"
+        else _row_media_identity(
+            source,
+            f"localized activeSource {fixture.key}",
+        )[1]
     )
-    if not _same_identity(source_id, active_source_id):
+    if active_source_id is not None and not _same_identity(source_id, active_source_id):
         raise SoundBankRuntimeError(
             f"localized activeSource identity drifted: {fixture.key}"
         )
     parent_id = _payload_identity(source.get("parent"))
-    if parent_id is None or not _same_identity(parent_id, sound_id):
+    if version != "2021.1" and (
+        parent_id is None or not _same_identity(parent_id, sound_id)
+    ):
         raise SoundBankRuntimeError(
             f"localized activeSource parent differs from its logical Sound: "
             f"{fixture.key}"
@@ -3973,6 +4096,8 @@ def _read_media_source_state(
         raw_language = sound.get("audioSource:language")
     actual_language = _language_name(raw_language, f"media source {fixture.key}.language")
     copied_path = source.get("originalFilePath")
+    if copied_path is None:
+        copied_path = source.get("originalWavFilePath")
     if copied_path is None:
         copied_path = sound.get("sound:originalWavFilePath")
     copied_file = _copied_original_file_proof(
@@ -4253,6 +4378,79 @@ def _row_media_identity(row: Mapping[str, Any], label: str) -> tuple[str, int]:
     return object_id, media_id
 
 
+def _legacy_media_id_from_project(source_id: str, *, sandbox_root: Path) -> int:
+    """Resolve one Wwise 2021 AudioFileSource GUID to its persisted MediaID.
+
+    Wwise 2021.1 reflects neither ``activeSource`` nor ``mediaId`` and can
+    return no identities from ``audio.import``.  The runner first proves the
+    source as the unique direct child of the exact Sound, saves the owned
+    sandbox, and then uses this bounded read-only XML oracle.  No path or
+    identifier comes from the evaluated model.
+    """
+
+    expected_id = _guid(source_id, "legacy AudioFileSource id").casefold()
+    root = sandbox_root.expanduser().resolve(strict=True)
+    entries = _tree_entries(
+        root,
+        include=lambda path: path.suffix.casefold() == ".wwu",
+    )
+    matches: list[int] = []
+    for entry in entries:
+        path = root / PurePosixPath(entry.relative_path)
+        proof = _file_proof(path, root)
+        if proof.sha256 != entry.sha256 or proof.size != entry.size:
+            raise SoundBankRuntimeError(
+                f"persisted Wwise work unit changed while being read: {path}"
+            )
+        try:
+            content = path.read_bytes()
+        except OSError as exc:
+            raise SoundBankRuntimeError(
+                f"persisted Wwise work unit is unreadable XML: {path}"
+            ) from exc
+        if len(content) != proof.size or hashlib.sha256(content).hexdigest() != proof.sha256:
+            raise SoundBankRuntimeError(
+                f"persisted Wwise work unit changed while being read: {path}"
+            )
+        try:
+            document = ET.fromstring(content)
+        except ET.ParseError as exc:
+            raise SoundBankRuntimeError(
+                f"persisted Wwise work unit is unreadable XML: {path}"
+            ) from exc
+        for element in document.iter():
+            if element.tag.rsplit("}", 1)[-1] != "AudioFileSource":
+                continue
+            raw_id = element.attrib.get("ID")
+            if not isinstance(raw_id, str) or raw_id.casefold() != expected_id:
+                continue
+            media_rows = [
+                child.attrib.get("ID")
+                for child in element.iter()
+                if child.tag.rsplit("}", 1)[-1] == "MediaID"
+            ]
+            if len(media_rows) != 1:
+                raise SoundBankRuntimeError(
+                    "persisted AudioFileSource must contain exactly one MediaID"
+                )
+            raw_media_id = media_rows[0]
+            if not isinstance(raw_media_id, str) or not raw_media_id.isdecimal():
+                raise SoundBankRuntimeError(
+                    "persisted AudioFileSource MediaID is not a decimal uint32"
+                )
+            media_id = int(raw_media_id)
+            if not 0 <= media_id <= 0xFFFFFFFF:
+                raise SoundBankRuntimeError(
+                    "persisted AudioFileSource MediaID exceeds uint32"
+                )
+            matches.append(media_id)
+    if len(matches) != 1:
+        raise SoundBankRuntimeError(
+            "persisted AudioFileSource GUID must resolve to exactly one MediaID"
+        )
+    return matches[0]
+
+
 def _normalize_live_inclusions(
     rows: Sequence[Mapping[str, Any]],
 ) -> tuple[tuple[str, tuple[str, ...]], ...]:
@@ -4278,8 +4476,14 @@ def _tree_entries(
     include: Callable[[Path], bool],
 ) -> tuple[TreeEntry, ...]:
     candidate = root.expanduser()
-    if candidate.is_symlink():
-        raise SoundBankRuntimeError(f"tree root must not be a symlink: {candidate}")
+    try:
+        root_metadata = candidate.lstat()
+    except OSError as exc:
+        raise SoundBankRuntimeError(f"tree root is unavailable: {candidate}") from exc
+    if path_is_link_or_reparse(candidate, metadata=root_metadata):
+        raise SoundBankRuntimeError(
+            f"tree root must not be a symlink or reparse point: {candidate}"
+        )
     resolved = candidate.resolve(strict=True)
     if not resolved.is_dir():
         raise SoundBankRuntimeError(f"tree root must be a real directory: {resolved}")
@@ -4288,23 +4492,39 @@ def _tree_entries(
         current_path = Path(current)
         for name in list(directory_names):
             path = current_path / name
-            if path.is_symlink():
-                raise SoundBankRuntimeError(f"tree contains a symlink directory: {path}")
+            try:
+                metadata = path.lstat()
+            except OSError as exc:
+                raise SoundBankRuntimeError(
+                    f"tree directory metadata is unavailable: {path}"
+                ) from exc
+            if path_is_link_or_reparse(path, metadata=metadata):
+                raise SoundBankRuntimeError(
+                    f"tree contains a symlink or reparse directory: {path}"
+                )
         for name in file_names:
             path = current_path / name
-            if path.is_symlink():
-                raise SoundBankRuntimeError(f"tree contains a symlink file: {path}")
+            try:
+                metadata = path.lstat()
+            except OSError as exc:
+                raise SoundBankRuntimeError(
+                    f"tree file metadata is unavailable: {path}"
+                ) from exc
+            if path_is_link_or_reparse(path, metadata=metadata):
+                raise SoundBankRuntimeError(
+                    f"tree contains a symlink or reparse file: {path}"
+                )
             if not include(path):
                 continue
-            stat = path.stat()
-            if not path.is_file() or stat.st_size > MAX_FILE_BYTES:
+            stat_result = path.stat()
+            if not path.is_file() or stat_result.st_size > MAX_FILE_BYTES:
                 raise SoundBankRuntimeError(f"tree file is unbounded or not regular: {path}")
             entries.append(
                 TreeEntry(
                     path.relative_to(resolved).as_posix(),
-                    stat.st_size,
+                    stat_result.st_size,
                     _sha256_file(path),
-                    stat.st_mtime_ns,
+                    stat_result.st_mtime_ns,
                 )
             )
             if len(entries) > MAX_TREE_FILES:
@@ -4322,8 +4542,14 @@ def _is_output_file(path: Path, case: MaterializedSoundBankCase) -> bool:
 
 def _file_proof(path: Path, relative_to: Path) -> FileProof:
     candidate = path.expanduser()
-    if candidate.is_symlink():
-        raise SoundBankRuntimeError(f"input must not be a symlink: {candidate}")
+    try:
+        candidate_metadata = candidate.lstat()
+    except OSError as exc:
+        raise SoundBankRuntimeError(f"input is unavailable: {candidate}") from exc
+    if path_is_link_or_reparse(candidate, metadata=candidate_metadata):
+        raise SoundBankRuntimeError(
+            f"input must not be a symlink or reparse point: {candidate}"
+        )
     absolute = candidate.resolve(strict=True)
     root = relative_to.expanduser().resolve(strict=True)
     _require_under(absolute, root, "file proof")

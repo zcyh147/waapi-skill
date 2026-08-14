@@ -159,7 +159,8 @@ def prepare_harbor_integration_runtime(
         version=version,
         runtime=runtime,
         backend_factory=lambda _blueprint: ClosedDirectWaapiSoundBankBackend(
-            direct
+            direct,
+            version=version,
         ),
     )
 

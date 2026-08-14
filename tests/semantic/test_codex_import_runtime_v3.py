@@ -131,6 +131,14 @@ def test_ordinary_import_runtime_resolves_2021_audio_source_without_active_sourc
                 )
             return super().read_objects(**kwargs)
 
+        def read_direct_children(self, object_id, *, fields):
+            # Real Wwise 2021.1 scopes this result to direct children but does
+            # not echo the requested parent accessor on AudioFileSource rows.
+            return tuple(
+                {key: value for key, value in row.items() if key != "parent"}
+                for row in super().read_direct_children(object_id, fields=fields)
+            )
+
     backend = _LegacyBackend(sandbox_root, version=version)
 
     runtime = prepare_import_runtime(
@@ -145,6 +153,29 @@ def test_ordinary_import_runtime_resolves_2021_audio_source_without_active_sourc
         row.object is None or row.object.audio_source is not None
         for row in runtime.hidden_before.rows
     )
+
+    class _AmbiguousLegacyBackend(_LegacyBackend):
+        def read_direct_children(self, object_id, *, fields):
+            rows = super().read_direct_children(object_id, fields=fields)
+            source = next(
+                (row for row in rows if row.get("type") == "AudioFileSource"),
+                None,
+            )
+            if source is None:
+                return rows
+            duplicate = dict(source)
+            duplicate["id"] = _guid(999)
+            duplicate["name"] = str(source["name"]) + "_duplicate"
+            duplicate["path"] = str(source["path"]) + "_duplicate"
+            return (*rows, duplicate)
+
+    with pytest.raises(ImportRuntimeError, match="exactly one direct AudioFileSource"):
+        prepare_import_runtime(
+            unit.scenario,
+            materialized,
+            sandbox_project=project,
+            backend=_AmbiguousLegacyBackend(sandbox_root, version=version),
+        )
 
 
 def test_ordinary_import_runtime_rejects_unreviewed_cross_version_scenario(

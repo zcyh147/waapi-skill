@@ -2003,7 +2003,11 @@ def _prepare_soundbank_case(
         )
 
     monkeypatch.setattr(runner, "prepare_soundbank_runtime", lambda *_args, **_kwargs: runtime)
-    monkeypatch.setattr(runner, "ClosedDirectWaapiSoundBankBackend", lambda _direct: SimpleNamespace())
+    monkeypatch.setattr(
+        runner,
+        "ClosedDirectWaapiSoundBankBackend",
+        lambda _direct, *, version: SimpleNamespace(version=version),
+    )
     monkeypatch.setattr(runner, "compile_soundbank_business_plan", compile_plan)
     monkeypatch.setattr(runner, "validate_soundbank_business_plan", validate_plan)
     prepared = runner._prepare_case(

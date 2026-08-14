@@ -3680,6 +3680,32 @@ def operation_composer_input_contract(
         ],
         "remove_typed_fact": ["--fact-handle", "HANDLE"],
     }
+    fact_action_argv = {
+        "set": [
+            "--fact-action", "set", "--field-handle", "HANDLE",
+            "--value-type", "TYPE", "--fact-value", "VALUE",
+        ],
+        "append": [
+            "--fact-action", "append", "--field-handle", "HANDLE",
+            "--value-type", "TYPE", "--fact-value", "VALUE",
+        ],
+        "present": [
+            "--fact-action", "present", "--field-handle", "HANDLE",
+        ],
+        "choose": [
+            "--fact-action", "choose", "--field-handle", "HANDLE",
+            "--fact-value", "CHOICE_HANDLE",
+        ],
+        "choose-dynamic": [
+            "--fact-action", "choose-dynamic", "--field-handle", "HANDLE",
+            "--key", "KEY", "--fact-value", "CHOICE_HANDLE",
+        ],
+        "map-put": [
+            "--fact-action", "map-put", "--field-handle", "HANDLE",
+            "--key", "KEY", "--value-type", "TYPE",
+            "--fact-value", "VALUE",
+        ],
+    }
     action_argv_by_operation = {
         "object.set": {
             "set_request_option": ["--option", "NAME", "TYPE", "VALUE"],
@@ -3828,6 +3854,12 @@ def operation_composer_input_contract(
             "<typed-fact-arguments>",
         ],
         "action_argv": action_argv,
+        **(
+            {"fact_action_argv": fact_action_argv}
+            if "add_typed_fact" in action_argv
+            or "add_child_typed_fact" in action_argv
+            else {}
+        ),
         "scalar_types": ["string", "number", "integer", "boolean"],
         **(
             {"selector_kinds": selector_kinds}

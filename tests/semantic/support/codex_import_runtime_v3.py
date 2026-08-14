@@ -1367,7 +1367,6 @@ class PreparedImportRuntime:
                     fields=AUDIO_SOURCE_FIELDS_2021,
                 )
                 if _object_type_matches(source.get("type"), "AudioFileSource")
-                and _same_guid(_identity_value(source.get("parent")), object_id)
                 and _language_name(_field_value(source, "audioSource:language"))
                 == language
             )

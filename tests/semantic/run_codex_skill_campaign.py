@@ -6887,10 +6887,17 @@ def _validate_heavy_v3_pass_checks(
         "ak.wwise.core.getInfo",
         "ak.wwise.core.executeLuaScript",
     }:
+        expected_primary_keys = {"api", "dispatch_count"}
+        if api == "ak.wwise.core.getInfo":
+            expected_primary_keys.add("status_preflight_dispatch_count")
         if (
-            set(primary) != {"api", "dispatch_count"}
+            set(primary) != expected_primary_keys
             or primary.get("api") != api
             or primary.get("dispatch_count") != primary_count
+            or (
+                api == "ak.wwise.core.getInfo"
+                and primary.get("status_preflight_dispatch_count") != 1
+            )
         ):
             raise CampaignEvidenceError(
                 "passing direct primary-dispatch proof is invalid"

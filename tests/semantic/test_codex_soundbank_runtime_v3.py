@@ -91,7 +91,9 @@ class FakeSoundBankBackend:
         self.omit_conversion_short_id = False
         self.omit_source_media_id = False
         self.omit_source_from_import_result = False
+        self.omit_all_import_result_ids = False
         self.add_second_source_to_import_result = False
+        self.add_second_legacy_source = False
         self.use_wrong_source_parent = False
         self.replace_sound_on_localized_reuse = False
         self.replace_action_on_localized_reuse = False
@@ -187,6 +189,27 @@ class FakeSoundBankBackend:
                     pass
             projected.append({key: row.get(key) for key in fields})
         return tuple(projected)
+
+    def read_direct_children(
+        self,
+        object_id: str,
+        *,
+        fields: Sequence[str],
+    ) -> tuple[Mapping[str, Any], ...]:
+        rows = [
+            row
+            for row in self.rows.values()
+            if soundbank_runtime._payload_identity(row.get("parent")) == object_id
+        ]
+        return tuple(
+            {field: row.get(field) for field in fields}
+            for row in sorted(rows, key=lambda item: str(item["path"]))
+        )
+
+    def read_legacy_media_id(self, source_id: str, *, sandbox_root: Path) -> int:
+        del sandbox_root
+        row = self.rows[source_id.casefold()]
+        return int(row["mediaId"])
 
     def create_object(self, fixture: ObjectFixture) -> str:
         if fixture.path.casefold() in self.by_path:
@@ -332,6 +355,25 @@ class FakeSoundBankBackend:
             duplicate_row["mediaId"] = self.next_media
             duplicate_row["parent"] = {"id": sound_id}
             imported_ids.append(duplicate_id)
+        if self.add_second_legacy_source:
+            duplicate_path = source_path + "_legacy_duplicate"
+            duplicate_id = self._insert(
+                duplicate_path,
+                "AudioFileSource_" + fixture.key + "_legacy_duplicate",
+                "AudioFileSource",
+            )
+            duplicate_row = self.rows[duplicate_id.casefold()]
+            duplicate_row.pop("shortId")
+            duplicate_row.update(
+                {
+                    "parent": {"id": sound_id},
+                    "mediaId": self.next_media + 20_000,
+                    "audioSource:language": {"name": fixture.language},
+                    "originalWavFilePath": str(copied),
+                }
+            )
+        if self.omit_all_import_result_ids:
+            return ()
         return tuple(imported_ids)
 
     def read_event_graph(self, path: str) -> EventGraphState | None:
@@ -688,6 +730,7 @@ def test_2021_topic_runtime_derives_reviewed_project_info_without_unavailable_ap
     )
     scenario = replace(scenario, versions=("2021.1",))
     runtime, backend = _unprepared_runtime(tmp_path, scenario, version="2021.1")
+    backend.omit_all_import_result_ids = True
     backend._insert(r"\Platforms\Windows", "Windows", "Platform")
     backend._insert(r"\Languages\SFX", "SFX", "Language")
 
@@ -704,6 +747,93 @@ def test_2021_topic_runtime_derives_reviewed_project_info_without_unavailable_ap
         row.platform_id is not None
         for row in materialized.topic_plan.expected_events
     )
+
+
+def test_2021_topic_runtime_rejects_ambiguous_direct_audio_sources(
+    tmp_path: Path,
+) -> None:
+    scenario = next(
+        row for row in _scenarios() if row.id == "O22-SB-GENERATED-01"
+    )
+    scenario = replace(scenario, versions=("2021.1",))
+    runtime, backend = _unprepared_runtime(tmp_path, scenario, version="2021.1")
+    backend.omit_all_import_result_ids = True
+    backend.add_second_legacy_source = True
+    backend._insert(r"\Platforms\Windows", "Windows", "Platform")
+    backend._insert(r"\Languages\SFX", "SFX", "Language")
+
+    with pytest.raises(
+        SoundBankRuntimeError,
+        match="must bind exactly one imported AudioFileSource; got 2",
+    ):
+        runtime.prepare()
+
+
+def test_2021_persisted_media_id_is_exact_and_bounded(tmp_path: Path) -> None:
+    source_id = _guid("persisted-source")
+    work_unit = tmp_path / "Actor-Mixer Hierarchy" / "Owned.wwu"
+    work_unit.parent.mkdir(parents=True)
+    work_unit.write_text(
+        "<?xml version='1.0' encoding='utf-8'?>"
+        "<WwiseDocument><AudioFileSource ID='"
+        + source_id
+        + "'><MediaIDList><MediaID ID='76597505'/></MediaIDList>"
+        "</AudioFileSource></WwiseDocument>",
+        encoding="utf-8",
+    )
+
+    assert soundbank_runtime._legacy_media_id_from_project(
+        source_id,
+        sandbox_root=tmp_path,
+    ) == 76597505
+
+    duplicate = tmp_path / "Actor-Mixer Hierarchy" / "Duplicate.wwu"
+    duplicate.write_text(work_unit.read_text(encoding="utf-8"), encoding="utf-8")
+    with pytest.raises(
+        SoundBankRuntimeError,
+        match="must resolve to exactly one MediaID",
+    ):
+        soundbank_runtime._legacy_media_id_from_project(
+            source_id,
+            sandbox_root=tmp_path,
+        )
+
+
+def test_2021_persisted_media_id_rejects_reparse_before_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_id = _guid("persisted-reparse-source")
+    work_unit = tmp_path / "Actor-Mixer Hierarchy" / "Owned.wwu"
+    work_unit.parent.mkdir(parents=True)
+    work_unit.write_text(
+        "<WwiseDocument><AudioFileSource ID='"
+        + source_id
+        + "'><MediaIDList><MediaID ID='7'/></MediaIDList>"
+        "</AudioFileSource></WwiseDocument>",
+        encoding="utf-8",
+    )
+    original = soundbank_runtime.path_is_link_or_reparse
+
+    def simulated_reparse(path: Path, *, metadata: os.stat_result | None = None) -> bool:
+        if path == work_unit.parent:
+            return True
+        return original(path, metadata=metadata)
+
+    monkeypatch.setattr(
+        soundbank_runtime,
+        "path_is_link_or_reparse",
+        simulated_reparse,
+    )
+
+    with pytest.raises(
+        SoundBankRuntimeError,
+        match="symlink or reparse directory",
+    ):
+        soundbank_runtime._legacy_media_id_from_project(
+            source_id,
+            sandbox_root=tmp_path,
+        )
 
 
 def test_2021_topic_runtime_rejects_output_link_before_creating_external_rows(

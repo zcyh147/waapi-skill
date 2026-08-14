@@ -712,6 +712,65 @@ def test_structurally_distinct_adapters_share_one_public_lifecycle(
         assert "action_argv" in composer["apply"]
         assert "typed_fact_flags" not in composer["apply"]
     assert "selector_kinds" not in projections["object.create"]["apply"]
+    assert projections["object.create"]["apply"]["fact_action_argv"] == {
+        "set": [
+            "--fact-action",
+            "set",
+            "--field-handle",
+            "HANDLE",
+            "--value-type",
+            "TYPE",
+            "--fact-value",
+            "VALUE",
+        ],
+        "append": [
+            "--fact-action",
+            "append",
+            "--field-handle",
+            "HANDLE",
+            "--value-type",
+            "TYPE",
+            "--fact-value",
+            "VALUE",
+        ],
+        "present": [
+            "--fact-action",
+            "present",
+            "--field-handle",
+            "HANDLE",
+        ],
+        "choose": [
+            "--fact-action",
+            "choose",
+            "--field-handle",
+            "HANDLE",
+            "--fact-value",
+            "CHOICE_HANDLE",
+        ],
+        "choose-dynamic": [
+            "--fact-action",
+            "choose-dynamic",
+            "--field-handle",
+            "HANDLE",
+            "--key",
+            "KEY",
+            "--fact-value",
+            "CHOICE_HANDLE",
+        ],
+        "map-put": [
+            "--fact-action",
+            "map-put",
+            "--field-handle",
+            "HANDLE",
+            "--key",
+            "KEY",
+            "--value-type",
+            "TYPE",
+            "--fact-value",
+            "VALUE",
+        ],
+    }
+    assert "set_scalar" not in json.dumps(projections["object.create"]["apply"])
     assert object_set["start"]["subcommand"] == "draft-start"
     assert audio_import["start"]["subcommand"] == "draft-start"
     assert object_set["start"]["gateway_argv"] == [

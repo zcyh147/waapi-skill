@@ -6096,6 +6096,68 @@ def test_heavy_cli_pass_checks_reject_migration_disconnect_before_dispatch() -> 
         )
 
 
+def test_get_info_pass_checks_bind_status_preflight_separately(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    unit = SimpleNamespace(
+        scenario=SimpleNamespace(
+            id="O22-GET-INFO-01",
+            api="ak.wwise.core.getInfo",
+            item_type="function",
+            fixture={},
+        ),
+        unit_id="TYP21-ZERO-GET-INFO",
+    )
+    checks = {
+        "task_passed": True,
+        "first_use_intro": True,
+        "final_response_nonempty": True,
+        "direct_client_closed": True,
+        "primary_dispatch": {
+            "api": "ak.wwise.core.getInfo",
+            "dispatch_count": 1,
+            "status_preflight_dispatch_count": 1,
+        },
+        "business_verification": {"passed": True},
+    }
+    monkeypatch.setattr(
+        campaign,
+        "_validate_heavy_v3_archived_verification",
+        lambda *_args, **_kwargs: None,
+    )
+
+    campaign._validate_heavy_v3_pass_checks(
+        checks,
+        expected_unit=unit,
+        expected_row={
+            "api": "ak.wwise.core.getInfo",
+            "runner": "project",
+            "version": "2021.1",
+        },
+        expected_thread_id="thread-1",
+        primary_count=1,
+        task_root=Path("/synthetic/task"),
+        prompt_evidence=None,  # type: ignore[arg-type]
+    )
+
+    missing_preflight = copy.deepcopy(checks)
+    missing_preflight["primary_dispatch"].pop("status_preflight_dispatch_count")
+    with pytest.raises(CampaignEvidenceError, match="primary-dispatch proof"):
+        campaign._validate_heavy_v3_pass_checks(
+            missing_preflight,
+            expected_unit=unit,
+            expected_row={
+                "api": "ak.wwise.core.getInfo",
+                "runner": "project",
+                "version": "2021.1",
+            },
+            expected_thread_id="thread-1",
+            primary_count=1,
+            task_root=Path("/synthetic/task"),
+            prompt_evidence=None,  # type: ignore[arg-type]
+        )
+
+
 def test_heavy_validator_maps_clean_pre_agent_quota_block_to_retryable(
     tmp_path: Path,
 ) -> None:

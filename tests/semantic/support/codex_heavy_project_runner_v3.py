@@ -4889,7 +4889,7 @@ def _prepare_case(
         sandbox_project=runtime.sandbox.sandbox_project,
         io_root=runtime.owned_root,
         asset_root=runtime.asset_root / "soundbank-case",
-        backend=ClosedDirectWaapiSoundBankBackend(direct),
+        backend=ClosedDirectWaapiSoundBankBackend(direct, version=runtime.version),
     )
     soundbank_materialized = soundbank_runtime.materialized
     if soundbank_materialized is None:
