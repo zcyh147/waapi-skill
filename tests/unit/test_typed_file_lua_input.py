@@ -71,6 +71,13 @@ def test_lua_lanes_have_one_public_typed_draft(
         assert code == 0, payload
         assert payload["operation"]["input_mode"] == "composer"
         assert payload["composer"]["start"]["subcommand"] == "draft-start"
+        assert payload["composer"]["start"]["gateway_argv"] == [
+            "draft-start",
+            operation,
+        ]
+        dynamic = payload["composer"]["dynamic_container_commands"]
+        assert "fact-action map-put" in dynamic["scalar_map_entry_action"]
+        assert "object or array" in dynamic["scalar_map_entry_action"]
         assert payload["composer"]["complete_request_authored_by_gateway"] is True
 
 

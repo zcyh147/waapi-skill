@@ -284,7 +284,14 @@ def validate_direct_status_archive_binding(
     if not isinstance(wwise, Mapping) or not isinstance(project, Mapping):
         raise DirectBusinessPlanError("broker status identity is incomplete")
     build = _wwise_build(wwise)
-    projected = {key: project.get(key) for key in ("id", "name", "type", "path")}
+    # Public ``status`` intentionally projects only the stable project fields
+    # returned by getProjectInfo.  The sealed Direct plan owns the canonical
+    # Wwise object type; do not require a synthetic ``type`` member that the
+    # real Gateway status envelope does not expose.
+    expected_project = expected.get("project")
+    if not isinstance(expected_project, Mapping) or expected_project.get("type") != "Project":
+        raise DirectBusinessPlanError("archived getInfo project type is invalid")
+    projected = {key: project.get(key) for key in ("id", "name", "path")}
     version = bindings.get("version")
     if version == "2021.1":
         try:
@@ -297,7 +304,7 @@ def validate_direct_status_archive_binding(
             project.get("path") != "\\"
             or not _archive_name_matches(
                 start_path,
-                f"{expected.get('project', {}).get('name')}.wproj",
+                f"{expected_project.get('name')}.wproj",
             )
         ):
             raise DirectBusinessPlanError("legacy broker project path is invalid")
@@ -305,7 +312,7 @@ def validate_direct_status_archive_binding(
         try:
             status_path = parse_archive_absolute_path(str(project.get("path")))
             start_path = parse_archive_absolute_path(sandbox_project)
-            expected_name = str(expected.get("project", {}).get("path"))
+            expected_name = str(expected_project.get("path"))
             portable = parse_archive_relative_path(expected_name)
             localized_status = Path(
                 localize_waapi_host_path(str(project.get("path")))
@@ -332,7 +339,8 @@ def validate_direct_status_archive_binding(
     if (
         build != bindings.get("build")
         or wwise.get("processId") != bindings.get("process_id")
-        or projected != expected.get("project")
+        or projected
+        != {key: expected_project.get(key) for key in ("id", "name", "path")}
         or expected.get("wwise_build") != build
         or expected.get("process_id") != wwise.get("processId")
     ):

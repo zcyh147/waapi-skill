@@ -184,7 +184,6 @@ def test_complex_schema_discloses_one_complete_non_json_continuation(tmp_path: P
     ]
     assert continuation["gateway_argv_prefix"] == [
         "typed-call",
-        "--uri",
         VALIDATE_URI,
         "--schema-digest",
         schema["schema_digest"],
@@ -209,7 +208,6 @@ def test_mutating_typed_call_prefix_places_apply_before_every_fact(tmp_path: Pat
     continuation = schema["continuation"]
     assert continuation["gateway_argv_prefix"] == [
         "typed-call",
-        "--uri",
         AUDIO_CONVERT_URI,
         "--schema-digest",
         schema["schema_digest"],

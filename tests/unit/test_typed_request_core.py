@@ -470,6 +470,50 @@ def test_inverse_encoder_round_trips_open_map_overlay_inside_fixed_object() -> N
     assert materialized.args == {"wa_args": {"count": 3, "enabled": True}}
 
 
+def test_inverse_encoder_fact_order_is_independent_of_mapping_insertion() -> None:
+    contract = compile_typed_request_contract(
+        version="2025.1",
+        uri="ak.example.inverse-order",
+        schema={
+            "argsSchema": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["mode", "payload"],
+                "properties": {
+                    "mode": {"type": "string"},
+                    "payload": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "oneOf": [
+                                {"type": "integer"},
+                                {"type": "string"},
+                            ]
+                        },
+                    },
+                },
+            },
+            "optionsSchema": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {},
+            },
+        },
+        graph=load_definition_graph("2025.1"),
+    )
+    forward = typed_request_construction_for_values(
+        contract,
+        args={"mode": "replace", "payload": {"z": 1, "a": "x"}},
+        options={},
+    )
+    reversed_order = typed_request_construction_for_values(
+        contract,
+        args={"payload": {"a": "x", "z": 1}, "mode": "replace"},
+        options={},
+    )
+
+    assert reversed_order == forward
+
+
 def test_inverse_encoder_does_not_use_map_overlay_to_bypass_fixed_member_schema() -> None:
     contract = compile_typed_request_contract(
         version="2025.1",

@@ -354,7 +354,6 @@ class TypedRequestContract:
             ):
                 gateway_argv_prefix = [
                     "typed-call",
-                    "--uri",
                     self.uri,
                     "--schema-digest",
                     self.schema_digest,
@@ -398,6 +397,20 @@ class TypedRequestContract:
                             "<object|array>",
                         ],
                         "draft_binding": False,
+                        "nested_parent_argv": [
+                            "--parent-schema-token",
+                            "<schema_lineage_token_from_parent_disclosure>",
+                        ],
+                        "scalar_map_entry_action": (
+                            "append one --map-put <map_handle> <key> <type> <value> "
+                            "fact directly; request-map-container is only for an "
+                            "object or array value"
+                        ),
+                        "sequence": (
+                            "use the root template only for a top-level handle; "
+                            "for a returned child handle append nested_parent_argv "
+                            "with that same response's schema_lineage_token"
+                        ),
                     }
                 if self.route == "isolated_transaction":
                     continuation["io_root_flag"] = (
@@ -408,6 +421,11 @@ class TypedRequestContract:
                 continuation = {
                     "subcommand": "draft-start",
                     "operation": self.uri,
+                    "gateway_argv_prefix": ["draft-start", self.uri],
+                    "schema_digest_usage": (
+                        "the digest binds request-map-container/request-array-item; "
+                        "do not pass it to draft-start"
+                    ),
                     "business_values_required": True,
                     "action_argv": {
                         "add_typed_fact": (
@@ -457,6 +475,21 @@ class TypedRequestContract:
                             "<object|array>",
                         ],
                         "draft_binding": False,
+                        "nested_parent_argv": [
+                            "--parent-schema-token",
+                            "<schema_lineage_token_from_parent_disclosure>",
+                        ],
+                        "scalar_map_entry_action": (
+                            "use draft-apply add_typed_fact with fact-action map-put "
+                            "directly; request-map-container is only for an object "
+                            "or array value"
+                        ),
+                        "sequence": (
+                            "disclose a complex item without --member-key first; "
+                            "follow a returned choice continuation exactly; for a "
+                            "returned child handle append nested_parent_argv with "
+                            "that same response's schema_lineage_token"
+                        ),
                     },
                     "completion": (
                         "draft-check executes this read directly"
@@ -1186,53 +1219,12 @@ def dynamic_container_disclosure(
         graph=contract.definition_graph,
         section=parent.section if parent is not None else (parent_section or "args"),
     )
-    branches: list[dict[str, Any]] = []
-    if child.shape == "map":
-        branch_members: list[tuple[str, tuple[Mapping[str, Any], ...]]] = []
-        if member_key is not None:
-            _require_bounded_map_key(member_key)
-            variants = _map_key_variants(child, member_key)
-            matching_groups = [
-                group
-                for pattern, group in child.map_patterns
-                if re.search(pattern, member_key) is not None
-            ]
-            choice_required = any(len(group) > 1 for group in matching_groups)
-            if not matching_groups:
-                choice_required = len(child.additional_variants) > 1
-            if choice_required:
-                branch_members.append((member_key, variants))
-        else:
-            for pattern, variants in child.map_patterns:
-                literal_key = _optional_literal_pattern_key(pattern)
-                if literal_key is not None and len(variants) > 1:
-                    branch_members.append((literal_key, variants))
-        for branch_key, variants in branch_members:
-            choices = dynamic_branch_choices(
-                contract,
-                object_handle=child_handle,
-                key=branch_key,
-                value_schema={"oneOf": list(variants)},
-            )
-            branches.append(
-                {
-                    "key": branch_key,
-                    "choices": [
-                        {
-                            "handle": choice_handle,
-                            "accepted_types": [str(variant.get("type"))],
-                            "required_keys": list(variant.get("required", ())),
-                            "constant_fields": _variant_constant_fields(variant),
-                            **(
-                                {"enum": list(variant["enum"])}
-                                if isinstance(variant.get("enum"), list)
-                                else {}
-                            ),
-                        }
-                        for choice_handle, variant in choices
-                    ],
-                }
-            )
+    branches = _dynamic_map_branch_payloads(
+        contract,
+        child=child,
+        object_handle=child_handle,
+        member_key=member_key,
+    )
     return {
         "shape": shape,
         "open": child.open_map,
@@ -1251,6 +1243,64 @@ def dynamic_container_disclosure(
         ),
         "schema_lineage": dict(schema),
     }
+
+
+def _dynamic_map_branch_payloads(
+    contract: TypedRequestContract,
+    *,
+    child: TypedFieldContract,
+    object_handle: str,
+    member_key: str | None,
+) -> list[dict[str, Any]]:
+    branches: list[dict[str, Any]] = []
+    if child.shape != "map":
+        return branches
+    branch_members: list[tuple[str, tuple[Mapping[str, Any], ...]]] = []
+    if member_key is not None:
+        _require_bounded_map_key(member_key)
+        variants = _map_key_variants(child, member_key)
+        matching_groups = [
+            group
+            for pattern, group in child.map_patterns
+            if re.search(pattern, member_key) is not None
+        ]
+        choice_required = any(len(group) > 1 for group in matching_groups)
+        if not matching_groups:
+            choice_required = len(child.additional_variants) > 1
+        if choice_required:
+            branch_members.append((member_key, variants))
+    else:
+        for pattern, variants in child.map_patterns:
+            literal_key = _optional_literal_pattern_key(pattern)
+            if literal_key is not None and len(variants) > 1:
+                branch_members.append((literal_key, variants))
+    for branch_key, variants in branch_members:
+        choices = dynamic_branch_choices(
+            contract,
+            object_handle=object_handle,
+            key=branch_key,
+            value_schema={"oneOf": list(variants)},
+        )
+        branches.append(
+            {
+                "key": branch_key,
+                "choices": [
+                    {
+                        "handle": choice_handle,
+                        "accepted_types": [str(variant.get("type"))],
+                        "required_keys": list(variant.get("required", ())),
+                        "constant_fields": _variant_constant_fields(variant),
+                        **(
+                            {"enum": list(variant["enum"])}
+                            if isinstance(variant.get("enum"), list)
+                            else {}
+                        ),
+                    }
+                    for choice_handle, variant in choices
+                ],
+            }
+        )
+    return branches
 
 
 def typed_schema_lineage_token(
@@ -1984,7 +2034,10 @@ def typed_request_construction_for_values(
             raise TypedRequestError(
                 "Typed request values contain fields outside the disclosed contract"
             )
-        for name, value in values.items():
+        ordered_names = [name for name in properties if name in values]
+        ordered_names.extend(sorted(set(values) - set(ordered_names)))
+        for name in ordered_names:
+            value = values[name]
             field = next(
                 (
                     item
@@ -2234,7 +2287,10 @@ def _value_matches_schema(
     ):
         return False
     additional = expanded.get("additionalProperties", True)
-    for key, item in value.items():
+    ordered_keys = [key for key in properties if key in value]
+    ordered_keys.extend(sorted(set(value) - set(ordered_keys)))
+    for key in ordered_keys:
+        item = value[key]
         if not isinstance(key, str):
             return False
         fixed = properties.get(key)
@@ -2555,7 +2611,10 @@ def _append_static_object_facts(
         raise TypedRequestError("Typed request object properties are malformed")
     if not value:
         facts.append(TypedRequestFact("present", parent.handle, "null", "null"))
-    for key, item in value.items():
+    ordered_keys = [key for key in properties if key in value]
+    ordered_keys.extend(sorted(set(value) - set(ordered_keys)))
+    for key in ordered_keys:
+        item = value[key]
         child = children.get(key)
         child_schema = properties.get(key)
         if key in properties:
@@ -2728,7 +2787,11 @@ def _append_dynamic_object_members(
         graph=contract.definition_graph,
         section=section,
     )
-    for key, item in value.items():
+    schema_keys = (*dynamic.required_map_keys, *dynamic.fixed_map_keys)
+    ordered_keys = list(dict.fromkeys(key for key in schema_keys if key in value))
+    ordered_keys.extend(sorted(set(value) - set(ordered_keys)))
+    for key in ordered_keys:
+        item = value[key]
         item_type = _typed_value_type(item)
         variants = _map_key_variants(dynamic, key)
         selected_indexes = _preferred_matching_variants(

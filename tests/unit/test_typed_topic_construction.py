@@ -280,6 +280,21 @@ def test_topic_schema_discloses_one_typed_continuation_offline(tmp_path: Path) -
     assert payload["event_match"]["schema_digest"]
     assert payload["bounds"]["stdout_utf8_bytes"] == 32 * 1024
     assert payload["continuation"]["subcommands"] == ["wait-topic", "stream-topic"]
+    prefix = payload["continuation"]["wait_argv_prefix"]
+    assert prefix[:6] == [
+        "--timeout",
+        "<positive-seconds>",
+        "wait-topic",
+        topic,
+        "--event-count",
+        "<1..64>",
+    ]
+    assert prefix[6:] == [
+        "--options-schema-digest",
+        payload["options"]["schema_digest"],
+        "--match-schema-digest",
+        payload["event_match"]["schema_digest"],
+    ]
     assert payload["event_match"]["continuation"]["dynamic_container_commands"] == {
         "map_value": "request-map-container",
         "array_item": "request-array-item",

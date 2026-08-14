@@ -2361,6 +2361,8 @@ def wait_topic_step(
         ) from exc
     arguments: list[Any] = [
         topic,
+        "--event-count",
+        str(event_count),
         "--options-schema-digest",
         (
             ResponseBinding(schema_step_name, "/options/schema_digest")
@@ -2376,7 +2378,6 @@ def wait_topic_step(
         *(_typed_fact_cli_arguments(option_facts, prefix="option")),
         *(_typed_fact_cli_arguments(match_facts, prefix="match")),
     ]
-    arguments.extend(("--event-count", str(event_count)))
     return ExpectedGatewayStep(
         name=name,
         subcommand="wait-topic",

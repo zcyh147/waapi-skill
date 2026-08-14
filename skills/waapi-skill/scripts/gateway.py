@@ -3930,10 +3930,21 @@ def operation_composer_input_contract(
                 "<object|array>",
             ],
             "draft_binding": False,
+            "nested_parent_argv": [
+                "--parent-schema-token",
+                "<schema_lineage_token_from_parent_disclosure>",
+            ],
+            "scalar_map_entry_action": (
+                "use draft-apply add_typed_fact with fact-action map-put directly; "
+                "request-map-container is only for an object or array value"
+            ),
             "sequence": (
                 "disclose each complex child with the operation and schema digest; "
                 "then add the append/map-put Draft fact with the returned child handle; "
-                "disclosure never consumes or changes the Draft revision"
+                "disclosure never consumes or changes the Draft revision; a nested "
+                "child must append --parent-schema-token with the exact token returned "
+                "by its parent disclosure; do not add --member-key until the parent "
+                "response explicitly returns branch_disclosure"
             ),
         },
         "apply": apply_contract,
@@ -4030,6 +4041,81 @@ def typed_topic_contract_payload(contract: Any) -> dict[str, Any]:
     return payload
 
 
+def _dynamic_branch_disclosure_continuation(
+    args: argparse.Namespace,
+    *,
+    contract: Any,
+    child_handle: str,
+    child_contract: Mapping[str, Any],
+    lineage_token: str,
+) -> dict[str, Any]:
+    """Return the sole next disclosure for one newly issued object handle."""
+
+    if args.member_key is not None or args.shape != "object":
+        return {}
+    branch_rows = child_contract.get("branch_choices")
+    if not isinstance(branch_rows, list):
+        branch_rows = []
+    has_container_choice = any(
+        isinstance(row, Mapping)
+        and isinstance(row.get("choices"), list)
+        and any(
+            isinstance(choice, Mapping)
+            and isinstance(choice.get("accepted_types"), list)
+            and any(
+                value_type in {"object", "array"}
+                for value_type in choice["accepted_types"]
+            )
+            for choice in row["choices"]
+        )
+        for row in branch_rows
+    )
+    if child_contract.get("member_key_disclosure_required"):
+        command = [
+            args.command,
+            args.api,
+            "--schema-digest",
+            contract.schema_digest,
+            *(
+                ["--map-handle", args.map_handle, "--key", args.key]
+                if args.command == "request-map-container"
+                else ["--array-handle", args.array_handle, "--index", str(args.index)]
+            ),
+            "--shape",
+            args.shape,
+            *(
+                ["--choice-handle", args.choice_handle]
+                if args.choice_handle is not None
+                else []
+            ),
+            "--member-key",
+            "<exact-key>",
+            *(
+                ["--parent-schema-token", args.parent_schema_token]
+                if args.parent_schema_token is not None
+                else []
+            ),
+        ]
+    elif has_container_choice:
+        command = [
+            "request-map-container",
+            args.api,
+            "--schema-digest",
+            contract.schema_digest,
+            "--map-handle",
+            child_handle,
+            "--key",
+            "<exact-key>",
+            "--shape",
+            "object",
+            "--parent-schema-token",
+            lineage_token,
+        ]
+    else:
+        return {}
+    return {"branch_disclosure": command}
+
+
 def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]) -> dict[str, Any]:
     """Run catalog commands without requiring a WAAPI port or live Wwise."""
 
@@ -4050,6 +4136,22 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             },
             "continuation": {
                 "subcommands": ["wait-topic", "stream-topic"],
+                "wait_argv_prefix": [
+                    "--timeout",
+                    "<positive-seconds>",
+                    "wait-topic",
+                    args.api,
+                    "--event-count",
+                    "<1..64>",
+                    "--options-schema-digest",
+                    options.schema_digest,
+                    "--match-schema-digest",
+                    match.schema_digest,
+                ],
+                "append_after_prefix": [
+                    "zero or more --option-* typed facts",
+                    "zero or more --match-* typed facts",
+                ],
                 "bind": {
                     "--options-schema-digest": options.schema_digest,
                     "--match-schema-digest": match.schema_digest,
@@ -4193,6 +4295,25 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     "continuation": {
                         "subcommand": "request-map-container",
                         "choice_flag": "--choice-handle <choice_handle>",
+                        "choice_argv": [
+                            "request-map-container",
+                            args.api,
+                            "--schema-digest",
+                            contract.schema_digest,
+                            "--map-handle",
+                            args.map_handle,
+                            "--key",
+                            args.key,
+                            "--shape",
+                            args.shape,
+                            "--choice-handle",
+                            "<choice_handle_from_this_response>",
+                            *(
+                                ["--parent-schema-token", args.parent_schema_token]
+                                if args.parent_schema_token is not None
+                                else []
+                            ),
+                        ],
                     },
                 }
             child_handle = dynamic_map_entry_handle(
@@ -4243,6 +4364,25 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     "continuation": {
                         "subcommand": "request-array-item",
                         "choice_flag": "--choice-handle <choice_handle>",
+                        "choice_argv": [
+                            "request-array-item",
+                            args.api,
+                            "--schema-digest",
+                            contract.schema_digest,
+                            "--array-handle",
+                            args.array_handle,
+                            "--index",
+                            str(args.index),
+                            "--shape",
+                            args.shape,
+                            "--choice-handle",
+                            "<choice_handle_from_this_response>",
+                            *(
+                                ["--parent-schema-token", args.parent_schema_token]
+                                if args.parent_schema_token is not None
+                                else []
+                            ),
+                        ],
                     },
                 }
             child_handle = dynamic_array_item_handle(
@@ -4356,37 +4496,12 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                         ),
                     }
                 ),
-                **(
-                    {}
-                    if args.member_key is not None or args.shape != "object"
-                    else {
-                        "branch_disclosure": [
-                            args.command,
-                            args.api,
-                            "--schema-digest",
-                            contract.schema_digest,
-                            *(
-                                ["--map-handle", args.map_handle, "--key", args.key]
-                                if args.command == "request-map-container"
-                                else [
-                                    "--array-handle", args.array_handle,
-                                    "--index", str(args.index),
-                                ]
-                            ),
-                            "--shape", args.shape,
-                            *(
-                                ["--choice-handle", args.choice_handle]
-                                if args.choice_handle is not None
-                                else []
-                            ),
-                            "--member-key", "<exact-key>",
-                            *(
-                                ["--parent-schema-token", args.parent_schema_token]
-                                if args.parent_schema_token is not None
-                                else []
-                            ),
-                        ]
-                    }
+                **_dynamic_branch_disclosure_continuation(
+                    args,
+                    contract=contract,
+                    child_handle=child_handle,
+                    child_contract=child_contract,
+                    lineage_token=lineage_token,
                 ),
             },
         }

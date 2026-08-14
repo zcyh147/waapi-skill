@@ -1418,6 +1418,28 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             },
             "typed_request_schema_digest": typed.schema_digest,
             "typed_request_fields": typed.gateway_field_payloads(),
+            **(
+                {
+                    "start_preconditions": {
+                        "dynamic_metadata_before_draft_start": True,
+                        "applies_when": (
+                            "the requested object tree contains dynamic properties "
+                            "or references whose exact live tokens are not already proven"
+                        ),
+                        "required_sequence": [
+                            "operation-schema",
+                            "metadata discover",
+                            "draft-start",
+                        ],
+                        "metadata_scope": (
+                            "use --object-type for the exact new object type; "
+                            "never replace it with --object <target-path>"
+                        ),
+                    }
+                }
+                if operation == "object.create"
+                else {}
+            ),
             "complete_request_is_never_an_action": True,
             "completion_discipline": {
                 "successful_action_response_is_complete": True,
@@ -1708,11 +1730,32 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             ],
             "split_initial_row_across_follow_up_actions": False,
             "follow_up_flat_actions": "corrections_only",
+            "metadata_dependency_activation": (
+                "agent_selects_only_requested_exact_tokens; Gateway validates and "
+                "activates required dependency values"
+            ),
+            "unrequested_dependency_flags_are_not_action_fields": True,
             "selector_only_allowed_for": [
                 "nested_children",
                 "closed_lists",
                 "embedded_import",
             ],
+        },
+        "start_preconditions": {
+            "dynamic_metadata_before_draft_start": True,
+            "applies_when": (
+                "the request contains dynamic properties or references whose exact "
+                "live tokens are not already proven"
+            ),
+            "required_sequence": [
+                "operation-schema",
+                "metadata discover",
+                "draft-start",
+            ],
+            "metadata_scope": (
+                "when the exact shared target type is known, keep --object-type "
+                "and do not substitute --object <target-path>"
+            ),
         },
         "action_shapes": {
             action_name: {

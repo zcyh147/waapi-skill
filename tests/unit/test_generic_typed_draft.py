@@ -506,6 +506,13 @@ def test_media_pool_request_schema_discloses_typed_result_filter(
     )
 
     assert code == 0
+    assert payload["continuation"]["gateway_argv_prefix"] == [
+        "draft-start",
+        "ak.wwise.core.mediaPool.get",
+    ]
+    assert "do not pass it to draft-start" in payload["continuation"][
+        "schema_digest_usage"
+    ]
     assert payload["result_filter"] == {
         "contract": "waapi-skill.media-pool-post-filter/v1",
         "availability": "optional_after_complete_typed_candidate_request",

@@ -249,7 +249,6 @@ def test_reviewed_2021_profile_import_compiles_and_replays_its_business_plan(
         protocol=protocol,
         verify_files=True,
     )
-
     assert sections.static_expectation["version"] == "2021.1"
 
     base_scenario = load_eval_bundle_v3(SUITE).scenario(unit.base_scenario_id)
@@ -293,6 +292,49 @@ def test_reviewed_2021_profile_import_compiles_and_replays_its_business_plan(
             protocol=protocol,
             verify_files=True,
         )
+
+
+def test_reviewed_2025_tab_import_replays_version_projected_fixture_paths(
+    tmp_path: Path,
+) -> None:
+    unit = next(
+        row
+        for row in load_typed_input_profile(TYPED_PROFILE).units
+        if row.unit_id == "TYP25-INLINE-TAB-IMPORT"
+    )
+    project = tmp_path / "sandbox" / "SampleProject.wproj"
+    project.parent.mkdir(parents=True)
+    project.write_text("<WwiseDocument/>", encoding="utf-8")
+    materialized = materialize_import_case(
+        unit.scenario,
+        version=unit.version,
+        asset_root=tmp_path / "assets",
+    )
+    plan = build_import_runtime_plan(
+        unit.scenario,
+        materialized,
+        sandbox_project=project,
+    )
+    before = _snapshot(plan, before=True)
+    protocol = build_transaction_protocol(plan.operation_requests)
+    sections = compile_import_business_plan(
+        unit.scenario,
+        materialized,
+        plan,
+        before,
+        protocol,
+    )
+
+    validate_import_business_plan_archive(
+        sections,
+        scenario=unit.scenario,
+        protocol=protocol,
+        verify_files=True,
+    )
+    assert sections.static_expectation["operation_requests"][0]["version"] == "2025.1"
+    assert sections.static_expectation["operation_requests"][0]["arguments"][
+        "import_location"
+    ]["value"].startswith(r"\Containers")
 
 
 @pytest.mark.parametrize(

@@ -48,7 +48,6 @@ from tests.semantic.support.codex_import_assets_v3 import (
 from tests.semantic.support.codex_import_runtime_v3 import (
     IMPORT_APIS,
     MAX_FILE_BYTES,
-    SUPPORTED_VERSION,
     import_runtime_version_is_reviewed,
     ImportCompoundRuntimeSnapshot,
     ImportRuntimePlan,
@@ -837,7 +836,20 @@ def _validate_rows_against_fixture_and_requests(static: Mapping[str, Any], live:
             if not all(isinstance(value, str) for value in (name, language, operation)) or name not in table_paths:
                 raise ImportBusinessPlanError("tab import fixture table binding is invalid")
             operation_by_table[name] = operation
-            expected_requests.append({"contract": "waapi-skill.operation-request/v1", "version": SUPPORTED_VERSION, "operation": "audio.importTabDelimited", "arguments": {"import_file": table_paths[name], "import_location": {"kind": "path", "value": spec.get("import_location")}, "import_language": canonical_wwise_language(language), "import_operation": operation}})
+            location = spec.get("import_location")
+            if not isinstance(location, str):
+                raise ImportBusinessPlanError(
+                    "tab import fixture location is invalid"
+                )
+            try:
+                location = get_codex_version_layout_v3(
+                    str(static["version"])
+                ).translate_2022_path(location)
+            except CodexVersionLayoutError as exc:
+                raise ImportBusinessPlanError(
+                    "tab import fixture location cannot be version-projected"
+                ) from exc
+            expected_requests.append({"contract": "waapi-skill.operation-request/v1", "version": static["version"], "operation": "audio.importTabDelimited", "arguments": {"import_file": table_paths[name], "import_location": {"kind": "path", "value": location}, "import_language": canonical_wwise_language(language), "import_operation": operation}})
         if requests != expected_requests:
             raise ImportBusinessPlanError("tab import requests do not exactly bind fixture tables")
     expected_contracts = []
@@ -846,8 +858,18 @@ def _validate_rows_against_fixture_and_requests(static: Mapping[str, Any], live:
             raise ImportBusinessPlanError("import fixture row is invalid")
         table_key = "__audio_import__" if static["api"] == "ak.wwise.core.audio.import" else raw.get("tsv_name")
         event = raw.get("event")
+        target_path = raw.get("target_path")
+        if isinstance(target_path, str) and target_path.startswith("\\"):
+            try:
+                target_path = get_codex_version_layout_v3(
+                    str(static["version"])
+                ).translate_2022_path(target_path)
+            except CodexVersionLayoutError as exc:
+                raise ImportBusinessPlanError(
+                    "import row target path cannot be version-projected"
+                ) from exc
         expected_contracts.append({
-            "row_key": raw.get("row_key"), "target_path": raw.get("target_path"), "object_type": raw.get("object_type"),
+            "row_key": raw.get("row_key"), "target_path": target_path, "object_type": raw.get("object_type"),
             "language": canonical_wwise_language(str(raw.get("language") or "")), "import_operation": operation_by_table.get(str(table_key)),
             "guid_policy": raw.get("guid_policy"), "event": None if event is None else {"path": event.get("path"), "action": event.get("action")},
             "source_key": raw.get("source_key"), "pre_state_existence": raw.get("pre_state", {}).get("existence") if isinstance(raw.get("pre_state"), Mapping) else None,

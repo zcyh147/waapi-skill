@@ -25,6 +25,7 @@ from wwise_waapi.typed_requests import (
     dynamic_container_disclosure,
     dynamic_map_entry_handle,
     materialize_typed_request,
+    typed_request_construction_for_values,
 )
 from wwise_waapi.transactions import TransactionStore
 
@@ -414,6 +415,103 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
         {"kind": "direct-child"},
         {"kind": "scoped-name"},
     ]
+
+    inclusions = next(
+        field
+        for field in schema["composer"]["typed_request_fields"]
+        if field["path"] == ["args", "inclusions"]
+    )
+    digest = schema["composer"]["typed_request_schema_digest"]
+    item_code, item = gateway.execute_gateway(
+        [
+            "--version", "2025.1", "request-array-item", "soundbank.setInclusions",
+            "--schema-digest", digest,
+            "--array-handle", inclusions["handle"],
+            "--index", "0", "--shape", "object",
+        ],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda url: pytest.fail(f"array disclosure connected to {url}"),
+    )
+    assert item_code == 0, item
+    construction = typed_request_construction_for_values(
+        draft_operation_request_contract("soundbank.setInclusions", "2025.1"),
+        args={
+            "soundbank": {"kind": "id", "value": BANK_ID},
+            "mode": "add",
+            "inclusions": [
+                {
+                    "object": {"kind": "id", "value": EVENT_ID},
+                    "filters": ["events"],
+                }
+            ],
+        },
+        options={},
+    )
+    assert [
+        (disclosure.command, disclosure.key, disclosure.shape)
+        for disclosure in construction.disclosures
+    ] == [
+        ("request-array-item", "0", "object"),
+        ("request-map-container", "object", "object"),
+        ("request-map-container", "filters", "array"),
+    ]
+    branch_argv = [
+        "object" if token == "<exact-key>" else token
+        for token in item["continuation"]["branch_disclosure"]
+    ]
+    assert "--member-key" not in branch_argv
+    branch_code, branch = gateway.execute_gateway(
+        ["--version", "2025.1", *branch_argv],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda url: pytest.fail(f"branch disclosure connected to {url}"),
+    )
+    assert branch_code == 0, branch
+    assert branch["contract"] == "waapi-skill.typed-map-container-choices/v1"
+    assert branch["status"] == "choice_required"
+    assert branch["map_handle"] == item["handle"]
+    item_choices = item["child_contract"]["branch_choices"][0]["choices"]
+    assert [choice["handle"] for choice in branch["choices"]] == [
+        choice["handle"] for choice in item_choices
+    ]
+    id_choice = branch["choices"][0]["handle"]
+    choice_argv = [
+        id_choice if token == "<choice_handle_from_this_response>" else token
+        for token in branch["continuation"]["choice_argv"]
+    ]
+    identity_code, identity = gateway.execute_gateway(
+        ["--version", "2025.1", *choice_argv],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda url: pytest.fail(f"identity disclosure connected to {url}"),
+    )
+    assert identity_code == 0, identity
+    assert identity["parent_handle"] == item["handle"]
+    assert identity["handle"] != item["handle"]
+    assert identity["child_contract"]["required_keys"] == ["kind", "value"]
+    assert "branch_disclosure" not in identity["continuation"]
+    assert identity["continuation"]["action_argv"] == [
+        "--action", "add_typed_fact", "--fact-action", "map-put",
+        "--field-handle", item["handle"], "--value-type", "object",
+        "--fact-value", identity["handle"], "--key", "object",
+    ]
+
+    for contradiction in (
+        ["--shape", "array"],
+        ["--shape", "object", "--choice-handle", "trc1-000000000000000000000000"],
+    ):
+        rejected_code, rejected = gateway.execute_gateway(
+            [
+                "--version", "2025.1", "request-map-container",
+                "soundbank.setInclusions", "--schema-digest", digest,
+                "--map-handle", item["handle"], "--key", "object",
+                *contradiction,
+                "--parent-schema-token", item["schema_lineage_token"],
+            ],
+            env=_env(tmp_path, "2025.1"),
+            client_factory=lambda url: pytest.fail(
+                f"invalid member disclosure connected to {url}"
+            ),
+        )
+        assert rejected_code == 2, rejected
 
 
 def test_file_operations_materialize_exact_paths_without_rewriting_sources(tmp_path: Path) -> None:

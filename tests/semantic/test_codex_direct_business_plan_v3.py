@@ -225,7 +225,8 @@ def test_direct_archive_accepts_same_project_across_posix_and_wine_path_flavors(
             "version": {"year": 2025, "major": 1, "minor": 0, "build": 9000},
         },
         "project": {
-            **bindings["status"]["project"],
+            "id": bindings["status"]["project"]["id"],
+            "name": bindings["status"]["project"]["name"],
             "path": status_path,
         },
     }
@@ -235,6 +236,53 @@ def test_direct_archive_accepts_same_project_across_posix_and_wine_path_flavors(
         status_payload=status,
         sandbox_project=sandbox_project,
     )
+
+
+def test_direct_archive_rejects_a_non_project_sealed_type() -> None:
+    bindings = {
+        "version": "2025.1",
+        "build": "2025.1.0.9000",
+        "process_id": 42,
+        "launch_process_id": 41,
+        "session_id": "session",
+        "result_sha256": "a" * 64,
+        "project_digest": "b" * 64,
+        "status": {
+            "wwise_build": "2025.1.0.9000",
+            "process_id": 42,
+            "project": {
+                "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+                "name": "SampleProject",
+                "type": "WorkUnit",
+                "path": "SampleProject.wproj",
+            },
+        },
+    }
+    sections = compile_direct_business_plan(
+        scenario_id="O22-GET-INFO-01",
+        api="ak.wwise.core.getInfo",
+        protocol_steps=({"name": "host.status", "subcommand": "status"},),
+        live_bindings=bindings,
+        verification_boundary="exact_host_identity",
+    )
+    status = {
+        "wwise": {
+            "processId": 42,
+            "version": {"year": 2025, "major": 1, "minor": 0, "build": 9000},
+        },
+        "project": {
+            "id": bindings["status"]["project"]["id"],
+            "name": "SampleProject",
+            "path": "/owned/SampleProject.wproj",
+        },
+    }
+
+    with pytest.raises(DirectBusinessPlanError, match="project type"):
+        validate_direct_status_archive_binding(
+            sections,
+            status_payload=status,
+            sandbox_project="/owned/SampleProject.wproj",
+        )
 
 
 @pytest.mark.parametrize(

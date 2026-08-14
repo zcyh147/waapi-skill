@@ -184,12 +184,22 @@ def test_object_set_composer_discloses_every_exact_typed_action_shape(
         ],
         "split_initial_row_across_follow_up_actions": False,
         "follow_up_flat_actions": "corrections_only",
+        "metadata_dependency_activation": (
+            "agent_selects_only_requested_exact_tokens; Gateway validates and "
+            "activates required dependency values"
+        ),
+        "unrequested_dependency_flags_are_not_action_fields": True,
         "selector_only_allowed_for": [
             "nested_children",
             "closed_lists",
             "embedded_import",
         ],
     }
+    assert contract["start_preconditions"]["required_sequence"] == [
+        "operation-schema",
+        "metadata discover",
+        "draft-start",
+    ]
     for action_name, (required_fields, optional_fields) in expected.items():
         assert contract["action_shapes"][action_name] == {
             "fixed_fields": {
