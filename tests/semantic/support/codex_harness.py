@@ -26,6 +26,10 @@ from wwise_waapi.platform_commands import (
     decode_windows_model_argv,
     decode_windows_powershell_argv,
 )
+from tests.semantic.support.codex_gateway_contracts import (
+    GATEWAY_RESULT_CONTRACT,
+    gateway_payload_contracts,
+)
 
 
 MACOS_APP_CODEX_FALLBACK = Path("/Applications/ChatGPT.app/Contents/Resources/codex")
@@ -87,7 +91,6 @@ SOURCE_SUFFIXES = frozenset(
         ".rs",
     }
 )
-GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
 SUPPORTED_WWISE_VERSIONS = frozenset({"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"})
 GATEWAY_SUBCOMMANDS = frozenset(
     {
@@ -96,6 +99,7 @@ GATEWAY_SUBCOMMANDS = frozenset(
         "config-set",
         "buses",
         "selected",
+        "query-schema",
         "query-object",
         "metadata",
         "wait-topic",
@@ -3876,7 +3880,7 @@ def successful_gateway_payload(
     if not isinstance(payload, Mapping):
         return None
     if (
-        payload.get("contract") != GATEWAY_RESULT_CONTRACT
+        payload.get("contract") not in gateway_payload_contracts(subcommand)
         or payload.get("command") != subcommand
         or payload.get("ok") is not True
     ):

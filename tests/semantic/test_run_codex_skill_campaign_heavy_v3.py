@@ -59,6 +59,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_object_set_composer_transaction_steps,
     build_transaction_protocol,
     query_object_step,
+    query_schema_step,
     _typed_fact_cli_arguments,
 )
 from tests.semantic.support.codex_gateway_broker import (
@@ -71,6 +72,11 @@ from tests.semantic.support.codex_gateway_broker import (
     SemanticJsonArgument,
     TypedRequestFactsArgument,
     resolve_gateway_invocation,
+)
+from tests.semantic.support.codex_gateway_contracts import (
+    GATEWAY_RESULT_CONTRACT,
+    TYPED_CONTAINER_HANDLE_CONTRACT,
+    gateway_payload_contracts,
 )
 from tests.semantic.support.codex_harness import (
     CodexHarnessConfig,
@@ -1792,7 +1798,10 @@ def _synthetic_protocol(
             return build_transaction_protocol((recipe.request.as_dict(),))
         if isinstance(recipe.request, QueryObjectRequestSpec):
             return build_direct_protocol(
-                [query_object_step("query-object", recipe.request.argv[3:])]
+                [
+                    query_schema_step(),
+                    query_object_step("query-object", recipe.request.argv[3:]),
+                ]
             )
         raise AssertionError("synthetic object recipe request is not closed")
     if api == "ak.wwise.core.audio.convert":
@@ -1991,8 +2000,19 @@ def _synthetic_gateway_records(
             resolved.gateway_arguments,
         )
         structured_refusal = step.allowed_exit_codes == (2,)
+        allowed_contracts = gateway_payload_contracts(step.subcommand)
+        payload_contract = (
+            GATEWAY_RESULT_CONTRACT
+            if structured_refusal
+            else (
+                TYPED_CONTAINER_HANDLE_CONTRACT
+                if step.subcommand
+                in {"request-map-container", "request-array-item"}
+                else next(iter(allowed_contracts))
+            )
+        )
         payload = {
-            "contract": "waapi-skill.gateway-result/v1",
+            "contract": payload_contract,
             "ok": not structured_refusal,
             "command": step.subcommand,
         }

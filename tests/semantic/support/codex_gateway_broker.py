@@ -64,18 +64,17 @@ from wwise_waapi.platform_commands import (
     encode_windows_model_argv,
     encode_windows_powershell_argv,
 )
+from tests.semantic.support.codex_gateway_contracts import (
+    GATEWAY_RESULT_CONTRACT,
+    TYPED_ARRAY_ITEM_CHOICES_CONTRACT,
+    TYPED_CONTAINER_HANDLE_CONTRACT,
+    TYPED_MAP_CONTAINER_CHOICES_CONTRACT,
+    TYPED_REQUEST_SCHEMA_CONTRACT,
+    TYPED_TOPIC_INPUT_CONTRACT,
+    gateway_payload_contracts,
+)
 
 
-GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
-TYPED_REQUEST_SCHEMA_CONTRACT = "waapi-skill.typed-request-schema/v1"
-TYPED_TOPIC_INPUT_CONTRACT = "waapi-skill.typed-topic-input/v1"
-TYPED_CONTAINER_HANDLE_CONTRACT = "waapi-skill.typed-container-handle/v1"
-TYPED_MAP_CONTAINER_CHOICES_CONTRACT = (
-    "waapi-skill.typed-map-container-choices/v1"
-)
-TYPED_ARRAY_ITEM_CHOICES_CONTRACT = (
-    "waapi-skill.typed-array-item-choices/v1"
-)
 TRANSACTION_NEXT_COMMAND_CONTRACT = "waapi-skill.gateway-next-command/v2"
 TRANSACTION_COPY_INSTRUCTION_CONTRACT = (
     "waapi-skill.gateway-command-copy-instruction/v2"
@@ -5462,19 +5461,7 @@ def _extract_payload(stdout: str, *, required_contract: str | None = None) -> Ma
 def _gateway_payload_contracts(step: ExpectedGatewayStep) -> frozenset[str]:
     """Return the exact public response envelopes allowed for one command."""
 
-    if step.subcommand in {"request-schema", "query-schema"}:
-        return frozenset({TYPED_REQUEST_SCHEMA_CONTRACT})
-    if step.subcommand == "topic-schema":
-        return frozenset({TYPED_TOPIC_INPUT_CONTRACT})
-    if step.subcommand == "request-map-container":
-        return frozenset(
-            {TYPED_CONTAINER_HANDLE_CONTRACT, TYPED_MAP_CONTAINER_CHOICES_CONTRACT}
-        )
-    if step.subcommand == "request-array-item":
-        return frozenset(
-            {TYPED_CONTAINER_HANDLE_CONTRACT, TYPED_ARRAY_ITEM_CHOICES_CONTRACT}
-        )
-    return frozenset({GATEWAY_RESULT_CONTRACT})
+    return gateway_payload_contracts(step.subcommand)
 
 
 def _project_next_command_runner(

@@ -10,6 +10,7 @@ from tests.semantic.support.codex_gateway_broker import (
     GatewayInvocationError,
     project_required_metadata_tokens,
 )
+from tests.semantic.support.codex_gateway_contracts import gateway_payload_contracts
 
 from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
 from wwise_waapi.operation_composer import (
@@ -152,15 +153,20 @@ def _verification_projection_matches_journal(
     return projected == expected
 
 
-def _record_payload(record: Mapping[str, Any], *, index: int) -> Mapping[str, Any]:
+def _record_payload(
+    record: Mapping[str, Any],
+    *,
+    index: int,
+    subcommand: str,
+) -> Mapping[str, Any]:
     if record.get("succeeded") is False:
         _fail(f"Composer Broker record {index} did not succeed")
     payload = _mapping(record.get("payload"), label=f"Composer Broker payload {index}")
     if (
-        payload.get("contract") != "waapi-skill.gateway-result/v1"
+        payload.get("contract") not in gateway_payload_contracts(subcommand)
         or payload.get("ok") is not True
     ):
-        _fail(f"Composer Broker payload {index} is not one successful Gateway result")
+        _fail(f"Composer Broker payload {index} has an invalid success contract")
     return payload
 
 
@@ -395,7 +401,11 @@ def validate_typed_draft_evidence(
             if step.subcommand != "draft-start":
                 continue
             record = _mapping(raw_record, label=f"Composer Broker record {index}")
-            payload = _record_payload(record, index=index)
+            payload = _record_payload(
+                record,
+                index=index,
+                subcommand=step.subcommand,
+            )
             draft = _draft_projection(payload, command="draft-start")
             draft_id = draft.get("draft_id")
             if not isinstance(draft_id, str) or not draft_id:
@@ -482,7 +492,11 @@ def _validate_typed_draft_evidence(
             _fail(f"Composer Broker record {index} is out of order")
         argv = _gateway_arguments(record, index=index)
         arguments = _subcommand_arguments(argv, step.subcommand)
-        payload = _record_payload(record, index=index)
+        payload = _record_payload(
+            record,
+            index=index,
+            subcommand=step.subcommand,
+        )
         if payload.get("command") != step.subcommand:
             _fail(f"Composer Broker payload {index} command is inconsistent")
         payloads.append(payload)

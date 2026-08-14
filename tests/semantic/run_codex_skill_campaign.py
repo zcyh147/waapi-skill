@@ -218,6 +218,10 @@ from tests.semantic.support.codex_gateway_broker import (  # noqa: E402
     InlineTypedOperationArgument,
     TypedRequestFactsArgument,
 )
+from tests.semantic.support.codex_gateway_contracts import (  # noqa: E402
+    GATEWAY_RESULT_CONTRACT,
+    gateway_payload_contracts,
+)
 from tests.semantic.support.codex_filesystem_security import (  # noqa: E402
     CodexFileSecurityError,
     path_is_link_or_reparse,
@@ -5486,7 +5490,12 @@ def _validate_heavy_v3_gateway_payload(
     runner_exit_code: Any,
     expected_project_modification_policy: str | None = None,
 ) -> None:
-    if payload.get("contract") != "waapi-skill.gateway-result/v1":
+    allowed_contracts = (
+        frozenset({GATEWAY_RESULT_CONTRACT})
+        if step.allowed_exit_codes == (2,)
+        else gateway_payload_contracts(step.subcommand)
+    )
+    if payload.get("contract") not in allowed_contracts:
         raise CampaignEvidenceError("heavy broker payload contract is invalid")
     context = payload.get("session_context")
     introduction = (

@@ -74,6 +74,7 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
     SemanticJsonArgument,
     SHIM_TRUSTED_PYTHON_ENV,
 )
+from .support.codex_gateway_contracts import TYPED_REQUEST_SCHEMA_CONTRACT
 
 
 _FAKE_KILL_RETURN_CODE = -9
@@ -2796,6 +2797,95 @@ def test_command_classifier_recognizes_versioned_operation_input_routes(
     assert facts.gateway_commands == (record.command,)
     assert facts.gateway_attempt_commands == (record.command,)
     assert facts.gateway_subcommands == (subcommand,)
+    assert facts.unexpected_commands == ()
+
+
+@pytest.mark.parametrize("subcommand", ("request-schema", "query-schema"))
+def test_command_classifier_requires_exact_typed_schema_envelope(
+    tmp_path: Path,
+    subcommand: str,
+) -> None:
+    skill = tmp_path / "skill"
+    runner = skill / "scripts" / "run.py"
+    runner.parent.mkdir(parents=True)
+    runner.write_text("# packaged runner\n", encoding="utf-8")
+    argv = ("python", str(runner), "gateway.py", subcommand)
+
+    def record(contract: str) -> CodexCommandRecord:
+        return CodexCommandRecord(
+            command=shlex.join(argv),
+            exit_code=0,
+            status="completed",
+            aggregated_output=json.dumps(
+                {
+                    "contract": contract,
+                    "ok": True,
+                    "command": subcommand,
+                }
+            ),
+            argv=argv,
+            has_shell_operators=False,
+            parse_error="",
+            parser_kind="posix-native",
+        )
+
+    accepted = classify_commands(
+        (record(TYPED_REQUEST_SCHEMA_CONTRACT),),
+        skill_source=skill,
+        expected_gateway_subcommands=(subcommand,),
+    )
+    rejected = classify_commands(
+        (record("waapi-skill.gateway-result/v1"),),
+        skill_source=skill,
+        expected_gateway_subcommands=(subcommand,),
+    )
+
+    assert accepted.gateway_subcommands == (subcommand,)
+    assert accepted.unexpected_commands == ()
+    assert rejected.gateway_commands == ()
+    assert rejected.gateway_attempt_commands == (shlex.join(argv),)
+    assert rejected.unexpected_commands == (shlex.join(argv),)
+
+
+def test_command_classifier_accepts_packaged_query_schema_result() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    skill = repo_root / "skills" / "waapi-skill"
+    runner = skill / "scripts" / "run.py"
+    argv = (
+        sys.executable,
+        str(runner),
+        "gateway.py",
+        "--version",
+        "2021.1",
+        "query-schema",
+    )
+    completed = subprocess.run(
+        argv,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert completed.returncode == 0, completed.stderr
+    record = CodexCommandRecord(
+        command=shlex.join(argv),
+        exit_code=completed.returncode,
+        status="completed",
+        aggregated_output=completed.stdout,
+        argv=argv,
+        has_shell_operators=False,
+        parse_error="",
+        parser_kind="posix-native",
+    )
+
+    facts = classify_commands(
+        (record,),
+        skill_source=skill,
+        expected_gateway_subcommands=("query-schema",),
+        expected_wwise_version="2021.1",
+    )
+
+    assert facts.gateway_subcommands == ("query-schema",)
     assert facts.unexpected_commands == ()
 
 

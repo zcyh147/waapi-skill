@@ -20,8 +20,8 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_direct_protocol,
     build_transaction_protocol,
     query_object_step,
+    query_schema_step,
 )
-from tests.semantic.support.codex_gateway_broker import ExpectedGatewayStep
 from tests.semantic.support.codex_object_heavy_v3 import (
     FixtureObject,
     MaterializedObject,
@@ -365,7 +365,7 @@ class PreparedObjectRuntime:
         if isinstance(request, QueryObjectRequestSpec):
             return build_direct_protocol(
                 [
-                    ExpectedGatewayStep("query-schema", "query-schema"),
+                    query_schema_step(),
                     query_object_step("query-object", request.argv[3:]),
                 ]
             )

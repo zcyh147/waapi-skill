@@ -2293,6 +2293,10 @@ def query_object_step(name: str, arguments: Sequence[str]) -> ExpectedGatewaySte
     )
 
 
+def query_schema_step(name: str = "query-schema") -> ExpectedGatewayStep:
+    return ExpectedGatewayStep(name=name, subcommand="query-schema")
+
+
 def wait_topic_step(
     name: str,
     topic: str,
@@ -2477,5 +2481,6 @@ __all__ = [
     "materialize_typed_transaction_protocol_requests",
     "operation_request_equivalence",
     "query_object_step",
+    "query_schema_step",
     "wait_topic_step",
 ]
