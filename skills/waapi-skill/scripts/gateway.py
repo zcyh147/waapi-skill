@@ -3803,6 +3803,60 @@ def operation_composer_input_contract(
         action_name: operation_argv[action_name]
         for action_name in contract["actions"]
     }
+    selector_kinds = [
+        "id-string VALUE",
+        "id-integer VALUE",
+        "path VALUE",
+        "exact-type-name TYPE NAME",
+        "direct-child TYPE PARENT_SELECTOR...",
+        "scoped-name TYPE NAME PARENT_SELECTOR...",
+    ]
+    apply_contract = {
+        "subcommand": "draft-apply",
+        "action_flag": "--action",
+        "gateway_argv": [
+            "draft-apply",
+            "<draft_id>",
+            "--task-authority",
+            "<task_authority>",
+            "--expected-revision",
+            "<revision>",
+            "--compact",
+            "--facts",
+            "--action",
+            "<action-name>",
+            "<typed-fact-arguments>",
+        ],
+        "action_argv": action_argv,
+        "scalar_types": ["string", "number", "integer", "boolean"],
+        **(
+            {"selector_kinds": selector_kinds}
+            if any(
+                "SELECTOR" in token
+                for tokens in action_argv.values()
+                for token in tokens
+            )
+            else {}
+        ),
+        "bind_from_prior_response": [
+            "draft_id",
+            "task_authority",
+            "revision",
+        ],
+        "revision_discipline": {
+            "mode": "one_action_then_read_next_response",
+            "expected_revision_source": "/draft/revision",
+            "next_action_template_source": (
+                "/draft/next_action_binding/fixed_argv_prefix"
+            ),
+            "replace_only": [
+                "<task-authority-from-draft-start>",
+                "<action-name>",
+                "<typed-fact-arguments>",
+            ],
+            "precompute_or_increment_revision": False,
+        },
+    }
     return {
         **contract,
         "start": {
@@ -3819,51 +3873,7 @@ def operation_composer_input_contract(
             "array_item": "request-array-item",
             "schema_digest": contract.get("typed_request_schema_digest"),
         },
-        "apply": {
-            "subcommand": "draft-apply",
-            "action_flag": "--action",
-            "gateway_argv": [
-                "draft-apply",
-                "<draft_id>",
-                "--task-authority",
-                "<task_authority>",
-                "--expected-revision",
-                "<revision>",
-                "--compact",
-                "--facts",
-                "--action",
-                "<action-name>",
-                "<typed-fact-arguments>",
-            ],
-            "action_argv": action_argv,
-            "scalar_types": ["string", "number", "integer", "boolean"],
-            "selector_kinds": [
-                "id-string VALUE",
-                "id-integer VALUE",
-                "path VALUE",
-                "exact-type-name TYPE NAME",
-                "direct-child TYPE PARENT_SELECTOR...",
-                "scoped-name TYPE NAME PARENT_SELECTOR...",
-            ],
-            "bind_from_prior_response": [
-                "draft_id",
-                "task_authority",
-                "revision",
-            ],
-            "revision_discipline": {
-                "mode": "one_action_then_read_next_response",
-                "expected_revision_source": "/draft/revision",
-                "next_action_template_source": (
-                    "/draft/next_action_binding/fixed_argv_prefix"
-                ),
-                "replace_only": [
-                    "<task-authority-from-draft-start>",
-                    "<action-name>",
-                    "<typed-fact-arguments>",
-                ],
-                "precompute_or_increment_revision": False,
-            },
-        },
+        "apply": apply_contract,
         "check": {
             "subcommand": "draft-check",
             "gateway_argv": [

@@ -930,6 +930,8 @@ def test_prepare_get_info_case_binds_exact_live_process_and_result(
         "request-schema",
         "typed-zero-call",
     ]
+    assert prepared.required_reference is None
+    assert prepared.turn_reference_schedule is None
     assert prepared.typed_sections.static_expectation["verification_boundary"] == (
         "exact_host_identity"
     )

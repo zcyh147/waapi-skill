@@ -768,7 +768,7 @@ class _PreparedCase:
     prompt: str
     visible_values: Mapping[str, Any]
     protocol: V3GatewayProtocol
-    required_reference: str
+    required_reference: str | None
     snapshot: Callable[[], Any]
     verify_final: Callable[[Mapping[str, Any] | None, CodexRunResult], Any]
     turn_reference_schedule: tuple[tuple[str, ...], ...] | None = None
@@ -4376,7 +4376,8 @@ def _prepare_case(
             prompt=scenario.prompt,
             visible_values=MappingProxyType({}),
             protocol=protocol,
-            required_reference="references/waapi-query.md",
+            required_reference=None,
+            turn_reference_schedule=None,
             snapshot=snapshot_get_info,
             verify_final=verify_get_info,
             observe_payload=observe_get_info,

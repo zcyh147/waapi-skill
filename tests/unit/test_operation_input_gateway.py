@@ -661,7 +661,7 @@ def test_structurally_distinct_adapters_share_one_public_lifecycle(
     tmp_path: Path,
 ) -> None:
     projections: dict[str, dict[str, Any]] = {}
-    for operation in ("object.set", "audio.import"):
+    for operation in ("object.set", "audio.import", "object.create"):
         code, payload = offline_execute(
             tmp_path / operation.replace(".", "-"),
             "--version",
@@ -701,8 +701,17 @@ def test_structurally_distinct_adapters_share_one_public_lifecycle(
             "integer",
             "boolean",
         ]
+        assert composer["apply"]["selector_kinds"] == [
+            "id-string VALUE",
+            "id-integer VALUE",
+            "path VALUE",
+            "exact-type-name TYPE NAME",
+            "direct-child TYPE PARENT_SELECTOR...",
+            "scoped-name TYPE NAME PARENT_SELECTOR...",
+        ]
         assert "action_argv" in composer["apply"]
         assert "typed_fact_flags" not in composer["apply"]
+    assert "selector_kinds" not in projections["object.create"]["apply"]
     assert object_set["start"]["subcommand"] == "draft-start"
     assert audio_import["start"]["subcommand"] == "draft-start"
     assert object_set["start"]["gateway_argv"] == [

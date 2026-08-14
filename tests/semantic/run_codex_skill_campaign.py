@@ -238,6 +238,9 @@ from tests.semantic.support.codex_prompt_asset_reads_v3 import (  # noqa: E402
     remove_validated_command_occurrences,
     validated_prompt_asset_cat_commands,
 )
+from tests.semantic.support.codex_task_runner_v3 import (  # noqa: E402
+    _normalize_turn_reference_schedule,
+)
 from tests.semantic.support.codex_harness import (  # noqa: E402
     CodexGatewayErrorExpectation,
     CodexHarnessConfig,
@@ -4390,7 +4393,7 @@ def _heavy_v3_topic_publisher_request_count(
     return len(requests)
 
 
-def _heavy_v3_required_reference(expected_unit: Any) -> str:
+def _heavy_v3_required_reference(expected_unit: Any) -> str | None:
     if _heavy_v3_integration_workflow_id(
         expected_unit
     ) in _INTEGRATION_QUERY_FIRST_WORKFLOW_IDS:
@@ -4398,6 +4401,8 @@ def _heavy_v3_required_reference(expected_unit: Any) -> str:
     scenario = getattr(expected_unit, "scenario", None)
     api = getattr(scenario, "api", None)
     item_type = getattr(scenario, "item_type", None)
+    if api == "ak.wwise.core.getInfo":
+        return None
     if api in {
         "ak.wwise.core.object.get",
         "ak.wwise.core.mediaPool.get",
@@ -4431,12 +4436,11 @@ def _heavy_v3_expected_skill_reads(
             (),
         )
     else:
-        lane_schedule = (
-            ((required_reference,),) + ((),) * (turn_count - 1)
-        )
-    return (
-        ("SKILL.md", *lane_schedule[0]),
-        *lane_schedule[1:],
+        lane_schedule = None
+    return _normalize_turn_reference_schedule(
+        prompt_count=turn_count,
+        required_reference=required_reference,
+        turn_reference_schedule=lane_schedule,
     )
 
 

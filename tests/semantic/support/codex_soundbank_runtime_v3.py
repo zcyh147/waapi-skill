@@ -534,6 +534,7 @@ class ClosedDirectWaapiSoundBankBackend:
             "SoundBank",
         }
     )
+    _TYPED_NAME_READ_TYPES = _CREATE_TYPES | frozenset({"Language", "Platform"})
 
     def __init__(self, call: DirectWaapiCall) -> None:
         if not callable(call):
@@ -568,7 +569,7 @@ class ClosedDirectWaapiSoundBankBackend:
             args = {"from": {"id": [object_id]}}
         else:
             assert object_type is not None and name is not None
-            if object_type not in self._CREATE_TYPES:
+            if object_type not in self._TYPED_NAME_READ_TYPES:
                 raise SoundBankRuntimeError("typed-name read uses an unreviewed type")
             args = {
                 "waql": f"from type {object_type} where name = "
@@ -1586,11 +1587,20 @@ class PreparedSoundBankRuntime:
     def prepare(self) -> MaterializedSoundBankCase:
         if self.materialized is not None or self.hidden_before is not None or self._closed:
             raise SoundBankRuntimeError("SoundBank runtime is single-use")
-        project_info = _normalize_fixture_project_info(
-            self.backend,
-            blueprint=self.blueprint,
-            observer=self._project_info_observer,
-        )
+        if (
+            self.blueprint.version == "2021.1"
+            and self.blueprint.api == SOUNDBANK_TOPIC
+        ):
+            project_info = _normalize_2021_topic_project_info(
+                self.backend,
+                blueprint=self.blueprint,
+            )
+        else:
+            project_info = _normalize_fixture_project_info(
+                self.backend,
+                blueprint=self.blueprint,
+                observer=self._project_info_observer,
+            )
         if self.blueprint.scenario_id == PROCESS_REFUSAL_ID:
             for _key, object_type, name in PROCESS_REFUSAL_ABSENT_IDENTITIES:
                 rows = self.backend.read_objects(
@@ -3598,6 +3608,123 @@ def _normalize_fixture_project_info(
         observer(_project_info_observer_projection(saved_raw))
     return _validate_project_info(
         saved_raw,
+        blueprint=blueprint,
+    )
+
+
+def _normalize_2021_topic_project_info(
+    backend: SoundBankRuntimeBackend,
+    *,
+    blueprint: SoundBankBlueprint,
+) -> Mapping[str, Any]:
+    """Build the closed 2021 Topic project projection without getProjectInfo.
+
+    Wwise 2021.1 does not reflect ``ak.wwise.core.getProjectInfo``.  This
+    profile lane already owns the exact lifecycle project path, so the missing
+    API is replaced only for the reviewed generated-Topic case: Platform and
+    Language identities are resolved from their reflected object types while
+    every filesystem path is derived below the scenario-owned sandbox.
+    """
+
+    if blueprint.version != "2021.1" or blueprint.api != SOUNDBANK_TOPIC:
+        raise SoundBankRuntimeError(
+            "the 2021 project-info fallback is limited to the reviewed Topic lane"
+        )
+    publisher_rows = _mapping_rows(
+        blueprint.asset_spec.get("publisher_requests"),
+        "publisher_requests",
+    )
+    platform_names = sorted(
+        {
+            name
+            for row in publisher_rows
+            for name in _string_rows(row.get("platforms"), "publisher.platforms")
+        }
+    )
+    language_names = sorted(
+        {_canonical_language(row.language) for row in blueprint.media_fixtures}
+    )
+    if not platform_names or not language_names:
+        raise SoundBankRuntimeError(
+            "the 2021 Topic fixture lacks reviewed platform or language identities"
+        )
+
+    layout = get_codex_version_layout_v3(blueprint.version)
+
+    def exact_identity(object_type: str, name: str) -> Mapping[str, Any]:
+        reflected_type = layout.reflected_type(object_type)
+        rows = backend.read_objects(
+            object_type=reflected_type,
+            name=name,
+            fields=("id", "name", "type", "path"),
+        )
+        if len(rows) != 1:
+            raise SoundBankRuntimeError(
+                f"2021 {object_type} identity did not resolve exactly once: {name}"
+            )
+        row = dict(rows[0])
+        _row_guid(row, f"2021 {object_type} {name}")
+        if row.get("name") != name or row.get("type") != reflected_type:
+            raise SoundBankRuntimeError(
+                f"2021 {object_type} identity differs from its reviewed name/type"
+            )
+        return row
+
+    root = blueprint.sandbox_root.resolve(strict=True)
+    cache = _resolve_owned_host_directory(
+        str(root / ".cache"),
+        "directories.cache",
+        io_root=blueprint.io_root,
+    )
+    generated = _resolve_owned_host_directory(
+        str(root / "GeneratedSoundBanks"),
+        "directories.soundBankOutputRoot",
+        io_root=blueprint.io_root,
+    )
+    platforms: list[dict[str, Any]] = []
+    platform_directories: list[tuple[Path, Path]] = []
+    for name in platform_names:
+        row = dict(exact_identity("Platform", name))
+        soundbank_path = _resolve_owned_host_directory(
+            str(generated / name),
+            "platform.soundBankPath",
+            io_root=blueprint.io_root,
+        )
+        copied_media_path = _resolve_owned_host_directory(
+            str(soundbank_path / "Media"),
+            "platform.copiedMediaPath",
+            io_root=blueprint.io_root,
+        )
+        platform_directories.append((soundbank_path, copied_media_path))
+        row.update(
+            {
+                "baseName": name,
+                "soundBankPath": str(soundbank_path),
+                "copiedMediaPath": str(copied_media_path),
+            }
+        )
+        platforms.append(row)
+    languages = [
+        dict(exact_identity("Language", name)) for name in language_names
+    ]
+    cache.mkdir(parents=True, exist_ok=True)
+    generated.mkdir(parents=True, exist_ok=True)
+    for soundbank_path, copied_media_path in platform_directories:
+        soundbank_path.mkdir(parents=True, exist_ok=True)
+        copied_media_path.mkdir(parents=True, exist_ok=True)
+    backend.save_project()
+    return _validate_project_info(
+        {
+            "path": str(blueprint.sandbox_project),
+            "isDirty": False,
+            "platforms": platforms,
+            "languages": languages,
+            "directories": {
+                "root": str(root),
+                "cache": str(cache),
+                "soundBankOutputRoot": str(generated),
+            },
+        },
         blueprint=blueprint,
     )
 

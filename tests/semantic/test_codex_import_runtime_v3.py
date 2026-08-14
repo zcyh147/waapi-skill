@@ -1161,6 +1161,9 @@ def test_all_ten_import_cases_build_and_prepare_with_hidden_live_state(tmp_path)
         assert runtime.hidden_before is not None
         assert runtime.verify_preview_unchanged().passed
         assert "00000000-0000" not in runtime.render_prompt()
+        assert "清单列出的行就是完整范围；不要另增目录或容器行" in (
+            runtime.render_prompt()
+        )
         cleanup = runtime.cleanup_success()
         assert cleanup.paths_absent
         assert cleanup.assets_removed

@@ -215,6 +215,34 @@ def test_reference_schedule_preserves_default_and_allows_alarm_lane_transition()
         assert all(gates.values())
 
 
+def test_reference_schedule_allows_reviewed_skill_only_first_turn() -> None:
+    schedule = task_runner._normalize_turn_reference_schedule(
+        prompt_count=1,
+        required_reference=None,
+        turn_reference_schedule=None,
+    )
+
+    assert schedule == (("SKILL.md",),)
+    errors, gates = _grade_common_turn(
+        _result(turn=1, gateway_count=3, skill_reads=schedule[0]),
+        turn_index=1,
+        required_reference=None,
+        expected_skill_reads=schedule[0],
+        expected_gateway_count=3,
+    )
+    assert errors == ()
+    assert all(gates.values())
+    with pytest.raises(
+        task_runner.V3TaskRunnerError,
+        match="SKILL-only task must not schedule lane references",
+    ):
+        task_runner._normalize_turn_reference_schedule(
+            prompt_count=1,
+            required_reference=None,
+            turn_reference_schedule=(("references/waapi-query.md",),),
+        )
+
+
 @pytest.mark.parametrize(
     "schedule",
     (

@@ -679,6 +679,87 @@ def test_project_info_observer_receives_detached_strict_json_before_validation(
     assert normalized["directories"]["root"] == raw_before["directories"]["root"]
 
 
+def test_2021_topic_runtime_derives_reviewed_project_info_without_unavailable_api(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scenario = next(
+        row for row in _scenarios() if row.id == "O22-SB-GENERATED-01"
+    )
+    scenario = replace(scenario, versions=("2021.1",))
+    runtime, backend = _unprepared_runtime(tmp_path, scenario, version="2021.1")
+    backend._insert(r"\Platforms\Windows", "Windows", "Platform")
+    backend._insert(r"\Languages\SFX", "SFX", "Language")
+
+    def unavailable() -> Mapping[str, Any]:
+        raise AssertionError("2021.1 must not call getProjectInfo")
+
+    monkeypatch.setattr(backend, "get_project_info", unavailable)
+
+    materialized = runtime.prepare()
+
+    assert materialized.topic_plan is not None
+    assert materialized.topic_plan.event_count == 3
+    assert all(
+        row.platform_id is not None
+        for row in materialized.topic_plan.expected_events
+    )
+
+
+def test_2021_topic_runtime_rejects_output_link_before_creating_external_rows(
+    tmp_path: Path,
+) -> None:
+    scenario = next(
+        row for row in _scenarios() if row.id == "O22-SB-GENERATED-01"
+    )
+    scenario = replace(scenario, versions=("2021.1",))
+    runtime, backend = _unprepared_runtime(tmp_path, scenario, version="2021.1")
+    backend._insert(r"\Platforms\Windows", "Windows", "Platform")
+    backend._insert(r"\Languages\SFX", "SFX", "Language")
+    generated = runtime.blueprint.sandbox_root / "GeneratedSoundBanks"
+    shutil.rmtree(generated)
+    outside = tmp_path / "outside-generated"
+    outside.mkdir()
+    create_symlink_or_skip(generated, outside, target_is_directory=True)
+
+    with pytest.raises(
+        SoundBankRuntimeError,
+        match="symbolic link or Windows reparse point",
+    ):
+        runtime.prepare()
+
+    assert list(outside.iterdir()) == []
+
+
+def test_2021_topic_runtime_rejects_output_reparse_before_creating_rows(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scenario = next(
+        row for row in _scenarios() if row.id == "O22-SB-GENERATED-01"
+    )
+    scenario = replace(scenario, versions=("2021.1",))
+    runtime, backend = _unprepared_runtime(tmp_path, scenario, version="2021.1")
+    backend._insert(r"\Platforms\Windows", "Windows", "Platform")
+    backend._insert(r"\Languages\SFX", "SFX", "Language")
+    generated = runtime.blueprint.sandbox_root / "GeneratedSoundBanks"
+    shutil.rmtree(generated)
+    generated.mkdir()
+    monkeypatch.setattr(
+        soundbank_runtime,
+        "path_is_link_or_reparse",
+        lambda path, *, metadata: path == generated,
+    )
+
+    with pytest.raises(
+        SoundBankRuntimeError,
+        match="symbolic link or Windows reparse point",
+    ):
+        runtime.prepare()
+
+    assert list(generated.iterdir()) == []
+
+
 def _bounded_project_info_inventories(
     backend: FakeSoundBankBackend,
     *,
@@ -2524,3 +2605,44 @@ def test_closed_direct_effect_fixture_copies_reviewed_factory_template() -> None
         "onNameConflict": "fail",
     }
     assert calls[2][1] == {"object": copied_id, "value": "Radio_Filter"}
+
+
+@pytest.mark.parametrize("object_type", ("Platform", "Language"))
+def test_closed_direct_backend_reads_2021_project_identities_by_exact_name(
+    object_type: str,
+) -> None:
+    object_id = _guid(f"2021:{object_type}")
+    calls: list[tuple[str, Mapping[str, Any], Mapping[str, Any]]] = []
+
+    def call(uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Any:
+        calls.append((uri, dict(args), dict(options)))
+        return {
+            "return": [
+                {
+                    "id": object_id,
+                    "name": "Windows" if object_type == "Platform" else "SFX",
+                    "type": object_type,
+                    "path": f"\\{object_type}s",
+                }
+            ]
+        }
+
+    backend = ClosedDirectWaapiSoundBankBackend(call)
+    name = "Windows" if object_type == "Platform" else "SFX"
+
+    rows = backend.read_objects(
+        object_type=object_type,
+        name=name,
+        fields=("id", "name", "type", "path"),
+    )
+
+    assert rows == (
+        {"id": object_id, "name": name, "type": object_type, "path": f"\\{object_type}s"},
+    )
+    assert calls == [
+        (
+            "ak.wwise.core.object.get",
+            {"waql": f'from type {object_type} where name = "{name}" take 2'},
+            {"return": ["id", "name", "type", "path"]},
+        )
+    ]

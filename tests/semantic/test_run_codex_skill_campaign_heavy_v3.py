@@ -3437,7 +3437,9 @@ def test_campaign_broker_seal_rejects_unreviewed_nonzero_exit(
         )
 
 
-def _synthetic_required_reference(unit: _Unit) -> str:
+def _synthetic_required_reference(unit: _Unit) -> str | None:
+    if unit.scenario.api == "ak.wwise.core.getInfo":
+        return None
     if (
         unit.scenario.api in {
             "ak.wwise.core.object.get",
@@ -3456,9 +3458,11 @@ def _synthetic_first_turn_reads(
     skill_source: Path | None = None,
 ) -> tuple[Path, Path]:
     source = skill_source or options.skill_source
+    reference = _synthetic_required_reference(unit)
     return (
-        source / "SKILL.md",
-        source / _synthetic_required_reference(unit),
+        (source / "SKILL.md",)
+        if reference is None
+        else (source / "SKILL.md", source / reference)
     )
 
 
@@ -3471,6 +3475,19 @@ def _synthetic_runtime_skill_read_source(
         if options.windows_powershell_core_host is not None
         else options.skill_source
     )
+
+
+def test_typed_get_info_campaign_expects_only_the_mandatory_skill_read() -> None:
+    unit = SimpleNamespace(
+        user_turn_count=1,
+        scenario=SimpleNamespace(
+            api="ak.wwise.core.getInfo",
+            item_type="function",
+        ),
+    )
+
+    assert campaign._heavy_v3_required_reference(unit) is None
+    assert campaign._heavy_v3_expected_skill_reads(unit) == (("SKILL.md",),)
 
 
 def _synthetic_codex_facts(

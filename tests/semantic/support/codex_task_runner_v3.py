@@ -173,7 +173,7 @@ def run_v3_codex_task(
     service_tier: str,
     timeout_seconds: float,
     runner_environment: Mapping[str, str],
-    required_reference: str,
+    required_reference: str | None,
     business_oracle_plan: BusinessOraclePlanEvidence,
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
     turn_reference_schedule: Sequence[Sequence[str]] | None = None,
@@ -664,7 +664,7 @@ def _grade_common_turn(
     result: CodexRunResult,
     *,
     turn_index: int,
-    required_reference: str,
+    required_reference: str | None,
     expected_skill_reads: Sequence[str] | None = None,
     expected_gateway_count: int,
     expected_terminal_execute_exit2_count: int = 0,
@@ -677,7 +677,11 @@ def _grade_common_turn(
         tuple(expected_skill_reads)
         if expected_skill_reads is not None
         else (
-            ("SKILL.md", required_reference)
+            (
+                ("SKILL.md", required_reference)
+                if required_reference is not None
+                else ("SKILL.md",)
+            )
             if turn_index == 1
             else ()
         )
@@ -750,7 +754,7 @@ def _grade_common_turn(
 def _normalize_turn_reference_schedule(
     *,
     prompt_count: int,
-    required_reference: str,
+    required_reference: str | None,
     turn_reference_schedule: Sequence[Sequence[str]] | None,
 ) -> tuple[tuple[str, ...], ...]:
     """Close per-turn lane reads while preserving the historical default.
@@ -761,15 +765,22 @@ def _normalize_turn_reference_schedule(
     task, matching the Skill's conversation-scoped read contract.
     """
 
-    if (
-        type(prompt_count) is not int
-        or prompt_count < 1
-        or not isinstance(required_reference, str)
+    if type(prompt_count) is not int or prompt_count < 1:
+        raise V3TaskRunnerError("prompt_count must be a positive integer")
+    if required_reference is not None and (
+        not isinstance(required_reference, str)
         or required_reference not in _PACKAGED_LANE_REFERENCES
     ):
         raise V3TaskRunnerError(
-            "required_reference must be one packaged waapi lane reference"
+            "required_reference must be one packaged waapi lane reference or None"
         )
+    if required_reference is None:
+        if turn_reference_schedule is not None:
+            raise V3TaskRunnerError(
+                "a SKILL-only task must not schedule lane references"
+            )
+        reference_rows = ((),) * prompt_count
+        return (("SKILL.md",), *reference_rows[1:])
     if turn_reference_schedule is None:
         reference_rows: tuple[tuple[str, ...], ...] = (
             ((required_reference,),) + ((),) * (prompt_count - 1)
