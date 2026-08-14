@@ -61,6 +61,38 @@ OBJECT_APIS = frozenset(
     }
 )
 TYPED_PROFILE_SET03_UNIT_ID = "TYP22-METADATA-OBJECT-SET"
+TYPED_PROFILE_OBJECT_METADATA_UNITS = MappingProxyType(
+    {
+        TYPED_PROFILE_SET03_UNIT_ID: (
+            "OBJ22-F-SET-03",
+            "ak.wwise.core.object.set",
+            "2022.1",
+            ("volume", "pitch", "notes", "output bus"),
+            ("Volume", "Pitch", "OutputBus"),
+        ),
+        "TYP23-DEDICATED-OBJECT-CREATE": (
+            "OBJ22-F-CREATE-03",
+            "ak.wwise.core.object.create",
+            "2023.1",
+            ("volume",),
+            ("Volume",),
+        ),
+        "TYP24-METADATA-OBJECT-SET": (
+            "OBJ22-F-SET-01",
+            "ak.wwise.core.object.set",
+            "2024.1",
+            ("volume",),
+            ("Volume",),
+        ),
+        "TYP25-METADATA-OBJECT-SET": (
+            "OBJ22-F-SET-02",
+            "ak.wwise.core.object.set",
+            "2025.1",
+            ("volume",),
+            ("Volume",),
+        ),
+    }
+)
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _MAX_OBJECT_INPUT_FILE_BYTES = 256 * 1024 * 1024
 _GUID_RE = re.compile(
@@ -1567,17 +1599,17 @@ def _compound_metadata_protocol(
     profile_unit_id: str | None,
 ) -> V3GatewayProtocol | None:
     if profile_unit_id is not None:
-        if (
-            profile_unit_id != TYPED_PROFILE_SET03_UNIT_ID
-            or recipe.scenario_id != "OBJ22-F-SET-03"
-            or recipe.api != "ak.wwise.core.object.set"
-            or recipe.version != "2022.1"
-        ):
+        reviewed = TYPED_PROFILE_OBJECT_METADATA_UNITS.get(profile_unit_id)
+        if reviewed is None or (
+            recipe.scenario_id,
+            recipe.api,
+            recipe.version,
+        ) != reviewed[:3]:
             raise ObjectBusinessPlanError(
                 "object metadata profile unit is outside its reviewed lane"
             )
-        metadata_queries = ("volume", "pitch", "notes", "output bus")
-        required_tokens = ("Volume", "Pitch", "OutputBus")
+        metadata_queries = reviewed[3]
+        required_tokens = reviewed[4]
     else:
         metadata_queries = ()
         required_tokens = ()

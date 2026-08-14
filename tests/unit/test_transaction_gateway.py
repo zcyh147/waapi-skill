@@ -1568,7 +1568,7 @@ def test_operation_schema_exposes_tab_import_path_only_progression(
     continuation = payload["typed_operation"]["continuation"]
     assert continuation["operation"] == "audio.importTabDelimited"
     assert "--import-file ABSOLUTE_PATH" in continuation["fields"]
-    assert "--import-location SELECTOR" in continuation["fields"]
+    assert "--import-location SELECTOR_KIND SELECTOR_VALUES..." in continuation["fields"]
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])

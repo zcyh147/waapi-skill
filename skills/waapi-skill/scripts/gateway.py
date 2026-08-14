@@ -3905,6 +3905,36 @@ def operation_composer_input_contract(
             "map_value": "request-map-container",
             "array_item": "request-array-item",
             "schema_digest": contract.get("typed_request_schema_digest"),
+            "map_value_argv": [
+                "request-map-container",
+                operation,
+                "--schema-digest",
+                contract.get("typed_request_schema_digest"),
+                "--map-handle",
+                "<parent_handle>",
+                "--key",
+                "<key>",
+                "--shape",
+                "<object|array>",
+            ],
+            "array_item_argv": [
+                "request-array-item",
+                operation,
+                "--schema-digest",
+                contract.get("typed_request_schema_digest"),
+                "--array-handle",
+                "<parent_handle>",
+                "--index",
+                "<zero_based_index>",
+                "--shape",
+                "<object|array>",
+            ],
+            "draft_binding": False,
+            "sequence": (
+                "disclose each complex child with the operation and schema digest; "
+                "then add the append/map-put Draft fact with the returned child handle; "
+                "disclosure never consumes or changes the Draft revision"
+            ),
         },
         "apply": apply_contract,
         "check": {

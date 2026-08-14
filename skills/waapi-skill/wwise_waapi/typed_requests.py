@@ -352,10 +352,20 @@ class TypedRequestContract:
                 or self.uri == TYPED_REQUEST_COMPLEX_TRACER_URI
                 or self.route == "isolated_transaction"
             ):
+                gateway_argv_prefix = [
+                    "typed-call",
+                    "--uri",
+                    self.uri,
+                    "--schema-digest",
+                    self.schema_digest,
+                ]
+                if self.effect != "read":
+                    gateway_argv_prefix.append("--apply")
                 continuation = {
                     "subcommand": "typed-call",
                     "uri": self.uri,
                     "schema_digest": self.schema_digest,
+                    "gateway_argv_prefix": gateway_argv_prefix,
                     "fact_flags": fact_flags,
                     **({"apply": True} if self.effect != "read" else {}),
                 }
@@ -363,6 +373,31 @@ class TypedRequestContract:
                     continuation["dynamic_container_commands"] = {
                         "map_value": "request-map-container",
                         "array_item": "request-array-item",
+                        "map_value_argv": [
+                            "request-map-container",
+                            self.uri,
+                            "--schema-digest",
+                            self.schema_digest,
+                            "--map-handle",
+                            "<parent_handle>",
+                            "--key",
+                            "<key>",
+                            "--shape",
+                            "<object|array>",
+                        ],
+                        "array_item_argv": [
+                            "request-array-item",
+                            self.uri,
+                            "--schema-digest",
+                            self.schema_digest,
+                            "--array-handle",
+                            "<parent_handle>",
+                            "--index",
+                            "<zero_based_index>",
+                            "--shape",
+                            "<object|array>",
+                        ],
+                        "draft_binding": False,
                     }
                 if self.route == "isolated_transaction":
                     continuation["io_root_flag"] = (
@@ -397,6 +432,31 @@ class TypedRequestContract:
                     "dynamic_container_commands": {
                         "map_value": "request-map-container",
                         "array_item": "request-array-item",
+                        "map_value_argv": [
+                            "request-map-container",
+                            self.uri,
+                            "--schema-digest",
+                            self.schema_digest,
+                            "--map-handle",
+                            "<parent_handle>",
+                            "--key",
+                            "<key>",
+                            "--shape",
+                            "<object|array>",
+                        ],
+                        "array_item_argv": [
+                            "request-array-item",
+                            self.uri,
+                            "--schema-digest",
+                            self.schema_digest,
+                            "--array-handle",
+                            "<parent_handle>",
+                            "--index",
+                            "<zero_based_index>",
+                            "--shape",
+                            "<object|array>",
+                        ],
+                        "draft_binding": False,
                     },
                     "completion": (
                         "draft-check executes this read directly"

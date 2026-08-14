@@ -651,6 +651,13 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
     assert tab_schema["operation"]["input_mode"] == "inline_typed"
     assert "request_envelope" not in tab_schema
     assert tab_schema["typed_operation"]["operation"] == "audio.importTabDelimited"
+    tab_continuation = tab_schema["typed_operation"]["continuation"]
+    assert tab_continuation["gateway_argv_prefix"][-1] == "--apply"
+    assert tab_continuation["selector_argv"]["path"] == [
+        "--import-location",
+        "path",
+        "<complete_wwise_path>",
+    ]
     assert "composer" not in tab_schema
     normal_surfaces = json.dumps({"schema": schema, "detail": detail})
     assert "legacy-preview" not in normal_surfaces
@@ -671,6 +678,16 @@ def test_structurally_distinct_adapters_share_one_public_lifecycle(
         )
         assert code == 0
         projections[operation] = payload["composer"]
+
+    create_dynamic = projections["object.create"]["dynamic_container_commands"]
+    assert create_dynamic["draft_binding"] is False
+    assert create_dynamic["array_item_argv"][:2] == [
+        "request-array-item",
+        "object.create",
+    ]
+    assert "never consumes or changes the Draft revision" in create_dynamic[
+        "sequence"
+    ]
 
     shared_keys = {
         "contract",

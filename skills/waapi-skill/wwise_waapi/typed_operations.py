@@ -677,7 +677,7 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
             else (
                 [
                     "--import-file ABSOLUTE_PATH",
-                    "--import-location SELECTOR",
+                    "--import-location SELECTOR_KIND SELECTOR_VALUES...",
                     "--import-language LANGUAGE",
                     "--import-operation createNew|useExisting|replaceExisting (optional)",
                     "--auto-add true|false (optional)",
@@ -745,6 +745,18 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
     else:
         fields.extend(["--property TOKEN", "--platform PLATFORM", "--linked true|false"])
     continuation["fields"] = fields
+    if operation == "audio.importTabDelimited":
+        continuation["selector_argv"] = {
+            "path": ["--import-location", "path", "<complete_wwise_path>"],
+            "id-string": ["--import-location", "id-string", "<guid>"],
+            "id-integer": ["--import-location", "id-integer", "<integer_id>"],
+            "exact-type-name": [
+                "--import-location",
+                "exact-type-name",
+                "<type>",
+                "<name>",
+            ],
+        }
     contract = {
         "contract": INLINE_OPERATION_CONTRACT,
         "operation": operation,

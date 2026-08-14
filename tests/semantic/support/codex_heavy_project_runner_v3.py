@@ -64,6 +64,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_transaction_protocol,
     call_step,
     query_object_step,
+    request_schema_step,
     typed_read_draft_steps,
     wait_topic_step,
     topic_schema_step,
@@ -165,6 +166,7 @@ from tests.semantic.support.codex_object_heavy_v3 import (
 )
 from tests.semantic.support.codex_object_business_plan_v3 import (
     ObjectBusinessPlanSections,
+    TYPED_PROFILE_OBJECT_METADATA_UNITS,
     TYPED_PROFILE_SET03_UNIT_ID,
     build_object_merge_query_protocol,
     compile_object_business_plan,
@@ -2624,6 +2626,10 @@ def _prepare_media_pool_case(
         oracle=oracle,
     )
     steps: list[ExpectedGatewayStep] = [
+        request_schema_step(
+            "media.get-fields.schema",
+            MEDIA_POOL_GET_FIELDS_URI,
+        ),
         call_step("media.get-fields", MEDIA_POOL_GET_FIELDS_URI, version=runtime.version),
     ]
     steps.extend(
@@ -3541,20 +3547,24 @@ def _compound_object_metadata_binding(
 
     Historical V3 object cases intentionally retain their original protocol.
     Compound cases carry a closed hidden marker; the typed-input profile adds
-    one exact reviewed SET03/version lane whose three live tokens are required.
-    Neither path can silently broaden another campaign or version.
+    a fixed exact unit/scenario/version map for its metadata tasks. Neither path
+    can silently broaden another campaign or version.
     """
 
-    if (
-        scenario.id == "OBJ22-F-SET-03"
-        and scenario.api == "ak.wwise.core.object.set"
-        and version == "2022.1"
-        and profile_unit_id == TYPED_PROFILE_SET03_UNIT_ID
-    ):
+    if profile_unit_id is not None:
+        reviewed = TYPED_PROFILE_OBJECT_METADATA_UNITS.get(profile_unit_id)
+        if reviewed is None or (
+            scenario.id,
+            scenario.api,
+            version,
+        ) != reviewed[:3]:
+            raise HeavyProjectRunnerError(
+                "typed-input object metadata unit is outside its reviewed lane"
+            )
         return (
             get_codex_version_layout_v3(version).reflected_type("ActorMixer"),
-            ("volume", "pitch", "notes", "output bus"),
-            ("Volume", "Pitch", "OutputBus"),
+            reviewed[3],
+            reviewed[4],
         )
 
     asset_spec = scenario.fixture.get("asset_spec")
@@ -4590,7 +4600,7 @@ def _prepare_case(
         )
         metadata_profile_unit_id = (
             unit_id
-            if unit_id == TYPED_PROFILE_SET03_UNIT_ID
+            if unit_id in TYPED_PROFILE_OBJECT_METADATA_UNITS
             else None
         )
         recipe = build_object_heavy_v3_recipe(

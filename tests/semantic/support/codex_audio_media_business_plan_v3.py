@@ -30,6 +30,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_transaction_protocol,
     call_step,
     query_object_step,
+    request_schema_step,
     typed_read_draft_steps,
 )
 from tests.semantic.support.codex_media_pool_runtime_v3 import (
@@ -290,7 +291,10 @@ def validate_audio_media_business_plan_archive(
             raise AudioMediaBusinessPlanError(
                 "archived media request shape is not closed"
             )
-        steps = [call_step("media.get-fields", MEDIA_POOL_GET_FIELDS_URI, version=MEDIA_VERSION)]
+        steps = [
+            request_schema_step("media.get-fields.schema", MEDIA_POOL_GET_FIELDS_URI),
+            call_step("media.get-fields", MEDIA_POOL_GET_FIELDS_URI, version=MEDIA_VERSION),
+        ]
         steps.extend(
             typed_read_draft_steps(
                 "media",
@@ -1945,7 +1949,10 @@ def _validate_media_inputs(
 
 
 def _expected_media_protocol(case: MaterializedMediaPoolCase, oracle: SealedMediaPoolOracle) -> V3GatewayProtocol:
-    steps = [call_step("media.get-fields", MEDIA_POOL_GET_FIELDS_URI, version=MEDIA_VERSION)]
+    steps = [
+        request_schema_step("media.get-fields.schema", MEDIA_POOL_GET_FIELDS_URI),
+        call_step("media.get-fields", MEDIA_POOL_GET_FIELDS_URI, version=MEDIA_VERSION),
+    ]
     steps.extend(
         typed_read_draft_steps(
             "media",

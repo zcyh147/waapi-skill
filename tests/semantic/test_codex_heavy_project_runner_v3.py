@@ -1217,15 +1217,60 @@ def test_typed_profile_set03_requires_exact_live_property_metadata() -> None:
         ("volume", "pitch", "notes", "output bus"),
         ("Volume", "Pitch", "OutputBus"),
     )
-    assert runner._compound_object_metadata_binding(
-        scenario,
-        version="2023.1",
-        profile_unit_id="TYP22-METADATA-OBJECT-SET",
-    ) is None
+    with pytest.raises(
+        runner.HeavyProjectRunnerError,
+        match="outside its reviewed lane",
+    ):
+        runner._compound_object_metadata_binding(
+            scenario,
+            version="2023.1",
+            profile_unit_id="TYP22-METADATA-OBJECT-SET",
+        )
     assert runner._compound_object_metadata_binding(
         scenario,
         version="2022.1",
     ) is None
+
+
+@pytest.mark.parametrize(
+    ("unit_id", "scenario_id", "api", "version"),
+    (
+        (
+            "TYP23-DEDICATED-OBJECT-CREATE",
+            "OBJ22-F-CREATE-03",
+            "ak.wwise.core.object.create",
+            "2023.1",
+        ),
+        (
+            "TYP24-METADATA-OBJECT-SET",
+            "OBJ22-F-SET-01",
+            "ak.wwise.core.object.set",
+            "2024.1",
+        ),
+        (
+            "TYP25-METADATA-OBJECT-SET",
+            "OBJ22-F-SET-02",
+            "ak.wwise.core.object.set",
+            "2025.1",
+        ),
+    ),
+)
+def test_other_typed_profile_object_metadata_lanes_are_exact(
+    unit_id: str,
+    scenario_id: str,
+    api: str,
+    version: str,
+) -> None:
+    scenario = _scenario(api, scenario_id=scenario_id, version=version)
+    assert runner._compound_object_metadata_binding(
+        scenario,
+        version=version,
+        profile_unit_id=unit_id,
+    ) == (
+        runner.get_codex_version_layout_v3(version).reflected_type("ActorMixer"),
+        ("volume",),
+        ("Volume",),
+    )
 
 
 def test_typed_profile_set03_builds_schema_first_metadata_protocol(

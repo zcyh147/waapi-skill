@@ -153,6 +153,7 @@ from tests.semantic.support.codex_cli_runtime_v3 import (  # noqa: E402
 from tests.semantic.support.codex_object_business_plan_v3 import (  # noqa: E402
     ObjectBusinessPlanError,
     ObjectBusinessPlanSections,
+    TYPED_PROFILE_OBJECT_METADATA_UNITS,
     TYPED_PROFILE_SET03_UNIT_ID,
     parse_object_business_plan_sections,
     validate_archived_object_business_plan,
@@ -6233,9 +6234,9 @@ def _validate_heavy_v3_typed_business_plan(
             protocol=protocol,
             verify_files=False,
             profile_unit_id=(
-                TYPED_PROFILE_SET03_UNIT_ID
+                str(getattr(expected_unit, "unit_id", ""))
                 if getattr(expected_unit, "unit_id", None)
-                == TYPED_PROFILE_SET03_UNIT_ID
+                in TYPED_PROFILE_OBJECT_METADATA_UNITS
                 else None
             ),
         )

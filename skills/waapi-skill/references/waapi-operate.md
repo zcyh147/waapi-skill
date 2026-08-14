@@ -45,12 +45,16 @@ For direct `audio.import`, schema owns fixed fields and Event/Switch Assignation
 
 Follow the schema's sole `input_mode`. No schema-to-preview shortcut. Reuse evidence-bound live property/reference accessors: remove one leading `@` (`@Foo` becomes `Foo`); `OutputBus` remains `OutputBus`; never infer a token. For `inline_typed`, run only the returned `typed-operation` continuation; Gateway owns the complete request and Preview. For `composer`, run `composer.start.gateway_argv`, then only the selected `action_argv`; Gateway serializes and `draft-check` validates metadata. Start `object.set` rows with `add_target --target ...`. Start every `audio.import` row with one `add_import_row`: include `--assignment none`, or `--assignment switch VALUE` only when requested. Corrections keep the same draft; run its `preview-from-draft` unchanged. `--apply` marks a preview, not execution. Exact reflected URIs use `request-schema`; follow its sole typed continuation.
 
+Copy every returned `gateway_argv` or `gateway_argv_prefix` as separate argv tokens and append facts only after that prefix. Never move `--apply` behind typed facts, join a selector kind and value into one shell argument, or substitute a Draft id/revision for the operation and schema digest required by `request-array-item` / `request-map-container`. A dynamic disclosure does not change the Draft: disclose the child schema first, then submit the dependent append/map fact with the returned handle and the current response-issued Draft revision.
+
 Public mutation identities are closed to `id`, `path`, `exact-type-name`,
 `direct-child`, and `scoped-name`. Use a schema-fitting selector directly in
 preview; do not query only to translate it or use raw WAQL. After exact
 relationship/path read returns canonical `id`/`name`/`type`/`path`, reuse its
 GUID as an `id` selector for later object/target; never switch to path/name or
-retype its Wwise path. Gateway revalidates it.
+retype its Wwise path. Gateway revalidates it. When the user already supplied a
+complete Wwise path, keep it as one `path` selector; do not decompose it into
+`scoped-name` plus a parent path.
 
 For an exact SoundBank name that is intended to be globally unique by type, use
 `{"kind":"exact-type-name","type":"SoundBank","name":"<exact name>"}`. For an
@@ -124,6 +128,8 @@ For `object.create`, `object.set`, and direct `audio.import`, read the named sch
 The operation preview performs final live typed validation and remains authoritative. Do not add a separate property-info check for a token already proved in the visible conversation, and never inspect metadata-cache files.
 
 For direct imports, discover only requested dynamic `properties[]`/`references[]`; for table imports, only dynamic `Property[...]`, `Reference[...]`, or `@...` columns. Fixed fields and side effects never trigger discovery. `Notes` and `Audio Source Notes` are fixed import columns, not Sound metadata queries; Event, Dialogue Event, and Switch Assignation are schema-owned too. Requested infinite looping needs separate “looping enabled” and “looping infinite” phrases; per-object limits need separate “ignore parent playback limit”, “sound instance limit enabled”, and “maximum sound instances” phrases; `volume` and `output bus` are other concepts. These are search phrases, not permission to guess tokens.
+
+For a user-supplied existing Lua file in connected Authoring, select the named `lua.executeCoreFile` operation. `lua.executeCliFile` is only the explicit WwiseConsole/CLI file route; there is no `lua.executeFile` operation. Read the named operation schema and follow its Composer continuation without renaming it.
 
 ### Compact import and value rules
 

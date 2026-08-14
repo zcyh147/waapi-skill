@@ -35,6 +35,9 @@ Require the unique terminal sentinel required by `SKILL.md` and no truncation or
 - The configured exact Wwise version selects every schema. Typed values and
   Gateway-issued handles remain bounded by that schema; a rejected continuation
   is a boundary, not permission to try another input language.
+- Live Skill work must not copy `--version` from an example. The runner-owned
+  session already selects the connected exact version; an explicit selector is
+  only for an offline request that the user actually asked to inspect.
 
 ## Wwise 2025.1 Media Pool
 
@@ -447,6 +450,12 @@ Bank × platform × language cells. Add typed match facts for `soundbank.name` o
 `platform.name` only when one explicit name is common to all
 cells; otherwise submit no match facts. Never
 discover or inject a GUID for this predicate.
+Use the exact leaf scalar handle when `topic-schema` exposes one (for example
+`soundbank.name`); do not replace that fact with `map-put` on its parent map.
+Conversely, use `map-put` only where the schema exposes an open map without a
+leaf scalar. If every requested cell shares one platform, that platform is a
+common explicit name and its typed match fact is required even when the Bank
+names differ.
 
 Use `ak.wwise.core.soundbank.generated` for per-Bank × platform × language
 result events. Use `ak.wwise.core.soundbank.generationDone` only for the overall

@@ -728,6 +728,9 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "include `--assignment none`" in OPERATE
     assert "`--assignment switch VALUE` only when requested" in OPERATE
     assert "run its `preview-from-draft` unchanged" in OPERATE
+    assert "Never move `--apply` behind typed facts" in OPERATE
+    assert "there is no `lua.executeFile` operation" in OPERATE
+    assert "keep it as one `path` selector" in OPERATE
     assert "`--apply` marks a preview, not execution" in OPERATE
     assert "Exact reflected URIs use `request-schema`" in OPERATE
     assert "follow its sole typed continuation" in OPERATE

@@ -2299,6 +2299,16 @@ def query_schema_step(name: str = "query-schema") -> ExpectedGatewayStep:
     return ExpectedGatewayStep(name=name, subcommand="query-schema")
 
 
+def request_schema_step(name: str, api: str) -> ExpectedGatewayStep:
+    if not isinstance(api, str) or not api.startswith("ak.wwise."):
+        raise V3ProtocolError("request-schema requires one exact WAAPI API")
+    return ExpectedGatewayStep(
+        name=name,
+        subcommand="request-schema",
+        arguments=(api,),
+    )
+
+
 def topic_schema_step(name: str, topic: str) -> ExpectedGatewayStep:
     if not isinstance(topic, str) or not topic.startswith("ak.wwise."):
         raise V3ProtocolError("topic-schema requires one exact WAAPI topic")
@@ -2503,6 +2513,7 @@ __all__ = [
     "operation_request_equivalence",
     "query_object_step",
     "query_schema_step",
+    "request_schema_step",
     "topic_schema_step",
     "wait_topic_step",
 ]

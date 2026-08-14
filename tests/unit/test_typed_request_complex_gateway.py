@@ -20,6 +20,7 @@ sys.modules[SPEC.name] = gateway
 SPEC.loader.exec_module(gateway)
 
 VALIDATE_URI = "ak.wwise.debug.validateCall"
+AUDIO_CONVERT_URI = "ak.wwise.core.audio.convert"
 
 
 class FakeClient:
@@ -163,10 +164,31 @@ def test_complex_schema_discloses_one_complete_non_json_continuation(tmp_path: P
     )
     assert exit_code == 0
     continuation = schema["continuation"]
-    assert continuation["dynamic_container_commands"] == {
-        "map_value": "request-map-container",
-        "array_item": "request-array-item",
-    }
+    dynamic = continuation["dynamic_container_commands"]
+    assert dynamic["map_value"] == "request-map-container"
+    assert dynamic["array_item"] == "request-array-item"
+    assert dynamic["draft_binding"] is False
+    assert dynamic["map_value_argv"][:5] == [
+        "request-map-container",
+        VALIDATE_URI,
+        "--schema-digest",
+        schema["schema_digest"],
+        "--map-handle",
+    ]
+    assert dynamic["array_item_argv"][:5] == [
+        "request-array-item",
+        VALIDATE_URI,
+        "--schema-digest",
+        schema["schema_digest"],
+        "--array-handle",
+    ]
+    assert continuation["gateway_argv_prefix"] == [
+        "typed-call",
+        "--uri",
+        VALIDATE_URI,
+        "--schema-digest",
+        schema["schema_digest"],
+    ]
     assert set(continuation["fact_flags"]) == {
         "scalar", "array_item", "container", "branch", "dynamic_branch", "map_put",
         "map_correct", "map_remove",
@@ -175,6 +197,25 @@ def test_complex_schema_discloses_one_complete_non_json_continuation(tmp_path: P
     assert "args-json" not in encoded
     assert "options-json" not in encoded
     assert "action-json" not in encoded
+
+
+def test_mutating_typed_call_prefix_places_apply_before_every_fact(tmp_path: Path) -> None:
+    exit_code, schema = gateway.execute_gateway(
+        ["request-schema", AUDIO_CONVERT_URI],
+        env=_env(tmp_path, "2024.1"),
+        client_factory=lambda _url: pytest.fail("schema must be offline"),
+    )
+    assert exit_code == 0
+    continuation = schema["continuation"]
+    assert continuation["gateway_argv_prefix"] == [
+        "typed-call",
+        "--uri",
+        AUDIO_CONVERT_URI,
+        "--schema-digest",
+        schema["schema_digest"],
+        "--apply",
+    ]
+    assert continuation["apply"] is True
 
 
 def test_nested_container_handles_can_be_issued_before_one_atomic_typed_call(
