@@ -41,6 +41,37 @@ def _request(index: int = 1) -> dict[str, object]:
     }
 
 
+def test_object_create_top_level_facts_precede_dynamic_container_disclosure() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2021.1",
+        "operation": "object.create",
+        "arguments": {
+            "parent": {
+                "kind": "path",
+                "value": r"\Actor-Mixer Hierarchy\Default Work Unit\SemanticLab\NPC",
+            },
+            "type": "ActorMixer",
+            "name": "TypedRoot",
+            "children": [
+                {
+                    "type": "Sound",
+                    "name": "TypedChild",
+                }
+            ],
+        },
+    }
+
+    protocol = build_transaction_protocol([request])
+    subcommands = tuple(step.subcommand for step in protocol.steps)
+
+    first_disclosure = subcommands.index("request-array-item")
+    assert any(
+        step.subcommand == "draft-apply"
+        for step in protocol.steps[2:first_disclosure]
+    )
+
+
 def _object_set_request(**options: object) -> dict[str, object]:
     return {
         "contract": "waapi-skill.operation-request/v1",

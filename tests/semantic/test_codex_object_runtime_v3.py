@@ -518,6 +518,24 @@ def test_get01_2021_snapshot_rejects_a_second_direct_audio_source() -> None:
         runtime.snapshot()
 
 
+def test_read_only_object_protocol_discovers_query_schema_first(tmp_path: Path) -> None:
+    scenario = replace(_scenario("OBJ22-F-GET-01"), versions=("2021.1",))
+    recipe = build_object_heavy_v3_recipe(scenario.id, version="2021.1")
+    runtime = PreparedObjectRuntime(
+        scenario=scenario,
+        recipe=recipe,
+        backend=_StateBackend(_fixture_objects(scenario.id, "2021.1")),
+        asset_root=tmp_path,
+    )
+
+    protocol = runtime.gateway_protocol()
+
+    assert tuple(step.subcommand for step in protocol.steps[:2]) == (
+        "query-schema",
+        "query-object",
+    )
+
+
 @pytest.mark.parametrize(
     "mutation, match",
     (
@@ -1523,8 +1541,11 @@ def test_all_object_recipes_build_exact_single_or_two_turn_protocols() -> None:
             )
         else:
             assert isinstance(recipe.request, QueryObjectRequestSpec)
-            assert protocol.turn_prefix_counts == (1,)
-            assert protocol.steps[0].subcommand == "query-object"
+            assert protocol.turn_prefix_counts == (2,)
+            assert tuple(step.subcommand for step in protocol.steps) == (
+                "query-schema",
+                "query-object",
+            )
 
 
 @pytest.mark.parametrize(

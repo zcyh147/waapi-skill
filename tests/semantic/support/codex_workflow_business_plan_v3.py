@@ -522,18 +522,63 @@ def _matches_transaction_step_sequence(
     if actual[-len(tail) :] != tail:
         return False
     construction = actual[2 : -len(tail)]
-    counters = {"action": 0, "disclose": 0}
     for name, kind in construction:
         if kind != "operation_compose":
             return False
-        prefix = name.removeprefix(f"{transaction_id}.")
-        family, separator, raw_index = prefix.partition(".")
-        if family not in counters or separator != "." or not raw_index.isdigit():
+    prefixes = [
+        name.removeprefix(f"{transaction_id}.") for name, _kind in construction
+    ]
+    action_indexes: list[int] = []
+    disclosure_positions: list[int] = []
+    for position, prefix in enumerate(prefixes):
+        if prefix.startswith("action."):
+            raw_index = prefix.removeprefix("action.")
+            if len(raw_index) != 3 or not raw_index.isdigit():
+                return False
+            action_indexes.append(int(raw_index))
+        elif prefix.startswith("disclose."):
+            disclosure_positions.append(position)
+        else:
             return False
-        counters[family] += 1
-        if raw_index != f"{counters[family]:03d}":
+    if not action_indexes or sorted(action_indexes) != list(
+        range(1, len(action_indexes) + 1)
+    ):
+        return False
+    if not disclosure_positions:
+        return action_indexes == sorted(action_indexes)
+    first_disclosure = disclosure_positions[0]
+    last_disclosure = disclosure_positions[-1]
+    if disclosure_positions != list(range(first_disclosure, last_disclosure + 1)):
+        return False
+    before_indexes = [
+        int(prefix.removeprefix("action."))
+        for prefix in prefixes[:first_disclosure]
+    ]
+    after_indexes = [
+        int(prefix.removeprefix("action."))
+        for prefix in prefixes[last_disclosure + 1 :]
+    ]
+    if (
+        not after_indexes
+        or before_indexes != sorted(before_indexes)
+        or after_indexes != sorted(after_indexes)
+    ):
+        return False
+    disclosure_prefixes = prefixes[first_disclosure : last_disclosure + 1]
+    cursor = 0
+    disclosure_index = 1
+    while cursor < len(disclosure_prefixes):
+        base = f"disclose.{disclosure_index:03d}"
+        if disclosure_prefixes[cursor] == f"{base}.choices":
+            cursor += 1
+        if (
+            cursor >= len(disclosure_prefixes)
+            or disclosure_prefixes[cursor] != base
+        ):
             return False
-    return bool(construction)
+        cursor += 1
+        disclosure_index += 1
+    return True
 
 
 def _validate_diagnostic_evidence(

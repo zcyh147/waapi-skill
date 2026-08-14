@@ -1111,7 +1111,9 @@ def _build_generic_typed_draft_transaction_steps(
         )
         disclosure_by_child[disclosure.child_handle] = base_name
         disclosed_handle_bindings[disclosure.child_handle] = (base_name, "/handle")
-    steps.extend(disclosure_steps)
+    fact_rows: list[
+        tuple[int, Any, tuple[DraftActionResponseBinding, ...], Mapping[str, Any]]
+    ] = []
     for index, fact in enumerate(construction.facts, start=1):
         response_bindings: list[DraftActionResponseBinding] = []
         if fact.handle in disclosed_handle_bindings:
@@ -1152,28 +1154,36 @@ def _build_generic_typed_draft_transaction_steps(
                 else {}
             ),
         }
-        step_name = f"{label}.action.{index:03d}"
-        steps.append(
-            ExpectedGatewayStep(
-                step_name,
-                "draft-apply",
-                (
-                    ResponseBinding(f"{label}.draft-start", "/draft/draft_id"),
-                    "--task-authority",
-                    ResponseBinding(f"{label}.draft-start", "/task_authority"),
-                    "--expected-revision",
-                    ResponseBinding(revision_step, "/draft/revision"),
-                    "--compact",
-                    "--facts",
-                    DraftTypedActionArgument(
-                        action,
-                        response_bindings=tuple(response_bindings),
-                        operation=operation,
+        fact_rows.append((index, fact, tuple(response_bindings), action))
+
+    independent_rows = tuple(row for row in fact_rows if not row[2])
+    dependent_rows = tuple(row for row in fact_rows if row[2])
+    for position, rows in enumerate((independent_rows, dependent_rows)):
+        if position == 1:
+            steps.extend(disclosure_steps)
+        for index, _fact, response_bindings, action in rows:
+            step_name = f"{label}.action.{index:03d}"
+            steps.append(
+                ExpectedGatewayStep(
+                    step_name,
+                    "draft-apply",
+                    (
+                        ResponseBinding(f"{label}.draft-start", "/draft/draft_id"),
+                        "--task-authority",
+                        ResponseBinding(f"{label}.draft-start", "/task_authority"),
+                        "--expected-revision",
+                        ResponseBinding(revision_step, "/draft/revision"),
+                        "--compact",
+                        "--facts",
+                        DraftTypedActionArgument(
+                            action,
+                            response_bindings=response_bindings,
+                            operation=operation,
+                        ),
                     ),
-                ),
+                )
             )
-        )
-        revision_step = step_name
+            revision_step = step_name
     check_name = f"{label}.check"
     check_trailing: tuple[Any, ...] = ()
     if post_filter is not None:

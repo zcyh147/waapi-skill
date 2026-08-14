@@ -1549,7 +1549,7 @@ def test_prepare_compound_import_uses_two_stage_reference_and_metadata_binding(
     monkeypatch.setattr(
         runner,
         "ClosedDirectWaapiBackend",
-        lambda _direct: backend_sentinel,
+        lambda _direct, **_kwargs: backend_sentinel,
     )
 
     def prepare_references(scenario, materialized, *, version, backend):
@@ -1691,7 +1691,7 @@ def test_prepare_compound_import_cleans_unadopted_bus_after_binding_failure(
     monkeypatch.setattr(
         runner,
         "ClosedDirectWaapiBackend",
-        lambda _direct: SimpleNamespace(),
+        lambda _direct, **_kwargs: SimpleNamespace(),
     )
     monkeypatch.setattr(
         runner,

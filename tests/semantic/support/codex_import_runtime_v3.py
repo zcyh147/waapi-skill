@@ -92,6 +92,11 @@ OBJECT_FIELDS = (
     "sound:originalWavFilePath",
     "audioSource:language",
 )
+OBJECT_FIELDS_2021 = tuple(
+    field
+    for field in OBJECT_FIELDS
+    if field not in {"activeSource", "originalFilePath"}
+)
 AUDIO_SOURCE_FIELDS = (
     "id",
     "name",
@@ -102,6 +107,9 @@ AUDIO_SOURCE_FIELDS = (
     "originalFilePath",
     "audioSource:language",
 )
+AUDIO_SOURCE_FIELDS_2021 = tuple(
+    field for field in AUDIO_SOURCE_FIELDS if field != "originalFilePath"
+) + ("originalWavFilePath",)
 EVENT_FIELDS = ("id", "name", "type", "path", "parent", "notes")
 ACTION_FIELDS = (*EVENT_FIELDS, "ActionType", "Target")
 PLAY_ACTION_TYPE = 1
@@ -395,10 +403,11 @@ class ImportRuntimeBackend(Protocol):
 class ClosedDirectWaapiBackend:
     """Strict direct-WAAPI adapter for trusted setup/read/save/cleanup only."""
 
-    def __init__(self, call: DirectWaapiCall) -> None:
+    def __init__(self, call: DirectWaapiCall, *, version: str = "2022.1") -> None:
         if not callable(call):
             raise TypeError("call must be callable")
         self._call = call
+        self._version = _required_text(version, "version")
 
     def read_objects(
         self,
@@ -544,7 +553,13 @@ class ClosedDirectWaapiBackend:
                 "imports": [row],
                 "autoAddToSourceControl": False,
             },
-            {"return": list(OBJECT_FIELDS)},
+            {
+                "return": list(
+                    OBJECT_FIELDS_2021
+                    if self._version == "2021.1"
+                    else OBJECT_FIELDS
+                )
+            },
         )
         if not isinstance(result, Mapping):
             raise ImportRuntimeError("audio.import setup result must be an object")
@@ -1304,7 +1319,11 @@ class PreparedImportRuntime:
     def _snapshot_row(self, plan: ImportRowPlan) -> ImportRowState:
         rows = self.backend.read_objects(
             path=plan.target_path,
-            fields=OBJECT_FIELDS,
+            fields=(
+                OBJECT_FIELDS_2021
+                if self.plan.version == "2021.1"
+                else OBJECT_FIELDS
+            ),
             language=plan.language,
         )
         if len(rows) > 1:
@@ -1326,11 +1345,36 @@ class PreparedImportRuntime:
         path = _required_wwise_path(row.get("path"), "object path")
         active_source = _identity_value(_field_value(row, "activeSource"))
         source_state: ImportAudioSourceState | None = None
+        if self.plan.version == "2021.1":
+            direct_sources = tuple(
+                source
+                for source in self.backend.read_direct_children(
+                    object_id,
+                    fields=AUDIO_SOURCE_FIELDS_2021,
+                )
+                if _object_type_matches(source.get("type"), "AudioFileSource")
+                and _same_guid(_identity_value(source.get("parent")), object_id)
+                and _language_name(_field_value(source, "audioSource:language"))
+                == language
+            )
+            if len(direct_sources) != 1:
+                raise ImportRuntimeError(
+                    "2021 import target must have exactly one direct AudioFileSource "
+                    f"for {language}: {path}"
+                )
+            active_source = _required_guid(
+                direct_sources[0].get("id"),
+                "2021 direct Audio Source id",
+            )
         if active_source is not None:
-            source_rows = self.backend.read_objects(
-                object_id=active_source,
-                fields=AUDIO_SOURCE_FIELDS,
-                language=language,
+            source_rows = (
+                direct_sources
+                if self.plan.version == "2021.1"
+                else self.backend.read_objects(
+                    object_id=active_source,
+                    fields=AUDIO_SOURCE_FIELDS,
+                    language=language,
+                )
             )
             if len(source_rows) != 1:
                 raise ImportRuntimeError(
@@ -1339,6 +1383,8 @@ class PreparedImportRuntime:
             source = source_rows[0]
             source_id = _required_guid(source.get("id"), "Audio Source id")
             copied = _field_value(source, "originalFilePath")
+            if copied is None:
+                copied = _field_value(source, "originalWavFilePath")
             if copied is None:
                 copied = _field_value(row, "originalFilePath")
             if copied is None:
@@ -3094,7 +3140,15 @@ def _validated_fields(fields: Sequence[str]) -> tuple[str, ...]:
     if isinstance(fields, (str, bytes)):
         raise ImportRuntimeError("return fields must be a sequence")
     values = tuple(fields)
-    allowed = frozenset({*OBJECT_FIELDS, *AUDIO_SOURCE_FIELDS, *ACTION_FIELDS})
+    allowed = frozenset(
+        {
+            *OBJECT_FIELDS,
+            *OBJECT_FIELDS_2021,
+            *AUDIO_SOURCE_FIELDS,
+            *AUDIO_SOURCE_FIELDS_2021,
+            *ACTION_FIELDS,
+        }
+    )
     if not values or len(values) != len(set(values)) or any(value not in allowed for value in values):
         raise ImportRuntimeError("direct read fields are outside the closed import oracle")
     return values

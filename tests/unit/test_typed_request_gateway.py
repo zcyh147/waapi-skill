@@ -349,6 +349,60 @@ def test_zero_input_read_discloses_one_short_continuation_and_dispatches_directl
     assert "transaction_id" not in payload
 
 
+def test_get_info_request_schema_discloses_the_independent_typed_read(
+    tmp_path: Path,
+) -> None:
+    exit_code, contract = waapi_gateway.execute_gateway(
+        ["request-schema", "ak.wwise.core.getInfo"],
+        env=_env(tmp_path, "2021.1"),
+        client_factory=lambda _url: pytest.fail("discovery must remain offline"),
+    )
+
+    assert exit_code == 0
+    assert contract["continuation"] == {
+        "subcommand": "typed-zero-call",
+        "uri": "ak.wwise.core.getInfo",
+        "schema_digest": contract["schema_digest"],
+        "business_values_required": False,
+    }
+
+    result = _live_info("2021.1")
+    result.update(
+        {
+            "sessionId": "{11111111-1111-1111-1111-111111111111}",
+            "apiVersion": 1,
+            "branch": "main",
+            "copyright": "Audiokinetic",
+            "configuration": "release",
+            "platform": "macosx",
+            "processId": 4242,
+            "processPath": "/Applications/Wwise.app/Contents/MacOS/Wwise",
+            "directories": {
+                key: f"/tmp/{key}"
+                for key in ("install", "authoring", "bin", "log", "help", "user")
+            },
+        }
+    )
+    result["version"].update({"nickname": "", "schema": 110})
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": result,
+        }
+    )
+    exit_code, payload = waapi_gateway.execute_gateway(
+        [
+            "typed-zero-call",
+            "ak.wwise.core.getInfo",
+            "--schema-digest",
+            contract["schema_digest"],
+        ],
+        env=_env(tmp_path, "2021.1"),
+        client_factory=lambda _url: client,
+    )
+    assert exit_code == 0, payload
+    assert payload["agent_result"] == result
+
+
 def test_zero_input_mutation_cannot_bypass_preview_before_connection(
     tmp_path: Path,
 ) -> None:
@@ -595,6 +649,14 @@ def test_zero_input_fixed_route_discloses_only_its_existing_command(
     )
     assert exit_code == 0, contract
     assert contract["input_shape"] == "zero"
+    if api == "ak.wwise.core.getInfo":
+        assert contract["continuation"] == {
+            "subcommand": "typed-zero-call",
+            "uri": api,
+            "schema_digest": contract["schema_digest"],
+            "business_values_required": False,
+        }
+        return
     assert contract["continuation"] == {
         "subcommand": commands[0].split()[0],
         "arguments": commands[0].split()[1:],

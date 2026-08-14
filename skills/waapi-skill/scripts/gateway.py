@@ -3040,7 +3040,7 @@ def preflight_typed_zero_input(
         "effect": contract.effect,
         "route": contract.route,
     }
-    if contract.route == "fixed_command":
+    if contract.route == "fixed_command" and contract.uri != "ak.wwise.core.getInfo":
         raise GatewayInputError(
             "This zero-input API retains its packaged fixed command: "
             + ", ".join(contract.gateway_commands)

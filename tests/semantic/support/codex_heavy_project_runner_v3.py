@@ -4663,7 +4663,10 @@ def _prepare_case(
             version=runtime.version,
             asset_root=runtime.asset_root / "import-case",
         )
-        import_backend = ClosedDirectWaapiBackend(direct)
+        import_backend = ClosedDirectWaapiBackend(
+            direct,
+            version=runtime.version,
+        )
         reference_fixtures = None
         metadata_discovery = None
         try:

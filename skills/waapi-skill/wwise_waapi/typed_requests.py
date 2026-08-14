@@ -165,7 +165,7 @@ class TypedRequestContract:
                 "business_values_required": False,
                 **({"apply": True} if self.effect != "read" else {}),
             }
-            if self.route == "fixed_command":
+            if self.route == "fixed_command" and self.uri != "ak.wwise.core.getInfo":
                 command = self.gateway_commands[0].split()
                 continuation = {
                     "subcommand": command[0],

@@ -21,6 +21,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_transaction_protocol,
     query_object_step,
 )
+from tests.semantic.support.codex_gateway_broker import ExpectedGatewayStep
 from tests.semantic.support.codex_object_heavy_v3 import (
     FixtureObject,
     MaterializedObject,
@@ -363,7 +364,10 @@ class PreparedObjectRuntime:
             )
         if isinstance(request, QueryObjectRequestSpec):
             return build_direct_protocol(
-                [query_object_step("query-object", request.argv[3:])]
+                [
+                    ExpectedGatewayStep("query-schema", "query-schema"),
+                    query_object_step("query-object", request.argv[3:]),
+                ]
             )
         raise ObjectRuntimeError("unknown object recipe request type")
 

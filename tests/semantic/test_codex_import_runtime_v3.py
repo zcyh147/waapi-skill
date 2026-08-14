@@ -100,6 +100,52 @@ def test_ordinary_import_runtime_accepts_the_reviewed_2021_profile_lane(
     assert plan.version == version
 
 
+def test_ordinary_import_runtime_resolves_2021_audio_source_without_active_source(
+    tmp_path: Path,
+) -> None:
+    version = "2021.1"
+    profile = load_typed_input_profile(TYPED_PROFILE)
+    unit = next(
+        item
+        for item in profile.units
+        if item.unit_id == "TYP21-FILE-AUDIO-IMPORT"
+    )
+    sandbox_root = tmp_path / "sandbox"
+    sandbox_root.mkdir()
+    project = sandbox_root / "SampleProject.wproj"
+    project.write_text("<WwiseDocument/>", encoding="utf-8")
+    materialized = materialize_import_case(
+        unit.scenario,
+        version=version,
+        asset_root=tmp_path / "assets",
+    )
+    class _LegacyBackend(_FakeImportBackend):
+        def read_objects(self, **kwargs):
+            unsupported = {"activeSource", "originalFilePath"}.intersection(
+                kwargs.get("fields", ())
+            )
+            if unsupported:
+                raise ImportRuntimeError(
+                    "Unknown accessor " + sorted(unsupported)[0]
+                )
+            return super().read_objects(**kwargs)
+
+    backend = _LegacyBackend(sandbox_root, version=version)
+
+    runtime = prepare_import_runtime(
+        unit.scenario,
+        materialized,
+        sandbox_project=project,
+        backend=backend,
+    )
+
+    assert runtime.hidden_before is not None
+    assert all(
+        row.object is None or row.object.audio_source is not None
+        for row in runtime.hidden_before.rows
+    )
+
+
 def test_ordinary_import_runtime_rejects_unreviewed_cross_version_scenario(
     tmp_path: Path,
 ) -> None:

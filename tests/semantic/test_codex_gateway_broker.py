@@ -1058,6 +1058,8 @@ elif mode == "bad-command":
     payload["command"] = "buses"
 elif mode == "bad-contract":
     payload["contract"] = "forged/v1"
+elif mode == "typed-schema":
+    payload["contract"] = "waapi-skill.typed-request-schema/v1"
 elif mode in {"expected-error", "expected-error-exact-output"}:
     payload["ok"] = os.environ.get("FAKE_GATEWAY_ERROR_OK", "false") == "true"
     payload["error_code"] = os.environ.get(
@@ -7051,6 +7053,35 @@ def test_broker_rejects_an_unbounded_commutative_read_only_group(
             expected_steps=steps,
             commutative_read_only_step_groups=(names,),
         )
+
+
+def test_broker_accepts_typed_schema_envelopes_for_public_discovery(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    steps = (
+        ExpectedGatewayStep(
+            "schema",
+            "request-schema",
+            ("ak.wwise.core.getInfo",),
+        ),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        runner_environment={
+            **os.environ,
+            "FAKE_GATEWAY_MODE": "typed-schema",
+        },
+    ) as broker:
+        result = run_model_command(
+            broker,
+            ["request-schema", "ak.wwise.core.getInfo"],
+        )
+
+    assert result.returncode == 0
+    assert broker.evidence().passed
 
 
 def test_broker_rejects_commutative_query_pair_outside_closed_identity_shape(

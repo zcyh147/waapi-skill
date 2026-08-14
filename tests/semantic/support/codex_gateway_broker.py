@@ -67,6 +67,8 @@ from wwise_waapi.platform_commands import (
 
 
 GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
+TYPED_REQUEST_SCHEMA_CONTRACT = "waapi-skill.typed-request-schema/v1"
+TYPED_TOPIC_INPUT_CONTRACT = "waapi-skill.typed-topic-input/v1"
 TYPED_CONTAINER_HANDLE_CONTRACT = "waapi-skill.typed-container-handle/v1"
 TYPED_MAP_CONTAINER_CHOICES_CONTRACT = (
     "waapi-skill.typed-map-container-choices/v1"
@@ -5460,6 +5462,10 @@ def _extract_payload(stdout: str, *, required_contract: str | None = None) -> Ma
 def _gateway_payload_contracts(step: ExpectedGatewayStep) -> frozenset[str]:
     """Return the exact public response envelopes allowed for one command."""
 
+    if step.subcommand in {"request-schema", "query-schema"}:
+        return frozenset({TYPED_REQUEST_SCHEMA_CONTRACT})
+    if step.subcommand == "topic-schema":
+        return frozenset({TYPED_TOPIC_INPUT_CONTRACT})
     if step.subcommand == "request-map-container":
         return frozenset(
             {TYPED_CONTAINER_HANDLE_CONTRACT, TYPED_MAP_CONTAINER_CHOICES_CONTRACT}
