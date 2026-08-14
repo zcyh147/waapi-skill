@@ -2470,6 +2470,49 @@ def test_soundbank_trusted_projection_is_closed_and_leaf_bound(tmp_path: Path) -
     )
 
 
+def test_soundbank_live_provenance_allows_owned_cache_growth(tmp_path: Path) -> None:
+    root = _scenario_root(tmp_path)
+    scenario, protocol, values, trusted = _soundbank_case(root)
+    cache = root / "owned" / "cache"
+    lmdb = cache / "LMDB"
+    lmdb.mkdir()
+    (cache / "CacheVersion").write_bytes(b"0000")
+    (lmdb / "lock.mdb").write_bytes(b"\0" * 8_128)
+    data = lmdb / "data.mdb"
+    data.write_bytes(b"\0" * 28_672)
+    evidence = _write(
+        scenario=scenario,
+        root=root,
+        protocol=protocol,
+        visible_values=values,
+        trusted_sources=trusted,
+    )
+
+    data.write_bytes(b"\0" * 57_344)
+
+    reread = _read_again(
+        evidence.path,
+        scenario=scenario,
+        root=root,
+        protocol=protocol,
+        visible_values=values,
+        require_paths=True,
+    )
+    assert reread.payload == evidence.payload
+
+    bank = root / "owned" / "GeneratedSoundBanks" / "Windows"
+    (bank / "unexpected.bnk").write_bytes(b"drift")
+    with pytest.raises(PromptProvenanceError, match="path proof changed"):
+        _read_again(
+            evidence.path,
+            scenario=scenario,
+            root=root,
+            protocol=protocol,
+            visible_values=values,
+            require_paths=True,
+        )
+
+
 def test_soundbank_rejects_untrusted_projection_fields_and_projection_tamper(
     tmp_path: Path,
 ) -> None:

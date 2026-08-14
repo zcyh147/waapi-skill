@@ -718,6 +718,107 @@ def test_normal_composer_schema_discloses_typed_argv_not_action_json(
     assert "typed-action-json" not in encoded
 
 
+@pytest.mark.parametrize(
+    ("version", "operation", "path", "expected"),
+    (
+        (
+            "2021.1",
+            "object.create",
+            ["args", "on_name_conflict"],
+            {
+                "phase": "before_dynamic_disclosure",
+                "fact_action": "set",
+            },
+        ),
+        (
+            "2022.1",
+            "soundbank.setInclusions",
+            ["args", "soundbank", "kind"],
+            {
+                "phase": "before_dynamic_disclosure",
+                "fact_action": "set",
+                "constant_fact_required": True,
+            },
+        ),
+    ),
+)
+def test_public_composer_fields_bind_fact_action_before_disclosure(
+    tmp_path: Path,
+    version: str,
+    operation: str,
+    path: list[str],
+    expected: dict[str, object],
+) -> None:
+    code, payload = execute(
+        tmp_path,
+        "--version",
+        version,
+        "operation-schema",
+        operation,
+    )
+
+    assert code == 0, payload
+    field = next(
+        item
+        for item in payload["composer"]["typed_request_fields"]
+        if item["path"] == path
+    )
+    if "constant_fact_required" in expected:
+        assert field["constant_values"]
+        assert "fact_construction" not in field
+    else:
+        columns = payload["composer"]["top_level_fact_plan"]["columns"]
+        rows = payload["composer"]["top_level_fact_plan"]["rows"]
+        plan = [dict(zip(columns, row, strict=True)) for row in rows]
+        planned = next(item for item in plan if item["handle"] == field["handle"])
+        assert planned["phase"] == "fact"
+        assert planned["action"] == expected["fact_action"]
+    assert payload["composer"]["construction_order"]["top_level_facts"] == (
+        "complete top_level_fact_plan facts before disclosures"
+    )
+    assert payload["composer"]["construction_order"]["constant_facts"] == (
+        "selected constant_values require set facts"
+    )
+
+
+def test_object_create_schema_puts_the_top_level_fact_plan_before_large_fields(
+    tmp_path: Path,
+) -> None:
+    code, payload = execute(
+        tmp_path,
+        "--version",
+        "2021.1",
+        "operation-schema",
+        "object.create",
+    )
+
+    assert code == 0, payload
+    composer = payload["composer"]
+    assert list(composer).index("construction_order") < list(composer).index(
+        "typed_request_fields"
+    )
+    assert list(composer).index("top_level_fact_plan") < list(
+        composer
+    ).index("typed_request_fields")
+    table = composer["top_level_fact_plan"]
+    plan = [
+        dict(zip(table["columns"], row, strict=True)) for row in table["rows"]
+    ]
+    names = [field["name"] for field in plan]
+    assert names.index("on_name_conflict") < names.index("children")
+    conflict = next(field for field in plan if field["name"] == "on_name_conflict")
+    children = next(field for field in plan if field["name"] == "children")
+    assert conflict["phase"] == "fact"
+    assert conflict["action"] == "set"
+    assert children["phase"] == "disclosure"
+    assert table["action_codes"]["array"] == (
+        "append items; present iff empty"
+    )
+    assert composer["construction_order"]["branch_constants"] == (
+        "after choose, set selected branch constants before disclosure"
+    )
+
+
 def test_invalid_or_mixed_typed_action_argv_is_atomic(
     tmp_path: Path,
 ) -> None:

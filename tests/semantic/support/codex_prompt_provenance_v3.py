@@ -1595,13 +1595,23 @@ def _validate_input_rows(
         require_paths=require_paths,
         protocol_request_materializer=protocol_request_materializer,
     )
-    if not require_paths:
-        for actual_row, expected_row in zip(rows, expected, strict=True):
-            actual_bindings = actual_row["leaf_bindings"]
-            expected_bindings = expected_row["leaf_bindings"]
-            for actual, derived in zip(actual_bindings, expected_bindings, strict=True):
-                if derived["origin_kind"] != "owned_path":
-                    continue
+    for actual_row, expected_row in zip(rows, expected, strict=True):
+        actual_bindings = actual_row["leaf_bindings"]
+        expected_bindings = expected_row["leaf_bindings"]
+        if len(actual_bindings) != len(expected_bindings):
+            raise PromptProvenanceError(
+                "prompt provenance leaf origins are not reproducible"
+            )
+        for actual, derived in zip(actual_bindings, expected_bindings, strict=True):
+            if derived["origin_kind"] != "owned_path":
+                continue
+            mutable_soundbank_root = (
+                require_paths
+                and scenario.api == "ak.wwise.core.soundbank.generate"
+                and actual_row.get("name") == "generation_request"
+                and actual.get("pointer") == "/io_root"
+            )
+            if not require_paths or mutable_soundbank_root:
                 _validate_archived_path_binding(actual, derived)
                 for key in ("size", "sha256", "mtime_ns"):
                     derived[key] = actual[key]
@@ -2790,7 +2800,7 @@ def _trusted_sources(
                 ),
             )
         )
-    if serialized and not require_paths:
+    if serialized:
         raw_proofs = source.get("path_proofs")
         if not isinstance(raw_proofs, list) or len(raw_proofs) != len(paths):
             raise PromptProvenanceError("SoundBank project-info path proofs are incomplete")
@@ -2810,10 +2820,35 @@ def _trusted_sources(
             _validate_archived_path_proof(actual, expected_kind=kind)
             if (
                 actual.get("pointer") != pointer
+                or actual.get("path_kind") != kind
                 or actual.get("owned_relative_path")
                 != expected["owned_relative_path"]
             ):
                 raise PromptProvenanceError("SoundBank project-info path proof is misbound")
+            if require_paths:
+                live = {
+                    "pointer": pointer,
+                    **_path_proof(
+                        path,
+                        root=root,
+                        expected_kind=kind,
+                        require_exists=True,
+                    ),
+                }
+                if pointer == "/value/directories/cache":
+                    # Wwise owns and mutates its cache while the Headless
+                    # lifecycle is live.  The immutable evidence binds the
+                    # original bounded digest, while rereads revalidate only
+                    # the live directory's owned identity and safety.
+                    for key in ("pointer", "path_kind", "owned_relative_path"):
+                        if actual.get(key) != live.get(key):
+                            raise PromptProvenanceError(
+                                "SoundBank cache path proof is misbound"
+                            )
+                elif dict(actual) != live:
+                    raise PromptProvenanceError(
+                        "SoundBank project-info path proof changed"
+                    )
             proofs.append(dict(actual))
     else:
         proofs = [

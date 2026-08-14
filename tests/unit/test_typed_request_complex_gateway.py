@@ -21,6 +21,7 @@ SPEC.loader.exec_module(gateway)
 
 VALIDATE_URI = "ak.wwise.debug.validateCall"
 AUDIO_CONVERT_URI = "ak.wwise.core.audio.convert"
+MEDIA_POOL_URI = "ak.wwise.core.mediaPool.get"
 
 
 class FakeClient:
@@ -43,6 +44,60 @@ def _env(tmp_path: Path, version: str) -> dict[str, str]:
     config = tmp_path / "config.json"
     config.write_text(json.dumps({"wwise_version": version, "waapi_host": "127.0.0.1", "waapi_port": 31337}), encoding="utf-8")
     return {"WAAPI_SKILL_CONFIG_PATH": str(config), "WWISE_VERSION": version}
+
+
+def test_media_pool_schema_marks_scalar_array_items_as_append_facts(
+    tmp_path: Path,
+) -> None:
+    exit_code, schema = gateway.execute_gateway(
+        ["request-schema", MEDIA_POOL_URI],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda _url: pytest.fail("schema must be offline"),
+    )
+
+    assert exit_code == 0, schema
+    databases = next(
+        field for field in schema["fields"] if field["path"] == ["args", "databases"]
+    )
+    assert databases["fact_construction"] == {
+        "nonempty_scalar_items": {
+            "phase": "before_dynamic_disclosure",
+            "fact_action": "append",
+            "repeat_for_each_item": True,
+        },
+        "empty_array_only": {
+            "phase": "before_dynamic_disclosure",
+            "fact_action": "present",
+            "must_not_accompany": ["append"],
+        },
+        "complex_item_phase": "dynamic_disclosure",
+        "complex_item_disclosure": "request-array-item",
+    }
+
+
+def test_audio_convert_schema_forbids_present_with_nonempty_languages(
+    tmp_path: Path,
+) -> None:
+    exit_code, schema = gateway.execute_gateway(
+        ["request-schema", AUDIO_CONVERT_URI],
+        env=_env(tmp_path, "2024.1"),
+        client_factory=lambda _url: pytest.fail("schema must be offline"),
+    )
+
+    assert exit_code == 0, schema
+    languages = next(
+        field for field in schema["fields"] if field["path"] == ["args", "languages"]
+    )
+    assert languages["fact_construction"]["nonempty_scalar_items"] == {
+        "phase": "before_dynamic_disclosure",
+        "fact_action": "append",
+        "repeat_for_each_item": True,
+    }
+    assert languages["fact_construction"]["empty_array_only"] == {
+        "phase": "before_dynamic_disclosure",
+        "fact_action": "present",
+        "must_not_accompany": ["append"],
+    }
 
 
 @pytest.mark.parametrize("version", ("2024.1", "2025.1"))

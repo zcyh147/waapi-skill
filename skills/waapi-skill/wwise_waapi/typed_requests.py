@@ -94,6 +94,51 @@ class TypedFieldContract:
                 }
             ),
         }
+        if self.shape == "scalar":
+            payload["fact_construction"] = {
+                "phase": "before_dynamic_disclosure",
+                "fact_action": "set",
+            }
+        elif self.shape == "branch":
+            payload["fact_construction"] = {
+                "phase": "before_dynamic_disclosure",
+                "fact_action": "choose",
+            }
+        elif self.shape == "array":
+            payload["fact_construction"] = {
+                "nonempty_scalar_items": {
+                    "phase": "before_dynamic_disclosure",
+                    "fact_action": "append",
+                    "repeat_for_each_item": True,
+                },
+                "empty_array_only": {
+                    "phase": "before_dynamic_disclosure",
+                    "fact_action": "present",
+                    "must_not_accompany": ["append"],
+                },
+                "complex_item_phase": "dynamic_disclosure",
+                "complex_item_disclosure": "request-array-item",
+            }
+        elif self.shape == "map":
+            payload["fact_construction"] = {
+                "nonempty_scalar_members": {
+                    "phase": "before_dynamic_disclosure",
+                    "fact_action": "map-put",
+                    "repeat_for_each_member": True,
+                },
+                "empty_map_only": {
+                    "phase": "before_dynamic_disclosure",
+                    "fact_action": "present",
+                    "must_not_accompany": ["map-put"],
+                },
+                "complex_member_phase": "dynamic_disclosure",
+                "complex_member_disclosure": "request-map-container",
+            }
+        else:
+            payload["fact_construction"] = {
+                "phase": "static_child_facts_or_dynamic_container_handle",
+                "empty_fact_action": "present",
+            }
         enum_values = [
             value
             for variant in self.variants
@@ -109,6 +154,7 @@ class TypedFieldContract:
         ]
         if constant_values:
             payload["constant_values"] = constant_values
+            payload["fact_construction"]["constant_fact_required"] = True
         patterns = sorted(
             {
                 str(variant["pattern"])
@@ -177,6 +223,11 @@ class TypedRequestContract:
             }
             if constants:
                 field_payload["branch_choice_constants"] = constants
+            field_payload["fact_construction"] = {
+                "phase": "before_dynamic_disclosure",
+                "role": "branch_choice_handle",
+                "parent_fact_action": "choose",
+            }
         return field_payloads
 
     def gateway_field_table(self) -> dict[str, Any]:

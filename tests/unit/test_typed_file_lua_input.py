@@ -79,6 +79,13 @@ def test_lua_lanes_have_one_public_typed_draft(
         assert "fact-action map-put" in dynamic["scalar_map_entry_action"]
         assert "object or array" in dynamic["scalar_map_entry_action"]
         assert payload["composer"]["construction_order"] == {
+            "top_level_facts": (
+                "complete top_level_fact_plan facts before disclosures"
+            ),
+            "constant_facts": "selected constant_values require set facts",
+            "branch_constants": (
+                "after choose, set selected branch constants before disclosure"
+            ),
             "independent_facts": (
                 "emit every business-present scalar, branch, constant, and empty-"
                 "container fact in typed_request_fields order before disclosure"

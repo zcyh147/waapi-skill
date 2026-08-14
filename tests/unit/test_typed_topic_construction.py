@@ -367,6 +367,25 @@ def test_wait_topic_digests_bind_to_the_real_topic_schema_envelope(
             expected = dict(full)
             expected.pop("path")
             assert compact == expected
+    platform = next(
+        field
+        for field in _expand_compact_field_table(payload["event_match"]["fields"])
+        if field["name"] == "platform" and field.get("parent_handle") is None
+    )
+    assert platform["fact_construction"] == {
+        "nonempty_scalar_members": {
+            "phase": "before_dynamic_disclosure",
+            "fact_action": "map-put",
+            "repeat_for_each_member": True,
+        },
+        "empty_map_only": {
+            "phase": "before_dynamic_disclosure",
+            "fact_action": "present",
+            "must_not_accompany": ["map-put"],
+        },
+        "complex_member_phase": "dynamic_disclosure",
+        "complex_member_disclosure": "request-map-container",
+    }
     encoded = gateway.gateway_stdout_json_encoder(payload).encode(payload)
     assert len(encoded.encode("utf-8")) < 32 * 1024
     assert "\n" not in encoded

@@ -1797,7 +1797,9 @@ _DRAFT_SUBCOMMANDS = frozenset(
 )
 _DRAFT_ID_RE = re.compile(r"^od1-[0-9a-f]{32}$")
 _DRAFT_AUTHORITY_RE = re.compile(r"^da1-[0-9a-f]{40}$")
-_DRAFT_HANDLE_RE = re.compile(r"^(?:odh1|odn1|trm1|trh1|trc1)-[0-9a-f]{24}$")
+_DRAFT_HANDLE_RE = re.compile(
+    r"^(?:odh1|odn1|tdh1|trm1|trh1|trc1)-[0-9a-f]{24}$"
+)
 _NUMBERED_DRAFT_ACTION_STEP_RE = re.compile(r"^(?P<prefix>.+\.action\.)\d{3}$")
 
 

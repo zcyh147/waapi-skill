@@ -94,6 +94,30 @@ def _typed_draft_argv(action: dict[str, object]) -> tuple[str, ...]:
     return ("--compact", "--facts", *typed_action_cli_arguments(action))
 
 
+def test_compact_generic_typed_fact_receipt_accepts_its_real_fact_handle_family() -> None:
+    action, created, affected, summary = broker_module._draft_compact_action_result(
+        {
+            "action_result": {
+                "contract": "waapi-skill.operation-draft-action-result/v1",
+                "action": "add_typed_fact",
+                "created_handles": ["tdh1-c12aa1ea49a4d727357b105b"],
+                "affected_handles": ["trh1-4dedc2c7c0aea1301b0d773f"],
+            },
+            "current_facts_summary": {
+                "contract": "waapi-skill.operation-draft-facts-summary/v1",
+                "target_count": 1,
+                "handle_count": 1,
+                "canonical_sha256": "1" * 64,
+            },
+        }
+    )
+
+    assert action == "add_typed_fact"
+    assert created == {"tdh1-c12aa1ea49a4d727357b105b"}
+    assert affected == {"trh1-4dedc2c7c0aea1301b0d773f"}
+    assert summary["target_count"] == 1
+
+
 @pytest.mark.parametrize(
     ("subcommand", "contracts"),
     (

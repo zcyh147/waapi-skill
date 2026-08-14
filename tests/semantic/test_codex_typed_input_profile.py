@@ -137,6 +137,24 @@ def test_create_merge_prompt_keeps_the_existing_node_out_of_the_parent_role() ->
         for command in ("operation-schema", "draft-start", "--fact-action")
     )
 
+
+def test_2025_metadata_prompt_uses_the_exact_version_owned_container_path() -> None:
+    profile = load_typed_input_profile(PROFILE_PATH)
+    unit = next(
+        unit
+        for unit in profile.units
+        if unit.unit_id == "TYP25-METADATA-OBJECT-SET"
+    )
+
+    assert r"\Containers\Default Work Unit\SemanticLab\UI" in unit.scenario.prompt
+    assert r"\Actor-Mixer Hierarchy\Default Work Unit\SemanticLab\UI" not in (
+        unit.scenario.prompt
+    )
+    assert all(
+        command not in unit.scenario.prompt
+        for command in ("operation-schema", "draft-start", "--fact-action")
+    )
+
 def test_typed_input_profile_rejects_definition_drift_before_filtering(
     tmp_path: Path,
 ) -> None:
