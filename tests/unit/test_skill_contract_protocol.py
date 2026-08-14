@@ -812,6 +812,10 @@ def test_operate_business_selection_and_execution_domains_remain_explicit() -> N
     ) in compact
     assert "`object.create` same-name-root merge goes directly" in compact
     assert (
+        "After its schema, exact-query that unchanged root before starting the Draft"
+        in compact
+    )
+    assert (
         "`object.set` uses its returned target base, live token discovery, "
         "and Composer validation"
     ) in compact

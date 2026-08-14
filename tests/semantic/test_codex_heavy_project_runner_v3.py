@@ -132,12 +132,13 @@ def _scenario(
     item_type: str = "function",
     count: int = 1,
     fixture: dict | None = None,
+    version: str = "2022.1",
 ):
     prompt = "请读取这个 Wwise 工程并总结结果。"
     return SimpleNamespace(
         id=scenario_id,
         api=api,
-        versions=("2022.1",),
+        versions=(version,),
         protocol=protocol,
         item_type=item_type,
         fixture=fixture or {},
@@ -967,6 +968,168 @@ def test_prepare_get_info_case_binds_exact_live_process_and_result(
         SimpleNamespace(final_response="Wwise 2021.1，进程 4242。"),
     )
     assert incomplete.passed is False
+
+
+@pytest.mark.parametrize(
+    ("version", "status_project_api"),
+    (
+        ("2021.1", "ak.wwise.core.object.get"),
+        ("2025.1", "ak.wwise.core.getProjectInfo"),
+    ),
+)
+def test_get_info_dispatch_audit_separates_status_preflight_from_named_result(
+    tmp_path: Path,
+    version: str,
+    status_project_api: str,
+) -> None:
+    evidence_root = tmp_path / "evidence"
+    evidence_root.mkdir()
+
+    def write_evidence(name: str, api: str) -> Path:
+        path = evidence_root / name
+        path.write_text(
+            json.dumps({"api": api, "evidence_path": str(path)}),
+            encoding="utf-8",
+        )
+        return path
+
+    status_get_info = write_evidence("01-get-info.json", runner.GET_INFO_URI)
+    status_project = write_evidence("02-project.json", status_project_api)
+    named_get_info = write_evidence("03-get-info.json", runner.GET_INFO_URI)
+    task = SimpleNamespace(
+        broker_evidence=SimpleNamespace(
+            evidence_directory=str(evidence_root),
+            records=(
+                SimpleNamespace(
+                    step_name="host.status",
+                    payload={
+                        "calls": [
+                            {
+                                "api": runner.GET_INFO_URI,
+                                "evidence_path": str(status_get_info),
+                            },
+                            {
+                                "api": status_project_api,
+                                "evidence_path": str(status_project),
+                            },
+                        ]
+                    },
+                ),
+                SimpleNamespace(
+                    step_name="host.get-info.schema",
+                    payload={"command": "request-schema"},
+                ),
+                SimpleNamespace(
+                    step_name="host.get-info",
+                    payload={
+                        "call": {
+                            "api": runner.GET_INFO_URI,
+                            "evidence_path": str(named_get_info),
+                        }
+                    },
+                ),
+            ),
+        )
+    )
+
+    audit = runner._audit_primary_dispatch(
+        _scenario(
+            runner.GET_INFO_URI,
+            scenario_id="O22-GET-INFO-01",
+            version=version,
+        ),
+        task=task,
+        topic_payload=None,
+        expected_count=1,
+    )
+
+    assert audit == {
+        "api": runner.GET_INFO_URI,
+        "dispatch_count": 1,
+        "status_preflight_dispatch_count": 1,
+    }
+
+    task.broker_evidence.records[0].payload["calls"][1]["api"] = (
+        "ak.wwise.core.getProjectInfo"
+        if status_project_api == "ak.wwise.core.object.get"
+        else "ak.wwise.core.object.get"
+    )
+    with pytest.raises(
+        runner.HeavyProjectRunnerError,
+        match="status/result dispatch partition is invalid",
+    ):
+        runner._audit_primary_dispatch(
+            _scenario(
+                runner.GET_INFO_URI,
+                scenario_id="O22-GET-INFO-01",
+                version=version,
+            ),
+            task=task,
+            topic_payload=None,
+            expected_count=1,
+        )
+    task.broker_evidence.records[0].payload["calls"][1]["api"] = (
+        status_project_api
+    )
+
+    task.broker_evidence.records[0].payload["calls"][0]["evidence_path"] = []
+    with pytest.raises(
+        runner.HeavyProjectRunnerError,
+        match="evidence paths are invalid",
+    ):
+        runner._audit_primary_dispatch(
+            _scenario(
+                runner.GET_INFO_URI,
+                scenario_id="O22-GET-INFO-01",
+                version=version,
+            ),
+            task=task,
+            topic_payload=None,
+            expected_count=1,
+        )
+
+    task.broker_evidence.records[0].payload["calls"][0]["evidence_path"] = str(
+        status_get_info
+    )
+    task.broker_evidence.records[0].payload["calls"][1]["evidence_path"] = []
+    with pytest.raises(
+        runner.HeavyProjectRunnerError,
+        match="evidence paths are invalid",
+    ):
+        runner._audit_primary_dispatch(
+            _scenario(
+                runner.GET_INFO_URI,
+                scenario_id="O22-GET-INFO-01",
+                version=version,
+            ),
+            task=task,
+            topic_payload=None,
+            expected_count=1,
+        )
+
+    task.broker_evidence.records[0].payload["calls"][1]["evidence_path"] = str(
+        status_project
+    )
+    task.broker_evidence.records[0].payload["calls"][0]["evidence_path"] = str(
+        named_get_info
+    )
+    task.broker_evidence.records[2].payload["call"]["evidence_path"] = str(
+        status_get_info
+    )
+    with pytest.raises(
+        runner.HeavyProjectRunnerError,
+        match="not bound to its ordered status and named result",
+    ):
+        runner._audit_primary_dispatch(
+            _scenario(
+                runner.GET_INFO_URI,
+                scenario_id="O22-GET-INFO-01",
+                version=version,
+            ),
+            task=task,
+            topic_payload=None,
+            expected_count=1,
+        )
 
 
 def test_prepare_get_info_rejects_status_for_a_different_project(

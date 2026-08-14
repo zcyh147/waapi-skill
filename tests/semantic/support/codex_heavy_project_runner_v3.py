@@ -5891,6 +5891,27 @@ def _audit_primary_dispatch(
         if expected_count is None
         else expected_count
     )
+    if scenario.api == GET_INFO_URI:
+        versions = tuple(scenario.versions)
+        if versions == ("2021.1",):
+            status_project_api = "ak.wwise.core.object.get"
+        elif versions in {
+            ("2022.1",),
+            ("2023.1",),
+            ("2024.1",),
+            ("2025.1",),
+        }:
+            status_project_api = "ak.wwise.core.getProjectInfo"
+        else:
+            raise HeavyProjectRunnerError(
+                "getInfo dispatch audit has no exact reviewed version"
+            )
+        return _audit_get_info_dispatch_partition(
+            task=task,
+            rows=rows,
+            primary_count=primary_count,
+            status_project_api=status_project_api,
+        )
     if observed_calls != primary_count:
         raise HeavyProjectRunnerError(
             f"primary dispatch count differs for {scenario.api}: "
@@ -5900,6 +5921,86 @@ def _audit_primary_dispatch(
         {
             "api": scenario.api,
             "dispatch_count": observed_calls,
+        }
+    )
+
+
+def _audit_get_info_dispatch_partition(
+    *,
+    task: V3TaskRun,
+    rows: Sequence[Mapping[str, Any]],
+    primary_count: int,
+    status_project_api: str,
+) -> Mapping[str, Any]:
+    """Separate the required status preflight from the named API result."""
+
+    records = tuple(task.broker_evidence.records)
+    if tuple(record.step_name for record in records) != (
+        "host.status",
+        "host.get-info.schema",
+        "host.get-info",
+    ):
+        raise HeavyProjectRunnerError(
+            "getInfo dispatch audit differs from its exact public protocol"
+        )
+    status_payload = records[0].payload
+    result_payload = records[2].payload
+    status_calls = (
+        status_payload.get("calls")
+        if isinstance(status_payload, Mapping)
+        else None
+    )
+    result_call = (
+        result_payload.get("call")
+        if isinstance(result_payload, Mapping)
+        else None
+    )
+    if (
+        primary_count != 1
+        or not isinstance(status_calls, list)
+        or len(status_calls) != 2
+        or not all(isinstance(row, Mapping) for row in status_calls)
+        or {row.get("api") for row in status_calls}
+        != {GET_INFO_URI, status_project_api}
+        or not isinstance(result_call, Mapping)
+        or result_call.get("api") != GET_INFO_URI
+    ):
+        raise HeavyProjectRunnerError(
+            "getInfo status/result dispatch partition is invalid"
+        )
+    status_get_info = next(
+        row for row in status_calls if row.get("api") == GET_INFO_URI
+    )
+    status_project = next(
+        row
+        for row in status_calls
+        if row.get("api") == status_project_api
+    )
+    expected_bindings = (
+        (GET_INFO_URI, status_get_info.get("evidence_path")),
+        (status_project_api, status_project.get("evidence_path")),
+        (GET_INFO_URI, result_call.get("evidence_path")),
+    )
+    expected_paths = tuple(path for _api, path in expected_bindings)
+    if not all(isinstance(path, str) and path for path in expected_paths):
+        raise HeavyProjectRunnerError(
+            "getInfo dispatcher evidence paths are invalid"
+        )
+    observed_bindings = tuple(
+        (row.get("api"), row.get("evidence_path")) for row in rows
+    )
+    if (
+        len(set(expected_paths)) != 3
+        or observed_bindings != expected_bindings
+    ):
+        raise HeavyProjectRunnerError(
+            "getInfo dispatcher evidence is not bound to its ordered status and named result"
+        )
+    return MappingProxyType(
+        {
+            "api": GET_INFO_URI,
+            "dispatch_count": 1,
+            "status_preflight_dispatch_count": 1,
         }
     )
 

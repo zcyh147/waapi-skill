@@ -872,10 +872,7 @@ class PreparedImportRuntime:
     def render_prompt(self) -> str:
         """Render only reviewed model-visible inputs; no hidden identity is used."""
 
-        return (
-            self.scenario.render_prompt(self.plan.visible_values)
-            + " 清单列出的行就是完整范围；不要另增目录或容器行，也不要拆分或改写清单中的完整 object_path。"
-        )
+        return self.scenario.render_prompt(self.plan.visible_values)
 
     def prepare(self) -> "PreparedImportRuntime":
         if self.hidden_before is not None or self._closed:

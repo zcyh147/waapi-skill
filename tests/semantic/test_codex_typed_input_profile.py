@@ -104,6 +104,24 @@ def test_get_info_tasks_describe_the_business_result_without_gateway_commands() 
     )
 
 
+def test_bounded_query_prompt_keeps_boolean_filtering_in_the_returned_inventory() -> None:
+    profile = load_typed_input_profile(PROFILE_PATH)
+    unit = next(
+        unit
+        for unit in profile.units
+        if unit.unit_id == "TYP21-QUERY-OBJECT-GET"
+    )
+
+    assert "候选可以包含更深层" in unit.scenario.prompt
+    assert "从这份有界候选清单中只保留相对该根三层以内" in unit.scenario.prompt
+    assert "Volume 低于 -6 dB 或备注含 `needs-review`" in unit.scenario.prompt
+    assert "筛选结果可能不完整" in unit.scenario.prompt
+    assert all(
+        command not in unit.scenario.prompt
+        for command in ("query-schema", "query-object", "--where")
+    )
+
+
 def test_typed_input_profile_rejects_definition_drift_before_filtering(
     tmp_path: Path,
 ) -> None:
