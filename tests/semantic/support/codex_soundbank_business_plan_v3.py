@@ -23,6 +23,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_direct_protocol,
     build_transaction_protocol,
     wait_topic_step,
+    topic_schema_step,
 )
 from tests.semantic.support.codex_filesystem_security import (
     CodexFileSecurityError,
@@ -277,7 +278,8 @@ def _validate_inputs(materialized: MaterializedSoundBankCase, before: SoundBankS
             raise SoundBankBusinessPlanError("topic must have only a closed topic plan")
         topic = materialized.topic_plan
         expected = build_direct_protocol([
-            wait_topic_step("soundbank.generated.wait", topic.topic, version=blueprint.version, event_count=topic.event_count, match=topic.match, options=topic.options),
+            topic_schema_step("soundbank.generated.schema", topic.topic),
+            wait_topic_step("soundbank.generated.wait", topic.topic, version=blueprint.version, event_count=topic.event_count, match=topic.match, options=topic.options, schema_step_name="soundbank.generated.schema"),
         ])
     elif materialized.topic_plan is not None or not materialized.operation_requests:
         raise SoundBankBusinessPlanError("function/refusal materialization has invalid request topology")
@@ -396,7 +398,10 @@ def _refusal_archive_delta(static: Mapping[str, Any], live: Mapping[str, Any]) -
 def _expected_protocol_archive(static: Mapping[str, Any], live: Mapping[str, Any], protocol: V3GatewayProtocol) -> dict[str, Any]:
     if static["api"] == SOUNDBANK_TOPIC:
         topic = live["topic"]
-        return _protocol(build_direct_protocol([wait_topic_step("soundbank.generated.wait", topic["topic"], version=str(static["version"]), event_count=topic["event_count"], match=topic["match"], options=topic["options"])]))
+        return _protocol(build_direct_protocol([
+            topic_schema_step("soundbank.generated.schema", topic["topic"]),
+            wait_topic_step("soundbank.generated.wait", topic["topic"], version=str(static["version"]), event_count=topic["event_count"], match=topic["match"], options=topic["options"], schema_step_name="soundbank.generated.schema"),
+        ]))
     return _protocol(build_transaction_protocol(static["operation_requests"], refusal=None if static["zero_dispatch_error_code"] is None else _refusal(static["zero_dispatch_error_code"])))
 
 

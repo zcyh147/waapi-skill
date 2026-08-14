@@ -2299,6 +2299,16 @@ def query_schema_step(name: str = "query-schema") -> ExpectedGatewayStep:
     return ExpectedGatewayStep(name=name, subcommand="query-schema")
 
 
+def topic_schema_step(name: str, topic: str) -> ExpectedGatewayStep:
+    if not isinstance(topic, str) or not topic.startswith("ak.wwise."):
+        raise V3ProtocolError("topic-schema requires one exact WAAPI topic")
+    return ExpectedGatewayStep(
+        name=name,
+        subcommand="topic-schema",
+        arguments=(topic,),
+    )
+
+
 def wait_topic_step(
     name: str,
     topic: str,
@@ -2308,6 +2318,7 @@ def wait_topic_step(
     match: Mapping[str, Any] | None = None,
     options: Mapping[str, Any] | None = None,
     timeout_seconds: float = 120.0,
+    schema_step_name: str | None = None,
 ) -> ExpectedGatewayStep:
     if not isinstance(event_count, int) or isinstance(event_count, bool) or not 1 <= event_count <= 64:
         raise V3ProtocolError("wait-topic event_count must be an integer from 1 through 64")
@@ -2341,9 +2352,17 @@ def wait_topic_step(
     arguments: list[Any] = [
         topic,
         "--options-schema-digest",
-        options_contract.schema_digest,
+        (
+            ResponseBinding(schema_step_name, "/options/schema_digest")
+            if schema_step_name is not None
+            else options_contract.schema_digest
+        ),
         "--match-schema-digest",
-        match_contract.schema_digest,
+        (
+            ResponseBinding(schema_step_name, "/event_match/schema_digest")
+            if schema_step_name is not None
+            else match_contract.schema_digest
+        ),
         *(_typed_fact_cli_arguments(option_facts, prefix="option")),
         *(_typed_fact_cli_arguments(match_facts, prefix="match")),
     ]
@@ -2484,5 +2503,6 @@ __all__ = [
     "operation_request_equivalence",
     "query_object_step",
     "query_schema_step",
+    "topic_schema_step",
     "wait_topic_step",
 ]

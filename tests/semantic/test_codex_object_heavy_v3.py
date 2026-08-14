@@ -436,7 +436,7 @@ def test_every_get_is_one_bounded_query_object_with_closed_return_fields() -> No
     required_fields = {
         "OBJ22-F-GET-01": {"id", "name", "type", "path", "@Volume", "notes", "OutputBus"},
         "OBJ22-F-GET-02": {"id", "name", "type", "path", "parent", "audioSource:language", "@Volume", "notes"},
-        "OBJ22-F-GET-03": {"id", "name", "type", "path", "@Volume", "notes", "audioSource:language", "isIncluded", "OutputBus"},
+        "OBJ22-F-GET-03": {"id", "name", "type", "path", "@Volume", "notes", "isIncluded", "OutputBus"},
         "OBJ22-F-GET-04": {"id", "name", "type", "path", "childrenCount", "notes", "OutputBus"},
         "OBJ22-F-GET-05": {"id", "name", "type", "path", "childrenCount", "notes"},
     }
@@ -523,7 +523,6 @@ def test_get_03_through_get_05_have_exact_rows_limits_and_decoy_oracles() -> Non
         "path",
         "@Volume",
         "notes",
-        "audioSource:language",
         "OutputBus",
         "isIncluded",
     )

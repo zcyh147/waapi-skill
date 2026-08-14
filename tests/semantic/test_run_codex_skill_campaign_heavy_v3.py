@@ -59,6 +59,8 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_object_set_composer_transaction_steps,
     build_transaction_protocol,
     query_object_step,
+    topic_schema_step,
+    wait_topic_step,
     _typed_fact_cli_arguments,
 )
 from tests.semantic.support.codex_gateway_broker import (
@@ -129,6 +131,7 @@ from wwise_waapi.operation_registry import operation_request_schema_digest
 from wwise_waapi.transaction_cleanup import transaction_cleanup_payload
 from wwise_waapi.typed_operations import inline_operation_cli_arguments
 from wwise_waapi.typed_requests import typed_request_construction_for_values
+from wwise_waapi.typed_topics import topic_match_contract, topic_options_contract
 from tests.semantic.support.codex_object_runtime_v3 import ObjectRuntimeSnapshot
 from tests.semantic.support.codex_soundbank_business_plan_v3 import (
     compile_soundbank_business_plan,
@@ -2016,6 +2019,24 @@ def _synthetic_gateway_records(
         }
         if structured_refusal:
             payload["error_code"] = step.expected_error_code
+        elif step.subcommand == "topic-schema":
+            topic = str(step.arguments[0])
+            payload.update(
+                {
+                    "version": version,
+                    "topic": topic,
+                    "options": {
+                        "schema_digest": topic_options_contract(
+                            version, topic
+                        ).schema_digest,
+                    },
+                    "event_match": {
+                        "schema_digest": topic_match_contract(
+                            version, topic
+                        ).schema_digest,
+                    },
+                }
+            )
         elif step.subcommand == "draft-start":
             operation = str(step.arguments[0])
             schema_digest = operation_request_schema_digest(operation, version)
@@ -2437,6 +2458,36 @@ def _synthetic_gateway_records(
         replay._payloads_by_step[step.name] = payload  # noqa: SLF001
         use_candidate_runner = _selected_next_command(payload) is not None
     return records
+
+
+def test_synthetic_topic_schema_supplies_bound_wait_digests(tmp_path: Path) -> None:
+    topic = "ak.wwise.core.soundbank.generated"
+    protocol = build_direct_protocol(
+        [
+            topic_schema_step("soundbank.generated.schema", topic),
+            wait_topic_step(
+                "soundbank.generated.wait",
+                topic,
+                version="2022.1",
+                event_count=1,
+                schema_step_name="soundbank.generated.schema",
+            ),
+        ]
+    )
+    options = _options(tmp_path)
+    task_root = tmp_path / "synthetic-topic"
+    task_root.mkdir()
+
+    records = _synthetic_gateway_records(
+        options=options,
+        task_root=task_root,
+        protocol=protocol,
+        version="2022.1",
+    )
+
+    assert records[0]["payload"]["options"]["schema_digest"]
+    assert records[0]["payload"]["event_match"]["schema_digest"]
+    assert records[1]["accepted"] is True
 
 
 def _synthetic_audio_transaction_request() -> dict[str, Any]:

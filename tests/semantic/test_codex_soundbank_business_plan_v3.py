@@ -12,6 +12,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     StructuredRefusal,
     build_direct_protocol,
     build_transaction_protocol,
+    topic_schema_step,
     wait_topic_step,
 )
 from tests.semantic.support.codex_soundbank_business_plan_v3 import (
@@ -161,6 +162,7 @@ def _case(api: str, scenario_id: str, root: Path, *, refusal: bool = False, topi
     if topic:
         protocol = build_direct_protocol(
             [
+                topic_schema_step("soundbank.generated.schema", api),
                 wait_topic_step(
                     "soundbank.generated.wait",
                     api,
@@ -168,6 +170,7 @@ def _case(api: str, scenario_id: str, root: Path, *, refusal: bool = False, topi
                     event_count=topic_count,
                     match={},
                     options={},
+                    schema_step_name="soundbank.generated.schema",
                 )
             ]
         )

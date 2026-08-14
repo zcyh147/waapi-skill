@@ -320,7 +320,7 @@ python scripts/run.py gateway.py query-object --path '\Actor-Mixer Hierarchy\Def
 Pure AND; `isIncluded` is appended last because it is filter-only:
 
 ```bash
-python scripts/run.py gateway.py query-object --path '\Actor-Mixer Hierarchy\Default Work Unit\CombatMix' --select descendants --where type = string Sound --where '@Volume' '<=' number -6.0 --where notes : string mix-review --where isIncluded = boolean true --take 12 --return-field id --return-field name --return-field type --return-field path --return-field '@Volume' --return-field notes --return-field audioSource:language --return-field OutputBus --return-field isIncluded
+python scripts/run.py gateway.py query-object --path '\Actor-Mixer Hierarchy\Default Work Unit\CombatMix' --select descendants --where type = string Sound --where '@Volume' '<=' number -6.0 --where notes : string mix-review --where isIncluded = boolean true --take 12 --return-field id --return-field name --return-field type --return-field path --return-field '@Volume' --return-field notes --return-field OutputBus --return-field isIncluded
 ```
 
 Direct parents:

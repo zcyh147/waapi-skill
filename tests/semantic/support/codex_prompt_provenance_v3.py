@@ -1966,6 +1966,16 @@ def _derive_input(
                 _canonical_json_bytes(projected).decode("utf-8"), origins
             )
 
+    if api == "ak.wwise.core.executeLuaScript":
+        if input_name == "script_file":
+            return _scalar_derived(
+                arguments.get("script_file"), base + "/arguments/script_file"
+            )
+        if input_name == "io_root":
+            return _scalar_derived(
+                arguments.get("io_root"), base + "/arguments/io_root"
+            )
+
     if api.startswith("ak.wwise.cli."):
         return _derive_cli_input(
             api,

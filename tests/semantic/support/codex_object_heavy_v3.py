@@ -1822,7 +1822,7 @@ def _get_03() -> ObjectHeavyRecipe:
         _seed("q3_decoy_outside", outside_path + r"\Outside_Match", "Sound", role="decoy", notes="mix-review outside", volume=-9.0, output_bus="q3_bus_b", language="SFX", included=True),
     )
     objects.extend(decoys)
-    return_fields = ("id", "name", "type", "path", "@Volume", "notes", "audioSource:language", "OutputBus", "isIncluded")
+    return_fields = ("id", "name", "type", "path", "@Volume", "notes", "OutputBus", "isIncluded")
     exact_keys = tuple(key for key, *_ in sorted(matches, key=lambda row: row[1]))
     expected = tuple(
         _expected_from_seed(next(item for item in objects if item.key == key), objects, return_fields=return_fields)

@@ -696,9 +696,18 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
             )
         )
     )
+    schema_digest = operation_request_schema_digest(operation, version)
     continuation: dict[str, Any] = {
         "subcommand": "typed-operation",
         "operation": operation,
+        "schema_digest": schema_digest,
+        "gateway_argv_prefix": [
+            "typed-operation",
+            operation,
+            "--schema-digest",
+            schema_digest,
+            "--apply",
+        ],
         "required_flag": "--apply",
     }
     if operation in {
@@ -740,7 +749,7 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
         "contract": INLINE_OPERATION_CONTRACT,
         "operation": operation,
         "version": version,
-        "schema_digest": operation_request_schema_digest(operation, version),
+        "schema_digest": schema_digest,
         "input_shape": (
             "zero"
             if operation

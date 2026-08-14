@@ -52,6 +52,7 @@ from tests.semantic.support.codex_prompt_provenance_v3 import (
     PROMPT_MATERIALIZATION_RECEIPT_CONTRACT,
     PROMPT_PROVENANCE_FILE,
     PromptProvenanceError,
+    _derive_input,
     _audio_import_composer_row_origins,
     _protocol_requests,
     _select_shared_cli_manifest,
@@ -175,6 +176,52 @@ def _operation_request(
         "operation": operation,
         "arguments": arguments,
     }
+
+
+def test_lua_file_visible_paths_are_derived_from_the_sealed_request(
+    tmp_path: Path,
+) -> None:
+    scenario = _scenario(
+        api="ak.wwise.core.executeLuaScript",
+        visible_inputs=(
+            VisibleInput("script_file", "path", "script_file"),
+            VisibleInput("io_root", "path", "io_root"),
+        ),
+    )
+    request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": "2023.1",
+        "operation": "lua.executeCoreFile",
+        "arguments": {
+            "script_file": str(tmp_path / "owned" / "script.lua"),
+            "io_root": str(tmp_path / "owned"),
+            "source_authority": "user_supplied_verbatim",
+            "wa_args": {"count": 3},
+        },
+    }
+    materializer = lambda _protocol: (("/requests/0", request),)
+
+    script = _derive_input(
+        scenario,
+        input_name="script_file",
+        root=tmp_path,
+        protocol_value={},
+        trusted_sources={},
+        protocol_request_materializer=materializer,
+    )
+    io_root = _derive_input(
+        scenario,
+        input_name="io_root",
+        root=tmp_path,
+        protocol_value={},
+        trusted_sources={},
+        protocol_request_materializer=materializer,
+    )
+
+    assert script.value == str(tmp_path / "owned" / "script.lua")
+    assert script.leaf_origins == {"": "/requests/0/arguments/script_file"}
+    assert io_root.value == str(tmp_path / "owned")
+    assert io_root.leaf_origins == {"": "/requests/0/arguments/io_root"}
 
 
 def _prompts(

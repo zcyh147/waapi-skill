@@ -66,6 +66,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     query_object_step,
     typed_read_draft_steps,
     wait_topic_step,
+    topic_schema_step,
 )
 from tests.semantic.support.codex_gateway_broker import (
     SUBSCRIPTION_ACK_CONTRACT,
@@ -3533,13 +3534,27 @@ def _compound_object_metadata_binding(
     scenario: OnlineScenario,
     *,
     version: str,
+    profile_unit_id: str | None = None,
 ) -> tuple[str, tuple[str, ...], tuple[str, ...]] | None:
     """Parse the profile-owned live-metadata requirement for object mutation.
 
     Historical V3 object cases intentionally retain their original protocol.
-    Only the compound profile carries this closed hidden marker, so adding the
-    supporting read here cannot silently broaden an older campaign.
+    Compound cases carry a closed hidden marker; the typed-input profile adds
+    one exact reviewed SET03/version lane whose three live tokens are required.
+    Neither path can silently broaden another campaign or version.
     """
+
+    if (
+        scenario.id == "OBJ22-F-SET-03"
+        and scenario.api == "ak.wwise.core.object.set"
+        and version == "2022.1"
+        and profile_unit_id == "TYP22-METADATA-OBJECT-SET"
+    ):
+        return (
+            get_codex_version_layout_v3(version).reflected_type("ActorMixer"),
+            ("volume", "pitch", "notes", "output bus"),
+            ("Volume", "Pitch", "OutputBus"),
+        )
 
     asset_spec = scenario.fixture.get("asset_spec")
     if not isinstance(asset_spec, Mapping):
@@ -3598,10 +3613,15 @@ def _build_compound_object_metadata_protocol(
     recipe: ObjectHeavyRecipe,
     direct: OwnedDirectWaapiCall,
     version: str,
+    profile_unit_id: str | None = None,
 ) -> V3GatewayProtocol | None:
     """Seal one object mutation behind an agent-visible live metadata read."""
 
-    binding = _compound_object_metadata_binding(scenario, version=version)
+    binding = _compound_object_metadata_binding(
+        scenario,
+        version=version,
+        profile_unit_id=profile_unit_id,
+    )
     if binding is None:
         return None
     if not isinstance(recipe.request, OperationRequestSpec):
@@ -4311,6 +4331,8 @@ def _prepare_case(
                     for key in ("id", "name", "type", "path")
                 }
                 if runtime.version != "2021.1":
+                    if normalized_project["type"] is None:
+                        normalized_project["type"] = "Project"
                     try:
                         localized = Path(
                             localize_waapi_host_path(project.get("path"))
@@ -4584,6 +4606,11 @@ def _prepare_case(
             recipe=recipe,
             direct=direct,
             version=runtime.version,
+            profile_unit_id=(
+                unit.unit_id
+                if isinstance(getattr(unit, "unit_id", None), str)
+                else None
+            ),
         )
         if protocol is None:
             protocol = build_object_merge_query_protocol(
@@ -4596,6 +4623,11 @@ def _prepare_case(
             if _compound_object_metadata_binding(
                 scenario,
                 version=runtime.version,
+                profile_unit_id=(
+                    unit.unit_id
+                    if isinstance(getattr(unit, "unit_id", None), str)
+                    else None
+                ),
             ) is not None:
                 raise HeavyProjectRunnerError(
                     "compound object metadata cases do not run policy probes"
@@ -4908,6 +4940,7 @@ def _prepare_case(
         step_name = "soundbank.generated.wait"
         protocol = build_direct_protocol(
             [
+                topic_schema_step("soundbank.generated.schema", topic.topic),
                 wait_topic_step(
                     step_name,
                     topic.topic,
@@ -4916,6 +4949,7 @@ def _prepare_case(
                     match=topic.match,
                     options=topic.options,
                     timeout_seconds=120.0,
+                    schema_step_name="soundbank.generated.schema",
                 )
             ]
         )

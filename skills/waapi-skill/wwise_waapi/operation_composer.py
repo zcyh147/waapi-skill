@@ -1417,7 +1417,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "action_bytes": MAX_TYPED_COMPOSER_ACTION_BYTES,
             },
             "typed_request_schema_digest": typed.schema_digest,
-            "typed_request_fields": [field.as_dict() for field in typed.fields],
+            "typed_request_fields": typed.gateway_field_payloads(),
             "complete_request_is_never_an_action": True,
             "completion_discipline": {
                 "successful_action_response_is_complete": True,

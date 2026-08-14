@@ -1177,7 +1177,6 @@ def test_prepare_get_info_rejects_status_for_a_different_project(
             "project": {
                 "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
                 "name": "SampleProject",
-                "type": "Project",
                 "path": str(project),
                 "displayTitle": "SampleProject",
                 "isDirty": False,
@@ -1200,6 +1199,101 @@ def test_prepare_get_info_rejects_status_for_a_different_project(
                 },
             },
         )
+
+
+def test_typed_profile_set03_requires_exact_live_property_metadata() -> None:
+    scenario = _scenario(
+        "ak.wwise.core.object.set",
+        scenario_id="OBJ22-F-SET-03",
+        version="2022.1",
+    )
+
+    assert runner._compound_object_metadata_binding(
+        scenario,
+        version="2022.1",
+        profile_unit_id="TYP22-METADATA-OBJECT-SET",
+    ) == (
+        "ActorMixer",
+        ("volume", "pitch", "notes", "output bus"),
+        ("Volume", "Pitch", "OutputBus"),
+    )
+    assert runner._compound_object_metadata_binding(
+        scenario,
+        version="2023.1",
+        profile_unit_id="TYP22-METADATA-OBJECT-SET",
+    ) is None
+    assert runner._compound_object_metadata_binding(
+        scenario,
+        version="2022.1",
+    ) is None
+
+
+def test_typed_profile_set03_builds_schema_first_metadata_protocol(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scenario = _scenario(
+        "ak.wwise.core.object.set",
+        scenario_id="OBJ22-F-SET-03",
+        version="2022.1",
+    )
+    recipe = build_object_heavy_v3_recipe("OBJ22-F-SET-03", "2022.1")
+    candidates = [
+        {"name": name, "kind": kind, "metadata": {"type": value_type}}
+        for name, kind, value_type in (
+            ("Volume", "property", "Real32"),
+            ("Pitch", "property", "Real32"),
+            ("OutputBus", "reference", "Object"),
+        )
+    ]
+    monkeypatch.setattr(
+        runner,
+        "discover_metadata",
+        lambda **_kwargs: SimpleNamespace(
+            as_dict=lambda: {
+                "contract": "waapi-skill.metadata-discovery/v2",
+                "authority": "live-waapi",
+                "result_detail": "compact",
+                "selection_required": True,
+                "exact_live_name_required_for_mutation": True,
+                "dependency_closure_complete": True,
+                "unresolved_dependencies": [],
+                "scope": {
+                    "kind": "object_type",
+                    "requested": "ActorMixer",
+                    "resolved": {"name": "ActorMixer"},
+                },
+                "candidates": candidates,
+                "dependency_candidates": [],
+            }
+        ),
+    )
+
+    protocol = runner._build_compound_object_metadata_protocol(
+        scenario,
+        recipe=recipe,
+        direct=SimpleNamespace(),
+        version="2022.1",
+        profile_unit_id="TYP22-METADATA-OBJECT-SET",
+    )
+
+    assert protocol is not None
+    assert [step.subcommand for step in protocol.steps[:2]] == [
+        "operation-schema",
+        "metadata",
+    ]
+    binding = next(
+        candidate
+        for step in protocol.steps
+        for candidate in (
+            step.metadata_binding,
+            *(
+                getattr(argument, "metadata_binding", None)
+                for argument in step.arguments
+            ),
+        )
+        if candidate is not None
+    )
+    assert binding.required_tokens == ("Volume", "Pitch", "OutputBus")
 
 
 def test_prepare_get_info_rejects_process_drift_from_readiness_proof(
@@ -2045,7 +2139,10 @@ def test_prepare_case_compiles_and_validates_typed_soundbank_sections_for_all_ap
     assert validated[-1] is True
     assert prepared.typed_sections is sections
     if topic:
-        assert [step.name for step in prepared.protocol.steps] == ["soundbank.generated.wait"]
+        assert [step.name for step in prepared.protocol.steps] == [
+            "soundbank.generated.schema",
+            "soundbank.generated.wait",
+        ]
         assert len(prepared.topic_publishers) == 3
         assert all("publisher" not in step.name for step in prepared.protocol.steps)
     else:

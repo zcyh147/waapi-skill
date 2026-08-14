@@ -396,9 +396,13 @@ def test_pure_and_query_pushes_every_supported_conjunct_in_canonical_order() -> 
     ) in query_flat
     assert (
         "--return-field '@Volume' --return-field notes "
-        "--return-field audioSource:language --return-field OutputBus "
+        "--return-field OutputBus "
         "--return-field isIncluded"
     ) in query_flat
+    assert (
+        "--return-field notes --return-field audioSource:language "
+        "--return-field OutputBus"
+    ) not in query_flat
 
 
 def test_query_shell_examples_never_expose_bare_at_prefixed_argv_values() -> None:

@@ -424,7 +424,7 @@
       "lane": "online_authoring",
       "scenario_family": "bounded_mix_review_rollup",
       "scenario_index": 3,
-      "prompt": "帮我复核 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab_Query03\\CombatMix` 这棵层级里的混音问题：从全部后代中找出同时满足 Sound、Volume 不高于 -6 dB、备注包含 `mix-review`、并且已纳入工程的对象，最多取 12 条。请按完整路径排序，列出名称、GUID、Volume、备注、语言和 Output Bus，再按 Output Bus 汇总数量，并说明结果有没有触及 12 条上限。",
+      "prompt": "帮我复核 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab_Query03\\CombatMix` 这棵层级里的混音问题：从全部后代中找出同时满足 Sound、Volume 不高于 -6 dB、备注包含 `mix-review`、并且已纳入工程的对象，最多取 12 条。请按完整路径排序，列出名称、GUID、Volume、备注和 Output Bus，再按 Output Bus 汇总数量，并说明结果有没有触及 12 条上限。",
       "protocol": "single",
       "confirmation_prompt": null,
       "fixture": {
@@ -442,7 +442,7 @@
       ],
       "oracle_assertions": [
         {"phase": "before", "adapter": "fixture_expected_rows", "subject_api": "ak.wwise.core.object.get", "expectation": "hidden baseline contains exactly eight expected path-to-GUID rows, five and three rows for the two recorded OutputBus GUIDs, and distinct excluded GUID sets for every failed predicate and the out-of-subtree decoy"},
-        {"phase": "after", "adapter": "waapi_object_query_readback", "subject_api": "ak.wwise.core.object.get", "expectation": "returned GUID set and path-sorted path list exactly equal the eight-row baseline; every row's name, type, path, Volume, notes, language, isIncluded, and @OutputBus.id equal its recorded values and no excluded GUID appears"},
+        {"phase": "after", "adapter": "waapi_object_query_readback", "subject_api": "ak.wwise.core.object.get", "expectation": "returned GUID set and path-sorted path list exactly equal the eight-row baseline; every row's name, type, path, Volume, notes, isIncluded, and @OutputBus.id equal its recorded values and no excluded GUID appears"},
         {"phase": "after", "adapter": "semantic_answer_assertion", "subject_api": "ak.wwise.core.object.get", "expectation": "reported Output Bus buckets exactly match the independent 5-to-3 GUID counts, total equals eight, and the answer explicitly reports that the 12-row bound was not reached"},
         {"phase": "cleanup", "adapter": "sandbox_integrity", "subject_api": "ak.wwise.core.object.get", "expectation": "the read leaves every fixture GUID and field unchanged; on success the case-owned project copy is deleted, on failure or an indeterminate result it is sealed and never reused, and source-project hashes remain unchanged"}
       ],

@@ -75,6 +75,14 @@ def test_debug_host_controls_disclose_one_zero_value_confirmation_entry(
         assert typed["continuation"] == {
             "subcommand": "typed-operation",
             "operation": operation,
+            "schema_digest": typed["schema_digest"],
+            "gateway_argv_prefix": [
+                "typed-operation",
+                operation,
+                "--schema-digest",
+                typed["schema_digest"],
+                "--apply",
+            ],
             "required_flag": "--apply",
             "fields": [],
         }

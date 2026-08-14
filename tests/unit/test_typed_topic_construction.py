@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.semantic.support.codex_eval_protocol_v3 import wait_topic_step
+from tests.semantic.support.codex_gateway_broker import ResponseBinding
 from wwise_waapi.capabilities import CapabilityCatalog
 from wwise_waapi.execution_contracts import AUTHORING_UI_EXECUTION_PROFILE
 from wwise_waapi.typed_topics import (
@@ -204,6 +206,40 @@ def test_topic_schema_discloses_one_typed_continuation_offline(tmp_path: Path) -
     serialized = json.dumps(payload, sort_keys=True)
     assert "options-json" not in serialized
     assert "match-json" not in serialized
+
+
+def test_wait_topic_digests_bind_to_the_real_topic_schema_envelope(
+    tmp_path: Path,
+) -> None:
+    topic = "ak.wwise.core.soundbank.generated"
+    code, payload = gateway.execute_gateway(
+        ["topic-schema", topic],
+        env=_env(tmp_path, "2021.1"),
+        client_factory=lambda url: pytest.fail(f"topic-schema connected to {url}"),
+    )
+    assert code == 0, payload
+    step = wait_topic_step(
+        "soundbank.generated.wait",
+        topic,
+        version="2021.1",
+        event_count=1,
+        schema_step_name="soundbank.generated.schema",
+    )
+    options_binding = step.arguments[
+        step.arguments.index("--options-schema-digest") + 1
+    ]
+    match_binding = step.arguments[
+        step.arguments.index("--match-schema-digest") + 1
+    ]
+
+    assert options_binding == ResponseBinding(
+        "soundbank.generated.schema", "/options/schema_digest"
+    )
+    assert match_binding == ResponseBinding(
+        "soundbank.generated.schema", "/event_match/schema_digest"
+    )
+    assert payload["options"]["schema_digest"]
+    assert payload["event_match"]["schema_digest"]
 
 
 def test_public_nested_topic_match_handle_is_lifecycle_neutral(tmp_path: Path) -> None:

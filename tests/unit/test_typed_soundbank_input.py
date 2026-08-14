@@ -367,7 +367,16 @@ def test_every_soundbank_lane_is_one_public_typed_draft(
         "inline_typed" if expected_shape == "inline" else "composer"
     )
     if expected_shape == "inline":
-        assert schema["typed_operation"]["continuation"]["subcommand"] == "typed-operation"
+        continuation = schema["typed_operation"]["continuation"]
+        assert continuation["subcommand"] == "typed-operation"
+        assert continuation["schema_digest"] == schema["typed_operation"]["schema_digest"]
+        assert continuation["gateway_argv_prefix"] == [
+            "typed-operation",
+            operation,
+            "--schema-digest",
+            schema["typed_operation"]["schema_digest"],
+            "--apply",
+        ]
         return
     assert schema["composer"]["start"]["subcommand"] == "draft-start"
 
@@ -378,6 +387,33 @@ def test_every_soundbank_lane_is_one_public_typed_draft(
     )
     assert code == 0, started
     assert started["draft"]["binding"]["operation"] == operation
+
+
+def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> None:
+    code, schema = gateway.execute_gateway(
+        ["--version", "2025.1", "operation-schema", "soundbank.setInclusions"],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda url: pytest.fail(f"operation-schema connected to {url}"),
+    )
+    assert code == 0, schema
+    payload = {"fields": schema["composer"]["typed_request_fields"]}
+    soundbank = next(
+        field
+        for field in payload["fields"]
+        if field["path"] == ["args", "soundbank"] and field["shape"] == "branch"
+    )
+    choices = [
+        field
+        for field in payload["fields"]
+        if field.get("parent_handle") == soundbank["handle"]
+    ]
+    assert [choice["branch_choice_constants"] for choice in choices] == [
+        {"kind": "id"},
+        {"kind": "path"},
+        {"kind": "exact-type-name"},
+        {"kind": "direct-child"},
+        {"kind": "scoped-name"},
+    ]
 
 
 def test_file_operations_materialize_exact_paths_without_rewriting_sources(tmp_path: Path) -> None:

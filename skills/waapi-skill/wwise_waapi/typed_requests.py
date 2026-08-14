@@ -156,6 +156,29 @@ class TypedRequestContract:
     def fields_by_handle(self) -> Mapping[str, TypedFieldContract]:
         return {field.handle: field for field in self.fields}
 
+    def gateway_field_payloads(self) -> list[dict[str, Any]]:
+        """Project fields once for every public Gateway discovery surface."""
+
+        field_payloads = [field.as_dict() for field in self.fields]
+        fields_by_parent: dict[str, list[TypedFieldContract]] = {}
+        for field in self.fields:
+            if field.parent_handle is not None:
+                fields_by_parent.setdefault(field.parent_handle, []).append(field)
+        for field, field_payload in zip(self.fields, field_payloads, strict=True):
+            if field.shape != "object" or field.parent_handle is None:
+                continue
+            parent = self.fields_by_handle.get(field.parent_handle)
+            if parent is None or parent.shape != "branch":
+                continue
+            constants = {
+                child.name: child.variants[0]["const"]
+                for child in fields_by_parent.get(field.handle, ())
+                if len(child.variants) == 1 and "const" in child.variants[0]
+            }
+            if constants:
+                field_payload["branch_choice_constants"] = constants
+        return field_payloads
+
     def as_gateway_payload(self) -> dict[str, Any]:
         if not self.fields:
             gateway_argv = [
@@ -270,6 +293,7 @@ class TypedRequestContract:
                 input_shape = "draft"
         if not self.fields:
             input_shape = "zero"
+        field_payloads = self.gateway_field_payloads()
         payload = {
             "contract": TYPED_REQUEST_SCHEMA_CONTRACT,
             "ok": True,
@@ -279,7 +303,7 @@ class TypedRequestContract:
             "uri": self.uri,
             "input_shape": input_shape,
             "schema_digest": self.schema_digest,
-            "fields": [field.as_dict() for field in self.fields],
+            "fields": field_payloads,
             "continuation": continuation,
         }
         if self.uri == "ak.wwise.core.mediaPool.get":
