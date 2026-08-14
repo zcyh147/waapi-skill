@@ -553,6 +553,88 @@ def test_soundbank_generate_transaction_uses_typed_draft_facts() -> None:
     assert all("--request-json" not in step.arguments for step in protocol.steps)
 
 
+def test_multi_row_typed_draft_finishes_each_disclosure_chain_before_next_row() -> None:
+    request = {
+        **_request(),
+        "version": "2024.1",
+        "operation": "soundbank.generate",
+        "arguments": {
+            "soundbanks": [
+                {
+                    "name": "Main_UI",
+                    "artifact_expectation": "nonlocalized",
+                    "rebuild": False,
+                },
+                {
+                    "name": "Dialogue",
+                    "artifact_expectation": "nonlocalized",
+                    "rebuild": False,
+                },
+            ],
+            "platforms": ["Windows"],
+            "skip_languages": True,
+            "write_to_disk": True,
+            "io_root": "/owned",
+            "rebuild_soundbanks": False,
+            "clear_audio_file_cache": False,
+            "rebuild_init_bank": False,
+        },
+    }
+
+    protocol = build_transaction_protocol([request])
+    construction_names = [
+        step.name
+        for step in protocol.steps
+        if ".action." in step.name or ".disclose." in step.name
+    ]
+
+    first_disclosure = construction_names.index("tx01.disclose.001")
+    second_disclosure = construction_names.index("tx01.disclose.002")
+    assert first_disclosure < construction_names.index("tx01.action.001")
+    assert construction_names.index("tx01.action.004") < second_disclosure
+    assert second_disclosure < construction_names.index("tx01.action.005")
+
+
+def test_nested_choice_uses_parent_disclosure_choice_without_requery() -> None:
+    request = {
+        **_request(),
+        "operation": "soundbank.setInclusions",
+        "arguments": {
+            "soundbank": {
+                "kind": "id",
+                "value": "{00000000-0000-0000-0000-000000000001}",
+            },
+            "mode": "replace",
+            "inclusions": [
+                {
+                    "object": {
+                        "kind": "id",
+                        "value": "{00000000-0000-0000-0000-000000000002}",
+                    },
+                    "filters": ["events"],
+                }
+            ],
+        },
+    }
+
+    protocol = build_transaction_protocol([request])
+    construction = tuple(
+        step
+        for step in protocol.steps
+        if ".action." in step.name or ".disclose." in step.name
+    )
+
+    assert all(not step.name.endswith(".choices") for step in construction)
+    object_disclosure = next(
+        step for step in construction if step.name == "tx01.disclose.002"
+    )
+    assert object_disclosure.arguments[-2] == "--choice-handle"
+    assert object_disclosure.arguments[-1] == ResponseBinding(
+        "tx01.disclose.001",
+        "/child_contract/branch_choices/0/choices/0/handle",
+    )
+
+
 def test_metadata_transaction_protocol_is_generic_and_binds_every_preview() -> None:
     first = _object_set_request()
     second = _object_set_request()

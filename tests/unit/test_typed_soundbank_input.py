@@ -465,11 +465,13 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
     )
     assert item["continuation"]["request_wide_order"] == {
         "phase": "dynamic_disclosure",
-        "finish_all_business_present_disclosures_first": True,
+        "finish_current_root_disclosure_chain_first": True,
         "array_item_order": "ascending_index",
         "nested_member_order": "schema_property_order",
-        "facts_using_returned_handles": "only_after_all_disclosures",
-        "deferred_action_argv": "only_after_all_disclosures",
+        "facts_using_returned_handles": (
+            "after_current_root_chain_before_next_root"
+        ),
+        "deferred_action_argv": "after_current_root_chain_before_next_root",
         "this_handle_is_not_a_complete_request": True,
     }
     assert item["continuation"]["deferred_action_argv"] == [

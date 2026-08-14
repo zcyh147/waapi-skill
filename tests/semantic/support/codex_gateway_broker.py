@@ -965,6 +965,11 @@ class DraftActionResponseBinding:
                 == "/draft/action_result/created_handles/0"
                 or self.response_pointer == "/handle"
                 or re.fullmatch(r"/choices/(0|[1-9][0-9]*)/handle", self.response_pointer)
+                or re.fullmatch(
+                    r"/child_contract/branch_choices/(0|[1-9][0-9]*)/"
+                    r"choices/(0|[1-9][0-9]*)/handle",
+                    self.response_pointer,
+                )
             )
             or len(self.response_pointer) > 512
         ):

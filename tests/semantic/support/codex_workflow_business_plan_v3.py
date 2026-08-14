@@ -546,38 +546,35 @@ def _matches_transaction_step_sequence(
         return False
     if not disclosure_positions:
         return action_indexes == sorted(action_indexes)
-    first_disclosure = disclosure_positions[0]
-    last_disclosure = disclosure_positions[-1]
-    if disclosure_positions != list(range(first_disclosure, last_disclosure + 1)):
-        return False
-    before_indexes = [
-        int(prefix.removeprefix("action."))
-        for prefix in prefixes[:first_disclosure]
-    ]
-    after_indexes = [
-        int(prefix.removeprefix("action."))
-        for prefix in prefixes[last_disclosure + 1 :]
-    ]
-    if (
-        not after_indexes
-        or before_indexes != sorted(before_indexes)
-        or after_indexes != sorted(after_indexes)
-    ):
-        return False
-    disclosure_prefixes = prefixes[first_disclosure : last_disclosure + 1]
     cursor = 0
-    disclosure_index = 1
-    while cursor < len(disclosure_prefixes):
-        base = f"disclose.{disclosure_index:03d}"
-        if disclosure_prefixes[cursor] == f"{base}.choices":
-            cursor += 1
-        if (
-            cursor >= len(disclosure_prefixes)
-            or disclosure_prefixes[cursor] != base
-        ):
-            return False
+    initial_actions: list[int] = []
+    while cursor < len(prefixes) and prefixes[cursor].startswith("action."):
+        initial_actions.append(int(prefixes[cursor].removeprefix("action.")))
         cursor += 1
-        disclosure_index += 1
+    if initial_actions != sorted(initial_actions):
+        return False
+    disclosure_index = 1
+    while cursor < len(prefixes):
+        disclosed = 0
+        while cursor < len(prefixes) and prefixes[cursor].startswith("disclose."):
+            base = f"disclose.{disclosure_index:03d}"
+            if prefixes[cursor] == f"{base}.choices":
+                cursor += 1
+            if cursor >= len(prefixes) or prefixes[cursor] != base:
+                return False
+            cursor += 1
+            disclosure_index += 1
+            disclosed += 1
+        if disclosed == 0:
+            return False
+        dependent_actions: list[int] = []
+        while cursor < len(prefixes) and prefixes[cursor].startswith("action."):
+            dependent_actions.append(
+                int(prefixes[cursor].removeprefix("action."))
+            )
+            cursor += 1
+        if not dependent_actions or dependent_actions != sorted(dependent_actions):
+            return False
     return True
 
 

@@ -116,8 +116,17 @@ class TypedFieldContract:
                     "fact_action": "present",
                     "must_not_accompany": ["append"],
                 },
-                "complex_item_phase": "dynamic_disclosure",
-                "complex_item_disclosure": "request-array-item",
+                **(
+                    {
+                        "complex_item_phase": "dynamic_disclosure",
+                        "complex_item_disclosure": "request-array-item",
+                    }
+                    if any(
+                        variant.get("type") in {"object", "array"}
+                        for variant in self.variants
+                    )
+                    else {}
+                ),
             }
         elif self.shape == "map":
             payload["fact_construction"] = {
@@ -131,8 +140,17 @@ class TypedFieldContract:
                     "fact_action": "present",
                     "must_not_accompany": ["map-put"],
                 },
-                "complex_member_phase": "dynamic_disclosure",
-                "complex_member_disclosure": "request-map-container",
+                **(
+                    {
+                        "complex_member_phase": "dynamic_disclosure",
+                        "complex_member_disclosure": "request-map-container",
+                    }
+                    if any(
+                        variant.get("type") in {"object", "array"}
+                        for variant in self.variants
+                    )
+                    else {}
+                ),
             }
         else:
             payload["fact_construction"] = {
@@ -704,6 +722,7 @@ class TypedRequestDisclosure:
     choice_handle: str | None = None
     choice_index: int | None = None
     parent_child_handle: str | None = None
+    parent_choice_group_index: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -3027,6 +3046,26 @@ def _append_dynamic_object_members(
                 )
             )
         if item_type in {"object", "array"}:
+            parent_choice_group_index = None
+            if choice_handle is not None and handle not in contract.fields_by_handle:
+                branch_rows = _dynamic_map_branch_payloads(
+                    contract,
+                    child=dynamic,
+                    object_handle=handle,
+                    member_key=None,
+                )
+                parent_choice_group_index = next(
+                    (
+                        index
+                        for index, row in enumerate(branch_rows)
+                        if row.get("key") == key
+                    ),
+                    None,
+                )
+                if parent_choice_group_index is None:
+                    raise TypedRequestError(
+                        f"Typed map key {key!r} lacks its parent-published branch"
+                    )
             child = dynamic_map_entry_handle(
                 contract,
                 map_handle=handle,
@@ -3056,6 +3095,7 @@ def _append_dynamic_object_members(
                     parent_child_handle=(
                         handle if handle not in contract.fields_by_handle else None
                     ),
+                    parent_choice_group_index=parent_choice_group_index,
                 )
             )
             facts.append(TypedRequestFact("map-put", handle, item_type, child, key=key))

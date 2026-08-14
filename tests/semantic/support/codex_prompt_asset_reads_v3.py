@@ -165,6 +165,7 @@ def _applied_tab_import_file_paths(
         requests = materialize_typed_transaction_protocol_requests(
             protocol,
             version=version,
+            allow_cleaned_file_evidence=True,
         )
     except ValueError as exc:
         raise PromptAssetReadError(

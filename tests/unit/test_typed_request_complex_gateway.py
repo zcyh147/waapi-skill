@@ -70,8 +70,6 @@ def test_media_pool_schema_marks_scalar_array_items_as_append_facts(
             "fact_action": "present",
             "must_not_accompany": ["append"],
         },
-        "complex_item_phase": "dynamic_disclosure",
-        "complex_item_disclosure": "request-array-item",
     }
 
 

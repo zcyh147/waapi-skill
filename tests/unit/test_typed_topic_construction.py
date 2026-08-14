@@ -319,6 +319,37 @@ def test_topic_schema_discloses_one_typed_continuation_offline(tmp_path: Path) -
     assert "match-json" not in serialized
 
 
+def test_scalar_topic_array_does_not_advertise_container_disclosure(
+    tmp_path: Path,
+) -> None:
+    topic = "ak.wwise.core.soundbank.generated"
+    code, payload = gateway.execute_gateway(
+        ["topic-schema", topic],
+        env=_env(tmp_path, "2021.1"),
+        client_factory=lambda url: pytest.fail(f"topic-schema connected to {url}"),
+    )
+
+    assert code == 0
+    return_field = next(
+        field
+        for field in _expand_compact_field_table(payload["options"]["fields"])
+        if field["name"] == "return"
+    )
+    assert return_field["accepted_types"] == ["string"]
+    assert return_field["fact_construction"] == {
+        "nonempty_scalar_items": {
+            "phase": "before_dynamic_disclosure",
+            "fact_action": "append",
+            "repeat_for_each_item": True,
+        },
+        "empty_array_only": {
+            "phase": "before_dynamic_disclosure",
+            "fact_action": "present",
+            "must_not_accompany": ["append"],
+        },
+    }
+
+
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
 def test_wait_topic_digests_bind_to_the_real_topic_schema_envelope(
     tmp_path: Path,
@@ -388,8 +419,6 @@ def test_wait_topic_digests_bind_to_the_real_topic_schema_envelope(
             "fact_action": "present",
             "must_not_accompany": ["map-put"],
         },
-        "complex_member_phase": "dynamic_disclosure",
-        "complex_member_disclosure": "request-map-container",
     }
     assert payload["continuation"]["fact_selection"]["open_map_scalar"] == (
         "map_put only without an exact static child row; use the listed child "

@@ -1126,7 +1126,10 @@ def _build_generic_typed_draft_transaction_steps(
     revision_step = f"{label}.draft-start"
     disclosure_by_child: dict[str, str] = {}
     disclosed_handle_bindings: dict[str, tuple[str, str]] = {}
-    disclosure_steps: list[ExpectedGatewayStep] = []
+    disclosure_groups: dict[str, list[ExpectedGatewayStep]] = {}
+    disclosure_group_order: list[str] = []
+    disclosure_group_by_step: dict[str, str] = {}
+    disclosure_root_by_child: dict[str, str] = {}
     for disclosure_index, disclosure in enumerate(
         construction.disclosures,
         start=1,
@@ -1143,6 +1146,12 @@ def _build_generic_typed_draft_transaction_steps(
                 "--parent-schema-token",
                 ResponseBinding(parent_source, "/schema_lineage_token"),
             )
+            disclosure_root = disclosure_root_by_child[disclosure.parent_child_handle]
+        else:
+            disclosure_root = disclosure.child_handle
+        if disclosure_root not in disclosure_groups:
+            disclosure_groups[disclosure_root] = []
+            disclosure_group_order.append(disclosure_root)
         command_arguments: list[Any] = [
             operation,
             "--schema-digest",
@@ -1164,33 +1173,50 @@ def _build_generic_typed_draft_transaction_steps(
             *parent_token_arguments,
         ]
         if disclosure.choice_handle is not None:
-            choice_name = f"{base_name}.choices"
-            disclosure_steps.append(
-                ExpectedGatewayStep(
+            if disclosure.choice_index is None:
+                raise V3ProtocolError("typed Draft disclosure choice is unindexed")
+            if disclosure.parent_choice_group_index is not None:
+                if disclosure.parent_child_handle is None:
+                    raise V3ProtocolError(
+                        "typed Draft parent-published choice lacks its parent"
+                    )
+                choice_source = disclosure_by_child[disclosure.parent_child_handle]
+                choice_pointer = (
+                    "/child_contract/branch_choices/"
+                    f"{disclosure.parent_choice_group_index}/choices/"
+                    f"{disclosure.choice_index}/handle"
+                )
+            else:
+                choice_name = f"{base_name}.choices"
+                choice_step = ExpectedGatewayStep(
                     choice_name,
                     disclosure.command,
                     tuple(command_arguments),
                 )
-            )
+                disclosure_groups[disclosure_root].append(choice_step)
+                disclosure_group_by_step[choice_name] = disclosure_root
+                choice_source = choice_name
+                choice_pointer = f"/choices/{disclosure.choice_index}/handle"
             disclosed_handle_bindings[disclosure.choice_handle] = (
-                choice_name,
-                f"/choices/{disclosure.choice_index}/handle",
+                choice_source,
+                choice_pointer,
             )
-            if disclosure.choice_index is None:
-                raise V3ProtocolError("typed Draft disclosure choice is unindexed")
             command_arguments.extend(
                 (
                     "--choice-handle",
                     ResponseBinding(
-                        choice_name,
-                        f"/choices/{disclosure.choice_index}/handle",
+                        choice_source,
+                        choice_pointer,
                     ),
                 )
             )
-        disclosure_steps.append(
-            ExpectedGatewayStep(base_name, disclosure.command, tuple(command_arguments))
+        disclosure_step = ExpectedGatewayStep(
+            base_name, disclosure.command, tuple(command_arguments)
         )
+        disclosure_groups[disclosure_root].append(disclosure_step)
+        disclosure_group_by_step[base_name] = disclosure_root
         disclosure_by_child[disclosure.child_handle] = base_name
+        disclosure_root_by_child[disclosure.child_handle] = disclosure_root
         disclosed_handle_bindings[disclosure.child_handle] = (base_name, "/handle")
     fact_rows: list[
         tuple[int, Any, tuple[DraftActionResponseBinding, ...], Mapping[str, Any]]
@@ -1238,10 +1264,33 @@ def _build_generic_typed_draft_transaction_steps(
         fact_rows.append((index, fact, tuple(response_bindings), action))
 
     independent_rows = tuple(row for row in fact_rows if not row[2])
-    dependent_rows = tuple(row for row in fact_rows if row[2])
-    for position, rows in enumerate((independent_rows, dependent_rows)):
-        if position == 1:
-            steps.extend(disclosure_steps)
+    dependent_rows_by_group: dict[
+        str,
+        list[tuple[int, Any, tuple[DraftActionResponseBinding, ...], Mapping[str, Any]]],
+    ] = {root: [] for root in disclosure_group_order}
+    for row in (row for row in fact_rows if row[2]):
+        roots = {
+            disclosure_group_by_step[binding.step]
+            for binding in row[2]
+            if binding.step in disclosure_group_by_step
+        }
+        if len(roots) != 1:
+            raise V3ProtocolError(
+                "typed Draft dependent fact crosses disclosure groups"
+            )
+        dependent_rows_by_group[next(iter(roots))].append(row)
+
+    def append_fact_rows(
+        rows: Sequence[
+            tuple[
+                int,
+                Any,
+                tuple[DraftActionResponseBinding, ...],
+                Mapping[str, Any],
+            ]
+        ],
+    ) -> None:
+        nonlocal revision_step
         for index, _fact, response_bindings, action in rows:
             step_name = f"{label}.action.{index:03d}"
             steps.append(
@@ -1265,6 +1314,11 @@ def _build_generic_typed_draft_transaction_steps(
                 )
             )
             revision_step = step_name
+
+    append_fact_rows(independent_rows)
+    for root in disclosure_group_order:
+        steps.extend(disclosure_groups[root])
+        append_fact_rows(dependent_rows_by_group[root])
     check_name = f"{label}.check"
     check_trailing: tuple[Any, ...] = ()
     if post_filter is not None:

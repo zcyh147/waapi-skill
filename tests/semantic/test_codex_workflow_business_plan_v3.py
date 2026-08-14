@@ -360,7 +360,7 @@ def test_composer_accepts_independent_facts_before_bound_container_disclosure() 
         "duplicate_action",
         "reordered_actions",
         "orphan_disclosure",
-        "split_disclosures",
+        "split_choice_disclosure",
         "wrong_kind",
         "wrong_operation",
         "missing_check",
@@ -383,11 +383,11 @@ def test_object_set_composer_rejects_incomplete_or_cross_operation_steps(
             4,
             {**steps[2], "name": "tx02.disclose.001"},
         )
-    elif attack == "split_disclosures":
+    elif attack == "split_choice_disclosure":
         steps[2:4] = [
-            {**steps[2], "name": "tx02.disclose.001"},
+            {**steps[2], "name": "tx02.disclose.001.choices"},
             steps[2],
-            {**steps[2], "name": "tx02.disclose.002"},
+            {**steps[2], "name": "tx02.disclose.001"},
             steps[3],
         ]
     elif attack == "wrong_kind":
