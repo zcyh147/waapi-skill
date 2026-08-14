@@ -186,6 +186,61 @@ def test_mutation_requests_parse_through_the_production_closed_contract() -> Non
     }
 
 
+def test_query_recipes_use_current_typed_where_facts_without_legacy_json() -> None:
+    simple = build_object_heavy_v3_recipe("OBJ22-F-GET-01", "2021.1")
+    conjunctive = build_object_heavy_v3_recipe("OBJ22-F-GET-03", "2022.1")
+
+    assert isinstance(simple.request, QueryObjectRequestSpec)
+    assert "--where-json" not in simple.request.argv
+    assert simple.request.argv[simple.request.argv.index("--where") :] == (
+        "--where",
+        "type",
+        "=",
+        "string",
+        "Sound",
+        "--take",
+        "24",
+        "--return-field",
+        "id",
+        "--return-field",
+        "name",
+        "--return-field",
+        "type",
+        "--return-field",
+        "path",
+        "--return-field",
+        "@Volume",
+        "--return-field",
+        "notes",
+        "--return-field",
+        "OutputBus",
+    )
+    assert isinstance(conjunctive.request, QueryObjectRequestSpec)
+    assert "--where-json" not in conjunctive.request.argv
+    assert (
+        "--where",
+        "@Volume",
+        "<=",
+        "number",
+        "-6.0",
+    ) in tuple(
+        conjunctive.request.argv[index : index + 5]
+        for index, value in enumerate(conjunctive.request.argv)
+        if value == "--where"
+    )
+    assert (
+        "--where",
+        "isIncluded",
+        "=",
+        "boolean",
+        "true",
+    ) in tuple(
+        conjunctive.request.argv[index : index + 5]
+        for index, value in enumerate(conjunctive.request.argv)
+        if value == "--where"
+    )
+
+
 @pytest.mark.parametrize(
     "case_id",
     (

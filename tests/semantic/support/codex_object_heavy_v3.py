@@ -760,11 +760,16 @@ def _expected(
     )
 
 
-def _where(predicates: Sequence[Mapping[str, Any]]) -> str:
-    value: Any = list(predicates)
-    if len(value) == 1:
-        value = value[0]
-    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+def _where_scalar(value: Any) -> tuple[str, str]:
+    if isinstance(value, bool):
+        return "boolean", "true" if value else "false"
+    if isinstance(value, int):
+        return "integer", str(value)
+    if isinstance(value, float):
+        return "number", str(value)
+    if isinstance(value, str):
+        return "string", value
+    raise ObjectHeavyRecipeError("query predicate scalar is not supported")
 
 
 def _query(
@@ -785,8 +790,19 @@ def _query(
     argv = ["gateway.py", "--version", VERSION, "query-object", source[0], source[1]]
     for select in selects:
         argv.extend(("--select", select))
-    if predicates:
-        argv.extend(("--where-json", _where(predicates)))
+    for predicate in predicates:
+        if set(predicate) != {"field", "operator", "value"}:
+            raise ObjectHeavyRecipeError("query predicate shape is not closed")
+        value_type, value = _where_scalar(predicate["value"])
+        argv.extend(
+            (
+                "--where",
+                str(predicate["field"]),
+                str(predicate["operator"]),
+                value_type,
+                value,
+            )
+        )
     argv.extend(("--take", str(take)))
     for field_name in return_fields:
         argv.extend(("--return-field", field_name))

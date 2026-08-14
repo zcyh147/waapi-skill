@@ -46,10 +46,10 @@ from tests.semantic.support.codex_import_assets_v3 import (
     compound_dynamic_modes_by_row,
 )
 from tests.semantic.support.codex_import_runtime_v3 import (
-    COMPOUND_SUPPORTED_VERSIONS,
     IMPORT_APIS,
     MAX_FILE_BYTES,
     SUPPORTED_VERSION,
+    import_runtime_version_is_reviewed,
     ImportCompoundRuntimeSnapshot,
     ImportRuntimePlan,
     ImportRuntimeSnapshot,
@@ -268,15 +268,21 @@ def _validate_runtime_inputs(
     compound = plan.metadata_binding is not None
     if (
         plan.api not in IMPORT_APIS
-        or (
-            plan.version not in COMPOUND_SUPPORTED_VERSIONS
-            if compound
-            else plan.version != SUPPORTED_VERSION
+        or not import_runtime_version_is_reviewed(
+            plan.scenario_id,
+            plan.version,
+            compound=compound,
         )
         or getattr(scenario, "id", None) != plan.scenario_id
         or getattr(scenario, "api", None) != plan.api
+        or tuple(getattr(scenario, "versions", ())) != (plan.version,)
     ):
         raise ImportBusinessPlanError("import scenario/runtime identity is misbound")
+    _validate_request_contract_versions(
+        plan.operation_requests,
+        api=plan.api,
+        version=plan.version,
+    )
     if compound != isinstance(before, ImportCompoundRuntimeSnapshot):
         raise ImportBusinessPlanError(
             "compound import plan/snapshot shape is misbound"
@@ -628,14 +634,15 @@ def _validate_static_archive(static: Mapping[str, Any], live: Mapping[str, Any],
     )
     if (
         static["api"] not in IMPORT_APIS
-        or (
-            static["version"] not in COMPOUND_SUPPORTED_VERSIONS
-            if compound
-            else static["version"] != SUPPORTED_VERSION
+        or not import_runtime_version_is_reviewed(
+            static["scenario_id"],
+            static["version"],
+            compound=compound,
         )
         or static["family"] != "audio_import"
         or static["scenario_id"] != getattr(scenario, "id", None)
         or static["api"] != getattr(scenario, "api", None)
+        or tuple(getattr(scenario, "versions", ())) != (static["version"],)
         or static["scenario_api"] != static["api"]
     ):
         raise ImportBusinessPlanError("archived import scenario identity is misbound")
@@ -645,6 +652,11 @@ def _validate_static_archive(static: Mapping[str, Any], live: Mapping[str, Any],
     requests = static["operation_requests"]
     if not isinstance(requests, list) or static["operation_requests_sha256"] != _hash(requests):
         raise ImportBusinessPlanError("archived import requests digest is invalid")
+    _validate_request_contract_versions(
+        requests,
+        api=static["api"],
+        version=static["version"],
+    )
     if count == 0 and (len(requests) != 1 or static["refusal_error_code"] != _REFUSAL_CODES.get(static["scenario_id"])):
         raise ImportBusinessPlanError("archived zero-dispatch refusal is not closed")
     if count > 0 and (len(requests) != count or static["refusal_error_code"] is not None):
@@ -749,6 +761,29 @@ def _validate_static_archive(static: Mapping[str, Any], live: Mapping[str, Any],
     if any(row["import_operation"] not in request_operations for row in static["row_contracts"]):
         raise ImportBusinessPlanError("archived import row operation is not bound to a request")
     _validate_rows_against_fixture_and_requests(static, live, scenario)
+
+
+def _validate_request_contract_versions(
+    requests: Sequence[Mapping[str, Any]],
+    *,
+    api: str,
+    version: str,
+) -> None:
+    expected_operation = (
+        "audio.import"
+        if api == "ak.wwise.core.audio.import"
+        else "audio.importTabDelimited"
+    )
+    if not requests or any(
+        not isinstance(request, Mapping)
+        or request.get("contract") != "waapi-skill.operation-request/v1"
+        or request.get("version") != version
+        or request.get("operation") != expected_operation
+        for request in requests
+    ):
+        raise ImportBusinessPlanError(
+            "import request contract/version is misbound"
+        )
 
 
 def _validate_rows_against_fixture_and_requests(static: Mapping[str, Any], live: Mapping[str, Any], scenario: Any) -> None:

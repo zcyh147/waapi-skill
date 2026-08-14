@@ -518,7 +518,9 @@ def test_get01_2021_snapshot_rejects_a_second_direct_audio_source() -> None:
         runtime.snapshot()
 
 
-def test_read_only_object_protocol_discovers_query_schema_first(tmp_path: Path) -> None:
+def test_read_only_object_protocol_uses_the_existing_simple_typed_flags(
+    tmp_path: Path,
+) -> None:
     scenario = replace(_scenario("OBJ22-F-GET-01"), versions=("2021.1",))
     recipe = build_object_heavy_v3_recipe(scenario.id, version="2021.1")
     runtime = PreparedObjectRuntime(
@@ -530,9 +532,30 @@ def test_read_only_object_protocol_discovers_query_schema_first(tmp_path: Path) 
 
     protocol = runtime.gateway_protocol()
 
-    assert tuple(step.subcommand for step in protocol.steps[:2]) == (
-        "query-schema",
-        "query-object",
+    assert tuple(step.subcommand for step in protocol.steps) == ("query-object",)
+    assert "--where-json" not in protocol.steps[0].arguments
+    assert protocol.steps[0].arguments[protocol.steps[0].arguments.index("--where") :] == (
+        "--where",
+        "type",
+        "=",
+        "string",
+        "Sound",
+        "--take",
+        "24",
+        "--return-field",
+        "id",
+        "--return-field",
+        "name",
+        "--return-field",
+        "type",
+        "--return-field",
+        "path",
+        "--return-field",
+        "@Volume",
+        "--return-field",
+        "notes",
+        "--return-field",
+        "OutputBus",
     )
 
 
@@ -1541,9 +1564,8 @@ def test_all_object_recipes_build_exact_single_or_two_turn_protocols() -> None:
             )
         else:
             assert isinstance(recipe.request, QueryObjectRequestSpec)
-            assert protocol.turn_prefix_counts == (2,)
+            assert protocol.turn_prefix_counts == (1,)
             assert tuple(step.subcommand for step in protocol.steps) == (
-                "query-schema",
                 "query-object",
             )
 

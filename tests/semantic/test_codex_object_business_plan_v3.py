@@ -15,10 +15,12 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_schema_query_transaction_protocol,
     build_transaction_protocol,
     query_object_step,
-    query_schema_step,
 )
 from tests.semantic.support.codex_compound_heavy_v1 import (
     load_compound_heavy_profile,
+)
+from tests.semantic.support.codex_typed_input_profile import (
+    load_typed_input_profile,
 )
 from tests.semantic.support.codex_gateway_broker import (
     DraftActionMetadataBinding,
@@ -168,7 +170,6 @@ def _case(
         if isinstance(request, OperationRequestSpec)
         else build_direct_protocol(
             [
-                query_schema_step(),
                 query_object_step("query-object", request.argv[3:]),
             ]
         )
@@ -522,6 +523,42 @@ def test_compound_merge_query_protocol_rejects_a_different_root(
             before,
             manifest,
         )
+
+
+def test_typed_profile_merge_discloses_the_exact_root_read_before_composition() -> None:
+    profile_path = (
+        Path(__file__).resolve().parent
+        / "data"
+        / "typed-input-v1"
+        / "profile.json"
+    )
+    unit = next(
+        row
+        for row in load_typed_input_profile(profile_path).units
+        if row.unit_id == "TYP21-DEDICATED-OBJECT-CREATE"
+    )
+    recipe = build_object_heavy_v3_recipe(unit.base_scenario_id, unit.version)
+
+    protocol = build_object_merge_query_protocol(unit.scenario, recipe)
+
+    assert protocol is not None
+    assert tuple(step.subcommand for step in protocol.steps[:3]) == (
+        "operation-schema",
+        "query-object",
+        "draft-start",
+    )
+    assert protocol.steps[1].arguments == (
+        "--path",
+        r"\Actor-Mixer Hierarchy\Default Work Unit\SemanticLab\NPC\Robot_VO",
+        "--return-field",
+        "id",
+        "--return-field",
+        "name",
+        "--return-field",
+        "type",
+        "--return-field",
+        "path",
+    )
 
 
 def test_object_archive_rejects_static_live_file_delta_and_extra_field_tamper(

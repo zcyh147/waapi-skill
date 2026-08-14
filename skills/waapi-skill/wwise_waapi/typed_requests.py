@@ -158,10 +158,19 @@ class TypedRequestContract:
 
     def as_gateway_payload(self) -> dict[str, Any]:
         if not self.fields:
+            gateway_argv = [
+                "typed-zero-call",
+                self.uri,
+                "--schema-digest",
+                self.schema_digest,
+            ]
+            if self.effect != "read":
+                gateway_argv.append("--apply")
             continuation: dict[str, Any] = {
                 "subcommand": "typed-zero-call",
                 "uri": self.uri,
                 "schema_digest": self.schema_digest,
+                "gateway_argv": gateway_argv,
                 "business_values_required": False,
                 **({"apply": True} if self.effect != "read" else {}),
             }

@@ -66,6 +66,20 @@ PROFILE_CROSS_VERSION_SCENARIOS = MappingProxyType(
         "O22-AUDIO-TAB-04": ("2025.1",),
     }
 )
+
+
+def import_runtime_version_is_reviewed(
+    scenario_id: str,
+    version: str,
+    *,
+    compound: bool,
+) -> bool:
+    if compound:
+        return version in COMPOUND_SUPPORTED_VERSIONS
+    return version == SUPPORTED_VERSION or version in PROFILE_CROSS_VERSION_SCENARIOS.get(
+        scenario_id,
+        (),
+    )
 ACTOR_DWU = r"\Actor-Mixer Hierarchy\Default Work Unit"
 EVENTS_DWU = r"\Events\Default Work Unit"
 GUID_RE = re.compile(
@@ -1459,15 +1473,13 @@ def build_import_runtime_plan(
         raise ImportRuntimeError("import runtime requires one exact Wwise version")
     version = scenario.versions[0]
     compound = materialized.compound_spec is not None
-    if not compound and version != SUPPORTED_VERSION and version not in (
-        PROFILE_CROSS_VERSION_SCENARIOS.get(scenario.id, ())
+    if not import_runtime_version_is_reviewed(
+        scenario.id,
+        version,
+        compound=compound,
     ):
         raise ImportRuntimeError(
             f"{scenario.id} import runtime does not support Wwise {version}"
-        )
-    if compound and version not in COMPOUND_SUPPORTED_VERSIONS:
-        raise ImportRuntimeError(
-            f"compound import runtime does not support Wwise {version}"
         )
     if compound:
         if materialized.requires_metadata_binding or materialized.metadata_binding is None:
@@ -3408,6 +3420,7 @@ __all__ = [
     "SetupImport",
     "XmlIdentityEvidence",
     "build_import_runtime_plan",
+    "import_runtime_version_is_reviewed",
     "prepare_import_reference_fixtures",
     "prepare_import_runtime",
 ]

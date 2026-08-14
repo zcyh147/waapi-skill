@@ -319,6 +319,12 @@ def test_zero_input_read_discloses_one_short_continuation_and_dispatches_directl
         "subcommand": "typed-zero-call",
         "uri": api,
         "schema_digest": contract["schema_digest"],
+        "gateway_argv": [
+            "typed-zero-call",
+            api,
+            "--schema-digest",
+            contract["schema_digest"],
+        ],
         "business_values_required": False,
     }
     assert "args" not in json.dumps(contract["continuation"])
@@ -363,6 +369,12 @@ def test_get_info_request_schema_discloses_the_independent_typed_read(
         "subcommand": "typed-zero-call",
         "uri": "ak.wwise.core.getInfo",
         "schema_digest": contract["schema_digest"],
+        "gateway_argv": [
+            "typed-zero-call",
+            "ak.wwise.core.getInfo",
+            "--schema-digest",
+            contract["schema_digest"],
+        ],
         "business_values_required": False,
     }
 
@@ -419,6 +431,13 @@ def test_zero_input_mutation_cannot_bypass_preview_before_connection(
         "subcommand": "typed-zero-call",
         "uri": api,
         "schema_digest": contract["schema_digest"],
+        "gateway_argv": [
+            "typed-zero-call",
+            api,
+            "--schema-digest",
+            contract["schema_digest"],
+            "--apply",
+        ],
         "business_values_required": False,
         "apply": True,
     }
@@ -654,6 +673,12 @@ def test_zero_input_fixed_route_discloses_only_its_existing_command(
             "subcommand": "typed-zero-call",
             "uri": api,
             "schema_digest": contract["schema_digest"],
+            "gateway_argv": [
+                "typed-zero-call",
+                api,
+                "--schema-digest",
+                contract["schema_digest"],
+            ],
             "business_values_required": False,
         }
         return

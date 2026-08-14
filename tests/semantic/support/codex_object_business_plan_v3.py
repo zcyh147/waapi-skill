@@ -32,7 +32,6 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_schema_query_transaction_protocol,
     build_transaction_protocol,
     query_object_step,
-    query_schema_step,
 )
 from tests.semantic.support.codex_filesystem_security import (
     CodexFileSecurityError,
@@ -40,6 +39,7 @@ from tests.semantic.support.codex_filesystem_security import (
 )
 from tests.semantic.support.codex_gateway_broker import DraftActionMetadataBinding
 from tests.semantic.support.codex_object_heavy_v3 import (
+    OBJECT_COMPOUND_CROSS_VERSION_CASE_VERSIONS,
     ObjectHeavyRecipe,
     OperationRequestSpec,
     QueryObjectRequestSpec,
@@ -1618,16 +1618,36 @@ def build_object_merge_query_protocol(
         if isinstance(asset_spec, Mapping)
         else None
     )
-    if binding is None:
+    if recipe.scenario_id != "OBJ22-F-CREATE-02":
+        if binding is not None:
+            raise ObjectBusinessPlanError(
+                "compound object merge identity binding differs from the reviewed profile"
+            )
+        return None
+    if binding is None and recipe.version != "2021.1":
         return None
     if (
-        recipe.scenario_id != "OBJ22-F-CREATE-02"
-        or not isinstance(binding, Mapping)
-        or dict(binding)
-        != {
-            "contract": "waapi-skill.compound-object-identity/v1",
-            "fixture_key": "robot",
-        }
+        getattr(scenario, "id", None) != recipe.scenario_id
+        or getattr(scenario, "api", None) != recipe.api
+        or recipe.version not in tuple(getattr(scenario, "versions", ()))
+        or (
+            binding is None
+            and recipe.version
+            not in OBJECT_COMPOUND_CROSS_VERSION_CASE_VERSIONS[
+                recipe.scenario_id
+            ]
+        )
+        or (
+            binding is not None
+            and (
+                not isinstance(binding, Mapping)
+                or dict(binding)
+                != {
+                    "contract": "waapi-skill.compound-object-identity/v1",
+                    "fixture_key": "robot",
+                }
+            )
+        )
         or not isinstance(recipe.request, OperationRequestSpec)
     ):
         raise ObjectBusinessPlanError(
@@ -1708,7 +1728,6 @@ def _validate_protocol(
         expected_protocols = (
             build_direct_protocol(
                 [
-                    query_schema_step(),
                     query_object_step("query-object", request.argv[3:]),
                 ]
             ),

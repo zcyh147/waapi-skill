@@ -59,7 +59,6 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_object_set_composer_transaction_steps,
     build_transaction_protocol,
     query_object_step,
-    query_schema_step,
     _typed_fact_cli_arguments,
 )
 from tests.semantic.support.codex_gateway_broker import (
@@ -1799,7 +1798,6 @@ def _synthetic_protocol(
         if isinstance(recipe.request, QueryObjectRequestSpec):
             return build_direct_protocol(
                 [
-                    query_schema_step(),
                     query_object_step("query-object", recipe.request.argv[3:]),
                 ]
             )
