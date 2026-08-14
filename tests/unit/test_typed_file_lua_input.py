@@ -78,6 +78,22 @@ def test_lua_lanes_have_one_public_typed_draft(
         dynamic = payload["composer"]["dynamic_container_commands"]
         assert "fact-action map-put" in dynamic["scalar_map_entry_action"]
         assert "object or array" in dynamic["scalar_map_entry_action"]
+        assert payload["composer"]["construction_order"] == {
+            "independent_facts": (
+                "emit every business-present scalar, branch, constant, and empty-"
+                "container fact in typed_request_fields order before disclosure"
+            ),
+            "scalar_map_values": (
+                "use fact-action map-put directly; never request a container handle"
+            ),
+            "complex_values": (
+                "follow dynamic disclosures in schema property order and finish "
+                "nested_container_disclosures before deferred_action_argv"
+            ),
+            "dependent_facts": (
+                "emit returned-handle facts only after their disclosure chain"
+            ),
+        }
         assert payload["composer"]["complete_request_authored_by_gateway"] is True
 
 

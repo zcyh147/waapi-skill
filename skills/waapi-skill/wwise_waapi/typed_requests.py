@@ -360,6 +360,10 @@ class TypedRequestContract:
                 ]
                 if self.effect != "read":
                     gateway_argv_prefix.append("--apply")
+                if self.route == "isolated_transaction":
+                    gateway_argv_prefix.extend(
+                        ("--io-root", "<absolute-allowed-root>")
+                    )
                 continuation = {
                     "subcommand": "typed-call",
                     "uri": self.uri,
@@ -412,10 +416,6 @@ class TypedRequestContract:
                             "with that same response's schema_lineage_token"
                         ),
                     }
-                if self.route == "isolated_transaction":
-                    continuation["io_root_flag"] = (
-                        "--io-root <absolute-allowed-root>"
-                    )
                 input_shape = "inline"
             else:
                 continuation = {
@@ -1098,6 +1098,45 @@ def _variant_constant_fields(variant: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _fixed_container_members(
+    schema: Mapping[str, Any],
+    *,
+    root_schema: Mapping[str, Any],
+    graph: DefinitionGraph,
+) -> list[dict[str, Any]]:
+    """Project direct schema-owned object/array members in property order."""
+
+    expanded = _expanded_schema(schema, root_schema=root_schema, graph=graph)
+    properties = expanded.get("properties")
+    if not isinstance(properties, Mapping):
+        return []
+    required = expanded.get("required", ())
+    required_names = set(required) if isinstance(required, list) else set()
+    members: list[dict[str, Any]] = []
+    for name, member_schema in properties.items():
+        if not isinstance(name, str) or not isinstance(member_schema, Mapping):
+            continue
+        variants = _structural_variants(
+            member_schema,
+            root_schema=root_schema,
+            graph=graph,
+        )
+        shapes = {
+            str(variant.get("type"))
+            for variant in variants
+            if variant.get("type") in {"object", "array"}
+        }
+        if len(shapes) == 1:
+            members.append(
+                {
+                    "key": name,
+                    "shape": next(iter(shapes)),
+                    "required": name in required_names,
+                }
+            )
+    return members
+
+
 def dynamic_container_disclosure(
     contract: TypedRequestContract,
     *,
@@ -1229,6 +1268,11 @@ def dynamic_container_disclosure(
         "shape": shape,
         "open": child.open_map,
         "required_keys": list(child.required_map_keys),
+        "fixed_container_members": _fixed_container_members(
+            schema,
+            root_schema=root_schema,
+            graph=contract.definition_graph,
+        ),
         "branch_choices": branches,
         "member_key_disclosure_required": (
             member_key is None

@@ -474,6 +474,21 @@ def test_normal_object_set_schema_and_detail_expose_only_composer_input(
     assert schema["composer"]["start"]["preconditions"][
         "required_sequence"
     ] == ["operation-schema", "metadata discover", "draft-start"]
+    assert schema["composer"]["start"]["preconditions"][
+        "metadata_gateway_argv_template"
+    ] == [
+        "metadata",
+        "discover",
+        "--object-type",
+        "<exact-shared-target-type>",
+        "--query",
+        "<requested-field-name>",
+        "--limit",
+        "<1..8>",
+    ]
+    assert schema["composer"]["start"]["preconditions"][
+        "forbidden_scope_flags"
+    ] == ["--object"]
     assert schema["composer"]["apply"]["gateway_argv"] == [
         "draft-apply",
         "<draft_id>",

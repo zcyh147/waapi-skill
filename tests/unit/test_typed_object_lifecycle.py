@@ -117,6 +117,19 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
     )
     assert container_code == 0, container
     assert container["continuation"]["subcommand"] == "draft-apply"
+    assert [
+        (row["key"], row["shape"])
+        for row in container["continuation"]["nested_container_disclosures"]
+    ] == [
+        ("properties", "array"),
+        ("references", "array"),
+        ("children", "array"),
+    ]
+    assert "action_argv" not in container["continuation"]
+    assert container["continuation"]["deferred_action_argv"][
+        container["continuation"]["deferred_action_argv"].index("--fact-value")
+        + 1
+    ] == container["handle"]
 
     nested_code, nested_children = waapi_gateway.execute_gateway(
         [

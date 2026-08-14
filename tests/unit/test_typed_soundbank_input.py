@@ -455,6 +455,20 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
         ("request-map-container", "object", "object"),
         ("request-map-container", "filters", "array"),
     ]
+    nested = item["continuation"]["nested_container_disclosures"]
+    assert [(row["key"], row["shape"]) for row in nested] == [
+        ("filters", "array"),
+    ]
+    assert item["continuation"]["nested_container_order"] == (
+        "follow branch_disclosure first, then disclose every business-present "
+        "member in this order before deferred_action_argv"
+    )
+    assert item["continuation"]["deferred_action_argv"] == [
+        "--action", "add_typed_fact", "--fact-action", "append",
+        "--field-handle", inclusions["handle"], "--value-type", "object",
+        "--fact-value", item["handle"],
+    ]
+    assert "action_argv" not in item["continuation"]
     branch_argv = [
         "object" if token == "<exact-key>" else token
         for token in item["continuation"]["branch_disclosure"]

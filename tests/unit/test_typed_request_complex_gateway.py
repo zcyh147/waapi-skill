@@ -198,7 +198,9 @@ def test_complex_schema_discloses_one_complete_non_json_continuation(tmp_path: P
     assert "action-json" not in encoded
 
 
-def test_mutating_typed_call_prefix_places_apply_before_every_fact(tmp_path: Path) -> None:
+def test_isolated_typed_call_prefix_places_io_authority_before_every_fact(
+    tmp_path: Path,
+) -> None:
     exit_code, schema = gateway.execute_gateway(
         ["request-schema", AUDIO_CONVERT_URI],
         env=_env(tmp_path, "2024.1"),
@@ -212,8 +214,11 @@ def test_mutating_typed_call_prefix_places_apply_before_every_fact(tmp_path: Pat
         "--schema-digest",
         schema["schema_digest"],
         "--apply",
+        "--io-root",
+        "<absolute-allowed-root>",
     ]
     assert continuation["apply"] is True
+    assert "io_root_flag" not in continuation
 
 
 def test_nested_container_handles_can_be_issued_before_one_atomic_typed_call(

@@ -173,13 +173,18 @@ def test_dynamic_draft_continuation_exposes_only_the_draft_action_form(
     assert code == 0, payload
     assert payload["continuation"]["subcommand"] == "draft-apply"
     assert payload["continuation"]["action"] == "add_typed_fact"
-    assert payload["continuation"]["action_argv"] == [
+    assert payload["continuation"]["deferred_action_argv"] == [
         "--action", "add_typed_fact",
         "--fact-action", "append",
         "--field-handle", positions.handle,
         "--value-type", "object",
         "--fact-value", payload["handle"],
     ]
+    assert "action_argv" not in payload["continuation"]
+    assert [
+        (row["key"], row["shape"], row["required"])
+        for row in payload["continuation"]["nested_container_disclosures"]
+    ] == [("position", "object", True)]
     assert "fact" not in payload["continuation"]
 
 

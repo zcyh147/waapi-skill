@@ -200,6 +200,19 @@ def test_object_set_composer_discloses_every_exact_typed_action_shape(
         "metadata discover",
         "draft-start",
     ]
+    assert contract["start_preconditions"]["metadata_gateway_argv_template"] == [
+        "metadata",
+        "discover",
+        "--object-type",
+        "<exact-shared-target-type>",
+        "--query",
+        "<requested-field-name>",
+        "--limit",
+        "<1..8>",
+    ]
+    assert contract["start_preconditions"]["forbidden_scope_flags"] == [
+        "--object"
+    ]
     for action_name, (required_fields, optional_fields) in expected.items():
         assert contract["action_shapes"][action_name] == {
             "fixed_fields": {

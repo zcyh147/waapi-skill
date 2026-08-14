@@ -280,6 +280,16 @@ def test_topic_schema_discloses_one_typed_continuation_offline(tmp_path: Path) -
     assert payload["event_match"]["schema_digest"]
     assert payload["bounds"]["stdout_utf8_bytes"] == 32 * 1024
     assert payload["continuation"]["subcommands"] == ["wait-topic", "stream-topic"]
+    assert payload["continuation"]["fact_selection"] == {
+        "scalar_field": "set",
+        "array_item": "append",
+        "empty_container": "present",
+        "branch_choice": "choose",
+        "open_map_scalar": (
+            "map_put with one exact key; never set or present the map handle"
+        ),
+        "complex_child": "follow the field's dynamic container continuation",
+    }
     prefix = payload["continuation"]["wait_argv_prefix"]
     assert prefix[:6] == [
         "--timeout",

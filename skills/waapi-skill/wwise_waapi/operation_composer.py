@@ -1418,6 +1418,24 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             },
             "typed_request_schema_digest": typed.schema_digest,
             "typed_request_fields": typed.gateway_field_payloads(),
+            "construction_order": {
+                "independent_facts": (
+                    "emit every business-present scalar, branch, constant, and "
+                    "empty-container fact in typed_request_fields order before "
+                    "disclosure"
+                ),
+                "scalar_map_values": (
+                    "use fact-action map-put directly; never request a container "
+                    "handle"
+                ),
+                "complex_values": (
+                    "follow dynamic disclosures in schema property order and finish "
+                    "nested_container_disclosures before deferred_action_argv"
+                ),
+                "dependent_facts": (
+                    "emit returned-handle facts only after their disclosure chain"
+                ),
+            },
             **(
                 {
                     "start_preconditions": {
@@ -1756,6 +1774,17 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "when the exact shared target type is known, keep --object-type "
                 "and do not substitute --object <target-path>"
             ),
+            "metadata_gateway_argv_template": [
+                "metadata",
+                "discover",
+                "--object-type",
+                "<exact-shared-target-type>",
+                "--query",
+                "<requested-field-name>",
+                "--limit",
+                "<1..8>",
+            ],
+            "forbidden_scope_flags": ["--object"],
         },
         "action_shapes": {
             action_name: {

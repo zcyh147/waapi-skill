@@ -1952,7 +1952,11 @@ def test_request_schema_owns_exact_audio_convert_typed_route_contract(
     assert payload["input_shape"] == "inline"
     assert payload["continuation"]["subcommand"] == "typed-call"
     assert payload["continuation"]["apply"] is True
-    assert payload["continuation"]["io_root_flag"] == "--io-root <absolute-allowed-root>"
+    assert payload["continuation"]["gateway_argv_prefix"][-2:] == [
+        "--io-root",
+        "<absolute-allowed-root>",
+    ]
+    assert "io_root_flag" not in payload["continuation"]
     fields = {field["name"]: field for field in payload["fields"]}
     assert set(fields) == {"objects", "platforms", "languages"}
     second_exit_code, second_payload = waapi_gateway.execute_gateway(

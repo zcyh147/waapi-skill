@@ -4116,6 +4116,68 @@ def _dynamic_branch_disclosure_continuation(
     return {"branch_disclosure": command}
 
 
+def _fixed_nested_container_disclosures(
+    args: argparse.Namespace,
+    *,
+    contract: Any,
+    child_handle: str,
+    child_contract: Mapping[str, Any],
+    lineage_token: str,
+) -> list[dict[str, Any]]:
+    """Return direct schema-owned child containers in canonical property order."""
+
+    if args.member_key is not None or args.shape != "object":
+        return []
+    rows = child_contract.get("fixed_container_members")
+    if not isinstance(rows, list):
+        return []
+    branch_rows = child_contract.get("branch_choices")
+    branch_keys: set[Any] = set()
+    if isinstance(branch_rows, list):
+        branch_keys = {
+            row.get("key")
+            for row in branch_rows
+            if isinstance(row, Mapping)
+            and isinstance(row.get("key"), str)
+            and isinstance(row.get("choices"), list)
+            and row["choices"]
+        }
+    result: list[dict[str, Any]] = []
+    for row in rows:
+        if (
+            not isinstance(row, Mapping)
+            or not isinstance(row.get("key"), str)
+            or row.get("shape") not in {"object", "array"}
+        ):
+            continue
+        key = str(row["key"])
+        shape = str(row["shape"])
+        if key in branch_keys:
+            continue
+        result.append(
+            {
+                "key": key,
+                "shape": shape,
+                "required": row.get("required") is True,
+                "argv": [
+                    "request-map-container",
+                    args.api,
+                    "--schema-digest",
+                    contract.schema_digest,
+                    "--map-handle",
+                    child_handle,
+                    "--key",
+                    key,
+                    "--shape",
+                    shape,
+                    "--parent-schema-token",
+                    lineage_token,
+                ],
+            }
+        )
+    return result
+
+
 def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]) -> dict[str, Any]:
     """Run catalog commands without requiring a WAAPI port or live Wwise."""
 
@@ -4136,6 +4198,19 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             },
             "continuation": {
                 "subcommands": ["wait-topic", "stream-topic"],
+                "fact_selection": {
+                    "scalar_field": "set",
+                    "array_item": "append",
+                    "empty_container": "present",
+                    "branch_choice": "choose",
+                    "open_map_scalar": (
+                        "map_put with one exact key; never set or present the map "
+                        "handle"
+                    ),
+                    "complex_child": (
+                        "follow the field's dynamic container continuation"
+                    ),
+                },
                 "wait_argv_prefix": [
                     "--timeout",
                     "<positive-seconds>",
@@ -4417,6 +4492,21 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             shape=args.shape,
             choice_handle=getattr(args, "choice_handle", None),
         )
+        nested_container_disclosures = _fixed_nested_container_disclosures(
+            args,
+            contract=contract,
+            child_handle=child_handle,
+            child_contract=child_contract,
+            lineage_token=lineage_token,
+        )
+        branch_continuation = _dynamic_branch_disclosure_continuation(
+            args,
+            contract=contract,
+            child_handle=child_handle,
+            child_contract=child_contract,
+            lineage_token=lineage_token,
+        )
+        defer_action = bool(nested_container_disclosures or branch_continuation)
         return {
             "contract": "waapi-skill.typed-container-handle/v1",
             "ok": True,
@@ -4459,7 +4549,11 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     if undo_child_shape
                     else {
                         "action": "add_typed_fact",
-                        "action_argv": [
+                        (
+                            "deferred_action_argv"
+                            if defer_action
+                            else "action_argv"
+                        ): [
                             "--action", "add_typed_fact",
                             "--fact-action", fact[0].removeprefix("--"),
                             "--field-handle", str(fact[1]),
@@ -4496,13 +4590,28 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                         ),
                     }
                 ),
-                **_dynamic_branch_disclosure_continuation(
-                    args,
-                    contract=contract,
-                    child_handle=child_handle,
-                    child_contract=child_contract,
-                    lineage_token=lineage_token,
+                **(
+                    {
+                        "nested_container_disclosures": (
+                            nested_container_disclosures
+                        ),
+                        "nested_container_order": (
+                            (
+                                "follow branch_disclosure first, then disclose every "
+                                "business-present member in this order before "
+                                "deferred_action_argv"
+                            )
+                            if branch_continuation
+                            else (
+                                "disclose every business-present member in this order "
+                                "before deferred_action_argv"
+                            )
+                        ),
+                    }
+                    if nested_container_disclosures
+                    else {}
                 ),
+                **branch_continuation,
             },
         }
     if args.command == "draft-start":
