@@ -70,7 +70,7 @@ python scripts/run.py gateway.py operation-schema waapi.undoGroup
 python scripts/run.py gateway.py --version 2022.1 operation-schema object.copy
 ```
 
-Use exactly one command for the corresponding intent:
+Use the listed route for the corresponding intent:
 
 | User intent | Command |
 | --- | --- |
@@ -92,6 +92,8 @@ Use exactly one command for the corresponding intent:
 | wait for one or a fixed bounded count of topic events | `wait-topic` |
 | explicitly stream topic events continuously | `stream-topic` |
 | inspect project-changing operation support | `operations` / `operation-schema` |
+
+`status` completes a connection/version/project request. When the user instead asks for the independent live result of a named API, including `getInfo`, use `status` only as the required host/project preflight, then run `request-schema <exact-uri>` and its sole typed continuation. The result embedded in `status` does not replace that independently requested API call.
 
 Every command except `stream-topic` prints one JSON document; streaming prints compact flushed NDJSON event records and one terminal record. Summarize actual values; show full JSON only if asked. Every result includes bounded `session_context`; use it for the one-time introduction and never reconstruct it.
 

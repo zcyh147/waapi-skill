@@ -21,6 +21,7 @@ from tests.semantic.support.codex_compound_heavy_v1 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     DraftActionMetadataBinding,
+    ExpectedGatewayStep,
     MetadataTokenProjection,
 )
 from tests.semantic.support.codex_object_business_plan_v3 import (
@@ -166,7 +167,10 @@ def _case(
         build_transaction_protocol([request.as_dict(version=recipe.version)])
         if isinstance(request, OperationRequestSpec)
         else build_direct_protocol(
-            [query_object_step("query-object", request.argv[3:])]
+            [
+                ExpectedGatewayStep("query-schema", "query-schema"),
+                query_object_step("query-object", request.argv[3:]),
+            ]
         )
     )
     scenario = SimpleNamespace(

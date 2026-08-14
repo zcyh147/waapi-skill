@@ -1118,3 +1118,9 @@ def test_one_time_onboarding_is_global_natural_and_does_not_add_a_gateway_call()
     assert "Do not add policy or implementation narration to a simple read-only result" not in SETUP
     assert "do not repeat policy narration in every simple read-only result" in SETUP
     assert "project modification policy" not in QUERY.lower()
+
+
+def test_named_api_result_uses_status_only_as_preflight() -> None:
+    assert "asks for the independent live result of a named API" in SKILL
+    assert "status` only as the required host/project preflight" in SKILL
+    assert "does not replace that independently requested API call" in SKILL

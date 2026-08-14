@@ -37,7 +37,10 @@ from tests.semantic.support.codex_filesystem_security import (
     CodexFileSecurityError,
     read_bounded_exclusive_regular_file,
 )
-from tests.semantic.support.codex_gateway_broker import DraftActionMetadataBinding
+from tests.semantic.support.codex_gateway_broker import (
+    DraftActionMetadataBinding,
+    ExpectedGatewayStep,
+)
 from tests.semantic.support.codex_object_heavy_v3 import (
     ObjectHeavyRecipe,
     OperationRequestSpec,
@@ -1706,7 +1709,10 @@ def _validate_protocol(
     elif isinstance(request, QueryObjectRequestSpec):
         expected_protocols = (
             build_direct_protocol(
-                [query_object_step("query-object", request.argv[3:])]
+                [
+                    ExpectedGatewayStep("query-schema", "query-schema"),
+                    query_object_step("query-object", request.argv[3:]),
+                ]
             ),
         )
     else:  # pragma: no cover - recipe union is closed
