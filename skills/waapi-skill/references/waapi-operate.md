@@ -182,9 +182,9 @@ For exact `ak.wwise.core.audio.convert` in `2024.1`/`2025.1`, run `request-schem
 
 ## Closed input, preview, and policy
 
-The successful schema is the sole authority for fields, identities, constraints, version support, and paths. Unknown fields fail. Runtime identity evidence, metadata records, dispatcher args/options, and raw `@Property` members are not model inputs.
+The schema owns fields, identities, constraints, versions, and paths. Unknown fields fail. Runtime identity evidence, metadata records, dispatcher args/options, and raw `@Property` members are not model inputs.
 
-Every normal input is typed. Use only `operation-schema` or `request-schema` output and its returned continuation; there is no caller-authored request document. Under `ask_before_changes`, `--apply` creates the durable confirmation-bound Preview and does not execute the change. Omit `--apply` only for a hypothetical, design-only, or explicitly non-executable Preview.
+Every normal input is typed. Use only the continuation from `operation-schema` or `request-schema`; there is no caller-authored request document. Never ask for confirmation while typed composition or Preview creation is still incomplete. A complete `awaiting_confirmation` Preview is the decision. Under `ask_before_changes`, `--apply` creates it without execution; omit it only for design work.
 In ordinary use omit `--state-dir`: the Gateway owns the external runtime state root. Pass it only when a trusted caller explicitly supplied an absolute override, then reuse that path unchanged.
 
 A rejected or incomplete preview is a hard same-turn boundary. Do not repair JSON, change an operation, or retry preview in that turn. A changed target/value requires a new preview.

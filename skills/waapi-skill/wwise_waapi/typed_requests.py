@@ -230,6 +230,99 @@ class TypedRequestContract:
             }
         return field_payloads
 
+    def gateway_construction_order(self) -> dict[str, str]:
+        """Describe the one request-wide fact/disclosure linearization."""
+
+        return {
+            "top_level_facts": (
+                "complete top_level_fact_plan facts before disclosures"
+            ),
+            "constant_facts": "selected constant_values require set facts",
+            "branch_constants": (
+                "after choose, set selected branch constants before disclosure"
+            ),
+            "independent_facts": (
+                "emit every business-present scalar, branch, constant, and empty-"
+                "container fact in typed_request_fields order before disclosure"
+            ),
+            "scalar_map_values": (
+                "use fact-action map-put directly; never request a container handle"
+            ),
+            "complex_values": (
+                "follow dynamic disclosures in schema property order and finish "
+                "nested_container_disclosures before deferred_action_argv"
+            ),
+            "dependent_facts": (
+                "emit returned-handle facts only after their disclosure chain"
+            ),
+        }
+
+    def top_level_fact_plan(self) -> dict[str, Any]:
+        """Return the compact plan that precedes all dynamic disclosures."""
+
+        field_payloads = self.gateway_field_payloads()
+        child_fields_by_parent: dict[str, list[dict[str, Any]]] = {}
+        for child_field in field_payloads:
+            parent_handle = child_field.get("parent_handle")
+            if isinstance(parent_handle, str):
+                child_fields_by_parent.setdefault(parent_handle, []).append(
+                    child_field
+                )
+        rows: list[list[Any]] = []
+        for field in field_payloads:
+            path = field.get("path")
+            if (
+                field.get("parent_handle") is not None
+                or not isinstance(path, list)
+                or len(path) != 2
+            ):
+                continue
+            accepted_types = field.get("accepted_types")
+            dynamic = field.get("shape") == "array" and isinstance(
+                accepted_types, list
+            ) and any(
+                value in {"object", "array"} for value in accepted_types
+            )
+            shape = field.get("shape")
+            fact_handle = field.get("handle")
+            child_fields = child_fields_by_parent.get(fact_handle, [])
+            if (
+                shape == "object"
+                and len(child_fields) == 1
+                and child_fields[0].get("shape") == "map"
+            ):
+                shape = "map"
+                fact_handle = child_fields[0].get("handle")
+            action = (
+                "set"
+                if shape == "scalar"
+                else "choose"
+                if shape == "branch"
+                else "array"
+                if shape == "array"
+                else "map"
+                if shape == "map"
+                else "child"
+            )
+            rows.append(
+                [
+                    fact_handle,
+                    field.get("name"),
+                    "disclosure" if dynamic else "fact",
+                    action,
+                ]
+            )
+        rows.sort(key=lambda row: row[2] == "disclosure")
+        return {
+            "columns": ["handle", "name", "phase", "action"],
+            "action_codes": {
+                "array": "append items; present iff empty",
+                "map": "map-put members; present iff empty",
+                "child": "static child facts",
+            },
+            "rows": rows,
+        }
+
     def gateway_field_table(self) -> dict[str, Any]:
         """Return a compact, lossless table for large discovery documents."""
 
@@ -561,6 +654,14 @@ class TypedRequestContract:
             "uri": self.uri,
             "input_shape": input_shape,
             "schema_digest": self.schema_digest,
+            **(
+                {
+                    "construction_order": self.gateway_construction_order(),
+                    "top_level_fact_plan": self.top_level_fact_plan(),
+                }
+                if input_shape == "draft"
+                else {}
+            ),
             "fields": field_payloads,
             "continuation": continuation,
         }

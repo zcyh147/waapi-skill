@@ -52,6 +52,8 @@ from wwise_waapi.typed_operations import (
 from wwise_waapi.typed_topics import topic_match_contract, topic_options_contract
 from wwise_waapi.typed_requests import (
     TypedRequestFact,
+    TypedRequestError,
+    materialize_typed_request,
     request_contract,
     typed_request_construction_for_values,
     typed_request_facts_for_values,
@@ -60,6 +62,9 @@ from wwise_waapi.typed_requests import (
 
 OPERATION_REQUEST_CONTRACT = "waapi-skill.operation-request/v1"
 OPERATION_DRAFT_ACTION_CONTRACT = "waapi-skill.operation-draft-action/v1"
+_SEALED_FILE_REPLAY_OPERATIONS = frozenset(
+    {"lua.executeCliFile", "lua.executeCoreFile"}
+)
 
 
 def _typed_fact_cli_arguments(
@@ -770,6 +775,7 @@ def materialize_typed_transaction_protocol_requests(
     protocol: V3GatewayProtocol,
     *,
     version: str,
+    allow_cleaned_file_evidence: bool = False,
 ) -> tuple[tuple[str, Mapping[str, Any]], ...]:
     """Replay every current typed transaction to its canonical request.
 
@@ -866,7 +872,82 @@ def materialize_typed_transaction_protocol_requests(
             )
         if terminal_index is None:
             continue
-        if operation == "audio.import":
+        if (
+            allow_cleaned_file_evidence
+            and operation in _SEALED_FILE_REPLAY_OPERATIONS
+        ):
+            facts: list[TypedRequestFact] = []
+            for step in protocol.steps[start_index + 1 : terminal_index]:
+                if step.subcommand != "draft-apply":
+                    continue
+                argument = step.arguments[-1] if step.arguments else None
+                if (
+                    not isinstance(argument, DraftTypedActionArgument)
+                    or argument.operation != operation
+                    or argument.response_bindings
+                    or argument.query_identity_bindings
+                ):
+                    raise V3ProtocolError(
+                        "sealed Lua file replay contains a dynamic Draft action"
+                    )
+                action = dict(argument.expected)
+                allowed = {
+                    "contract",
+                    "action",
+                    "fact_action",
+                    "field_handle",
+                    "value_type",
+                    "value",
+                    "key",
+                }
+                if (
+                    set(action) - allowed
+                    or action.get("contract") != OPERATION_DRAFT_ACTION_CONTRACT
+                    or action.get("action") != "add_typed_fact"
+                    or not all(
+                        isinstance(action.get(name), str)
+                        for name in (
+                            "fact_action",
+                            "field_handle",
+                            "value_type",
+                            "value",
+                        )
+                    )
+                    or (
+                        "key" in action
+                        and not isinstance(action.get("key"), str)
+                    )
+                ):
+                    raise V3ProtocolError(
+                        "sealed Lua file replay contains an invalid typed fact"
+                    )
+                facts.append(
+                    TypedRequestFact(
+                        str(action["fact_action"]),
+                        str(action["field_handle"]),
+                        str(action["value_type"]),
+                        str(action["value"]),
+                        key=action.get("key"),
+                    )
+                )
+            contract = draft_operation_request_contract(operation, version)
+            try:
+                materialized = materialize_typed_request(
+                    contract,
+                    schema_digest=contract.schema_digest,
+                    facts=tuple(facts),
+                )
+            except TypedRequestError as exc:
+                raise V3ProtocolError(
+                    "sealed Lua file replay cannot materialize its typed facts"
+                ) from exc
+            request = {
+                "contract": OPERATION_REQUEST_CONTRACT,
+                "version": version,
+                "operation": operation,
+                "arguments": dict(materialized.args),
+            }
+        elif operation == "audio.import":
             segment_start = start_index
             while segment_start > 0 and protocol.steps[segment_start - 1].subcommand in {
                 "metadata",

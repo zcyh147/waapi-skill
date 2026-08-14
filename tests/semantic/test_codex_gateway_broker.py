@@ -1761,6 +1761,16 @@ def test_numbered_draft_actions_follow_handle_dependencies_not_fixture_order(
     assert broker._match_dependency_ready_draft_action(  # noqa: SLF001
         argv(second_notes_action)
     ) is None
+    broker._payloads_by_step[second_target.name] = {  # noqa: SLF001
+        "draft": {
+            "draft_id": draft_id,
+            "revision": 2,
+            "action_result": {"created_handles": ["odh1-" + "4" * 24]},
+        }
+    }
+    assert broker._match_dependency_ready_draft_action(  # noqa: SLF001
+        argv(second_notes_action)
+    ) is None
 
     selected = broker._match_dependency_ready_draft_action(  # noqa: SLF001
         argv(dict(second_target.arguments[-1].expected))

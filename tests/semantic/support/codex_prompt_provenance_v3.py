@@ -196,6 +196,7 @@ def write_prompt_provenance(
         values,
         prompts,
         protocol=protocol,
+        allow_cleaned_file_evidence=False,
     )
     protocol_value = serialize_protocol(protocol)
     if len(prompt_values) != len(protocol.turn_prefix_counts):
@@ -299,6 +300,7 @@ def read_prompt_provenance(
         protocol_request_materializer=lambda value: _protocol_requests(
             value,
             version=version,
+            require_live_files=require_paths,
         ),
     )
 
@@ -424,6 +426,7 @@ def _read_prompt_provenance_with_codec(
         visible_values,
         expected_prompts,
         protocol=protocol,
+        allow_cleaned_file_evidence=not require_paths,
     )
     expected_turns = [
         {
@@ -2084,6 +2087,7 @@ def _protocol_requests(
     protocol_value: Mapping[str, Any],
     *,
     version: str | None = None,
+    require_live_files: bool = True,
 ) -> tuple[tuple[str, Mapping[str, Any]], ...]:
     """Replay only the current typed V3 protocol into canonical requests.
 
@@ -2101,6 +2105,7 @@ def _protocol_requests(
         return materialize_typed_transaction_protocol_requests(
             protocol,
             version=version,
+            allow_cleaned_file_evidence=not require_live_files,
         )
     except V3ProtocolError as exc:
         raise PromptProvenanceError(
@@ -3257,6 +3262,7 @@ def _expected_prompts(
     supplied: Sequence[str] | None,
     *,
     protocol: V3GatewayProtocol,
+    allow_cleaned_file_evidence: bool,
 ) -> tuple[str, ...]:
     request = scenario.render_prompt(values)
     if not isinstance(request, str) or not request.strip():
@@ -3279,6 +3285,7 @@ def _expected_prompts(
         policy = _modification_policy_for_protocol(
             protocol,
             version=versions[0] if len(versions) == 1 else None,
+            allow_cleaned_file_evidence=allow_cleaned_file_evidence,
         )
         if policy == "read_only":
             from tests.semantic.support.codex_modification_policy_v3 import (
@@ -3339,6 +3346,7 @@ def _modification_policy_for_protocol(
     protocol: V3GatewayProtocol,
     *,
     version: str | None,
+    allow_cleaned_file_evidence: bool,
 ) -> str | None:
     if (
         protocol.turn_prefix_counts == (1, 1)
@@ -3368,9 +3376,29 @@ def _modification_policy_for_protocol(
         typed_requests = materialize_typed_transaction_protocol_requests(
             protocol,
             version=version,
+            allow_cleaned_file_evidence=allow_cleaned_file_evidence,
         )
         if len(typed_requests) != 1:
             return None
+        file_operations = tuple(
+            str(step.arguments[0])
+            for step in protocol.steps
+            if step.subcommand == "draft-start" and step.arguments
+        )
+        if (
+            allow_cleaned_file_evidence
+            and file_operations
+            and set(file_operations) <= {"lua.executeCliFile", "lua.executeCoreFile"}
+        ):
+            # The current evidence was written while the sealed files were live.
+            # A passing sandbox is then deleted before campaign consolidation.
+            # The immutable protocol shape still distinguishes direct policy
+            # authorization from the normal later-confirmation lifecycle.
+            return (
+                "allow_changes"
+                if not any(step.subcommand == "confirm" for step in protocol.steps)
+                else "ask_before_changes"
+            )
         request = typed_requests[0][1]
         base = build_transaction_protocol([request])
         matches = tuple(

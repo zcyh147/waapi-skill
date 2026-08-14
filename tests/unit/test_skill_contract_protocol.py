@@ -998,6 +998,10 @@ def test_operate_policy_and_gateway_owned_continuation_are_closed() -> None:
     assert "Gateway owns the external runtime state root" in OPERATE
     assert "Gateway owns a deterministic external runtime-state default" in SKILL
     assert "A rejected or incomplete preview is a hard same-turn boundary" in OPERATE
+    assert (
+        "Never ask for confirmation while typed composition or Preview creation "
+        "is still incomplete"
+    ) in compact
     assert "On `LOCAL_WAAPI_HOST_REQUIRED`, report and stop" in OPERATE
     assert "execute only the field named by `next_command.copy_instruction.source_field`" in compact
     assert "copy that entire string verbatim as one shell tool call" in compact

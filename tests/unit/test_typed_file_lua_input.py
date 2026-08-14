@@ -109,6 +109,12 @@ def test_lua_lanes_have_one_public_typed_draft(
         wa_args = next(row for row in plan if row["name"] == "wa_args")
         assert wa_args["phase"] == "fact"
         assert wa_args["action"] == "map"
+        wa_args_map = next(
+            field
+            for field in payload["composer"]["typed_request_fields"]
+            if field["name"] == "wa_args:map"
+        )
+        assert wa_args["handle"] == wa_args_map["handle"]
         assert payload["composer"]["complete_request_authored_by_gateway"] is True
 
 

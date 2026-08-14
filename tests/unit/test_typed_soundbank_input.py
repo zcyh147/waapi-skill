@@ -514,7 +514,8 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
     assert identity["handle"] != item["handle"]
     assert identity["child_contract"]["required_keys"] == ["kind", "value"]
     assert "branch_disclosure" not in identity["continuation"]
-    assert identity["continuation"]["action_argv"] == [
+    assert "action_argv" not in identity["continuation"]
+    assert identity["continuation"]["deferred_action_argv"] == [
         "--action", "add_typed_fact", "--fact-action", "map-put",
         "--field-handle", item["handle"], "--value-type", "object",
         "--fact-value", identity["handle"], "--key", "object",

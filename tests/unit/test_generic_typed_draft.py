@@ -518,6 +518,25 @@ def test_media_pool_request_schema_discloses_typed_result_filter(
     assert "do not pass it to draft-start" in payload["continuation"][
         "schema_digest_usage"
     ]
+    assert list(payload).index("top_level_fact_plan") < list(payload).index("fields")
+    table = payload["top_level_fact_plan"]
+    plan = [
+        dict(zip(table["columns"], row, strict=True)) for row in table["rows"]
+    ]
+    assert [row["name"] for row in plan] == [
+        "databases",
+        "maxResults",
+        "searchText",
+        "return",
+        "filters",
+    ]
+    assert [row["phase"] for row in plan] == [
+        "fact",
+        "fact",
+        "fact",
+        "fact",
+        "disclosure",
+    ]
     assert payload["result_filter"] == {
         "contract": "waapi-skill.media-pool-post-filter/v1",
         "availability": "optional_after_complete_typed_candidate_request",

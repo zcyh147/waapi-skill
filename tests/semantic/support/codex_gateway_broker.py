@@ -7103,7 +7103,7 @@ class CodexGatewayBroker:
         self,
         actual: Sequence[str],
     ) -> tuple[ExpectedGatewayStep, str, tuple[str, ...]] | None:
-        """Select one equivalent typed action without fixing its linearization."""
+        """Select one handle-independent typed action without fixing its linearization."""
 
         current = self._execution_steps[self._next_step]
         current_match = _NUMBERED_DRAFT_ACTION_STEP_RE.fullmatch(current.name)
@@ -7141,6 +7141,23 @@ class CodexGatewayBroker:
                 or candidate_match.group("prefix") != prefix
             ):
                 break
+            candidate_argument = next(
+                (
+                    argument
+                    for argument in candidate.arguments
+                    if isinstance(argument, DraftTypedActionArgument)
+                ),
+                None,
+            )
+            if (
+                isinstance(candidate_argument, DraftTypedActionArgument)
+                and candidate_argument.response_bindings
+            ):
+                # A response-bound fact can depend on an earlier parent append,
+                # branch selection, or child attachment even when all opaque
+                # handles have already been disclosed.  Only handle-independent
+                # business facts are safe to commute across that boundary.
+                continue
             try:
                 semantic_hash, execution_arguments = self._validate_step(
                     candidate,

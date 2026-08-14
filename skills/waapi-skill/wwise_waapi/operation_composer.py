@@ -1386,57 +1386,11 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 details={"operation": operation, "version": version},
             )
         gateway_field_payloads = typed.gateway_field_payloads()
-        child_shapes_by_parent = {
-            field.get("parent_handle"): field.get("shape")
-            for field in gateway_field_payloads
-            if field.get("parent_handle") is not None
-        }
         field_payloads: list[dict[str, Any]] = []
-        top_level_rows: list[list[Any]] = []
         for field in gateway_field_payloads:
             public_field = dict(field)
             public_field.pop("fact_construction", None)
             field_payloads.append(public_field)
-            path = field.get("path")
-            if (
-                field.get("parent_handle") is not None
-                or not isinstance(path, list)
-                or len(path) != 2
-            ):
-                continue
-            accepted_types = field.get("accepted_types")
-            dynamic = field.get("shape") == "array" and isinstance(
-                accepted_types, list
-            ) and any(
-                value in {"object", "array"} for value in accepted_types
-            )
-            shape = field.get("shape")
-            if shape == "object" and child_shapes_by_parent.get(
-                field.get("handle")
-            ) == "map":
-                shape = "map"
-            fact_action = (
-                "set"
-                if shape == "scalar"
-                else "choose"
-                if shape == "branch"
-                else "array"
-                if shape == "array"
-                else "map"
-                if shape == "map"
-                else "child"
-            )
-            top_level_rows.append(
-                [
-                    field.get("handle"),
-                    field.get("name"),
-                    "disclosure" if dynamic else "fact",
-                    fact_action,
-                ]
-            )
-        top_level_rows.sort(
-            key=lambda row: row[2] == "disclosure"
-        )
         return {
             "contract": OPERATION_COMPOSER_CONTRACT,
             "operation": operation,
@@ -1469,47 +1423,8 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "action_bytes": MAX_TYPED_COMPOSER_ACTION_BYTES,
             },
             "typed_request_schema_digest": typed.schema_digest,
-            "construction_order": {
-                "top_level_facts": (
-                    "complete top_level_fact_plan facts before disclosures"
-                ),
-                "constant_facts": (
-                    "selected constant_values require set facts"
-                ),
-                "branch_constants": (
-                    "after choose, set selected branch constants before disclosure"
-                ),
-                "independent_facts": (
-                    "emit every business-present scalar, branch, constant, and "
-                    "empty-container fact in typed_request_fields order before "
-                    "disclosure"
-                ),
-                "scalar_map_values": (
-                    "use fact-action map-put directly; never request a container "
-                    "handle"
-                ),
-                "complex_values": (
-                    "follow dynamic disclosures in schema property order and finish "
-                    "nested_container_disclosures before deferred_action_argv"
-                ),
-                "dependent_facts": (
-                    "emit returned-handle facts only after their disclosure chain"
-                ),
-            },
-            "top_level_fact_plan": {
-                "columns": [
-                    "handle",
-                    "name",
-                    "phase",
-                    "action",
-                ],
-                "action_codes": {
-                    "array": "append items; present iff empty",
-                    "map": "map-put members; present iff empty",
-                    "child": "static child facts",
-                },
-                "rows": top_level_rows,
-            },
+            "construction_order": typed.gateway_construction_order(),
+            "top_level_fact_plan": typed.top_level_fact_plan(),
             "typed_request_fields": field_payloads,
             **(
                 {

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable
@@ -222,6 +223,74 @@ def test_lua_file_visible_paths_are_derived_from_the_sealed_request(
     assert script.leaf_origins == {"": "/requests/0/arguments/script_file"}
     assert io_root.value == str(tmp_path / "owned")
     assert io_root.leaf_origins == {"": "/requests/0/arguments/io_root"}
+
+
+def test_lua_file_provenance_replays_after_passing_assets_are_cleaned(
+    tmp_path: Path,
+) -> None:
+    root = _scenario_root(tmp_path)
+    io_root = root / "owned" / "assets" / "typed-input-lua"
+    io_root.mkdir(parents=True)
+    script = io_root / "user-script.lua"
+    script.write_text("return wa_args.count\n", encoding="utf-8")
+    scenario = replace(
+        _scenario(
+            api="ak.wwise.core.executeLuaScript",
+            visible_inputs=(
+                VisibleInput("script_file", "absolute_file_path", "script_file"),
+                VisibleInput("io_root", "absolute_directory_path", "io_root"),
+            ),
+            prompt="执行现成文件 {script_file}，隔离目录 {io_root}。",
+            protocol="preview_confirm",
+            scenario_id="LUA23-CLEANUP-REPLAY",
+        ),
+        versions=("2023.1",),
+    )
+    request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": "2023.1",
+        "operation": "lua.executeCoreFile",
+        "arguments": {
+            "script_file": str(script),
+            "io_root": str(io_root),
+            "source_authority": "user_supplied_verbatim",
+            "wa_args": {"count": 3},
+        },
+    }
+    protocol = build_transaction_protocol((request,))
+    visible = {"script_file": str(script), "io_root": str(io_root)}
+    evidence = write_prompt_provenance(
+        scenario=scenario,
+        version="2023.1",
+        scenario_root=root,
+        prompts=(scenario.render_prompt(visible), CONFIRMATION),
+        visible_values=visible,
+        protocol=protocol,
+    )
+
+    shutil.rmtree(io_root)
+
+    replay = read_prompt_provenance(
+        evidence.path,
+        scenario=scenario,
+        version="2023.1",
+        scenario_root=root,
+        expected_prompts=(scenario.render_prompt(visible), CONFIRMATION),
+        expected_protocol=protocol,
+        require_paths=False,
+    )
+    assert replay.visible_values == visible
+
+    with pytest.raises(PromptProvenanceError):
+        read_prompt_provenance(
+            evidence.path,
+            scenario=scenario,
+            version="2023.1",
+            scenario_root=root,
+            expected_prompts=(scenario.render_prompt(visible), CONFIRMATION),
+            expected_protocol=protocol,
+            require_paths=True,
+        )
 
 
 def _prompts(

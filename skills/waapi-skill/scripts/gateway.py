@@ -4073,6 +4073,13 @@ def typed_topic_contract_payload(contract: Any) -> dict[str, Any]:
     """Project one shared Core contract with Topic-specific continuation names."""
 
     payload = contract.as_gateway_payload()
+    # Topic discovery already owns one outer fact-selection continuation and
+    # exposes a compact, lossless field table for each of its two subcontracts.
+    # Repeating the request-wide Draft plan in both nested projections adds no
+    # construction authority and can push the final public document past its
+    # fixed visible ceiling.
+    payload.pop("construction_order", None)
+    payload.pop("top_level_fact_plan", None)
     payload["fields"] = contract.gateway_field_table()
     payload["input_shape"] = "typed-facts"
     payload["continuation"] = {
@@ -4550,7 +4557,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             child_contract=child_contract,
             lineage_token=lineage_token,
         )
-        defer_action = bool(nested_container_disclosures or branch_continuation)
         return {
             "contract": "waapi-skill.typed-container-handle/v1",
             "ok": True,
@@ -4602,11 +4608,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     if undo_child_shape
                     else {
                         "action": "add_typed_fact",
-                        (
-                            "deferred_action_argv"
-                            if defer_action
-                            else "action_argv"
-                        ): [
+                        "deferred_action_argv": [
                             "--action", "add_typed_fact",
                             "--fact-action", fact[0].removeprefix("--"),
                             "--field-handle", str(fact[1]),

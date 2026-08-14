@@ -925,6 +925,30 @@ def test_object_create_schema_puts_the_top_level_fact_plan_before_large_fields(
         "after choose, set selected branch constants before disclosure"
     )
 
+    properties = next(
+        field
+        for field in composer["typed_request_fields"]
+        if field["path"] == ["args", "properties"]
+    )
+    item_code, item = execute(
+        tmp_path,
+        "--version",
+        "2021.1",
+        "request-array-item",
+        "object.create",
+        "--schema-digest",
+        composer["typed_request_schema_digest"],
+        "--array-handle",
+        properties["handle"],
+        "--index",
+        "0",
+        "--shape",
+        "object",
+    )
+    assert item_code == 0, item
+    assert "action_argv" not in item["continuation"]
+    assert item["continuation"]["deferred_action_argv"][-1] == item["handle"]
+
 
 def test_invalid_or_mixed_typed_action_argv_is_atomic(
     tmp_path: Path,

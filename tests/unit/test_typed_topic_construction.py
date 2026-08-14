@@ -278,6 +278,10 @@ def test_topic_schema_discloses_one_typed_continuation_offline(tmp_path: Path) -
     assert payload["topic"] == topic
     assert payload["options"]["schema_digest"]
     assert payload["event_match"]["schema_digest"]
+    assert "construction_order" not in payload["options"]
+    assert "top_level_fact_plan" not in payload["options"]
+    assert "construction_order" not in payload["event_match"]
+    assert "top_level_fact_plan" not in payload["event_match"]
     assert payload["bounds"]["stdout_utf8_bytes"] == 32 * 1024
     assert payload["continuation"]["subcommands"] == ["wait-topic", "stream-topic"]
     assert payload["continuation"]["fact_selection"] == {
