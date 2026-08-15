@@ -2041,6 +2041,44 @@ def _valid_required_followup_facts(value: Any) -> bool:
     return len(handles) == len(set(handles))
 
 
+def _valid_draft_completion_candidate(value: Any) -> bool:
+    if (
+        not isinstance(value, Mapping)
+        or set(value)
+        != {
+            "condition",
+            "is_next_command_when_condition_true",
+            "fixed_argv_prefix",
+            "allowed_suffix_source",
+            "draft_apply_action_check",
+            "when_condition_false",
+        }
+        or value.get("condition")
+        != "all_current_business_request_facts_and_disclosures_submitted"
+        or value.get("is_next_command_when_condition_true") is not True
+        or value.get("allowed_suffix_source")
+        != "request_schema_terminal_arguments_only"
+        or value.get("draft_apply_action_check") != "invalid"
+        or value.get("when_condition_false")
+        != "continue_with_one_typed_action_or_dynamic_disclosure"
+        or not isinstance(value.get("fixed_argv_prefix"), list)
+    ):
+        return False
+    prefix = value["fixed_argv_prefix"]
+    return (
+        len(prefix) == 9
+        and all(isinstance(token, str) and token for token in prefix)
+        and prefix[0] == "python"
+        and prefix[2:4] == ["gateway.py", "draft-check"]
+        and _DRAFT_ID_RE.fullmatch(prefix[4]) is not None
+        and prefix[5] == "--task-authority"
+        and _DRAFT_AUTHORITY_RE.fullmatch(prefix[6]) is not None
+        and prefix[7] == "--expected-revision"
+        and prefix[8].isdigit()
+        and int(prefix[8]) > 0
+    )
+
+
 def _draft_compact_action_result(
     draft: Mapping[str, Any],
 ) -> tuple[str, set[str], set[str], Mapping[str, Any]]:
@@ -2099,6 +2137,9 @@ def _draft_compact_action_result(
         or not isinstance(next_action_binding, Mapping)
         or next_action_binding.get("shell_tool_timeout_ms")
         != GATEWAY_SHELL_TOOL_TIMEOUT_MS
+        or not _valid_draft_completion_candidate(
+            next_action_binding.get("completion_candidate")
+        )
         or "current_facts" in draft
     ):
         raise GatewayInvocationError(

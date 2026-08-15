@@ -62,6 +62,17 @@ def test_common_reads_use_closed_gateway_before_optional_references() -> None:
     assert "There is no raw-client fallback" in QUERY
 
 
+def test_dynamic_draft_guidance_distinguishes_complete_json_from_incomplete_construction() -> None:
+    compact = " ".join(OPERATE.split())
+    assert "`construction_state.complete: false` is complete JSON" in compact
+    assert "continue via `next_command_decision`" in compact
+    assert "Use its `business_value_pointer`" in compact
+    assert "never sibling/ancestor values or a handle twice" in compact
+    assert "Drain deferred facts" in compact
+    assert "`completion_candidate`" in compact
+    assert "never invent `draft-apply --action check`" in compact
+
+
 def test_machine_readable_agent_result_is_terminal_for_fixed_reads_and_transactions() -> None:
     assert "any successful gateway payload contains `agent_result`" in SKILL
     assert "This rule applies to fixed reads as well as transactions" in SKILL

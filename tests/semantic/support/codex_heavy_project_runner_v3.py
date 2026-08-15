@@ -2391,7 +2391,7 @@ class _PreparedMediaPoolAdapter:
 
         requirements = (
             ("media.get-fields", MEDIA_POOL_GET_FIELDS_URI),
-            ("media.get", MEDIA_POOL_GET_URI),
+            ("media.check", MEDIA_POOL_GET_URI),
         )
         results = result.command_facts.gateway_results
         for step_name, api in requirements:

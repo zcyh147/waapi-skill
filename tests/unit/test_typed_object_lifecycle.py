@@ -202,7 +202,9 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         "evaluate_in_order": [
             {
                 "candidate": "nested_container_disclosures",
-                "condition": "first_business_present_member_by_queue_index",
+                "condition": (
+                    "first_business_present_member_by_queue_index_on_exact_current_object"
+                ),
                 "business_value_pointers": [
                     "/args/children/0/children/0/properties",
                     "/args/children/0/children/0/references",
@@ -214,7 +216,10 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
             },
             {
                 "candidate": "next_sibling_disclosure",
-                "condition": "business_value_pointer_is_present",
+                "condition": (
+                    "current_object_has_no_business_present_nested_member_and_"
+                    "business_value_pointer_is_present"
+                ),
                 "business_value_pointer": "/args/children/0/children/1",
                 "command_pointer": (
                     "/continuation/next_sibling_disclosure/argv_by_shape/"
@@ -223,7 +228,9 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
             },
             {
                 "candidate": "deferred_fact_queue",
-                "condition": "no_earlier_business_present_disclosure",
+                "condition": (
+                    "no_earlier_business_present_disclosure_for_exact_current_object"
+                ),
                 "action": (
                     "drain_current_root_deferred_facts_in_response_tree_preorder"
                 ),
@@ -332,6 +339,8 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
     assert grandchild["child_contract"]["fixed_scalar_member_facts"] == [
         {
             "key": "type",
+            "business_value_pointer": "/args/children/0/children/0/type",
+            "condition": "current_business_request_contains_member",
             "required": True,
             "accepted_types": ["string"],
             "description": (
@@ -356,6 +365,8 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         },
         {
             "key": "name",
+            "business_value_pointer": "/args/children/0/children/0/name",
+            "condition": "current_business_request_contains_member",
             "required": True,
             "accepted_types": ["string"],
             "fact_argv_by_type": {
@@ -372,6 +383,8 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         },
         {
             "key": "notes",
+            "business_value_pointer": "/args/children/0/children/0/notes",
+            "condition": "current_business_request_contains_member",
             "required": False,
             "accepted_types": ["string"],
             "fact_argv_by_type": {

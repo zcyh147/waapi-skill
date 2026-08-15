@@ -4162,7 +4162,7 @@ def test_media_verifier_restores_only_exact_reconciled_gateway_reads() -> None:
     adapter.protocol = SimpleNamespace(
         steps=(
             ExpectedGatewayStep("media.get-fields", "typed-zero-call"),
-            ExpectedGatewayStep("media.get", "draft-check"),
+            ExpectedGatewayStep("media.check", "draft-check"),
         )
     )
     observed: list[tuple[str, object]] = []
@@ -4194,11 +4194,11 @@ def test_media_verifier_restores_only_exact_reconciled_gateway_reads() -> None:
 
     assert observed == [
         ("media.get-fields", get_fields["agent_result"]),
-        ("media.get", media_get["agent_result"]),
+        ("media.check", media_get["agent_result"]),
     ]
     with pytest.raises(
         runner.HeavyProjectRunnerError,
-        match="exactly one reconciled media.get gateway result",
+        match="exactly one reconciled media.check gateway result",
     ):
         adapter._restore_model_reads_from_gateway_results(
             SimpleNamespace(

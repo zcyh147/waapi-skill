@@ -1107,6 +1107,31 @@ def test_compact_draft_replay_accepts_only_the_exact_queried_bus_guid(
                     },
                     "next_action_binding": {
                         "shell_tool_timeout_ms": 30_000,
+                        "completion_candidate": {
+                            "condition": (
+                                "all_current_business_request_facts_and_"
+                                "disclosures_submitted"
+                            ),
+                            "is_next_command_when_condition_true": True,
+                            "fixed_argv_prefix": [
+                                "python",
+                                "/owned/run.py",
+                                "gateway.py",
+                                "draft-check",
+                                "od1-" + "2" * 32,
+                                "--task-authority",
+                                "da1-" + "1" * 40,
+                                "--expected-revision",
+                                str(revision),
+                            ],
+                            "allowed_suffix_source": (
+                                "request_schema_terminal_arguments_only"
+                            ),
+                            "draft_apply_action_check": "invalid",
+                            "when_condition_false": (
+                                "continue_with_one_typed_action_or_dynamic_disclosure"
+                            ),
+                        },
                     },
                 }
             }

@@ -100,6 +100,36 @@ def _typed_draft_argv(action: dict[str, object]) -> tuple[str, ...]:
     return ("--compact", "--facts", *typed_action_cli_arguments(action))
 
 
+def _compact_next_action_binding(
+    *, shell_tool_timeout_ms: object = 30_000
+) -> dict[str, object]:
+    return {
+        "shell_tool_timeout_ms": shell_tool_timeout_ms,
+        "completion_candidate": {
+            "condition": (
+                "all_current_business_request_facts_and_disclosures_submitted"
+            ),
+            "is_next_command_when_condition_true": True,
+            "fixed_argv_prefix": [
+                "python",
+                "/owned/run.py",
+                "gateway.py",
+                "draft-check",
+                "od1-0123456789abcdef0123456789abcdef",
+                "--task-authority",
+                "da1-0123456789abcdef0123456789abcdef01234567",
+                "--expected-revision",
+                "2",
+            ],
+            "allowed_suffix_source": "request_schema_terminal_arguments_only",
+            "draft_apply_action_check": "invalid",
+            "when_condition_false": (
+                "continue_with_one_typed_action_or_dynamic_disclosure"
+            ),
+        },
+    }
+
+
 def test_compact_generic_typed_fact_receipt_accepts_its_real_fact_handle_family() -> None:
     action, created, affected, summary = broker_module._draft_compact_action_result(
         {
@@ -115,7 +145,7 @@ def test_compact_generic_typed_fact_receipt_accepts_its_real_fact_handle_family(
                 "handle_count": 1,
                 "canonical_sha256": "1" * 64,
             },
-            "next_action_binding": {"shell_tool_timeout_ms": 30_000},
+            "next_action_binding": _compact_next_action_binding(),
         }
     )
 
@@ -184,7 +214,7 @@ def test_compact_generic_typed_fact_receipt_accepts_closed_required_followups() 
             "handle_count": 1,
             "canonical_sha256": "1" * 64,
         },
-        "next_action_binding": {"shell_tool_timeout_ms": 30_000},
+        "next_action_binding": _compact_next_action_binding(),
     }
 
     action, created, affected, summary = broker_module._draft_compact_action_result(
@@ -214,7 +244,47 @@ def test_compact_receipt_rejects_missing_or_tampered_shell_tool_timeout(
             "handle_count": 1,
             "canonical_sha256": "1" * 64,
         },
-        "next_action_binding": {"shell_tool_timeout_ms": timeout_ms},
+        "next_action_binding": _compact_next_action_binding(
+            shell_tool_timeout_ms=timeout_ms
+        ),
+    }
+
+    with pytest.raises(
+        GatewayInvocationError,
+        match="compact Draft action response has an invalid bounded projection",
+    ):
+        broker_module._draft_compact_action_result(payload)
+
+
+@pytest.mark.parametrize(
+    "candidate",
+    (
+        None,
+        {
+            **_compact_next_action_binding()["completion_candidate"],
+            "draft_apply_action_check": "allowed",
+        },
+    ),
+)
+def test_compact_receipt_rejects_missing_or_tampered_completion_candidate(
+    candidate: object,
+) -> None:
+    binding = _compact_next_action_binding()
+    binding["completion_candidate"] = candidate
+    payload = {
+        "action_result": {
+            "contract": "waapi-skill.operation-draft-action-result/v1",
+            "action": "add_typed_fact",
+            "created_handles": [],
+            "affected_handles": [],
+        },
+        "current_facts_summary": {
+            "contract": "waapi-skill.operation-draft-facts-summary/v1",
+            "target_count": 1,
+            "handle_count": 1,
+            "canonical_sha256": "1" * 64,
+        },
+        "next_action_binding": binding,
     }
 
     with pytest.raises(
@@ -283,7 +353,7 @@ def test_current_evidence_accepts_and_binds_closed_required_followups() -> None:
             "handle_count": 1,
             "canonical_sha256": "1" * 64,
         },
-        "next_action_binding": {"shell_tool_timeout_ms": 30_000},
+        "next_action_binding": _compact_next_action_binding(),
         "response_integrity": {
             "complete": True,
             "truncated": False,
@@ -3146,7 +3216,7 @@ def test_draft_replay_uses_the_validated_submitted_numeric_spelling(
                         [handle] if action_name == "set_property" else []
                     ),
                 },
-                "next_action_binding": {"shell_tool_timeout_ms": 30_000},
+                "next_action_binding": _compact_next_action_binding(),
             }
         }
     broker._submitted_draft_actions_by_step = {  # noqa: SLF001

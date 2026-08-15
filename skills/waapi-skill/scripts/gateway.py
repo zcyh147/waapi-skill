@@ -4703,7 +4703,9 @@ def _dynamic_next_command_decision(
         candidates.append(
             {
                 "candidate": "nested_container_disclosures",
-                "condition": "first_business_present_member_by_queue_index",
+                "condition": (
+                    "first_business_present_member_by_queue_index_on_exact_current_object"
+                ),
                 "business_value_pointers": [
                     str(row["business_value_pointer"])
                     for row in nested_container_disclosures
@@ -4733,7 +4735,10 @@ def _dynamic_next_command_decision(
     sibling_candidate = (
         {
             "candidate": "next_sibling_disclosure",
-            "condition": "business_value_pointer_is_present",
+            "condition": (
+                "current_object_has_no_business_present_nested_member_and_"
+                "business_value_pointer_is_present"
+            ),
             "business_value_pointer": sibling.get("business_value_pointer"),
             "command_pointer": (
                 "/continuation/next_sibling_disclosure/argv_by_shape/"
@@ -4749,7 +4754,9 @@ def _dynamic_next_command_decision(
         candidates.append(
             {
                 "candidate": "deferred_fact_queue",
-                "condition": "no_earlier_business_present_disclosure",
+                "condition": (
+                    "no_earlier_business_present_disclosure_for_exact_current_object"
+                ),
                 "action": (
                     "drain_current_root_deferred_facts_in_response_tree_preorder"
                 ),
@@ -5123,6 +5130,21 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             lineage_token=lineage_token,
         )
         if current_business_value_pointer is not None:
+            scalar_member_facts = child_contract.get("fixed_scalar_member_facts")
+            if isinstance(scalar_member_facts, list):
+                for row in scalar_member_facts:
+                    if not isinstance(row, dict):
+                        continue
+                    member_key = row.get("key")
+                    if not isinstance(member_key, str):
+                        continue
+                    escaped_key = member_key.replace("~", "~0").replace("/", "~1")
+                    row["business_value_pointer"] = (
+                        f"{current_business_value_pointer}/{escaped_key}"
+                    )
+                    row["condition"] = (
+                        "current_business_request_contains_member"
+                    )
             for row in nested_container_disclosures:
                 key_value = str(row["key"]).replace("~", "~0").replace("/", "~1")
                 row["business_value_pointer"] = (
@@ -13077,6 +13099,31 @@ def operation_draft_payload(
         if compact_action is None:
             next_action_binding["copy_all_other_values_exactly"] = True
         elif record.check is None:
+            if compact_action is not None:
+                next_action_binding["completion_candidate"] = {
+                    "condition": (
+                        "all_current_business_request_facts_and_disclosures_submitted"
+                    ),
+                    "is_next_command_when_condition_true": True,
+                    "fixed_argv_prefix": [
+                        "python",
+                        str(GATEWAY_RUNNER_PATH),
+                        "gateway.py",
+                        "draft-check",
+                        record.draft_id,
+                        "--task-authority",
+                        task_authority or "<task-authority-from-draft-start>",
+                        "--expected-revision",
+                        str(record.revision),
+                    ],
+                    "allowed_suffix_source": (
+                        "request_schema_terminal_arguments_only"
+                    ),
+                    "draft_apply_action_check": "invalid",
+                    "when_condition_false": (
+                        "continue_with_one_typed_action_or_dynamic_disclosure"
+                    ),
+                }
             action_result = draft.get("action_result")
             followups = (
                 action_result.get("required_followup_facts")

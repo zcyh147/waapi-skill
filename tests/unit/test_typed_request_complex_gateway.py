@@ -317,6 +317,28 @@ def test_media_pool_compact_draft_action_requires_read_result_not_preview(
     assert applied["draft"]["next_action_binding"]["fixed_argv_prefix"][6] == (
         started["task_authority"]
     )
+    assert applied["draft"]["next_action_binding"]["completion_candidate"] == {
+        "condition": (
+            "all_current_business_request_facts_and_disclosures_submitted"
+        ),
+        "is_next_command_when_condition_true": True,
+        "fixed_argv_prefix": [
+            "python",
+            str(gateway.GATEWAY_RUNNER_PATH),
+            "gateway.py",
+            "draft-check",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            "2",
+        ],
+        "allowed_suffix_source": "request_schema_terminal_arguments_only",
+        "draft_apply_action_check": "invalid",
+        "when_condition_false": (
+            "continue_with_one_typed_action_or_dynamic_disclosure"
+        ),
+    }
 
 
 def test_media_pool_dynamic_child_stdout_is_complete_within_visible_budget(

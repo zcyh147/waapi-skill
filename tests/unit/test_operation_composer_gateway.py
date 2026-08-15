@@ -1329,8 +1329,22 @@ def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
         "shell_tool_timeout_ms",
         "fixed_argv_prefix",
         "append_exactly_one_typed_action",
+        "completion_candidate",
         "replace_only",
     }
+    assert draft["next_action_binding"]["completion_candidate"][
+        "fixed_argv_prefix"
+    ] == [
+        "python",
+        str(waapi_gateway.GATEWAY_RUNNER_PATH),
+        "gateway.py",
+        "draft-check",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "2",
+    ]
     assert draft["next_action_binding"]["replace_only"] == [
         "<action-name>",
         "<typed-fact-arguments>",
@@ -1457,7 +1471,9 @@ def test_compact_weather_shaped_action_responses_remain_constant_size(
             response_sizes.append(len(json.dumps(changed).encode("utf-8")))
 
     assert len(response_sizes) == 15
-    assert max(response_sizes) < 1_800
+    # The exact draft-check completion candidate adds a bounded terminal
+    # continuation while keeping every action receipt comfortably small.
+    assert max(response_sizes) < 2_500
     assert max(response_sizes) - min(response_sizes) < 256
     inspect_code, inspected = execute(
         tmp_path,
