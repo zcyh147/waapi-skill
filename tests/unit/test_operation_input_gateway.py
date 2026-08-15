@@ -521,10 +521,13 @@ def test_normal_object_set_schema_and_detail_expose_only_composer_input(
         "schema_required_fields_status_scope": (
             "structural_preview_readiness_only"
         ),
-        "user_intent_coverage": (
-            "compare_planned_actions_before_draft-check"
-        ),
-        "draft_inspect_required_before_next_planned_action": False,
+        "construction_boundary": {
+            "phase": "preview_construction",
+            "project_mutation": False,
+            "confirmation_required": False,
+            "complete": False,
+            "required_terminal": "preview",
+        },
     }
     assert schema["composer"]["check"]["gateway_argv"] == [
         "draft-check",

@@ -151,6 +151,11 @@ class TypedFieldContract:
                     {
                         "complex_item_phase": "dynamic_disclosure",
                         "complex_item_disclosure": "request-array-item",
+                        "business_cardinality_authority": {
+                            "source": "current_business_request",
+                            "schema_does_not_require_another_item": True,
+                            "do_not_disclose_absent_index": True,
+                        },
                     }
                     if any(
                         variant.get("type") in {"object", "array"}

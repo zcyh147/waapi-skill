@@ -8,6 +8,7 @@ from typing import Any, Callable, Mapping, Sequence
 from tests.semantic.support.codex_gateway_broker import (
     DraftTypedActionArgument,
     GatewayInvocationError,
+    draft_compact_action_result,
     project_required_metadata_tokens,
 )
 from tests.semantic.support.codex_gateway_contracts import gateway_payload_contracts
@@ -19,6 +20,7 @@ from wwise_waapi.operation_composer import (
     composition_projection,
     new_composition,
     operation_composer_contract,
+    operation_draft_construction_boundary,
     parse_typed_action_cli_arguments,
 )
 from wwise_waapi.operation_drafts import (
@@ -33,6 +35,7 @@ from wwise_waapi.transactions import (
     TransactionError,
     load_transaction_archive_snapshot,
 )
+from wwise_waapi.typed_requests import request_contract
 
 
 TYPED_DRAFT_EVIDENCE_CONTRACT = "waapi-skill.codex-typed-draft-evidence/v1"
@@ -249,54 +252,34 @@ def _handle_factory(handles: set[str]) -> tuple[Callable[[], str], list[str]]:
 
 def _compact_action_projection(
     draft: Mapping[str, Any],
+    *,
+    read_only: bool = False,
 ) -> tuple[str, set[str], set[str], Mapping[str, Any]]:
-    result = _mapping(
-        draft.get("action_result"),
-        label="compact Composer action result",
-    )
-    summary = _mapping(
-        draft.get("current_facts_summary"),
-        label="compact Composer facts summary",
-    )
-    created = result.get("created_handles")
-    affected = result.get("affected_handles")
-    if (
-        set(result)
-        != {"contract", "action", "created_handles", "affected_handles"}
-        or result.get("contract")
-        != "waapi-skill.operation-draft-action-result/v1"
-        or not isinstance(result.get("action"), str)
-        or not isinstance(created, list)
-        or not isinstance(affected, list)
-        or not all(isinstance(handle, str) for handle in (*created, *affected))
-        or len(set(created)) != len(created)
-        or len(set(affected)) != len(affected)
-        or set(summary)
-        != {
-            "contract",
-            "target_count",
-            "handle_count",
-            "canonical_sha256",
-        }
-        or summary.get("contract")
-        != "waapi-skill.operation-draft-facts-summary/v1"
-        or type(summary.get("target_count")) is not int
-        or type(summary.get("handle_count")) is not int
-        or summary["target_count"] < 0
-        or summary["handle_count"] < 0
-        or not isinstance(summary.get("canonical_sha256"), str)
-        or len(summary["canonical_sha256"]) != 64
-        or "current_facts" in draft
-    ):
-        _fail("Compact Composer action projection is invalid")
-    return str(result["action"]), set(created), set(affected), summary
+    expected_integrity = {
+        "complete": True,
+        "truncated": False,
+        "projection": "action_delta_and_draft_receipt",
+        "compact_projection_is_not_truncation": True,
+        "construction_boundary": operation_draft_construction_boundary(
+            read_only=read_only
+        ),
+    }
+    if draft.get("response_integrity") != expected_integrity:
+        _fail("Compact Composer action response integrity does not replay")
+    try:
+        return draft_compact_action_result(draft)
+    except GatewayInvocationError as exc:
+        raise TypedDraftEvidenceError(
+            "Compact Composer action projection is invalid"
+        ) from exc
 
 
 def _compact_checked_projection(
     draft: Mapping[str, Any],
     *,
     current_facts: list[Any],
-) -> tuple[Mapping[str, Any], Mapping[str, Any]]:
+    read_only: bool = False,
+) -> tuple[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]]:
     summary = _mapping(
         draft.get("current_facts_summary"),
         label="checked Composer facts summary",
@@ -318,13 +301,23 @@ def _compact_checked_projection(
         "compact_projection_is_not_truncation": True,
         "draft_inspect_required_before_preview": False,
     }
+    expected_construction_state = {
+        "draft_complete": True,
+        "preview_created": False,
+        "required_next_phase": "preview-from-draft",
+        "execute_returned_next_command_exactly": True,
+        "construction_boundary": operation_draft_construction_boundary(
+            read_only=read_only
+        ),
+    }
     if (
         "current_facts" in draft
         or summary != expected_summary
         or integrity != expected_integrity
+        or draft.get("construction_state") != expected_construction_state
     ):
         _fail("Compact Composer check receipt does not replay")
-    return expected_summary, expected_integrity
+    return expected_summary, expected_integrity, expected_construction_state
 
 
 def _draft_projection(payload: Mapping[str, Any], *, command: str) -> Mapping[str, Any]:
@@ -543,6 +536,10 @@ def _validate_typed_draft_evidence(
         _fail("Composer archive is missing its durable composition binding")
 
     composition = new_composition(operation, version)
+    read_only_draft = (
+        operation.startswith("ak.")
+        and request_contract(version, operation).effect == "read"
+    )
 
     def project(value: Mapping[str, Any]) -> dict[str, Any]:
         return composition_projection(
@@ -616,7 +613,10 @@ def _validate_typed_draft_evidence(
                     project(composition)["current_facts"]
                 )
             else:
-                compact = _compact_action_projection(response_draft)
+                compact = _compact_action_projection(
+                    response_draft,
+                    read_only=read_only_draft,
+                )
                 new_handles = compact[1]
             factory, unused_handles = _handle_factory(new_handles)
             replay_action, submitted_action_name = _canonical_typed_action(action)
@@ -698,12 +698,14 @@ def _validate_typed_draft_evidence(
                 current_facts = checked_projection.pop("current_facts")
                 if not isinstance(current_facts, list):
                     _fail("Checked Composer replay lacks bounded current facts")
-                summary, integrity = _compact_checked_projection(
+                summary, integrity, construction_state = _compact_checked_projection(
                     response_draft,
                     current_facts=current_facts,
+                    read_only=read_only_draft,
                 )
                 checked_projection["current_facts_summary"] = summary
                 checked_projection["response_integrity"] = integrity
+                checked_projection["construction_state"] = construction_state
             _require_projection(
                 response_draft,
                 draft_id=draft_id,

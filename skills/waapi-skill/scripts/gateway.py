@@ -221,6 +221,7 @@ from wwise_waapi.operation_composer import (  # noqa: E402  # pyright: ignore[re
     OBJECT_SET_COMPOSER_OPERATION,
     OperationComposerError,
     composition_projection,
+    operation_draft_construction_boundary,
     operation_composer_contract,
     operation_composer_digest,
     parse_typed_action_cli_arguments,
@@ -4234,6 +4235,16 @@ def _fixed_nested_container_disclosures(
                     "--parent-schema-token",
                     lineage_token,
                 ],
+                **(
+                    {
+                        "blocked_by": [
+                            "all_business_present_sibling_item_disclosures"
+                        ],
+                        "is_next_command": False,
+                    }
+                    if args.command == "request-array-item"
+                    else {}
+                ),
             }
         )
     return result
@@ -4560,6 +4571,11 @@ def _next_array_item_disclosure(
             "index_order": "ascending_zero_based_index",
             "must_finish_before": "deferred_fact",
             "is_next_command": True,
+            "business_cardinality_authority": {
+                "source": "current_business_request",
+                "schema_does_not_require_another_item": True,
+                "do_not_disclose_absent_index": True,
+            },
             "argv_by_shape": argv_by_shape,
         }
     }
@@ -4585,11 +4601,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             },
             "continuation": {
                 "subcommands": ["wait-topic", "stream-topic"],
-                "fact_selection": {
-                    "source": "row action column named by columns",
-                    "or_present": "present only when that container is empty",
-                    "disclose": "use only rows whose code starts disclose-",
-                },
+                "fact_selection": (
+                    "row action; present only when empty; disclose-* rows only"
+                ),
                 "wait_argv_prefix": [
                     "--timeout",
                     "<positive-seconds>",
@@ -4602,7 +4616,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     "--match-schema-digest",
                     match.schema_digest,
                 ],
-                "fact_order": "options ordered; match facts commute; no extras",
+                "fact_order": "options ordered; match facts commute",
                 "bind": {
                     "--options-schema-digest": options.schema_digest,
                     "--match-schema-digest": match.schema_digest,
@@ -4623,10 +4637,8 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     },
                 },
                 "lifecycle": {
-                    "wait-topic": "collect bounded matches; unsubscribe",
-                    "stream-topic": (
-                        "emit until cancellation or finite timeout; unsubscribe"
-                    ),
+                    "wait-topic": "bounded; unsubscribe",
+                    "stream-topic": "cancel/timeout; unsubscribe",
                 },
             },
             "options": typed_topic_contract_payload(options),
@@ -4975,6 +4987,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                         "child_contract branch choices are typed facts"
                     ),
                     "array_item_order": "ascending_index",
+                    "array_siblings_before_descendants": True,
                     "nested_member_order": "schema_property_order",
                     "child_fact_order": "child_contract_schema_order",
                     "facts_using_returned_handles": (
@@ -5008,6 +5021,21 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                             nested_container_disclosures
                         ),
                         "nested_container_order": (
+                            "after all business-present sibling item disclosures; "
+                            + (
+                                "follow branch_disclosure first, then disclose every "
+                                "business-present member in this order before "
+                                "the deferred_fact queue"
+                            )
+                            if branch_continuation
+                            else "after all business-present sibling item disclosures; "
+                            + (
+                                "disclose every business-present member in this order "
+                                "before the deferred_fact queue"
+                            )
+                        )
+                        if args.command == "request-array-item"
+                        else (
                             (
                                 "follow branch_disclosure first, then disclose every "
                                 "business-present member in this order before "
@@ -5027,14 +5055,26 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             },
         }
         if draft_shape or undo_child_shape:
+            read_only_draft = (
+                draft_shape
+                and not undo_child_shape
+                and args.api.startswith("ak.")
+                and contract.effect == "read"
+            )
             response["construction_state"] = {
                 "complete": False,
-                "confirmation_allowed": False,
                 "disclosure_replay_allowed": False,
                 "next_phase": (
                     "finish_dynamic_disclosures_then_apply_deferred_facts"
                 ),
-                "completion_boundary": "draft-check_then_preview",
+                "completion_boundary": (
+                    "draft-check" if read_only_draft else "draft-check_then_preview"
+                ),
+                "construction_boundary": (
+                    operation_draft_construction_boundary(
+                        read_only=read_only_draft
+                    )
+                ),
             }
         return response
     if args.command == "draft-start":
@@ -5091,6 +5131,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             record,
             compact_action=parsed_action if args.compact else None,
             prior_record=inspected if args.compact else None,
+            task_authority=args.task_authority,
         )
     if args.command in {"draft-inspect", "draft-cancel"}:
         store = OperationDraftStore(
@@ -12504,8 +12545,14 @@ def operation_draft_payload(
     offline: bool = True,
     compact_action: Mapping[str, Any] | None = None,
     prior_record: OperationDraftRecord | None = None,
+    task_authority: str | None = None,
 ) -> dict[str, Any]:
     """Project bounded lifecycle facts without inventing adapter-owned fields."""
+
+    read_only_draft = (
+        record.operation.startswith("ak.")
+        and public_typed_contract(record.version, record.operation).effect == "read"
+    )
 
     if record.composer_digest is not None and record.composition is not None:
         projection = composition_projection(
@@ -12558,11 +12605,13 @@ def operation_draft_payload(
                 projection["construction_state"] = {
                     "draft_complete": True,
                     "preview_created": False,
-                    "turn_complete": False,
                     "required_next_phase": "preview-from-draft",
-                    "confirmation_or_user_input_required": False,
-                    "project_mutation_started": False,
                     "execute_returned_next_command_exactly": True,
+                    "construction_boundary": (
+                        operation_draft_construction_boundary(
+                            read_only=read_only_draft
+                        )
+                    ),
                 }
         if record.seal is None:
             projection["seal"] = None
@@ -12603,12 +12652,11 @@ def operation_draft_payload(
                 "truncated": False,
                 "projection": "action_delta_and_draft_receipt",
                 "compact_projection_is_not_truncation": True,
-                "user_intent_coverage": (
-                    "compare_planned_actions_before_draft-check"
+                "construction_boundary": (
+                    operation_draft_construction_boundary(
+                        read_only=read_only_draft
+                    )
                 ),
-                "draft_inspect_required_before_next_planned_action": False,
-                "turn_complete": False,
-                "preview_created": False,
             }
             projection = {
                 key: projection[key]
@@ -12675,12 +12723,16 @@ def operation_draft_payload(
                         "preview-from-draft",
                         record.draft_id,
                         "--task-authority",
-                        "<task-authority-from-draft-start>",
+                        task_authority or "<task-authority-from-draft-start>",
                         "--expected-revision",
                         str(record.revision),
                         "--apply",
                     ],
-                    "replace_only": ["<task-authority-from-draft-start>"],
+                    "replace_only": (
+                        []
+                        if task_authority is not None
+                        else ["<task-authority-from-draft-start>"]
+                    ),
                 }
             )
         else:
@@ -12693,7 +12745,7 @@ def operation_draft_payload(
                         "draft-apply",
                         record.draft_id,
                         "--task-authority",
-                        "<task-authority-from-draft-start>",
+                        task_authority or "<task-authority-from-draft-start>",
                         "--expected-revision",
                         str(record.revision),
                         "--compact",
@@ -12705,12 +12757,15 @@ def operation_draft_payload(
                         "<typed-fact-arguments>",
                     ],
                     "replace_only": [
-                        "<task-authority-from-draft-start>",
                         "<action-name>",
                         "<typed-fact-arguments>",
                     ],
                 }
             )
+            if task_authority is None:
+                next_action_binding["replace_only"].insert(
+                    0, "<task-authority-from-draft-start>"
+                )
         if compact_action is None:
             next_action_binding["copy_all_other_values_exactly"] = True
         if not (command == "draft-check" and record.check is not None):

@@ -75,6 +75,27 @@ _GENERIC_TYPED_ACTION_FIELDS: dict[
     ),
     "remove_typed_fact": (("fact_handle",), ()),
 }
+
+
+def operation_draft_construction_boundary(
+    *,
+    read_only: bool = False,
+) -> dict[str, Any]:
+    """Describe the non-mutating phase and its required public terminal."""
+
+    return {
+        "phase": (
+            "read_request_construction" if read_only else "preview_construction"
+        ),
+        "project_mutation": False,
+        "confirmation_required": False,
+        "complete": False,
+        "required_terminal": (
+            "draft_check_result" if read_only else "preview"
+        ),
+    }
+
+
 _UNDO_GROUP_ACTION_FIELDS: dict[
     str, tuple[tuple[str, ...], tuple[str, ...]]
 ] = {
@@ -1455,8 +1476,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "schema_required_fields_status_scope": (
                     "structural_preview_readiness_only"
                 ),
-                "user_intent_coverage": "compare_planned_actions_before_draft-check",
-                "draft_inspect_required_before_next_planned_action": False,
+                "construction_boundary": operation_draft_construction_boundary(),
             },
         }
 
@@ -1699,10 +1719,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "schema_required_fields_status_scope": (
                     "structural_preview_readiness_only"
                 ),
-                "user_intent_coverage": (
-                    "compare_planned_actions_before_draft-check"
-                ),
-                "draft_inspect_required_before_next_planned_action": False,
+                "construction_boundary": operation_draft_construction_boundary(),
             },
         }
     if operation != OBJECT_SET_COMPOSER_OPERATION:  # registry invariant
@@ -1802,10 +1819,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             "schema_required_fields_status_scope": (
                 "structural_preview_readiness_only"
             ),
-            "user_intent_coverage": (
-                "compare_planned_actions_before_draft-check"
-            ),
-            "draft_inspect_required_before_next_planned_action": False,
+            "construction_boundary": operation_draft_construction_boundary(),
         },
     }
 

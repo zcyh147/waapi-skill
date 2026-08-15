@@ -526,7 +526,7 @@ def test_object_set_typed_actions_build_one_target_scalar_fact_offline(
             "draft-apply",
             draft_id,
             "--task-authority",
-            "<task-authority-from-draft-start>",
+            authority,
             "--expected-revision",
             "2",
             "--compact",
@@ -538,7 +538,6 @@ def test_object_set_typed_actions_build_one_target_scalar_fact_offline(
             "<typed-fact-arguments>",
         ],
         "replace_only": [
-            "<task-authority-from-draft-start>",
             "<action-name>",
             "<typed-fact-arguments>",
         ],
@@ -1261,10 +1260,13 @@ def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
         "truncated": False,
         "projection": "action_delta_and_draft_receipt",
         "compact_projection_is_not_truncation": True,
-        "user_intent_coverage": "compare_planned_actions_before_draft-check",
-        "draft_inspect_required_before_next_planned_action": False,
-        "preview_created": False,
-        "turn_complete": False,
+        "construction_boundary": {
+            "phase": "preview_construction",
+            "project_mutation": False,
+            "confirmation_required": False,
+            "complete": False,
+            "required_terminal": "preview",
+        },
     }
     assert "draft-inspect" not in json.dumps(targeted)
     handle = draft["action_result"]["created_handles"][0]
@@ -1282,7 +1284,7 @@ def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
         "draft-apply",
         draft_id,
         "--task-authority",
-        "<task-authority-from-draft-start>",
+        authority,
         "--expected-revision",
         "2",
         "--compact",
@@ -1299,6 +1301,10 @@ def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
         "append_exactly_one_typed_action",
         "replace_only",
     }
+    assert draft["next_action_binding"]["replace_only"] == [
+        "<action-name>",
+        "<typed-fact-arguments>",
+    ]
 
     code, changed = execute(
         tmp_path,
@@ -1405,22 +1411,18 @@ def test_compact_weather_shaped_action_responses_remain_constant_size(
             assert "current_facts" not in changed["draft"]
             assert changed["draft"]["response_integrity"]["complete"] is True
             assert changed["draft"]["response_integrity"]["truncated"] is False
-            assert (
-                changed["draft"]["response_integrity"]["user_intent_coverage"]
-                == "compare_planned_actions_before_draft-check"
-            )
+            assert changed["draft"]["response_integrity"][
+                "construction_boundary"
+            ]["complete"] is False
             assert (
                 changed["draft"]["response_integrity"][
                     "compact_projection_is_not_truncation"
                 ]
                 is True
             )
-            assert (
-                changed["draft"]["response_integrity"][
-                    "draft_inspect_required_before_next_planned_action"
-                ]
-                is False
-            )
+            assert changed["draft"]["response_integrity"][
+                "construction_boundary"
+            ]["confirmation_required"] is False
             revision += 1
             response_sizes.append(len(json.dumps(changed).encode("utf-8")))
 
@@ -1828,11 +1830,15 @@ def test_live_check_is_bounded_durable_and_any_edit_invalidates_it(
     assert checked["draft"]["construction_state"] == {
         "draft_complete": True,
         "preview_created": False,
-        "turn_complete": False,
         "required_next_phase": "preview-from-draft",
-        "confirmation_or_user_input_required": False,
-        "project_mutation_started": False,
         "execute_returned_next_command_exactly": True,
+        "construction_boundary": {
+            "phase": "preview_construction",
+            "project_mutation": False,
+            "confirmation_required": False,
+            "complete": False,
+            "required_terminal": "preview",
+        },
     }
     assert "next_action_binding" not in checked["draft"]
     next_command = checked["next_command"]

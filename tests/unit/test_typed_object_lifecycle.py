@@ -149,6 +149,11 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         "index_order": "ascending_zero_based_index",
         "must_finish_before": "deferred_fact",
         "is_next_command": True,
+        "business_cardinality_authority": {
+            "source": "current_business_request",
+            "schema_does_not_require_another_item": True,
+            "do_not_disclose_absent_index": True,
+        },
         "argv_by_shape": {
             "object": [
                 "request-array-item",
@@ -198,11 +203,29 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
     }
     assert grandchild["construction_state"] == {
         "complete": False,
-        "confirmation_allowed": False,
         "disclosure_replay_allowed": False,
         "next_phase": "finish_dynamic_disclosures_then_apply_deferred_facts",
         "completion_boundary": "draft-check_then_preview",
+        "construction_boundary": {
+            "phase": "preview_construction",
+            "project_mutation": False,
+            "confirmation_required": False,
+            "complete": False,
+            "required_terminal": "preview",
+        },
     }
+    assert grandchild["continuation"]["request_wide_order"][
+        "array_siblings_before_descendants"
+    ] is True
+    assert grandchild["continuation"]["nested_container_order"] == (
+        "after all business-present sibling item disclosures; disclose every "
+        "business-present member in this order before the deferred_fact queue"
+    )
+    assert all(
+        row["blocked_by"] == ["all_business_present_sibling_item_disclosures"]
+        and row["is_next_command"] is False
+        for row in grandchild["continuation"]["nested_container_disclosures"]
+    )
     assert grandchild["continuation"]["deferred_fact"]["blocked_by"] == [
         "ancestor_deferred_parent_facts",
         "ancestor_child_contract_facts",

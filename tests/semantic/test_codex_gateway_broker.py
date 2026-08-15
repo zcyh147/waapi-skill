@@ -21,6 +21,7 @@ from tests.support.platform_filesystem import (
 )
 from tests.support.platform_process import run_model_argv
 from .support import codex_gateway_broker as broker_module  # pyright: ignore[reportMissingImports]
+from .support import codex_typed_draft_evidence_v3 as typed_evidence_module  # pyright: ignore[reportMissingImports]
 from .support.codex_harness import (  # pyright: ignore[reportMissingImports]
     WindowsPowerShellCoreHost,
     parse_command_argv,
@@ -159,6 +160,61 @@ def test_compact_generic_typed_fact_receipt_accepts_closed_required_followups() 
     assert created == {"tdh1-c12aa1ea49a4d727357b105b"}
     assert affected == {"trh1-4dedc2c7c0aea1301b0d773f"}
     assert summary["canonical_sha256"] == "1" * 64
+
+
+def test_current_evidence_accepts_and_binds_closed_required_followups() -> None:
+    payload = {
+        "action_result": {
+            "contract": "waapi-skill.operation-draft-action-result/v1",
+            "action": "add_typed_fact",
+            "created_handles": [],
+            "affected_handles": ["trh1-4dedc2c7c0aea1301b0d773f"],
+            "required_followup_facts": [
+                {
+                    "reason": "selected_branch_constant",
+                    "typed_fact_arguments": [
+                        "--action",
+                        "add_typed_fact",
+                        "--fact-action",
+                        "set",
+                        "--field-handle",
+                        "trh1-4dedc2c7c0aea1301b0d773f",
+                        "--value-type",
+                        "string",
+                        "--fact-value",
+                        "path",
+                    ],
+                }
+            ],
+        },
+        "current_facts_summary": {
+            "contract": "waapi-skill.operation-draft-facts-summary/v1",
+            "target_count": 1,
+            "handle_count": 1,
+            "canonical_sha256": "1" * 64,
+        },
+        "response_integrity": {
+            "complete": True,
+            "truncated": False,
+            "projection": "action_delta_and_draft_receipt",
+            "compact_projection_is_not_truncation": True,
+            "construction_boundary": {
+                "phase": "preview_construction",
+                "project_mutation": False,
+                "confirmation_required": False,
+                "complete": False,
+                "required_terminal": "preview",
+            },
+        },
+    }
+
+    action, created, affected, _summary = (
+        typed_evidence_module._compact_action_projection(payload)  # noqa: SLF001
+    )
+
+    assert action == "add_typed_fact"
+    assert created == set()
+    assert affected == {"trh1-4dedc2c7c0aea1301b0d773f"}
 
 
 @pytest.mark.parametrize(

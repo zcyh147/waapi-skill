@@ -344,13 +344,11 @@ def test_topic_schema_discloses_one_typed_continuation_offline(tmp_path: Path) -
     assert "top_level_fact_plan" not in payload["event_match"]
     assert payload["bounds"]["stdout_utf8_bytes"] == 32 * 1024
     assert payload["continuation"]["subcommands"] == ["wait-topic", "stream-topic"]
-    assert payload["continuation"]["fact_selection"] == {
-        "source": "row action column named by columns",
-        "or_present": "present only when that container is empty",
-        "disclose": "use only rows whose code starts disclose-",
-    }
+    assert payload["continuation"]["fact_selection"] == (
+        "row action; present only when empty; disclose-* rows only"
+    )
     assert payload["continuation"]["fact_order"] == (
-        "options ordered; match facts commute; no extras"
+        "options ordered; match facts commute"
     )
     prefix = payload["continuation"]["wait_argv_prefix"]
     assert prefix[:6] == [
@@ -477,8 +475,8 @@ def test_wait_topic_digests_bind_to_the_real_topic_schema_envelope(
             "must_not_accompany": ["map-put"],
         },
     }
-    assert payload["continuation"]["fact_selection"]["source"] == (
-        "row action column named by columns"
+    assert payload["continuation"]["fact_selection"] == (
+        "row action; present only when empty; disclose-* rows only"
     )
     soundbank_map = next(
         field

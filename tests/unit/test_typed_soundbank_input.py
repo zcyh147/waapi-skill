@@ -462,8 +462,9 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
         ("filters", "array"),
     ]
     assert item["continuation"]["nested_container_order"] == (
-        "follow branch_disclosure first, then disclose every business-present "
-        "member in this order before the deferred_fact queue"
+        "after all business-present sibling item disclosures; follow "
+        "branch_disclosure first, then disclose every business-present member "
+        "in this order before the deferred_fact queue"
     )
     assert item["continuation"]["request_wide_order"] == {
         "phase": "dynamic_disclosure",
@@ -473,6 +474,7 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
             "child_contract branch choices are typed facts"
         ),
         "array_item_order": "ascending_index",
+        "array_siblings_before_descendants": True,
         "nested_member_order": "schema_property_order",
         "child_fact_order": "child_contract_schema_order",
         "facts_using_returned_handles": (

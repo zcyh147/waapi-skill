@@ -46,7 +46,11 @@ class FakeClient:
 def _env(tmp_path: Path, version: str) -> dict[str, str]:
     config = tmp_path / "config.json"
     config.write_text(json.dumps({"wwise_version": version, "waapi_host": "127.0.0.1", "waapi_port": 31337}), encoding="utf-8")
-    return {"WAAPI_SKILL_CONFIG_PATH": str(config), "WWISE_VERSION": version}
+    return {
+        "WAAPI_SKILL_CONFIG_PATH": str(config),
+        "WAAPI_SKILL_STATE_DIR": str(tmp_path / "state"),
+        "WWISE_VERSION": version,
+    }
 
 
 def test_media_pool_schema_marks_scalar_array_items_as_append_facts(
@@ -74,6 +78,14 @@ def test_media_pool_schema_marks_scalar_array_items_as_append_facts(
             "must_not_accompany": ["append"],
         },
     }
+    filters = next(
+        field for field in schema["fields"] if field["path"] == ["args", "filters"]
+    )
+    assert filters["fact_construction"]["business_cardinality_authority"] == {
+        "source": "current_business_request",
+        "schema_does_not_require_another_item": True,
+        "do_not_disclose_absent_index": True,
+    }
 
 
 def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes(
@@ -94,6 +106,19 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
     )
 
     assert exit_code == 0, item
+    assert item["construction_state"] == {
+        "complete": False,
+        "disclosure_replay_allowed": False,
+        "next_phase": "finish_dynamic_disclosures_then_apply_deferred_facts",
+        "completion_boundary": "draft-check",
+        "construction_boundary": {
+            "phase": "read_request_construction",
+            "project_mutation": False,
+            "confirmation_required": False,
+            "complete": False,
+            "required_terminal": "draft_check_result",
+        },
+    }
     assert item["continuation"]["request_wide_order"] == {
         "phase": "dynamic_disclosure",
         "finish_current_root_disclosure_chain_first": True,
@@ -102,6 +127,7 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
             "child_contract branch choices are typed facts"
         ),
         "array_item_order": "ascending_index",
+        "array_siblings_before_descendants": True,
         "nested_member_order": "schema_property_order",
         "child_fact_order": "child_contract_schema_order",
         "facts_using_returned_handles": (
@@ -201,6 +227,46 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
     )
     assert item["continuation"]["deferred_fact"]["is_next_command"] is False
     assert "deferred_action_argv" not in item["continuation"]
+
+
+def test_media_pool_compact_draft_action_requires_read_result_not_preview(
+    tmp_path: Path,
+) -> None:
+    contract = request_contract("2025.1", MEDIA_POOL_URI)
+    databases = next(field for field in contract.fields if field.name == "databases")
+    env = _env(tmp_path, "2025.1")
+    start_code, started = gateway.execute_gateway(
+        ["--version", "2025.1", "draft-start", MEDIA_POOL_URI],
+        env=env,
+        client_factory=lambda _url: pytest.fail("draft-start must be offline"),
+    )
+    assert start_code == 0, started
+
+    apply_code, applied = gateway.execute_gateway(
+        [
+            "--version", "2025.1", "draft-apply",
+            started["draft"]["draft_id"],
+            "--task-authority", started["task_authority"],
+            "--expected-revision", "1", "--compact", "--facts",
+            "--action", "add_typed_fact", "--fact-action", "append",
+            "--field-handle", databases.handle,
+            "--value-type", "string", "--fact-value", "\\Databases\\Project Originals",
+        ],
+        env=env,
+        client_factory=lambda _url: pytest.fail("draft-apply must be offline"),
+    )
+
+    assert apply_code == 0, applied
+    assert applied["draft"]["response_integrity"]["construction_boundary"] == {
+        "phase": "read_request_construction",
+        "project_mutation": False,
+        "confirmation_required": False,
+        "complete": False,
+        "required_terminal": "draft_check_result",
+    }
+    assert applied["draft"]["next_action_binding"]["fixed_argv_prefix"][6] == (
+        started["task_authority"]
+    )
 
 
 def test_media_pool_dynamic_child_stdout_is_complete_within_visible_budget(

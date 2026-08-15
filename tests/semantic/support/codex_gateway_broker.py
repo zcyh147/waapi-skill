@@ -2071,6 +2071,14 @@ def _draft_compact_action_result(
     )
 
 
+def draft_compact_action_result(
+    draft: Mapping[str, Any],
+) -> tuple[str, set[str], set[str], Mapping[str, Any]]:
+    """Validate the one current compact Draft action evidence projection."""
+
+    return _draft_compact_action_result(draft)
+
+
 def validate_operation_draft_protocol_steps(
     expected_steps: Sequence[ExpectedGatewayStep],
 ) -> None:
