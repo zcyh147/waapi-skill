@@ -885,6 +885,7 @@ def test_choose_response_discloses_the_selected_branch_constant_before_disclosur
             ],
         }
     ]
+    assert applied["draft"]["next_action_binding"]["shell_tool_timeout_ms"] == 30_000
 
 
 def test_public_object_set_schema_discloses_the_exact_default_container_metadata_scope(
@@ -1325,6 +1326,7 @@ def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
     ]
     assert set(draft["next_action_binding"]) == {
         "contract",
+        "shell_tool_timeout_ms",
         "fixed_argv_prefix",
         "append_exactly_one_typed_action",
         "replace_only",

@@ -40,7 +40,10 @@ from tests.semantic.support.codex_media_pool_runtime_v3 import (
     WINE_C_DRIVE_TARGET,
     WINE_Z_DRIVE_TARGET,
 )
-from tests.semantic.support.codex_gateway_broker import MetadataTokenProjection
+from tests.semantic.support.codex_gateway_broker import (
+    ExpectedGatewayStep,
+    MetadataTokenProjection,
+)
 from tests.semantic.support.codex_object_heavy_v3 import (
     build_object_heavy_v3_recipe,
 )
@@ -4152,6 +4155,58 @@ def test_media_observer_accepts_only_closed_compact_reference_match_result(
         match="compact Audio Source association query",
     ):
         adapter.observe_payload(step, {"agent_result": tampered})
+
+
+def test_media_verifier_restores_only_exact_reconciled_gateway_reads() -> None:
+    adapter = object.__new__(runner._PreparedMediaPoolAdapter)
+    adapter.protocol = SimpleNamespace(
+        steps=(
+            ExpectedGatewayStep("media.get-fields", "typed-zero-call"),
+            ExpectedGatewayStep("media.get", "draft-check"),
+        )
+    )
+    observed: list[tuple[str, object]] = []
+    adapter.observe_payload = lambda step, payload: observed.append(
+        (step.name, payload["agent_result"])
+    )
+    get_fields = {
+        "command": "typed-zero-call",
+        "api_attempted": runner.MEDIA_POOL_GET_FIELDS_URI,
+        "ok": True,
+        "status": "ok",
+        "agent_result": {"return": ["Filename"]},
+    }
+    media_get = {
+        "command": "draft-check",
+        "api_attempted": runner.MEDIA_POOL_GET_URI,
+        "ok": True,
+        "status": "ok",
+        "agent_result": {"return": []},
+    }
+
+    adapter._restore_model_reads_from_gateway_results(
+        SimpleNamespace(
+            command_facts=SimpleNamespace(
+                gateway_results=(get_fields, {"command": "draft-start"}, media_get)
+            )
+        )
+    )
+
+    assert observed == [
+        ("media.get-fields", get_fields["agent_result"]),
+        ("media.get", media_get["agent_result"]),
+    ]
+    with pytest.raises(
+        runner.HeavyProjectRunnerError,
+        match="exactly one reconciled media.get gateway result",
+    ):
+        adapter._restore_model_reads_from_gateway_results(
+            SimpleNamespace(
+                command_facts=SimpleNamespace(
+                    gateway_results=(get_fields, media_get, dict(media_get))
+                )
+            )
+        )
 
 
 def test_custom_database_roundtrip_uses_plain_json_and_runner_owned_host_path(

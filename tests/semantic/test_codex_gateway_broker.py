@@ -115,6 +115,7 @@ def test_compact_generic_typed_fact_receipt_accepts_its_real_fact_handle_family(
                 "handle_count": 1,
                 "canonical_sha256": "1" * 64,
             },
+            "next_action_binding": {"shell_tool_timeout_ms": 30_000},
         }
     )
 
@@ -134,6 +135,34 @@ def test_compact_generic_typed_fact_receipt_accepts_closed_required_followups() 
             "required_followup_facts": [
                 {
                     "reason": "selected_branch_constant",
+                    "is_next_command": True,
+                    "literal_copy_policy": {
+                        "copy_fixed_full_argv_exactly": True,
+                        "business_value_substitution": "invalid",
+                    },
+                    "fixed_full_argv": [
+                        "python",
+                        "/owned/run.py",
+                        "gateway.py",
+                        "draft-apply",
+                        "od1-0123456789abcdef0123456789abcdef",
+                        "--task-authority",
+                        "da1-0123456789abcdef0123456789abcdef01234567",
+                        "--expected-revision",
+                        "2",
+                        "--compact",
+                        "--facts",
+                        "--action",
+                        "add_typed_fact",
+                        "--fact-action",
+                        "set",
+                        "--field-handle",
+                        "trh1-4dedc2c7c0aea1301b0d773f",
+                        "--value-type",
+                        "string",
+                        "--fact-value",
+                        "path",
+                    ],
                     "typed_fact_arguments": [
                         "--action",
                         "add_typed_fact",
@@ -155,6 +184,7 @@ def test_compact_generic_typed_fact_receipt_accepts_closed_required_followups() 
             "handle_count": 1,
             "canonical_sha256": "1" * 64,
         },
+        "next_action_binding": {"shell_tool_timeout_ms": 30_000},
     }
 
     action, created, affected, summary = broker_module._draft_compact_action_result(
@@ -167,6 +197,33 @@ def test_compact_generic_typed_fact_receipt_accepts_closed_required_followups() 
     assert summary["canonical_sha256"] == "1" * 64
 
 
+@pytest.mark.parametrize("timeout_ms", (None, 10_000, "30000"))
+def test_compact_receipt_rejects_missing_or_tampered_shell_tool_timeout(
+    timeout_ms: object,
+) -> None:
+    payload = {
+        "action_result": {
+            "contract": "waapi-skill.operation-draft-action-result/v1",
+            "action": "add_typed_fact",
+            "created_handles": [],
+            "affected_handles": [],
+        },
+        "current_facts_summary": {
+            "contract": "waapi-skill.operation-draft-facts-summary/v1",
+            "target_count": 1,
+            "handle_count": 1,
+            "canonical_sha256": "1" * 64,
+        },
+        "next_action_binding": {"shell_tool_timeout_ms": timeout_ms},
+    }
+
+    with pytest.raises(
+        GatewayInvocationError,
+        match="compact Draft action response has an invalid bounded projection",
+    ):
+        broker_module._draft_compact_action_result(payload)
+
+
 def test_current_evidence_accepts_and_binds_closed_required_followups() -> None:
     payload = {
         "action_result": {
@@ -177,6 +234,34 @@ def test_current_evidence_accepts_and_binds_closed_required_followups() -> None:
             "required_followup_facts": [
                 {
                     "reason": "selected_branch_constant",
+                    "is_next_command": True,
+                    "literal_copy_policy": {
+                        "copy_fixed_full_argv_exactly": True,
+                        "business_value_substitution": "invalid",
+                    },
+                    "fixed_full_argv": [
+                        "python",
+                        "/owned/run.py",
+                        "gateway.py",
+                        "draft-apply",
+                        "od1-0123456789abcdef0123456789abcdef",
+                        "--task-authority",
+                        "da1-0123456789abcdef0123456789abcdef01234567",
+                        "--expected-revision",
+                        "2",
+                        "--compact",
+                        "--facts",
+                        "--action",
+                        "add_typed_fact",
+                        "--fact-action",
+                        "set",
+                        "--field-handle",
+                        "trh1-4dedc2c7c0aea1301b0d773f",
+                        "--value-type",
+                        "string",
+                        "--fact-value",
+                        "path",
+                    ],
                     "typed_fact_arguments": [
                         "--action",
                         "add_typed_fact",
@@ -198,6 +283,7 @@ def test_current_evidence_accepts_and_binds_closed_required_followups() -> None:
             "handle_count": 1,
             "canonical_sha256": "1" * 64,
         },
+        "next_action_binding": {"shell_tool_timeout_ms": 30_000},
         "response_integrity": {
             "complete": True,
             "truncated": False,
@@ -3060,6 +3146,7 @@ def test_draft_replay_uses_the_validated_submitted_numeric_spelling(
                         [handle] if action_name == "set_property" else []
                     ),
                 },
+                "next_action_binding": {"shell_tool_timeout_ms": 30_000},
             }
         }
     broker._submitted_draft_actions_by_step = {  # noqa: SLF001

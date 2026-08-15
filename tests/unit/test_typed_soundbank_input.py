@@ -457,6 +457,20 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
         ("request-map-container", "object", "object"),
         ("request-map-container", "filters", "array"),
     ]
+    assert [
+        row["candidate"]
+        for row in item["continuation"]["next_command_decision"][
+            "evaluate_in_order"
+        ]
+    ] == [
+        "branch_disclosure",
+        "nested_container_disclosures",
+        "deferred_fact_queue",
+        "next_sibling_disclosure",
+    ]
+    assert item["continuation"]["next_command_decision"][
+        "draft_check_or_cancel_with_remaining_candidate_or_deferred_fact"
+    ] == "invalid"
     nested = item["continuation"]["nested_container_disclosures"]
     assert [(row["key"], row["shape"]) for row in nested] == [
         ("filters", "array"),
@@ -606,6 +620,12 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
     ]
     assert "branch_disclosure" not in identity["continuation"]
     assert "action_argv" not in identity["continuation"]
+    assert [
+        row["candidate"]
+        for row in identity["continuation"]["next_command_decision"][
+            "evaluate_in_order"
+        ]
+    ] == ["deferred_fact_queue"]
     assert identity["continuation"]["deferred_fact"]["argv"] == [
         "--action", "add_typed_fact", "--fact-action", "map-put",
         "--field-handle", item["handle"], "--value-type", "object",

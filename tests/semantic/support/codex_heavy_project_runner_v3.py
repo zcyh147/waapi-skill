@@ -2383,11 +2383,48 @@ class _PreparedMediaPoolAdapter:
             )
             self.model_reference_result = raw
 
+    def _restore_model_reads_from_gateway_results(
+        self,
+        result: CodexRunResult,
+    ) -> None:
+        """Restore exact reads from the already reconciled command evidence."""
+
+        requirements = (
+            ("media.get-fields", MEDIA_POOL_GET_FIELDS_URI),
+            ("media.get", MEDIA_POOL_GET_URI),
+        )
+        results = result.command_facts.gateway_results
+        for step_name, api in requirements:
+            steps = tuple(
+                step for step in self.protocol.steps if step.name == step_name
+            )
+            if len(steps) != 1:
+                raise HeavyProjectRunnerError(
+                    f"media protocol requires exactly one {step_name} step"
+                )
+            step = steps[0]
+            matches = tuple(
+                payload
+                for payload in results
+                if isinstance(payload, Mapping)
+                and payload.get("command") == step.subcommand
+                and payload.get("api_attempted") == api
+                and payload.get("ok") is True
+                and payload.get("status") == "ok"
+            )
+            if len(matches) != 1:
+                raise HeavyProjectRunnerError(
+                    f"expected exactly one reconciled {step_name} gateway result"
+                )
+            self.observe_payload(step, matches[0])
+
     def verify_final(
         self,
         _payload: Mapping[str, Any] | None,
         result: CodexRunResult,
     ) -> _MediaSemanticVerification:
+        if self.model_get_fields is None or self.model_media_result is None:
+            self._restore_model_reads_from_gateway_results(result)
         failures: list[str] = []
         if self.model_get_fields is None or self.model_media_result is None:
             failures.append("model did not complete both Media Pool reads")

@@ -19,6 +19,7 @@ from collections.abc import Sequence
 WINDOWS_POWERSHELL_ENCODED_FAMILY = "windows-powershell-encoded"
 WINDOWS_MODEL_COMMAND_FAMILY = "windows-pwsh-literal-v1"
 WINDOWS_MODEL_COMMAND_MAX_BYTES = 1024
+GATEWAY_SHELL_TOOL_TIMEOUT_MS = 30_000
 _WINDOWS_COMMAND_PREFIX = (
     "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand "
 )
@@ -239,6 +240,7 @@ def _decode_base64(value: str, *, label: str) -> bytes:
 
 
 __all__ = [
+    "GATEWAY_SHELL_TOOL_TIMEOUT_MS",
     "PlatformCommandError",
     "WINDOWS_MODEL_COMMAND_FAMILY",
     "WINDOWS_MODEL_COMMAND_MAX_BYTES",

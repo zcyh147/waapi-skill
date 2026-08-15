@@ -1093,7 +1093,7 @@ def test_compact_draft_replay_accepts_only_the_exact_queried_bus_guid(
                         if key.endswith("_handle") and isinstance(value, str)
                     ),
                 },
-                "current_facts_summary": {
+                    "current_facts_summary": {
                     "contract": "waapi-skill.operation-draft-facts-summary/v1",
                     "target_count": len(facts),
                     "handle_count": len(
@@ -1103,10 +1103,13 @@ def test_compact_draft_replay_accepts_only_the_exact_queried_bus_guid(
                             if isinstance(row, Mapping) and "handle" in row
                         }
                     ),
-                    "canonical_sha256": canonical_sha256(facts),
-                },
+                        "canonical_sha256": canonical_sha256(facts),
+                    },
+                    "next_action_binding": {
+                        "shell_tool_timeout_ms": 30_000,
+                    },
+                }
             }
-        }
 
     preview = next(
         step

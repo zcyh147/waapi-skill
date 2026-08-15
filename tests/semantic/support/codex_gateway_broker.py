@@ -59,6 +59,7 @@ from wwise_waapi.typed_requests import (
     request_contract,
 )
 from wwise_waapi.platform_commands import (
+    GATEWAY_SHELL_TOOL_TIMEOUT_MS,
     PlatformCommandError,
     WINDOWS_MODEL_COMMAND_FAMILY,
     WINDOWS_POWERSHELL_ENCODED_FAMILY,
@@ -1967,8 +1968,26 @@ def _valid_required_followup_facts(value: Any) -> bool:
     for row in value:
         if (
             not isinstance(row, Mapping)
-            or set(row) != {"reason", "typed_fact_arguments"}
+            or set(row)
+            != {
+                "reason",
+                "is_next_command",
+                "literal_copy_policy",
+                "fixed_full_argv",
+                "typed_fact_arguments",
+            }
             or row.get("reason") != "selected_branch_constant"
+            or row.get("is_next_command") is not True
+            or row.get("literal_copy_policy")
+            != {
+                "copy_fixed_full_argv_exactly": True,
+                "business_value_substitution": "invalid",
+            }
+            or not isinstance(row.get("fixed_full_argv"), list)
+            or not all(
+                isinstance(token, str) and token
+                for token in row["fixed_full_argv"]
+            )
             or not isinstance(row.get("typed_fact_arguments"), list)
             or not all(
                 isinstance(token, str) and token
@@ -1981,6 +2000,23 @@ def _valid_required_followup_facts(value: Any) -> bool:
                 row["typed_fact_arguments"]
             )
         except OperationComposerError:
+            return False
+        full_argv = row["fixed_full_argv"]
+        fact_arguments = row["typed_fact_arguments"]
+        if len(full_argv) != 11 + len(fact_arguments):
+            return False
+        prefix = full_argv[:11]
+        if (
+            full_argv[11:] != fact_arguments
+            or prefix[2:4] != ["gateway.py", "draft-apply"]
+            or _DRAFT_ID_RE.fullmatch(prefix[4]) is None
+            or prefix[5] != "--task-authority"
+            or _DRAFT_AUTHORITY_RE.fullmatch(prefix[6]) is None
+            or prefix[7] != "--expected-revision"
+            or not prefix[8].isdigit()
+            or int(prefix[8]) <= 0
+            or prefix[9:] != ["--compact", "--facts"]
+        ):
             return False
         handle = action.get("field_handle")
         if (
@@ -2010,6 +2046,7 @@ def _draft_compact_action_result(
 ) -> tuple[str, set[str], set[str], Mapping[str, Any]]:
     result = draft.get("action_result")
     summary = draft.get("current_facts_summary")
+    next_action_binding = draft.get("next_action_binding")
     if (
         not isinstance(result, Mapping)
         or not set(result).issubset(
@@ -2059,6 +2096,9 @@ def _draft_compact_action_result(
         or summary["handle_count"] < 0
         or not isinstance(summary.get("canonical_sha256"), str)
         or re.fullmatch(r"[0-9a-f]{64}", summary["canonical_sha256"]) is None
+        or not isinstance(next_action_binding, Mapping)
+        or next_action_binding.get("shell_tool_timeout_ms")
+        != GATEWAY_SHELL_TOOL_TIMEOUT_MS
         or "current_facts" in draft
     ):
         raise GatewayInvocationError(

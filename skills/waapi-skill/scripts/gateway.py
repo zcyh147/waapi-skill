@@ -87,6 +87,7 @@ from wwise_waapi.host_paths import (  # noqa: E402  # pyright: ignore[reportMiss
     localize_waapi_host_path,
 )
 from wwise_waapi.platform_commands import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    GATEWAY_SHELL_TOOL_TIMEOUT_MS,
     PlatformCommandError,
     WINDOWS_MODEL_COMMAND_FAMILY,
     WINDOWS_POWERSHELL_ENCODED_FAMILY,
@@ -4678,6 +4679,108 @@ def _next_nested_disclosure_selector(
     }
 
 
+def _dynamic_next_command_decision(
+    *,
+    draft_shape: bool,
+    branch_continuation: Mapping[str, Any],
+    nested_container_disclosures: Sequence[Mapping[str, Any]],
+    next_item_disclosure: Mapping[str, Any],
+    next_sibling_disclosure: Mapping[str, Any],
+    deferred_fact: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Return one ordered, machine-readable decision for the next action."""
+
+    candidates: list[dict[str, Any]] = []
+    if branch_continuation:
+        candidates.append(
+            {
+                "candidate": "branch_disclosure",
+                "condition": "current_business_value_requires_disclosed_branch",
+                "command_pointer": "/continuation/branch_disclosure",
+            }
+        )
+    if nested_container_disclosures:
+        candidates.append(
+            {
+                "candidate": "nested_container_disclosures",
+                "condition": "first_business_present_member_by_queue_index",
+                "business_value_pointers": [
+                    str(row["business_value_pointer"])
+                    for row in nested_container_disclosures
+                    if isinstance(row.get("business_value_pointer"), str)
+                ],
+                "command_pointer": (
+                    "/continuation/nested_container_disclosures/<selected>/argv"
+                ),
+            }
+        )
+    if next_item_disclosure:
+        candidates.append(
+            {
+                "candidate": "next_item_disclosure",
+                "condition": "next_business_present_item_by_ascending_index",
+                "command_pointer": (
+                    "/continuation/next_item_disclosure/argv_by_shape/"
+                    "<exact-business-shape>"
+                ),
+            }
+        )
+
+    sibling = next_sibling_disclosure.get("next_sibling_disclosure", {})
+    nested_sibling = (
+        isinstance(sibling, Mapping) and sibling.get("is_next_command") is True
+    )
+    sibling_candidate = (
+        {
+            "candidate": "next_sibling_disclosure",
+            "condition": "business_value_pointer_is_present",
+            "business_value_pointer": sibling.get("business_value_pointer"),
+            "command_pointer": (
+                "/continuation/next_sibling_disclosure/argv_by_shape/"
+                "<exact-business-shape>"
+            ),
+        }
+        if isinstance(sibling, Mapping) and sibling
+        else None
+    )
+    if nested_sibling and sibling_candidate is not None:
+        candidates.append(sibling_candidate)
+    if deferred_fact:
+        candidates.append(
+            {
+                "candidate": "deferred_fact_queue",
+                "condition": "no_earlier_business_present_disclosure",
+                "action": (
+                    "drain_current_root_deferred_facts_in_response_tree_preorder"
+                ),
+            }
+        )
+    if not nested_sibling and sibling_candidate is not None:
+        candidates.append(sibling_candidate)
+
+    return {
+        "next_command_decision": {
+            "business_presence_source": "current_user_business_request",
+            "conditional_candidates_do_not_block_when_absent": True,
+            "evaluate_in_order": candidates,
+            "first_true_candidate_is_the_only_next_action": True,
+            **(
+                {
+                    "draft_check_or_cancel_with_remaining_candidate_or_deferred_fact": (
+                        "invalid"
+                    )
+                }
+                if draft_shape
+                else {
+                    "terminal_command_with_remaining_candidate_or_deferred_fact": (
+                        "invalid"
+                    )
+                }
+            ),
+        }
+    }
+
+
 def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]) -> dict[str, Any]:
     """Run catalog commands without requiring a WAAPI port or live Wwise."""
 
@@ -5130,6 +5233,18 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 ),
             },
             "continuation": {
+                **_dynamic_next_command_decision(
+                    draft_shape=(
+                        (draft_shape or undo_child_shape)
+                        and not query_shape
+                        and topic_prefix is None
+                    ),
+                    branch_continuation=branch_continuation,
+                    nested_container_disclosures=nested_container_disclosures,
+                    next_item_disclosure=next_item_disclosure,
+                    next_sibling_disclosure=next_sibling_disclosure,
+                    deferred_fact=deferred_fact,
+                ),
                 "request_wide_order": {
                     "phase": "dynamic_disclosure",
                     "finish_current_root_disclosure_chain_first": True,
@@ -12892,6 +13007,10 @@ def operation_draft_payload(
         next_action_binding: dict[str, Any] = {
             "contract": "waapi-skill.operation-draft-next-action/v1",
         }
+        if compact_action is not None:
+            next_action_binding["shell_tool_timeout_ms"] = (
+                GATEWAY_SHELL_TOOL_TIMEOUT_MS
+            )
         if compact_action is None:
             next_action_binding.update(
                 {

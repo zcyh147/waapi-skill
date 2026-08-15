@@ -263,6 +263,16 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
     assert item["continuation"]["next_sibling_disclosure"]["must_follow"] == (
         "current_root_deferred_facts"
     )
+    assert next(iter(item["continuation"])) == "next_command_decision"
+    assert [
+        row["candidate"]
+        for row in item["continuation"]["next_command_decision"][
+            "evaluate_in_order"
+        ]
+    ] == ["deferred_fact_queue", "next_sibling_disclosure"]
+    assert item["continuation"]["next_command_decision"][
+        "draft_check_or_cancel_with_remaining_candidate_or_deferred_fact"
+    ] == "invalid"
     assert "next_sibling_disclosure" not in item["continuation"][
         "deferred_fact"
     ].get("blocked_by", ())

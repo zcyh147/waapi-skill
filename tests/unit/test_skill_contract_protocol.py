@@ -55,6 +55,9 @@ def test_common_reads_use_closed_gateway_before_optional_references() -> None:
     assert "request a zero/short tool-output budget" in SKILL
     assert "continue from the shell exit code alone" in SKILL
     assert "If no complete JSON is visible, stop" in SKILL
+    assert "`shell_tool_timeout_ms`" in SKILL
+    assert "outer shell tool call" in SKILL
+    assert "never add it to the command argv" in SKILL
     assert "Read one lane reference only when fixed commands are insufficient" in SKILL
     assert "There is no raw-client fallback" in QUERY
 

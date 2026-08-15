@@ -195,6 +195,43 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         "current_value_only": True,
         "unrelated_prompt_objects_do_not_satisfy_member_conditions": True,
     }
+    assert next(iter(grandchild["continuation"])) == "next_command_decision"
+    assert grandchild["continuation"]["next_command_decision"] == {
+        "business_presence_source": "current_user_business_request",
+        "conditional_candidates_do_not_block_when_absent": True,
+        "evaluate_in_order": [
+            {
+                "candidate": "nested_container_disclosures",
+                "condition": "first_business_present_member_by_queue_index",
+                "business_value_pointers": [
+                    "/args/children/0/children/0/properties",
+                    "/args/children/0/children/0/references",
+                    "/args/children/0/children/0/children",
+                ],
+                "command_pointer": (
+                    "/continuation/nested_container_disclosures/<selected>/argv"
+                ),
+            },
+            {
+                "candidate": "next_sibling_disclosure",
+                "condition": "business_value_pointer_is_present",
+                "business_value_pointer": "/args/children/0/children/1",
+                "command_pointer": (
+                    "/continuation/next_sibling_disclosure/argv_by_shape/"
+                    "<exact-business-shape>"
+                ),
+            },
+            {
+                "candidate": "deferred_fact_queue",
+                "condition": "no_earlier_business_present_disclosure",
+                "action": (
+                    "drain_current_root_deferred_facts_in_response_tree_preorder"
+                ),
+            },
+        ],
+        "first_true_candidate_is_the_only_next_action": True,
+        "draft_check_or_cancel_with_remaining_candidate_or_deferred_fact": "invalid",
+    }
     assert grandchild["schema_lineage_authority"] == {
         "returned_token_scope": "direct_descendants_of_this_handle_only",
         "returned_token_handle": grandchild["handle"],
