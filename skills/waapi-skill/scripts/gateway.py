@@ -4231,6 +4231,21 @@ def _fixed_nested_container_disclosures(
     return result
 
 
+def _dynamic_deferred_queue_contract() -> dict[str, str]:
+    """Return the one request-wide ordering contract for returned-handle facts."""
+
+    return {
+        "scope": "current_disclosed_root",
+        "root_boundary": "before_next_parent_array_sibling",
+        "drain_after": "root_dynamic_disclosures",
+        "response_order": "parent_fact_then_child_contract_then_descendants",
+        "array_traversal": (
+            "business_present_sibling_indices_then_nested_members"
+        ),
+        "member_traversal": "schema_property_order",
+    }
+
+
 def _bind_dynamic_branch_facts(
     child_contract: dict[str, Any],
     *,
@@ -4305,7 +4320,8 @@ def _bind_dynamic_branch_facts(
             choice["deferred_fact"] = {
                 "argv": argv,
                 "execute_after": "all_dynamic_disclosures_for_current_root",
-                "queue_order": "root_response_depth_first_schema_order",
+                "queue_phase": "child_contract",
+                "queue_order": _dynamic_deferred_queue_contract(),
                 "is_next_command": False,
             }
 
@@ -4354,7 +4370,8 @@ def _deferred_dynamic_fact_payload(
         "deferred_fact": {
             "argv": argv,
             "execute_after": "all_dynamic_disclosures_for_current_root",
-            "queue_order": "root_response_depth_first_schema_order",
+            "queue_phase": "parent_response",
+            "queue_order": _dynamic_deferred_queue_contract(),
             "is_next_command": False,
         }
     }
@@ -4728,7 +4745,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     "facts_using_returned_handles": (
                         "after_all_dynamic_disclosures_in_deferred_fact_queue_order"
                     ),
-                    "deferred_fact_queue": "root_response_depth_first_schema_order",
+                    "deferred_fact_queue": _dynamic_deferred_queue_contract(),
                     "this_handle_is_not_a_complete_request": True,
                 },
                 "subcommand": (

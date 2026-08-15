@@ -1471,6 +1471,18 @@ def test_prepare_lua_case_seals_source_and_preserves_result_schema_only_boundary
     )
     assert observed_natural_boundary.passed is True
 
+    windows_observed_boundary = prepared.verify_turn(
+        2,
+        SimpleNamespace(
+            final_response=(
+                "profile：typed_input；count：3。"
+                "弱验证：仅确认脚本返回结果符合预期结构；"
+                "不能据此声称已验证脚本的全部业务副作用。"
+            )
+        ),
+    )
+    assert windows_observed_boundary.passed is True
+
     broader_overclaim = prepared.verify_turn(
         2,
         SimpleNamespace(

@@ -6571,7 +6571,7 @@
       "lane": "online_topic",
       "scenario_family": "localized_language_event_matrix",
       "scenario_index": 2,
-      "prompt": "请监听 Dialogue_Chapter14 在 Windows 上生成 Chinese、English、Japanese 三种语言时的通知。按通知中的 SoundBank 身份、平台和 language 做三行对照，每种语言只能有一条成功记录；整体完成通知不能代替任何一条语言通知。",
+      "prompt": "请监听 Dialogue_Chapter14 在 Windows 上生成 Chinese、English、Japanese 三种语言时的通知。按通知中的 SoundBank 的 id、name、type，以及平台和 language 做三行对照；不要额外加入 path。每种语言只能有一条成功记录；整体完成通知不能代替任何一条语言通知。",
       "protocol": "single",
       "confirmation_prompt": null,
       "fixture": {
@@ -6633,7 +6633,7 @@
       "lane": "online_topic",
       "scenario_family": "dual_platform_single_bank_events",
       "scenario_index": 3,
-      "prompt": "请监听 Weapons_Core 同时为 Windows 和 Mac 生成时的通知。我要看到同一个 SoundBank 对象在两个平台各有一条记录，并用平台字段区分；不能把一条通知复制成两条，也不能把目录里的旧 Bank 当成本次事件。",
+      "prompt": "请监听 Weapons_Core 同时为 Windows 和 Mac 生成时的通知。每条记录只列 SoundBank 的 id、name、type 和平台，不要加入 path；我要看到同一个 SoundBank 对象在两个平台各有一条记录，并用平台字段区分。不能把一条通知复制成两条，也不能把目录里的旧 Bank 当成本次事件。",
       "protocol": "single",
       "confirmation_prompt": null,
       "fixture": {

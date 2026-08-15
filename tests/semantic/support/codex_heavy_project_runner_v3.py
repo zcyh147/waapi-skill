@@ -4550,6 +4550,11 @@ def _prepare_case(
                     or "only confirms that the returned result matches the expected structure"
                     in folded
                     or (
+                        "仅确认" in folded
+                        and "返回结果" in folded
+                        and "预期结构" in folded
+                    )
+                    or (
                         "验证仅限" in folded
                         and "返回" in folded
                         and "结构" in folded
@@ -4558,6 +4563,11 @@ def _prepare_case(
                 and (
                     "未验证" in folded
                     or "不能声称已验证" in folded
+                    or (
+                        "不能" in folded
+                        and "声称" in folded
+                        and "已验证" in folded
+                    )
                     or "not verified" in folded
                     or "does not verify" in folded
                 )

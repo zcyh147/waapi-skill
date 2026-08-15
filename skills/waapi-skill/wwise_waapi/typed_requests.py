@@ -271,9 +271,8 @@ class TypedRequestContract:
                 "nested_container_disclosures before draining deferred_fact entries"
             ),
             "dependent_facts": (
-                "queue returned-handle facts from each response and emit them only "
-                "after the root disclosure chain, traversing the root response "
-                "depth-first in schema order"
+                "root_order=siblings>nested>parent_fact>child_contract_facts>"
+                "descendant_facts"
             ),
         }
 

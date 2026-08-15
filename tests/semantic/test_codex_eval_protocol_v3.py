@@ -591,6 +591,9 @@ def test_multi_row_typed_draft_finishes_each_disclosure_chain_before_next_row() 
     first_disclosure = construction_names.index("tx01.disclose.001")
     second_disclosure = construction_names.index("tx01.disclose.002")
     assert first_disclosure < construction_names.index("tx01.action.001")
+    assert construction_names.index("tx01.action.001") < construction_names.index(
+        "tx01.action.002"
+    )
     assert construction_names.index("tx01.action.004") < second_disclosure
     assert second_disclosure < construction_names.index("tx01.action.005")
 
@@ -632,6 +635,13 @@ def test_nested_choice_uses_parent_disclosure_choice_without_requery() -> None:
     assert object_disclosure.arguments[-1] == ResponseBinding(
         "tx01.disclose.001",
         "/child_contract/branch_choices/0/choices/0/handle",
+    )
+    construction_names = [step.name for step in construction]
+    assert construction_names.index("tx01.disclose.002") < construction_names.index(
+        "tx01.action.005"
+    )
+    assert construction_names.index("tx01.action.005") < construction_names.index(
+        "tx01.action.006"
     )
 
 

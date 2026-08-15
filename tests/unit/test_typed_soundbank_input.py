@@ -478,7 +478,16 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
         "facts_using_returned_handles": (
             "after_all_dynamic_disclosures_in_deferred_fact_queue_order"
         ),
-        "deferred_fact_queue": "root_response_depth_first_schema_order",
+        "deferred_fact_queue": {
+            "scope": "current_disclosed_root",
+            "root_boundary": "before_next_parent_array_sibling",
+            "drain_after": "root_dynamic_disclosures",
+            "response_order": "parent_fact_then_child_contract_then_descendants",
+            "array_traversal": (
+                "business_present_sibling_indices_then_nested_members"
+            ),
+            "member_traversal": "schema_property_order",
+        },
         "this_handle_is_not_a_complete_request": True,
     }
     assert item["continuation"]["deferred_fact"]["argv"] == [

@@ -107,7 +107,16 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
         "facts_using_returned_handles": (
             "after_all_dynamic_disclosures_in_deferred_fact_queue_order"
         ),
-        "deferred_fact_queue": "root_response_depth_first_schema_order",
+        "deferred_fact_queue": {
+            "scope": "current_disclosed_root",
+            "root_boundary": "before_next_parent_array_sibling",
+            "drain_after": "root_dynamic_disclosures",
+            "response_order": "parent_fact_then_child_contract_then_descendants",
+            "array_traversal": (
+                "business_present_sibling_indices_then_nested_members"
+            ),
+            "member_traversal": "schema_property_order",
+        },
         "this_handle_is_not_a_complete_request": True,
     }
     assert item["continuation"]["deferred_fact"]["argv"] == [
@@ -130,6 +139,10 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
         field_choice["handle"], "--key", "type",
     ]
     assert field_choice["deferred_fact"]["is_next_command"] is False
+    assert field_choice["deferred_fact"]["queue_phase"] == "child_contract"
+    assert field_choice["deferred_fact"]["queue_order"] == item["continuation"][
+        "request_wide_order"
+    ]["deferred_fact_queue"]
     assert field_choice["typed_fact"] == {
         "action": "choose-dynamic",
         "handle": item["handle"],
@@ -140,9 +153,12 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
     assert item["continuation"]["deferred_fact"]["execute_after"] == (
         "all_dynamic_disclosures_for_current_root"
     )
-    assert item["continuation"]["deferred_fact"]["queue_order"] == (
-        "root_response_depth_first_schema_order"
+    assert item["continuation"]["deferred_fact"]["queue_phase"] == (
+        "parent_response"
     )
+    assert item["continuation"]["deferred_fact"]["queue_order"] == item[
+        "continuation"
+    ]["request_wide_order"]["deferred_fact_queue"]
     assert item["continuation"]["deferred_fact"]["is_next_command"] is False
     assert "deferred_action_argv" not in item["continuation"]
 

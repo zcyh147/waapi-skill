@@ -393,7 +393,7 @@
       "lane": "online_authoring",
       "scenario_family": "prefix_parent_child_inventory",
       "scenario_index": 2,
-      "prompt": "查一下 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab` 里名字以 `VO_` 开头的随机容器，并把它们直接子级的 Sound 一起整理出来。每个直接子 Sound 单独一行，同时列出父容器和子 Sound 各自的完整路径，以及这个 Sound 的语言、音量和备注；同一个子对象不要重复，结果按父级路径再按子级名称排列。这次最多返回 24 条候选记录；如果达到上限，请明确说明结果可能不完整。",
+      "prompt": "先在 `\\Actor-Mixer Hierarchy\\Default Work Unit\\SemanticLab` 下做一次有界后代候选盘点，最多返回 24 条候选记录；候选行保留 id、name、type、完整 path、parent，以及存在时的 language、Volume 和 notes。从这份返回的候选清单中，再整理名字以 `VO_` 开头的随机容器及其直接子级 Sound：每个直接子 Sound 单独一行，列出父容器和子 Sound 各自的完整路径以及 Sound 的语言、音量和备注；同一个子对象不要重复，结果按父级路径再按子级名称排列。如果候选盘点达到上限，请明确说明结果可能不完整。",
       "protocol": "single",
       "confirmation_prompt": null,
       "fixture": {

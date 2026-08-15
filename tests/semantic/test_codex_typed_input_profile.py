@@ -122,6 +122,49 @@ def test_bounded_query_prompt_keeps_boolean_filtering_in_the_returned_inventory(
     )
 
 
+def test_parent_child_query_prompt_keeps_join_logic_after_one_bounded_inventory() -> None:
+    profile = load_typed_input_profile(PROFILE_PATH)
+    unit = next(
+        unit
+        for unit in profile.units
+        if unit.unit_id == "TYP23-QUERY-OBJECT-GET"
+    )
+
+    assert "最多返回 24 条候选记录" in unit.scenario.prompt
+    assert "从这份返回的候选清单中" in unit.scenario.prompt
+    assert "名字以 `VO_` 开头" in unit.scenario.prompt
+    assert "直接子级" in unit.scenario.prompt
+    assert all(
+        command not in unit.scenario.prompt
+        for command in ("query-schema", "query-object", "--select")
+    )
+
+
+def test_topic_prompts_name_the_exact_business_projection_without_gateway_syntax() -> None:
+    profile = load_typed_input_profile(PROFILE_PATH)
+    units = [
+        unit
+        for unit in profile.units
+        if unit.unit_id
+        in {
+            "TYP23-TOPIC-SOUNDBANK-GENERATED",
+            "TYP24-TOPIC-SOUNDBANK-GENERATED",
+        }
+    ]
+
+    assert len(units) == 2
+    assert all("SoundBank 的 id、name、type" in unit.scenario.prompt for unit in units)
+    assert all(
+        "不要" in unit.scenario.prompt and "path" in unit.scenario.prompt
+        for unit in units
+    )
+    assert all(
+        command not in unit.scenario.prompt
+        for unit in units
+        for command in ("topic-schema", "wait-topic", "--option-append")
+    )
+
+
 def test_create_merge_prompt_keeps_the_existing_node_out_of_the_parent_role() -> None:
     profile = load_typed_input_profile(PROFILE_PATH)
     unit = next(
