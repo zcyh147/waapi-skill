@@ -2362,7 +2362,7 @@ class _PreparedMediaPoolAdapter:
                 )
             self.model_get_fields = raw
             return
-        if step.name == "media.get":
+        if step.name == "media.check":
             raw = _agent_result_mapping(payload, context=step.name)
             verification = verify_media_pool_result(self.oracle, raw)
             _assert_verification(verification, context="Media Pool business result")

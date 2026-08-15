@@ -4376,6 +4376,98 @@ def _bind_dynamic_branch_facts(
                 "next_branch_blocked_until_complete": True,
             }
         )
+        if (
+            (draft_shape or undo_child_shape)
+            and not query_shape
+            and topic_prefix is None
+        ):
+            action_prefix = [
+                "--action",
+                "add_child_typed_fact" if undo_child_shape else "add_typed_fact",
+                *(
+                    ["--child-handle", "<child_handle>"]
+                    if undo_child_shape
+                    else []
+                ),
+            ]
+            choose_argv = [
+                *action_prefix,
+                "--fact-action",
+                "choose-dynamic",
+                "--field-handle",
+                child_handle,
+                "--fact-value",
+                "<selected-choice-handle>",
+                "--key",
+                key,
+            ]
+            map_put_argv = [
+                *action_prefix,
+                "--fact-action",
+                "map-put",
+                "--field-handle",
+                child_handle,
+                "--key",
+                key,
+                "--value-type",
+                "<selected-accepted-type>",
+                "--fact-value",
+                "<selected-choice-enum-or-business-value>",
+            ]
+        elif query_shape:
+            choose_argv = [
+                "--typed-choose-dynamic",
+                child_handle,
+                key,
+                "<selected-choice-handle>",
+            ]
+            map_put_argv = [
+                "--typed-map-put",
+                child_handle,
+                key,
+                "<selected-accepted-type>",
+                "<selected-choice-enum-or-business-value>",
+            ]
+        elif topic_prefix is not None:
+            choose_argv = [
+                f"--{topic_prefix}-choose-dynamic",
+                child_handle,
+                key,
+                "<selected-choice-handle>",
+            ]
+            map_put_argv = [
+                f"--{topic_prefix}-map-put",
+                child_handle,
+                key,
+                "<selected-accepted-type>",
+                "<selected-choice-enum-or-business-value>",
+            ]
+        else:
+            choose_argv = [
+                "--choose-dynamic",
+                child_handle,
+                key,
+                "<selected-choice-handle>",
+            ]
+            map_put_argv = [
+                "--map-put",
+                child_handle,
+                key,
+                "<selected-accepted-type>",
+                "<selected-choice-enum-or-business-value>",
+            ]
+        row["fact_construction"] = {
+            "choose_dynamic_argv": choose_argv,
+            "map_put_argv": map_put_argv,
+            "selected_choice_source": "choices/<selected-by-business-value>",
+            "execute_after": "deferred_parent_fact",
+            "queue_phase": "child_contract",
+            "queue_order_ref": (
+                "/continuation/request_wide_order/deferred_fact_queue"
+            ),
+            "consume_each_fact_once": True,
+            "replay_allowed": False,
+        }
         choices = row.get("choices")
         if not isinstance(choices, list):
             continue
@@ -4384,62 +4476,6 @@ def _bind_dynamic_branch_facts(
                 choice.get("handle"), str
             ):
                 continue
-            choice_handle = str(choice["handle"])
-            choice["typed_fact"] = {
-                "action": "choose-dynamic",
-                "handle": child_handle,
-                "value_type": "choice",
-                "value": choice_handle,
-                "key": key,
-            }
-            if (
-                (draft_shape or undo_child_shape)
-                and not query_shape
-                and topic_prefix is None
-            ):
-                argv = [
-                    "--action",
-                    "add_child_typed_fact" if undo_child_shape else "add_typed_fact",
-                    *(
-                        ["--child-handle", "<child_handle>"]
-                        if undo_child_shape
-                        else []
-                    ),
-                    "--fact-action",
-                    "choose-dynamic",
-                    "--field-handle",
-                    child_handle,
-                    "--fact-value",
-                    choice_handle,
-                    "--key",
-                    key,
-                ]
-            elif query_shape:
-                argv = [
-                    "--typed-choose-dynamic", child_handle, key, choice_handle
-                ]
-            elif topic_prefix is not None:
-                argv = [
-                    f"--{topic_prefix}-choose-dynamic",
-                    child_handle,
-                    key,
-                    choice_handle,
-                ]
-            else:
-                argv = [
-                    "--choose-dynamic", child_handle, key, choice_handle
-                ]
-            choice["deferred_fact"] = {
-                "argv": argv,
-                "execute_after": "deferred_parent_fact",
-                "queue_phase": "child_contract",
-                "queue_order_ref": (
-                    "/continuation/request_wide_order/deferred_fact_queue"
-                ),
-                "is_next_command": False,
-                "consume_once": True,
-                "replay_allowed": False,
-            }
             enum_values = choice.get("enum")
             choice["map_put_required"] = True
             choice["map_put_value_source"] = (
@@ -4758,8 +4794,11 @@ def _dynamic_next_command_decision(
                     "no_earlier_business_present_disclosure_for_exact_current_object"
                 ),
                 "action": (
-                    "drain_current_root_deferred_facts_in_response_tree_preorder"
+                    "return_to_outermost_disclosed_root_then_drain_"
+                    "response_tree_preorder"
                 ),
+                "start_at": "outermost_disclosed_root_response",
+                "first_command_pointer": "/continuation/deferred_fact/argv",
             }
         )
     if not nested_sibling and sibling_candidate is not None:

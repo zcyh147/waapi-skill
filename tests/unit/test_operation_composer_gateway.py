@@ -773,10 +773,10 @@ def test_public_composer_fields_bind_fact_action_before_disclosure(
         assert planned["phase"] == "fact"
         assert planned["action"] == expected["fact_action"]
     assert payload["composer"]["construction_order"]["top_level_facts"] == (
-        "complete top_level_fact_plan facts before disclosures"
+        "follow top_level_fact_plan before disclosures"
     )
     assert payload["composer"]["construction_order"]["constant_facts"] == (
-        "selected constant_values require set facts"
+        "set selected constants"
     )
 
 
@@ -928,6 +928,8 @@ def test_object_create_schema_puts_the_top_level_fact_plan_before_large_fields(
     )
 
     assert code == 0, payload
+    encoded = waapi_gateway.gateway_stdout_json_encoder(payload).encode(payload)
+    assert len((encoded + "\n").encode("utf-8")) < 32 * 1024
     composer = payload["composer"]
     assert list(composer).index("construction_order") < list(composer).index(
         "typed_request_fields"
@@ -946,12 +948,12 @@ def test_object_create_schema_puts_the_top_level_fact_plan_before_large_fields(
     assert conflict["phase"] == "fact"
     assert conflict["action"] == "set"
     assert children["phase"] == "disclosure"
-    assert table["action_codes"]["array"] == (
-        "business-present items append; explicit empty present; omitted optional "
-        "has no fact"
+    assert table["business_fact_selection"] == (
+        "submit only prompt-present values; omit absent defaults"
     )
+    assert table["business_pointer_source"] == "typed_request_fields.path"
     assert composer["construction_order"]["branch_constants"] == (
-        "after choose, set selected branch constants before disclosure"
+        "set selected branch constants before disclosure"
     )
 
     properties = next(

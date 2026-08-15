@@ -4209,6 +4209,33 @@ def test_media_verifier_restores_only_exact_reconciled_gateway_reads() -> None:
         )
 
 
+def test_media_observer_records_the_sealed_media_check_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = object.__new__(runner._PreparedMediaPoolAdapter)
+    adapter.oracle = object()
+    adapter.staged = object()
+    adapter.model_media_result = None
+    monkeypatch.setattr(
+        runner,
+        "verify_media_pool_result",
+        lambda _oracle, _raw: _Verification(),
+    )
+    monkeypatch.setattr(
+        runner,
+        "verify_media_pool_read_unchanged",
+        lambda _staged, _oracle: _Verification(),
+    )
+    result = {"return": [{"id": "media-row"}]}
+
+    adapter.observe_payload(
+        ExpectedGatewayStep("media.check", "draft-check"),
+        {"agent_result": result},
+    )
+
+    assert adapter.model_media_result == result
+
+
 def test_custom_database_roundtrip_uses_plain_json_and_runner_owned_host_path(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

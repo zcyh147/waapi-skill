@@ -81,6 +81,13 @@ def test_media_pool_schema_marks_scalar_array_items_as_append_facts(
     filters = next(
         field for field in schema["fields"] if field["path"] == ["args", "filters"]
     )
+    plan = schema["top_level_fact_plan"]
+    assert plan["business_fact_selection"] == (
+        "submit only prompt-present values; omit absent defaults"
+    )
+    assert plan["business_pointer_source"] == "typed_request_fields.path"
+    filter_row = next(row for row in plan["rows"] if row[1] == "filters")
+    assert filter_row[0] == filters["handle"]
     assert filters["fact_construction"]["business_cardinality_authority"] == {
         "source": "current_business_request",
         "schema_does_not_require_another_item": True,
@@ -205,28 +212,28 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
         for choice in type_branch["choices"]
         if choice.get("enum") == ["field"]
     )
-    assert field_choice["deferred_fact"]["argv"] == [
+    assert type_branch["fact_construction"]["choose_dynamic_argv"] == [
         "--action", "add_typed_fact", "--fact-action", "choose-dynamic",
         "--field-handle", item["handle"], "--fact-value",
-        field_choice["handle"], "--key", "type",
+        "<selected-choice-handle>", "--key", "type",
     ]
-    assert field_choice["deferred_fact"]["is_next_command"] is False
-    assert field_choice["deferred_fact"]["execute_after"] == (
+    assert type_branch["fact_construction"]["map_put_argv"] == [
+        "--action", "add_typed_fact", "--fact-action", "map-put",
+        "--field-handle", item["handle"], "--key", "type",
+        "--value-type", "<selected-accepted-type>", "--fact-value",
+        "<selected-choice-enum-or-business-value>",
+    ]
+    assert type_branch["fact_construction"]["execute_after"] == (
         "deferred_parent_fact"
     )
-    assert field_choice["deferred_fact"]["consume_once"] is True
-    assert field_choice["deferred_fact"]["replay_allowed"] is False
-    assert field_choice["deferred_fact"]["queue_phase"] == "child_contract"
-    assert field_choice["deferred_fact"]["queue_order_ref"] == (
+    assert type_branch["fact_construction"]["consume_each_fact_once"] is True
+    assert type_branch["fact_construction"]["replay_allowed"] is False
+    assert type_branch["fact_construction"]["queue_phase"] == "child_contract"
+    assert type_branch["fact_construction"]["queue_order_ref"] == (
         "/continuation/request_wide_order/deferred_fact_queue"
     )
-    assert field_choice["typed_fact"] == {
-        "action": "choose-dynamic",
-        "handle": item["handle"],
-        "value_type": "choice",
-        "value": field_choice["handle"],
-        "key": "type",
-    }
+    assert "deferred_fact" not in field_choice
+    assert "typed_fact" not in field_choice
     assert field_choice["map_put_required"] is True
     assert field_choice["map_put_value_source"] == "sole_enum"
     value_branch = next(row for row in branch_choices if row["key"] == "value")
@@ -361,7 +368,7 @@ def test_media_pool_dynamic_child_stdout_is_complete_within_visible_budget(
 
     assert exit_code == 0, item
     encoded = gateway.gateway_stdout_json_encoder(item).encode(item)
-    assert len((encoded + "\n").encode("utf-8")) < 32 * 1024
+    assert len((encoded + "\n").encode("utf-8")) < 20 * 1024
     assert json.loads(encoded) == item
     assert gateway.gateway_stdout_json_encoder(item).indent is None
 

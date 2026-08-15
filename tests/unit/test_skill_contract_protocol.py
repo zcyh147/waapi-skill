@@ -64,13 +64,13 @@ def test_common_reads_use_closed_gateway_before_optional_references() -> None:
 
 def test_dynamic_draft_guidance_distinguishes_complete_json_from_incomplete_construction() -> None:
     compact = " ".join(OPERATE.split())
-    assert "`construction_state.complete: false` is complete JSON" in compact
-    assert "continue via `next_command_decision`" in compact
-    assert "Use its `business_value_pointer`" in compact
-    assert "never sibling/ancestor values or a handle twice" in compact
-    assert "Drain deferred facts" in compact
+    assert "`construction_state.complete:false` is complete JSON" in compact
+    assert "Follow `next_command_decision`" in compact
+    assert "match only its `business_value_pointer`" in compact
+    assert "never reuse handles" in compact
+    assert "return to the outermost response; parent fact before children" in compact
     assert "`completion_candidate`" in compact
-    assert "never invent `draft-apply --action check`" in compact
+    assert "never `draft-apply --action check`" in compact
 
 
 def test_machine_readable_agent_result_is_terminal_for_fixed_reads_and_transactions() -> None:
@@ -742,7 +742,7 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "include `--assignment none`" in OPERATE
     assert "`--assignment switch VALUE` only when requested" in OPERATE
     assert "run its `preview-from-draft` unchanged" in OPERATE
-    assert "Keep `--expected-revision` and `--apply` in that prefix" in OPERATE
+    assert "preserving `--expected-revision` and `--apply`" in OPERATE
     assert "there is no `lua.executeFile` operation" in OPERATE
     assert "keep it as one `path` selector" in OPERATE
     assert "`--apply` marks a preview, not execution" in OPERATE

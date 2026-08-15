@@ -80,26 +80,21 @@ def test_lua_lanes_have_one_public_typed_draft(
         assert "object or array" in dynamic["scalar_map_entry_action"]
         assert payload["composer"]["construction_order"] == {
             "top_level_facts": (
-                "complete top_level_fact_plan facts before disclosures"
+                "follow top_level_fact_plan before disclosures"
             ),
-            "constant_facts": "selected constant_values require set facts",
+            "constant_facts": "set selected constants",
             "branch_constants": (
-                "after choose, set selected branch constants before disclosure"
+                "set selected branch constants before disclosure"
             ),
             "independent_facts": (
-                "emit every business-present scalar, branch, constant, and empty-"
-                "container fact in typed_request_fields order before disclosure"
+                "submit each business-present top-level fact once; omit absent defaults"
             ),
             "scalar_map_values": (
-                "use fact-action map-put directly; never request a container handle"
+                "map-put scalars; container commands only for object or array"
             ),
-            "complex_values": (
-                "follow dynamic disclosures in schema property order and finish "
-                "nested_container_disclosures before draining deferred_fact entries"
-            ),
+            "complex_values": "disclose nested values in schema order",
             "dependent_facts": (
-                "after disclosures drain each response tree preorder: parent fact, "
-                "child-contract facts, then descendant responses in schema order"
+                "after disclosures drain the outermost response tree preorder"
             ),
         }
         plan_table = payload["composer"]["top_level_fact_plan"]

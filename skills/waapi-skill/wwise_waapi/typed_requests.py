@@ -288,27 +288,18 @@ class TypedRequestContract:
         """Describe the one request-wide fact/disclosure linearization."""
 
         return {
-            "top_level_facts": (
-                "complete top_level_fact_plan facts before disclosures"
-            ),
-            "constant_facts": "selected constant_values require set facts",
-            "branch_constants": (
-                "after choose, set selected branch constants before disclosure"
-            ),
+            "top_level_facts": "follow top_level_fact_plan before disclosures",
+            "constant_facts": "set selected constants",
+            "branch_constants": "set selected branch constants before disclosure",
             "independent_facts": (
-                "emit every business-present scalar, branch, constant, and empty-"
-                "container fact in typed_request_fields order before disclosure"
+                "submit each business-present top-level fact once; omit absent defaults"
             ),
             "scalar_map_values": (
-                "use fact-action map-put directly; never request a container handle"
+                "map-put scalars; container commands only for object or array"
             ),
-            "complex_values": (
-                "follow dynamic disclosures in schema property order and finish "
-                "nested_container_disclosures before draining deferred_fact entries"
-            ),
+            "complex_values": "disclose nested values in schema order",
             "dependent_facts": (
-                "after disclosures drain each response tree preorder: parent fact, "
-                "child-contract facts, then descendant responses in schema order"
+                "after disclosures drain the outermost response tree preorder"
             ),
         }
 
@@ -369,18 +360,11 @@ class TypedRequestContract:
             )
         rows.sort(key=lambda row: row[2] == "disclosure")
         return {
+            "business_fact_selection": (
+                "submit only prompt-present values; omit absent defaults"
+            ),
+            "business_pointer_source": "typed_request_fields.path",
             "columns": ["handle", "name", "phase", "action"],
-            "action_codes": {
-                "array": (
-                    "business-present items append; explicit empty present; "
-                    "omitted optional has no fact"
-                ),
-                "map": (
-                    "business-present members map-put; explicit empty present; "
-                    "omitted optional has no fact"
-                ),
-                "child": "static child facts",
-            },
             "rows": rows,
         }
 

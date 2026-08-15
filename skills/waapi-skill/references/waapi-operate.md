@@ -45,9 +45,9 @@ For direct `audio.import`, schema owns fixed fields and Event/Switch Assignation
 
 Follow the schema's sole `input_mode`. No schema-to-preview shortcut. Reuse evidence-bound live property/reference accessors: remove one leading `@` (`@Foo` becomes `Foo`); `OutputBus` remains `OutputBus`; never infer a token. For `inline_typed`, run only the returned `typed-operation` continuation; Gateway owns the complete request and Preview. For `composer`, run `composer.start.gateway_argv`, then only the selected `action_argv`; Gateway serializes and `draft-check` validates metadata. Start `object.set` rows with `add_target --target ...`. Start every `audio.import` row with one `add_import_row`: include `--assignment none`, or `--assignment switch VALUE` only when requested. Corrections keep the same draft; run its `preview-from-draft` unchanged. `--apply` marks a preview, not execution. Exact reflected URIs use `request-schema`; follow its sole typed continuation.
 
-Copy `gateway_argv` / `gateway_argv_prefix` exactly; append facts only after the prefix. Keep `--expected-revision` and `--apply` in that prefix. Never substitute Draft state for a container schema digest. Disclose children before appending returned handles. Scalar Maps use `map-put`; mint handles only for object/array values.
+Copy returned argv exactly; append facts only after its prefix, preserving `--expected-revision` and `--apply`. Never use Draft state as a schema digest. Disclose children before appending their handles. Scalar Maps use `map-put`; handles are only for object/array values.
 
-`construction_state.complete: false` is complete JSON: continue via `next_command_decision`. Use its `business_value_pointer`, never sibling/ancestor values or a handle twice. Drain deferred facts. Use `completion_candidate` when done; never invent `draft-apply --action check`.
+`construction_state.complete:false` is complete JSON. Follow `next_command_decision`; match only its `business_value_pointer`, never reuse handles. After disclosures return to the outermost response; parent fact before children. Finish via `completion_candidate`, never `draft-apply --action check`.
 
 Public mutation identities are closed to `id`, `path`, `exact-type-name`,
 `direct-child`, and `scoped-name`. Use a schema-fitting selector directly in

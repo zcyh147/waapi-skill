@@ -232,8 +232,11 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
                     "no_earlier_business_present_disclosure_for_exact_current_object"
                 ),
                 "action": (
-                    "drain_current_root_deferred_facts_in_response_tree_preorder"
+                    "return_to_outermost_disclosed_root_then_drain_"
+                    "response_tree_preorder"
                 ),
+                "start_at": "outermost_disclosed_root_response",
+                "first_command_pointer": "/continuation/deferred_fact/argv",
             },
         ],
         "first_true_candidate_is_the_only_next_action": True,
