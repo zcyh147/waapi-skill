@@ -4357,10 +4357,19 @@ def _bind_dynamic_branch_facts(
     rows = child_contract.get("branch_choices")
     if not isinstance(rows, list):
         return
-    for row in rows:
+    for queue_index, row in enumerate(rows, start=1):
         if not isinstance(row, dict) or not isinstance(row.get("key"), str):
             continue
         key = str(row["key"])
+        row.update(
+            {
+                "queue_index": queue_index,
+                "fact_sequence": (
+                    "choose_one_then_map_put_same_key_before_next_branch"
+                ),
+                "next_branch_blocked_until_complete": True,
+            }
+        )
         choices = row.get("choices")
         if not isinstance(choices, list):
             continue
@@ -4426,35 +4435,12 @@ def _bind_dynamic_branch_facts(
                 "replay_allowed": False,
             }
             enum_values = choice.get("enum")
-            if isinstance(enum_values, list) and len(enum_values) == 1:
-                enum_value = enum_values[0]
-                if isinstance(enum_value, bool):
-                    value_type = "boolean"
-                    value_text = "true" if enum_value else "false"
-                elif isinstance(enum_value, int):
-                    value_type, value_text = "integer", str(enum_value)
-                elif isinstance(enum_value, float) and math.isfinite(enum_value):
-                    value_type = "number"
-                    value_text = json.dumps(
-                        enum_value, ensure_ascii=False, allow_nan=False
-                    )
-                elif isinstance(enum_value, str):
-                    value_type, value_text = "string", enum_value
-                else:
-                    continue
-                choice["required_followup_fact"] = {
-                    "reason": "selected_scalar_choice_value",
-                    "typed_fact": {
-                        "action": "map-put",
-                        "handle": child_handle,
-                        "key": key,
-                        "value_type": value_type,
-                        "value": value_text,
-                    },
-                    "execute_immediately_after_this_choice": True,
-                    "consume_once": True,
-                    "replay_allowed": False,
-                }
+            choice["map_put_required"] = True
+            choice["map_put_value_source"] = (
+                "sole_enum"
+                if isinstance(enum_values, list) and len(enum_values) == 1
+                else "business_value"
+            )
 
 
 def _deferred_dynamic_fact_payload(
@@ -4932,7 +4918,12 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         if "deferred_fact" in deferred_fact:
             blocked_by: list[str] = []
             if args.parent_schema_token is not None:
-                blocked_by.append("ancestor_deferred_parent_facts")
+                blocked_by.extend(
+                    [
+                        "ancestor_deferred_parent_facts",
+                        "ancestor_child_contract_facts",
+                    ]
+                )
             if next_item_disclosure:
                 blocked_by.extend(
                     ["next_item_disclosure", "all_descendant_disclosures"]
@@ -4953,6 +4944,28 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "handle": child_handle,
             "child_contract": child_contract,
             "schema_lineage_token": lineage_token,
+            "schema_lineage_authority": {
+                "returned_token_scope": (
+                    "direct_descendants_of_this_handle_only"
+                ),
+                "returned_token_handle": child_handle,
+                "not_valid_for": "sibling_items_in_parent_array",
+                **(
+                    {
+                        "sibling_item_parent": {
+                            "array_handle": parent_handle,
+                            "parent_schema_token": args.parent_schema_token,
+                            "copy_parent_schema_token_exactly": True,
+                            "index_source": (
+                                "next_business_present_sibling_index"
+                            ),
+                        }
+                    }
+                    if args.command == "request-array-item"
+                    and args.parent_schema_token is not None
+                    else {}
+                ),
+            },
             "continuation": {
                 "request_wide_order": {
                     "phase": "dynamic_disclosure",
@@ -12542,6 +12555,15 @@ def operation_draft_payload(
                     "compact_projection_is_not_truncation": True,
                     "draft_inspect_required_before_preview": False,
                 }
+                projection["construction_state"] = {
+                    "draft_complete": True,
+                    "preview_created": False,
+                    "turn_complete": False,
+                    "required_next_phase": "preview-from-draft",
+                    "confirmation_or_user_input_required": False,
+                    "project_mutation_started": False,
+                    "execute_returned_next_command_exactly": True,
+                }
         if record.seal is None:
             projection["seal"] = None
         else:
@@ -12585,6 +12607,8 @@ def operation_draft_payload(
                     "compare_planned_actions_before_draft-check"
                 ),
                 "draft_inspect_required_before_next_planned_action": False,
+                "turn_complete": False,
+                "preview_created": False,
             }
             projection = {
                 key: projection[key]

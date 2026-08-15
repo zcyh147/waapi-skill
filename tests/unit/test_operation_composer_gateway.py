@@ -1263,6 +1263,8 @@ def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
         "compact_projection_is_not_truncation": True,
         "user_intent_coverage": "compare_planned_actions_before_draft-check",
         "draft_inspect_required_before_next_planned_action": False,
+        "preview_created": False,
+        "turn_complete": False,
     }
     assert "draft-inspect" not in json.dumps(targeted)
     handle = draft["action_result"]["created_handles"][0]
@@ -1822,6 +1824,15 @@ def test_live_check_is_bounded_durable_and_any_edit_invalidates_it(
         "projection": "checked_draft_receipt",
         "compact_projection_is_not_truncation": True,
         "draft_inspect_required_before_preview": False,
+    }
+    assert checked["draft"]["construction_state"] == {
+        "draft_complete": True,
+        "preview_created": False,
+        "turn_complete": False,
+        "required_next_phase": "preview-from-draft",
+        "confirmation_or_user_input_required": False,
+        "project_mutation_started": False,
+        "execute_returned_next_command_exactly": True,
     }
     assert "next_action_binding" not in checked["draft"]
     next_command = checked["next_command"]

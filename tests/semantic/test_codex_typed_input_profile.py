@@ -219,6 +219,19 @@ def test_media_pool_prompt_separates_the_bounded_candidate_inventory_from_the_fi
         )
     )
 
+
+def test_object_create_prompt_does_not_invite_a_redundant_parent_query() -> None:
+    profile = load_typed_input_profile(PROFILE_PATH)
+    unit = next(
+        unit
+        for unit in profile.units
+        if unit.unit_id == "TYP21-DEDICATED-OBJECT-CREATE"
+    )
+
+    assert "父级路径已经明确" in unit.scenario.prompt
+    assert "无需另行核对父级" in unit.scenario.prompt
+
+
 def test_typed_input_profile_rejects_definition_drift_before_filtering(
     tmp_path: Path,
 ) -> None:

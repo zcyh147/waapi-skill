@@ -168,6 +168,7 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
     }
     assert nested_children["continuation"]["deferred_fact"]["blocked_by"] == [
         "ancestor_deferred_parent_facts",
+        "ancestor_child_contract_facts",
         "next_item_disclosure",
         "all_descendant_disclosures",
     ]
@@ -184,6 +185,17 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
     )
     assert grandchild_code == 0, grandchild
     assert grandchild["child_contract"]["required_keys"] == ["type", "name"]
+    assert grandchild["schema_lineage_authority"] == {
+        "returned_token_scope": "direct_descendants_of_this_handle_only",
+        "returned_token_handle": grandchild["handle"],
+        "not_valid_for": "sibling_items_in_parent_array",
+        "sibling_item_parent": {
+            "array_handle": nested_children["handle"],
+            "parent_schema_token": nested_children["schema_lineage_token"],
+            "copy_parent_schema_token_exactly": True,
+            "index_source": "next_business_present_sibling_index",
+        },
+    }
     assert grandchild["construction_state"] == {
         "complete": False,
         "confirmation_allowed": False,
@@ -193,6 +205,7 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
     }
     assert grandchild["continuation"]["deferred_fact"]["blocked_by"] == [
         "ancestor_deferred_parent_facts",
+        "ancestor_child_contract_facts",
     ]
     assert grandchild["continuation"]["deferred_fact"]["consume_once"] is True
     assert grandchild["continuation"]["deferred_fact"]["replay_allowed"] is False

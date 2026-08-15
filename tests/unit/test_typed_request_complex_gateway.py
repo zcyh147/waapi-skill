@@ -141,6 +141,13 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
         "field",
         "operator",
     ]
+    assert [branch["queue_index"] for branch in branch_choices] == [1, 2, 3, 4]
+    assert all(
+        branch["fact_sequence"]
+        == "choose_one_then_map_put_same_key_before_next_branch"
+        and branch["next_branch_blocked_until_complete"] is True
+        for branch in branch_choices
+    )
     type_branch = next(row for row in branch_choices if row["key"] == "type")
     field_choice = next(
         choice
@@ -169,19 +176,16 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
         "value": field_choice["handle"],
         "key": "type",
     }
-    assert field_choice["required_followup_fact"] == {
-        "reason": "selected_scalar_choice_value",
-        "typed_fact": {
-            "action": "map-put",
-            "handle": item["handle"],
-            "key": "type",
-            "value_type": "string",
-            "value": "field",
-        },
-        "execute_immediately_after_this_choice": True,
-        "consume_once": True,
-        "replay_allowed": False,
-    }
+    assert field_choice["map_put_required"] is True
+    assert field_choice["map_put_value_source"] == "sole_enum"
+    value_branch = next(row for row in branch_choices if row["key"] == "value")
+    string_value = next(
+        choice
+        for choice in value_branch["choices"]
+        if choice["accepted_types"] == ["string"]
+    )
+    assert string_value["map_put_required"] is True
+    assert string_value["map_put_value_source"] == "business_value"
     assert item["continuation"]["deferred_fact"]["execute_after"] == (
         "all_dynamic_disclosures_for_current_root"
     )
