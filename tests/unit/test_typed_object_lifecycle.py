@@ -199,6 +199,12 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
             "parent_schema_token": nested_children["schema_lineage_token"],
             "copy_parent_schema_token_exactly": True,
             "index_source": "next_business_present_sibling_index",
+            "disclosure_condition": (
+                "current_business_request_contains_that_index"
+            ),
+            "allowed_after": "current_item_descendant_disclosures",
+            "absent_index_forbidden": True,
+            "is_next_command": False,
         },
     }
     assert grandchild["construction_state"] == {
@@ -215,16 +221,21 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         },
     }
     assert grandchild["continuation"]["request_wide_order"][
-        "array_siblings_before_descendants"
-    ] is True
+        "array_item_traversal"
+    ] == "response_tree_preorder_finish_item_descendants_before_next_sibling"
     assert grandchild["continuation"]["nested_container_order"] == (
-        "after all business-present sibling item disclosures; disclose every "
-        "business-present member in this order before the deferred_fact queue"
+        "for the current array item, disclose every business-present member "
+        "and its descendants in this order before the next sibling; after the "
+        "current root disclosures, drain its deferred facts"
     )
     assert all(
-        row["blocked_by"] == ["all_business_present_sibling_item_disclosures"]
+        row["condition"] == "current_business_request_contains_member"
+        and row["queue_index"] == index
         and row["is_next_command"] is False
-        for row in grandchild["continuation"]["nested_container_disclosures"]
+        and "blocked_by" not in row
+        for index, row in enumerate(
+            grandchild["continuation"]["nested_container_disclosures"], start=1
+        )
     )
     assert grandchild["continuation"]["deferred_fact"]["blocked_by"] == [
         "ancestor_deferred_parent_facts",

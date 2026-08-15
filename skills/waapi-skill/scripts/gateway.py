@@ -4205,7 +4205,7 @@ def _fixed_nested_container_disclosures(
             and row["choices"]
         }
     result: list[dict[str, Any]] = []
-    for row in rows:
+    for queue_index, row in enumerate(rows, start=1):
         if (
             not isinstance(row, Mapping)
             or not isinstance(row.get("key"), str)
@@ -4221,6 +4221,9 @@ def _fixed_nested_container_disclosures(
                 "key": key,
                 "shape": shape,
                 "required": row.get("required") is True,
+                "condition": "current_business_request_contains_member",
+                "queue_index": queue_index,
+                "is_next_command": False,
                 "argv": [
                     "request-map-container",
                     args.api,
@@ -4235,16 +4238,6 @@ def _fixed_nested_container_disclosures(
                     "--parent-schema-token",
                     lineage_token,
                 ],
-                **(
-                    {
-                        "blocked_by": [
-                            "all_business_present_sibling_item_disclosures"
-                        ],
-                        "is_next_command": False,
-                    }
-                    if args.command == "request-array-item"
-                    else {}
-                ),
             }
         )
     return result
@@ -4255,7 +4248,9 @@ def _dynamic_deferred_queue_contract() -> dict[str, Any]:
 
     return {
         "scope": "current_disclosed_root",
-        "root_boundary": "before_next_parent_array_sibling",
+        "root_boundary": (
+            "current_root_disclosures_then_current_root_facts_before_next_root"
+        ),
         "drain_after": "root_dynamic_disclosures",
         "traversal": "response_tree_preorder",
         "node_steps": [
@@ -4266,10 +4261,8 @@ def _dynamic_deferred_queue_contract() -> dict[str, Any]:
         "parent_dependency": (
             "deferred_parent_fact_before_every_fact_using_response_handle"
         ),
-        "array_traversal": (
-            "business_present_sibling_indices_then_nested_members"
-        ),
-        "sibling_order": "schema_property_order",
+        "array_traversal": "response_tree_preorder_within_current_root",
+        "sibling_order": "ascending_business_present_index",
     }
 
 
@@ -4971,6 +4964,14 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                             "index_source": (
                                 "next_business_present_sibling_index"
                             ),
+                            "disclosure_condition": (
+                                "current_business_request_contains_that_index"
+                            ),
+                            "allowed_after": (
+                                "current_item_descendant_disclosures"
+                            ),
+                            "absent_index_forbidden": True,
+                            "is_next_command": False,
                         }
                     }
                     if args.command == "request-array-item"
@@ -4986,12 +4987,16 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                         "only branch_disclosure and nested_container_disclosures; "
                         "child_contract branch choices are typed facts"
                     ),
-                    "array_item_order": "ascending_index",
-                    "array_siblings_before_descendants": True,
+                    "array_item_order": "ascending_business_present_index",
+                    "array_item_traversal": (
+                        "response_tree_preorder_finish_item_descendants_before_next_sibling"
+                    ),
+                    "absent_array_item_disclosure_forbidden": True,
                     "nested_member_order": "schema_property_order",
                     "child_fact_order": "child_contract_schema_order",
                     "facts_using_returned_handles": (
-                        "after_all_dynamic_disclosures_in_deferred_fact_queue_order"
+                        "after_current_root_dynamic_disclosures_in_"
+                        "deferred_fact_queue_order"
                     ),
                     "deferred_fact_queue": _dynamic_deferred_queue_contract(),
                     "this_handle_is_not_a_complete_request": True,
@@ -5021,17 +5026,19 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                             nested_container_disclosures
                         ),
                         "nested_container_order": (
-                            "after all business-present sibling item disclosures; "
-                            + (
-                                "follow branch_disclosure first, then disclose every "
-                                "business-present member in this order before "
-                                "the deferred_fact queue"
+                            (
+                                "for the current array item, follow "
+                                "branch_disclosure first, then disclose every "
+                                "business-present member and its descendants in "
+                                "this order before the next sibling; after the "
+                                "current root disclosures, drain its deferred facts"
                             )
                             if branch_continuation
-                            else "after all business-present sibling item disclosures; "
-                            + (
-                                "disclose every business-present member in this order "
-                                "before the deferred_fact queue"
+                            else (
+                                "for the current array item, disclose every "
+                                "business-present member and its descendants in this "
+                                "order before the next sibling; after the current root "
+                                "disclosures, drain its deferred facts"
                             )
                         )
                         if args.command == "request-array-item"
