@@ -31,6 +31,24 @@ _SCREENING = load_eval_suite(matrix.DEFAULT_SUITE).expand_profile("screening")
 _C1 = next(session for session in _SCREENING if session.case.id == "C1")
 
 
+def test_typed_input_profile_uses_a_bounded_long_form_turn_budget(
+    tmp_path: Path,
+) -> None:
+    options = campaign.parse_args(
+        [
+            "--campaign-root",
+            str(tmp_path / "typed-input"),
+            "--profile",
+            matrix.TYPED_INPUT_PROFILE_ID,
+        ]
+    )
+
+    assert options.timeout_seconds == matrix.TYPED_INPUT_CODEX_TIMEOUT_SECONDS
+    assert options.timeout_seconds == 360.0
+    assert options.max_pre_action_retries == 0
+
+
+
 def _options(
     tmp_path: Path,
     *,

@@ -1406,6 +1406,54 @@ def _fixed_container_members(
     return members
 
 
+def _fixed_scalar_members(
+    schema: Mapping[str, Any],
+    *,
+    root_schema: Mapping[str, Any],
+    graph: DefinitionGraph,
+) -> list[dict[str, Any]]:
+    """Project direct single-branch scalar members in property order."""
+
+    expanded = _expanded_schema(schema, root_schema=root_schema, graph=graph)
+    properties = expanded.get("properties")
+    if not isinstance(properties, Mapping):
+        return []
+    required = expanded.get("required", ())
+    required_names = set(required) if isinstance(required, list) else set()
+    members: list[dict[str, Any]] = []
+    for name, member_schema in properties.items():
+        if not isinstance(name, str) or not isinstance(member_schema, Mapping):
+            continue
+        expanded_member = _expanded_schema(
+            member_schema,
+            root_schema=root_schema,
+            graph=graph,
+        )
+        if "const" in expanded_member:
+            continue
+        variants = _structural_variants(
+            member_schema,
+            root_schema=root_schema,
+            graph=graph,
+        )
+        if len(variants) != 1:
+            # Multi-branch values use the existing opaque branch-choice rows.
+            continue
+        value_type = variants[0].get("type")
+        if value_type not in {"string", "integer", "number", "boolean", "null"}:
+            continue
+        row: dict[str, Any] = {
+            "key": name,
+            "required": name in required_names,
+            "accepted_types": [str(value_type)],
+        }
+        enum_values = variants[0].get("enum")
+        if isinstance(enum_values, list):
+            row["enum"] = list(enum_values)
+        members.append(row)
+    return members
+
+
 def dynamic_container_disclosure(
     contract: TypedRequestContract,
     *,
@@ -1565,6 +1613,11 @@ def dynamic_container_disclosure(
             else {}
         ),
         "fixed_container_members": _fixed_container_members(
+            schema,
+            root_schema=root_schema,
+            graph=contract.definition_graph,
+        ),
+        "fixed_scalar_members": _fixed_scalar_members(
             schema,
             root_schema=root_schema,
             graph=contract.definition_graph,

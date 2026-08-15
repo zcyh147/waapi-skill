@@ -728,7 +728,7 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "include `--assignment none`" in OPERATE
     assert "`--assignment switch VALUE` only when requested" in OPERATE
     assert "run its `preview-from-draft` unchanged" in OPERATE
-    assert "Never move `--apply` behind typed facts" in OPERATE
+    assert "Keep `--expected-revision` and `--apply` in that prefix" in OPERATE
     assert "there is no `lua.executeFile` operation" in OPERATE
     assert "keep it as one `path` selector" in OPERATE
     assert "`--apply` marks a preview, not execution" in OPERATE
@@ -822,6 +822,10 @@ def test_operate_business_selection_and_execution_domains_remain_explicit() -> N
     assert (
         "Then open `operation-schema object.create` and follow its sole continuation "
         "directly into the Draft"
+        in compact
+    )
+    assert (
+        "do not query the parent already determined by that verified path"
         in compact
     )
     assert compact.index("first exact-query the unchanged root") < compact.index(

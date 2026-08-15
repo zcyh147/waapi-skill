@@ -349,6 +349,9 @@ def test_topic_schema_discloses_one_typed_continuation_offline(tmp_path: Path) -
         "or_present": "present only when that container is empty",
         "disclose": "use only rows whose code starts disclose-",
     }
+    assert payload["continuation"]["fact_order"] == (
+        "options then match; selected rows only, no extras"
+    )
     prefix = payload["continuation"]["wait_argv_prefix"]
     assert prefix[:6] == [
         "--timeout",
@@ -356,7 +359,7 @@ def test_topic_schema_discloses_one_typed_continuation_offline(tmp_path: Path) -
         "wait-topic",
         topic,
         "--event-count",
-        "<1..64>",
+        "<exact-count:1..64>",
     ]
     assert prefix[6:] == [
         "--options-schema-digest",

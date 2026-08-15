@@ -4273,6 +4273,49 @@ def _bind_dynamic_branch_facts(
 ) -> None:
     """Attach exact public facts for schema-owned child values and choices."""
 
+    scalar_rows = child_contract.pop("fixed_scalar_members", None)
+    if isinstance(scalar_rows, list):
+        bound_scalar_rows: list[dict[str, Any]] = []
+        for row in scalar_rows:
+            if not isinstance(row, Mapping) or not isinstance(row.get("key"), str):
+                continue
+            accepted_types = row.get("accepted_types")
+            if not isinstance(accepted_types, list) or not all(
+                isinstance(value_type, str) for value_type in accepted_types
+            ):
+                continue
+            argv_by_type: dict[str, list[str]] = {}
+            for value_type in accepted_types:
+                deferred = _deferred_dynamic_fact_payload(
+                    [
+                        "--map-put",
+                        child_handle,
+                        str(row["key"]),
+                        value_type,
+                        "<business-value>",
+                    ],
+                    draft_shape=draft_shape,
+                    undo_child_shape=undo_child_shape,
+                    query_shape=query_shape,
+                    topic_prefix=topic_prefix,
+                )
+                payload = deferred.get("deferred_fact")
+                if isinstance(payload, Mapping) and isinstance(payload.get("argv"), list):
+                    argv_by_type[value_type] = list(payload["argv"])
+            if not argv_by_type:
+                continue
+            bound = dict(row)
+            bound.update(
+                {
+                    "fact_argv_by_type": argv_by_type,
+                    "execute_after": "deferred_parent_fact",
+                    "is_next_command": False,
+                }
+            )
+            bound_scalar_rows.append(bound)
+        if bound_scalar_rows:
+            child_contract["fixed_scalar_member_facts"] = bound_scalar_rows
+
     constant_rows = child_contract.get("constant_field_facts")
     if isinstance(constant_rows, list):
         for row in constant_rows:
@@ -4528,16 +4571,13 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     "wait-topic",
                     args.api,
                     "--event-count",
-                    "<1..64>",
+                    "<exact-count:1..64>",
                     "--options-schema-digest",
                     options.schema_digest,
                     "--match-schema-digest",
                     match.schema_digest,
                 ],
-                "fact_order": [
-                    "options compact-row order",
-                    "match compact-row order",
-                ],
+                "fact_order": "options then match; selected rows only, no extras",
                 "bind": {
                     "--options-schema-digest": options.schema_digest,
                     "--match-schema-digest": match.schema_digest,

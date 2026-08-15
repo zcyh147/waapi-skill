@@ -209,6 +209,7 @@ INTEGRATION_WORKFLOWS_V1_PROFILE_ID = "integration_workflows_cross_version_6"
 INTEGRATION_WORKFLOWS_V2_PROFILE_ID = "integration_workflows_v2_cross_version_6"
 INTEGRATION_PROFILE_ID = "integration"
 DEFAULT_CODEX_TIMEOUT_SECONDS = 240.0
+TYPED_INPUT_CODEX_TIMEOUT_SECONDS = 360.0
 INTEGRATION_CODEX_TIMEOUT_SECONDS = 360.0
 EXECUTABLE_V3_PROFILE_IDS = frozenset(
     {
@@ -3489,6 +3490,8 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         else (
             INTEGRATION_CODEX_TIMEOUT_SECONDS
             if is_integration
+            else TYPED_INPUT_CODEX_TIMEOUT_SECONDS
+            if is_typed_input
             else DEFAULT_CODEX_TIMEOUT_SECONDS
         )
     )

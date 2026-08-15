@@ -183,6 +183,50 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
     )
     assert grandchild_code == 0, grandchild
     assert grandchild["child_contract"]["required_keys"] == ["type", "name"]
+    assert grandchild["child_contract"]["fixed_scalar_member_facts"] == [
+        {
+            "key": "type",
+            "required": True,
+            "accepted_types": ["string"],
+            "fact_argv_by_type": {
+                "string": [
+                    "--action", "add_typed_fact", "--fact-action", "map-put",
+                    "--field-handle", grandchild["handle"], "--value-type", "string",
+                    "--fact-value", "<business-value>", "--key", "type",
+                ]
+            },
+            "execute_after": "deferred_parent_fact",
+            "is_next_command": False,
+        },
+        {
+            "key": "name",
+            "required": True,
+            "accepted_types": ["string"],
+            "fact_argv_by_type": {
+                "string": [
+                    "--action", "add_typed_fact", "--fact-action", "map-put",
+                    "--field-handle", grandchild["handle"], "--value-type", "string",
+                    "--fact-value", "<business-value>", "--key", "name",
+                ]
+            },
+            "execute_after": "deferred_parent_fact",
+            "is_next_command": False,
+        },
+        {
+            "key": "notes",
+            "required": False,
+            "accepted_types": ["string"],
+            "fact_argv_by_type": {
+                "string": [
+                    "--action", "add_typed_fact", "--fact-action", "map-put",
+                    "--field-handle", grandchild["handle"], "--value-type", "string",
+                    "--fact-value", "<business-value>", "--key", "notes",
+                ]
+            },
+            "execute_after": "deferred_parent_fact",
+            "is_next_command": False,
+        },
+    ]
 
 
 def test_public_object_create_draft_start_uses_the_dedicated_typed_contract(

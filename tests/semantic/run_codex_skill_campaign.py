@@ -13748,6 +13748,8 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         else (
             matrix.INTEGRATION_CODEX_TIMEOUT_SECONDS
             if is_integration
+            else matrix.TYPED_INPUT_CODEX_TIMEOUT_SECONDS
+            if is_typed_input
             else matrix.DEFAULT_CODEX_TIMEOUT_SECONDS
         )
     )
