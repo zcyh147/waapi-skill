@@ -769,7 +769,9 @@ def test_query_container_disclosure_points_only_to_direct_query_execution(
 
     assert code == 0
     assert child["continuation"]["subcommand"] == "query-object"
-    assert child["continuation"]["fact"][0] == "--typed-append"
+    assert child["continuation"]["deferred_fact"]["argv"][0] == (
+        "--typed-append"
+    )
     assert "draft" not in json.dumps(child["continuation"]).casefold()
 
 

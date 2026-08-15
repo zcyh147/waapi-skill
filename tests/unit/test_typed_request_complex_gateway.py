@@ -105,21 +105,46 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
         "nested_member_order": "schema_property_order",
         "child_fact_order": "child_contract_schema_order",
         "facts_using_returned_handles": (
-            "after_deferred_action_argv_before_next_root"
+            "after_all_dynamic_disclosures_in_deferred_fact_queue_order"
         ),
-        "deferred_action_argv": (
-            "immediately_after_current_disclosure_chain_before_child_facts_and_"
-            "next_root"
-        ),
+        "deferred_fact_queue": "root_response_depth_first_schema_order",
         "this_handle_is_not_a_complete_request": True,
     }
-    assert item["continuation"]["deferred_action_argv"] == [
+    assert item["continuation"]["deferred_fact"]["argv"] == [
         "--action", "add_typed_fact", "--fact-action", "append",
         "--field-handle", filters.handle, "--value-type", "object",
         "--fact-value", item["handle"],
     ]
     assert "branch_disclosure" not in item["continuation"]
-    assert item["child_contract"]["branch_choices"]
+    branch_choices = item["child_contract"]["branch_choices"]
+    assert branch_choices
+    type_branch = next(row for row in branch_choices if row["key"] == "type")
+    field_choice = next(
+        choice
+        for choice in type_branch["choices"]
+        if choice.get("enum") == ["field"]
+    )
+    assert field_choice["deferred_fact"]["argv"] == [
+        "--action", "add_typed_fact", "--fact-action", "choose-dynamic",
+        "--field-handle", item["handle"], "--fact-value",
+        field_choice["handle"], "--key", "type",
+    ]
+    assert field_choice["deferred_fact"]["is_next_command"] is False
+    assert field_choice["typed_fact"] == {
+        "action": "choose-dynamic",
+        "handle": item["handle"],
+        "value_type": "choice",
+        "value": field_choice["handle"],
+        "key": "type",
+    }
+    assert item["continuation"]["deferred_fact"]["execute_after"] == (
+        "all_dynamic_disclosures_for_current_root"
+    )
+    assert item["continuation"]["deferred_fact"]["queue_order"] == (
+        "root_response_depth_first_schema_order"
+    )
+    assert item["continuation"]["deferred_fact"]["is_next_command"] is False
+    assert "deferred_action_argv" not in item["continuation"]
 
 
 def test_audio_convert_schema_forbids_present_with_nonempty_languages(
@@ -224,7 +249,7 @@ def test_open_map_container_handle_is_gateway_issued_and_version_bound(tmp_path:
     )
     assert exit_code == 0
     assert payload["handle"].startswith("trm1-")
-    assert payload["continuation"]["fact"] == [
+    assert payload["continuation"]["deferred_fact"]["argv"] == [
         "--map-put", args_handle, "nested", "object", payload["handle"]
     ]
 

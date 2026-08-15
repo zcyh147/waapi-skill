@@ -456,6 +456,30 @@ def test_wait_topic_digests_bind_to_the_real_topic_schema_envelope(
         and field.get("parent_handle") == soundbank_map["parent_handle"]
         for field in _expand_compact_field_table(payload["event_match"]["fields"])
     )
+    duplicate_paths = {
+        int(row): path
+        for row, path in payload["event_match"]["fields"][
+            "duplicate_name_paths"
+        ]
+    }
+    compact_rows = payload["event_match"]["fields"]["rows"]
+    top_level_name_row = next(
+        index
+        for index, row in enumerate(compact_rows)
+        if row[2] == "name" and row[1] is not None
+        and compact_rows[row[1]][2] == "soundbank"
+    )
+    assert duplicate_paths[top_level_name_row] == "soundbank.name"
+    nested_name_rows = [
+        index
+        for index, row in enumerate(compact_rows)
+        if row[2] == "name" and row[1] is not None
+        and compact_rows[row[1]][2] == "activeSource"
+    ]
+    if nested_name_rows:
+        assert duplicate_paths[nested_name_rows[0]] == (
+            "soundbank.activeSource.name"
+        )
     encoded = gateway.gateway_stdout_json_encoder(payload).encode(payload)
     assert len(encoded.encode("utf-8")) < 32 * 1024
     assert "\n" not in encoded
@@ -494,7 +518,7 @@ def test_public_nested_topic_match_handle_is_lifecycle_neutral(tmp_path: Path) -
         "wait-topic",
         "stream-topic",
     ]
-    assert payload["continuation"]["fact"][:2] == [
+    assert payload["continuation"]["deferred_fact"]["argv"][:2] == [
         "--match-append",
         bank_info.handle,
     ]

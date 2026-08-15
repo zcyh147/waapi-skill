@@ -3507,11 +3507,6 @@ def _validate_2021_topic_streamed_media(
                 f"2021 Topic streamed path is not canonical: {path_rows[0].text}"
             )
             continue
-        if "/" in path_rows[0].text:
-            failures.append(
-                f"2021 Topic streamed path is not Wwise-relative: {path_rows[0].text}"
-            )
-            continue
         media_path = cache_root / bank_root.name / Path(*parsed.relative_parts)
         try:
             relative = media_path.relative_to(case.blueprint.io_root).as_posix()

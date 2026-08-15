@@ -463,7 +463,7 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
     ]
     assert item["continuation"]["nested_container_order"] == (
         "follow branch_disclosure first, then disclose every business-present "
-        "member in this order before deferred_action_argv"
+        "member in this order before the deferred_fact queue"
     )
     assert item["continuation"]["request_wide_order"] == {
         "phase": "dynamic_disclosure",
@@ -476,15 +476,12 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
         "nested_member_order": "schema_property_order",
         "child_fact_order": "child_contract_schema_order",
         "facts_using_returned_handles": (
-            "after_deferred_action_argv_before_next_root"
+            "after_all_dynamic_disclosures_in_deferred_fact_queue_order"
         ),
-        "deferred_action_argv": (
-            "immediately_after_current_disclosure_chain_before_child_facts_and_"
-            "next_root"
-        ),
+        "deferred_fact_queue": "root_response_depth_first_schema_order",
         "this_handle_is_not_a_complete_request": True,
     }
-    assert item["continuation"]["deferred_action_argv"] == [
+    assert item["continuation"]["deferred_fact"]["argv"] == [
         "--action", "add_typed_fact", "--fact-action", "append",
         "--field-handle", inclusions["handle"], "--value-type", "object",
         "--fact-value", item["handle"],
@@ -555,7 +552,7 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
     assert identity["child_contract"]["required_keys"] == ["kind", "value"]
     assert "branch_disclosure" not in identity["continuation"]
     assert "action_argv" not in identity["continuation"]
-    assert identity["continuation"]["deferred_action_argv"] == [
+    assert identity["continuation"]["deferred_fact"]["argv"] == [
         "--action", "add_typed_fact", "--fact-action", "map-put",
         "--field-handle", item["handle"], "--value-type", "object",
         "--fact-value", identity["handle"], "--key", "object",

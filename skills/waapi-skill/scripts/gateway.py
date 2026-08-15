@@ -4231,6 +4231,135 @@ def _fixed_nested_container_disclosures(
     return result
 
 
+def _bind_dynamic_branch_facts(
+    child_contract: dict[str, Any],
+    *,
+    child_handle: str,
+    draft_shape: bool,
+    undo_child_shape: bool,
+    query_shape: bool,
+    topic_prefix: str | None,
+) -> None:
+    """Attach the exact public fact for every already disclosed branch choice."""
+
+    rows = child_contract.get("branch_choices")
+    if not isinstance(rows, list):
+        return
+    for row in rows:
+        if not isinstance(row, dict) or not isinstance(row.get("key"), str):
+            continue
+        key = str(row["key"])
+        choices = row.get("choices")
+        if not isinstance(choices, list):
+            continue
+        for choice in choices:
+            if not isinstance(choice, dict) or not isinstance(
+                choice.get("handle"), str
+            ):
+                continue
+            choice_handle = str(choice["handle"])
+            choice["typed_fact"] = {
+                "action": "choose-dynamic",
+                "handle": child_handle,
+                "value_type": "choice",
+                "value": choice_handle,
+                "key": key,
+            }
+            if (
+                (draft_shape or undo_child_shape)
+                and not query_shape
+                and topic_prefix is None
+            ):
+                argv = [
+                    "--action",
+                    "add_child_typed_fact" if undo_child_shape else "add_typed_fact",
+                    *(
+                        ["--child-handle", "<child_handle>"]
+                        if undo_child_shape
+                        else []
+                    ),
+                    "--fact-action",
+                    "choose-dynamic",
+                    "--field-handle",
+                    child_handle,
+                    "--fact-value",
+                    choice_handle,
+                    "--key",
+                    key,
+                ]
+            elif query_shape:
+                argv = [
+                    "--typed-choose-dynamic", child_handle, key, choice_handle
+                ]
+            elif topic_prefix is not None:
+                argv = [
+                    f"--{topic_prefix}-choose-dynamic",
+                    child_handle,
+                    key,
+                    choice_handle,
+                ]
+            else:
+                argv = [
+                    "--choose-dynamic", child_handle, key, choice_handle
+                ]
+            choice["deferred_fact"] = {
+                "argv": argv,
+                "execute_after": "all_dynamic_disclosures_for_current_root",
+                "queue_order": "root_response_depth_first_schema_order",
+                "is_next_command": False,
+            }
+
+
+def _deferred_dynamic_fact_payload(
+    fact: Sequence[str],
+    *,
+    draft_shape: bool,
+    undo_child_shape: bool,
+    query_shape: bool,
+    topic_prefix: str | None,
+) -> dict[str, Any]:
+    """Describe one returned-handle fact without presenting it as the next command."""
+
+    if undo_child_shape:
+        argv = [
+            "--action", "add_child_typed_fact",
+            "--child-handle", "<child_handle>",
+            "--fact-action", fact[0].removeprefix("--"),
+            "--field-handle", str(fact[1]),
+            "--value-type", str(fact[-2]),
+            "--fact-value", str(fact[-1]),
+            *(["--key", str(fact[2])] if fact[0] == "--map-put" else []),
+        ]
+    elif draft_shape and not query_shape and topic_prefix is None:
+        argv = [
+            "--action", "add_typed_fact",
+            "--fact-action", fact[0].removeprefix("--"),
+            "--field-handle", str(fact[1]),
+            "--value-type", str(fact[-2]),
+            "--fact-value", str(fact[-1]),
+            *(["--key", str(fact[2])] if fact[0] == "--map-put" else []),
+        ]
+    else:
+        argv = [
+            (
+                f"--typed-{fact[0].removeprefix('--')}"
+                if query_shape
+                else f"--{topic_prefix}-{fact[0].removeprefix('--')}"
+                if topic_prefix is not None
+                else fact[0]
+            ),
+            *fact[1:],
+        ]
+    return {
+        "deferred_fact": {
+            "argv": argv,
+            "execute_after": "all_dynamic_disclosures_for_current_root",
+            "queue_order": "root_response_depth_first_schema_order",
+            "is_next_command": False,
+        }
+    }
+
+
 def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]) -> dict[str, Any]:
     """Run catalog commands without requiring a WAAPI port or live Wwise."""
 
@@ -4310,6 +4439,24 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             final_payload,
             stop_after_bytes=MAX_TOPIC_SCHEMA_GATEWAY_RESULT_BYTES,
         )
+        if observed > MAX_TOPIC_SCHEMA_GATEWAY_RESULT_BYTES:
+            # Qualified duplicate-name paths are a readability aid over the
+            # already lossless parent_row lineage.  Near-ceiling Topics keep
+            # that canonical lineage and omit only this redundant aid.
+            for section_name in ("event_match", "options"):
+                section = payload.get(section_name)
+                fields = section.get("fields") if isinstance(section, Mapping) else None
+                if isinstance(fields, dict):
+                    fields.pop("duplicate_name_paths", None)
+            final_payload = attach_gateway_session_context(
+                payload,
+                args=args,
+                env=env,
+            )
+            observed = gateway_json_document_size(
+                final_payload,
+                stop_after_bytes=MAX_TOPIC_SCHEMA_GATEWAY_RESULT_BYTES,
+            )
         if observed > MAX_TOPIC_SCHEMA_GATEWAY_RESULT_BYTES:
             raise ValueError(
                 "Typed Topic schema exceeds its fixed 32 KiB public output ceiling"
@@ -4522,6 +4669,14 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             choice_handle=getattr(args, "choice_handle", None),
         )
         child_contract.pop("schema_lineage")
+        _bind_dynamic_branch_facts(
+            child_contract,
+            child_handle=child_handle,
+            draft_shape=draft_shape,
+            undo_child_shape=undo_child_shape,
+            query_shape=query_shape,
+            topic_prefix=topic_prefix,
+        )
         lineage_token = typed_schema_lineage_token(
             contract,
             child_handle=child_handle,
@@ -4571,12 +4726,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     "nested_member_order": "schema_property_order",
                     "child_fact_order": "child_contract_schema_order",
                     "facts_using_returned_handles": (
-                        "after_deferred_action_argv_before_next_root"
+                        "after_all_dynamic_disclosures_in_deferred_fact_queue_order"
                     ),
-                    "deferred_action_argv": (
-                        "immediately_after_current_disclosure_chain_before_child_"
-                        "facts_and_next_root"
-                    ),
+                    "deferred_fact_queue": "root_response_depth_first_schema_order",
                     "this_handle_is_not_a_complete_request": True,
                 },
                 "subcommand": (
@@ -4586,62 +4738,22 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     else "draft-apply" if undo_child_shape
                     else "draft-apply" if draft_shape else "typed-call"
                 ),
+                **_deferred_dynamic_fact_payload(
+                    fact,
+                    draft_shape=draft_shape,
+                    undo_child_shape=undo_child_shape,
+                    query_shape=query_shape,
+                    topic_prefix=topic_prefix,
+                ),
                 **(
                     {
-                        "action": "add_child_typed_fact",
-                        "action_argv": [
-                            "--action", "add_child_typed_fact",
-                            "--child-handle", "<child_handle>",
-                            "--fact-action", fact[0].removeprefix("--"),
-                            "--field-handle", str(fact[1]),
-                            "--value-type", str(fact[-2]),
-                            "--fact-value", str(fact[-1]),
-                            *(
-                                ["--key", str(fact[2])]
-                                if fact[0] == "--map-put"
-                                else []
-                            ),
-                        ],
+                        "valid_subscription_subcommands": [
+                            "wait-topic",
+                            "stream-topic",
+                        ]
                     }
-                    if undo_child_shape
-                    else {
-                        "action": "add_typed_fact",
-                        "deferred_action_argv": [
-                            "--action", "add_typed_fact",
-                            "--fact-action", fact[0].removeprefix("--"),
-                            "--field-handle", str(fact[1]),
-                            "--value-type", str(fact[-2]),
-                            "--fact-value", str(fact[-1]),
-                            *(
-                                ["--key", str(fact[2])]
-                                if fact[0] == "--map-put"
-                                else []
-                            ),
-                        ],
-                    }
-                    if draft_shape and not query_shape and topic_prefix is None
-                    else {
-                        "fact": [
-                            (
-                                f"--typed-{fact[0].removeprefix('--')}"
-                                if query_shape
-                                else f"--{topic_prefix}-{fact[0].removeprefix('--')}"
-                                if topic_prefix is not None
-                                else fact[0]
-                            ),
-                            *fact[1:],
-                        ],
-                        **(
-                            {
-                                "valid_subscription_subcommands": [
-                                    "wait-topic",
-                                    "stream-topic",
-                                ]
-                            }
-                            if topic_prefix is not None
-                            else {}
-                        ),
-                    }
+                    if topic_prefix is not None
+                    else {}
                 ),
                 **(
                     {
@@ -4652,12 +4764,12 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                             (
                                 "follow branch_disclosure first, then disclose every "
                                 "business-present member in this order before "
-                                "deferred_action_argv"
+                                "the deferred_fact queue"
                             )
                             if branch_continuation
                             else (
                                 "disclose every business-present member in this order "
-                                "before deferred_action_argv"
+                                "before the deferred_fact queue"
                             )
                         ),
                     }

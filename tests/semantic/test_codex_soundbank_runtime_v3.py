@@ -2131,6 +2131,19 @@ def test_2021_topic_verifies_exact_new_cache_media_without_claiming_copy_step(
     assert topic_result.passed
     assert artifact_result.passed
 
+    info_path = next(
+        artifact.path.parent / "SoundbanksInfo.xml"
+        for artifact in case.expected_artifacts
+        if artifact.kind == "bank"
+    )
+    document = ET.parse(info_path)
+    for path_row in document.getroot().findall(".//StreamedFiles/File/Path"):
+        assert isinstance(path_row.text, str)
+        path_row.text = path_row.text.replace("\\", "/")
+    document.write(info_path, encoding="utf-8", xml_declaration=True)
+    _topic_result, forward_slash_artifacts = runtime.verify_topic(events)
+    assert forward_slash_artifacts.passed
+
     cache_files = sorted(case.allowed_dynamic_artifact_roots[0].rglob("*.wem"))
     assert len(cache_files) == len(case.blueprint.media_fixtures)
     cache_files[0].unlink()
@@ -2147,11 +2160,6 @@ def test_2021_topic_verifies_exact_new_cache_media_without_claiming_copy_step(
 
     extra.unlink()
     backend.apply_business_effect(case)
-    info_path = next(
-        artifact.path.parent / "SoundbanksInfo.xml"
-        for artifact in case.expected_artifacts
-        if artifact.kind == "bank"
-    )
     document = ET.parse(info_path)
     streamed = document.getroot().find("./StreamedFiles/File")
     assert streamed is not None

@@ -126,8 +126,9 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         ("children", "array"),
     ]
     assert "action_argv" not in container["continuation"]
-    assert container["continuation"]["deferred_action_argv"][
-        container["continuation"]["deferred_action_argv"].index("--fact-value")
+    deferred_argv = container["continuation"]["deferred_fact"]["argv"]
+    assert deferred_argv[
+        deferred_argv.index("--fact-value")
         + 1
     ] == container["handle"]
 

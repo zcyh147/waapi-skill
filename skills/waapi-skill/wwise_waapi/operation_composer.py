@@ -2287,6 +2287,7 @@ def _apply_generic_typed_action(
     action: Mapping[str, Any],
     *,
     handle_factory: Callable[[], str] | None,
+    allow_cleaned_file_evidence: bool = False,
 ) -> tuple[dict[str, Any], str]:
     normalized = _normalize_generic_typed_composition(
         operation, version, composition
@@ -2393,7 +2394,12 @@ def _apply_generic_typed_action(
     # revisions remain editable, while malformed supplied facts still fail
     # before any durable write.
     try:
-        materialize_operation_request(operation, version, candidate)
+        materialize_operation_request(
+            operation,
+            version,
+            candidate,
+            allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+        )
     except OperationComposerError as exc:
         if exc.error_code != "OPERATION_DRAFT_INCOMPLETE":
             raise
@@ -2438,6 +2444,7 @@ def apply_composer_action(
     action: Mapping[str, Any],
     *,
     handle_factory: Callable[[], str] | None = None,
+    allow_cleaned_file_evidence: bool = False,
 ) -> tuple[dict[str, Any], str]:
     """Validate and apply one closed action without mutating the input mapping."""
 
@@ -2456,6 +2463,7 @@ def apply_composer_action(
             composition,
             action,
             handle_factory=handle_factory,
+            allow_cleaned_file_evidence=allow_cleaned_file_evidence,
         )
     normalized = _normalize_composition(composition, operation=operation, version=version)
     _require_json_object(action, label="action")
@@ -3109,8 +3117,13 @@ def materialize_operation_request(
     operation: str,
     version: str,
     composition: Mapping[str, Any],
+    *,
+    allow_cleaned_file_evidence: bool = False,
 ) -> dict[str, Any]:
     """Build and canonically reparse the complete operation request."""
+
+    if not isinstance(allow_cleaned_file_evidence, bool):
+        raise TypeError("allow_cleaned_file_evidence must be a boolean")
 
     normalized = _normalize_composition(composition, operation=operation, version=version)
     if operation == "waapi.undoGroup":
@@ -3160,6 +3173,15 @@ def materialize_operation_request(
             ),
         }
         if operation in DRAFT_TYPED_OPERATIONS:
+            if allow_cleaned_file_evidence and operation in {
+                "lua.executeCliFile",
+                "lua.executeCoreFile",
+            }:
+                # A sealed PASS archive is replayed after its owned source tree
+                # has been deleted.  Typed Core still rebuilds every fact and
+                # the durable seal supplies the exact request comparison; only
+                # the live file-existence proof is intentionally not repeated.
+                return request
             try:
                 return parse_operation_request(request, expected_version=version).as_dict()
             except OperationContractError as exc:
@@ -3252,6 +3274,8 @@ def composition_projection(
     operation: str,
     version: str,
     composition: Mapping[str, Any],
+    *,
+    allow_cleaned_file_evidence: bool = False,
 ) -> dict[str, Any]:
     normalized = _normalize_composition(composition, operation=operation, version=version)
     if operation == "waapi.undoGroup":
@@ -3290,7 +3314,12 @@ def composition_projection(
     if operation.startswith("ak.") or operation in DRAFT_TYPED_OPERATIONS:
         missing: list[str] = []
         try:
-            materialize_operation_request(operation, version, normalized)
+            materialize_operation_request(
+                operation,
+                version,
+                normalized,
+                allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+            )
         except OperationComposerError as exc:
             if exc.error_code != "OPERATION_DRAFT_INCOMPLETE":
                 raise

@@ -1874,6 +1874,7 @@ def _validate_durable_composition(
     *,
     operation: str,
     version: str,
+    allow_cleaned_file_evidence: bool = False,
 ) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise ValueError("draft composition fields are invalid")
@@ -1883,7 +1884,12 @@ def _validate_durable_composition(
         raise ValueError("draft composition is not strict JSON") from exc
     if not isinstance(normalized, Mapping):  # pragma: no cover - mapping invariant
         raise ValueError("draft composition is invalid")
-    composition_projection(operation, version, normalized)
+    composition_projection(
+        operation,
+        version,
+        normalized,
+        allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+    )
     return normalized
 
 
@@ -2134,11 +2140,13 @@ def _parse_canonical_record_bytes(
     data: bytes,
     *,
     expected_draft_id: str,
+    allow_cleaned_file_evidence: bool = False,
 ) -> OperationDraftRecord:
     payload = json.loads(data.decode("utf-8"))
     record = _record_from_mapping(
         payload,
         expected_draft_id=expected_draft_id,
+        allow_cleaned_file_evidence=allow_cleaned_file_evidence,
     )
     if not hmac.compare_digest(data, canonical_json_bytes(record.as_durable_dict())):
         raise ValueError("draft record bytes are not in canonical durable form")
@@ -2149,6 +2157,7 @@ def parse_operation_draft_archive_bytes(
     data: bytes,
     *,
     expected_draft_id: str,
+    allow_cleaned_file_evidence: bool = False,
 ) -> OperationDraftRecord:
     """Strictly parse one bounded canonical record without opening a live Store."""
 
@@ -2164,6 +2173,7 @@ def parse_operation_draft_archive_bytes(
         return _parse_canonical_record_bytes(
             data,
             expected_draft_id=expected_draft_id,
+            allow_cleaned_file_evidence=allow_cleaned_file_evidence,
         )
     except (json.JSONDecodeError, RecursionError, UnicodeError) as exc:
         raise ValueError("Operation Draft archive record is invalid") from exc
@@ -2172,18 +2182,23 @@ def parse_operation_draft_archive_bytes(
 def load_operation_draft_archive_record(
     state_dir: Path,
     draft_id: str,
+    *,
+    allow_cleaned_file_evidence: bool = False,
 ) -> OperationDraftRecord:
     """Read one frozen Draft record without creating, locking, or repairing state."""
 
     return load_operation_draft_archive_records(
         state_dir,
         (draft_id,),
+        allow_cleaned_file_evidence=allow_cleaned_file_evidence,
     )[draft_id]
 
 
 def load_operation_draft_archive_records(
     state_dir: Path,
     draft_ids: Collection[str],
+    *,
+    allow_cleaned_file_evidence: bool = False,
 ) -> dict[str, OperationDraftRecord]:
     """Read exactly the frozen Draft records bound by one semantic protocol."""
 
@@ -2246,6 +2261,7 @@ def load_operation_draft_archive_records(
         records[draft_id] = parse_operation_draft_archive_bytes(
             snapshot.data,
             expected_draft_id=draft_id,
+            allow_cleaned_file_evidence=allow_cleaned_file_evidence,
         )
     return records
 
@@ -2254,6 +2270,7 @@ def _record_from_mapping(
     payload: Any,
     *,
     expected_draft_id: str,
+    allow_cleaned_file_evidence: bool = False,
 ) -> OperationDraftRecord:
     if not isinstance(payload, Mapping):
         raise TypeError("draft record must be an object")
@@ -2364,10 +2381,14 @@ def _record_from_mapping(
             or not _SHA256_PATTERN.fullmatch(composer_digest)
         ):
             raise ValueError("composer digest is invalid")
+        cleaned_file_replay = (
+            allow_cleaned_file_evidence and state is OperationDraftState.SEALED
+        )
         composition = _validate_durable_composition(
             payload["composition"],
             operation=payload["operation"],
             version=payload["version"],
+            allow_cleaned_file_evidence=cleaned_file_replay,
         )
         check = _validate_durable_check(
             payload["check"],
@@ -2394,6 +2415,7 @@ def _record_from_mapping(
                     payload["operation"],
                     payload["version"],
                     composition,
+                    allow_cleaned_file_evidence=cleaned_file_replay,
                 )
             except OperationComposerError as exc:
                 raise ValueError(

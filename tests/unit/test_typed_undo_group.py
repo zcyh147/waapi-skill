@@ -414,7 +414,7 @@ def test_public_complex_child_schema_issues_nonempty_inclusion_row_handle(
     )
     assert len(object_choices["choices"]) == 5
     assert item["continuation"]["subcommand"] == "draft-apply"
-    action_argv = item["continuation"]["action_argv"]
+    action_argv = item["continuation"]["deferred_fact"]["argv"]
     assert action_argv[:4] == [
         "--action", "add_child_typed_fact", "--child-handle", "<child_handle>"
     ]

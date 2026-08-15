@@ -3397,6 +3397,25 @@ def test_passing_lua_draft_replays_after_owned_files_are_cleaned(
         version="2023.1",
         label="passing cleaned Lua",
     )
+    from tests.semantic.support.codex_typed_draft_evidence_v3 import (
+        TypedDraftEvidenceError,
+        validate_typed_draft_evidence,
+    )
+
+    with pytest.raises(TypedDraftEvidenceError, match="archive replay failed"):
+        validate_typed_draft_evidence(
+            state_directory=task_root / "broker" / "state",
+            steps=protocol.steps,
+            broker_records=records,
+        )
+
+    replayed = validate_typed_draft_evidence(
+        state_directory=task_root / "broker" / "state",
+        steps=protocol.steps,
+        broker_records=records,
+        allow_cleaned_file_evidence=True,
+    )
+    assert replayed is not None
 
 
 def test_campaign_archive_rejects_equivalent_requoted_continuation(

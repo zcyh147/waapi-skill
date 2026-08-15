@@ -268,10 +268,12 @@ class TypedRequestContract:
             ),
             "complex_values": (
                 "follow dynamic disclosures in schema property order and finish "
-                "nested_container_disclosures before deferred_action_argv"
+                "nested_container_disclosures before draining deferred_fact entries"
             ),
             "dependent_facts": (
-                "emit returned-handle facts only after their disclosure chain"
+                "queue returned-handle facts from each response and emit them only "
+                "after the root disclosure chain, traversing the root response "
+                "depth-first in schema order"
             ),
         }
 
@@ -464,6 +466,18 @@ class TypedRequestContract:
                     constraint_index,
                 ]
             )
+        name_counts: dict[str, int] = {}
+        for field in fields:
+            name = str(field["name"])
+            name_counts[name] = name_counts.get(name, 0) + 1
+        duplicate_name_paths = [
+            [index, ".".join(str(part) for part in field["path"][1:])]
+            for index, field in enumerate(fields)
+            if str(field["name"]) == "name"
+            and name_counts.get("name", 0) > 1
+            and isinstance(field.get("path"), list)
+            and len(field["path"]) > 1
+        ]
         return {
             "contract": "waapi-skill.compact-typed-field-table/v1",
             "section": section,
@@ -493,6 +507,7 @@ class TypedRequestContract:
                 },
             },
             "path": "omitted; construct with handles and parent_row lineage",
+            "duplicate_name_paths": duplicate_name_paths,
             "rows": rows,
         }
 

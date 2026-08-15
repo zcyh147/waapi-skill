@@ -384,6 +384,7 @@ def validate_typed_draft_evidence(
     state_directory: Path,
     steps: Sequence[Any],
     broker_records: Sequence[Mapping[str, Any]],
+    allow_cleaned_file_evidence: bool = False,
 ) -> Mapping[str, Any] | None:
     """Rebuild one Composer flow from Broker facts and frozen local state."""
 
@@ -412,7 +413,11 @@ def validate_typed_draft_evidence(
                 _fail("draft-start evidence is missing its issued Draft id")
             draft_ids.append(draft_id)
         durable_records = (
-            load_operation_draft_archive_records(state_directory, draft_ids)
+            load_operation_draft_archive_records(
+                state_directory,
+                draft_ids,
+                allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+            )
             if draft_ids
             else {}
         )
@@ -421,6 +426,7 @@ def validate_typed_draft_evidence(
             steps=steps,
             broker_records=broker_records,
             durable_records=durable_records,
+            allow_cleaned_file_evidence=allow_cleaned_file_evidence,
         )
     except TypedDraftEvidenceError:
         raise
@@ -441,6 +447,7 @@ def _validate_typed_draft_evidence(
     steps: Sequence[Any],
     broker_records: Sequence[Mapping[str, Any]],
     durable_records: Mapping[str, OperationDraftRecord],
+    allow_cleaned_file_evidence: bool = False,
 ) -> Mapping[str, Any]:
     if len(steps) != len(broker_records):
         _fail("Composer Broker record count does not match the sealed protocol")
@@ -536,7 +543,16 @@ def _validate_typed_draft_evidence(
         _fail("Composer archive is missing its durable composition binding")
 
     composition = new_composition(operation, version)
-    projection = composition_projection(operation, version, composition)
+
+    def project(value: Mapping[str, Any]) -> dict[str, Any]:
+        return composition_projection(
+            operation,
+            version,
+            value,
+            allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+        )
+
+    projection = project(composition)
     _require_projection(
         start_draft,
         draft_id=draft_id,
@@ -597,9 +613,7 @@ def _validate_typed_draft_evidence(
             compact: tuple[str, set[str], set[str], Mapping[str, Any]] | None = None
             if isinstance(response_facts, list):
                 new_handles = _handles(response_facts) - _handles(
-                    composition_projection(operation, version, composition)[
-                        "current_facts"
-                    ]
+                    project(composition)["current_facts"]
                 )
             else:
                 compact = _compact_action_projection(response_draft)
@@ -612,11 +626,12 @@ def _validate_typed_draft_evidence(
                 composition,
                 replay_action,
                 handle_factory=factory,
+                allow_cleaned_file_evidence=allow_cleaned_file_evidence,
             )
             if unused_handles:
                 _fail("Composer action response disclosed an unexplained handle")
             revision += 1
-            projection = composition_projection(operation, version, composition)
+            projection = project(composition)
             if compact is None:
                 _require_projection(
                     response_draft,
@@ -664,16 +679,12 @@ def _validate_typed_draft_evidence(
                 operation=operation,
                 version=version,
                 schema_digest=schema_digest,
-                projection=composition_projection(operation, version, composition),
+                projection=project(composition),
             )
         elif step.subcommand == "draft-check":
             revision += 1
             response_draft = _draft_projection(payload, command="draft-check")
-            checked_projection = composition_projection(
-                operation,
-                version,
-                composition,
-            )
+            checked_projection = project(composition)
             if isinstance(response_draft.get("check"), Mapping):
                 checked_projection["allowed_actions"] = [
                     action
@@ -716,7 +727,7 @@ def _validate_typed_draft_evidence(
                 operation=operation,
                 version=version,
                 schema_digest=schema_digest,
-                projection=composition_projection(operation, version, composition),
+                projection=project(composition),
             )
             expected_audit_types.append("cancelled")
         elif step.subcommand == "preview-from-draft":

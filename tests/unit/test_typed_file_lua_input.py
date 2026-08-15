@@ -95,10 +95,12 @@ def test_lua_lanes_have_one_public_typed_draft(
             ),
             "complex_values": (
                 "follow dynamic disclosures in schema property order and finish "
-                "nested_container_disclosures before deferred_action_argv"
+                "nested_container_disclosures before draining deferred_fact entries"
             ),
             "dependent_facts": (
-                "emit returned-handle facts only after their disclosure chain"
+                "queue returned-handle facts from each response and emit them only "
+                "after the root disclosure chain, traversing the root response "
+                "depth-first in schema order"
             ),
         }
         plan_table = payload["composer"]["top_level_fact_plan"]

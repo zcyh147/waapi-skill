@@ -4549,9 +4549,15 @@ def _prepare_case(
                     "验证仅确认返回结果符合预期结构" in folded
                     or "only confirms that the returned result matches the expected structure"
                     in folded
+                    or (
+                        "验证仅限" in folded
+                        and "返回" in folded
+                        and "结构" in folded
+                    )
                 )
                 and (
                     "未验证" in folded
+                    or "不能声称已验证" in folded
                     or "not verified" in folded
                     or "does not verify" in folded
                 )

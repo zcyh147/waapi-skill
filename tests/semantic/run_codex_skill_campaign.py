@@ -4925,7 +4925,8 @@ def _validate_heavy_v3_task_result(
             }
             if is_current_typed_evidence:
                 replayed_composer = validate_typed_draft_evidence(
-                    **validator_arguments
+                    **validator_arguments,
+                    allow_cleaned_file_evidence=True,
                 )
             else:
                 # Historical grammar is imported only at the explicit

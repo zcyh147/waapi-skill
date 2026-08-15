@@ -948,7 +948,7 @@ def test_object_create_schema_puts_the_top_level_fact_plan_before_large_fields(
     )
     assert item_code == 0, item
     assert "action_argv" not in item["continuation"]
-    assert item["continuation"]["deferred_action_argv"][-1] == item["handle"]
+    assert item["continuation"]["deferred_fact"]["argv"][-1] == item["handle"]
 
 
 def test_invalid_or_mixed_typed_action_argv_is_atomic(
