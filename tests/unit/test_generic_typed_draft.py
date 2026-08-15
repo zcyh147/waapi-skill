@@ -81,6 +81,25 @@ def test_complex_generic_schema_discloses_draft_as_the_only_normal_entry(
     assert payload["continuation"]["subcommand"] == "draft-start"
     assert payload["continuation"]["operation"] == URI
     assert payload["continuation"]["business_values_required"] is True
+    assert payload["continuation"]["start_command"] == {
+        "argv": ["draft-start", URI],
+        "execute_alone": True,
+        "typed_facts_on_draft_start": "invalid",
+    }
+    assert payload["continuation"]["after_start"] == {
+        "fact_command_prefix_pointer": (
+            "/draft/next_action_binding/fixed_argv_prefix"
+        ),
+        "append_exactly_one_action": True,
+        "then_read_next_response": True,
+    }
+    assert payload["continuation"]["fact_value_argv_policy"] == {
+        "one_business_value_is_one_argv_token": True,
+        "whitespace_or_shell_metacharacters": (
+            "shell-quote the complete value; splitting it is invalid"
+        ),
+        "preserve_value_text_exactly": True,
+    }
     assert set(payload["continuation"]["action_argv"]) == {
         "add_typed_fact",
         "correct_typed_fact",

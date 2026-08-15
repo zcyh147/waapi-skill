@@ -251,6 +251,21 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
         "/continuation/request_wide_order/deferred_fact_queue"
     )
     assert item["continuation"]["deferred_fact"]["is_next_command"] is False
+    assert item["business_value_scope"] == {
+        "current_value_pointer": "/args/filters/0",
+        "current_value_only": True,
+        "unrelated_prompt_objects_do_not_satisfy_member_conditions": True,
+    }
+    assert item["continuation"]["next_sibling_disclosure"]["is_next_command"] is False
+    assert item["continuation"]["next_sibling_disclosure"][
+        "business_value_pointer"
+    ] == "/args/filters/1"
+    assert item["continuation"]["next_sibling_disclosure"]["must_follow"] == (
+        "current_root_deferred_facts"
+    )
+    assert "next_sibling_disclosure" not in item["continuation"][
+        "deferred_fact"
+    ].get("blocked_by", ())
     assert "deferred_action_argv" not in item["continuation"]
 
 

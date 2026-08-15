@@ -128,6 +128,7 @@ from wwise_waapi.typed_requests import (  # noqa: E402  # pyright: ignore[report
     materialize_typed_request,
     parse_typed_schema_lineage_token,
     request_contract,
+    typed_schema_lineage_business_pointer,
     typed_schema_lineage_token,
 )
 from wwise_waapi.typed_queries import (  # noqa: E402  # pyright: ignore[reportMissingImports]
@@ -4580,6 +4581,7 @@ def _next_array_sibling_disclosure(
     contract: TypedRequestContract,
     parent_schema: Mapping[str, Any] | None,
     parent_section: str | None,
+    current_business_value_pointer: str | None,
 ) -> dict[str, Any]:
     """Expose the exact conditional next complex sibling for one array item."""
 
@@ -4623,14 +4625,28 @@ def _next_array_sibling_disclosure(
         ]
     if not argv_by_shape:
         return {}
+    if current_business_value_pointer is None:
+        return {}
+    nested_sibling = args.parent_schema_token is not None
     return {
         "next_sibling_disclosure": {
             "condition": "current_business_request_contains_next_complex_item",
+            "business_value_pointer": (
+                f"{current_business_value_pointer.rsplit('/', 1)[0]}/{next_index}"
+            ),
             "index": next_index,
-            "must_follow": "current_item_descendant_disclosures",
-            "must_precede": "current_root_deferred_facts",
+            "must_follow": (
+                "current_item_descendant_disclosures"
+                if nested_sibling
+                else "current_root_deferred_facts"
+            ),
+            **(
+                {"must_precede": "current_root_deferred_facts"}
+                if nested_sibling
+                else {}
+            ),
             "absent_or_scalar_next_item_forbidden": True,
-            "is_next_command": True,
+            "is_next_command": nested_sibling,
             "argv_by_shape": argv_by_shape,
         }
     }
@@ -4638,6 +4654,8 @@ def _next_array_sibling_disclosure(
 
 def _next_nested_disclosure_selector(
     rows: Sequence[Mapping[str, Any]],
+    *,
+    next_sibling_disclosure: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Tell the caller how to select the next exact business-present child."""
 
@@ -4648,7 +4666,13 @@ def _next_nested_disclosure_selector(
             "candidate_pointer": "/continuation/nested_container_disclosures",
             "selection": "first_business_present_member_by_queue_index",
             "repeat_for_descendants": True,
-            "when_none": "follow_next_sibling_disclosure_or_deferred_fact_queue",
+            "when_none": (
+                "follow_next_sibling_then_drain_deferred_fact_queue"
+                if next_sibling_disclosure.get(
+                    "next_sibling_disclosure", {}
+                ).get("is_next_command") is True
+                else "drain_deferred_fact_queue_then_follow_next_sibling"
+            ),
             "is_next_command": True,
         }
     }
@@ -4978,6 +5002,16 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             shape=args.shape,
             choice_handle=getattr(args, "choice_handle", None),
         )
+        try:
+            current_business_value_pointer = typed_schema_lineage_business_pointer(
+                contract,
+                child_handle=child_handle,
+                token=lineage_token,
+            )
+        except TypedRequestError:
+            # Legacy unlineaged dynamic parents remain usable for their bounded
+            # current response, but cannot claim a canonical business pointer.
+            current_business_value_pointer = None
         nested_container_disclosures = _fixed_nested_container_disclosures(
             args,
             contract=contract,
@@ -4985,6 +5019,12 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             child_contract=child_contract,
             lineage_token=lineage_token,
         )
+        if current_business_value_pointer is not None:
+            for row in nested_container_disclosures:
+                key_value = str(row["key"]).replace("~", "~0").replace("/", "~1")
+                row["business_value_pointer"] = (
+                    f"{current_business_value_pointer}/{key_value}"
+                )
         branch_continuation = _dynamic_branch_disclosure_continuation(
             args,
             contract=contract,
@@ -5003,6 +5043,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             contract=contract,
             parent_schema=parent_schema,
             parent_section=parent_section,
+            current_business_value_pointer=current_business_value_pointer,
         )
         deferred_fact = _deferred_dynamic_fact_payload(
             fact,
@@ -5025,9 +5066,10 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     ["next_item_disclosure", "all_descendant_disclosures"]
                 )
             if next_sibling_disclosure:
-                blocked_by.extend(
-                    ["next_sibling_disclosure", "all_descendant_disclosures"]
-                )
+                sibling = next_sibling_disclosure["next_sibling_disclosure"]
+                if sibling.get("is_next_command") is True:
+                    blocked_by.append("next_sibling_disclosure")
+                blocked_by.append("all_descendant_disclosures")
             if blocked_by:
                 deferred_fact["deferred_fact"]["blocked_by"] = blocked_by
         response = {
@@ -5042,6 +5084,17 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "key": key,
             "shape": args.shape,
             "handle": child_handle,
+            **(
+                {
+                    "business_value_scope": {
+                        "current_value_pointer": current_business_value_pointer,
+                        "current_value_only": True,
+                        "unrelated_prompt_objects_do_not_satisfy_member_conditions": True,
+                    }
+                }
+                if current_business_value_pointer is not None
+                else {}
+            ),
             "child_contract": child_contract,
             "schema_lineage_token": lineage_token,
             "schema_lineage_authority": {
@@ -5064,6 +5117,8 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                             ),
                             "allowed_after": (
                                 "current_item_descendant_disclosures"
+                                if args.parent_schema_token is not None
+                                else "current_root_deferred_facts"
                             ),
                             "absent_index_forbidden": True,
                             "is_next_command": False,
@@ -5183,7 +5238,8 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 ),
                 **branch_continuation,
                 **_next_nested_disclosure_selector(
-                    nested_container_disclosures
+                    nested_container_disclosures,
+                    next_sibling_disclosure=next_sibling_disclosure,
                 ),
             },
         }
@@ -12901,6 +12957,33 @@ def operation_draft_payload(
                 )
         if compact_action is None:
             next_action_binding["copy_all_other_values_exactly"] = True
+        elif record.check is None:
+            action_result = draft.get("action_result")
+            followups = (
+                action_result.get("required_followup_facts")
+                if isinstance(action_result, Mapping)
+                else None
+            )
+            prefix = next_action_binding.get("fixed_argv_prefix")
+            if isinstance(followups, list) and isinstance(prefix, list):
+                for followup in followups:
+                    arguments = (
+                        followup.get("typed_fact_arguments")
+                        if isinstance(followup, dict)
+                        else None
+                    )
+                    if not isinstance(arguments, list):
+                        continue
+                    followup.update(
+                        {
+                            "is_next_command": True,
+                            "literal_copy_policy": {
+                                "copy_fixed_full_argv_exactly": True,
+                                "business_value_substitution": "invalid",
+                            },
+                            "fixed_full_argv": [*prefix, *arguments],
+                        }
+                    )
         if not (command == "draft-check" and record.check is not None):
             draft["next_action_binding"] = next_action_binding
     return {

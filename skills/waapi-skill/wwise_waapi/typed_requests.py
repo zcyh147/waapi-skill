@@ -687,6 +687,25 @@ class TypedRequestContract:
                     "subcommand": "draft-start",
                     "operation": self.uri,
                     "gateway_argv_prefix": ["draft-start", self.uri],
+                    "start_command": {
+                        "argv": ["draft-start", self.uri],
+                        "execute_alone": True,
+                        "typed_facts_on_draft_start": "invalid",
+                    },
+                    "after_start": {
+                        "fact_command_prefix_pointer": (
+                            "/draft/next_action_binding/fixed_argv_prefix"
+                        ),
+                        "append_exactly_one_action": True,
+                        "then_read_next_response": True,
+                    },
+                    "fact_value_argv_policy": {
+                        "one_business_value_is_one_argv_token": True,
+                        "whitespace_or_shell_metacharacters": (
+                            "shell-quote the complete value; splitting it is invalid"
+                        ),
+                        "preserve_value_text_exactly": True,
+                    },
                     "schema_digest_usage": (
                         "the digest binds request-map-container/request-array-item; "
                         "do not pass it to draft-start"
@@ -1452,6 +1471,9 @@ def _fixed_scalar_members(
             "required": name in required_names,
             "accepted_types": [str(value_type)],
         }
+        description = expanded_member.get("description")
+        if isinstance(description, str) and description:
+            row["description"] = description
         enum_values = variants[0].get("enum")
         if isinstance(enum_values, list):
             row["enum"] = list(enum_values)
@@ -1780,6 +1802,38 @@ def parse_typed_schema_lineage_token(
     if derived is None or derived[1] != parent_handle:
         raise TypedRequestError("Typed schema lineage token is unknown or stale")
     return derived[0], derived[2]
+
+
+def typed_schema_lineage_business_pointer(
+    contract: TypedRequestContract,
+    *,
+    child_handle: str,
+    token: str,
+) -> str:
+    """Return the exact canonical request location named by a lineage token."""
+
+    # The caller has just issued this token from the already validated
+    # container request. Nested callers independently revalidate it through
+    # parse_typed_schema_lineage_token before it can authorize another handle.
+    if not child_handle.startswith(TYPED_DYNAMIC_HANDLE_PREFIX):
+        raise TypedRequestError("Typed schema lineage child handle is invalid")
+    steps = _decode_lineage_steps(token)
+    if not steps:
+        raise TypedRequestError("Typed schema lineage token is empty")
+    root_handle = steps[0]["parent_handle"]
+    root = next(
+        (field for field in contract.fields if field.handle == root_handle),
+        None,
+    )
+    if root is None:
+        raise TypedRequestError("Typed schema lineage token has no request root")
+
+    def escape(value: object) -> str:
+        return str(value).replace("~", "~0").replace("/", "~1")
+
+    parts = [root.section, *root.path]
+    parts.extend(str(step["key"]) for step in steps)
+    return "/" + "/".join(escape(part) for part in parts)
 
 
 def _decode_lineage_steps(token: str) -> list[Mapping[str, Any]]:

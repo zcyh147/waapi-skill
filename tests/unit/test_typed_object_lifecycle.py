@@ -190,6 +190,11 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
     )
     assert grandchild_code == 0, grandchild
     assert grandchild["child_contract"]["required_keys"] == ["type", "name"]
+    assert grandchild["business_value_scope"] == {
+        "current_value_pointer": "/args/children/0/children/0",
+        "current_value_only": True,
+        "unrelated_prompt_objects_do_not_satisfy_member_conditions": True,
+    }
     assert grandchild["schema_lineage_authority"] == {
         "returned_token_scope": "direct_descendants_of_this_handle_only",
         "returned_token_handle": grandchild["handle"],
@@ -209,6 +214,7 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
     }
     assert grandchild["continuation"]["next_sibling_disclosure"] == {
         "condition": "current_business_request_contains_next_complex_item",
+        "business_value_pointer": "/args/children/0/children/1",
         "index": 1,
         "must_follow": "current_item_descendant_disclosures",
         "must_precede": "current_root_deferred_facts",
@@ -261,13 +267,21 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
             grandchild["continuation"]["nested_container_disclosures"], start=1
         )
     )
+    assert [
+        row["business_value_pointer"]
+        for row in grandchild["continuation"]["nested_container_disclosures"]
+    ] == [
+        "/args/children/0/children/0/properties",
+        "/args/children/0/children/0/references",
+        "/args/children/0/children/0/children",
+    ]
     assert grandchild["continuation"][
         "next_business_present_nested_disclosure"
     ] == {
         "candidate_pointer": "/continuation/nested_container_disclosures",
         "selection": "first_business_present_member_by_queue_index",
         "repeat_for_descendants": True,
-        "when_none": "follow_next_sibling_disclosure_or_deferred_fact_queue",
+        "when_none": "follow_next_sibling_then_drain_deferred_fact_queue",
         "is_next_command": True,
     }
     assert grandchild["continuation"]["deferred_fact"]["blocked_by"] == [
@@ -283,6 +297,14 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
             "key": "type",
             "required": True,
             "accepted_types": ["string"],
+            "description": (
+                "Exact Wwise request token. Natural mappings: Actor Mixer -> "
+                "ActorMixer; Random Container / 随机容器 -> "
+                "RandomSequenceContainer (never RandomContainer); Blend "
+                "Container / 混合容器 -> BlendContainer; Sound -> Sound. "
+                "Wwise 2025.1 reflects an Actor Mixer as PropertyContainer, "
+                "but its object.create request token remains ActorMixer."
+            ),
             "fact_argv_by_type": {
                 "string": [
                     "--action", "add_typed_fact", "--fact-action", "map-put",
