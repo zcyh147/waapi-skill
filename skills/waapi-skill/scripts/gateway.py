@@ -2256,7 +2256,13 @@ def gateway_stdout_json_encoder(value: Any | None = None) -> json.JSONEncoder:
     if (
         isinstance(value, Mapping)
         and value.get("command")
-        in {"operation-schema", "query-schema", "topic-schema"}
+        in {
+            "operation-schema",
+            "query-schema",
+            "topic-schema",
+            "request-map-container",
+            "request-array-item",
+        }
     ):
         options["separators"] = (",", ":")
     else:
@@ -4231,18 +4237,26 @@ def _fixed_nested_container_disclosures(
     return result
 
 
-def _dynamic_deferred_queue_contract() -> dict[str, str]:
+def _dynamic_deferred_queue_contract() -> dict[str, Any]:
     """Return the one request-wide ordering contract for returned-handle facts."""
 
     return {
         "scope": "current_disclosed_root",
         "root_boundary": "before_next_parent_array_sibling",
         "drain_after": "root_dynamic_disclosures",
-        "response_order": "parent_fact_then_child_contract_then_descendants",
+        "traversal": "response_tree_preorder",
+        "node_steps": [
+            "deferred_parent_fact",
+            "child_contract_facts",
+            "descendant_response_nodes",
+        ],
+        "parent_dependency": (
+            "deferred_parent_fact_before_every_fact_using_response_handle"
+        ),
         "array_traversal": (
             "business_present_sibling_indices_then_nested_members"
         ),
-        "member_traversal": "schema_property_order",
+        "sibling_order": "schema_property_order",
     }
 
 
@@ -4321,7 +4335,9 @@ def _bind_dynamic_branch_facts(
                 "argv": argv,
                 "execute_after": "all_dynamic_disclosures_for_current_root",
                 "queue_phase": "child_contract",
-                "queue_order": _dynamic_deferred_queue_contract(),
+                "queue_order_ref": (
+                    "/continuation/request_wide_order/deferred_fact_queue"
+                ),
                 "is_next_command": False,
             }
 
@@ -4371,7 +4387,13 @@ def _deferred_dynamic_fact_payload(
             "argv": argv,
             "execute_after": "all_dynamic_disclosures_for_current_root",
             "queue_phase": "parent_response",
-            "queue_order": _dynamic_deferred_queue_contract(),
+            "queue_order_ref": (
+                "/continuation/request_wide_order/deferred_fact_queue"
+            ),
+            "must_precede": {
+                "all_facts_with_field_handle": str(fact[-1]),
+                "reason": "attach_returned_handle_to_its_parent_first",
+            },
             "is_next_command": False,
         }
     }
@@ -4398,7 +4420,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "continuation": {
                 "subcommands": ["wait-topic", "stream-topic"],
                 "fact_selection": {
-                    "source": "row fact_action_code",
+                    "source": "row action column named by columns",
                     "or_present": "present only when that container is empty",
                     "disclose": "use only rows whose code starts disclose-",
                 },

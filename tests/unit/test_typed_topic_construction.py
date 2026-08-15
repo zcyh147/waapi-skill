@@ -68,21 +68,28 @@ def _expand_compact_field_table(table: dict[str, object]) -> list[dict[str, obje
     constraint_sets = list(table["constraint_sets"])
     defaults = dict(table["constraint_defaults"])
     rows = list(table["rows"])
-    handles = [str(table["handle_prefix"]) + str(row[0]) for row in rows]
+    handle_prefix = str(table.get("handle_prefix", ""))
+    handles = [handle_prefix + str(row[0]) for row in rows]
     expanded_fields: list[dict[str, object]] = []
-    assert columns == [
-        "handle_suffix",
+    assert columns[:5] == [
+        "handle_suffix" if handle_prefix else "handle",
         "parent_row",
         "name",
         "shape_code",
         "accepted_type_set",
-        "fact_action_code",
-        "constraint_set",
     ]
+    assert columns[5] in {"fact_action", "fact_action_code"}
+    assert columns[6] == "constraint_set"
     for handle, row in zip(handles, rows, strict=True):
         parent_row = row[1]
         shape = shapes[row[3]]
         constraints = dict(constraint_sets[row[6]])
+        fact_action = row[5]
+        fact_action_index = (
+            int(fact_action)
+            if columns[5] == "fact_action_code"
+            else list(table["fact_action_codes"]).index(fact_action)
+        )
         field: dict[str, object] = {
             "handle": handle,
             "section": table["section"],
@@ -90,7 +97,7 @@ def _expand_compact_field_table(table: dict[str, object]) -> list[dict[str, obje
             "required": constraints.pop("required", defaults["required"]),
             "shape": shape,
             "accepted_types": accepted_type_sets[row[4]],
-            "fact_construction": dict(fact_action_definitions[row[5]]),
+            "fact_construction": dict(fact_action_definitions[fact_action_index]),
             **constraints,
         }
         if parent_row is not None:
@@ -111,6 +118,20 @@ def _expand_compact_field_table(table: dict[str, object]) -> list[dict[str, obje
     return expanded_fields
 
 
+@pytest.mark.parametrize("version", ("2021.1", "2023.1", "2024.1"))
+def test_profile_soundbank_topic_rows_expose_copy_ready_handles(version: str) -> None:
+    table = topic_match_contract(
+        version,
+        "ak.wwise.core.soundbank.generated",
+    ).gateway_field_table()
+
+    assert "handle_prefix" not in table
+    assert table["columns"][0] == "handle"
+    assert table["columns"][5] == "fact_action"
+    assert all(str(row[0]).startswith("trh1-") for row in table["rows"])
+    assert all(isinstance(row[5], str) for row in table["rows"])
+
+
 @pytest.mark.parametrize(
     ("version", "field_name", "expected_action"),
     (
@@ -129,12 +150,18 @@ def test_compact_topic_rows_disclose_the_direct_fact_action(
         "ak.wwise.core.soundbank.generated",
     ).gateway_field_table()
     columns = list(table["columns"])
-    action_index = columns.index("fact_action_code")
+    action_name = "fact_action" if "fact_action" in columns else "fact_action_code"
+    action_index = columns.index(action_name)
     name_index = columns.index("name")
     actions = list(table["fact_action_codes"])
     rows = [row for row in table["rows"] if row[name_index] == field_name]
 
-    assert expected_action in {actions[row[action_index]] for row in rows}
+    assert expected_action in {
+        row[action_index]
+        if action_name == "fact_action"
+        else actions[row[action_index]]
+        for row in rows
+    }
 
 
 class _TopicClient:
@@ -314,7 +341,7 @@ def test_topic_schema_discloses_one_typed_continuation_offline(tmp_path: Path) -
     assert payload["bounds"]["stdout_utf8_bytes"] == 32 * 1024
     assert payload["continuation"]["subcommands"] == ["wait-topic", "stream-topic"]
     assert payload["continuation"]["fact_selection"] == {
-        "source": "row fact_action_code",
+        "source": "row action column named by columns",
         "or_present": "present only when that container is empty",
         "disclose": "use only rows whose code starts disclose-",
     }
@@ -444,7 +471,7 @@ def test_wait_topic_digests_bind_to_the_real_topic_schema_envelope(
         },
     }
     assert payload["continuation"]["fact_selection"]["source"] == (
-        "row fact_action_code"
+        "row action column named by columns"
     )
     soundbank_map = next(
         field

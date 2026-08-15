@@ -98,8 +98,8 @@ def test_lua_lanes_have_one_public_typed_draft(
                 "nested_container_disclosures before draining deferred_fact entries"
             ),
             "dependent_facts": (
-                "root_order=siblings>nested>parent_fact>child_contract_facts>"
-                "descendant_facts"
+                "after disclosures drain each response tree preorder: parent fact, "
+                "child-contract facts, then descendant responses in schema order"
             ),
         }
         plan_table = payload["composer"]["top_level_fact_plan"]

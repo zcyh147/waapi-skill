@@ -32,7 +32,12 @@ TYPED_REQUEST_TRACER_URI = "ak.wwise.core.profiler.getVoiceContributions"
 TYPED_REQUEST_COMPLEX_TRACER_URI = "ak.wwise.debug.validateCall"
 TYPED_DYNAMIC_HANDLE_PREFIX = "trm1-"
 TYPED_DYNAMIC_CHOICE_PREFIX = "trc1-"
-TYPED_SCHEMA_LINEAGE_PREFIX = "trl1-"
+TYPED_SCHEMA_LINEAGE_PREFIX = "trl2-"
+# Full handles avoid a model-side prefix/suffix join on ordinary field tables.
+# Larger reflected tables use the lossless shared-prefix encoding so their
+# complete final topic-schema envelope remains inside the fixed 32 KiB ceiling.
+COPY_READY_FIELD_TABLE_MAX_ROWS = 128
+DIRECT_ACTION_FIELD_TABLE_MIN_ROWS = 64
 # The largest reviewed closed request is one complete 256-point RTPC curve.
 # Each point needs one array-membership fact plus its three scalar fields.  The
 # remaining headroom covers the two identities and curve options without
@@ -271,8 +276,8 @@ class TypedRequestContract:
                 "nested_container_disclosures before draining deferred_fact entries"
             ),
             "dependent_facts": (
-                "root_order=siblings>nested>parent_fact>child_contract_facts>"
-                "descendant_facts"
+                "after disclosures drain each response tree preorder: parent fact, "
+                "child-contract facts, then descendant responses in schema order"
             ),
         }
 
@@ -359,9 +364,16 @@ class TypedRequestContract:
             section = next(iter(sections))
         else:
             raise TypedRequestError("Typed field table requires one request section")
+        copy_ready = len(fields) <= COPY_READY_FIELD_TABLE_MAX_ROWS
+        direct_actions = (
+            DIRECT_ACTION_FIELD_TABLE_MIN_ROWS
+            <= len(fields)
+            <= COPY_READY_FIELD_TABLE_MAX_ROWS
+        )
         handle_prefix = (
             "trh1-"
-            if fields and all(str(field["handle"]).startswith("trh1-") for field in fields)
+            if not copy_ready
+            and all(str(field["handle"]).startswith("trh1-") for field in fields)
             else ""
         )
         row_by_handle = {
@@ -461,7 +473,7 @@ class TypedRequestContract:
                     field["name"],
                     shape_codes.index(shape),
                     accepted_type_sets.index(accepted_types),
-                    fact_action_index,
+                    fact_action_code if direct_actions else fact_action_index,
                     constraint_index,
                 ]
             )
@@ -480,14 +492,14 @@ class TypedRequestContract:
         return {
             "contract": "waapi-skill.compact-typed-field-table/v1",
             "section": section,
-            "handle_prefix": handle_prefix,
+            **({"handle_prefix": handle_prefix} if handle_prefix else {}),
             "columns": [
-                "handle_suffix",
+                "handle_suffix" if handle_prefix else "handle",
                 "parent_row",
                 "name",
                 "shape_code",
                 "accepted_type_set",
-                "fact_action_code",
+                "fact_action" if direct_actions else "fact_action_code",
                 "constraint_set",
             ],
             "shape_codes": shape_codes,
@@ -1490,10 +1502,18 @@ def dynamic_container_disclosure(
         object_handle=child_handle,
         member_key=member_key,
     )
+    constant_fields = _variant_constant_fields(
+        _expanded_schema(
+            schema,
+            root_schema=root_schema,
+            graph=contract.definition_graph,
+        )
+    )
     return {
         "shape": shape,
         "open": child.open_map,
         "required_keys": list(child.required_map_keys),
+        **({"constant_fields": constant_fields} if constant_fields else {}),
         "fixed_container_members": _fixed_container_members(
             schema,
             root_schema=root_schema,
@@ -1587,20 +1607,27 @@ def typed_schema_lineage_token(
 
     from base64 import urlsafe_b64encode
 
-    payload = {
-        "schema_digest": contract.schema_digest,
-        "child_handle": child_handle,
-        "steps": [
-            *(_decode_lineage_steps(parent_token) if parent_token is not None else []),
-            {
-                "parent_handle": parent_handle,
-                "key": key,
-                "shape": shape,
-                "choice_handle": choice_handle,
-            },
-        ],
-    }
-    encoded = urlsafe_b64encode(canonical_json_bytes(payload)).decode("ascii").rstrip("=")
+    steps = [
+        *(_decode_lineage_steps(parent_token) if parent_token is not None else []),
+        {
+            "parent_handle": parent_handle,
+            "key": key,
+            "shape": shape,
+            "choice_handle": choice_handle,
+        },
+    ]
+    compact_steps = [
+        [
+            step["parent_handle"],
+            step["key"],
+            step["shape"],
+            step["choice_handle"],
+        ]
+        for step in steps
+    ]
+    encoded = urlsafe_b64encode(canonical_json_bytes(compact_steps)).decode(
+        "ascii"
+    ).rstrip("=")
     return f"{TYPED_SCHEMA_LINEAGE_PREFIX}{encoded}"
 
 
@@ -1627,20 +1654,10 @@ def parse_typed_schema_lineage_token(
         payload = json.loads(decoded.decode("utf-8"))
     except (ValueError, UnicodeDecodeError) as exc:
         raise TypedRequestError("Typed schema lineage token is malformed") from exc
-    if not isinstance(payload, Mapping) or set(payload) != {
-        "schema_digest", "child_handle", "steps"
-    }:
-        raise TypedRequestError("Typed schema lineage token is malformed")
-    if (
-        payload.get("schema_digest") != contract.schema_digest
-        or payload.get("child_handle") != parent_handle
-        or not isinstance(payload.get("steps"), list)
-        or len(payload["steps"]) > MAX_TYPED_SCHEMA_DEPTH
-    ):
-        raise TypedRequestError("Typed schema lineage token is unknown or stale")
     if canonical_json_bytes(payload) != decoded:
         raise TypedRequestError("Typed schema lineage token is noncanonical")
-    derived = _derive_schema_from_lineage_steps(contract, payload["steps"])
+    steps = _expand_compact_lineage_steps(payload)
+    derived = _derive_schema_from_lineage_steps(contract, steps)
     if derived is None or derived[1] != parent_handle:
         raise TypedRequestError("Typed schema lineage token is unknown or stale")
     return derived[0], derived[2]
@@ -1661,9 +1678,34 @@ def _decode_lineage_steps(token: str) -> list[Mapping[str, Any]]:
         )
     except (ValueError, UnicodeDecodeError) as exc:
         raise TypedRequestError("Typed schema lineage token is malformed") from exc
-    steps = payload.get("steps") if isinstance(payload, Mapping) else None
-    if not isinstance(steps, list) or len(steps) > MAX_TYPED_SCHEMA_DEPTH:
+    return _expand_compact_lineage_steps(payload)
+
+
+def _expand_compact_lineage_steps(payload: Any) -> list[Mapping[str, Any]]:
+    """Expand the compact public token only after validating its closed shape."""
+
+    if not isinstance(payload, list) or len(payload) > MAX_TYPED_SCHEMA_DEPTH:
         raise TypedRequestError("Typed schema lineage token is malformed")
+    steps: list[Mapping[str, Any]] = []
+    for row in payload:
+        if not isinstance(row, list) or len(row) != 4:
+            raise TypedRequestError("Typed schema lineage token is malformed")
+        parent_handle, key, shape, choice_handle = row
+        if (
+            not isinstance(parent_handle, str)
+            or not isinstance(key, str)
+            or shape not in {"object", "array"}
+            or (choice_handle is not None and not isinstance(choice_handle, str))
+        ):
+            raise TypedRequestError("Typed schema lineage token is malformed")
+        steps.append(
+            {
+                "parent_handle": parent_handle,
+                "key": key,
+                "shape": shape,
+                "choice_handle": choice_handle,
+            }
+        )
     return steps
 
 

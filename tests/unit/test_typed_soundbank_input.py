@@ -482,11 +482,19 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
             "scope": "current_disclosed_root",
             "root_boundary": "before_next_parent_array_sibling",
             "drain_after": "root_dynamic_disclosures",
-            "response_order": "parent_fact_then_child_contract_then_descendants",
+            "traversal": "response_tree_preorder",
+            "node_steps": [
+                "deferred_parent_fact",
+                "child_contract_facts",
+                "descendant_response_nodes",
+            ],
+            "parent_dependency": (
+                "deferred_parent_fact_before_every_fact_using_response_handle"
+            ),
             "array_traversal": (
                 "business_present_sibling_indices_then_nested_members"
             ),
-            "member_traversal": "schema_property_order",
+            "sibling_order": "schema_property_order",
         },
         "this_handle_is_not_a_complete_request": True,
     }
@@ -495,6 +503,10 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
         "--field-handle", inclusions["handle"], "--value-type", "object",
         "--fact-value", item["handle"],
     ]
+    assert item["continuation"]["deferred_fact"]["must_precede"] == {
+        "all_facts_with_field_handle": item["handle"],
+        "reason": "attach_returned_handle_to_its_parent_first",
+    }
     assert "action_argv" not in item["continuation"]
     branch_argv = [
         "object" if token == "<exact-key>" else token
@@ -559,6 +571,7 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
     assert identity["parent_handle"] == item["handle"]
     assert identity["handle"] != item["handle"]
     assert identity["child_contract"]["required_keys"] == ["kind", "value"]
+    assert identity["child_contract"]["constant_fields"] == {"kind": "id"}
     assert "branch_disclosure" not in identity["continuation"]
     assert "action_argv" not in identity["continuation"]
     assert identity["continuation"]["deferred_fact"]["argv"] == [
@@ -566,6 +579,10 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
         "--field-handle", item["handle"], "--value-type", "object",
         "--fact-value", identity["handle"], "--key", "object",
     ]
+    assert identity["continuation"]["deferred_fact"]["must_precede"] == {
+        "all_facts_with_field_handle": identity["handle"],
+        "reason": "attach_returned_handle_to_its_parent_first",
+    }
 
     for contradiction in (
         ["--shape", "array"],

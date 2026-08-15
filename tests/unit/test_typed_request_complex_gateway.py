@@ -111,11 +111,19 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
             "scope": "current_disclosed_root",
             "root_boundary": "before_next_parent_array_sibling",
             "drain_after": "root_dynamic_disclosures",
-            "response_order": "parent_fact_then_child_contract_then_descendants",
+            "traversal": "response_tree_preorder",
+            "node_steps": [
+                "deferred_parent_fact",
+                "child_contract_facts",
+                "descendant_response_nodes",
+            ],
+            "parent_dependency": (
+                "deferred_parent_fact_before_every_fact_using_response_handle"
+            ),
             "array_traversal": (
                 "business_present_sibling_indices_then_nested_members"
             ),
-            "member_traversal": "schema_property_order",
+            "sibling_order": "schema_property_order",
         },
         "this_handle_is_not_a_complete_request": True,
     }
@@ -140,9 +148,9 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
     ]
     assert field_choice["deferred_fact"]["is_next_command"] is False
     assert field_choice["deferred_fact"]["queue_phase"] == "child_contract"
-    assert field_choice["deferred_fact"]["queue_order"] == item["continuation"][
-        "request_wide_order"
-    ]["deferred_fact_queue"]
+    assert field_choice["deferred_fact"]["queue_order_ref"] == (
+        "/continuation/request_wide_order/deferred_fact_queue"
+    )
     assert field_choice["typed_fact"] == {
         "action": "choose-dynamic",
         "handle": item["handle"],
@@ -156,11 +164,40 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
     assert item["continuation"]["deferred_fact"]["queue_phase"] == (
         "parent_response"
     )
-    assert item["continuation"]["deferred_fact"]["queue_order"] == item[
-        "continuation"
-    ]["request_wide_order"]["deferred_fact_queue"]
+    assert item["continuation"]["deferred_fact"]["must_precede"] == {
+        "all_facts_with_field_handle": item["handle"],
+        "reason": "attach_returned_handle_to_its_parent_first",
+    }
+    assert item["continuation"]["deferred_fact"]["queue_order_ref"] == (
+        "/continuation/request_wide_order/deferred_fact_queue"
+    )
     assert item["continuation"]["deferred_fact"]["is_next_command"] is False
     assert "deferred_action_argv" not in item["continuation"]
+
+
+def test_media_pool_dynamic_child_stdout_is_complete_within_visible_budget(
+    tmp_path: Path,
+) -> None:
+    """The public child disclosure must not rely on a truncated tool result."""
+
+    contract = request_contract("2025.1", MEDIA_POOL_URI)
+    filters = next(field for field in contract.fields if field.name == "filters")
+    exit_code, item = gateway.execute_gateway(
+        [
+            "request-array-item", MEDIA_POOL_URI,
+            "--schema-digest", contract.schema_digest,
+            "--array-handle", filters.handle,
+            "--index", "0", "--shape", "object",
+        ],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda _url: pytest.fail("disclosure must be offline"),
+    )
+
+    assert exit_code == 0, item
+    encoded = gateway.gateway_stdout_json_encoder(item).encode(item)
+    assert len((encoded + "\n").encode("utf-8")) < 32 * 1024
+    assert json.loads(encoded) == item
+    assert gateway.gateway_stdout_json_encoder(item).indent is None
 
 
 def test_audio_convert_schema_forbids_present_with_nonempty_languages(
@@ -796,13 +833,15 @@ def test_schema_lineage_token_cannot_invent_a_child_schema(
     )
     assert code == 0
     token = parent["schema_lineage_token"]
+    assert token.startswith("trl2-")
+    assert len(token) < 96
     from base64 import urlsafe_b64decode, urlsafe_b64encode
-    raw = token.removeprefix("trl1-")
+    raw = token.removeprefix("trl2-")
     decoded = json.loads(
         urlsafe_b64decode(raw + "=" * (-len(raw) % 4)).decode("utf-8")
     )
-    decoded["steps"][0]["key"] = "invented"
-    forged = "trl1-" + urlsafe_b64encode(
+    decoded[0][1] = "invented"
+    forged = "trl2-" + urlsafe_b64encode(
         json.dumps(decoded, separators=(",", ":"), sort_keys=True).encode("utf-8")
     ).decode("ascii").rstrip("=")
     rejected_code, rejected = gateway.execute_gateway(
@@ -819,13 +858,27 @@ def test_schema_lineage_token_cannot_invent_a_child_schema(
     assert rejected_code == 2
     assert rejected["ok"] is False
 
+    stale_code, stale = gateway.execute_gateway(
+        [
+            "request-map-container", VALIDATE_URI,
+            "--schema-digest", schema["schema_digest"],
+            "--map-handle", parent["handle"],
+            "--key", "child", "--shape", "object",
+            "--parent-schema-token", token.replace("trl2-", "trl1-", 1),
+        ],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda _url: pytest.fail("stale token must fail offline"),
+    )
+    assert stale_code == 2
+    assert stale["ok"] is False
+
     oversized_code, oversized = gateway.execute_gateway(
         [
             "request-map-container", VALIDATE_URI,
             "--schema-digest", schema["schema_digest"],
             "--map-handle", parent["handle"],
             "--key", "child", "--shape", "object",
-            "--parent-schema-token", "trl1-" + "A" * (64 * 1024 * 2 + 1),
+            "--parent-schema-token", "trl2-" + "A" * (64 * 1024 * 2 + 1),
         ],
         env=_env(tmp_path, "2025.1"),
         client_factory=lambda _url: pytest.fail("oversized token must fail offline"),
