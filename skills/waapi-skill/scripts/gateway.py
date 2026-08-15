@@ -117,6 +117,8 @@ from wwise_waapi.builders.stable_reads import (  # noqa: E402  # pyright: ignore
 from wwise_waapi.typed_requests import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     TYPED_REQUEST_COMPLEX_TRACER_URI,
     TYPED_REQUEST_TRACER_URI,
+    TypedRequestContract,
+    TypedRequestError,
     TypedRequestFact,
     dynamic_array_item_choices,
     dynamic_array_item_handle,
@@ -4269,7 +4271,40 @@ def _bind_dynamic_branch_facts(
     query_shape: bool,
     topic_prefix: str | None,
 ) -> None:
-    """Attach the exact public fact for every already disclosed branch choice."""
+    """Attach exact public facts for schema-owned child values and choices."""
+
+    constant_rows = child_contract.get("constant_field_facts")
+    if isinstance(constant_rows, list):
+        for row in constant_rows:
+            if not isinstance(row, dict):
+                continue
+            typed_fact = row.get("typed_fact")
+            if not isinstance(typed_fact, Mapping):
+                continue
+            key = typed_fact.get("key")
+            value_type = typed_fact.get("value_type")
+            value = typed_fact.get("value")
+            if not all(isinstance(item, str) for item in (key, value_type, value)):
+                continue
+            deferred = _deferred_dynamic_fact_payload(
+                ["--map-put", child_handle, key, value_type, value],
+                draft_shape=draft_shape,
+                undo_child_shape=undo_child_shape,
+                query_shape=query_shape,
+                topic_prefix=topic_prefix,
+            )
+            if isinstance(deferred.get("deferred_fact"), dict):
+                deferred["deferred_fact"].pop("must_precede", None)
+                deferred["deferred_fact"].update(
+                    {
+                        "queue_phase": "child_contract",
+                        "queue_order_ref": (
+                            "/continuation/request_wide_order/deferred_fact_queue"
+                        ),
+                        "is_next_command": False,
+                    }
+                )
+            row.update(deferred)
 
     rows = child_contract.get("branch_choices")
     if not isinstance(rows, list):
@@ -4395,6 +4430,69 @@ def _deferred_dynamic_fact_payload(
                 "reason": "attach_returned_handle_to_its_parent_first",
             },
             "is_next_command": False,
+        }
+    }
+
+
+def _next_array_item_disclosure(
+    args: argparse.Namespace,
+    *,
+    contract: TypedRequestContract,
+    child_handle: str,
+    lineage_token: str,
+) -> dict[str, Any]:
+    """Expose the sole nested-array continuation before its parent fact."""
+
+    if args.shape != "array":
+        return {}
+    try:
+        lineage = parse_typed_schema_lineage_token(
+            contract,
+            token=lineage_token,
+            parent_handle=child_handle,
+        )
+    except TypedRequestError:
+        # A legacy caller may mint a nested container without replaying its
+        # parent lineage. Preserve that bounded response, but do not advertise
+        # a descendant continuation that the Gateway cannot revalidate.
+        return {}
+    if lineage is None:
+        return {}
+    child_schema, child_section = lineage
+    argv_by_shape: dict[str, list[str]] = {}
+    for shape in ("object", "array"):
+        if not dynamic_array_item_choices(
+            contract,
+            array_handle=child_handle,
+            index=0,
+            shape=shape,
+            parent_schema=child_schema,
+            parent_section=child_section,
+        ):
+            continue
+        argv_by_shape[shape] = [
+            "request-array-item",
+            args.api,
+            "--schema-digest",
+            contract.schema_digest,
+            "--array-handle",
+            child_handle,
+            "--index",
+            "<zero_based_business_present_index>",
+            "--shape",
+            shape,
+            "--parent-schema-token",
+            lineage_token,
+        ]
+    if not argv_by_shape:
+        return {}
+    return {
+        "next_item_disclosure": {
+            "condition": "for_each_business_present_item",
+            "index_order": "ascending_zero_based_index",
+            "must_finish_before": "deferred_fact",
+            "is_next_command": True,
+            "argv_by_shape": argv_by_shape,
         }
     }
 
@@ -4739,6 +4837,24 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             child_contract=child_contract,
             lineage_token=lineage_token,
         )
+        next_item_disclosure = _next_array_item_disclosure(
+            args,
+            contract=contract,
+            child_handle=child_handle,
+            lineage_token=lineage_token,
+        )
+        deferred_fact = _deferred_dynamic_fact_payload(
+            fact,
+            draft_shape=draft_shape,
+            undo_child_shape=undo_child_shape,
+            query_shape=query_shape,
+            topic_prefix=topic_prefix,
+        )
+        if next_item_disclosure and "deferred_fact" in deferred_fact:
+            deferred_fact["deferred_fact"]["blocked_by"] = [
+                "next_item_disclosure",
+                "all_descendant_disclosures",
+            ]
         return {
             "contract": "waapi-skill.typed-container-handle/v1",
             "ok": True,
@@ -4777,13 +4893,8 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     else "draft-apply" if undo_child_shape
                     else "draft-apply" if draft_shape else "typed-call"
                 ),
-                **_deferred_dynamic_fact_payload(
-                    fact,
-                    draft_shape=draft_shape,
-                    undo_child_shape=undo_child_shape,
-                    query_shape=query_shape,
-                    topic_prefix=topic_prefix,
-                ),
+                **next_item_disclosure,
+                **deferred_fact,
                 **(
                     {
                         "valid_subscription_subcommands": [

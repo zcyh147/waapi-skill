@@ -144,6 +144,32 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         client_factory=lambda url: (_ for _ in ()).throw(AssertionError(url)),
     )
     assert nested_code == 0, nested_children
+    assert nested_children["continuation"]["next_item_disclosure"] == {
+        "condition": "for_each_business_present_item",
+        "index_order": "ascending_zero_based_index",
+        "must_finish_before": "deferred_fact",
+        "is_next_command": True,
+        "argv_by_shape": {
+            "object": [
+                "request-array-item",
+                "object.create",
+                "--schema-digest",
+                payload["composer"]["typed_request_schema_digest"],
+                "--array-handle",
+                nested_children["handle"],
+                "--index",
+                "<zero_based_business_present_index>",
+                "--shape",
+                "object",
+                "--parent-schema-token",
+                nested_children["schema_lineage_token"],
+            ]
+        },
+    }
+    assert nested_children["continuation"]["deferred_fact"]["blocked_by"] == [
+        "next_item_disclosure",
+        "all_descendant_disclosures",
+    ]
     grandchild_code, grandchild = waapi_gateway.execute_gateway(
         [
             "--version", "2025.1", "request-array-item", "object.create",

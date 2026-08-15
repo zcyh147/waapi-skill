@@ -572,6 +572,30 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
     assert identity["handle"] != item["handle"]
     assert identity["child_contract"]["required_keys"] == ["kind", "value"]
     assert identity["child_contract"]["constant_fields"] == {"kind": "id"}
+    assert identity["child_contract"]["constant_field_facts"] == [
+        {
+            "typed_fact": {
+                "action": "map-put",
+                "handle": identity["handle"],
+                "key": "kind",
+                "value_type": "string",
+                "value": "id",
+            },
+            "deferred_fact": {
+                "argv": [
+                    "--action", "add_typed_fact", "--fact-action", "map-put",
+                    "--field-handle", identity["handle"], "--value-type", "string",
+                    "--fact-value", "id", "--key", "kind",
+                ],
+                "execute_after": "all_dynamic_disclosures_for_current_root",
+                "queue_phase": "child_contract",
+                "queue_order_ref": (
+                    "/continuation/request_wide_order/deferred_fact_queue"
+                ),
+                "is_next_command": False,
+            },
+        }
+    ]
     assert "branch_disclosure" not in identity["continuation"]
     assert "action_argv" not in identity["continuation"]
     assert identity["continuation"]["deferred_fact"]["argv"] == [

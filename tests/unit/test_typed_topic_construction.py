@@ -135,9 +135,13 @@ def test_profile_soundbank_topic_rows_expose_copy_ready_handles(version: str) ->
 @pytest.mark.parametrize(
     ("version", "field_name", "expected_action"),
     (
-        ("2021.1", "platform", "map-put-or-present"),
-        ("2023.1", "name", "set"),
-        ("2024.1", "name", "set"),
+        (
+            "2021.1",
+            "platform",
+            "--match-map-put(nonempty)|--match-present(empty)",
+        ),
+        ("2023.1", "name", "--match-set"),
+        ("2024.1", "name", "--match-set"),
     ),
 )
 def test_compact_topic_rows_disclose_the_direct_fact_action(

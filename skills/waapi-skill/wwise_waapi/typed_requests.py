@@ -50,6 +50,32 @@ MAX_TYPED_SCHEMA_NODES = 1024
 MAX_TYPED_SCHEMA_DEPTH = 16
 
 
+def _copy_ready_fact_action(uri: str, action: str) -> str:
+    """Render one compact-table action as the exact public Topic flag."""
+
+    prefix = (
+        "option"
+        if uri.startswith("topic.options:")
+        else "match" if uri.startswith("topic.match:") else ""
+    )
+    if not prefix:
+        return action
+    return {
+        "set": f"--{prefix}-set",
+        "choose": f"--{prefix}-choose",
+        "append-or-present": (
+            f"--{prefix}-append(nonempty)|--{prefix}-present(empty)"
+        ),
+        "map-put-or-present": (
+            f"--{prefix}-map-put(nonempty)|--{prefix}-present(empty)"
+        ),
+        "disclose-array-item-or-present": (
+            f"request-array-item(nonempty)|--{prefix}-present(empty)"
+        ),
+        "static-child-facts": "child_contract_facts",
+    }.get(action, action)
+
+
 class TypedRequestError(ValueError):
     """A typed request cannot be disclosed or materialized safely."""
 
@@ -456,15 +482,20 @@ class TypedRequestContract:
                     fact_action_code = "map-put-or-present"
                 elif fact_construction.get("role") == "branch_choice_handle":
                     fact_action_code = "choose"
-            if fact_action_code in fact_action_codes:
-                fact_action_index = fact_action_codes.index(fact_action_code)
+            public_fact_action = (
+                _copy_ready_fact_action(self.uri, fact_action_code)
+                if direct_actions
+                else fact_action_code
+            )
+            if public_fact_action in fact_action_codes:
+                fact_action_index = fact_action_codes.index(public_fact_action)
                 if fact_action_definitions[fact_action_index] != fact_construction:
                     raise TypedRequestError(
                         "Compact field action code has inconsistent semantics"
                     )
             else:
                 fact_action_index = len(fact_action_codes)
-                fact_action_codes.append(fact_action_code)
+                fact_action_codes.append(public_fact_action)
                 fact_action_definitions.append(dict(fact_construction))
             rows.append(
                 [
@@ -473,7 +504,7 @@ class TypedRequestContract:
                     field["name"],
                     shape_codes.index(shape),
                     accepted_type_sets.index(accepted_types),
-                    fact_action_code if direct_actions else fact_action_index,
+                    public_fact_action if direct_actions else fact_action_index,
                     constraint_index,
                 ]
             )
@@ -1509,11 +1540,30 @@ def dynamic_container_disclosure(
             graph=contract.definition_graph,
         )
     )
+    constant_field_facts = []
+    for constant_key, constant_value in constant_fields.items():
+        value_type = _typed_value_type(constant_value)
+        constant_field_facts.append(
+            {
+                "typed_fact": {
+                    "action": "map-put",
+                    "handle": child_handle,
+                    "key": constant_key,
+                    "value_type": value_type,
+                    "value": _typed_value_text(constant_value, value_type),
+                }
+            }
+        )
     return {
         "shape": shape,
         "open": child.open_map,
         "required_keys": list(child.required_map_keys),
         **({"constant_fields": constant_fields} if constant_fields else {}),
+        **(
+            {"constant_field_facts": constant_field_facts}
+            if constant_field_facts
+            else {}
+        ),
         "fixed_container_members": _fixed_container_members(
             schema,
             root_schema=root_schema,
@@ -1564,6 +1614,17 @@ def _dynamic_map_branch_payloads(
             literal_key = _optional_literal_pattern_key(pattern)
             if literal_key is not None and len(variants) > 1:
                 branch_members.append((literal_key, variants))
+    construction_keys = tuple(
+        dict.fromkeys((*child.required_map_keys, *child.fixed_map_keys))
+    )
+    construction_order = {
+        key: index for index, key in enumerate(construction_keys)
+    }
+    branch_members.sort(
+        key=lambda member: construction_order.get(
+            member[0], len(construction_order)
+        )
+    )
     for branch_key, variants in branch_members:
         choices = dynamic_branch_choices(
             contract,

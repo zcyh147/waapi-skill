@@ -135,6 +135,12 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
     assert "branch_disclosure" not in item["continuation"]
     branch_choices = item["child_contract"]["branch_choices"]
     assert branch_choices
+    assert [branch["key"] for branch in branch_choices] == [
+        "type",
+        "value",
+        "field",
+        "operator",
+    ]
     type_branch = next(row for row in branch_choices if row["key"] == "type")
     field_choice = next(
         choice
