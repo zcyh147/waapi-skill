@@ -212,6 +212,7 @@ from tests.semantic.support.codex_prompt_provenance_v3 import (  # noqa: E402
     serialize_protocol,
 )
 from tests.semantic.support.codex_eval_protocol_v3 import (  # noqa: E402
+    V3GatewayProtocol,
     V3ProtocolError,
     materialize_typed_transaction_protocol_requests,
     operation_request_equivalence,
@@ -3728,6 +3729,36 @@ def _build_heavy_v3_broker_replay(
         if len(present_prefix) >= 2:
             replay_setup_groups.append(present_prefix)
 
+    offline_replay_preview_requests: dict[str, Mapping[str, Any]] = {}
+    for start_index, step in enumerate(execution):
+        if (
+            step.subcommand != "draft-start"
+            or not step.arguments
+            or step.arguments[0]
+            not in {"lua.executeCliFile", "lua.executeCoreFile"}
+        ):
+            continue
+        preview_index = next(
+            (
+                index
+                for index in range(start_index + 1, len(execution))
+                if execution[index].subcommand == "preview-from-draft"
+            ),
+            None,
+        )
+        if preview_index is None:
+            continue
+        segment = V3GatewayProtocol(
+            steps=execution[start_index : preview_index + 1],
+            turn_prefix_counts=(preview_index - start_index + 1,),
+        )
+        for pointer, request in materialize_typed_transaction_protocol_requests(
+            segment,
+            version=expected_wwise_version,
+            allow_cleaned_file_evidence=True,
+        ):
+            offline_replay_preview_requests[pointer.rsplit("/", 1)[-1]] = request
+
     replay = CodexGatewayBroker(
         skill_source=skill_source,
         invocation_skill_source=invocation_skill_source,
@@ -3737,6 +3768,7 @@ def _build_heavy_v3_broker_replay(
         expected_wwise_version=expected_wwise_version,
         project_modification_policy=project_modification_policy,
         runner_environment={},
+        offline_replay_preview_requests=offline_replay_preview_requests,
     )
     # Offline replay never starts the Broker.  Its Draft payload validator must
     # follow the archived dependency-valid order and its rebound revision chain.

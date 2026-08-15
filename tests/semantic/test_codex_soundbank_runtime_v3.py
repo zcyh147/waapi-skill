@@ -498,6 +498,58 @@ class FakeSoundBankBackend:
                     (artifact.path.parent / "Wwise.dat").write_bytes(
                         ("INDEX:" + case.scenario_id).encode("utf-8")
                     )
+            if case.blueprint.version == "2021.1" and case.blueprint.api == SOUNDBANK_TOPIC:
+                cache_root = case.allowed_dynamic_artifact_roots[0] / "Windows" / "SFX"
+                cache_root.mkdir(parents=True, exist_ok=True)
+                info = ET.Element("SoundBanksInfo")
+                roots = ET.SubElement(info, "RootPaths")
+                ET.SubElement(roots, "SourceFilesRoot").text = str(
+                    cache_root.parent
+                )
+                streamed = ET.SubElement(info, "StreamedFiles")
+                for media in case.blueprint.media_fixtures:
+                    relative = f"SFX\\{media.wav_path.stem}_A07A4AEB.wem"
+                    (cache_root / f"{media.wav_path.stem}_A07A4AEB.wem").write_bytes(
+                        b"bounded converted cache media"
+                    )
+                    row = ET.SubElement(
+                        streamed,
+                        "File",
+                        {"Id": str(case.media_ids[media.key])},
+                    )
+                    ET.SubElement(row, "ShortName").text = media.wav_path.name
+                    ET.SubElement(row, "Path").text = relative
+                soundbanks = ET.SubElement(info, "SoundBanks")
+                for bank_name in sorted(
+                    {
+                        name
+                        for media in case.blueprint.media_fixtures
+                        for name in media.soundbank_names
+                    }
+                ):
+                    bank = ET.SubElement(soundbanks, "SoundBank")
+                    ET.SubElement(bank, "ShortName").text = bank_name
+                    events = ET.SubElement(bank, "IncludedEvents")
+                    event = ET.SubElement(events, "Event")
+                    references = ET.SubElement(event, "ReferencedStreamedFiles")
+                    for media in case.blueprint.media_fixtures:
+                        if bank_name in media.soundbank_names:
+                            ET.SubElement(
+                                references,
+                                "File",
+                                {"Id": str(case.media_ids[media.key])},
+                            )
+                bank_root = next(
+                    artifact.path.parent
+                    for artifact in case.expected_artifacts
+                    if artifact.kind == "bank"
+                )
+                ET.SubElement(roots, "SoundBanksRoot").text = str(bank_root)
+                ET.ElementTree(info).write(
+                    bank_root / "SoundbanksInfo.xml",
+                    encoding="utf-8",
+                    xml_declaration=True,
+                )
             return
         if case.blueprint.api == "ak.wwise.core.soundbank.setInclusions":
             spec = case.blueprint.asset_spec
@@ -2025,11 +2077,14 @@ def test_each_generated_topic_binds_live_media_id_for_exact_wem_oracle(
     expected_keys = {fixture.key for fixture in case.blueprint.media_fixtures}
     assert set(case.media_ids) == expected_keys
     assert not any(key.startswith("media_source:") for key in case.short_ids)
-    assert {
+    expected_artifact_ids = {
         int(artifact.path.stem)
         for artifact in case.expected_artifacts
         if artifact.kind == "media"
-    } == set(case.media_ids.values())
+    }
+    assert expected_artifact_ids == (
+        set() if case.blueprint.version == "2021.1" else set(case.media_ids.values())
+    )
 
     for fixture in case.blueprint.media_fixtures:
         source_id = case.object_ids[f"media_source:{fixture.key}"]
@@ -2053,6 +2108,83 @@ def test_each_generated_topic_binds_live_media_id_for_exact_wem_oracle(
         match=r"media source .* has no bounded uint32 mediaId",
     ):
         invalid_runtime.prepare()
+
+
+def test_2021_topic_verifies_exact_new_cache_media_without_claiming_copy_step(
+    tmp_path: Path,
+) -> None:
+    scenario = _typed_scenario("TYP21-TOPIC-SOUNDBANK-GENERATED")
+    runtime, backend = _unprepared_runtime(
+        tmp_path / "valid", scenario, version="2021.1"
+    )
+    backend.omit_all_import_result_ids = True
+    backend._insert(r"\Platforms\Windows", "Windows", "Platform")
+    backend._insert(r"\Languages\SFX", "SFX", "Language")
+    runtime.prepare()
+    case = runtime.materialized
+    assert case is not None and case.blueprint.version == "2021.1"
+    assert case.topic_plan is not None
+    events = [_topic_payload(row) for row in case.topic_plan.expected_events]
+
+    backend.apply_business_effect(case)
+    topic_result, artifact_result = runtime.verify_topic(events)
+    assert topic_result.passed
+    assert artifact_result.passed
+
+    cache_files = sorted(case.allowed_dynamic_artifact_roots[0].rglob("*.wem"))
+    assert len(cache_files) == len(case.blueprint.media_fixtures)
+    cache_files[0].unlink()
+    _topic_result, missing = runtime.verify_topic(events)
+    assert not missing.passed
+    assert any("streamed cache media is absent" in row for row in missing.failures)
+
+    backend.apply_business_effect(case)
+    extra = cache_files[0].parent / "unreviewed_A07A4AEB.wem"
+    extra.write_bytes(b"unreviewed cache media")
+    _topic_result, surplus = runtime.verify_topic(events)
+    assert not surplus.passed
+    assert any("unreviewed cache media" in row for row in surplus.failures)
+
+    extra.unlink()
+    backend.apply_business_effect(case)
+    info_path = next(
+        artifact.path.parent / "SoundbanksInfo.xml"
+        for artifact in case.expected_artifacts
+        if artifact.kind == "bank"
+    )
+    document = ET.parse(info_path)
+    streamed = document.getroot().find("./StreamedFiles/File")
+    assert streamed is not None
+    streamed.set("Id", "4294967295")
+    document.write(info_path, encoding="utf-8", xml_declaration=True)
+    _topic_result, wrong_media_id = runtime.verify_topic(events)
+    assert not wrong_media_id.passed
+    assert any("MediaID set differs" in row for row in wrong_media_id.failures)
+
+    backend.apply_business_effect(case)
+    document = ET.parse(info_path)
+    reference = document.getroot().find(
+        "./SoundBanks/SoundBank/IncludedEvents/Event/ReferencedStreamedFiles/File"
+    )
+    assert reference is not None
+    reference.set("Id", "4294967295")
+    document.write(info_path, encoding="utf-8", xml_declaration=True)
+    _topic_result, wrong_bank_reference = runtime.verify_topic(events)
+    assert not wrong_bank_reference.passed
+    assert any(
+        "per-Bank streamed references differ" in row
+        for row in wrong_bank_reference.failures
+    )
+
+    backend.apply_business_effect(case)
+    document = ET.parse(info_path)
+    source_root = document.getroot().find("./RootPaths/SourceFilesRoot")
+    assert source_root is not None
+    source_root.text = str(case.blueprint.io_root / "foreign-cache" / "Windows")
+    document.write(info_path, encoding="utf-8", xml_declaration=True)
+    _topic_result, wrong_source_root = runtime.verify_topic(events)
+    assert not wrong_source_root.passed
+    assert any("SourceFilesRoot differs" in row for row in wrong_source_root.failures)
 
 
 @pytest.mark.parametrize(

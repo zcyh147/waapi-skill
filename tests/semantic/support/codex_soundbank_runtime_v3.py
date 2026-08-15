@@ -2961,6 +2961,13 @@ def _generation_artifacts(
                 for media in media_by_bank.get(bank_name, []):
                     if media.language != "SFX" and languages and media.language not in languages:
                         continue
+                    # The reviewed 2021 Topic publisher runs through WAAPI
+                    # generation, which creates the Bank and its converted
+                    # cache media but does not invoke the project's external
+                    # CopyStreamedFiles post-step.  Bind those cache files
+                    # below instead of inventing a copied-media output path.
+                    if blueprint.version == "2021.1" and blueprint.api == SOUNDBANK_TOPIC:
+                        continue
                     media_id = media_ids.get(media.key)
                     if media_id is None:
                         raise SoundBankRuntimeError(
@@ -3392,6 +3399,192 @@ def _validate_before_state(
         )
 
 
+def _validate_2021_topic_streamed_media(
+    case: MaterializedSoundBankCase,
+    before_outputs: Mapping[str, FileProof],
+    after_outputs: Mapping[str, FileProof],
+) -> list[str]:
+    """Bind 2021 streamed media to SoundbanksInfo and the converted cache.
+
+    WAAPI generation writes ``SoundbanksInfo.xml`` and converted streamed WEMs
+    below its ``SourceFilesRoot``.  It does not run the Authoring project's
+    external CopyStreamedFiles post-step, so a copied-media output path is not
+    business evidence for this exact lane.
+    """
+
+    failures: list[str] = []
+    if len(case.allowed_dynamic_artifact_roots) != 1:
+        return ["2021 Topic cache authority is not singular"]
+    cache_root = case.allowed_dynamic_artifact_roots[0]
+    expected_media = {
+        str(_require_key(case.media_ids, media.key)): media
+        for media in case.blueprint.media_fixtures
+    }
+    expected_by_bank: dict[str, set[str]] = {}
+    for media_id, media in expected_media.items():
+        for bank_name in media.soundbank_names:
+            expected_by_bank.setdefault(bank_name, set()).add(media_id)
+
+    bank_roots = {
+        artifact.path.parent
+        for artifact in case.expected_artifacts
+        if artifact.kind == "bank"
+    }
+    if len(bank_roots) != 1:
+        return ["2021 Topic SoundBank output authority is not singular"]
+    bank_root = next(iter(bank_roots))
+    info_path = bank_root / "SoundbanksInfo.xml"
+    try:
+        before = _file_proof(info_path, case.blueprint.io_root)
+        document = ET.parse(info_path).getroot()
+        after = _file_proof(info_path, case.blueprint.io_root)
+    except (ET.ParseError, OSError, SoundBankRuntimeError) as exc:
+        return [f"2021 Topic SoundbanksInfo is invalid: {exc}"]
+    if before != after:
+        return ["2021 Topic SoundbanksInfo changed while it was read"]
+
+    def direct_children(parent: ET.Element, name: str) -> tuple[ET.Element, ...]:
+        return tuple(
+            child
+            for child in parent
+            if child.tag.rsplit("}", 1)[-1] == name
+        )
+
+    root_paths = direct_children(document, "RootPaths")
+    if len(root_paths) != 1:
+        return ["2021 Topic SoundbanksInfo has no singular RootPaths section"]
+    source_roots = direct_children(root_paths[0], "SourceFilesRoot")
+    soundbank_roots = direct_children(root_paths[0], "SoundBanksRoot")
+    if (
+        len(source_roots) != 1
+        or len(soundbank_roots) != 1
+        or not isinstance(source_roots[0].text, str)
+        or not isinstance(soundbank_roots[0].text, str)
+    ):
+        return ["2021 Topic SoundbanksInfo root paths are malformed"]
+    try:
+        source_root = _localize_wwise_host_path(
+            source_roots[0].text,
+            "SoundbanksInfo.SourceFilesRoot",
+            allow_trailing_separator=True,
+        ).resolve(strict=False)
+        soundbank_root = _localize_wwise_host_path(
+            soundbank_roots[0].text,
+            "SoundbanksInfo.SoundBanksRoot",
+            allow_trailing_separator=True,
+        ).resolve(strict=False)
+    except SoundBankRuntimeError as exc:
+        return [f"2021 Topic SoundbanksInfo root path is invalid: {exc}"]
+    if source_root != (cache_root / bank_root.name).resolve(strict=False):
+        failures.append("2021 Topic SourceFilesRoot differs from the sealed cache")
+    if soundbank_root != bank_root.resolve(strict=False):
+        failures.append("2021 Topic SoundBanksRoot differs from the sealed output")
+
+    streamed_sections = direct_children(document, "StreamedFiles")
+    if len(streamed_sections) != 1:
+        return ["2021 Topic SoundbanksInfo has no singular StreamedFiles section"]
+    observed: dict[str, tuple[str, str]] = {}
+    resolved_paths: dict[str, str] = {}
+    for row in direct_children(streamed_sections[0], "File"):
+        media_id = row.attrib.get("Id")
+        short_rows = direct_children(row, "ShortName")
+        path_rows = direct_children(row, "Path")
+        if (
+            not isinstance(media_id, str)
+            or not media_id.isdecimal()
+            or len(short_rows) != 1
+            or len(path_rows) != 1
+            or not isinstance(short_rows[0].text, str)
+            or not isinstance(path_rows[0].text, str)
+            or media_id in observed
+        ):
+            failures.append("2021 Topic StreamedFiles contains a malformed row")
+            continue
+        try:
+            parsed = parse_relative_host_path(path_rows[0].text)
+        except ReflectedHostPathError:
+            failures.append(
+                f"2021 Topic streamed path is not canonical: {path_rows[0].text}"
+            )
+            continue
+        if "/" in path_rows[0].text:
+            failures.append(
+                f"2021 Topic streamed path is not Wwise-relative: {path_rows[0].text}"
+            )
+            continue
+        media_path = cache_root / bank_root.name / Path(*parsed.relative_parts)
+        try:
+            relative = media_path.relative_to(case.blueprint.io_root).as_posix()
+        except ValueError:
+            failures.append("2021 Topic streamed media escaped its cache authority")
+            continue
+        observed[media_id] = (short_rows[0].text, path_rows[0].text)
+        resolved_paths[media_id] = relative
+
+    if set(observed) != set(expected_media):
+        failures.append(
+            "2021 Topic streamed MediaID set differs from the sealed sources: "
+            f"expected={sorted(expected_media)} observed={sorted(observed)}"
+        )
+    for media_id, media in expected_media.items():
+        row = observed.get(media_id)
+        if row is None:
+            continue
+        if row[0] != media.wav_path.name:
+            failures.append(
+                f"2021 Topic streamed ShortName differs for {media.key}: {row[0]}"
+            )
+        relative = resolved_paths[media_id]
+        proof = after_outputs.get(relative)
+        if proof is None or proof.size <= 0:
+            failures.append(f"2021 Topic streamed cache media is absent: {relative}")
+        elif relative in before_outputs:
+            failures.append(f"2021 Topic streamed cache media preexisted: {relative}")
+    cache_relative = cache_root.relative_to(case.blueprint.io_root).as_posix() + "/"
+    created_cache_media = {
+        relative
+        for relative in after_outputs
+        if relative.startswith(cache_relative)
+        and Path(relative).suffix.casefold() == ".wem"
+        and relative not in before_outputs
+    }
+    unexpected_cache_media = created_cache_media - set(resolved_paths.values())
+    if unexpected_cache_media:
+        failures.append(
+            "2021 Topic created unreviewed cache media: "
+            f"{sorted(unexpected_cache_media)}"
+        )
+
+    soundbank_sections = direct_children(document, "SoundBanks")
+    if len(soundbank_sections) != 1:
+        failures.append("2021 Topic SoundbanksInfo has no singular SoundBanks section")
+        return failures
+    observed_by_bank: dict[str, set[str]] = {}
+    for bank in direct_children(soundbank_sections[0], "SoundBank"):
+        names = direct_children(bank, "ShortName")
+        if len(names) != 1 or not isinstance(names[0].text, str):
+            failures.append("2021 Topic SoundbanksInfo has a malformed SoundBank name")
+            continue
+        if names[0].text not in expected_by_bank:
+            continue
+        references = [
+            row.attrib.get("Id")
+            for row in bank.iter()
+            if row.tag.rsplit("}", 1)[-1] == "File"
+            and row.get("Id") in expected_media
+        ]
+        if len(references) != len(set(references)):
+            failures.append(
+                f"2021 Topic SoundBank has duplicate streamed references: {names[0].text}"
+            )
+        observed_by_bank[names[0].text] = set(references)
+    if observed_by_bank != expected_by_bank:
+        failures.append(
+            "2021 Topic per-Bank streamed references differ from the sealed fixture"
+        )
+    return failures
+
+
 def _validate_after_state(
     case: MaterializedSoundBankCase,
     before: SoundBankSnapshot,
@@ -3428,6 +3621,11 @@ def _validate_after_state(
             failures.append(f"expected non-empty {artifact.kind} artifact is absent: {relative}")
         elif artifact.required_change and old == new:
             failures.append(f"expected {artifact.kind} artifact did not change: {relative}")
+
+    if case.blueprint.version == "2021.1" and case.blueprint.api == SOUNDBANK_TOPIC:
+        failures.extend(
+            _validate_2021_topic_streamed_media(case, before_outputs, after_outputs)
+        )
 
     before_banks = {row.name: row for row in before.banks}
     after_banks = {row.name: row for row in after.banks}

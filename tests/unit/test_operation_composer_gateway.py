@@ -919,7 +919,8 @@ def test_object_create_schema_puts_the_top_level_fact_plan_before_large_fields(
     assert conflict["action"] == "set"
     assert children["phase"] == "disclosure"
     assert table["action_codes"]["array"] == (
-        "append items; present iff empty"
+        "business-present items append; explicit empty present; omitted optional "
+        "has no fact"
     )
     assert composer["construction_order"]["branch_constants"] == (
         "after choose, set selected branch constants before disclosure"

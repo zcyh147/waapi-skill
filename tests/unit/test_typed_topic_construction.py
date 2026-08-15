@@ -64,6 +64,7 @@ def _expand_compact_field_table(table: dict[str, object]) -> list[dict[str, obje
     columns = list(table["columns"])
     shapes = list(table["shape_codes"])
     accepted_type_sets = list(table["accepted_type_sets"])
+    fact_action_definitions = list(table["fact_action_definitions"])
     constraint_sets = list(table["constraint_sets"])
     defaults = dict(table["constraint_defaults"])
     rows = list(table["rows"])
@@ -75,12 +76,13 @@ def _expand_compact_field_table(table: dict[str, object]) -> list[dict[str, obje
         "name",
         "shape_code",
         "accepted_type_set",
+        "fact_action_code",
         "constraint_set",
     ]
     for handle, row in zip(handles, rows, strict=True):
         parent_row = row[1]
         shape = shapes[row[3]]
-        constraints = dict(constraint_sets[row[5]])
+        constraints = dict(constraint_sets[row[6]])
         field: dict[str, object] = {
             "handle": handle,
             "section": table["section"],
@@ -88,6 +90,7 @@ def _expand_compact_field_table(table: dict[str, object]) -> list[dict[str, obje
             "required": constraints.pop("required", defaults["required"]),
             "shape": shape,
             "accepted_types": accepted_type_sets[row[4]],
+            "fact_construction": dict(fact_action_definitions[row[5]]),
             **constraints,
         }
         if parent_row is not None:
@@ -106,6 +109,32 @@ def _expand_compact_field_table(table: dict[str, object]) -> list[dict[str, obje
             field["map"] = map_payload
         expanded_fields.append(field)
     return expanded_fields
+
+
+@pytest.mark.parametrize(
+    ("version", "field_name", "expected_action"),
+    (
+        ("2021.1", "platform", "map-put-or-present"),
+        ("2023.1", "name", "set"),
+        ("2024.1", "name", "set"),
+    ),
+)
+def test_compact_topic_rows_disclose_the_direct_fact_action(
+    version: str,
+    field_name: str,
+    expected_action: str,
+) -> None:
+    table = topic_match_contract(
+        version,
+        "ak.wwise.core.soundbank.generated",
+    ).gateway_field_table()
+    columns = list(table["columns"])
+    action_index = columns.index("fact_action_code")
+    name_index = columns.index("name")
+    actions = list(table["fact_action_codes"])
+    rows = [row for row in table["rows"] if row[name_index] == field_name]
+
+    assert expected_action in {actions[row[action_index]] for row in rows}
 
 
 class _TopicClient:
@@ -285,15 +314,9 @@ def test_topic_schema_discloses_one_typed_continuation_offline(tmp_path: Path) -
     assert payload["bounds"]["stdout_utf8_bytes"] == 32 * 1024
     assert payload["continuation"]["subcommands"] == ["wait-topic", "stream-topic"]
     assert payload["continuation"]["fact_selection"] == {
-        "scalar_field": "set",
-        "array_item": "append",
-        "empty_container": "present",
-        "branch_choice": "choose",
-        "open_map_scalar": (
-            "map_put only without an exact static child row; use the listed child "
-            "handle otherwise"
-        ),
-        "complex_child": "follow the field's dynamic container continuation",
+        "source": "row fact_action_code",
+        "or_present": "present only when that container is empty",
+        "disclose": "use only rows whose code starts disclose-",
     }
     prefix = payload["continuation"]["wait_argv_prefix"]
     assert prefix[:6] == [
@@ -420,9 +443,8 @@ def test_wait_topic_digests_bind_to_the_real_topic_schema_envelope(
             "must_not_accompany": ["map-put"],
         },
     }
-    assert payload["continuation"]["fact_selection"]["open_map_scalar"] == (
-        "map_put only without an exact static child row; use the listed child "
-        "handle otherwise"
+    assert payload["continuation"]["fact_selection"]["source"] == (
+        "row fact_action_code"
     )
     soundbank_map = next(
         field

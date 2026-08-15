@@ -334,8 +334,14 @@ class TypedRequestContract:
         return {
             "columns": ["handle", "name", "phase", "action"],
             "action_codes": {
-                "array": "append items; present iff empty",
-                "map": "map-put members; present iff empty",
+                "array": (
+                    "business-present items append; explicit empty present; "
+                    "omitted optional has no fact"
+                ),
+                "map": (
+                    "business-present members map-put; explicit empty present; "
+                    "omitted optional has no fact"
+                ),
                 "child": "static child facts",
             },
             "rows": rows,
@@ -362,6 +368,8 @@ class TypedRequestContract:
         }
         shape_codes: list[str] = []
         accepted_type_sets: list[list[str]] = []
+        fact_action_codes: list[str] = []
+        fact_action_definitions: list[dict[str, Any]] = []
         constraint_sets: list[dict[str, Any]] = []
         constraint_indexes: dict[str, int] = {}
         rows: list[list[Any]] = []
@@ -399,6 +407,7 @@ class TypedRequestContract:
                 )
                 and not (key == "unique_items" and value is False)
             }
+            fact_construction = constraints.pop("fact_construction", {})
             map_payload = constraints.get("map")
             if isinstance(map_payload, Mapping):
                 compact_map = dict(map_payload)
@@ -416,6 +425,34 @@ class TypedRequestContract:
                 constraint_indexes[constraint_key] = constraint_index
                 constraint_sets.append(constraints)
             parent_handle = field.get("parent_handle")
+            fact_action_code = "static-child-facts"
+            if isinstance(fact_construction, Mapping):
+                if isinstance(
+                    fact_construction.get("complex_item_disclosure"), str
+                ):
+                    fact_action_code = "disclose-array-item-or-present"
+                elif isinstance(fact_construction.get("fact_action"), str):
+                    fact_action_code = str(fact_construction["fact_action"])
+                elif isinstance(
+                    fact_construction.get("nonempty_scalar_items"), Mapping
+                ):
+                    fact_action_code = "append-or-present"
+                elif isinstance(
+                    fact_construction.get("nonempty_scalar_members"), Mapping
+                ):
+                    fact_action_code = "map-put-or-present"
+                elif fact_construction.get("role") == "branch_choice_handle":
+                    fact_action_code = "choose"
+            if fact_action_code in fact_action_codes:
+                fact_action_index = fact_action_codes.index(fact_action_code)
+                if fact_action_definitions[fact_action_index] != fact_construction:
+                    raise TypedRequestError(
+                        "Compact field action code has inconsistent semantics"
+                    )
+            else:
+                fact_action_index = len(fact_action_codes)
+                fact_action_codes.append(fact_action_code)
+                fact_action_definitions.append(dict(fact_construction))
             rows.append(
                 [
                     str(field["handle"]).removeprefix(handle_prefix),
@@ -423,6 +460,7 @@ class TypedRequestContract:
                     field["name"],
                     shape_codes.index(shape),
                     accepted_type_sets.index(accepted_types),
+                    fact_action_index,
                     constraint_index,
                 ]
             )
@@ -436,10 +474,13 @@ class TypedRequestContract:
                 "name",
                 "shape_code",
                 "accepted_type_set",
+                "fact_action_code",
                 "constraint_set",
             ],
             "shape_codes": shape_codes,
             "accepted_type_sets": accepted_type_sets,
+            "fact_action_codes": fact_action_codes,
+            "fact_action_definitions": fact_action_definitions,
             "constraint_sets": constraint_sets,
             "constraint_defaults": {
                 "required": False,

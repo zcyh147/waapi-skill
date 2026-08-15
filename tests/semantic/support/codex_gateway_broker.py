@@ -5921,6 +5921,9 @@ class CodexGatewayBroker:
         trusted_step_observer: TrustedStepObserver | None = None,
         trusted_subscription_ack: TrustedSubscriptionAckSpec | None = None,
         trusted_subscription_ack_observer: TrustedSubscriptionAckObserver | None = None,
+        offline_replay_preview_requests: (
+            Mapping[str, Mapping[str, Any]] | None
+        ) = None,
     ) -> None:
         self.skill_source = _absolute_lexical(skill_source)
         self.runner_path = self.skill_source / "scripts" / "run.py"
@@ -5976,6 +5979,16 @@ class CodexGatewayBroker:
         self.trusted_step_observer = trusted_step_observer
         self.trusted_subscription_ack = trusted_subscription_ack
         self.trusted_subscription_ack_observer = trusted_subscription_ack_observer
+        if offline_replay_preview_requests and runner_environment != {}:
+            raise ValueError(
+                "cleaned-file Preview requests are restricted to offline replay"
+            )
+        self._offline_replay_preview_requests = {
+            str(name): json.loads(
+                _canonical_json_bytes(dict(request)).decode("utf-8")
+            )
+            for name, request in (offline_replay_preview_requests or {}).items()
+        }
         self._runner_environment = dict(os.environ if runner_environment is None else runner_environment)
 
         if transport not in {"auto", "unix", "tcp"}:
@@ -8537,6 +8550,9 @@ class CodexGatewayBroker:
         self,
         preview_step: ExpectedGatewayStep,
     ) -> Mapping[str, Any]:
+        sealed_request = self._offline_replay_preview_requests.get(preview_step.name)
+        if sealed_request is not None:
+            return sealed_request
         preview_index = self._execution_steps.index(preview_step)
         prior_starts = tuple(
             step

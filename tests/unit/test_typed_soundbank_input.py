@@ -8,6 +8,8 @@ from typing import Any, Mapping
 
 import pytest
 
+from tests.semantic.support.codex_eval_protocol_v3 import build_transaction_protocol
+from tests.semantic.support.codex_gateway_broker import ResponseBinding
 from wwise_waapi.operation_composer import (
     OPERATION_COMPOSITION_CONTRACT,
     materialize_operation_request,
@@ -466,12 +468,20 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
     assert item["continuation"]["request_wide_order"] == {
         "phase": "dynamic_disclosure",
         "finish_current_root_disclosure_chain_first": True,
+        "disclosure_chain_definition": (
+            "only branch_disclosure and nested_container_disclosures; "
+            "child_contract branch choices are typed facts"
+        ),
         "array_item_order": "ascending_index",
         "nested_member_order": "schema_property_order",
+        "child_fact_order": "child_contract_schema_order",
         "facts_using_returned_handles": (
-            "after_current_root_chain_before_next_root"
+            "after_deferred_action_argv_before_next_root"
         ),
-        "deferred_action_argv": "after_current_root_chain_before_next_root",
+        "deferred_action_argv": (
+            "immediately_after_current_disclosure_chain_before_child_facts_and_"
+            "next_root"
+        ),
         "this_handle_is_not_a_complete_request": True,
     }
     assert item["continuation"]["deferred_action_argv"] == [
@@ -485,24 +495,52 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
         for token in item["continuation"]["branch_disclosure"]
     ]
     assert "--member-key" not in branch_argv
-    branch_code, branch = gateway.execute_gateway(
-        ["--version", "2025.1", *branch_argv],
-        env=_env(tmp_path, "2025.1"),
-        client_factory=lambda url: pytest.fail(f"branch disclosure connected to {url}"),
-    )
-    assert branch_code == 0, branch
-    assert branch["contract"] == "waapi-skill.typed-map-container-choices/v1"
-    assert branch["status"] == "choice_required"
-    assert branch["map_handle"] == item["handle"]
     item_choices = item["child_contract"]["branch_choices"][0]["choices"]
-    assert [choice["handle"] for choice in branch["choices"]] == [
-        choice["handle"] for choice in item_choices
-    ]
-    id_choice = branch["choices"][0]["handle"]
+    id_choice = item_choices[0]["handle"]
     choice_argv = [
-        id_choice if token == "<choice_handle_from_this_response>" else token
-        for token in branch["continuation"]["choice_argv"]
+        id_choice
+        if token == "<selected-choice-handle-from-child_contract>"
+        else token
+        for token in branch_argv
     ]
+    protocol = build_transaction_protocol(
+        (
+            {
+                "contract": "waapi-skill.operation-request/v1",
+                "version": "2025.1",
+                "operation": "soundbank.setInclusions",
+                "arguments": {
+                    "soundbank": {"kind": "id", "value": BANK_ID},
+                    "mode": "add",
+                    "inclusions": [
+                        {
+                            "object": {"kind": "id", "value": EVENT_ID},
+                            "filters": ["events"],
+                        }
+                    ],
+                },
+            },
+        )
+    )
+    protocol_disclosure = next(
+        step for step in protocol.steps if step.name == "tx01.disclose.002"
+    )
+
+    def resolve_item_binding(value: object) -> object:
+        if not isinstance(value, ResponseBinding):
+            return value
+        assert value.step == "tx01.disclose.001"
+        current: object = item
+        for token in value.pointer.removeprefix("/").split("/"):
+            assert isinstance(current, (dict, list))
+            current = (
+                current[int(token)] if isinstance(current, list) else current[token]
+            )
+        return current
+
+    assert tuple(choice_argv[1:]) == tuple(
+        resolve_item_binding(value) for value in protocol_disclosure.arguments
+    )
     assert choice_argv.index("--parent-schema-token") < choice_argv.index(
         "--choice-handle"
     )

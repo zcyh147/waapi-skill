@@ -4161,6 +4161,8 @@ def _dynamic_branch_disclosure_continuation(
             "object",
             "--parent-schema-token",
             lineage_token,
+            "--choice-handle",
+            "<selected-choice-handle-from-child_contract>",
         ]
     else:
         return {}
@@ -4250,17 +4252,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "continuation": {
                 "subcommands": ["wait-topic", "stream-topic"],
                 "fact_selection": {
-                    "scalar_field": "set",
-                    "array_item": "append",
-                    "empty_container": "present",
-                    "branch_choice": "choose",
-                    "open_map_scalar": (
-                        "map_put only without an exact static child row; use the "
-                        "listed child handle otherwise"
-                    ),
-                    "complex_child": (
-                        "follow the field's dynamic container continuation"
-                    ),
+                    "source": "row fact_action_code",
+                    "or_present": "present only when that container is empty",
+                    "disclose": "use only rows whose code starts disclose-",
                 },
                 "wait_argv_prefix": [
                     "--timeout",
@@ -4274,39 +4268,33 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     "--match-schema-digest",
                     match.schema_digest,
                 ],
-                "append_after_prefix": [
-                    "zero or more --option-* typed facts",
-                    "zero or more --match-* typed facts",
+                "fact_order": [
+                    "options compact-row order",
+                    "match compact-row order",
                 ],
                 "bind": {
                     "--options-schema-digest": options.schema_digest,
                     "--match-schema-digest": match.schema_digest,
                 },
-                "options_facts": {
-                    "set": "--option-set <handle> <type> <value>",
-                    "append": "--option-append <handle> <type> <value>",
-                    "present": "--option-present <handle>",
-                    "choose": "--option-choose <handle> <choice_handle>",
-                    "choose_dynamic": (
-                        "--option-choose-dynamic <handle> <key> <choice_handle>"
-                    ),
-                    "map_put": "--option-map-put <handle> <key> <type> <value>",
-                },
-                "match_facts": {
-                    "set": "--match-set <handle> <type> <value>",
-                    "append": "--match-append <handle> <type> <value>",
-                    "present": "--match-present <handle>",
-                    "choose": "--match-choose <handle> <choice_handle>",
-                    "choose_dynamic": (
-                        "--match-choose-dynamic <handle> <key> <choice_handle>"
-                    ),
-                    "map_put": "--match-map-put <handle> <key> <type> <value>",
+                "fact_argv": {
+                    "prefixes": ["option", "match"],
+                    "templates": {
+                        "set": "--<prefix>-set <handle> <type> <value>",
+                        "append": "--<prefix>-append <handle> <type> <value>",
+                        "present": "--<prefix>-present <handle>",
+                        "choose": "--<prefix>-choose <handle> <choice_handle>",
+                        "choose_dynamic": (
+                            "--<prefix>-choose-dynamic <handle> <key> <choice_handle>"
+                        ),
+                        "map_put": (
+                            "--<prefix>-map-put <handle> <key> <type> <value>"
+                        ),
+                    },
                 },
                 "lifecycle": {
-                    "wait-topic": "bounded matching-event collection, then unsubscribe",
+                    "wait-topic": "collect bounded matches; unsubscribe",
                     "stream-topic": (
-                        "persistent event emission until cancellation or finite timeout, "
-                        "then unsubscribe"
+                        "emit until cancellation or finite timeout; unsubscribe"
                     ),
                 },
             },
@@ -4575,13 +4563,19 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 "request_wide_order": {
                     "phase": "dynamic_disclosure",
                     "finish_current_root_disclosure_chain_first": True,
+                    "disclosure_chain_definition": (
+                        "only branch_disclosure and nested_container_disclosures; "
+                        "child_contract branch choices are typed facts"
+                    ),
                     "array_item_order": "ascending_index",
                     "nested_member_order": "schema_property_order",
+                    "child_fact_order": "child_contract_schema_order",
                     "facts_using_returned_handles": (
-                        "after_current_root_chain_before_next_root"
+                        "after_deferred_action_argv_before_next_root"
                     ),
                     "deferred_action_argv": (
-                        "after_current_root_chain_before_next_root"
+                        "immediately_after_current_disclosure_chain_before_child_"
+                        "facts_and_next_root"
                     ),
                     "this_handle_is_not_a_complete_request": True,
                 },

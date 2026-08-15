@@ -3338,6 +3338,67 @@ def test_campaign_broker_seal_binds_confirmation_to_archived_transaction_store(
         )
 
 
+def test_passing_lua_draft_replays_after_owned_files_are_cleaned(
+    tmp_path: Path,
+) -> None:
+    options = _options(tmp_path)
+    task_root = tmp_path / "task"
+    task_root.mkdir()
+    io_root = tmp_path / "scenario" / "owned" / "assets" / "lua"
+    io_root.mkdir(parents=True)
+    script = io_root / "user-script.lua"
+    script.write_text("return wa_args.count\n", encoding="utf-8")
+    protocol = build_transaction_protocol(
+        (
+            {
+                "contract": "waapi-skill.operation-request/v1",
+                "version": "2023.1",
+                "operation": "lua.executeCoreFile",
+                "arguments": {
+                    "script_file": str(script),
+                    "io_root": str(io_root),
+                    "source_authority": "user_supplied_verbatim",
+                    "wa_args": {"count": 3},
+                },
+            },
+        )
+    )
+    records = _synthetic_gateway_records(
+        options=options,
+        task_root=task_root,
+        protocol=protocol,
+        version="2023.1",
+    )
+    command_records = completed_command_records(
+        parse_jsonl_events(
+            _synthetic_events(
+                thread_id="thread-lua-cleanup-replay",
+                records=records,
+                final_response="profile=typed_input, count=3; result schema only",
+                windows_powershell_core_host=options.windows_powershell_core_host,
+            )
+        ),
+        windows_powershell_core_host=options.windows_powershell_core_host,
+    )
+    serialized_commands = [
+        campaign._json_canonical_value(asdict(record))
+        for record in command_records
+    ]
+
+    script.unlink()
+    io_root.rmdir()
+
+    campaign._validate_heavy_v3_broker_records(
+        records,
+        task_root=task_root,
+        steps=protocol.steps,
+        command_records=serialized_commands,
+        options=options,
+        version="2023.1",
+        label="passing cleaned Lua",
+    )
+
+
 def test_campaign_archive_rejects_equivalent_requoted_continuation(
     tmp_path: Path,
 ) -> None:

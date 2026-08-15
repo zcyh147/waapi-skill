@@ -9,7 +9,10 @@ from typing import Any, Mapping
 import pytest
 
 from wwise_waapi.schema_inventory import load_definition_graph
-from wwise_waapi.typed_requests import compile_typed_request_contract
+from wwise_waapi.typed_requests import (
+    compile_typed_request_contract,
+    request_contract,
+)
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[2] / "skills/waapi-skill/scripts/gateway.py"
@@ -71,6 +74,52 @@ def test_media_pool_schema_marks_scalar_array_items_as_append_facts(
             "must_not_accompany": ["append"],
         },
     }
+
+
+def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes(
+    tmp_path: Path,
+) -> None:
+    contract = request_contract("2025.1", MEDIA_POOL_URI)
+    filters = next(field for field in contract.fields if field.name == "filters")
+
+    exit_code, item = gateway.execute_gateway(
+        [
+            "--version", "2025.1", "request-array-item", MEDIA_POOL_URI,
+            "--schema-digest", contract.schema_digest,
+            "--array-handle", filters.handle,
+            "--index", "0", "--shape", "object",
+        ],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda _url: pytest.fail("disclosure must be offline"),
+    )
+
+    assert exit_code == 0, item
+    assert item["continuation"]["request_wide_order"] == {
+        "phase": "dynamic_disclosure",
+        "finish_current_root_disclosure_chain_first": True,
+        "disclosure_chain_definition": (
+            "only branch_disclosure and nested_container_disclosures; "
+            "child_contract branch choices are typed facts"
+        ),
+        "array_item_order": "ascending_index",
+        "nested_member_order": "schema_property_order",
+        "child_fact_order": "child_contract_schema_order",
+        "facts_using_returned_handles": (
+            "after_deferred_action_argv_before_next_root"
+        ),
+        "deferred_action_argv": (
+            "immediately_after_current_disclosure_chain_before_child_facts_and_"
+            "next_root"
+        ),
+        "this_handle_is_not_a_complete_request": True,
+    }
+    assert item["continuation"]["deferred_action_argv"] == [
+        "--action", "add_typed_fact", "--fact-action", "append",
+        "--field-handle", filters.handle, "--value-type", "object",
+        "--fact-value", item["handle"],
+    ]
+    assert "branch_disclosure" not in item["continuation"]
+    assert item["child_contract"]["branch_choices"]
 
 
 def test_audio_convert_schema_forbids_present_with_nonempty_languages(
