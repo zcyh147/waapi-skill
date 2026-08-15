@@ -64,9 +64,13 @@ def test_common_reads_use_closed_gateway_before_optional_references() -> None:
 
 def test_dynamic_draft_guidance_distinguishes_complete_json_from_incomplete_construction() -> None:
     compact = " ".join(OPERATE.split())
-    assert "`construction_state.complete:false` is complete JSON" in compact
+    assert (
+        "`construction_state.complete:false` and compact action receipts are "
+        "complete JSON"
+    ) in compact
     assert "Follow `next_command_decision`" in compact
-    assert "match only its `business_value_pointer`" in compact
+    assert "only an exact `business_value_pointer` authorizes it" in compact
+    assert "schema alone never does" in compact
     assert "never reuse handles" in compact
     assert "return to the outermost response; parent fact before children" in compact
     assert "`completion_candidate`" in compact

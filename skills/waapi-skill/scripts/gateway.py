@@ -4807,6 +4807,8 @@ def _dynamic_next_command_decision(
     return {
         "next_command_decision": {
             "business_presence_source": "current_user_business_request",
+            "schema_members_are_not_business_facts": True,
+            "candidate_without_its_exact_business_pointer": "forbidden",
             "conditional_candidates_do_not_block_when_absent": True,
             "evaluate_in_order": candidates,
             "first_true_candidate_is_the_only_next_action": True,
@@ -12832,6 +12834,47 @@ def _operation_draft_compact_action_projection(
         "created_handles": sorted(current_handles - prior_handles),
         "affected_handles": affected_handles,
     }
+    fact_action = action.get("fact_action")
+    field_handle = action.get("field_handle")
+    value = action.get("value")
+    key = action.get("key")
+    dynamic_field = (
+        field_handle
+        if isinstance(field_handle, str) and field_handle.startswith("trm1-")
+        else None
+    )
+    dynamic_value = (
+        value
+        if isinstance(value, str) and value.startswith("trm1-")
+        else None
+    )
+    if fact_action in {"append", "set", "map-put", "choose-dynamic"} and (
+        dynamic_field is not None or dynamic_value is not None
+    ):
+        continuation: dict[str, Any] = {
+            "source": "most_recent_typed_container_handle_response",
+            "response_was_complete_not_truncated": True,
+            "current_handle": dynamic_field or dynamic_value,
+            "completed_fact_action": fact_action,
+            "next_rule": (
+                "map_put_the_same_key_from_its_disclosed_choice"
+                if fact_action == "choose-dynamic"
+                else (
+                    "continue_with_child_contract_facts_for_the_appended_value"
+                    if fact_action == "append" and dynamic_value is not None
+                    else (
+                        "continue_with_the_next_business_present_child_contract_"
+                        "fact_in_queue_index_order"
+                    )
+                )
+            ),
+            "stop_cancel_or_claim_truncation_before_current_root_is_complete": (
+                "invalid"
+            ),
+        }
+        if isinstance(key, str):
+            continuation["current_key"] = key
+        action_result["construction_continuation"] = continuation
     if action.get("fact_action") == "choose" and isinstance(
         action.get("value"), str
     ):

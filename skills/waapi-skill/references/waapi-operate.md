@@ -47,7 +47,7 @@ Follow the schema's sole `input_mode`. No schema-to-preview shortcut. Reuse evid
 
 Copy returned argv exactly; append facts only after its prefix, preserving `--expected-revision` and `--apply`. Never use Draft state as a schema digest. Disclose children before appending their handles. Scalar Maps use `map-put`; handles are only for object/array values.
 
-`construction_state.complete:false` is complete JSON. Follow `next_command_decision`; match only its `business_value_pointer`, never reuse handles. After disclosures return to the outermost response; parent fact before children. Finish via `completion_candidate`, never `draft-apply --action check`.
+`construction_state.complete:false` and compact action receipts are complete JSON. Follow `next_command_decision`; only an exact `business_value_pointer` authorizes it; schema alone never does; never reuse handles. After disclosures return to the outermost response; parent fact before children. Finish via `completion_candidate`, never `draft-apply --action check`.
 
 Public mutation identities are closed to `id`, `path`, `exact-type-name`,
 `direct-child`, and `scoped-name`. Use a schema-fitting selector directly in

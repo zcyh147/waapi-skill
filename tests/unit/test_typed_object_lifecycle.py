@@ -198,6 +198,8 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
     assert next(iter(grandchild["continuation"])) == "next_command_decision"
     assert grandchild["continuation"]["next_command_decision"] == {
         "business_presence_source": "current_user_business_request",
+        "schema_members_are_not_business_facts": True,
+        "candidate_without_its_exact_business_pointer": "forbidden",
         "conditional_candidates_do_not_block_when_absent": True,
         "evaluate_in_order": [
             {

@@ -280,6 +280,12 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
     assert item["continuation"]["next_command_decision"][
         "draft_check_or_cancel_with_remaining_candidate_or_deferred_fact"
     ] == "invalid"
+    assert item["continuation"]["next_command_decision"][
+        "schema_members_are_not_business_facts"
+    ] is True
+    assert item["continuation"]["next_command_decision"][
+        "candidate_without_its_exact_business_pointer"
+    ] == "forbidden"
     assert "next_sibling_disclosure" not in item["continuation"][
         "deferred_fact"
     ].get("blocked_by", ())
@@ -371,6 +377,107 @@ def test_media_pool_dynamic_child_stdout_is_complete_within_visible_budget(
     assert len((encoded + "\n").encode("utf-8")) < 20 * 1024
     assert json.loads(encoded) == item
     assert gateway.gateway_stdout_json_encoder(item).indent is None
+
+
+def test_compact_dynamic_fact_receipt_keeps_disclosed_sequence_active(
+    tmp_path: Path,
+) -> None:
+    contract = request_contract("2025.1", MEDIA_POOL_URI)
+    filters = next(field for field in contract.fields if field.name == "filters")
+    env = _env(tmp_path, "2025.1")
+    start_code, started = gateway.execute_gateway(
+        ["--version", "2025.1", "draft-start", MEDIA_POOL_URI],
+        env=env,
+        client_factory=lambda _url: pytest.fail("draft-start must be offline"),
+    )
+    assert start_code == 0, started
+    item_code, item = gateway.execute_gateway(
+        [
+            "request-array-item", MEDIA_POOL_URI,
+            "--schema-digest", contract.schema_digest,
+            "--array-handle", filters.handle,
+            "--index", "0", "--shape", "object",
+        ],
+        env=env,
+        client_factory=lambda _url: pytest.fail("disclosure must be offline"),
+    )
+    assert item_code == 0, item
+    type_branch = next(
+        row for row in item["child_contract"]["branch_choices"]
+        if row["key"] == "type"
+    )
+    field_choice = next(
+        row for row in type_branch["choices"] if row.get("enum") == ["field"]
+    )
+
+    append_code, appended = gateway.execute_gateway(
+        [
+            "--version", "2025.1", "draft-apply",
+            started["draft"]["draft_id"],
+            "--task-authority", started["task_authority"],
+            "--expected-revision", "1", "--compact", "--facts",
+            "--action", "add_typed_fact", "--fact-action", "append",
+            "--field-handle", filters.handle, "--value-type", "object",
+            "--fact-value", item["handle"],
+        ],
+        env=env,
+        client_factory=lambda _url: pytest.fail("draft-apply must be offline"),
+    )
+    assert append_code == 0, appended
+    assert appended["draft"]["action_result"]["construction_continuation"] == {
+        "source": "most_recent_typed_container_handle_response",
+        "response_was_complete_not_truncated": True,
+        "current_handle": item["handle"],
+        "completed_fact_action": "append",
+        "next_rule": "continue_with_child_contract_facts_for_the_appended_value",
+        "stop_cancel_or_claim_truncation_before_current_root_is_complete": "invalid",
+    }
+
+    choose_code, chosen = gateway.execute_gateway(
+        [
+            "--version", "2025.1", "draft-apply",
+            started["draft"]["draft_id"],
+            "--task-authority", started["task_authority"],
+            "--expected-revision", "2", "--compact", "--facts",
+            "--action", "add_typed_fact", "--fact-action", "choose-dynamic",
+            "--field-handle", item["handle"], "--key", "type",
+            "--fact-value", field_choice["handle"],
+        ],
+        env=env,
+        client_factory=lambda _url: pytest.fail("draft-apply must be offline"),
+    )
+    assert choose_code == 0, chosen
+    assert chosen["draft"]["action_result"]["construction_continuation"] == {
+        "source": "most_recent_typed_container_handle_response",
+        "response_was_complete_not_truncated": True,
+        "current_handle": item["handle"],
+        "completed_fact_action": "choose-dynamic",
+        "current_key": "type",
+        "next_rule": "map_put_the_same_key_from_its_disclosed_choice",
+        "stop_cancel_or_claim_truncation_before_current_root_is_complete": "invalid",
+    }
+
+    put_code, put = gateway.execute_gateway(
+        [
+            "--version", "2025.1", "draft-apply",
+            started["draft"]["draft_id"],
+            "--task-authority", started["task_authority"],
+            "--expected-revision", "3", "--compact", "--facts",
+            "--action", "add_typed_fact", "--fact-action", "map-put",
+            "--field-handle", item["handle"], "--key", "type",
+            "--value-type", "string", "--fact-value", "field",
+        ],
+        env=env,
+        client_factory=lambda _url: pytest.fail("draft-apply must be offline"),
+    )
+    assert put_code == 0, put
+    continuation = put["draft"]["action_result"]["construction_continuation"]
+    assert continuation["response_was_complete_not_truncated"] is True
+    assert continuation["current_handle"] == item["handle"]
+    assert continuation["current_key"] == "type"
+    assert continuation["next_rule"] == (
+        "continue_with_the_next_business_present_child_contract_fact_in_queue_index_order"
+    )
 
 
 def test_audio_convert_schema_forbids_present_with_nonempty_languages(
