@@ -83,16 +83,15 @@ def operation_draft_construction_boundary(
 ) -> dict[str, Any]:
     """Describe the non-mutating phase and its required public terminal."""
 
+    required_terminal = "draft_check_result" if read_only else "preview"
     return {
         "phase": (
             "read_request_construction" if read_only else "preview_construction"
         ),
-        "project_mutation": False,
-        "confirmation_required": False,
+        "mutation": False,
         "complete": False,
-        "required_terminal": (
-            "draft_check_result" if read_only else "preview"
-        ),
+        "required_terminal": required_terminal,
+        "before": "continue_no_confirm_no_end",
     }
 
 

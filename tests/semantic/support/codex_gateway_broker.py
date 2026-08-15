@@ -56,6 +56,7 @@ from wwise_waapi.typed_requests import (
     TypedRequestError,
     TypedRequestFact,
     materialize_typed_request,
+    request_contract,
 )
 from wwise_waapi.platform_commands import (
     PlatformCommandError,
@@ -8555,6 +8556,13 @@ class CodexGatewayBroker:
                 )
             return
 
+        if (
+            step.subcommand == "draft-check"
+            and self._operation_draft_step_is_read_only(step)
+        ):
+            self._validate_read_only_operation_draft_payload(step, payload)
+            return
+
         draft = payload.get("draft")
         if not isinstance(draft, Mapping):
             raise GatewayInvocationError(
@@ -8644,6 +8652,166 @@ class CodexGatewayBroker:
         if lifecycle_state != expected_state:
             raise GatewayInvocationError(
                 "Draft response lifecycle state does not follow the reviewed transition"
+            )
+
+    def _operation_draft_step_is_read_only(
+        self,
+        step: ExpectedGatewayStep,
+    ) -> bool:
+        """Classify one Draft flow from its exact prior start binding."""
+
+        step_index = self._execution_steps.index(step)
+        starts = tuple(
+            candidate
+            for candidate in self._execution_steps[: step_index + 1]
+            if candidate.subcommand == "draft-start"
+        )
+        if not starts:
+            raise GatewayInvocationError(
+                "Draft response is missing its flow-local draft-start"
+            )
+        start = starts[-1]
+        operation = start.arguments[0] if start.arguments else None
+        if not isinstance(operation, str) or not operation.startswith("ak."):
+            return False
+        start_payload = self._payloads_by_step.get(start.name)
+        start_draft = (
+            start_payload.get("draft")
+            if isinstance(start_payload, Mapping)
+            else None
+        )
+        binding = (
+            start_draft.get("binding")
+            if isinstance(start_draft, Mapping)
+            else None
+        )
+        version = binding.get("version") if isinstance(binding, Mapping) else None
+        if not isinstance(version, str):
+            raise GatewayInvocationError(
+                "Draft response is missing its immutable start version"
+            )
+        try:
+            return request_contract(version, operation).effect == "read"
+        except TypedRequestError as exc:
+            raise GatewayInvocationError(
+                "Draft response has no exact typed request contract"
+            ) from exc
+
+    def _validate_read_only_operation_draft_payload(
+        self,
+        step: ExpectedGatewayStep,
+        payload: Mapping[str, Any],
+    ) -> None:
+        """Bind a direct read terminal to its exact typed Draft composition."""
+
+        step_index = self._execution_steps.index(step)
+        starts = tuple(
+            candidate
+            for candidate in self._execution_steps[: step_index + 1]
+            if candidate.subcommand == "draft-start"
+        )
+        if not starts:
+            raise GatewayInvocationError(
+                "read-only Draft result is missing its flow-local draft-start"
+            )
+        start = starts[-1]
+        start_payload = self._payloads_by_step.get(start.name)
+        start_draft = (
+            start_payload.get("draft")
+            if isinstance(start_payload, Mapping)
+            else None
+        )
+        binding = (
+            start_draft.get("binding")
+            if isinstance(start_draft, Mapping)
+            else None
+        )
+        if not isinstance(binding, Mapping):
+            raise GatewayInvocationError(
+                "read-only Draft result is missing its immutable start binding"
+            )
+        operation = binding.get("operation")
+        version = binding.get("version")
+        schema_digest = binding.get("schema_digest")
+        if (
+            not isinstance(operation, str)
+            or not operation.startswith("ak.")
+            or not isinstance(version, str)
+            or not isinstance(schema_digest, str)
+        ):
+            raise GatewayInvocationError(
+                "read-only Draft result contains an invalid start binding"
+            )
+        try:
+            contract = request_contract(version, operation)
+        except TypedRequestError as exc:
+            raise GatewayInvocationError(
+                "read-only Draft result has no exact typed request contract"
+            ) from exc
+        if contract.effect != "read" or contract.schema_digest != schema_digest:
+            raise GatewayInvocationError(
+                "read-only Draft result differs from its typed request binding"
+            )
+        expected_request = self._replay_expected_operation_draft_request(step)
+        arguments = expected_request.get("arguments")
+        if (
+            expected_request.get("operation") != "waapi.call"
+            or expected_request.get("version") != version
+            or not isinstance(arguments, Mapping)
+            or arguments.get("api") != operation
+            or not isinstance(arguments.get("args"), Mapping)
+            or not isinstance(arguments.get("options"), Mapping)
+        ):
+            raise GatewayInvocationError(
+                "read-only Draft result does not replay one canonical typed call"
+            )
+        typed_request = payload.get("typed_request")
+        if typed_request != {
+            "contract": "waapi-skill.typed-request/v1",
+            "schema_digest": schema_digest,
+        }:
+            raise GatewayInvocationError(
+                "read-only Draft result differs from its typed request binding"
+            )
+        call = payload.get("call")
+        if (
+            payload.get("ok") is not True
+            or payload.get("status") != "ok"
+            or payload.get("api_attempted") != operation
+            or not isinstance(call, Mapping)
+            or call.get("api") != operation
+            or call.get("version") != version
+            or call.get("ok") is not True
+            or call.get("dry_run") is not False
+            or not isinstance(call.get("evidence_path"), str)
+            or not call["evidence_path"]
+        ):
+            raise GatewayInvocationError(
+                "read-only Draft result differs from its exact live call binding"
+            )
+        validation = payload.get("schema_validation")
+        request_validation = (
+            validation.get("request")
+            if isinstance(validation, Mapping)
+            else None
+        )
+        result_validation = (
+            validation.get("result")
+            if isinstance(validation, Mapping)
+            else None
+        )
+        if any(
+            not isinstance(row, Mapping)
+            or row.get("uri") != operation
+            or row.get("version") != version
+            for row in (request_validation, result_validation)
+        ):
+            raise GatewayInvocationError(
+                "read-only Draft result differs from its schema validation binding"
+            )
+        if "agent_result" not in payload or list(payload)[-1] != "agent_result":
+            raise GatewayInvocationError(
+                "read-only Draft result must keep its exact agent_result final"
             )
 
     def _normalize_operation_draft_query_identities(

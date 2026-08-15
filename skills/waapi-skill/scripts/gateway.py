@@ -4574,6 +4574,86 @@ def _next_array_item_disclosure(
     }
 
 
+def _next_array_sibling_disclosure(
+    args: argparse.Namespace,
+    *,
+    contract: TypedRequestContract,
+    parent_schema: Mapping[str, Any] | None,
+    parent_section: str | None,
+) -> dict[str, Any]:
+    """Expose the exact conditional next complex sibling for one array item."""
+
+    if args.command != "request-array-item":
+        return {}
+    if args.parent_schema_token is None and not any(
+        field.handle == args.array_handle for field in contract.fields
+    ):
+        # A legacy caller may use a dynamic child handle without its lineage.
+        # The current item remains bounded, but no sibling command can be
+        # rederived safely from the root contract alone.
+        return {}
+    next_index = args.index + 1
+    argv_by_shape: dict[str, list[str]] = {}
+    for shape in ("object", "array"):
+        if not dynamic_array_item_choices(
+            contract,
+            array_handle=args.array_handle,
+            index=next_index,
+            shape=shape,
+            parent_schema=parent_schema,
+            parent_section=parent_section,
+        ):
+            continue
+        argv_by_shape[shape] = [
+            "request-array-item",
+            args.api,
+            "--schema-digest",
+            contract.schema_digest,
+            "--array-handle",
+            args.array_handle,
+            "--index",
+            str(next_index),
+            "--shape",
+            shape,
+            *(
+                ["--parent-schema-token", args.parent_schema_token]
+                if args.parent_schema_token is not None
+                else []
+            ),
+        ]
+    if not argv_by_shape:
+        return {}
+    return {
+        "next_sibling_disclosure": {
+            "condition": "current_business_request_contains_next_complex_item",
+            "index": next_index,
+            "must_follow": "current_item_descendant_disclosures",
+            "must_precede": "current_root_deferred_facts",
+            "absent_or_scalar_next_item_forbidden": True,
+            "is_next_command": True,
+            "argv_by_shape": argv_by_shape,
+        }
+    }
+
+
+def _next_nested_disclosure_selector(
+    rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Tell the caller how to select the next exact business-present child."""
+
+    if not rows:
+        return {}
+    return {
+        "next_business_present_nested_disclosure": {
+            "candidate_pointer": "/continuation/nested_container_disclosures",
+            "selection": "first_business_present_member_by_queue_index",
+            "repeat_for_descendants": True,
+            "when_none": "follow_next_sibling_disclosure_or_deferred_fact_queue",
+            "is_next_command": True,
+        }
+    }
+
+
 def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]) -> dict[str, Any]:
     """Run catalog commands without requiring a WAAPI port or live Wwise."""
 
@@ -4884,6 +4964,11 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             query_shape=query_shape,
             topic_prefix=topic_prefix,
         )
+        child_contract["fact_literal_policy"] = {
+            "copy_handles_and_choice_handles_exactly": True,
+            "placeholder_or_added_punctuation": "invalid",
+            "business_value_placeholders_must_be_replaced": True,
+        }
         lineage_token = typed_schema_lineage_token(
             contract,
             child_handle=child_handle,
@@ -4913,6 +4998,12 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             child_handle=child_handle,
             lineage_token=lineage_token,
         )
+        next_sibling_disclosure = _next_array_sibling_disclosure(
+            args,
+            contract=contract,
+            parent_schema=parent_schema,
+            parent_section=parent_section,
+        )
         deferred_fact = _deferred_dynamic_fact_payload(
             fact,
             draft_shape=draft_shape,
@@ -4932,6 +5023,10 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             if next_item_disclosure:
                 blocked_by.extend(
                     ["next_item_disclosure", "all_descendant_disclosures"]
+                )
+            if next_sibling_disclosure:
+                blocked_by.extend(
+                    ["next_sibling_disclosure", "all_descendant_disclosures"]
                 )
             if blocked_by:
                 deferred_fact["deferred_fact"]["blocked_by"] = blocked_by
@@ -5008,7 +5103,35 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     else "draft-apply" if undo_child_shape
                     else "draft-apply" if draft_shape else "typed-call"
                 ),
+                **(
+                    {
+                        "draft_fact_execution": {
+                            "fact_argv_role": (
+                                "append_after_latest_draft_apply_next_command_facts_marker"
+                            ),
+                            "required_prefix_order": [
+                                "draft-apply",
+                                "<draft_id>",
+                                "--task-authority",
+                                "<task_authority>",
+                                "--expected-revision",
+                                "<latest_revision>",
+                                "--compact",
+                                "--facts",
+                            ],
+                            "fact_argv_must_follow_prefix": True,
+                            "inserting_fact_before_expected_revision": "invalid",
+                            "copy_returned_handles_exactly": True,
+                            "placeholder_or_added_punctuation": "invalid",
+                        }
+                    }
+                    if (draft_shape or undo_child_shape)
+                    and not query_shape
+                    and topic_prefix is None
+                    else {}
+                ),
                 **next_item_disclosure,
+                **next_sibling_disclosure,
                 **deferred_fact,
                 **(
                     {
@@ -5059,6 +5182,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     else {}
                 ),
                 **branch_continuation,
+                **_next_nested_disclosure_selector(
+                    nested_container_disclosures
+                ),
             },
         }
         if draft_shape or undo_child_shape:

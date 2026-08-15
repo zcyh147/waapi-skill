@@ -113,10 +113,10 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
         "completion_boundary": "draft-check",
         "construction_boundary": {
             "phase": "read_request_construction",
-            "project_mutation": False,
-            "confirmation_required": False,
+            "mutation": False,
             "complete": False,
             "required_terminal": "draft_check_result",
+            "before": "continue_no_confirm_no_end",
         },
     }
     assert item["continuation"]["request_wide_order"] == {
@@ -161,6 +161,28 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
         "--field-handle", filters.handle, "--value-type", "object",
         "--fact-value", item["handle"],
     ]
+    assert item["continuation"]["draft_fact_execution"] == {
+        "fact_argv_role": "append_after_latest_draft_apply_next_command_facts_marker",
+        "required_prefix_order": [
+            "draft-apply",
+            "<draft_id>",
+            "--task-authority",
+            "<task_authority>",
+            "--expected-revision",
+            "<latest_revision>",
+            "--compact",
+            "--facts",
+        ],
+        "fact_argv_must_follow_prefix": True,
+        "inserting_fact_before_expected_revision": "invalid",
+        "copy_returned_handles_exactly": True,
+        "placeholder_or_added_punctuation": "invalid",
+    }
+    assert item["child_contract"]["fact_literal_policy"] == {
+        "copy_handles_and_choice_handles_exactly": True,
+        "placeholder_or_added_punctuation": "invalid",
+        "business_value_placeholders_must_be_replaced": True,
+    }
     assert "branch_disclosure" not in item["continuation"]
     branch_choices = item["child_contract"]["branch_choices"]
     assert branch_choices
@@ -262,10 +284,10 @@ def test_media_pool_compact_draft_action_requires_read_result_not_preview(
     assert apply_code == 0, applied
     assert applied["draft"]["response_integrity"]["construction_boundary"] == {
         "phase": "read_request_construction",
-        "project_mutation": False,
-        "confirmation_required": False,
+        "mutation": False,
         "complete": False,
         "required_terminal": "draft_check_result",
+        "before": "continue_no_confirm_no_end",
     }
     assert applied["draft"]["next_action_binding"]["fixed_argv_prefix"][6] == (
         started["task_authority"]

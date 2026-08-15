@@ -523,10 +523,10 @@ def test_normal_object_set_schema_and_detail_expose_only_composer_input(
         ),
         "construction_boundary": {
             "phase": "preview_construction",
-            "project_mutation": False,
-            "confirmation_required": False,
+            "mutation": False,
             "complete": False,
             "required_terminal": "preview",
+            "before": "continue_no_confirm_no_end",
         },
     }
     assert schema["composer"]["check"]["gateway_argv"] == [

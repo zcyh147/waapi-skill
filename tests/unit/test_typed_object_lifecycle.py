@@ -207,6 +207,30 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
             "is_next_command": False,
         },
     }
+    assert grandchild["continuation"]["next_sibling_disclosure"] == {
+        "condition": "current_business_request_contains_next_complex_item",
+        "index": 1,
+        "must_follow": "current_item_descendant_disclosures",
+        "must_precede": "current_root_deferred_facts",
+        "absent_or_scalar_next_item_forbidden": True,
+        "is_next_command": True,
+        "argv_by_shape": {
+            "object": [
+                "request-array-item",
+                "object.create",
+                "--schema-digest",
+                payload["composer"]["typed_request_schema_digest"],
+                "--array-handle",
+                nested_children["handle"],
+                "--index",
+                "1",
+                "--shape",
+                "object",
+                "--parent-schema-token",
+                nested_children["schema_lineage_token"],
+            ]
+        },
+    }
     assert grandchild["construction_state"] == {
         "complete": False,
         "disclosure_replay_allowed": False,
@@ -214,10 +238,10 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         "completion_boundary": "draft-check_then_preview",
         "construction_boundary": {
             "phase": "preview_construction",
-            "project_mutation": False,
-            "confirmation_required": False,
+            "mutation": False,
             "complete": False,
             "required_terminal": "preview",
+            "before": "continue_no_confirm_no_end",
         },
     }
     assert grandchild["continuation"]["request_wide_order"][
@@ -237,9 +261,20 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
             grandchild["continuation"]["nested_container_disclosures"], start=1
         )
     )
+    assert grandchild["continuation"][
+        "next_business_present_nested_disclosure"
+    ] == {
+        "candidate_pointer": "/continuation/nested_container_disclosures",
+        "selection": "first_business_present_member_by_queue_index",
+        "repeat_for_descendants": True,
+        "when_none": "follow_next_sibling_disclosure_or_deferred_fact_queue",
+        "is_next_command": True,
+    }
     assert grandchild["continuation"]["deferred_fact"]["blocked_by"] == [
         "ancestor_deferred_parent_facts",
         "ancestor_child_contract_facts",
+        "next_sibling_disclosure",
+        "all_descendant_disclosures",
     ]
     assert grandchild["continuation"]["deferred_fact"]["consume_once"] is True
     assert grandchild["continuation"]["deferred_fact"]["replay_allowed"] is False

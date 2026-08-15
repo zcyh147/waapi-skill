@@ -12,6 +12,7 @@ import subprocess
 import threading
 import time
 from pathlib import Path
+from typing import Mapping
 
 import pytest
 
@@ -67,14 +68,17 @@ from .support.codex_eval_protocol_v3 import (  # pyright: ignore[reportMissingIm
     build_audio_import_composer_transaction_steps,
     build_object_set_composer_transaction_steps,
     build_transaction_protocol,
+    typed_read_draft_steps,
 )
 from wwise_waapi.operation_composer import (
     apply_composer_action,
     composition_projection,
     materialize_operation_request,
     new_composition,
+    operation_composer_digest,
     typed_action_cli_arguments,
 )
+from wwise_waapi.canonical import canonical_sha256
 from wwise_waapi.operation_drafts import OperationDraftStore
 from wwise_waapi.transactions import confirmation_token_for
 from wwise_waapi.platform_commands import (
@@ -84,6 +88,7 @@ from wwise_waapi.platform_commands import (
     encode_windows_model_argv,
     encode_windows_powershell_argv,
 )
+from wwise_waapi.typed_requests import request_contract
 
 
 FAKE_ARTIFACT_HASH = "a" * 64
@@ -200,10 +205,10 @@ def test_current_evidence_accepts_and_binds_closed_required_followups() -> None:
             "compact_projection_is_not_truncation": True,
             "construction_boundary": {
                 "phase": "preview_construction",
-                "project_mutation": False,
-                "confirmation_required": False,
+                "mutation": False,
                 "complete": False,
                 "required_terminal": "preview",
+                "before": "continue_no_confirm_no_end",
             },
         },
     }
@@ -2693,6 +2698,272 @@ def test_numbered_draft_action_sequence_matches_any_exact_permutation() -> None:
             "tx01.draft-check",
         ),
     )
+
+
+def _read_only_draft_evidence_fixture(
+    tmp_path: Path,
+) -> tuple[
+    CodexGatewayBroker,
+    tuple[ExpectedGatewayStep, ...],
+    list[dict[str, object]],
+    Path,
+]:
+    operation = "ak.wwise.core.mediaPool.get"
+    version = "2025.1"
+    steps = typed_read_draft_steps(
+        "tx01",
+        operation,
+        version=version,
+        args={"maxResults": 200},
+        options={"return": ["Filename"]},
+        post_filter={
+            "field": "Filename",
+            "operator": "containsCaseSensitive",
+            "value": "footstep",
+            "limit": 20,
+        },
+    )
+    state_directory = tmp_path / "state"
+    store = OperationDraftStore(state_directory)
+    schema_digest = request_contract(version, operation).schema_digest
+    composer_digest = operation_composer_digest(operation, version)
+    started = store.start(
+        operation=operation,
+        version=version,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+    )
+    draft_id = started.record.draft_id
+    authority = started.task_authority
+    composition = new_composition(operation, version)
+    start_payload: dict[str, object] = {
+        "contract": "waapi-skill.gateway-result/v1",
+        "ok": True,
+        "status": "ok",
+        "command": "draft-start",
+        "task_authority": authority,
+        "draft": {
+            "draft_id": draft_id,
+            "revision": 1,
+            "lifecycle_state": "editable",
+            "binding": {
+                "operation": operation,
+                "version": version,
+                "schema_digest": schema_digest,
+            },
+            **composition_projection(operation, version, composition),
+        },
+    }
+    records: list[dict[str, object]] = [
+        {
+            "succeeded": True,
+            "gateway_arguments": ["gateway.py", "request-schema", operation],
+            "payload": {
+                "contract": "waapi-skill.typed-request-schema/v1",
+                "ok": True,
+                "command": "request-schema",
+            },
+        },
+        {
+            "succeeded": True,
+            "gateway_arguments": ["gateway.py", "draft-start", operation],
+            "payload": start_payload,
+        },
+    ]
+    revision = 1
+    action_payloads: dict[str, Mapping[str, object]] = {}
+    for step in (row for row in steps if row.subcommand == "draft-apply"):
+        argument = step.arguments[-1]
+        assert isinstance(argument, DraftTypedActionArgument)
+        action = dict(argument.expected)
+        record = store.apply_action(
+            draft_id,
+            task_authority=authority,
+            expected_revision=revision,
+            schema_digest=schema_digest,
+            composer_digest=composer_digest,
+            action=action,
+        )
+        assert record.composition is not None
+        composition = record.composition
+        revision = record.revision
+        payload = {
+            "contract": "waapi-skill.gateway-result/v1",
+            "ok": True,
+            "status": "ok",
+            "command": "draft-apply",
+            "draft": {
+                "draft_id": draft_id,
+                "revision": revision,
+                "lifecycle_state": "editable",
+                "binding": {
+                    "operation": operation,
+                    "version": version,
+                    "schema_digest": schema_digest,
+                },
+                **composition_projection(operation, version, composition),
+            },
+        }
+        action_payloads[step.name] = payload
+        records.append(
+            {
+                "succeeded": True,
+                "gateway_arguments": [
+                    "gateway.py",
+                    "draft-apply",
+                    draft_id,
+                    "--task-authority",
+                    authority,
+                    "--expected-revision",
+                    str(revision - 1),
+                    "--compact",
+                    "--facts",
+                    *typed_action_cli_arguments(action),
+                ],
+                "payload": payload,
+            }
+        )
+    check_payload: dict[str, object] = {
+        "contract": "waapi-skill.gateway-result/v1",
+        "ok": True,
+        "status": "ok",
+        "command": "draft-check",
+        "offline": False,
+        "api_attempted": operation,
+        "typed_request": {
+            "contract": "waapi-skill.typed-request/v1",
+            "schema_digest": schema_digest,
+        },
+        "call": {
+            "api": operation,
+            "version": version,
+            "ok": True,
+            "dry_run": False,
+            "evidence_path": str(tmp_path / "call-evidence.json"),
+        },
+        "schema_validation": {
+            "request": {"uri": operation, "version": version},
+            "result": {"uri": operation, "version": version},
+        },
+        "post_filter": {
+            "contract": "waapi-skill.media-pool-post-filter/v1",
+            "field": "Filename",
+            "operator": "containsCaseSensitive",
+            "status": "applied",
+        },
+        "agent_result": {"return": [{"Filename": "footstep.wav"}]},
+    }
+    records.append(
+        {
+            "succeeded": True,
+            "gateway_arguments": [
+                "gateway.py",
+                "draft-check",
+                draft_id,
+                "--task-authority",
+                authority,
+                "--expected-revision",
+                str(revision),
+                "--post-filter-value",
+                "footstep",
+                "--post-filter-limit",
+                "20",
+            ],
+            "payload": check_payload,
+        }
+    )
+    broker = CodexGatewayBroker(
+        skill_source=make_fake_skill(tmp_path),
+        expected_steps=steps,
+        expected_wwise_version=version,
+    )
+    broker._payloads_by_step[steps[1].name] = start_payload  # noqa: SLF001
+    broker._payloads_by_step.update(action_payloads)  # noqa: SLF001
+    for step, record in zip(steps, records, strict=True):
+        record["step_name"] = step.name
+    return broker, steps, records, state_directory
+
+
+def test_read_only_draft_check_binds_direct_result_without_draft_projection(
+    tmp_path: Path,
+) -> None:
+    broker, steps, records, state_directory = _read_only_draft_evidence_fixture(
+        tmp_path
+    )
+    check = steps[-1]
+    payload = records[-1]["payload"]
+    assert isinstance(payload, dict)
+
+    broker._validate_operation_draft_payload(check, payload)  # noqa: SLF001
+    records[-1]["payload"] = json.loads(json.dumps(payload, sort_keys=True))
+    evidence = typed_evidence_module.validate_typed_draft_evidence(
+        state_directory=state_directory,
+        steps=steps,
+        broker_records=records,
+    )
+
+    assert evidence is not None
+    assert evidence["lifecycle_state"] == "editable"
+    assert evidence["check"] is None
+    assert evidence["preview_binding"] is None
+    assert evidence["canonical_request"]["arguments"] == {
+        "api": "ak.wwise.core.mediaPool.get",
+        "args": {"maxResults": 200},
+        "options": {"return": ["Filename"]},
+    }
+    assert evidence["direct_read_binding"]["agent_result_sha256"] == canonical_sha256(
+        payload["agent_result"]
+    )
+
+
+def test_read_only_draft_check_rejects_schema_binding_tamper(tmp_path: Path) -> None:
+    broker, steps, records, state_directory = _read_only_draft_evidence_fixture(
+        tmp_path
+    )
+    payload = json.loads(json.dumps(records[-1]["payload"]))
+    payload["typed_request"]["schema_digest"] = "0" * 64
+
+    with pytest.raises(GatewayInvocationError, match="typed request binding"):
+        broker._validate_operation_draft_payload(steps[-1], payload)  # noqa: SLF001
+
+    records[-1]["payload"] = payload
+    with pytest.raises(
+        typed_evidence_module.TypedDraftEvidenceError,
+        match="typed request binding",
+    ):
+        typed_evidence_module.validate_typed_draft_evidence(
+            state_directory=state_directory,
+            steps=steps,
+            broker_records=records,
+        )
+
+
+def test_read_only_draft_check_rejects_mutation_style_draft_projection(
+    tmp_path: Path,
+) -> None:
+    broker, steps, records, _state_directory = _read_only_draft_evidence_fixture(
+        tmp_path
+    )
+    start_payload = records[1]["payload"]
+    assert isinstance(start_payload, dict)
+    start_draft = start_payload["draft"]
+    assert isinstance(start_draft, dict)
+    mutation_style = {
+        "contract": "waapi-skill.gateway-result/v1",
+        "ok": True,
+        "status": "ok",
+        "command": "draft-check",
+        "draft": {
+            **start_draft,
+            "revision": 4,
+        },
+    }
+
+    with pytest.raises(GatewayInvocationError, match="typed request binding"):
+        broker._validate_operation_draft_payload(  # noqa: SLF001
+            steps[-1],
+            mutation_style,
+        )
 
 
 def test_draft_replay_uses_the_validated_submitted_numeric_spelling(

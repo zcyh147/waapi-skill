@@ -18,6 +18,7 @@ from wwise_waapi.operation_composer import (
     OperationComposerError,
     apply_composer_action,
     composition_projection,
+    materialize_operation_request,
     new_composition,
     operation_composer_contract,
     operation_draft_construction_boundary,
@@ -320,6 +321,75 @@ def _compact_checked_projection(
     return expected_summary, expected_integrity, expected_construction_state
 
 
+def _direct_read_binding(
+    payload: Mapping[str, Any],
+    *,
+    operation: str,
+    version: str,
+    schema_digest: str,
+    canonical_request: Mapping[str, Any],
+) -> Mapping[str, Any]:
+    """Validate and seal one read-only Draft terminal without a Draft write."""
+
+    arguments = canonical_request.get("arguments")
+    if (
+        canonical_request.get("operation") != "waapi.call"
+        or canonical_request.get("version") != version
+        or not isinstance(arguments, Mapping)
+        or arguments.get("api") != operation
+        or not isinstance(arguments.get("args"), Mapping)
+        or not isinstance(arguments.get("options"), Mapping)
+    ):
+        _fail("read-only Draft result does not replay one canonical typed call")
+    if payload.get("typed_request") != {
+        "contract": "waapi-skill.typed-request/v1",
+        "schema_digest": schema_digest,
+    }:
+        _fail("read-only Draft result differs from its typed request binding")
+    call = payload.get("call")
+    if (
+        payload.get("ok") is not True
+        or payload.get("status") != "ok"
+        or payload.get("api_attempted") != operation
+        or not isinstance(call, Mapping)
+        or call.get("api") != operation
+        or call.get("version") != version
+        or call.get("ok") is not True
+        or call.get("dry_run") is not False
+        or not isinstance(call.get("evidence_path"), str)
+        or not call["evidence_path"]
+    ):
+        _fail("read-only Draft result differs from its exact live call binding")
+    validation = payload.get("schema_validation")
+    request_validation = (
+        validation.get("request") if isinstance(validation, Mapping) else None
+    )
+    result_validation = (
+        validation.get("result") if isinstance(validation, Mapping) else None
+    )
+    if any(
+        not isinstance(row, Mapping)
+        or row.get("uri") != operation
+        or row.get("version") != version
+        for row in (request_validation, result_validation)
+    ):
+        _fail("read-only Draft result differs from its schema validation binding")
+    if "agent_result" not in payload:
+        _fail("read-only Draft result must contain its exact agent_result")
+    post_filter = payload.get("post_filter")
+    return {
+        "api": operation,
+        "canonical_request_sha256": canonical_sha256(canonical_request),
+        "call_evidence_path": call["evidence_path"],
+        "call_sha256": canonical_sha256(call),
+        "schema_validation_sha256": canonical_sha256(validation),
+        "post_filter_sha256": (
+            None if post_filter is None else canonical_sha256(post_filter)
+        ),
+        "agent_result_sha256": canonical_sha256(payload["agent_result"]),
+    }
+
+
 def _draft_projection(payload: Mapping[str, Any], *, command: str) -> Mapping[str, Any]:
     if payload.get("command") != command:
         _fail(f"Composer payload command does not match {command!r}")
@@ -565,6 +635,7 @@ def _validate_typed_draft_evidence(
     expected_audit_types = ["started"]
     checked_payload: Mapping[str, Any] | None = None
     preview_payload: Mapping[str, Any] | None = None
+    direct_read_binding: Mapping[str, Any] | None = None
 
     for step, payload, arguments in zip(steps, payloads, arguments_by_step):
         if step.subcommand == "draft-start":
@@ -682,6 +753,26 @@ def _validate_typed_draft_evidence(
                 projection=project(composition),
             )
         elif step.subcommand == "draft-check":
+            if read_only_draft:
+                try:
+                    canonical_read_request = materialize_operation_request(
+                        operation,
+                        version,
+                        composition,
+                    )
+                except OperationComposerError as exc:
+                    raise TypedDraftEvidenceError(
+                        "read-only Draft canonical request cannot be materialized"
+                    ) from exc
+                direct_read_binding = _direct_read_binding(
+                    payload,
+                    operation=operation,
+                    version=version,
+                    schema_digest=schema_digest,
+                    canonical_request=canonical_read_request,
+                )
+                checked_payload = payload
+                continue
             revision += 1
             response_draft = _draft_projection(payload, command="draft-check")
             checked_projection = project(composition)
@@ -745,6 +836,28 @@ def _validate_typed_draft_evidence(
         _fail("Durable Draft audit does not match the archived action sequence")
     if durable.state is OperationDraftState.CANCELLED:
         canonical = None
+        preview_binding = None
+        cleanup = None
+    elif read_only_draft:
+        if (
+            checked_payload is None
+            or direct_read_binding is None
+            or preview_payload is not None
+            or durable.state is not OperationDraftState.EDITABLE
+            or durable.check is not None
+            or durable.seal is not None
+        ):
+            _fail("read-only Draft archive has an invalid direct-result terminal")
+        try:
+            canonical = materialize_operation_request(
+                operation,
+                version,
+                composition,
+            )
+        except OperationComposerError as exc:
+            raise TypedDraftEvidenceError(
+                "read-only Draft canonical request cannot be materialized"
+            ) from exc
         preview_binding = None
         cleanup = None
     else:
@@ -901,6 +1014,11 @@ def _validate_typed_draft_evidence(
         ),
         "preview_binding": preview_binding,
         "cleanup_outcome": cleanup,
+        **(
+            {"direct_read_binding": direct_read_binding}
+            if direct_read_binding is not None
+            else {}
+        ),
     }
     if len(canonical_json_bytes(evidence)) > MAX_TYPED_DRAFT_EVIDENCE_BYTES:
         _fail("Composer evidence exceeds its fixed archive byte ceiling")

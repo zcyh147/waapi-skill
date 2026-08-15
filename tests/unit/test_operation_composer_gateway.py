@@ -1262,10 +1262,10 @@ def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
         "compact_projection_is_not_truncation": True,
         "construction_boundary": {
             "phase": "preview_construction",
-            "project_mutation": False,
-            "confirmation_required": False,
+            "mutation": False,
             "complete": False,
             "required_terminal": "preview",
+            "before": "continue_no_confirm_no_end",
         },
     }
     assert "draft-inspect" not in json.dumps(targeted)
@@ -1422,7 +1422,7 @@ def test_compact_weather_shaped_action_responses_remain_constant_size(
             )
             assert changed["draft"]["response_integrity"][
                 "construction_boundary"
-            ]["confirmation_required"] is False
+            ]["before"] == "continue_no_confirm_no_end"
             revision += 1
             response_sizes.append(len(json.dumps(changed).encode("utf-8")))
 
@@ -1834,10 +1834,10 @@ def test_live_check_is_bounded_durable_and_any_edit_invalidates_it(
         "execute_returned_next_command_exactly": True,
         "construction_boundary": {
             "phase": "preview_construction",
-            "project_mutation": False,
-            "confirmation_required": False,
+            "mutation": False,
             "complete": False,
             "required_terminal": "preview",
+            "before": "continue_no_confirm_no_end",
         },
     }
     assert "next_action_binding" not in checked["draft"]
