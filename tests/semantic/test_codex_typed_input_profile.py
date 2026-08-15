@@ -134,6 +134,8 @@ def test_parent_child_query_prompt_keeps_join_logic_after_one_bounded_inventory(
     assert "从这份返回的候选清单中" in unit.scenario.prompt
     assert "名字以 `VO_` 开头" in unit.scenario.prompt
     assert "直接子级" in unit.scenario.prompt
+    assert "父容器只作为匹配子 Sound 行中的一列" in unit.scenario.prompt
+    assert "不要列出或提及被排除候选的路径" in unit.scenario.prompt
     assert all(
         command not in unit.scenario.prompt
         for command in ("query-schema", "query-object", "--select")
@@ -154,10 +156,7 @@ def test_topic_prompts_name_the_exact_business_projection_without_gateway_syntax
 
     assert len(units) == 2
     assert all("SoundBank 的 id、name、type" in unit.scenario.prompt for unit in units)
-    assert all(
-        "不要" in unit.scenario.prompt and "path" in unit.scenario.prompt
-        for unit in units
-    )
+    assert all("完整 path" in unit.scenario.prompt for unit in units)
     assert all(
         command not in unit.scenario.prompt
         for unit in units

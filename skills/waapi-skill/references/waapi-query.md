@@ -74,8 +74,11 @@ nested typed facts and optional closed result filter.
    Append only non-standard bound fields needed by explicit filtering,
    grouping, sorting, or reporting, in first-mention order, without duplicates;
    the complete projection has at most 32 fields.
-5. Start with `request-schema ak.wwise.core.mediaPool.get` and follow every
-   returned handle/continuation exactly. Preserve each returned `Db` and
+5. Start with `request-schema ak.wwise.core.mediaPool.getFields`, follow its
+   sole continuation, and bind the exact returned field names. Only then run
+   `request-schema ak.wwise.core.mediaPool.get` and follow every returned
+   handle/continuation exactly. Do not request the `.get` schema first or use
+   `.getFields` as a schema for `.get`. Preserve each returned `Db` and
    complete `Path`; never shorten a path or guess a host translation; never run
    the old unfiltered 1000-row AudioFileSource projection; never perform this join in model-authored code.
 

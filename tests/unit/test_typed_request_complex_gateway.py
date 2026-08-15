@@ -153,6 +153,11 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
         field_choice["handle"], "--key", "type",
     ]
     assert field_choice["deferred_fact"]["is_next_command"] is False
+    assert field_choice["deferred_fact"]["execute_after"] == (
+        "deferred_parent_fact"
+    )
+    assert field_choice["deferred_fact"]["consume_once"] is True
+    assert field_choice["deferred_fact"]["replay_allowed"] is False
     assert field_choice["deferred_fact"]["queue_phase"] == "child_contract"
     assert field_choice["deferred_fact"]["queue_order_ref"] == (
         "/continuation/request_wide_order/deferred_fact_queue"
@@ -163,6 +168,19 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
         "value_type": "choice",
         "value": field_choice["handle"],
         "key": "type",
+    }
+    assert field_choice["required_followup_fact"] == {
+        "reason": "selected_scalar_choice_value",
+        "typed_fact": {
+            "action": "map-put",
+            "handle": item["handle"],
+            "key": "type",
+            "value_type": "string",
+            "value": "field",
+        },
+        "execute_immediately_after_this_choice": True,
+        "consume_once": True,
+        "replay_allowed": False,
     }
     assert item["continuation"]["deferred_fact"]["execute_after"] == (
         "all_dynamic_disclosures_for_current_root"

@@ -1055,6 +1055,16 @@ def test_complex_query_projection_documents_derived_field_first_mention_order() 
     assert "`notes`" in QUERY
 
 
+def test_media_pool_reference_orders_field_discovery_before_the_bound_read() -> None:
+    fields_schema = "`request-schema ak.wwise.core.mediaPool.getFields`"
+    get_schema = "`request-schema ak.wwise.core.mediaPool.get`"
+
+    assert fields_schema in QUERY
+    assert get_schema in QUERY
+    assert QUERY.index(fields_schema) < QUERY.index(get_schema)
+    assert "Do not request the `.get` schema first" in QUERY
+
+
 def test_soundbank_generation_notifications_remain_query_only() -> None:
     assert "Classify the requested action, not background wording" in SKILL
     assert "listen for, wait for, or report a SoundBank generation notification" in SKILL

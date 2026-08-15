@@ -118,6 +118,111 @@ def test_compact_generic_typed_fact_receipt_accepts_its_real_fact_handle_family(
     assert summary["target_count"] == 1
 
 
+def test_compact_generic_typed_fact_receipt_accepts_closed_required_followups() -> None:
+    payload = {
+        "action_result": {
+            "contract": "waapi-skill.operation-draft-action-result/v1",
+            "action": "add_typed_fact",
+            "created_handles": ["tdh1-c12aa1ea49a4d727357b105b"],
+            "affected_handles": ["trh1-4dedc2c7c0aea1301b0d773f"],
+            "required_followup_facts": [
+                {
+                    "reason": "selected_branch_constant",
+                    "typed_fact_arguments": [
+                        "--action",
+                        "add_typed_fact",
+                        "--fact-action",
+                        "set",
+                        "--field-handle",
+                        "trh1-4dedc2c7c0aea1301b0d773f",
+                        "--value-type",
+                        "string",
+                        "--fact-value",
+                        "path",
+                    ],
+                }
+            ],
+        },
+        "current_facts_summary": {
+            "contract": "waapi-skill.operation-draft-facts-summary/v1",
+            "target_count": 1,
+            "handle_count": 1,
+            "canonical_sha256": "1" * 64,
+        },
+    }
+
+    action, created, affected, summary = broker_module._draft_compact_action_result(
+        payload
+    )
+
+    assert action == "add_typed_fact"
+    assert created == {"tdh1-c12aa1ea49a4d727357b105b"}
+    assert affected == {"trh1-4dedc2c7c0aea1301b0d773f"}
+    assert summary["canonical_sha256"] == "1" * 64
+
+
+@pytest.mark.parametrize(
+    "followup",
+    (
+        {"reason": "invented", "typed_fact_arguments": []},
+        {
+            "reason": "selected_branch_constant",
+            "typed_fact_arguments": [
+                "--action",
+                "add_typed_fact",
+                "--fact-action",
+                "append",
+                "--field-handle",
+                "trh1-4dedc2c7c0aea1301b0d773f",
+                "--value-type",
+                "string",
+                "--fact-value",
+                "path",
+            ],
+        },
+        {
+            "reason": "selected_branch_constant",
+            "typed_fact_arguments": [
+                "--action",
+                "add_typed_fact",
+                "--fact-action",
+                "set",
+                "--field-handle",
+                "not-a-handle",
+                "--value-type",
+                "string",
+                "--fact-value",
+                "path",
+            ],
+        },
+    ),
+)
+def test_compact_generic_typed_fact_receipt_rejects_open_followups(
+    followup: dict[str, object],
+) -> None:
+    payload = {
+        "action_result": {
+            "contract": "waapi-skill.operation-draft-action-result/v1",
+            "action": "add_typed_fact",
+            "created_handles": [],
+            "affected_handles": [],
+            "required_followup_facts": [followup],
+        },
+        "current_facts_summary": {
+            "contract": "waapi-skill.operation-draft-facts-summary/v1",
+            "target_count": 1,
+            "handle_count": 1,
+            "canonical_sha256": "1" * 64,
+        },
+    }
+
+    with pytest.raises(
+        GatewayInvocationError,
+        match="compact Draft action response has an invalid bounded projection",
+    ):
+        broker_module._draft_compact_action_result(payload)
+
+
 @pytest.mark.parametrize(
     ("subcommand", "contracts"),
     (
@@ -4565,6 +4670,115 @@ def test_wait_topic_event_count_greater_than_one_cannot_be_omitted(
         transport="tcp",
     ) as broker:
         result = run_model_command(broker, ["wait-topic", topic])
+
+        assert result.returncode == 126
+        assert broker.evidence().terminal_state == "FAILED"
+        assert not (broker.state_directory / "fake-runner-calls.jsonl").exists()
+
+
+def test_wait_topic_commutes_only_independent_selected_match_facts(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    topic = "ak.wwise.core.soundbank.generated"
+    fixed = (
+        topic,
+        "--event-count",
+        "3",
+        "--options-schema-digest",
+        "1" * 64,
+        "--match-schema-digest",
+        "2" * 64,
+    )
+    options = (
+        "--option-append",
+        "trh1-111111111111111111111111",
+        "string",
+        "id",
+        "--option-append",
+        "trh1-111111111111111111111111",
+        "string",
+        "name",
+    )
+    platform = (
+        "--match-map-put",
+        "trh1-222222222222222222222222",
+        "name",
+        "string",
+        "Windows",
+    )
+    soundbank = (
+        "--match-set",
+        "trh1-333333333333333333333333",
+        "string",
+        "Dialogue_Chapter14",
+    )
+    step = ExpectedGatewayStep(
+        "soundbank.generated.wait",
+        "wait-topic",
+        (*fixed, *options, *platform, *soundbank),
+    )
+    semantic_hashes: list[str] = []
+
+    for index, facts in enumerate(((*platform, *soundbank), (*soundbank, *platform))):
+        with CodexGatewayBroker(
+            skill_source=skill,
+            expected_steps=(step,),
+            working_root=tmp_path / f"broker-{index}",
+            transport="tcp",
+        ) as broker:
+            result = run_model_command(
+                broker,
+                ["wait-topic", *fixed, *options, *facts],
+            )
+
+            assert result.returncode == 0, result.stderr
+            evidence = broker.evidence()
+            assert evidence.passed is True
+            semantic_hashes.append(evidence.records[0].semantic_argv_sha256)
+
+    assert len(set(semantic_hashes)) == 1
+
+
+def test_wait_topic_does_not_commute_ordered_option_appends(tmp_path: Path) -> None:
+    skill = make_fake_skill(tmp_path)
+    topic = "ak.wwise.core.soundbank.generated"
+    fixed = (
+        topic,
+        "--event-count",
+        "3",
+        "--options-schema-digest",
+        "1" * 64,
+        "--match-schema-digest",
+        "2" * 64,
+    )
+    first = (
+        "--option-append",
+        "trh1-111111111111111111111111",
+        "string",
+        "id",
+    )
+    second = (
+        "--option-append",
+        "trh1-111111111111111111111111",
+        "string",
+        "name",
+    )
+    step = ExpectedGatewayStep(
+        "soundbank.generated.wait",
+        "wait-topic",
+        (*fixed, *first, *second),
+    )
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(step,),
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(
+            broker,
+            ["wait-topic", *fixed, *second, *first],
+        )
 
         assert result.returncode == 126
         assert broker.evidence().terminal_state == "FAILED"

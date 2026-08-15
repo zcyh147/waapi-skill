@@ -167,6 +167,7 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         },
     }
     assert nested_children["continuation"]["deferred_fact"]["blocked_by"] == [
+        "ancestor_deferred_parent_facts",
         "next_item_disclosure",
         "all_descendant_disclosures",
     ]
@@ -183,6 +184,18 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
     )
     assert grandchild_code == 0, grandchild
     assert grandchild["child_contract"]["required_keys"] == ["type", "name"]
+    assert grandchild["construction_state"] == {
+        "complete": False,
+        "confirmation_allowed": False,
+        "disclosure_replay_allowed": False,
+        "next_phase": "finish_dynamic_disclosures_then_apply_deferred_facts",
+        "completion_boundary": "draft-check_then_preview",
+    }
+    assert grandchild["continuation"]["deferred_fact"]["blocked_by"] == [
+        "ancestor_deferred_parent_facts",
+    ]
+    assert grandchild["continuation"]["deferred_fact"]["consume_once"] is True
+    assert grandchild["continuation"]["deferred_fact"]["replay_allowed"] is False
     assert grandchild["child_contract"]["fixed_scalar_member_facts"] == [
         {
             "key": "type",
@@ -197,6 +210,8 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
             },
             "execute_after": "deferred_parent_fact",
             "is_next_command": False,
+            "consume_once": True,
+            "replay_allowed": False,
         },
         {
             "key": "name",
@@ -211,6 +226,8 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
             },
             "execute_after": "deferred_parent_fact",
             "is_next_command": False,
+            "consume_once": True,
+            "replay_allowed": False,
         },
         {
             "key": "notes",
@@ -225,6 +242,8 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
             },
             "execute_after": "deferred_parent_fact",
             "is_next_command": False,
+            "consume_once": True,
+            "replay_allowed": False,
         },
     ]
 

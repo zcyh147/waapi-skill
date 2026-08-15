@@ -1378,6 +1378,128 @@ def _parse_typed_request_fact_argv(
     return tuple(result)
 
 
+_TOPIC_FACT_GROUP_WIDTHS = {
+    "set": 4,
+    "append": 4,
+    "present": 2,
+    "choose": 3,
+    "choose-dynamic": 4,
+    "map-put": 5,
+    "map-correct": 5,
+    "map-remove": 3,
+}
+_COMMUTATIVE_TOPIC_MATCH_ACTIONS = frozenset(
+    {"set", "present", "choose", "choose-dynamic", "map-put"}
+)
+
+
+def _topic_fact_groups(
+    values: Sequence[Any],
+) -> tuple[tuple[str, ...], ...] | None:
+    groups: list[tuple[str, ...]] = []
+    index = 0
+    while index < len(values):
+        flag = values[index]
+        if not isinstance(flag, str):
+            return None
+        prefix = next(
+            (
+                candidate
+                for candidate in ("option", "match")
+                if flag.startswith(f"--{candidate}-")
+            ),
+            None,
+        )
+        if prefix is None:
+            return None
+        action = flag.removeprefix(f"--{prefix}-")
+        width = _TOPIC_FACT_GROUP_WIDTHS.get(action)
+        if width is None or index + width > len(values):
+            return None
+        group = tuple(values[index : index + width])
+        if not all(isinstance(token, str) for token in group):
+            return None
+        groups.append(group)
+        index += width
+    return tuple(groups)
+
+
+def _commutative_topic_match_destination(
+    group: Sequence[str],
+) -> tuple[str, ...] | None:
+    action = group[0].removeprefix("--match-")
+    if action not in _COMMUTATIVE_TOPIC_MATCH_ACTIONS:
+        return None
+    if action in {"choose-dynamic", "map-put"}:
+        return (group[1], group[2])
+    return (group[1],)
+
+
+def _normalize_commutative_wait_topic_facts(
+    step: "ExpectedGatewayStep",
+    supplied: Sequence[str],
+) -> tuple[str, ...]:
+    """Canonicalize only declared independent match assignments.
+
+    Option appends preserve result projection order. Match assignments may be
+    reordered only when the exact same fact groups target distinct slots.
+    """
+
+    actual = tuple(supplied)
+    if step.subcommand != "wait-topic" or actual == step.arguments:
+        return actual
+    fact_start = next(
+        (
+            index
+            for index, value in enumerate(step.arguments)
+            if isinstance(value, str)
+            and any(
+                value == f"--{prefix}-{action}"
+                for prefix in ("option", "match")
+                for action in _TOPIC_FACT_GROUP_WIDTHS
+            )
+        ),
+        None,
+    )
+    if fact_start is None or len(actual) != len(step.arguments):
+        return actual
+    expected_groups = _topic_fact_groups(step.arguments[fact_start:])
+    actual_groups = _topic_fact_groups(actual[fact_start:])
+    if expected_groups is None or actual_groups is None:
+        return actual
+    expected_options = tuple(
+        group for group in expected_groups if group[0].startswith("--option-")
+    )
+    actual_options = tuple(
+        group for group in actual_groups if group[0].startswith("--option-")
+    )
+    expected_matches = tuple(
+        group for group in expected_groups if group[0].startswith("--match-")
+    )
+    actual_matches = tuple(
+        group for group in actual_groups if group[0].startswith("--match-")
+    )
+    if (
+        expected_groups != (*expected_options, *expected_matches)
+        or actual_groups != (*actual_options, *actual_matches)
+        or actual_options != expected_options
+        or sorted(actual_matches) != sorted(expected_matches)
+    ):
+        return actual
+    destinations = tuple(
+        _commutative_topic_match_destination(group)
+        for group in actual_matches
+    )
+    if any(destination is None for destination in destinations) or len(
+        set(destinations)
+    ) != len(destinations):
+        return actual
+    return (
+        *actual[:fact_start],
+        *(token for group in expected_groups for token in group),
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class ExpectedGatewayStep:
     """One exact, ordered packaged gateway invocation."""
@@ -1806,6 +1928,8 @@ _DRAFT_HANDLE_RE = re.compile(
     r"^(?:odh1|odn1|tdh1|trm1|trh1|trc1)-[0-9a-f]{24}$"
 )
 _NUMBERED_DRAFT_ACTION_STEP_RE = re.compile(r"^(?P<prefix>.+\.action\.)\d{3}$")
+_MAX_REQUIRED_FOLLOWUP_FACTS = 64
+_MAX_REQUIRED_FOLLOWUP_BYTES = 32 * 1024
 
 
 def _draft_projection_handles(value: Any) -> set[str]:
@@ -1822,6 +1946,64 @@ def _draft_projection_handles(value: Any) -> set[str]:
     return handles
 
 
+def _valid_required_followup_facts(value: Any) -> bool:
+    """Validate the one closed compact-response extension emitted by Gateway."""
+
+    if value is None:
+        return True
+    if (
+        not isinstance(value, list)
+        or not value
+        or len(value) > _MAX_REQUIRED_FOLLOWUP_FACTS
+    ):
+        return False
+    try:
+        if len(_canonical_json_bytes(value)) > _MAX_REQUIRED_FOLLOWUP_BYTES:
+            return False
+    except (RecursionError, TypeError, UnicodeError, ValueError):
+        return False
+    handles: list[str] = []
+    for row in value:
+        if (
+            not isinstance(row, Mapping)
+            or set(row) != {"reason", "typed_fact_arguments"}
+            or row.get("reason") != "selected_branch_constant"
+            or not isinstance(row.get("typed_fact_arguments"), list)
+            or not all(
+                isinstance(token, str) and token
+                for token in row["typed_fact_arguments"]
+            )
+        ):
+            return False
+        try:
+            action = parse_typed_action_cli_arguments(
+                row["typed_fact_arguments"]
+            )
+        except OperationComposerError:
+            return False
+        handle = action.get("field_handle")
+        if (
+            set(action)
+            != {
+                "contract",
+                "action",
+                "fact_action",
+                "field_handle",
+                "value_type",
+                "value",
+            }
+            or action.get("contract")
+            != "waapi-skill.operation-draft-action/v1"
+            or action.get("action") != "add_typed_fact"
+            or action.get("fact_action") != "set"
+            or not isinstance(handle, str)
+            or _DRAFT_HANDLE_RE.fullmatch(handle) is None
+        ):
+            return False
+        handles.append(handle)
+    return len(handles) == len(set(handles))
+
+
 def _draft_compact_action_result(
     draft: Mapping[str, Any],
 ) -> tuple[str, set[str], set[str], Mapping[str, Any]]:
@@ -1829,8 +2011,21 @@ def _draft_compact_action_result(
     summary = draft.get("current_facts_summary")
     if (
         not isinstance(result, Mapping)
-        or set(result)
-        != {"contract", "action", "created_handles", "affected_handles"}
+        or not set(result).issubset(
+            {
+                "contract",
+                "action",
+                "created_handles",
+                "affected_handles",
+                "required_followup_facts",
+            }
+        )
+        or not {
+            "contract",
+            "action",
+            "created_handles",
+            "affected_handles",
+        }.issubset(result)
         or result.get("contract")
         != "waapi-skill.operation-draft-action-result/v1"
         or not isinstance(result.get("action"), str)
@@ -1844,6 +2039,9 @@ def _draft_compact_action_result(
         )
         or len(set(result["created_handles"])) != len(result["created_handles"])
         or len(set(result["affected_handles"])) != len(result["affected_handles"])
+        or not _valid_required_followup_facts(
+            result.get("required_followup_facts")
+        )
         or not isinstance(summary, Mapping)
         or set(summary)
         != {
@@ -7425,6 +7623,10 @@ class CodexGatewayBroker:
                     "utf-8"
                 ),
             )
+        validation_arguments = _normalize_commutative_wait_topic_facts(
+            step,
+            validation_arguments,
+        )
         if (
             metadata_discovery is None
             and len(validation_arguments) != len(step.arguments)

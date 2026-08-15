@@ -587,13 +587,15 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
                     "--field-handle", identity["handle"], "--value-type", "string",
                     "--fact-value", "id", "--key", "kind",
                 ],
-                "execute_after": "all_dynamic_disclosures_for_current_root",
+                "execute_after": "deferred_parent_fact",
                 "queue_phase": "child_contract",
-                "queue_order_ref": (
-                    "/continuation/request_wide_order/deferred_fact_queue"
-                ),
-                "is_next_command": False,
-            },
+                    "queue_order_ref": (
+                        "/continuation/request_wide_order/deferred_fact_queue"
+                    ),
+                    "is_next_command": False,
+                    "consume_once": True,
+                    "replay_allowed": False,
+                },
         }
     ]
     assert "branch_disclosure" not in identity["continuation"]

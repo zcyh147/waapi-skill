@@ -4310,6 +4310,8 @@ def _bind_dynamic_branch_facts(
                     "fact_argv_by_type": argv_by_type,
                     "execute_after": "deferred_parent_fact",
                     "is_next_command": False,
+                    "consume_once": True,
+                    "replay_allowed": False,
                 }
             )
             bound_scalar_rows.append(bound)
@@ -4340,11 +4342,14 @@ def _bind_dynamic_branch_facts(
                 deferred["deferred_fact"].pop("must_precede", None)
                 deferred["deferred_fact"].update(
                     {
+                        "execute_after": "deferred_parent_fact",
                         "queue_phase": "child_contract",
                         "queue_order_ref": (
                             "/continuation/request_wide_order/deferred_fact_queue"
                         ),
                         "is_next_command": False,
+                        "consume_once": True,
+                        "replay_allowed": False,
                     }
                 )
             row.update(deferred)
@@ -4411,13 +4416,45 @@ def _bind_dynamic_branch_facts(
                 ]
             choice["deferred_fact"] = {
                 "argv": argv,
-                "execute_after": "all_dynamic_disclosures_for_current_root",
+                "execute_after": "deferred_parent_fact",
                 "queue_phase": "child_contract",
                 "queue_order_ref": (
                     "/continuation/request_wide_order/deferred_fact_queue"
                 ),
                 "is_next_command": False,
+                "consume_once": True,
+                "replay_allowed": False,
             }
+            enum_values = choice.get("enum")
+            if isinstance(enum_values, list) and len(enum_values) == 1:
+                enum_value = enum_values[0]
+                if isinstance(enum_value, bool):
+                    value_type = "boolean"
+                    value_text = "true" if enum_value else "false"
+                elif isinstance(enum_value, int):
+                    value_type, value_text = "integer", str(enum_value)
+                elif isinstance(enum_value, float) and math.isfinite(enum_value):
+                    value_type = "number"
+                    value_text = json.dumps(
+                        enum_value, ensure_ascii=False, allow_nan=False
+                    )
+                elif isinstance(enum_value, str):
+                    value_type, value_text = "string", enum_value
+                else:
+                    continue
+                choice["required_followup_fact"] = {
+                    "reason": "selected_scalar_choice_value",
+                    "typed_fact": {
+                        "action": "map-put",
+                        "handle": child_handle,
+                        "key": key,
+                        "value_type": value_type,
+                        "value": value_text,
+                    },
+                    "execute_immediately_after_this_choice": True,
+                    "consume_once": True,
+                    "replay_allowed": False,
+                }
 
 
 def _deferred_dynamic_fact_payload(
@@ -4473,6 +4510,8 @@ def _deferred_dynamic_fact_payload(
                 "reason": "attach_returned_handle_to_its_parent_first",
             },
             "is_next_command": False,
+            "consume_once": True,
+            "replay_allowed": False,
         }
     }
 
@@ -4577,7 +4616,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     "--match-schema-digest",
                     match.schema_digest,
                 ],
-                "fact_order": "options then match; selected rows only, no extras",
+                "fact_order": "options ordered; match facts commute; no extras",
                 "bind": {
                     "--options-schema-digest": options.schema_digest,
                     "--match-schema-digest": match.schema_digest,
@@ -4890,12 +4929,17 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             query_shape=query_shape,
             topic_prefix=topic_prefix,
         )
-        if next_item_disclosure and "deferred_fact" in deferred_fact:
-            deferred_fact["deferred_fact"]["blocked_by"] = [
-                "next_item_disclosure",
-                "all_descendant_disclosures",
-            ]
-        return {
+        if "deferred_fact" in deferred_fact:
+            blocked_by: list[str] = []
+            if args.parent_schema_token is not None:
+                blocked_by.append("ancestor_deferred_parent_facts")
+            if next_item_disclosure:
+                blocked_by.extend(
+                    ["next_item_disclosure", "all_descendant_disclosures"]
+                )
+            if blocked_by:
+                deferred_fact["deferred_fact"]["blocked_by"] = blocked_by
+        response = {
             "contract": "waapi-skill.typed-container-handle/v1",
             "ok": True,
             "status": "ok",
@@ -4969,6 +5013,17 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 **branch_continuation,
             },
         }
+        if draft_shape or undo_child_shape:
+            response["construction_state"] = {
+                "complete": False,
+                "confirmation_allowed": False,
+                "disclosure_replay_allowed": False,
+                "next_phase": (
+                    "finish_dynamic_disclosures_then_apply_deferred_facts"
+                ),
+                "completion_boundary": "draft-check_then_preview",
+            }
+        return response
     if args.command == "draft-start":
         request_version = resolve_operation_schema_version(args, env=env)
         if request_version is None:
