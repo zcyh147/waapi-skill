@@ -379,6 +379,31 @@ def test_media_pool_dynamic_child_stdout_is_complete_within_visible_budget(
     assert gateway.gateway_stdout_json_encoder(item).indent is None
 
 
+def test_dynamic_child_puts_the_next_action_before_the_schema_table(
+    tmp_path: Path,
+) -> None:
+    """A tool-output prefix must carry control flow before optional schema detail."""
+
+    contract = request_contract("2025.1", MEDIA_POOL_URI)
+    filters = next(field for field in contract.fields if field.name == "filters")
+    exit_code, item = gateway.execute_gateway(
+        [
+            "request-array-item", MEDIA_POOL_URI,
+            "--schema-digest", contract.schema_digest,
+            "--array-handle", filters.handle,
+            "--index", "0", "--shape", "object",
+        ],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda _url: pytest.fail("disclosure must be offline"),
+    )
+
+    assert exit_code == 0, item
+    keys = tuple(item)
+    assert keys.index("continuation") < keys.index("child_contract")
+    encoded = gateway.gateway_stdout_json_encoder(item).encode(item)
+    assert encoded.index('"continuation"') < encoded.index('"child_contract"')
+
+
 def test_compact_dynamic_fact_receipt_keeps_disclosed_sequence_active(
     tmp_path: Path,
 ) -> None:
@@ -432,6 +457,7 @@ def test_compact_dynamic_fact_receipt_keeps_disclosed_sequence_active(
         "next_rule": "continue_with_child_contract_facts_for_the_appended_value",
         "stop_cancel_or_claim_truncation_before_current_root_is_complete": "invalid",
     }
+    assert "completion_candidate" not in appended["draft"]["next_action_binding"]
 
     choose_code, chosen = gateway.execute_gateway(
         [
@@ -456,6 +482,7 @@ def test_compact_dynamic_fact_receipt_keeps_disclosed_sequence_active(
         "next_rule": "map_put_the_same_key_from_its_disclosed_choice",
         "stop_cancel_or_claim_truncation_before_current_root_is_complete": "invalid",
     }
+    assert "completion_candidate" not in chosen["draft"]["next_action_binding"]
 
     put_code, put = gateway.execute_gateway(
         [
@@ -478,6 +505,7 @@ def test_compact_dynamic_fact_receipt_keeps_disclosed_sequence_active(
     assert continuation["next_rule"] == (
         "continue_with_the_next_business_present_child_contract_fact_in_queue_index_order"
     )
+    assert "completion_candidate" not in put["draft"]["next_action_binding"]
 
 
 def test_audio_convert_schema_forbids_present_with_nonempty_languages(
