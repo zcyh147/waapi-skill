@@ -11,6 +11,7 @@ import pytest
 
 from tests.semantic.support.codex_gateway_broker import (
     DraftTypedActionArgument,
+    DraftTypedActionBatchArgument,
     MetadataTokenProjection,
 )
 from tests.semantic.support.codex_integration_weather_runtime_v1 import (
@@ -541,9 +542,18 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         if step.subcommand == "draft-apply"
     ]
     assert rtpc_actions
+    rtpc_action_members = [
+        action
+        for argument in rtpc_actions
+        for action in (
+            argument.actions
+            if isinstance(argument, DraftTypedActionBatchArgument)
+            else (argument,)
+        )
+    ]
     bound_rtpc_actions = [
         argument
-        for argument in rtpc_actions
+        for argument in rtpc_action_members
         if argument.metadata_binding is not None
     ]
     assert bound_rtpc_actions

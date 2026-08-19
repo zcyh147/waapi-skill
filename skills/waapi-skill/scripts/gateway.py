@@ -220,6 +220,7 @@ from wwise_waapi.operation_drafts import (  # noqa: E402  # pyright: ignore[repo
     OperationDraftStore,
 )
 from wwise_waapi.operation_composer import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    MAX_TYPED_ACTIONS_PER_APPLY,
     OBJECT_SET_COMPOSER_OPERATION,
     OperationComposerError,
     composition_projection,
@@ -227,6 +228,7 @@ from wwise_waapi.operation_composer import (  # noqa: E402  # pyright: ignore[re
     operation_composer_contract,
     operation_composer_digest,
     parse_typed_action_cli_arguments,
+    parse_typed_action_cli_argument_sequence,
 )
 from wwise_waapi.platform_paths import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     WWISE_WIRE_PATH_INPUT_AUDIT_CONTRACT,
@@ -3511,7 +3513,7 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
                 f"wait-topic --event-count must be between 1 and {MAX_WAIT_EVENT_COUNT}"
             )
     elif args.command == "draft-apply":
-        parse_operation_draft_cli_action(args)
+        parse_operation_draft_cli_actions(args)
 
 
 def topic_typed_input_requested(args: argparse.Namespace) -> bool:
@@ -3932,16 +3934,22 @@ def operation_composer_input_contract(
             "revision",
         ],
         "revision_discipline": {
-            "mode": "one_action_then_read_next_response",
+            "mode": "one_ordered_atomic_batch_then_read",
+            "action_count": {
+                "minimum": 1,
+                "maximum": MAX_TYPED_ACTIONS_PER_APPLY,
+            },
+            "repeat_complete_action_group": [
+                "--action",
+                "<action-name>",
+                "<typed-fact-arguments>",
+            ],
+            "revision_delta": "action_count",
+            "failure": "unchanged",
             "expected_revision_source": "/draft/revision",
             "next_action_template_source": (
                 "/draft/next_action_binding/fixed_argv_prefix"
             ),
-            "replace_only": [
-                "<task-authority-from-draft-start>",
-                "<action-name>",
-                "<typed-fact-arguments>",
-            ],
             "precompute_or_increment_revision": False,
         },
     }
@@ -4799,6 +4807,11 @@ def _dynamic_next_command_decision(
                 ),
                 "start_at": "outermost_disclosed_root_response",
                 "first_command_pointer": "/continuation/deferred_fact/argv",
+                "batch_facts": (
+                    f"next_up_to_{MAX_TYPED_ACTIONS_PER_APPLY}_deferred_facts_"
+                    "in_queue_order"
+                ),
+                "first_fact_only": "invalid",
             }
         )
     if not nested_sibling and sibling_candidate is not None:
@@ -5352,6 +5365,10 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                                 "--facts",
                             ],
                             "fact_argv_must_follow_prefix": True,
+                            "atomic_batch_scope": "next_current_root_deferred_fact_chunk",
+                            "complete_action_groups_in_queue_order": True,
+                            "dispatch_after_complete_chunk": True,
+                            "maximum_actions": MAX_TYPED_ACTIONS_PER_APPLY,
                             "inserting_fact_before_expected_revision": "invalid",
                             "copy_returned_handles_exactly": True,
                             "placeholder_or_added_punctuation": "invalid",
@@ -5487,19 +5504,19 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             inspected.operation,
             inspected.version,
         )
-        parsed_action = parse_operation_draft_cli_action(args)
-        record = store.apply_action(
+        parsed_actions = parse_operation_draft_cli_actions(args)
+        record = store.apply_actions(
             args.draft_id,
             task_authority=args.task_authority,
             expected_revision=args.expected_revision,
             schema_digest=schema_digest,
             composer_digest=composer_digest,
-            action=parsed_action,
+            actions=parsed_actions,
         )
         return operation_draft_payload(
             args.command,
             record,
-            compact_action=parsed_action if args.compact else None,
+            compact_actions=parsed_actions if args.compact else None,
             prior_record=inspected if args.compact else None,
             task_authority=args.task_authority,
         )
@@ -12789,6 +12806,26 @@ def _operation_draft_projection_handles(value: Any) -> set[str]:
     return handles
 
 
+def _operation_draft_projection_handles_in_order(value: Any) -> tuple[str, ...]:
+    handles: list[str] = []
+    seen: set[str] = set()
+
+    def visit(item: Any) -> None:
+        if isinstance(item, Mapping):
+            handle = item.get("handle")
+            if isinstance(handle, str) and handle not in seen:
+                seen.add(handle)
+                handles.append(handle)
+            for nested in item.values():
+                visit(nested)
+        elif isinstance(item, list):
+            for nested in item:
+                visit(nested)
+
+    visit(value)
+    return tuple(handles)
+
+
 def _operation_draft_facts_summary(current_facts: list[Any]) -> dict[str, Any]:
     return {
         "contract": "waapi-skill.operation-draft-facts-summary/v1",
@@ -12800,7 +12837,7 @@ def _operation_draft_facts_summary(current_facts: list[Any]) -> dict[str, Any]:
 
 def _operation_draft_compact_action_projection(
     *,
-    action: Mapping[str, Any],
+    actions: Sequence[Mapping[str, Any]],
     prior_record: OperationDraftRecord,
     record: OperationDraftRecord,
     current_facts: list[Any],
@@ -12821,20 +12858,28 @@ def _operation_draft_compact_action_projection(
     )["current_facts"]
     prior_handles = _operation_draft_projection_handles(prior_facts)
     current_handles = _operation_draft_projection_handles(current_facts)
+    if not actions:
+        raise GatewayInputError("Compact Draft action result lacks its action batch.")
+    action = actions[-1]
     action_name = action.get("action")
     if not isinstance(action_name, str) or not action_name:
         raise GatewayInputError("Compact Draft action result lacks its action name.")
     affected_handles = sorted(
         {
             value
-            for key, value in action.items()
+            for row in actions
+            for key, value in row.items()
             if key.endswith("_handle") and isinstance(value, str)
         }
     )
     action_result: dict[str, Any] = {
         "contract": "waapi-skill.operation-draft-action-result/v1",
         "action": action_name,
-        "created_handles": sorted(current_handles - prior_handles),
+        "created_handles": [
+            handle
+            for handle in _operation_draft_projection_handles_in_order(current_facts)
+            if handle not in prior_handles
+        ],
         "affected_handles": affected_handles,
     }
     fact_action = action.get("fact_action")
@@ -12954,7 +12999,7 @@ def operation_draft_payload(
     record: OperationDraftRecord,
     *,
     offline: bool = True,
-    compact_action: Mapping[str, Any] | None = None,
+    compact_actions: Sequence[Mapping[str, Any]] | None = None,
     prior_record: OperationDraftRecord | None = None,
     task_authority: str | None = None,
 ) -> dict[str, Any]:
@@ -13037,7 +13082,7 @@ def operation_draft_payload(
                 "transaction_id": record.seal["transaction_id"],
                 "artifact_hash": record.seal["artifact_hash"],
             }
-        if compact_action is not None:
+        if compact_actions is not None:
             if command != "draft-apply" or prior_record is None:
                 raise GatewayInputError(
                     "Compact Draft action projection is valid only for draft-apply."
@@ -13049,12 +13094,23 @@ def operation_draft_payload(
                 )
             projection.update(
                 _operation_draft_compact_action_projection(
-                    action=compact_action,
+                    actions=compact_actions,
                     prior_record=prior_record,
                     record=record,
                     current_facts=current_facts,
                 )
             )
+            if len(compact_actions) > 1:
+                action_result = projection.get("action_result")
+                if not isinstance(action_result, dict):
+                    raise GatewayInputError(
+                        "Compact Draft batch projection lacks its action result."
+                    )
+                action_result["last_action"] = action_result.pop("action")
+                action_result["action"] = "batch"
+                action_result["action_count"] = len(compact_actions)
+                action_result["applied_atomically"] = True
+                action_result.pop("construction_continuation", None)
             projection["schema_required_fields_status"] = projection.pop(
                 "missing_fields_status"
             )
@@ -13101,7 +13157,7 @@ def operation_draft_payload(
         },
         **(
             {}
-            if compact_action is not None
+            if compact_actions is not None
             else {
                 "created_at": record.created_at,
                 "updated_at": record.updated_at,
@@ -13114,16 +13170,18 @@ def operation_draft_payload(
         next_action_binding: dict[str, Any] = {
             "contract": "waapi-skill.operation-draft-next-action/v1",
         }
-        if compact_action is not None:
+        if compact_actions is not None:
             next_action_binding["shell_tool_timeout_ms"] = (
                 GATEWAY_SHELL_TOOL_TIMEOUT_MS
             )
-        if compact_action is None:
+        if compact_actions is None:
             next_action_binding.update(
                 {
                     "draft_id": record.draft_id,
                     "expected_revision": record.revision,
-                    "one_action_only": True,
+                    "one_atomic_action_batch_only": True,
+                    "minimum_actions": 1,
+                    "maximum_actions": MAX_TYPED_ACTIONS_PER_APPLY,
                     "then_read_next_response": True,
                     "precompute_or_increment_revision": False,
                 }
@@ -13166,7 +13224,7 @@ def operation_draft_payload(
                         "--compact",
                         "--facts",
                     ],
-                    "append_exactly_one_typed_action": [
+                    "append_one_or_more_complete_typed_actions": [
                         "--action",
                         "<action-name>",
                         "<typed-fact-arguments>",
@@ -13181,7 +13239,7 @@ def operation_draft_payload(
                 next_action_binding["replace_only"].insert(
                     0, "<task-authority-from-draft-start>"
                 )
-        if compact_action is None:
+        if compact_actions is None:
             next_action_binding["copy_all_other_values_exactly"] = True
         elif record.check is None:
             action_result = draft.get("action_result")
@@ -13190,7 +13248,7 @@ def operation_draft_payload(
                 if isinstance(action_result, Mapping)
                 else None
             )
-            if compact_action is not None and not isinstance(
+            if compact_actions is not None and not isinstance(
                 construction_continuation, Mapping
             ):
                 next_action_binding["completion_candidate"] = {
@@ -13214,7 +13272,7 @@ def operation_draft_payload(
                     ),
                     "draft_apply_action_check": "invalid",
                     "when_condition_false": (
-                        "continue_with_one_typed_action_or_dynamic_disclosure"
+                        "continue_with_one_atomic_typed_action_batch_or_dynamic_disclosure"
                     ),
                 }
             followups = (
@@ -14288,13 +14346,15 @@ def parse_json_object(
     return payload
 
 
-def parse_operation_draft_cli_action(args: argparse.Namespace) -> dict[str, Any]:
-    """Build the sole production Draft action from typed facts."""
+def parse_operation_draft_cli_actions(
+    args: argparse.Namespace,
+) -> tuple[dict[str, Any], ...]:
+    """Build one bounded ordered production Draft action batch."""
 
     if not args.facts:
         raise GatewayInputError("draft-apply requires --facts --action and typed facts")
     try:
-        return parse_typed_action_cli_arguments(args.facts)
+        return parse_typed_action_cli_argument_sequence(args.facts)
     except OperationComposerError as exc:
         raise GatewayInputError(str(exc)) from exc
 

@@ -67,6 +67,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
 from tests.semantic.support.codex_gateway_broker import (
     CodexGatewayBroker,
     DraftTypedActionArgument,
+    DraftTypedActionBatchArgument,
     ExpectedGatewayStep,
     InlineTypedOperationArgument,
     MetadataQueryArgument,
@@ -1918,12 +1919,19 @@ def _synthetic_gateway_records(
     required_response_values: dict[tuple[str, str], Any] = {}
     for expected_step in protocol.steps:
         for expected_argument in expected_step.arguments:
-            if isinstance(expected_argument, DraftTypedActionArgument):
-                for binding in expected_argument.response_bindings:
+            action_arguments = (
+                (expected_argument,)
+                if isinstance(expected_argument, DraftTypedActionArgument)
+                else expected_argument.actions
+                if isinstance(expected_argument, DraftTypedActionBatchArgument)
+                else ()
+            )
+            for action_argument in action_arguments:
+                for binding in action_argument.response_bindings:
                     key = binding.pointer.removeprefix("/")
                     required_response_values[
                         (binding.step, binding.response_pointer)
-                    ] = expected_argument.expected[key]
+                    ] = action_argument.expected[key]
 
     def set_pointer(payload: dict[str, Any], pointer: str, value: Any) -> None:
         current: dict[str, Any] = payload
@@ -1953,6 +1961,11 @@ def _synthetic_gateway_records(
                 )
             elif isinstance(item, DraftTypedActionArgument):
                 arguments.extend(typed_action_cli_arguments(item.expected))
+            elif isinstance(item, DraftTypedActionBatchArgument):
+                for action_argument in item.actions:
+                    arguments.extend(
+                        typed_action_cli_arguments(action_argument.expected)
+                    )
             elif isinstance(item, TypedRequestFactsArgument):
                 construction = typed_request_construction_for_values(
                     item.contract,
@@ -2079,23 +2092,34 @@ def _synthetic_gateway_records(
         elif step.subcommand == "draft-apply":
             operation = next(reversed(draft_started))
             draft_id, authority, schema_digest, revision = draft_started[operation]
-            action_argument = next(
+            typed_argument = next(
                 item
                 for item in step.arguments
-                if isinstance(item, DraftTypedActionArgument)
+                if isinstance(
+                    item,
+                    (DraftTypedActionArgument, DraftTypedActionBatchArgument),
+                )
             )
-            action = dict(action_argument.expected)
-            for binding in action_argument.response_bindings:
-                action[binding.pointer.removeprefix("/")] = required_response_values[
-                    (binding.step, binding.response_pointer)
-                ]
-            updated = draft_store.apply_action(
+            action_arguments = (
+                (typed_argument,)
+                if isinstance(typed_argument, DraftTypedActionArgument)
+                else typed_argument.actions
+            )
+            actions: list[dict[str, Any]] = []
+            for action_argument in action_arguments:
+                action = dict(action_argument.expected)
+                for binding in action_argument.response_bindings:
+                    action[binding.pointer.removeprefix("/")] = required_response_values[
+                        (binding.step, binding.response_pointer)
+                    ]
+                actions.append(action)
+            updated = draft_store.apply_actions(
                 draft_id,
                 task_authority=authority,
                 expected_revision=revision,
                 schema_digest=schema_digest,
                 composer_digest=operation_composer_digest(operation, version),
-                action=action,
+                actions=tuple(actions),
             )
             draft_started[operation] = (
                 draft_id,

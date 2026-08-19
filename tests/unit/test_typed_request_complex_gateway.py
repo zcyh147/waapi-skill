@@ -181,10 +181,25 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
             "--facts",
         ],
         "fact_argv_must_follow_prefix": True,
+        "atomic_batch_scope": "next_current_root_deferred_fact_chunk",
+        "complete_action_groups_in_queue_order": True,
+        "dispatch_after_complete_chunk": True,
+            "maximum_actions": 6,
         "inserting_fact_before_expected_revision": "invalid",
         "copy_returned_handles_exactly": True,
         "placeholder_or_added_punctuation": "invalid",
     }
+    deferred_candidate = next(
+        row
+        for row in item["continuation"]["next_command_decision"][
+            "evaluate_in_order"
+        ]
+        if row["candidate"] == "deferred_fact_queue"
+    )
+    assert deferred_candidate["batch_facts"] == (
+        "next_up_to_6_deferred_facts_in_queue_order"
+    )
+    assert deferred_candidate["first_fact_only"] == "invalid"
     assert item["child_contract"]["fact_literal_policy"] == {
         "copy_handles_and_choice_handles_exactly": True,
         "placeholder_or_added_punctuation": "invalid",
@@ -349,7 +364,7 @@ def test_media_pool_compact_draft_action_requires_read_result_not_preview(
         "allowed_suffix_source": "request_schema_terminal_arguments_only",
         "draft_apply_action_check": "invalid",
         "when_condition_false": (
-            "continue_with_one_typed_action_or_dynamic_disclosure"
+            "continue_with_one_atomic_typed_action_batch_or_dynamic_disclosure"
         ),
     }
 

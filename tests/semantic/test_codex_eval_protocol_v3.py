@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from tests.support.platform_filesystem import native_absolute_test_path
@@ -22,6 +24,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     DraftTypedActionArgument,
+    DraftTypedActionBatchArgument,
     DraftActionMetadataBinding,
     ExpectedGatewayStep,
     MetadataQueryArgument,
@@ -30,6 +33,14 @@ from tests.semantic.support.codex_gateway_broker import (
     TypedRequestFactsArgument,
     validate_commutative_composer_setup_step_groups,
 )
+from tests.semantic.support.codex_object_heavy_v3 import (
+    build_object_heavy_v3_recipe,
+)
+from tests.semantic.support.codex_typed_input_profile import (
+    load_typed_input_profile,
+)
+from wwise_waapi.operation_composer import typed_action_cli_arguments
+from wwise_waapi.platform_commands import encode_windows_powershell_argv
 
 
 def _request(index: int = 1) -> dict[str, object]:
@@ -70,6 +81,50 @@ def test_object_create_top_level_facts_precede_dynamic_container_disclosure() ->
         step.subcommand == "draft-apply"
         for step in protocol.steps[2:first_disclosure]
     )
+
+
+def test_typed_profile_object_create_batches_fit_windows_command_transport() -> None:
+    profile = load_typed_input_profile(
+        Path(__file__).resolve().parent / "data" / "typed-input-v1" / "profile.json"
+    )
+    unit = next(
+        row
+        for row in profile.units
+        if row.unit_id == "TYP21-DEDICATED-OBJECT-CREATE"
+    )
+    recipe = build_object_heavy_v3_recipe(unit.base_scenario_id, unit.version)
+    protocol = build_transaction_protocol(
+        (recipe.request.as_dict(version=unit.version),)
+    )
+    # Reserve a deliberately long runner path; the formal Windows campaign
+    # additionally constrains its owned workspace/current-directory lengths.
+    runner = "C:/" + ("owned/" * 28) + "run.py"
+    encoded_lengths: list[int] = []
+    for step in protocol.steps:
+        if step.subcommand != "draft-apply":
+            continue
+        argv = ["python", runner, "gateway.py", "--version", unit.version]
+        argv.append(step.subcommand)
+        for argument in step.arguments:
+            if isinstance(argument, ResponseBinding):
+                if argument.pointer.endswith("/draft_id"):
+                    argv.append("od1-" + ("0" * 32))
+                elif argument.pointer.endswith("/task_authority"):
+                    argv.append("da1-" + ("0" * 40))
+                else:
+                    argv.append("999")
+            elif isinstance(argument, DraftTypedActionBatchArgument):
+                for action in argument.actions:
+                    argv.extend(typed_action_cli_arguments(action.expected))
+            elif isinstance(argument, DraftTypedActionArgument):
+                argv.extend(typed_action_cli_arguments(argument.expected))
+            else:
+                assert isinstance(argument, str)
+                argv.append(argument)
+        encoded_lengths.append(len(encode_windows_powershell_argv(argv)))
+
+    assert encoded_lengths
+    assert max(encoded_lengths) < 30_000
 
 
 def _object_set_request(**options: object) -> dict[str, object]:
@@ -312,14 +367,10 @@ def test_object_set_composer_keeps_nondefault_request_options_explicit() -> None
 def test_single_transaction_spans_two_turn_prefixes_with_response_bindings() -> None:
     protocol = build_transaction_protocol([_request()])
 
-    assert protocol.turn_prefix_counts == (9, 13)
+    assert protocol.turn_prefix_counts == (5, 9)
     assert tuple(step.subcommand for step in protocol.steps) == (
         "operation-schema",
         "draft-start",
-        "draft-apply",
-        "draft-apply",
-        "draft-apply",
-        "draft-apply",
         "draft-apply",
         "draft-check",
         "preview-from-draft",
@@ -547,7 +598,11 @@ def test_soundbank_generate_transaction_uses_typed_draft_facts() -> None:
         if step.subcommand == "draft-apply"
     )
     assert actions
-    assert all(isinstance(value, DraftTypedActionArgument) for value in actions)
+    assert all(
+        isinstance(value, (DraftTypedActionArgument, DraftTypedActionBatchArgument))
+        for value in actions
+    )
+    assert any(isinstance(value, DraftTypedActionBatchArgument) for value in actions)
     assert all(value.operation == "soundbank.generate" for value in actions)
     assert any(step.subcommand == "preview-from-draft" for step in protocol.steps)
     assert all("--request-json" not in step.arguments for step in protocol.steps)
@@ -590,12 +645,20 @@ def test_multi_row_typed_draft_finishes_each_disclosure_chain_before_next_row() 
 
     first_disclosure = construction_names.index("tx01.disclose.001")
     second_disclosure = construction_names.index("tx01.disclose.002")
-    assert first_disclosure < construction_names.index("tx01.action.001")
-    assert construction_names.index("tx01.action.001") < construction_names.index(
-        "tx01.action.002"
-    )
-    assert construction_names.index("tx01.action.004") < second_disclosure
-    assert second_disclosure < construction_names.index("tx01.action.005")
+    assert construction_names.index("tx01.action.001") < first_disclosure
+    assert construction_names.index("tx01.action.002") < first_disclosure
+    assert first_disclosure < construction_names.index("tx01.action.003")
+    assert construction_names.index("tx01.action.003") < second_disclosure
+    assert second_disclosure < construction_names.index("tx01.action.004")
+    batches = {
+        step.name: step.arguments[-1]
+        for step in protocol.steps
+        if step.subcommand == "draft-apply"
+    }
+    assert isinstance(batches["tx01.action.003"], DraftTypedActionBatchArgument)
+    assert isinstance(batches["tx01.action.004"], DraftTypedActionBatchArgument)
+    assert len(batches["tx01.action.003"].actions) == 4
+    assert len(batches["tx01.action.004"].actions) == 4
 
 
 def test_nested_choice_uses_parent_disclosure_choice_without_requery() -> None:
@@ -638,11 +701,18 @@ def test_nested_choice_uses_parent_disclosure_choice_without_requery() -> None:
     )
     construction_names = [step.name for step in construction]
     assert construction_names.index("tx01.disclose.002") < construction_names.index(
-        "tx01.action.005"
+        "tx01.action.002"
     )
-    assert construction_names.index("tx01.action.005") < construction_names.index(
-        "tx01.action.006"
+    action_batches = [
+        step.arguments[-1]
+        for step in construction
+        if step.name in {"tx01.action.002", "tx01.action.003"}
+    ]
+    assert all(
+        isinstance(batch, DraftTypedActionBatchArgument)
+        for batch in action_batches
     )
+    assert [len(batch.actions) for batch in action_batches] == [6, 2]
 
 
 def test_metadata_transaction_protocol_is_generic_and_binds_every_preview() -> None:
@@ -783,7 +853,7 @@ def test_schema_query_protocol_requires_one_exact_auditable_preflight_lookup() -
         query_step=query,
     )
 
-    assert protocol.turn_prefix_counts == (10, 14)
+    assert protocol.turn_prefix_counts == (6, 10)
     assert tuple(step.subcommand for step in protocol.steps[:3]) == (
         "query-object",
         "operation-schema",
@@ -1068,8 +1138,8 @@ def test_audio_import_metadata_equivalence_rejects_duplicate_expected_names() ->
 def test_three_transactions_preserve_four_natural_turn_boundaries() -> None:
     protocol = build_transaction_protocol([_request(1), _request(2), _request(3)])
 
-    assert protocol.turn_prefix_counts == (9, 22, 35, 39)
-    assert len(protocol.steps) == 39
+    assert protocol.turn_prefix_counts == (5, 14, 23, 27)
+    assert len(protocol.steps) == 27
     assert [step.name for step in protocol.steps if step.subcommand == "preview-from-draft"] == [
         "tx01.preview",
         "tx02.preview",
@@ -1096,7 +1166,7 @@ def test_structured_refusal_is_one_turn_and_exact_exit_two() -> None:
         [_request()], refusal=StructuredRefusal("INPUT_FILE_NOT_FOUND")
     )
 
-    assert protocol.turn_prefix_counts == (9,)
+    assert protocol.turn_prefix_counts == (5,)
     assert protocol.steps[-1].allowed_exit_codes == (2,)
     assert protocol.steps[-1].expected_error_code == "INPUT_FILE_NOT_FOUND"
     assert protocol.steps[-1].expected_result_command == "preview"
@@ -1105,14 +1175,10 @@ def test_structured_refusal_is_one_turn_and_exact_exit_two() -> None:
 def test_terminal_execute_transaction_ends_at_execute_without_verify() -> None:
     protocol = build_transaction_protocol([_request()], terminal_execute=True)
 
-    assert protocol.turn_prefix_counts == (9, 12)
+    assert protocol.turn_prefix_counts == (5, 8)
     assert tuple(step.subcommand for step in protocol.steps) == (
         "operation-schema",
         "draft-start",
-        "draft-apply",
-        "draft-apply",
-        "draft-apply",
-        "draft-apply",
         "draft-apply",
         "draft-check",
         "preview-from-draft",

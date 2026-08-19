@@ -50,7 +50,7 @@ if str(REPO_ROOT) not in sys.path:
 from tests.semantic import run_codex_skill_matrix as matrix  # noqa: E402
 from wwise_waapi.operation_composer import (  # noqa: E402
     OperationComposerError,
-    parse_typed_action_cli_arguments,
+    parse_typed_action_cli_argument_sequence,
 )
 from tests.destructive.support.live_environment import (  # noqa: E402
     LiveEnvironmentError,
@@ -5129,12 +5129,12 @@ def _archived_draft_action(
         raise CampaignEvidenceError(str(exc)) from exc
 
 
-def _submitted_typed_draft_action(
+def _submitted_typed_draft_actions(
     gateway_arguments: Sequence[str],
     *,
     label: str,
-) -> Mapping[str, Any]:
-    """Recover one current typed action without historical grammar."""
+) -> tuple[Mapping[str, Any], ...]:
+    """Recover one bounded current typed action batch without historical grammar."""
 
     if "--action-json" in gateway_arguments:
         raise CampaignEvidenceError(
@@ -5147,10 +5147,10 @@ def _submitted_typed_draft_action(
     ]
     if len(indexes) != 1:
         raise CampaignEvidenceError(
-            f"{label} Draft action argv does not contain one typed action"
+            f"{label} Draft action argv does not contain one typed action batch"
         )
     try:
-        return parse_typed_action_cli_arguments(
+        return parse_typed_action_cli_argument_sequence(
             gateway_arguments[indexes[0] + 1 :]
         )
     except OperationComposerError as exc:
@@ -5284,8 +5284,8 @@ def _validate_heavy_v3_broker_records(
             raise CampaignEvidenceError(
                 f"{label} broker argv cannot replay protocol step {step.name}: {exc}"
             ) from exc
-        submitted_draft_action = (
-            _submitted_typed_draft_action(
+        submitted_draft_actions = (
+            _submitted_typed_draft_actions(
                 resolved.gateway_arguments,
                 label=f"{label} protocol step {step.name}",
             )
@@ -5442,9 +5442,9 @@ def _validate_heavy_v3_broker_records(
                     f"{label} Draft response cannot replay protocol step "
                     f"{step.name}: {exc}"
                 ) from exc
-        if submitted_draft_action is not None:
+        if submitted_draft_actions is not None:
             replay._submitted_draft_actions_by_step[step.name] = (  # noqa: SLF001
-                submitted_draft_action
+                submitted_draft_actions
             )
         replay._payloads_by_step[step.name] = payload  # noqa: SLF001
 

@@ -15,6 +15,7 @@ from typing import Any, Mapping, Sequence
 
 from tests.semantic.support.codex_gateway_broker import (
     DraftTypedActionArgument,
+    DraftTypedActionBatchArgument,
     DraftActionMetadataBinding,
     DraftActionQueryIdentityBinding,
     DraftActionResponseBinding,
@@ -32,6 +33,7 @@ from tests.semantic.support.codex_gateway_broker import (
     validate_operation_draft_protocol_steps,
 )
 from wwise_waapi.operation_composer import (
+    MAX_TYPED_ACTIONS_PER_APPLY,
     OperationComposerError,
     apply_composer_action,
     materialize_operation_request,
@@ -881,55 +883,66 @@ def materialize_typed_transaction_protocol_requests(
                 if step.subcommand != "draft-apply":
                     continue
                 argument = step.arguments[-1] if step.arguments else None
-                if (
-                    not isinstance(argument, DraftTypedActionArgument)
-                    or argument.operation != operation
-                    or argument.response_bindings
-                    or argument.query_identity_bindings
+                action_arguments = (
+                    (argument,)
+                    if isinstance(argument, DraftTypedActionArgument)
+                    else (
+                        argument.actions
+                        if isinstance(argument, DraftTypedActionBatchArgument)
+                        else ()
+                    )
+                )
+                if not action_arguments or any(
+                    action_argument.operation != operation
+                    or action_argument.response_bindings
+                    or action_argument.query_identity_bindings
+                    for action_argument in action_arguments
                 ):
                     raise V3ProtocolError(
                         "sealed Lua file replay contains a dynamic Draft action"
                     )
-                action = dict(argument.expected)
-                allowed = {
-                    "contract",
-                    "action",
-                    "fact_action",
-                    "field_handle",
-                    "value_type",
-                    "value",
-                    "key",
-                }
-                if (
-                    set(action) - allowed
-                    or action.get("contract") != OPERATION_DRAFT_ACTION_CONTRACT
-                    or action.get("action") != "add_typed_fact"
-                    or not all(
-                        isinstance(action.get(name), str)
-                        for name in (
-                            "fact_action",
-                            "field_handle",
-                            "value_type",
-                            "value",
+                for action_argument in action_arguments:
+                    action = dict(action_argument.expected)
+                    allowed = {
+                        "contract",
+                        "action",
+                        "fact_action",
+                        "field_handle",
+                        "value_type",
+                        "value",
+                        "key",
+                    }
+                    if (
+                        set(action) - allowed
+                        or action.get("contract")
+                        != OPERATION_DRAFT_ACTION_CONTRACT
+                        or action.get("action") != "add_typed_fact"
+                        or not all(
+                            isinstance(action.get(name), str)
+                            for name in (
+                                "fact_action",
+                                "field_handle",
+                                "value_type",
+                                "value",
+                            )
+                        )
+                        or (
+                            "key" in action
+                            and not isinstance(action.get("key"), str)
+                        )
+                    ):
+                        raise V3ProtocolError(
+                            "sealed Lua file replay contains an invalid typed fact"
+                        )
+                    facts.append(
+                        TypedRequestFact(
+                            str(action["fact_action"]),
+                            str(action["field_handle"]),
+                            str(action["value_type"]),
+                            str(action["value"]),
+                            key=action.get("key"),
                         )
                     )
-                    or (
-                        "key" in action
-                        and not isinstance(action.get("key"), str)
-                    )
-                ):
-                    raise V3ProtocolError(
-                        "sealed Lua file replay contains an invalid typed fact"
-                    )
-                facts.append(
-                    TypedRequestFact(
-                        str(action["fact_action"]),
-                        str(action["field_handle"]),
-                        str(action["value_type"]),
-                        str(action["value"]),
-                        key=action.get("key"),
-                    )
-                )
             contract = draft_operation_request_contract(operation, version)
             try:
                 materialized = materialize_typed_request(
@@ -987,7 +1000,16 @@ def materialize_typed_transaction_protocol_requests(
                 if step.subcommand != "draft-apply":
                     continue
                 argument = step.arguments[-1] if step.arguments else None
-                if not isinstance(argument, DraftTypedActionArgument):
+                action_arguments = (
+                    (argument,)
+                    if isinstance(argument, DraftTypedActionArgument)
+                    else (
+                        argument.actions
+                        if isinstance(argument, DraftTypedActionBatchArgument)
+                        else ()
+                    )
+                )
+                if not action_arguments:
                     raise V3ProtocolError(
                         "typed transaction contains a non-typed Draft action"
                     )
@@ -997,30 +1019,31 @@ def materialize_typed_transaction_protocol_requests(
                 # disclosure response must bind at runtime.  Query-identity
                 # bindings likewise retain the reviewed path form in evidence;
                 # the Broker separately proves the live GUID/path equivalence.
-                action = dict(argument.expected)
-                for binding in argument.response_bindings:
-                    bound = issued_handles.get(binding.step)
-                    if bound is not None:
-                        action[binding.pointer.removeprefix("/")] = bound
                 prior_handles = composition_handles(composition)
-                try:
-                    composition, _ = apply_composer_action(
-                        operation,
-                        version,
-                        composition,
-                        action,
-                    )
-                except OperationComposerError as exc:
-                    raise V3ProtocolError(
-                        "typed transaction action cannot be replayed"
-                    ) from exc
-                created = sorted(composition_handles(composition) - prior_handles)
-                if created:
-                    if len(created) != 1:
-                        raise V3ProtocolError(
-                            "typed transaction action created ambiguous handles"
+                for action_argument in action_arguments:
+                    action = dict(action_argument.expected)
+                    for binding in action_argument.response_bindings:
+                        bound = issued_handles.get(binding.step)
+                        if bound is not None:
+                            action[binding.pointer.removeprefix("/")] = bound
+                    try:
+                        composition, _ = apply_composer_action(
+                            operation,
+                            version,
+                            composition,
+                            action,
                         )
+                    except OperationComposerError as exc:
+                        raise V3ProtocolError(
+                            "typed transaction action cannot be replayed"
+                        ) from exc
+                created = sorted(composition_handles(composition) - prior_handles)
+                if len(created) == 1:
                     issued_handles[step.name] = created[0]
+                elif created and len(action_arguments) == 1:
+                    raise V3ProtocolError(
+                        "typed transaction action created ambiguous handles"
+                    )
             try:
                 request = materialize_operation_request(
                     operation,
@@ -1280,6 +1303,8 @@ def _build_generic_typed_draft_transaction_steps(
             )
         dependent_rows_by_group[next(iter(roots))].append(row)
 
+    action_step_index = 0
+
     def append_fact_rows(
         rows: Sequence[
             tuple[
@@ -1290,9 +1315,25 @@ def _build_generic_typed_draft_transaction_steps(
             ]
         ],
     ) -> None:
-        nonlocal revision_step
-        for index, _fact, response_bindings, action in rows:
-            step_name = f"{label}.action.{index:03d}"
+        nonlocal action_step_index, revision_step
+        for offset in range(0, len(rows), MAX_TYPED_ACTIONS_PER_APPLY):
+            batch = tuple(rows[offset : offset + MAX_TYPED_ACTIONS_PER_APPLY])
+            action_step_index += 1
+            step_name = f"{label}.action.{action_step_index:03d}"
+            action_arguments = tuple(
+                DraftTypedActionArgument(
+                    action,
+                    response_bindings=response_bindings,
+                    operation=operation,
+                )
+                for _index, _fact, response_bindings, action in batch
+            )
+            typed_argument: DraftTypedActionArgument | DraftTypedActionBatchArgument
+            typed_argument = (
+                action_arguments[0]
+                if len(action_arguments) == 1
+                else DraftTypedActionBatchArgument(action_arguments)
+            )
             steps.append(
                 ExpectedGatewayStep(
                     step_name,
@@ -1305,11 +1346,7 @@ def _build_generic_typed_draft_transaction_steps(
                         ResponseBinding(revision_step, "/draft/revision"),
                         "--compact",
                         "--facts",
-                        DraftTypedActionArgument(
-                            action,
-                            response_bindings=response_bindings,
-                            operation=operation,
-                        ),
+                        typed_argument,
                     ),
                 )
             )
@@ -2158,6 +2195,20 @@ def build_metadata_transaction_protocol(
                     )
                     changed = True
                     bound = True
+            elif isinstance(argument, DraftTypedActionBatchArgument):
+                bound_actions: list[DraftTypedActionArgument] = []
+                batch_changed = False
+                for action in argument.actions:
+                    if _tokens_from_typed_action(action.expected) & set(tokens):
+                        action = replace(action, metadata_binding=binding)
+                        batch_changed = True
+                        bound = True
+                    bound_actions.append(action)
+                if batch_changed:
+                    arguments[argument_index] = DraftTypedActionBatchArgument(
+                        tuple(bound_actions)
+                    )
+                    changed = True
             elif isinstance(argument, TypedRequestFactsArgument):
                 arguments[argument_index] = replace(
                     argument,

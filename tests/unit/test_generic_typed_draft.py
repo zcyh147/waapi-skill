@@ -15,6 +15,7 @@ from wwise_waapi.operation_composer import (
     materialize_operation_request,
     new_composition,
     operation_composer_contract,
+    parse_typed_action_cli_argument_sequence,
 )
 from wwise_waapi.transactions import TransactionStore
 from wwise_waapi.typed_requests import request_contract
@@ -67,6 +68,52 @@ def _action(action: str, **facts: object) -> dict[str, object]:
     }
 
 
+def test_typed_action_batch_parser_preserves_option_looking_business_values() -> None:
+    actions = parse_typed_action_cli_argument_sequence(
+        [
+            "--action",
+            "add_typed_fact",
+            "--fact-action",
+            "set",
+            "--field-handle",
+            "trh1-000000000000000000000000",
+            "--value-type",
+            "string",
+            "--fact-value",
+            "--action",
+            "--action",
+            "add_typed_fact",
+            "--fact-action",
+            "set",
+            "--field-handle",
+            "trh1-111111111111111111111111",
+            "--value-type",
+            "string",
+            "--fact-value",
+            "next",
+        ]
+    )
+
+    assert [action["value"] for action in actions] == ["--action", "next"]
+
+
+def test_typed_action_batch_parser_accepts_exact_ceiling_and_rejects_next() -> None:
+    action_argv = (
+        "--action",
+        "add_typed_fact",
+        "--fact-action",
+        "present",
+        "--field-handle",
+        "trh1-000000000000000000000000",
+    )
+
+    assert len(
+        parse_typed_action_cli_argument_sequence(action_argv * 6)
+    ) == 6
+    with pytest.raises(Exception, match="batch|ceiling|invalid"):
+        parse_typed_action_cli_argument_sequence(action_argv * 7)
+
+
 def test_complex_generic_schema_discloses_draft_as_the_only_normal_entry(
     tmp_path: Path,
 ) -> None:
@@ -90,7 +137,10 @@ def test_complex_generic_schema_discloses_draft_as_the_only_normal_entry(
         "fact_command_prefix_pointer": (
             "/draft/next_action_binding/fixed_argv_prefix"
         ),
-        "append_exactly_one_action": True,
+        "append_one_or_more_complete_actions": True,
+        "minimum_actions": 1,
+        "maximum_actions": 6,
+        "ordered_atomic_batch": True,
         "then_read_next_response": True,
     }
     assert payload["continuation"]["fact_value_argv_policy"] == {
@@ -168,6 +218,154 @@ def test_branch_and_empty_container_actions_require_no_placeholder_values(
     )
     assert present_code == 0, present
     assert present["draft"]["revision"] == 3
+
+
+def test_draft_apply_batches_ordered_typed_actions_in_one_atomic_write(
+    tmp_path: Path,
+) -> None:
+    contract = request_contract("2022.1", URI)
+    handles = {".".join(field.path): field.handle for field in contract.fields}
+    state_dir = tmp_path / "state"
+    start_code, started = gateway.execute_gateway(
+        ["--state-dir", str(state_dir), "draft-start", URI],
+        env=_env(tmp_path),
+        client_factory=lambda _url: pytest.fail("draft-start must be offline"),
+    )
+    assert start_code == 0
+
+    code, payload = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(state_dir),
+            "draft-apply",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            "1",
+            "--compact",
+            "--facts",
+            "--action",
+            "add_typed_fact",
+            "--fact-action",
+            "set",
+            "--field-handle",
+            handles["gameObject"],
+            "--value-type",
+            "integer",
+            "--fact-value",
+            "7",
+            "--action",
+            "add_typed_fact",
+            "--fact-action",
+            "set",
+            "--field-handle",
+            handles["position.orientationFront.x"],
+            "--value-type",
+            "number",
+            "--fact-value",
+            "1",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: pytest.fail("draft-apply must be offline"),
+    )
+
+    assert code == 0, payload
+    assert payload["draft"]["revision"] == 3
+    assert payload["draft"]["action_result"] == {
+        "contract": "waapi-skill.operation-draft-action-result/v1",
+        "action": "batch",
+        "last_action": "add_typed_fact",
+        "action_count": 2,
+        "applied_atomically": True,
+        "created_handles": payload["draft"]["action_result"]["created_handles"],
+        "affected_handles": payload["draft"]["action_result"]["affected_handles"],
+    }
+    assert payload["draft"]["action_result"]["affected_handles"] == sorted(
+        [handles["gameObject"], handles["position.orientationFront.x"]]
+    )
+    assert len(payload["draft"]["action_result"]["created_handles"]) == 2
+    assert payload["draft"]["next_action_binding"]["completion_candidate"][
+        "fixed_argv_prefix"
+    ][-1] == "3"
+    assert "current_facts" not in payload["draft"]
+    inspect_code, inspected = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(state_dir),
+            "draft-inspect",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: pytest.fail("draft-inspect must be offline"),
+    )
+    assert inspect_code == 0
+    assert [
+        (row["fact_action"], row["field_handle"], row["value"])
+        for row in inspected["draft"]["current_facts"]
+    ] == [
+        ("set", handles["gameObject"], "7"),
+        ("set", handles["position.orientationFront.x"], "1"),
+    ]
+
+
+def test_invalid_later_batched_typed_action_leaves_identical_draft_bytes(
+    tmp_path: Path,
+) -> None:
+    contract = request_contract("2022.1", URI)
+    game_object = next(
+        field.handle for field in contract.fields if field.path == ("gameObject",)
+    )
+    state_dir = tmp_path / "state"
+    _start_code, started = gateway.execute_gateway(
+        ["--state-dir", str(state_dir), "draft-start", URI],
+        env=_env(tmp_path),
+        client_factory=lambda _url: pytest.fail("draft-start must be offline"),
+    )
+    record_path = next(state_dir.rglob("*.json"))
+    before = record_path.read_bytes()
+
+    code, payload = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(state_dir),
+            "draft-apply",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            "1",
+            "--facts",
+            "--action",
+            "add_typed_fact",
+            "--fact-action",
+            "set",
+            "--field-handle",
+            game_object,
+            "--value-type",
+            "integer",
+            "--fact-value",
+            "7",
+            "--action",
+            "add_typed_fact",
+            "--fact-action",
+            "set",
+            "--field-handle",
+            "trf1-000000000000000000000000",
+            "--value-type",
+            "integer",
+            "--fact-value",
+            "9",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: pytest.fail("draft-apply must be offline"),
+    )
+
+    assert code == 2
+    assert payload["error_code"] == "OPERATION_DRAFT_ACTION_INVALID"
+    assert record_path.read_bytes() == before
 
 
 def test_dynamic_draft_continuation_exposes_only_the_draft_action_form(

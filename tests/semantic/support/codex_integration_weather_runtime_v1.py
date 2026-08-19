@@ -29,6 +29,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
 from tests.semantic.support.codex_gateway_broker import (
     DraftActionMetadataBinding,
     DraftTypedActionArgument,
+    DraftTypedActionBatchArgument,
     ExpectedGatewayStep,
     GatewayDerivedReferenceActivationAllowance,
     MetadataQueryArgument,
@@ -1268,7 +1269,10 @@ def _build_metadata_workflow_protocol(
             continue
         metadata_row = metadata_by_tx[prefix]
         if metadata_row is not None and any(
-            isinstance(argument, DraftTypedActionArgument)
+            isinstance(
+                argument,
+                (DraftTypedActionArgument, DraftTypedActionBatchArgument),
+            )
             for argument in step.arguments
         ):
             object_type, _queries, tokens, projection, _equivalence = metadata_row
@@ -1282,20 +1286,29 @@ def _build_metadata_workflow_protocol(
                 required_tokens=tuple(tokens),
                 expected_projection=tuple(projection),
             )
-            step = replace(
-                step,
-                arguments=tuple(
-                    replace(argument, metadata_binding=binding)
-                    if isinstance(argument, DraftTypedActionArgument)
-                    and argument.metadata_binding is None
-                    and any(
+            arguments: list[Any] = []
+            for argument in step.arguments:
+                if isinstance(argument, DraftTypedActionArgument):
+                    if argument.metadata_binding is None and any(
                         token in _string_facts(argument.expected)
                         for token in tokens
+                    ):
+                        argument = replace(argument, metadata_binding=binding)
+                elif isinstance(argument, DraftTypedActionBatchArgument):
+                    argument = DraftTypedActionBatchArgument(
+                        tuple(
+                            replace(action, metadata_binding=binding)
+                            if action.metadata_binding is None
+                            and any(
+                                token in _string_facts(action.expected)
+                                for token in tokens
+                            )
+                            else action
+                            for action in argument.actions
+                        )
                     )
-                    else argument
-                    for argument in step.arguments
-                ),
-            )
+                arguments.append(argument)
+            step = replace(step, arguments=tuple(arguments))
         steps.append(step)
     prefixes = tuple(
         next(

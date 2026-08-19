@@ -21,11 +21,12 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Collection, Iterator, Mapping
+from typing import Any, Callable, Collection, Iterator, Mapping, Sequence
 
 from .canonical import canonical_json_bytes, canonical_sha256
 from .filesystem_security import path_is_link_or_reparse
 from .operation_composer import (
+    MAX_TYPED_ACTIONS_PER_APPLY,
     OperationComposerError,
     apply_composer_action,
     composition_projection,
@@ -556,6 +557,41 @@ class OperationDraftStore:
     ) -> OperationDraftRecord:
         """Atomically apply one typed Adapter action to an editable Draft."""
 
+        return self.apply_actions(
+            draft_id,
+            task_authority=task_authority,
+            expected_revision=expected_revision,
+            schema_digest=schema_digest,
+            composer_digest=composer_digest,
+            actions=(action,),
+            now=now,
+        )
+
+    def apply_actions(
+        self,
+        draft_id: str,
+        *,
+        task_authority: str,
+        expected_revision: int,
+        schema_digest: str,
+        composer_digest: str,
+        actions: Sequence[Mapping[str, Any]],
+        now: datetime | None = None,
+    ) -> OperationDraftRecord:
+        """Atomically apply one bounded ordered typed-action batch."""
+
+        if (
+            not isinstance(actions, Sequence)
+            or isinstance(actions, (str, bytes, bytearray))
+            or not actions
+            or len(actions) > MAX_TYPED_ACTIONS_PER_APPLY
+            or any(not isinstance(action, Mapping) for action in actions)
+        ):
+            raise OperationComposerError(
+                "Typed action batch must contain a bounded ordered action list."
+            )
+        ordered_actions = tuple(actions)
+
         if not isinstance(draft_id, str) or not _DRAFT_ID_PATTERN.fullmatch(draft_id):
             raise _not_available()
         with self._existing_draft_lock(draft_id):
@@ -588,27 +624,49 @@ class OperationDraftStore:
                 raise OperationDraftStorageCorruption(
                     "Composer-backed Operation Draft is missing its composition."
                 )
+            if len(record.audit) + len(ordered_actions) > MAX_OPERATION_DRAFT_ACTIONS:
+                raise OperationDraftLimitExceeded(
+                    "Operation Draft action history exceeds its fixed ceiling.",
+                    details={"limit": MAX_OPERATION_DRAFT_ACTIONS},
+                )
             # Validation and normalization happen entirely before the first
-            # durable write, so every invalid action leaves identical bytes.
-            try:
+            # durable write, so every invalid action in the ordered batch leaves
+            # identical bytes.
+            composition = record.composition
+            action_names: list[str] = []
+            for action in ordered_actions:
                 composition, action_name = apply_composer_action(
                     record.operation,
                     record.version,
-                    record.composition,
+                    composition,
                     action,
                 )
-            except OperationComposerError:
-                raise
-            _require_composition_projection_budget(
-                record.operation,
-                record.version,
-                composition,
-            )
+                action_names.append(action_name)
+                _require_composition_projection_budget(
+                    record.operation,
+                    record.version,
+                    composition,
+                )
             updated_at = _timestamp(current)
+            audit = list(record.audit)
+            previous_event_hash = str(audit[-1]["event_hash"])
+            for offset, action_name in enumerate(action_names, start=1):
+                event = _build_audit_event(
+                    draft_id=record.draft_id,
+                    sequence=len(audit) + 1,
+                    revision=record.revision + offset,
+                    event_type=f"action.{action_name}",
+                    from_state=record.state,
+                    to_state=record.state,
+                    timestamp=updated_at,
+                    previous_event_hash=previous_event_hash,
+                )
+                audit.append(event)
+                previous_event_hash = str(event["event_hash"])
             updated = OperationDraftRecord(
                 draft_id=record.draft_id,
                 state=record.state,
-                revision=record.revision + 1,
+                revision=record.revision + len(ordered_actions),
                 operation=record.operation,
                 version=record.version,
                 schema_digest=record.schema_digest,
@@ -617,19 +675,7 @@ class OperationDraftStore:
                 updated_at=updated_at,
                 expires_at=record.expires_at,
                 terminal_at=None,
-                audit=(
-                    *record.audit,
-                    _build_audit_event(
-                        draft_id=record.draft_id,
-                        sequence=len(record.audit) + 1,
-                        revision=record.revision + 1,
-                        event_type=f"action.{action_name}",
-                        from_state=record.state,
-                        to_state=record.state,
-                        timestamp=updated_at,
-                        previous_event_hash=str(record.audit[-1]["event_hash"]),
-                    ),
-                ),
+                audit=tuple(audit),
                 limits_digest=record.limits_digest,
                 schema_version=record.schema_version,
                 composer_digest=record.composer_digest,

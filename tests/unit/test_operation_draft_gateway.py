@@ -92,7 +92,9 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
             "contract": "waapi-skill.operation-draft-next-action/v1",
             "draft_id": draft_id,
             "expected_revision": 1,
-            "one_action_only": True,
+            "one_atomic_action_batch_only": True,
+            "minimum_actions": 1,
+            "maximum_actions": 6,
             "then_read_next_response": True,
             "precompute_or_increment_revision": False,
             "fixed_argv_prefix": [
@@ -108,7 +110,7 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
                 "--compact",
                 "--facts",
             ],
-            "append_exactly_one_typed_action": [
+            "append_one_or_more_complete_typed_actions": [
                 "--action",
                 "<action-name>",
                 "<typed-fact-arguments>",

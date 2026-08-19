@@ -1129,7 +1129,7 @@ def test_compact_draft_replay_accepts_only_the_exact_queried_bus_guid(
                             ),
                             "draft_apply_action_check": "invalid",
                             "when_condition_false": (
-                                "continue_with_one_typed_action_or_dynamic_disclosure"
+                                "continue_with_one_atomic_typed_action_batch_or_dynamic_disclosure"
                             ),
                         },
                     },

@@ -502,17 +502,27 @@ def test_normal_object_set_schema_and_detail_expose_only_composer_input(
         "<action-name>",
         "<typed-fact-arguments>",
     ]
+    assert len(
+        json.dumps(
+            schema,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ) < 32 * 1024
     assert schema["composer"]["apply"]["revision_discipline"] == {
-        "mode": "one_action_then_read_next_response",
+        "mode": "one_ordered_atomic_batch_then_read",
+        "action_count": {"minimum": 1, "maximum": 6},
+        "repeat_complete_action_group": [
+            "--action",
+            "<action-name>",
+            "<typed-fact-arguments>",
+        ],
+        "revision_delta": "action_count",
+        "failure": "unchanged",
         "expected_revision_source": "/draft/revision",
         "next_action_template_source": (
             "/draft/next_action_binding/fixed_argv_prefix"
         ),
-        "replace_only": [
-            "<task-authority-from-draft-start>",
-            "<action-name>",
-            "<typed-fact-arguments>",
-        ],
         "precompute_or_increment_revision": False,
     }
     assert schema["composer"]["completion_discipline"] == {

@@ -41,6 +41,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
 from tests.semantic.support.codex_gateway_broker import (
     BoundedIntegerArgument,
     DraftTypedActionArgument,
+    DraftTypedActionBatchArgument,
     DraftActionMetadataBinding,
     DraftActionQueryIdentityBinding,
     DraftActionResponseBinding,
@@ -635,6 +636,45 @@ def deserialize_protocol(value: Mapping[str, Any]) -> V3GatewayProtocol:
         ) from exc
 
 
+def _serialize_draft_action_argument(
+    item: DraftTypedActionArgument,
+) -> dict[str, Any]:
+    cloned = _json_clone(item.expected)
+    row: dict[str, Any] = {
+        "kind": "draft_typed_action",
+        "value": cloned,
+        "sha256": _sha256_json(cloned),
+        "response_bindings": [
+            {
+                "pointer": binding.pointer,
+                "step": binding.step,
+                "response_pointer": binding.response_pointer,
+            }
+            for binding in item.response_bindings
+        ],
+    }
+    if item.query_identity_bindings:
+        row["query_identity_bindings"] = [
+            {"pointer": binding.pointer, "step": binding.step}
+            for binding in item.query_identity_bindings
+        ]
+    if item.operation != "object.set":
+        row["operation"] = item.operation
+    if item.metadata_binding is not None:
+        binding = item.metadata_binding
+        row["metadata_binding"] = {
+            "step": binding.step,
+            "object_type": binding.object_type,
+            "required_tokens": list(binding.required_tokens),
+            "expected_projection": (
+                None
+                if binding.expected_projection is None
+                else [projection.as_dict() for projection in binding.expected_projection]
+            ),
+        }
+    return row
+
+
 def _serialize_step(step: ExpectedGatewayStep) -> dict[str, Any]:
     arguments: list[dict[str, Any]] = []
     for item in step.arguments:
@@ -711,46 +751,17 @@ def _serialize_step(step: ExpectedGatewayStep) -> dict[str, Any]:
                 }
             )
         elif isinstance(item, DraftTypedActionArgument):
-            cloned = _json_clone(item.expected)
-            row = {
-                "kind": "draft_typed_action",
-                "value": cloned,
-                "sha256": _sha256_json(cloned),
-                "response_bindings": [
-                    {
-                        "pointer": binding.pointer,
-                        "step": binding.step,
-                        "response_pointer": binding.response_pointer,
-                    }
-                    for binding in item.response_bindings
-                ],
-            }
-            if item.query_identity_bindings:
-                row["query_identity_bindings"] = [
-                    {
-                        "pointer": binding.pointer,
-                        "step": binding.step,
-                    }
-                    for binding in item.query_identity_bindings
-                ]
-            if item.operation != "object.set":
-                row["operation"] = item.operation
-            if item.metadata_binding is not None:
-                binding = item.metadata_binding
-                row["metadata_binding"] = {
-                    "step": binding.step,
-                    "object_type": binding.object_type,
-                    "required_tokens": list(binding.required_tokens),
-                    "expected_projection": (
-                        None
-                        if binding.expected_projection is None
-                        else [
-                            item.as_dict()
-                            for item in binding.expected_projection
-                        ]
-                    ),
+            arguments.append(_serialize_draft_action_argument(item))
+        elif isinstance(item, DraftTypedActionBatchArgument):
+            arguments.append(
+                {
+                    "kind": "draft_typed_action_batch",
+                    "actions": [
+                        _serialize_draft_action_argument(action)
+                        for action in item.actions
+                    ],
                 }
-            arguments.append(row)
+            )
         elif isinstance(item, TypedRequestFactsArgument):
             arguments.append(
                 {
@@ -1250,6 +1261,37 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
             except (TypeError, ValueError) as exc:
                 raise PromptProvenanceError(
                     "Typed Draft protocol argument is invalid"
+                ) from exc
+        elif kind == "draft_typed_action_batch" and set(row) == {
+            "kind",
+            "actions",
+        }:
+            raw_actions = row.get("actions")
+            if not isinstance(raw_actions, list):
+                raise PromptProvenanceError(
+                    "Typed Draft batch protocol argument is invalid"
+                )
+            try:
+                decoded_actions = tuple(
+                    _deserialize_step(
+                        {
+                            **dict(value),
+                            "arguments": [action_row],
+                        }
+                    ).arguments[0]
+                    for action_row in raw_actions
+                )
+                if any(
+                    not isinstance(action, DraftTypedActionArgument)
+                    for action in decoded_actions
+                ):
+                    raise TypeError("batch member is not one typed action")
+                arguments.append(
+                    DraftTypedActionBatchArgument(decoded_actions)  # type: ignore[arg-type]
+                )
+            except (PromptProvenanceError, TypeError, ValueError) as exc:
+                raise PromptProvenanceError(
+                    "Typed Draft batch protocol argument is invalid"
                 ) from exc
         elif kind == "typed_request_facts" and set(row) == {
             "kind",

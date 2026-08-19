@@ -516,7 +516,9 @@ def test_object_set_typed_actions_build_one_target_scalar_fact_offline(
         "contract": "waapi-skill.operation-draft-next-action/v1",
         "draft_id": draft_id,
         "expected_revision": 2,
-        "one_action_only": True,
+        "one_atomic_action_batch_only": True,
+        "minimum_actions": 1,
+        "maximum_actions": 6,
         "then_read_next_response": True,
         "precompute_or_increment_revision": False,
         "fixed_argv_prefix": [
@@ -532,7 +534,7 @@ def test_object_set_typed_actions_build_one_target_scalar_fact_offline(
             "--compact",
             "--facts",
         ],
-        "append_exactly_one_typed_action": [
+        "append_one_or_more_complete_typed_actions": [
             "--action",
             "<action-name>",
             "<typed-fact-arguments>",
@@ -1321,7 +1323,7 @@ def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
         "--compact",
         "--facts",
     ]
-    assert draft["next_action_binding"]["append_exactly_one_typed_action"] == [
+    assert draft["next_action_binding"]["append_one_or_more_complete_typed_actions"] == [
         "--action",
         "<action-name>",
         "<typed-fact-arguments>",
@@ -1330,7 +1332,7 @@ def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
         "contract",
         "shell_tool_timeout_ms",
         "fixed_argv_prefix",
-        "append_exactly_one_typed_action",
+        "append_one_or_more_complete_typed_actions",
         "completion_candidate",
         "replace_only",
     }

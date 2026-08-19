@@ -43,6 +43,10 @@ DIRECT_ACTION_FIELD_TABLE_MIN_ROWS = 64
 # remaining headroom covers the two identities and curve options without
 # weakening the independent canonical-document ceiling.
 MAX_TYPED_REQUEST_FACTS = 1280
+# Six complete fact actions keep the worst reviewed Fresh Agent batch inside
+# the native-Windows encoded PowerShell/CreateProcess command boundary while
+# still collapsing the long one-fact-at-a-time construction chain.
+MAX_TYPED_ACTIONS_PER_APPLY = 6
 MAX_TYPED_ARRAY_ITEMS = 256
 MAX_TYPED_STRING_BYTES = 64 * 1024
 MAX_TYPED_REQUEST_BYTES = 256 * 1024
@@ -680,7 +684,10 @@ class TypedRequestContract:
                         "fact_command_prefix_pointer": (
                             "/draft/next_action_binding/fixed_argv_prefix"
                         ),
-                        "append_exactly_one_action": True,
+                        "append_one_or_more_complete_actions": True,
+                        "minimum_actions": 1,
+                        "maximum_actions": MAX_TYPED_ACTIONS_PER_APPLY,
+                        "ordered_atomic_batch": True,
                         "then_read_next_response": True,
                     },
                     "fact_value_argv_policy": {

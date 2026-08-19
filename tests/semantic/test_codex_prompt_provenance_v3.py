@@ -1974,7 +1974,8 @@ def test_soundbank_generate_equivalence_round_trips_and_rejects_wrong_route() ->
     protocol = build_transaction_protocol((request,))
     serialized = serialize_protocol(protocol)
     assert any(
-        argument.get("kind") == "draft_typed_action"
+        argument.get("kind")
+        in {"draft_typed_action", "draft_typed_action_batch"}
         for step in serialized["steps"]
         for argument in step["arguments"]
     )

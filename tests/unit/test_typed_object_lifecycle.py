@@ -239,6 +239,8 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
                 ),
                 "start_at": "outermost_disclosed_root_response",
                 "first_command_pointer": "/continuation/deferred_fact/argv",
+                "batch_facts": "next_up_to_6_deferred_facts_in_queue_order",
+                "first_fact_only": "invalid",
             },
         ],
         "first_true_candidate_is_the_only_next_action": True,

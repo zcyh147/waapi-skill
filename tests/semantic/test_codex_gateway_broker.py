@@ -32,6 +32,7 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
     BROKER_TOKEN_ENV,
     BoundedIntegerArgument,
     CodexGatewayBroker,
+    DraftTypedActionBatchArgument,
     DraftTypedActionArgument,
     DraftActionMetadataBinding,
     DraftActionResponseBinding,
@@ -124,7 +125,7 @@ def _compact_next_action_binding(
             "allowed_suffix_source": "request_schema_terminal_arguments_only",
             "draft_apply_action_check": "invalid",
             "when_condition_false": (
-                "continue_with_one_typed_action_or_dynamic_disclosure"
+                "continue_with_one_atomic_typed_action_batch_or_dynamic_disclosure"
             ),
         },
     }
@@ -1908,7 +1909,7 @@ def test_broker_executes_typed_draft_actions_with_gateway_response_bindings(
                 check_result,
                 preview_result,
             )
-        ] == [0, 0, 0, 0, 0], preview_result.stderr
+            ] == [0, 0, 0, 0, 0], preview_result.stderr
         assert broker.evidence().complete is True
         assert broker.evidence().consumed_step_names == tuple(step.name for step in steps)
         assert not (broker.state_directory / "mutation-executed").exists()
@@ -1930,6 +1931,94 @@ def test_broker_executes_typed_draft_actions_with_gateway_response_bindings(
             )
 
 
+def test_broker_executes_one_atomic_generic_typed_draft_batch(
+    tmp_path: Path,
+) -> None:
+    skill = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.create",
+        "arguments": {
+            "parent": {"kind": "path", "value": r"\Root"},
+            "name": "BatchChild",
+            "type": "Sound",
+        },
+    }
+    protocol = build_transaction_protocol((request,))
+    final_action_index = max(
+        index
+        for index, step in enumerate(protocol.steps)
+        if step.subcommand == "draft-apply"
+    )
+    steps = protocol.steps[: final_action_index + 1]
+    batches = tuple(
+        step.arguments[-1]
+        for step in steps
+        if step.subcommand == "draft-apply"
+    )
+    assert len(batches) == 1
+    assert isinstance(batches[0], DraftTypedActionBatchArgument)
+
+    payloads: dict[str, Mapping[str, object]] = {}
+
+    def pointer(payload: object, value: str) -> object:
+        current = payload
+        for token in value.removeprefix("/").split("/"):
+            assert isinstance(current, (dict, list))
+            current = current[int(token)] if isinstance(current, list) else current[token]
+        return current
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=protocol.steps,
+        expected_wwise_version="2022.1",
+        transport="tcp",
+        working_root=tmp_path / "broker-root",
+    ) as broker:
+        for step in steps:
+            argv: list[str] = [step.subcommand]
+            for argument in step.arguments:
+                if isinstance(argument, ResponseBinding):
+                    argv.append(str(pointer(payloads[argument.step], argument.pointer)))
+                elif isinstance(argument, DraftTypedActionBatchArgument):
+                    for action_argument in argument.actions:
+                        action = dict(action_argument.expected)
+                        for binding in action_argument.response_bindings:
+                            action[binding.pointer.removeprefix("/")] = pointer(
+                                payloads[binding.step],
+                                binding.response_pointer,
+                            )
+                        argv.extend(typed_action_cli_arguments(action))
+                elif isinstance(argument, DraftTypedActionArgument):
+                    argv.extend(typed_action_cli_arguments(argument.expected))
+                else:
+                    assert isinstance(argument, str)
+                    argv.append(argument)
+            result = run_model_command(broker, argv)
+            assert result.returncode == 0, result.stderr
+            payloads[step.name] = json.loads(
+                result.stdout[result.stdout.index("{") :]
+            )
+        preview = next(
+            step
+            for step in protocol.steps
+            if step.subcommand == "preview-from-draft"
+        )
+        assert broker._replay_expected_operation_draft_request(  # noqa: SLF001
+            preview
+        ) == request
+
+    action_payload = payloads[steps[-1].name]
+    draft = action_payload["draft"]
+    assert isinstance(draft, Mapping)
+    assert draft["revision"] == 1 + len(batches[0].actions)
+    assert draft["action_result"] == {
+        **draft["action_result"],
+        "action": "batch",
+        "action_count": len(batches[0].actions),
+        "applied_atomically": True,
+    }
 def test_numbered_draft_actions_follow_handle_dependencies_not_fixture_order(
     tmp_path: Path,
 ) -> None:
@@ -2930,15 +3019,23 @@ def _read_only_draft_evidence_fixture(
     action_payloads: dict[str, Mapping[str, object]] = {}
     for step in (row for row in steps if row.subcommand == "draft-apply"):
         argument = step.arguments[-1]
-        assert isinstance(argument, DraftTypedActionArgument)
-        action = dict(argument.expected)
-        record = store.apply_action(
+        action_arguments = (
+            (argument,)
+            if isinstance(argument, DraftTypedActionArgument)
+            else argument.actions
+            if isinstance(argument, DraftTypedActionBatchArgument)
+            else ()
+        )
+        assert action_arguments
+        actions = tuple(dict(item.expected) for item in action_arguments)
+        prior_revision = revision
+        record = store.apply_actions(
             draft_id,
             task_authority=authority,
             expected_revision=revision,
             schema_digest=schema_digest,
             composer_digest=composer_digest,
-            action=action,
+            actions=actions,
         )
         assert record.composition is not None
         composition = record.composition
@@ -2971,10 +3068,14 @@ def _read_only_draft_evidence_fixture(
                     "--task-authority",
                     authority,
                     "--expected-revision",
-                    str(revision - 1),
+                    str(prior_revision),
                     "--compact",
                     "--facts",
-                    *typed_action_cli_arguments(action),
+                    *(
+                        token
+                        for action in actions
+                        for token in typed_action_cli_arguments(action)
+                    ),
                 ],
                 "payload": payload,
             }
@@ -3219,10 +3320,10 @@ def test_draft_replay_uses_the_validated_submitted_numeric_spelling(
                 "next_action_binding": _compact_next_action_binding(),
             }
         }
-    broker._submitted_draft_actions_by_step = {  # noqa: SLF001
-        step.name: action
-        for step, action in zip(actions, submitted_actions, strict=True)
-    }
+        broker._submitted_draft_actions_by_step = {  # noqa: SLF001
+            step.name: (action,)
+            for step, action in zip(actions, submitted_actions, strict=True)
+        }
 
     replayed = broker._replay_expected_operation_draft_request(  # noqa: SLF001
         preview

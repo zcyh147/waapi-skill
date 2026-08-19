@@ -28,6 +28,7 @@ from .operation_registry import (
 )
 from .typed_requests import (
     MAX_TYPED_ARRAY_ITEMS,
+    MAX_TYPED_ACTIONS_PER_APPLY,
     MAX_TYPED_REQUEST_FACTS,
     MAX_TYPED_REQUEST_BYTES,
     MAX_TYPED_STRING_BYTES,
@@ -758,6 +759,73 @@ def parse_typed_action_cli_arguments(
             details={"name": action.get("name")},
         )
     return action
+
+
+def parse_typed_action_cli_argument_sequence(
+    arguments: Sequence[str],
+) -> tuple[dict[str, Any], ...]:
+    """Parse one or more ordered typed actions from one ``--facts`` suffix.
+
+    Every action still starts with the existing ``--action`` marker.  Candidate
+    boundaries are accepted only when both adjacent slices independently parse
+    through the authoritative single-action grammar.  This keeps an option-like
+    business value such as the literal ``--action`` unambiguous and avoids a
+    second fact syntax.
+    """
+
+    tokens = tuple(arguments)
+    if not tokens or tokens[0] != "--action":
+        raise OperationComposerError(
+            "Typed action argv must start with --action ACTION."
+        )
+    action_starts = tuple(
+        index for index, token in enumerate(tokens) if token == "--action"
+    )
+    if len(action_starts) > MAX_TYPED_ACTIONS_PER_APPLY * 2:
+        # Values may themselves equal ``--action``; allow one such value per
+        # action while keeping the ambiguity search strictly bounded.
+        raise OperationComposerError(
+            "Typed action batch exceeds its fixed marker ceiling."
+        )
+
+    starts = (*action_starts, len(tokens))
+    parses_by_start: dict[int, list[tuple[dict[str, Any], ...]]] = {}
+
+    def parse_from(start: int) -> list[tuple[dict[str, Any], ...]]:
+        cached = parses_by_start.get(start)
+        if cached is not None:
+            return cached
+        results: list[tuple[dict[str, Any], ...]] = []
+        start_position = action_starts.index(start)
+        for end in starts[start_position + 1 :]:
+            try:
+                action = parse_typed_action_cli_arguments(tokens[start:end])
+            except OperationComposerError:
+                continue
+            if end == len(tokens):
+                results.append((action,))
+            elif end in action_starts:
+                for tail in parse_from(end):
+                    candidate = (action, *tail)
+                    if len(candidate) <= MAX_TYPED_ACTIONS_PER_APPLY:
+                        results.append(candidate)
+                    if len(results) > 1:
+                        break
+            if len(results) > 1:
+                break
+        parses_by_start[start] = results
+        return results
+
+    parses = parse_from(0)
+    if not parses:
+        raise OperationComposerError("Typed action batch is invalid.")
+    if len(parses) != 1:
+        raise OperationComposerError("Typed action batch boundaries are ambiguous.")
+    if len(parses[0]) > MAX_TYPED_ACTIONS_PER_APPLY:
+        raise OperationComposerError(
+            "Typed action batch exceeds its fixed action ceiling."
+        )
+    return parses[0]
 
 
 def _require_cli_argv_row(
@@ -4640,6 +4708,7 @@ def _require_allowed_keys(
 __all__ = [
     "AUDIO_IMPORT_COMPOSER_OPERATION",
     "MAX_COMPOSER_ACTION_BYTES",
+    "MAX_TYPED_ACTIONS_PER_APPLY",
     "OBJECT_SET_COMPOSER_OPERATION",
     "OPERATION_COMPOSER_CONTRACT",
     "OPERATION_COMPOSITION_CONTRACT",

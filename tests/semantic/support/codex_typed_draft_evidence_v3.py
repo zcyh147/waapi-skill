@@ -7,6 +7,7 @@ from typing import Any, Callable, Mapping, Sequence
 
 from tests.semantic.support.codex_gateway_broker import (
     DraftTypedActionArgument,
+    DraftTypedActionBatchArgument,
     GatewayInvocationError,
     draft_compact_action_result,
     project_required_metadata_tokens,
@@ -23,6 +24,7 @@ from wwise_waapi.operation_composer import (
     operation_composer_contract,
     operation_draft_construction_boundary,
     parse_typed_action_cli_arguments,
+    parse_typed_action_cli_argument_sequence,
 )
 from wwise_waapi.operation_drafts import (
     OperationDraftError,
@@ -226,6 +228,34 @@ def _strict_action(
     return dict(action)
 
 
+def _strict_actions(
+    arguments: tuple[str, ...],
+    *,
+    operation: str,
+    version: str,
+) -> tuple[Mapping[str, Any], ...]:
+    if "--action-json" in arguments:
+        _fail("Current typed-Draft evidence cannot contain historical action JSON")
+    try:
+        facts_index = arguments.index("--facts")
+        actions = parse_typed_action_cli_argument_sequence(
+            arguments[facts_index + 1 :]
+        )
+    except (OperationComposerError, ValueError) as exc:
+        raise TypedDraftEvidenceError("Composer typed action argv is invalid") from exc
+    contract = operation_composer_contract(operation, version)
+    limits = _mapping(contract.get("limits"), label="Composer contract limits")
+    action_bytes = limits.get("action_bytes")
+    if type(action_bytes) is not int or action_bytes <= 0:
+        _fail("Composer contract is missing its action byte ceiling")
+    result: list[Mapping[str, Any]] = []
+    for action in actions:
+        if len(canonical_json_bytes(action)) > action_bytes:
+            _fail("Composer action exceeds its archive byte ceiling")
+        result.append(dict(action))
+    return tuple(result)
+
+
 def _handles(value: Any) -> set[str]:
     found: set[str] = set()
     if isinstance(value, Mapping):
@@ -238,6 +268,26 @@ def _handles(value: Any) -> set[str]:
         for child in value:
             found.update(_handles(child))
     return found
+
+
+def _handles_in_order(value: Any) -> tuple[str, ...]:
+    found: list[str] = []
+    seen: set[str] = set()
+
+    def visit(item: Any) -> None:
+        if isinstance(item, Mapping):
+            handle = item.get("handle")
+            if isinstance(handle, str) and handle not in seen:
+                seen.add(handle)
+                found.append(handle)
+            for child in item.values():
+                visit(child)
+        elif isinstance(item, list):
+            for child in item:
+                visit(child)
+
+    visit(value)
+    return tuple(found)
 
 
 def _handle_factory(handles: set[str]) -> tuple[Callable[[], str], list[str]]:
@@ -641,18 +691,30 @@ def _validate_typed_draft_evidence(
         if step.subcommand == "draft-start":
             continue
         if step.subcommand == "draft-apply":
-            if len(action_rows) >= MAX_TYPED_DRAFT_EVIDENCE_ACTIONS:
-                _fail("Composer archive action count exceeds its fixed ceiling")
-            action = _strict_action(
+            actions = _strict_actions(
                 arguments,
                 operation=operation,
                 version=version,
             )
+            if len(action_rows) + len(actions) > MAX_TYPED_DRAFT_EVIDENCE_ACTIONS:
+                _fail("Composer archive action count exceeds its fixed ceiling")
             expected_argument = step.arguments[-1]
-            if not isinstance(expected_argument, DraftTypedActionArgument):
+            expected_actions = (
+                (expected_argument,)
+                if isinstance(expected_argument, DraftTypedActionArgument)
+                else (
+                    expected_argument.actions
+                    if isinstance(expected_argument, DraftTypedActionBatchArgument)
+                    else ()
+                )
+            )
+            if not expected_actions or len(expected_actions) != len(actions):
                 _fail("Composer archive action lacks its typed protocol argument")
-            metadata_binding = expected_argument.metadata_binding
-            if metadata_binding is not None:
+            for metadata_binding in (
+                expected.metadata_binding
+                for expected in expected_actions
+                if expected.metadata_binding is not None
+            ):
                 source_indexes = tuple(
                     index
                     for index, candidate in enumerate(steps)
@@ -683,25 +745,46 @@ def _validate_typed_draft_evidence(
                 new_handles = _handles(response_facts) - _handles(
                     project(composition)["current_facts"]
                 )
+                ordered_handles = [
+                    handle
+                    for handle in _handles_in_order(response_facts)
+                    if handle in new_handles
+                ]
             else:
                 compact = _compact_action_projection(
                     response_draft,
                     read_only=read_only_draft,
                 )
                 new_handles = compact[1]
-            factory, unused_handles = _handle_factory(new_handles)
-            replay_action, submitted_action_name = _canonical_typed_action(action)
-            composition, action_name = apply_composer_action(
-                operation,
-                version,
-                composition,
-                replay_action,
-                handle_factory=factory,
-                allow_cleaned_file_evidence=allow_cleaned_file_evidence,
-            )
-            if unused_handles:
+                result = _mapping(
+                    response_draft.get("action_result"),
+                    label="compact Composer action result",
+                )
+                ordered_handles = list(result.get("created_handles", []))
+                if set(ordered_handles) != new_handles:
+                    _fail("Compact Composer created-handle order is invalid")
+            remaining_handles = list(ordered_handles)
+
+            def factory() -> str:
+                if not remaining_handles:
+                    _fail("Composer action response lacks one created handle")
+                return remaining_handles.pop(0)
+
+            action_results: list[tuple[Mapping[str, Any], str, str]] = []
+            for action in actions:
+                replay_action, submitted_action_name = _canonical_typed_action(action)
+                composition, action_name = apply_composer_action(
+                    operation,
+                    version,
+                    composition,
+                    replay_action,
+                    handle_factory=factory,
+                    allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+                )
+                action_results.append((action, submitted_action_name, action_name))
+            if remaining_handles:
                 _fail("Composer action response disclosed an unexplained handle")
-            revision += 1
+            revision += len(actions)
             projection = project(composition)
             if compact is None:
                 _require_projection(
@@ -718,28 +801,38 @@ def _validate_typed_draft_evidence(
                 compact_action, _created, affected, summary = compact
                 expected_affected = {
                     value
+                    for action in actions
                     for key, value in action.items()
                     if key.endswith("_handle") and isinstance(value, str)
                 }
                 facts = projection["current_facts"]
                 if (
-                    compact_action not in {action_name, submitted_action_name}
+                    compact_action
+                    not in (
+                        {"batch"}
+                        if len(actions) > 1
+                        else {action_results[0][1], action_results[0][2]}
+                    )
                     or affected != expected_affected
                     or summary["target_count"] != len(facts)
                     or summary["handle_count"] != len(_handles(facts))
                     or summary["canonical_sha256"] != canonical_sha256(facts)
                 ):
                     _fail("Compact Composer action summary does not replay")
-            action_rows.append(
-                {
-                    "step_name": step.name,
-                    "revision": revision,
-                    "action": submitted_action_name,
-                    "action_sha256": canonical_sha256(action),
-                    "action_request": action,
-                }
-            )
-            expected_audit_types.append(f"action.{submitted_action_name}")
+            first_revision = revision - len(actions) + 1
+            for offset, (action, submitted_action_name, _action_name) in enumerate(
+                action_results
+            ):
+                action_rows.append(
+                    {
+                        "step_name": step.name,
+                        "revision": first_revision + offset,
+                        "action": submitted_action_name,
+                        "action_sha256": canonical_sha256(action),
+                        "action_request": action,
+                    }
+                )
+                expected_audit_types.append(f"action.{submitted_action_name}")
         elif step.subcommand == "draft-inspect":
             response_draft = _draft_projection(payload, command="draft-inspect")
             _require_projection(
