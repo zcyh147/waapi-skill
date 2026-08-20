@@ -25,6 +25,14 @@ def test_skill_entry_stays_within_one_complete_agent_tool_read() -> None:
     assert len(SKILL.encode("utf-8")) <= 30 * 1024
 
 
+def test_first_gateway_backed_introduction_names_all_three_policy_modes() -> None:
+    introduction = SKILL.split("## Setup", 1)[0]
+
+    assert "same introduction must name them exactly" in introduction
+    for policy in ("`read_only`", "`ask_before_changes`", "`allow_changes`"):
+        assert policy in introduction
+
+
 def test_lane_references_stay_within_one_complete_agent_tool_read() -> None:
     for name, content in {
         "waapi-query.md": QUERY,
