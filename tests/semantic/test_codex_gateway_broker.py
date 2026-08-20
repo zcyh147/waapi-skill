@@ -228,6 +228,101 @@ def test_compact_generic_typed_fact_receipt_accepts_closed_required_followups() 
     assert summary["canonical_sha256"] == "1" * 64
 
 
+def test_compact_generic_typed_fact_receipt_accepts_closed_construction_continuation() -> None:
+    payload = {
+        "action_result": {
+            "contract": "waapi-skill.operation-draft-action-result/v1",
+            "action": "add_typed_fact",
+            "created_handles": ["tdh1-c12aa1ea49a4d727357b105b"],
+            "affected_handles": ["trm1-4dedc2c7c0aea1301b0d773f"],
+            "construction_continuation": {
+                "source": "most_recent_typed_container_handle_response",
+                "response_was_complete_not_truncated": True,
+                "current_handle": "trm1-4dedc2c7c0aea1301b0d773f",
+                "completed_fact_action": "map-put",
+                "next_rule": (
+                    "continue_with_the_next_business_present_child_contract_"
+                    "fact_in_queue_index_order"
+                ),
+                "stop_cancel_or_claim_truncation_before_current_root_is_complete": (
+                    "invalid"
+                ),
+                "current_key": "children",
+            },
+        },
+        "current_facts_summary": {
+            "contract": "waapi-skill.operation-draft-facts-summary/v1",
+            "target_count": 1,
+            "handle_count": 1,
+            "canonical_sha256": "1" * 64,
+        },
+        "next_action_binding": {
+            "shell_tool_timeout_ms": 30_000,
+        },
+    }
+
+    action, created, affected, summary = broker_module._draft_compact_action_result(
+        payload
+    )
+
+    assert action == "add_typed_fact"
+    assert created == {"tdh1-c12aa1ea49a4d727357b105b"}
+    assert affected == {"trm1-4dedc2c7c0aea1301b0d773f"}
+    assert summary["target_count"] == 1
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    (
+        ("source", "caller_supplied"),
+        ("response_was_complete_not_truncated", False),
+        ("current_handle", "trm1-000000000000000000000000"),
+        ("completed_fact_action", "map-remove"),
+        ("next_rule", "skip_remaining_facts"),
+        ("stop_cancel_or_claim_truncation_before_current_root_is_complete", "ok"),
+    ),
+)
+def test_compact_generic_typed_fact_receipt_rejects_tampered_construction_continuation(
+    key: str,
+    value: object,
+) -> None:
+    continuation = {
+        "source": "most_recent_typed_container_handle_response",
+        "response_was_complete_not_truncated": True,
+        "current_handle": "trm1-4dedc2c7c0aea1301b0d773f",
+        "completed_fact_action": "map-put",
+        "next_rule": (
+            "continue_with_the_next_business_present_child_contract_"
+            "fact_in_queue_index_order"
+        ),
+        "stop_cancel_or_claim_truncation_before_current_root_is_complete": "invalid",
+        "current_key": "children",
+    }
+    continuation[key] = value
+    payload = {
+        "action_result": {
+            "contract": "waapi-skill.operation-draft-action-result/v1",
+            "action": "add_typed_fact",
+            "created_handles": ["tdh1-c12aa1ea49a4d727357b105b"],
+            "affected_handles": ["trm1-4dedc2c7c0aea1301b0d773f"],
+            "construction_continuation": continuation,
+        },
+        "current_facts_summary": {
+            "contract": "waapi-skill.operation-draft-facts-summary/v1",
+            "target_count": 1,
+            "handle_count": 1,
+            "canonical_sha256": "1" * 64,
+        },
+        "next_action_binding": {"shell_tool_timeout_ms": 30_000},
+    }
+
+    with pytest.raises(
+        GatewayInvocationError,
+        match="compact Draft action response has an invalid bounded projection",
+    ):
+        broker_module._draft_compact_action_result(payload)
+
+
 @pytest.mark.parametrize("timeout_ms", (None, 10_000, "30000"))
 def test_compact_receipt_rejects_missing_or_tampered_shell_tool_timeout(
     timeout_ms: object,

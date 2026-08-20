@@ -2140,6 +2140,72 @@ def _valid_draft_completion_candidate(value: Any) -> bool:
     )
 
 
+def _valid_draft_construction_continuation(
+    value: Any,
+    *,
+    action: Any,
+    created_handles: Sequence[str],
+    affected_handles: Sequence[str],
+) -> bool:
+    """Validate the closed node-local continuation emitted by compact Draft apply."""
+
+    if value is None:
+        return True
+    if not isinstance(value, Mapping) or action != "add_typed_fact":
+        return False
+    required = {
+        "source",
+        "response_was_complete_not_truncated",
+        "current_handle",
+        "completed_fact_action",
+        "next_rule",
+        "stop_cancel_or_claim_truncation_before_current_root_is_complete",
+    }
+    if not required.issubset(value) or not set(value).issubset(
+        required | {"current_key"}
+    ):
+        return False
+    current_handle = value.get("current_handle")
+    completed_fact_action = value.get("completed_fact_action")
+    expected_rules = {
+        "append": "continue_with_child_contract_facts_for_the_appended_value",
+        "set": (
+            "continue_with_the_next_business_present_child_contract_"
+            "fact_in_queue_index_order"
+        ),
+        "map-put": (
+            "continue_with_the_next_business_present_child_contract_"
+            "fact_in_queue_index_order"
+        ),
+        "choose-dynamic": "map_put_the_same_key_from_its_disclosed_choice",
+    }
+    current_key = value.get("current_key")
+    key_required = completed_fact_action in {"map-put", "choose-dynamic"}
+    try:
+        key_valid = (
+            isinstance(current_key, str)
+            and bool(current_key)
+            and len(current_key.encode("utf-8")) <= 64 * 1024
+        )
+    except UnicodeError:
+        key_valid = False
+    return (
+        value.get("source") == "most_recent_typed_container_handle_response"
+        and value.get("response_was_complete_not_truncated") is True
+        and isinstance(current_handle, str)
+        and current_handle.startswith("trm1-")
+        and _DRAFT_HANDLE_RE.fullmatch(current_handle) is not None
+        and current_handle in {*created_handles, *affected_handles}
+        and completed_fact_action in expected_rules
+        and value.get("next_rule") == expected_rules.get(completed_fact_action)
+        and value.get(
+            "stop_cancel_or_claim_truncation_before_current_root_is_complete"
+        )
+        == "invalid"
+        and (key_valid if key_required else "current_key" not in value)
+    )
+
+
 def _draft_compact_action_result(
     draft: Mapping[str, Any],
 ) -> tuple[str, set[str], set[str], Mapping[str, Any]]:
@@ -2155,6 +2221,7 @@ def _draft_compact_action_result(
                 "created_handles",
                 "affected_handles",
                 "required_followup_facts",
+                "construction_continuation",
                 "last_action",
                 "action_count",
                 "applied_atomically",
@@ -2177,6 +2244,7 @@ def _draft_compact_action_result(
                 or not 2 <= result["action_count"] <= MAX_TYPED_ACTIONS_PER_APPLY
                 or result.get("applied_atomically") is not True
                 or "required_followup_facts" in result
+                or "construction_continuation" in result
             )
         )
         or (
@@ -2199,6 +2267,12 @@ def _draft_compact_action_result(
         or not _valid_required_followup_facts(
             result.get("required_followup_facts")
         )
+        or not _valid_draft_construction_continuation(
+            result.get("construction_continuation"),
+            action=result.get("action"),
+            created_handles=result.get("created_handles", ()),
+            affected_handles=result.get("affected_handles", ()),
+        )
         or not isinstance(summary, Mapping)
         or set(summary)
         != {
@@ -2218,8 +2292,15 @@ def _draft_compact_action_result(
         or not isinstance(next_action_binding, Mapping)
         or next_action_binding.get("shell_tool_timeout_ms")
         != GATEWAY_SHELL_TOOL_TIMEOUT_MS
-        or not _valid_draft_completion_candidate(
-            next_action_binding.get("completion_candidate")
+        or (
+            "construction_continuation" in result
+            and "completion_candidate" in next_action_binding
+        )
+        or (
+            "construction_continuation" not in result
+            and not _valid_draft_completion_candidate(
+                next_action_binding.get("completion_candidate")
+            )
         )
         or "current_facts" in draft
     ):

@@ -2284,6 +2284,8 @@ def gateway_stdout_payload(value: Any) -> Any:
     raw_decision = raw_continuation.get("next_command_decision")
     continuation: dict[str, Any] = {}
     candidate_keys: list[str] = []
+    if isinstance(raw_continuation.get("root_fact_queue_anchor"), Mapping):
+        candidate_keys.append("root_fact_queue_anchor")
     if isinstance(raw_decision, Mapping):
         decision = {
             key: raw_decision[key]
@@ -5112,11 +5114,6 @@ def _dynamic_next_command_decision(
                 "child_contract_facts_in_schema_order"
             ),
             "start_at": "current_disclosed_node_response",
-            "first_command_pointer": (
-                "/continuation/root_fact_queue_anchor/first_fact_argv"
-                if outermost_disclosed_root_pointer is not None
-                else "/continuation/deferred_fact/argv"
-            ),
             "batch_facts": (
                 "current_disclosed_node_only_up_to_"
                 f"{MAX_TYPED_ACTIONS_PER_APPLY}_facts_in_queue_order"
@@ -5124,6 +5121,10 @@ def _dynamic_next_command_decision(
             "stop_before": "first_descendant_or_sibling_parent_fact",
             "after_success": "re_evaluate_remaining_candidates_from_this_response",
             "first_fact_only": "valid_only_when_current_node_has_no_other_business_facts",
+            # The deferred fact is the exact parent fact for this response's
+            # current node. The repeated root anchor is a cross-response audit
+            # aid and may already have been consumed by an ancestor response.
+            "first_command_pointer": "/continuation/deferred_fact/argv",
         }
         if deferred_fact
         else None

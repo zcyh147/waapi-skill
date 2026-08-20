@@ -1374,7 +1374,7 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     assert projected["continuation"]["next_command_decision"][
         "evaluate_in_order"
     ][0]["first_command_pointer"] == (
-        "/continuation/root_fact_queue_anchor/first_fact_argv"
+        "/continuation/deferred_fact/argv"
     )
     assert projected["continuation"]["root_fact_queue_anchor"] == leaf[
         "continuation"
@@ -1406,7 +1406,7 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     last_projected = gateway.gateway_stdout_payload(last_leaf)
     last_decision = last_projected["continuation"]["next_command_decision"]
     assert last_decision["evaluate_in_order"][0]["first_command_pointer"] == (
-        "/continuation/root_fact_queue_anchor/first_fact_argv"
+        "/continuation/deferred_fact/argv"
     )
     assert last_projected["continuation"]["root_fact_queue_anchor"] == root[
         "continuation"

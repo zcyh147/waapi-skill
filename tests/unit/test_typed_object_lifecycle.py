@@ -344,7 +344,7 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
                 ),
                 "start_at": "current_disclosed_node_response",
                 "first_command_pointer": (
-                    "/continuation/root_fact_queue_anchor/first_fact_argv"
+                    "/continuation/deferred_fact/argv"
                 ),
                 "batch_facts": (
                     "current_disclosed_node_only_up_to_6_facts_in_queue_order"
