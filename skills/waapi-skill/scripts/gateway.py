@@ -4781,7 +4781,7 @@ def _next_array_sibling_disclosure(
             ),
             "index": next_index,
             "must_follow": (
-                "current_item_descendant_disclosures"
+                "all_business_present_current_item_descendant_disclosures_if_any"
                 if nested_sibling
                 else "current_root_fact_apply_success"
             ),
@@ -4795,6 +4795,35 @@ def _next_array_sibling_disclosure(
             "argv_by_shape": argv_by_shape,
         }
     }
+
+
+def _business_declared_leaf_transition(
+    *,
+    current_business_value_pointer: str | None,
+    nested_container_disclosures: Sequence[Mapping[str, Any]],
+    next_sibling_disclosure: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Put the exact leaf escape before optional descendant disclosures."""
+
+    if current_business_value_pointer is None or not nested_container_disclosures:
+        return {}
+    sibling = next_sibling_disclosure.get("next_sibling_disclosure", {})
+    transition: dict[str, Any] = {
+        "first": True,
+        "condition": "business_leaf_no_properties_references_children",
+        "nested_container_disclosures": "forbidden",
+    }
+    if isinstance(sibling, Mapping) and sibling:
+        transition["when_next_sibling_present"] = {
+            "exact_command_pointer": (
+                "/continuation/next_sibling_disclosure/argv_by_shape/"
+                "<exact-business-shape>"
+            ),
+        }
+    transition["when_absent"] = {
+        "next_action": "nearest_ancestor_sibling_else_deferred_fact_queue",
+    }
+    return {"business_leaf_transition": transition}
 
 
 def _next_nested_disclosure_selector(
@@ -4935,35 +4964,8 @@ def _dynamic_next_command_decision(
     if not nested_sibling and sibling_candidate is not None:
         candidates.append(sibling_candidate)
 
-    leaf_gate: dict[str, Any] = {}
-    if nested_container_disclosures:
-        leaf_payload: dict[str, Any] = {
-            "evaluate_before_candidate_commands": True,
-            "condition": (
-                "current_business_object_has_no_properties_references_or_children"
-            ),
-            "nested_container_disclosures": "forbidden",
-            "next_action": (
-                "next_sibling_disclosure_then_deferred_fact_queue"
-                if nested_sibling
-                else "deferred_fact_queue_then_next_sibling_disclosure"
-            ),
-            **(
-                {
-                    "next_command_pointer": (
-                        "/continuation/next_sibling_disclosure/"
-                        "argv_by_shape/<exact-business-shape>"
-                    )
-                }
-                if nested_sibling
-                else {}
-            ),
-        }
-        leaf_gate["if_current_business_object_is_declared_leaf"] = leaf_payload
-
     return {
         "next_command_decision": {
-            **leaf_gate,
             "business_presence_source": "current_user_business_request",
             **(
                 {"current_business_object_pointer": current_object_pointer}
@@ -5500,7 +5502,8 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                                 "current_business_request_contains_that_index"
                             ),
                             "allowed_after": (
-                                "current_item_descendant_disclosures"
+                                "all_business_present_current_item_"
+                                "descendant_disclosures_if_any"
                                 if args.parent_schema_token is not None
                                 else "current_root_fact_apply_success"
                             ),
@@ -5514,6 +5517,11 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 ),
             },
             "continuation": {
+                **_business_declared_leaf_transition(
+                    current_business_value_pointer=current_business_value_pointer,
+                    nested_container_disclosures=nested_container_disclosures,
+                    next_sibling_disclosure=next_sibling_disclosure,
+                ),
                 **_root_fact_queue_anchor(
                     contract=contract,
                     child_handle=child_handle,

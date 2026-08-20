@@ -31,11 +31,11 @@ This is a mandatory safety gate. Do not call `operations`, `operation-schema`, o
 
 When this change uses a subset that the user selected from a previous multi-result ordinary, structured, or advanced object query, finish the query lane's selected-subset identity gate first: exact-ID read back every selected GUID and require its unaliased name, type, and path to match the candidate that the user chose. A failed, missing, changed, or ambiguous row stops the change. These bounded read-only checks precede the transaction contract; they do not replace its schema or metadata steps.
 
-After any required selected-subset identity gate, choose exactly one of these first transaction-contract branches:
+After a required selected-subset gate, choose one first transaction-contract branch:
 
 | Request | First transaction-contract sequence |
 |---|---|
-| `object.create` | `operation-schema object.create` first; discover requested unknown dynamic properties/references next. |
+| `object.create` | Its user-requested exact path/type preflight comes first; else `operation-schema object.create` first, then dynamic metadata. |
 | `object.set` or `audio.import` | its named `operation-schema` first; for naturally described dynamic properties/references, run one metadata discovery next, then Composer actions. |
 | Any other operation with an explicitly requested unknown dynamic property/reference token | one metadata discovery first, then its named `operation-schema` |
 | A named operation using only closed schema fields and side effects | its named `operation-schema` directly |

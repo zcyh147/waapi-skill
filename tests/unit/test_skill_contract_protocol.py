@@ -236,10 +236,17 @@ def test_operate_identity_preflight_stays_in_the_operate_reference_lane() -> Non
         in operate_compact
     )
     assert (
-        "`object.create` runs `operation-schema`, then `metadata discover` for "
-        "every prompt-present dynamic property/reference token, and only then "
-        "`draft-start`"
+        "Finish any user-requested exact path/type preflight before "
+        "`operation-schema object.create`"
     ) in operate_compact
+    assert (
+        "After that preflight, `object.create` runs `operation-schema`, then "
+        "`metadata discover` for every prompt-present dynamic property/reference "
+        "token, and only then `draft-start`"
+    ) in operate_compact
+    assert operate_compact.index(
+        "Finish any user-requested exact path/type preflight"
+    ) < operate_compact.index("`operation-schema object.create`")
 
 
 def test_exact_hop_playback_diagnosis_does_not_repeat_the_action_lookup() -> None:
@@ -747,10 +754,14 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "`object.set` or `audio.import`" in OPERATE
     assert "run one metadata discovery next, then Composer actions" in OPERATE
     assert "`operation-schema object.create` first" in OPERATE
+    assert "Its user-requested exact path/type preflight comes first" in compact
+    assert compact.index(
+        "Its user-requested exact path/type preflight comes first"
+    ) < compact.index("`operation-schema object.create` first")
     assert "selected-subset identity gate" in OPERATE
     assert "exact-ID read back every selected" in OPERATE
     assert "These bounded read-only checks precede the transaction contract" in OPERATE
-    assert "first transaction-contract branches" in OPERATE
+    assert "first transaction-contract branch" in OPERATE
     assert "explicitly requested unknown dynamic property/reference token" in OPERATE
     assert "one metadata discovery first, then its named `operation-schema`" in OPERATE
     assert "A named operation using only closed schema fields and side effects" in OPERATE
