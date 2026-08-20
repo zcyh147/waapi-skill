@@ -410,32 +410,40 @@ def test_scalar_topic_array_does_not_advertise_container_disclosure(
     )
     fact_tables = payload["continuation"]["fact_argv"]["top_level_fact_tables"]
     assert fact_tables["options"] == {
-        "columns": ["business_pointer", "nonempty_fact_argv", "empty_argv"],
+        "columns": [
+            "business_pointer", "nonempty_fact_argv", "empty_argv",
+            "object_identity_match_argv",
+        ],
         "rows": [
             [
                 "/options/bankData",
                 ["--option-set", "trh1-1a15d3daa1ee65ce7a4d8dc9", "boolean", "<business-value>"],
+                None,
                 None,
             ],
             [
                 "/options/infoFile",
                 ["--option-set", "trh1-a420199e36fa199a064d9b1a", "boolean", "<business-value>"],
                 None,
+                None,
             ],
             [
                 "/options/pluginInfo",
                 ["--option-set", "trh1-608f352938a2e4324477c1a4", "boolean", "<business-value>"],
+                None,
                 None,
             ],
             [
                 "/options/return",
                 ["--option-append", return_field["handle"], "string", "<business-value>"],
                 ["--option-present", return_field["handle"]],
+                None,
             ],
         ],
     }
     assert fact_tables["match"]["columns"] == [
         "business_pointer", "nonempty_fact_argv", "empty_argv",
+        "object_identity_match_argv",
     ]
     platform_row = next(
         row
@@ -445,10 +453,21 @@ def test_scalar_topic_array_does_not_advertise_container_disclosure(
     assert platform_row == [
         "/args/platform",
         [
-            "--match-map-put", platform["handle"], "<exact-key>",
-            "<type>", "<business-value>",
+            "--match-map-put", platform["handle"], "<business-map-member-key>",
+            "<type-of-business-map-member-value>",
+            "<business-map-member-value>",
         ],
         ["--match-present", platform["handle"]],
+        {
+            "id": [
+                "--match-map-put", platform["handle"], "id", "string",
+                "<exact-guid>",
+            ],
+            "name": [
+                "--match-map-put", platform["handle"], "name", "string",
+                "<exact-name>",
+            ],
+        },
     ]
     encoded = gateway.gateway_stdout_json_encoder(payload).encode(payload)
     assert encoded.index(platform["handle"]) < 4096

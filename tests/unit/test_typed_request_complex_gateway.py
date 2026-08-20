@@ -1326,6 +1326,12 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     )
     assert len((root_encoded + "\n").encode("utf-8")) < 7 * 1024
     assert "session_context" not in root_projected
+    assert root_projected["response_integrity"] == {
+        "complete": True,
+        "truncated": False,
+        "projection": "compact_lossless_container_contract",
+        "continue_with_returned_continuation": True,
+    }
     assert list(root_projected["continuation"])[:4] == [
         "next_command_decision",
         "root_fact_queue_anchor",
@@ -1382,6 +1388,7 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     assert len((encoded + "\n").encode("utf-8")) < 10 * 1024
     assert projected["handle"] == leaf["handle"]
     assert projected["schema_lineage_token"] == leaf["schema_lineage_token"]
+    assert projected["response_integrity"] == root_projected["response_integrity"]
     assert projected["child_contract"]["fixed_scalar_member_fact_table"] == (
         leaf["child_contract"]["fixed_scalar_member_fact_table"]
     )

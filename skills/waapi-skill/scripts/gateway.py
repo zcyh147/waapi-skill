@@ -2270,6 +2270,12 @@ def gateway_stdout_payload(value: Any) -> Any:
             "session_context",
         }
     }
+    projected["response_integrity"] = {
+        "complete": True,
+        "truncated": False,
+        "projection": "compact_lossless_container_contract",
+        "continue_with_returned_continuation": True,
+    }
     raw_child_contract = value.get("child_contract")
     if isinstance(raw_child_contract, Mapping):
         projected["child_contract"] = {
@@ -4258,8 +4264,9 @@ def _topic_top_level_fact_table(
             empty = [f"--{prefix}-present", handle]
         elif action == "map":
             nonempty = [
-                f"--{prefix}-map-put", handle, "<exact-key>", value_type,
-                "<business-value>",
+                f"--{prefix}-map-put", handle, "<business-map-member-key>",
+                "<type-of-business-map-member-value>",
+                "<business-map-member-value>",
             ]
             empty = [f"--{prefix}-present", handle]
         elif action == "choose":
@@ -4267,9 +4274,30 @@ def _topic_top_level_fact_table(
             empty = None
         else:
             continue
-        rows.append([pointer, nonempty, empty])
+        identity_facts = (
+            {
+                "id": [
+                    f"--{prefix}-map-put", handle, "id", "string",
+                    "<exact-guid>",
+                ],
+                "name": [
+                    f"--{prefix}-map-put", handle, "name", "string",
+                    "<exact-name>",
+                ],
+            }
+            if prefix == "match"
+            and action == "map"
+            and field.get("name") in {"language", "platform"}
+            else None
+        )
+        rows.append([pointer, nonempty, empty, identity_facts])
     return {
-        "columns": ["business_pointer", "nonempty_fact_argv", "empty_argv"],
+        "columns": [
+            "business_pointer",
+            "nonempty_fact_argv",
+            "empty_argv",
+            "object_identity_match_argv",
+        ],
         "rows": rows,
     }
 
