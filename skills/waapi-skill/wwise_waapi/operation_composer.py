@@ -1536,8 +1536,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                     "start_preconditions": {
                         "dynamic_metadata_before_draft_start": True,
                         "applies_when": (
-                            "the requested object tree contains dynamic properties "
-                            "or references whose exact live tokens are not already proven"
+                            "unproven dynamic property/reference tokens are required"
                         ),
                         "required_sequence": [
                             "operation-schema",
@@ -1545,8 +1544,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                             "draft-start",
                         ],
                         "metadata_scope": (
-                            "use --object-type for the exact new object type; "
-                            "never replace it with --object <target-path>"
+                            "use --object-type for the new type, never a target path"
                         ),
                     }
                 }

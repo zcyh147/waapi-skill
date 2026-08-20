@@ -270,7 +270,10 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
     assert item["continuation"]["next_sibling_disclosure"]["must_follow"] == (
         "current_root_fact_apply_success"
     )
-    assert next(iter(item["continuation"])) == "next_command_decision"
+    assert next(iter(item["continuation"])) == "root_fact_queue_anchor"
+    assert item["continuation"]["root_fact_queue_anchor"][
+        "first_fact_argv"
+    ] == item["continuation"]["deferred_fact"]["argv"]
     assert [
         row["candidate"]
         for row in item["continuation"]["next_command_decision"][

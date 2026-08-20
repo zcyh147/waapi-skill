@@ -130,6 +130,7 @@ from wwise_waapi.typed_requests import (  # noqa: E402  # pyright: ignore[report
     parse_typed_schema_lineage_token,
     request_contract,
     typed_schema_lineage_business_pointer,
+    typed_schema_lineage_root_fact,
     typed_schema_lineage_root_business_pointer,
     typed_schema_lineage_token,
     typed_container_command_contract,
@@ -3674,6 +3675,13 @@ def operation_composer_input_contract(
         }
     start_preconditions = contract.get("start_preconditions")
     fragments = contract.get("registry_fragments")
+    if isinstance(start_preconditions, Mapping):
+        exact_preconditions = dict(start_preconditions)
+        if exact_preconditions.get("dynamic_metadata_before_draft_start") is True:
+            exact_preconditions["next_step_decision"] = (
+                "metadata discover when required; otherwise draft-start"
+            )
+            contract = {**contract, "start_preconditions": exact_preconditions}
     if isinstance(start_preconditions, Mapping) and isinstance(fragments, Mapping):
         default_container = next(
             (
@@ -3697,7 +3705,7 @@ def operation_composer_input_contract(
             else None
         )
         if isinstance(actor_mixer_type, str) and actor_mixer_type:
-            exact_preconditions = dict(start_preconditions)
+            exact_preconditions = dict(contract["start_preconditions"])
             exact_preconditions["reviewed_default_container_metadata_argv"] = {
                 "applies_when": (
                     "all requested targets use the Registry-resolved default "
@@ -4590,6 +4598,60 @@ def _deferred_dynamic_fact_payload(
     }
 
 
+def _root_fact_queue_anchor(
+    *,
+    contract: TypedRequestContract,
+    child_handle: str,
+    lineage_token: str,
+    outermost_disclosed_root_pointer: str | None,
+    draft_shape: bool,
+    undo_child_shape: bool,
+    query_shape: bool,
+    topic_prefix: str | None,
+) -> dict[str, Any]:
+    """Repeat the exact first fact on every descendant response.
+
+    The response-local child tables remain authoritative for later facts.  The
+    anchor removes the only cross-response inference: which ancestor fact must
+    begin the first batch for this disclosed root.
+    """
+
+    if outermost_disclosed_root_pointer is None:
+        return {}
+    try:
+        action, parent_handle, key, shape, root_child_handle = (
+            typed_schema_lineage_root_fact(
+                contract,
+                child_handle=child_handle,
+                token=lineage_token,
+            )
+        )
+    except TypedRequestError:
+        return {}
+    fact = (
+        ["--append", parent_handle, shape, root_child_handle]
+        if action == "append"
+        else ["--map-put", parent_handle, key, shape, root_child_handle]
+    )
+    payload = _deferred_dynamic_fact_payload(
+        fact,
+        draft_shape=draft_shape,
+        undo_child_shape=undo_child_shape,
+        query_shape=query_shape,
+        topic_prefix=topic_prefix,
+    ).get("deferred_fact")
+    if not isinstance(payload, Mapping) or not isinstance(payload.get("argv"), list):
+        return {}
+    return {
+        "root_fact_queue_anchor": {
+            "outermost_disclosed_root_pointer": outermost_disclosed_root_pointer,
+            "first_fact_argv": list(payload["argv"]),
+            "first_batch_must_start_with_first_fact": True,
+            "batch_limit": MAX_TYPED_ACTIONS_PER_APPLY,
+        }
+    }
+
+
 def _next_array_item_disclosure(
     args: argparse.Namespace,
     *,
@@ -4858,7 +4920,11 @@ def _dynamic_next_command_decision(
                     "response_tree_preorder"
                 ),
                 "start_at": "outermost_disclosed_root_response",
-                "first_command_pointer": "/continuation/deferred_fact/argv",
+                "first_command_pointer": (
+                    "/continuation/root_fact_queue_anchor/first_fact_argv"
+                    if outermost_disclosed_root_pointer is not None
+                    else "/continuation/deferred_fact/argv"
+                ),
                 "batch_facts": (
                     f"current_root_only_next_up_to_{MAX_TYPED_ACTIONS_PER_APPLY}_"
                     "deferred_facts_in_queue_order"
@@ -4886,6 +4952,10 @@ def _dynamic_next_command_decision(
                         "complete": False,
                         "confirmation_before_preview": "invalid",
                         "final_response_before_preview": "invalid",
+                        "ask_user_to_continue_before_preview": "invalid",
+                        "same_turn_requirement": (
+                            "continue_until_preview_or_structured_gateway_error"
+                        ),
                     }
                 }
                 if draft_shape
@@ -5446,6 +5516,18 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 ),
             },
             "continuation": {
+                **_root_fact_queue_anchor(
+                    contract=contract,
+                    child_handle=child_handle,
+                    lineage_token=lineage_token,
+                    outermost_disclosed_root_pointer=(
+                        outermost_disclosed_root_pointer
+                    ),
+                    draft_shape=draft_shape,
+                    undo_child_shape=undo_child_shape,
+                    query_shape=query_shape,
+                    topic_prefix=topic_prefix,
+                ),
                 **_dynamic_next_command_decision(
                     draft_shape=(
                         (draft_shape or undo_child_shape)

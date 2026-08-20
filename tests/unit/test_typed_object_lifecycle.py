@@ -148,6 +148,12 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         "draft-start",
         "object.create",
     ]
+    metadata_decision = payload["composer"]["start_preconditions"][
+        "next_step_decision"
+    ]
+    assert metadata_decision == (
+        "metadata discover when required; otherwise draft-start"
+    )
     assert payload["composer"]["typed_request_field_table"]["rows"]
 
     children = next(
@@ -241,7 +247,24 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         "current_value_only": True,
         "unrelated_prompt_objects_do_not_satisfy_member_conditions": True,
     }
-    assert next(iter(grandchild["continuation"])) == "next_command_decision"
+    assert next(iter(grandchild["continuation"])) == "root_fact_queue_anchor"
+    assert grandchild["continuation"]["root_fact_queue_anchor"] == {
+        "outermost_disclosed_root_pointer": "/args/children/0",
+        "first_fact_argv": [
+            "--action",
+            "add_typed_fact",
+            "--fact-action",
+            "append",
+            "--field-handle",
+            children["handle"],
+            "--value-type",
+            "object",
+            "--fact-value",
+            container["handle"],
+        ],
+        "first_batch_must_start_with_first_fact": True,
+        "batch_limit": 6,
+    }
     assert grandchild["continuation"]["next_command_decision"] == {
         "business_presence_source": "current_user_business_request",
         "current_business_object_pointer": "/args/children/0/children/0",
@@ -252,6 +275,10 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
             "complete": False,
             "confirmation_before_preview": "invalid",
             "final_response_before_preview": "invalid",
+            "ask_user_to_continue_before_preview": "invalid",
+            "same_turn_requirement": (
+                "continue_until_preview_or_structured_gateway_error"
+            ),
         },
         "deferred_fact_root_barrier": {
             "outermost_disclosed_root_pointer": "/args/children/0",
@@ -307,7 +334,9 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
                     "response_tree_preorder"
                 ),
                 "start_at": "outermost_disclosed_root_response",
-                "first_command_pointer": "/continuation/deferred_fact/argv",
+                "first_command_pointer": (
+                    "/continuation/root_fact_queue_anchor/first_fact_argv"
+                ),
                 "batch_facts": (
                     "current_root_only_next_up_to_6_deferred_facts_in_queue_order"
                 ),

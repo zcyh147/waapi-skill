@@ -2003,6 +2003,45 @@ def typed_schema_lineage_root_business_pointer(
     return "/" + "/".join(escape(part) for part in parts)
 
 
+def typed_schema_lineage_root_fact(
+    contract: TypedRequestContract,
+    *,
+    child_handle: str,
+    token: str,
+) -> tuple[str, str, str, str, str]:
+    """Return the exact first parent fact for one disclosed response tree.
+
+    A descendant response cannot require its caller to infer where the
+    request-wide fact queue began. Re-derive the first lineage step from the
+    Gateway-issued token and return
+    ``(action, parent_handle, key, shape, child_handle)`` so
+    the Gateway can publish the exact queue anchor again on every descendant.
+    """
+
+    if not child_handle.startswith(TYPED_DYNAMIC_HANDLE_PREFIX):
+        raise TypedRequestError("Typed schema lineage child handle is invalid")
+    steps = _decode_lineage_steps(token)
+    if not steps:
+        raise TypedRequestError("Typed schema lineage token is empty")
+    first = steps[0]
+    parent_handle = str(first["parent_handle"])
+    root = contract.fields_by_handle.get(parent_handle)
+    if root is None:
+        raise TypedRequestError("Typed schema lineage token has no request root")
+    derived = _derive_schema_from_lineage_steps(contract, (first,))
+    if derived is None:
+        raise TypedRequestError("Typed schema lineage token has no request root fact")
+    root_child_handle = derived[1]
+    action = "append" if root.shape == "array" else "map-put"
+    return (
+        action,
+        parent_handle,
+        str(first["key"]),
+        str(first["shape"]),
+        root_child_handle,
+    )
+
+
 def _decode_lineage_steps(token: str) -> list[Mapping[str, Any]]:
     from base64 import urlsafe_b64decode
     import json
