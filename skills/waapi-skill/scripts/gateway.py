@@ -13812,6 +13812,22 @@ def operation_draft_payload(
                             "fixed_full_argv": [*prefix, *arguments],
                         }
                     )
+        if compact_actions is not None and "completion_candidate" in next_action_binding:
+            # A long generic composition can repeat several exact root
+            # disclosure commands after every atomic fact batch.  Put the
+            # terminal decision first so a caller that has finished every
+            # business-present fact sees the complete draft-check command in
+            # the bounded stdout prefix instead of mistaking the receipt for a
+            # truncated continuation.
+            contract_name = next_action_binding.pop("contract")
+            completion_candidate = next_action_binding.pop(
+                "completion_candidate"
+            )
+            next_action_binding = {
+                "contract": contract_name,
+                "completion_candidate": completion_candidate,
+                **next_action_binding,
+            }
         if not (command == "draft-check" and record.check is not None):
             draft["next_action_binding"] = next_action_binding
     return {

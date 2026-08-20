@@ -313,6 +313,14 @@ def test_generic_draft_start_requires_first_fact_batch_before_disclosure(
     assert applied["draft"]["next_action_binding"][
         "root_dynamic_disclosure_commands"
     ] == disclosures
+    public_payload = waapi_gateway.gateway_stdout_payload(applied)
+    encoded = waapi_gateway.gateway_stdout_json_encoder(public_payload).encode(
+        public_payload
+    )
+    assert encoded.index('"completion_candidate"') < encoded.index(
+        '"root_dynamic_disclosure_commands"'
+    )
+    assert '"draft-check"' in encoded[:4096]
 
 
 def test_object_create_prioritizes_collision_policy_before_optional_containers(
