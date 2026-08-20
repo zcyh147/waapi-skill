@@ -248,6 +248,23 @@ def test_generic_draft_start_requires_first_fact_batch_before_disclosure(
     assert binding["dynamic_disclosure_before_first_fact"] == "invalid"
 
 
+def test_object_create_prioritizes_collision_policy_before_optional_containers(
+    tmp_path: Path,
+) -> None:
+    code, payload = offline_execute(
+        tmp_path,
+        "operation-schema",
+        "object.create",
+        version="2023.1",
+    )
+
+    assert code == 0, payload
+    rows = payload["composer"]["top_level_fact_plan"]["rows"]
+    names = [row[1] for row in rows]
+    assert names.index("on_name_conflict") < names.index("notes")
+    assert names.index("on_name_conflict") < names.index("properties")
+
+
 def test_typed_operation_materializes_exact_request_into_the_single_preview_ingress(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

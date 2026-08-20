@@ -198,10 +198,19 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
     assert next(iter(grandchild["continuation"])) == "next_command_decision"
     assert grandchild["continuation"]["next_command_decision"] == {
         "business_presence_source": "current_user_business_request",
+        "current_business_object_pointer": "/args/children/0/children/0",
         "schema_members_are_not_business_facts": True,
         "candidate_without_its_exact_business_pointer": "forbidden",
         "conditional_candidates_do_not_block_when_absent": True,
-        "declared_leaf_object": {
+        "preview_construction_boundary": {
+            "complete": False,
+            "confirmation_before_preview": "invalid",
+            "final_response_before_preview": "invalid",
+        },
+        "if_current_business_object_is_declared_leaf": {
+            "condition": (
+                "current_business_object_has_no_properties_references_or_children"
+            ),
             "nested_container_disclosures": "forbidden",
             "next_action": "next_sibling_disclosure_or_deferred_fact_queue",
         },

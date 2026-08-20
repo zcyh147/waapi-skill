@@ -199,6 +199,14 @@ def test_object_create_prompts_declare_the_requested_sound_leaves() -> None:
     assert all(
         "不再添加子对象、属性或引用" in unit.scenario.prompt for unit in units
     )
+    assert all("严格按这棵业务树" in unit.scenario.prompt for unit in units)
+    assert all(
+        "处理完一个叶节点后直接处理同组的下一个叶节点" in unit.scenario.prompt
+        for unit in units
+    )
+    assert all(
+        "预览返回后再请我确认执行" in unit.scenario.prompt for unit in units
+    )
     assert all(
         command not in unit.scenario.prompt
         for unit in units

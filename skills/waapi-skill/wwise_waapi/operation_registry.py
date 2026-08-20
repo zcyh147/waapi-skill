@@ -2224,6 +2224,10 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 "parent": IDENTITY_ARGUMENT_SCHEMA,
                 "type": _OBJECT_CREATE_TYPE_TOKEN_SCHEMA,
                 "name": {"type": "string", "minLength": 1},
+                "on_name_conflict": {
+                    "type": "string",
+                    "enum": ["fail", "rename", "merge", "replace"],
+                },
                 "notes": {"type": "string"},
                 "properties": {"type": "array", "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA},
                 "references": {"type": "array", "items": _OBJECT_REFERENCE_ARGUMENT_SCHEMA},
@@ -2238,10 +2242,6 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                         "For an existing named request root, keep its existing parent as parent, repeat "
                         "the root type/name, and use on_name_conflict=merge."
                     ),
-                },
-                "on_name_conflict": {
-                    "type": "string",
-                    "enum": ["fail", "rename", "merge", "replace"],
                 },
                 "replace_owned_root": {
                     **IDENTITY_ARGUMENT_SCHEMA,

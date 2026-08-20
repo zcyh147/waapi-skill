@@ -4735,6 +4735,17 @@ def _dynamic_next_command_decision(
     """Return one ordered, machine-readable decision for the next action."""
 
     candidates: list[dict[str, Any]] = []
+    current_object_pointers = {
+        str(row["business_value_pointer"]).rsplit("/", 1)[0]
+        for row in nested_container_disclosures
+        if isinstance(row.get("business_value_pointer"), str)
+        and "/" in str(row["business_value_pointer"])
+    }
+    current_object_pointer = (
+        next(iter(current_object_pointers))
+        if len(current_object_pointers) == 1
+        else None
+    )
     if branch_continuation:
         candidates.append(
             {
@@ -4820,12 +4831,32 @@ def _dynamic_next_command_decision(
     return {
         "next_command_decision": {
             "business_presence_source": "current_user_business_request",
+            **(
+                {"current_business_object_pointer": current_object_pointer}
+                if current_object_pointer is not None
+                else {}
+            ),
             "schema_members_are_not_business_facts": True,
             "candidate_without_its_exact_business_pointer": "forbidden",
             "conditional_candidates_do_not_block_when_absent": True,
             **(
                 {
-                    "declared_leaf_object": {
+                    "preview_construction_boundary": {
+                        "complete": False,
+                        "confirmation_before_preview": "invalid",
+                        "final_response_before_preview": "invalid",
+                    }
+                }
+                if draft_shape
+                else {}
+            ),
+            **(
+                {
+                    "if_current_business_object_is_declared_leaf": {
+                        "condition": (
+                            "current_business_object_has_no_properties_"
+                            "references_or_children"
+                        ),
                         "nested_container_disclosures": "forbidden",
                         "next_action": (
                             "next_sibling_disclosure_or_deferred_fact_queue"
