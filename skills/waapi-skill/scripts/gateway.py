@@ -4222,6 +4222,58 @@ def typed_topic_contract_payload(contract: Any) -> dict[str, Any]:
     return payload
 
 
+def _topic_top_level_fact_table(
+    contract: TypedRequestContract,
+    *,
+    prefix: str,
+) -> dict[str, Any]:
+    """Expose copy-ready top-level Topic facts before the large field tables."""
+
+    fields_by_handle = {
+        field.handle: field.as_dict()
+        for field in contract.fields
+    }
+    rows: list[list[Any]] = []
+    for handle, _name, phase, action, pointer in contract.top_level_fact_plan()[
+        "rows"
+    ]:
+        if phase != "fact" or not isinstance(handle, str):
+            continue
+        field = fields_by_handle.get(handle, {})
+        accepted_types = field.get("accepted_types", [])
+        value_type = (
+            accepted_types[0]
+            if isinstance(accepted_types, list) and len(accepted_types) == 1
+            else "<type>"
+        )
+        if action == "set":
+            nonempty = [
+                f"--{prefix}-set", handle, value_type, "<business-value>",
+            ]
+            empty = None
+        elif action == "array":
+            nonempty = [
+                f"--{prefix}-append", handle, value_type, "<business-value>",
+            ]
+            empty = [f"--{prefix}-present", handle]
+        elif action == "map":
+            nonempty = [
+                f"--{prefix}-map-put", handle, "<exact-key>", value_type,
+                "<business-value>",
+            ]
+            empty = [f"--{prefix}-present", handle]
+        elif action == "choose":
+            nonempty = [f"--{prefix}-choose", handle, "<choice-handle>"]
+            empty = None
+        else:
+            continue
+        rows.append([pointer, nonempty, empty])
+    return {
+        "columns": ["business_pointer", "nonempty_fact_argv", "empty_argv"],
+        "rows": rows,
+    }
+
+
 def _container_schema_binding_argv(
     contract: TypedRequestContract,
     *,
@@ -5309,6 +5361,16 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 },
                 "fact_argv": {
                     "prefixes": ["option", "match"],
+                    "top_level_fact_tables": {
+                        "options": _topic_top_level_fact_table(
+                            options,
+                            prefix="option",
+                        ),
+                        "match": _topic_top_level_fact_table(
+                            match,
+                            prefix="match",
+                        ),
+                    },
                     "templates": {
                         "set": "--<prefix>-set <handle> <type> <value>",
                         "append": "--<prefix>-append <handle> <type> <value>",
@@ -5348,6 +5410,27 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 fields = section.get("fields") if isinstance(section, Mapping) else None
                 if isinstance(fields, dict):
                     fields.pop("duplicate_name_paths", None)
+            final_payload = attach_gateway_session_context(
+                payload,
+                args=args,
+                env=env,
+            )
+            observed = gateway_json_document_size(
+                final_payload,
+                stop_after_bytes=MAX_TOPIC_SCHEMA_GATEWAY_RESULT_BYTES,
+            )
+        if observed > MAX_TOPIC_SCHEMA_GATEWAY_RESULT_BYTES:
+            # Copy-ready top-level facts prevent opaque-handle transcription
+            # on schemas with room for the redundant table. Large Topics keep
+            # the same exact handles in their lossless field tables.
+            continuation = payload.get("continuation")
+            fact_argv = (
+                continuation.get("fact_argv")
+                if isinstance(continuation, Mapping)
+                else None
+            )
+            if isinstance(fact_argv, dict):
+                fact_argv.pop("top_level_fact_tables", None)
             final_payload = attach_gateway_session_context(
                 payload,
                 args=args,

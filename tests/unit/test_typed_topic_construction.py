@@ -403,6 +403,55 @@ def test_scalar_topic_array_does_not_advertise_container_disclosure(
         },
     }
     assert "dynamic_container_commands" not in payload["options"]["continuation"]
+    platform = next(
+        field
+        for field in _expand_compact_field_table(payload["event_match"]["fields"])
+        if field["name"] == "platform" and field.get("parent_handle") is None
+    )
+    fact_tables = payload["continuation"]["fact_argv"]["top_level_fact_tables"]
+    assert fact_tables["options"] == {
+        "columns": ["business_pointer", "nonempty_fact_argv", "empty_argv"],
+        "rows": [
+            [
+                "/options/bankData",
+                ["--option-set", "trh1-1a15d3daa1ee65ce7a4d8dc9", "boolean", "<business-value>"],
+                None,
+            ],
+            [
+                "/options/infoFile",
+                ["--option-set", "trh1-a420199e36fa199a064d9b1a", "boolean", "<business-value>"],
+                None,
+            ],
+            [
+                "/options/pluginInfo",
+                ["--option-set", "trh1-608f352938a2e4324477c1a4", "boolean", "<business-value>"],
+                None,
+            ],
+            [
+                "/options/return",
+                ["--option-append", return_field["handle"], "string", "<business-value>"],
+                ["--option-present", return_field["handle"]],
+            ],
+        ],
+    }
+    assert fact_tables["match"]["columns"] == [
+        "business_pointer", "nonempty_fact_argv", "empty_argv",
+    ]
+    platform_row = next(
+        row
+        for row in fact_tables["match"]["rows"]
+        if row[0] == "/args/platform"
+    )
+    assert platform_row == [
+        "/args/platform",
+        [
+            "--match-map-put", platform["handle"], "<exact-key>",
+            "<type>", "<business-value>",
+        ],
+        ["--match-present", platform["handle"]],
+    ]
+    encoded = gateway.gateway_stdout_json_encoder(payload).encode(payload)
+    assert encoded.index(platform["handle"]) < 4096
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
