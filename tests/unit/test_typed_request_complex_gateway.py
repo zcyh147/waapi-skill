@@ -9,6 +9,7 @@ from typing import Any, Mapping
 import pytest
 
 from wwise_waapi.schema_inventory import load_definition_graph
+from wwise_waapi.operation_composer import draft_operation_request_contract
 from wwise_waapi.typed_requests import (
     compile_typed_request_contract,
     request_contract,
@@ -1296,3 +1297,61 @@ def test_nested_options_local_reference_keeps_its_origin_section(
     )
     assert code == 0
     assert row["child_contract"]["branch_choices"][0]["key"] == "v"
+
+
+def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
+    tmp_path: Path,
+) -> None:
+    contract = draft_operation_request_contract("object.create", "2021.1")
+    children = next(
+        field
+        for field in contract.fields
+        if field.path == ("children",) and field.shape == "array"
+    )
+
+    code, root = gateway.execute_gateway(
+        [
+            "--version", "2021.1", "request-array-item", "object.create",
+            "--schema-digest", contract.schema_digest,
+            "--array-handle", children.handle,
+            "--index", "0", "--shape", "object",
+        ],
+        env=_env(tmp_path, "2021.1"),
+        client_factory=lambda _url: pytest.fail("disclosure must be offline"),
+    )
+    assert code == 0, root
+    child_array_argv = next(
+        row["argv"]
+        for row in root["continuation"]["nested_container_disclosures"]
+        if row["key"] == "children"
+    )
+    code, child_array = gateway.execute_gateway(
+        ["--version", "2021.1", *child_array_argv],
+        env=_env(tmp_path, "2021.1"),
+        client_factory=lambda _url: pytest.fail("disclosure must be offline"),
+    )
+    assert code == 0, child_array
+    leaf_argv = [
+        "0" if token == "<zero_based_business_present_index>" else token
+        for token in child_array["continuation"]["next_item_disclosure"][
+            "argv_by_shape"
+        ]["object"]
+    ]
+    code, leaf = gateway.execute_gateway(
+        ["--version", "2021.1", *leaf_argv],
+        env=_env(tmp_path, "2021.1"),
+        client_factory=lambda _url: pytest.fail("disclosure must be offline"),
+    )
+    assert code == 0, leaf
+
+    projected = gateway.gateway_stdout_payload(leaf)
+    encoded = gateway.gateway_stdout_json_encoder(projected).encode(projected)
+    assert len((encoded + "\n").encode("utf-8")) < 10 * 1024
+    assert projected["handle"] == leaf["handle"]
+    assert projected["schema_lineage_token"] == leaf["schema_lineage_token"]
+    assert projected["child_contract"]["fixed_scalar_member_fact_table"] == (
+        leaf["child_contract"]["fixed_scalar_member_fact_table"]
+    )
+    assert projected["continuation"]["next_command_decision"][
+        "evaluate_in_order"
+    ] == leaf["continuation"]["next_command_decision"]["evaluate_in_order"]

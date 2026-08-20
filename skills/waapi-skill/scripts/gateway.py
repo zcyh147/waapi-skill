@@ -2251,6 +2251,53 @@ def gateway_json_document_size(
     return observed + 1  # print() appends one newline
 
 
+def gateway_stdout_payload(value: Any) -> Any:
+    """Return the compact public projection for one terminal stdout document."""
+
+    if (
+        not isinstance(value, Mapping)
+        or value.get("contract") != "waapi-skill.typed-container-handle/v1"
+    ):
+        return value
+    projected = {
+        key: item
+        for key, item in value.items()
+        if key
+        not in {
+            "business_value_scope",
+            "schema_lineage_authority",
+            "construction_state",
+        }
+    }
+    raw_continuation = value.get("continuation")
+    if not isinstance(raw_continuation, Mapping):
+        return projected
+    continuation = {
+        key: item
+        for key, item in raw_continuation.items()
+        if key
+        not in {
+            "draft_fact_execution",
+            "nested_container_order",
+            "next_business_present_nested_disclosure",
+        }
+    }
+    raw_decision = raw_continuation.get("next_command_decision")
+    if isinstance(raw_decision, Mapping):
+        continuation["next_command_decision"] = {
+            key: raw_decision[key]
+            for key in (
+                "preview_construction_boundary",
+                "evaluate_in_order",
+                "first_true_candidate_is_the_only_next_action",
+                "draft_check_or_cancel_with_remaining_candidate_or_deferred_fact",
+            )
+            if key in raw_decision
+        }
+    projected["continuation"] = continuation
+    return projected
+
+
 def gateway_stdout_json_encoder(value: Any | None = None) -> json.JSONEncoder:
     """Build the strict, insertion-ordered encoder used for gateway stdout.
 
@@ -15598,7 +15645,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if payload.get("contract") == TOPIC_STREAM_RECORD_CONTRACT:
         print(topic_stream_stdout_json_encoder().encode(payload), flush=True)
     else:
-        print(gateway_stdout_json_encoder(payload).encode(payload))
+        stdout_payload = gateway_stdout_payload(payload)
+        print(gateway_stdout_json_encoder(stdout_payload).encode(stdout_payload))
     return exit_code
 
 
