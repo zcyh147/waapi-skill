@@ -1326,12 +1326,15 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     )
     assert len((root_encoded + "\n").encode("utf-8")) < 7 * 1024
     assert "session_context" not in root_projected
-    assert list(root_projected["continuation"])[:3] == [
+    assert list(root_projected["continuation"])[:4] == [
         "next_command_decision",
         "nested_container_disclosures",
+        "root_fact_queue_anchor",
         "deferred_fact",
     ]
-    assert "root_fact_queue_anchor" not in root_projected["continuation"]
+    assert root_projected["continuation"]["root_fact_queue_anchor"] == root[
+        "continuation"
+    ]["root_fact_queue_anchor"]
     assert "request_wide_order" not in root_projected["continuation"]
     assert root_projected["continuation"]["next_command_decision"][
         "evaluate_in_order"
@@ -1370,17 +1373,53 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     )
     assert projected["continuation"]["next_command_decision"][
         "evaluate_in_order"
-    ][-1]["first_command_pointer"] == "/continuation/deferred_fact/argv"
+    ][-1]["first_command_pointer"] == (
+        "/continuation/root_fact_queue_anchor/first_fact_argv"
+    )
+    assert projected["continuation"]["root_fact_queue_anchor"] == leaf[
+        "continuation"
+    ]["root_fact_queue_anchor"]
     assert projected["continuation"]["next_command_decision"][
         "evaluate_in_order"
     ][0]["candidate"] == "business_sibling_transition"
-    assert list(projected["continuation"])[:4] == [
+    assert list(projected["continuation"])[:5] == [
         "next_command_decision",
         "business_sibling_transition",
         "nested_container_disclosures",
+        "root_fact_queue_anchor",
         "deferred_fact",
     ]
     assert "--no-dynamic-descendants" not in encoded
+
+    last_leaf_argv = [
+        "1" if token == "<zero_based_business_present_index>" else token
+        for token in child_array["continuation"]["next_item_disclosure"][
+            "argv_by_shape"
+        ]["object"]
+    ]
+    code, last_leaf = gateway.execute_gateway(
+        ["--version", "2021.1", *last_leaf_argv],
+        env=_env(tmp_path, "2021.1"),
+        client_factory=lambda _url: pytest.fail("disclosure must be offline"),
+    )
+    assert code == 0, last_leaf
+    last_projected = gateway.gateway_stdout_payload(last_leaf)
+    last_decision = last_projected["continuation"]["next_command_decision"]
+    assert last_decision["evaluate_in_order"][-1]["first_command_pointer"] == (
+        "/continuation/root_fact_queue_anchor/first_fact_argv"
+    )
+    assert last_projected["continuation"]["root_fact_queue_anchor"] == root[
+        "continuation"
+    ]["root_fact_queue_anchor"]
+    assert last_projected["continuation"]["root_fact_queue_anchor"][
+        "first_fact_argv"
+    ] != last_projected["continuation"]["deferred_fact"]["argv"]
+    last_encoded = gateway.gateway_stdout_json_encoder(last_projected).encode(
+        last_projected
+    )
+    assert last_encoded.index('"root_fact_queue_anchor":{') < last_encoded.index(
+        '"fixed_scalar_member_fact_table":{'
+    )
 
 
 def test_dynamic_container_schema_exposes_one_standard_argv_per_shape(

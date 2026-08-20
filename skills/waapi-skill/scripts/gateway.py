@@ -2297,25 +2297,7 @@ def gateway_stdout_payload(value: Any) -> Any:
         }
         evaluate = decision.get("evaluate_in_order")
         if isinstance(evaluate, list):
-            decision["evaluate_in_order"] = [
-                {
-                    **row,
-                    **(
-                        {
-                            "first_command_pointer": (
-                                "/continuation/deferred_fact/argv"
-                            )
-                        }
-                        if isinstance(row, Mapping)
-                        and row.get("first_command_pointer")
-                        == "/continuation/root_fact_queue_anchor/first_fact_argv"
-                        else {}
-                    ),
-                }
-                if isinstance(row, Mapping)
-                else row
-                for row in evaluate
-            ]
+            decision["evaluate_in_order"] = list(evaluate)
             candidate_key_by_name = {
                 "branch_disclosure": "branch_disclosure",
                 "nested_container_disclosures": "nested_container_disclosures",
@@ -2323,13 +2305,17 @@ def gateway_stdout_payload(value: Any) -> Any:
                 "business_sibling_transition": "business_sibling_transition",
                 "deferred_fact_queue": "deferred_fact",
             }
-            candidate_keys = [
-                candidate_key_by_name[name]
-                for row in decision["evaluate_in_order"]
-                if isinstance(row, Mapping)
-                and isinstance((name := row.get("candidate")), str)
-                and name in candidate_key_by_name
-            ]
+            for row in decision["evaluate_in_order"]:
+                if not isinstance(row, Mapping):
+                    continue
+                name = row.get("candidate")
+                if not isinstance(name, str) or name not in candidate_key_by_name:
+                    continue
+                if row.get("first_command_pointer") == (
+                    "/continuation/root_fact_queue_anchor/first_fact_argv"
+                ):
+                    candidate_keys.append("root_fact_queue_anchor")
+                candidate_keys.append(candidate_key_by_name[name])
         continuation["next_command_decision"] = decision
     for key in candidate_keys:
         if key in raw_continuation and key not in continuation:
@@ -2341,7 +2327,6 @@ def gateway_stdout_payload(value: Any) -> Any:
             "next_business_present_nested_disclosure",
             "next_command_decision",
             "request_wide_order",
-            "root_fact_queue_anchor",
         } or key in continuation:
             continue
         continuation[key] = item
