@@ -207,7 +207,7 @@ def test_exact_identity_query_is_complete_in_entry_file() -> None:
 
 
 def test_multihop_query_reads_reference_before_a_fast_looking_first_hop() -> None:
-    first_hop_rule = "Classify the complete task before its first hop"
+    first_hop_rule = "Classify the complete read-only task before its first hop"
     single_hop_rule = "For a complete single-hop exact path/GUID"
 
     assert first_hop_rule in SKILL
@@ -218,6 +218,27 @@ def test_multihop_query_reads_reference_before_a_fast_looking_first_hop() -> Non
         in SKILL
     )
     assert SKILL.index(first_hop_rule) < SKILL.index(single_hop_rule)
+
+
+def test_operate_identity_preflight_stays_in_the_operate_reference_lane() -> None:
+    operate_section = SKILL.split("### Operate lane", 1)[1].split(
+        "## Runner and packaged runtime", 1
+    )[0]
+    operate_compact = " ".join(operate_section.split())
+
+    assert (
+        "An exact path/GUID identity preflight inside a change request is part "
+        "of the operate lane"
+    ) in operate_compact
+    assert (
+        "read only `references/waapi-operate.md` for that task"
+        in operate_compact
+    )
+    assert (
+        "`object.create` runs `operation-schema`, then `metadata discover` for "
+        "every prompt-present dynamic property/reference token, and only then "
+        "`draft-start`"
+    ) in operate_compact
 
 
 def test_exact_hop_playback_diagnosis_does_not_repeat_the_action_lookup() -> None:

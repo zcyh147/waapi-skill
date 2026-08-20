@@ -145,7 +145,7 @@ Classify the requested action, not background wording. A request to listen for, 
 
 Default result shape: return the resolved structured result, not just “I called WAAPI”.
 
-Classify the complete task before its first hop. If it needs multiple or relationship hops, fully read `references/waapi-query.md` before any Gateway command; an exact path/GUID first hop does not make the whole task a complete fast route.
+Classify the complete read-only task before its first hop. If it needs multiple or relationship hops, fully read `references/waapi-query.md` before any Gateway command; an exact path/GUID first hop does not make the whole task a complete fast route.
 
 For a complete single-hop exact path/GUID existence or identity lookup, run exactly `query-object --path '<exact-object-path>' --return-field id --return-field name --return-field type --return-field path`; substitute `--object-id '<exact-guid>'`. Keep all four return fields explicit. Exact `not_found` stays Gateway-owned in compact output; use `--detail` only for explicit compile/dispatch diagnostics. This route is complete: do not read the query reference before or after it; do not retry a rejected or failed gateway invocation.
 
@@ -157,11 +157,13 @@ Conditional read for a query not fully covered by the fixed commands, exact-iden
 
 ### Operate lane
 
-Use operate for project-changing work: create, move, copy, delete, property/reference edits, imports, soundbanks, switch assignments, and design previews.
+Use operate for project-changing work: create, move, copy, delete, property/reference edits, imports, soundbanks, switch assignments, and design previews. An exact path/GUID identity preflight inside a change request is part of the operate lane; read only `references/waapi-operate.md` for that task.
 
 Finish any required selected-subset exact-ID readback first. `object.create`
-runs schema before metadata. `object.set` and `audio.import` run their schema,
-then discover naturally described dynamic tokens; Composer `draft-check`
+runs `operation-schema`, then `metadata discover` for every prompt-present
+dynamic property/reference token, and only then `draft-start`; without such
+fields it starts the Draft directly. `object.set` and `audio.import` run their
+schema, then discover naturally described dynamic tokens; Composer `draft-check`
 revalidates them and dependencies. For other
 operations, only an explicit unknown dynamic property/reference token needs
 metadata in the order stated by the operate reference. Never infer a token or

@@ -265,7 +265,26 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         "first_batch_must_start_with_first_fact": True,
         "batch_limit": 6,
     }
-    assert grandchild["continuation"]["next_command_decision"] == {
+    next_decision = grandchild["continuation"]["next_command_decision"]
+    assert list(grandchild["continuation"])[:3] == [
+        "root_fact_queue_anchor",
+        "next_sibling_disclosure",
+        "next_command_decision",
+    ]
+    assert next(iter(next_decision)) == "if_current_business_object_is_declared_leaf"
+    assert next_decision == {
+        "if_current_business_object_is_declared_leaf": {
+            "evaluate_before_candidate_commands": True,
+            "condition": (
+                "current_business_object_has_no_properties_references_or_children"
+            ),
+            "nested_container_disclosures": "forbidden",
+            "next_action": "next_sibling_disclosure_then_deferred_fact_queue",
+            "next_command_pointer": (
+                "/continuation/next_sibling_disclosure/"
+                "argv_by_shape/<exact-business-shape>"
+            ),
+        },
         "business_presence_source": "current_user_business_request",
         "current_business_object_pointer": "/args/children/0/children/0",
         "schema_members_are_not_business_facts": True,
@@ -284,18 +303,6 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
             "outermost_disclosed_root_pointer": "/args/children/0",
             "start_at_response_with_current_value_pointer": "/args/children/0",
             "descendant_facts_before_root_parent_and_child_facts": "forbidden",
-        },
-        "if_current_business_object_is_declared_leaf": {
-            "evaluate_before_candidate_commands": True,
-            "condition": (
-                "current_business_object_has_no_properties_references_or_children"
-            ),
-            "nested_container_disclosures": "forbidden",
-            "next_action": "next_sibling_disclosure_then_deferred_fact_queue",
-            "next_command_pointer": (
-                "/continuation/next_sibling_disclosure/"
-                "argv_by_shape/<exact-business-shape>"
-            ),
         },
         "evaluate_in_order": [
             {

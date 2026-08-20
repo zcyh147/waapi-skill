@@ -979,9 +979,9 @@ def test_object_create_schema_puts_the_top_level_fact_plan_before_large_fields(
         "submit only prompt-present values; omit absent defaults"
     )
     assert table["branch_selection_authority"] == (
-        "choose the branch matching the exact current user value at the row "
-        "business_pointer; a prior read result is proof only and must never replace "
-        "that value or its representation"
+        "object.create parent is /args/parent (the direct container); a preflight "
+        "merge-target GUID is proof only, never the parent; preserve every "
+        "business_pointer representation"
     )
     assert table["business_pointer_source"] == (
         "this table's business_pointer column"

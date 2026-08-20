@@ -4935,8 +4935,35 @@ def _dynamic_next_command_decision(
     if not nested_sibling and sibling_candidate is not None:
         candidates.append(sibling_candidate)
 
+    leaf_gate: dict[str, Any] = {}
+    if nested_container_disclosures:
+        leaf_payload: dict[str, Any] = {
+            "evaluate_before_candidate_commands": True,
+            "condition": (
+                "current_business_object_has_no_properties_references_or_children"
+            ),
+            "nested_container_disclosures": "forbidden",
+            "next_action": (
+                "next_sibling_disclosure_then_deferred_fact_queue"
+                if nested_sibling
+                else "deferred_fact_queue_then_next_sibling_disclosure"
+            ),
+            **(
+                {
+                    "next_command_pointer": (
+                        "/continuation/next_sibling_disclosure/"
+                        "argv_by_shape/<exact-business-shape>"
+                    )
+                }
+                if nested_sibling
+                else {}
+            ),
+        }
+        leaf_gate["if_current_business_object_is_declared_leaf"] = leaf_payload
+
     return {
         "next_command_decision": {
+            **leaf_gate,
             "business_presence_source": "current_user_business_request",
             **(
                 {"current_business_object_pointer": current_object_pointer}
@@ -4976,35 +5003,6 @@ def _dynamic_next_command_decision(
                     }
                 }
                 if outermost_disclosed_root_pointer is not None
-                else {}
-            ),
-            **(
-                {
-                    "if_current_business_object_is_declared_leaf": {
-                        "evaluate_before_candidate_commands": True,
-                        "condition": (
-                            "current_business_object_has_no_properties_"
-                            "references_or_children"
-                        ),
-                        "nested_container_disclosures": "forbidden",
-                        "next_action": (
-                            "next_sibling_disclosure_then_deferred_fact_queue"
-                            if nested_sibling
-                            else "deferred_fact_queue_then_next_sibling_disclosure"
-                        ),
-                        **(
-                            {
-                                "next_command_pointer": (
-                                    "/continuation/next_sibling_disclosure/"
-                                    "argv_by_shape/<exact-business-shape>"
-                                )
-                            }
-                            if nested_sibling
-                            else {}
-                        ),
-                    }
-                }
-                if nested_container_disclosures
                 else {}
             ),
             "evaluate_in_order": candidates,
@@ -5528,6 +5526,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     query_shape=query_shape,
                     topic_prefix=topic_prefix,
                 ),
+                **next_sibling_disclosure,
                 **_dynamic_next_command_decision(
                     draft_shape=(
                         (draft_shape or undo_child_shape)
@@ -5596,7 +5595,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     else {}
                 ),
                 **next_item_disclosure,
-                **next_sibling_disclosure,
                 **deferred_fact,
                 **(
                     {
