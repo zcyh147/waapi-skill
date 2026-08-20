@@ -190,6 +190,8 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
     assert decision_offset < nested_offset
     assert '"request_wide_order"' not in encoded_container
     assert children_offset < 4096
+
+
     assert "action_argv" not in container["continuation"]
     deferred_argv = container["continuation"]["deferred_fact"]["argv"]
     assert deferred_argv[
@@ -497,6 +499,93 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         public_grandchild
     )
     assert len((encoded + "\n").encode("utf-8")) < 12 * 1024
+
+
+def test_object_create_parent_fact_resumes_the_exact_container_response(
+    tmp_path: Path,
+) -> None:
+    env = _gateway_env(tmp_path)
+    env["WAAPI_SKILL_STATE_DIR"] = str(tmp_path / "state")
+    contract = draft_operation_request_contract("object.create", "2021.1")
+    children = next(
+        field
+        for field in contract.fields
+        if field.path == ("children",) and field.shape == "array"
+    )
+    start_code, started = waapi_gateway.execute_gateway(
+        ["--version", "2021.1", "draft-start", "object.create"],
+        env=env,
+        client_factory=lambda url: pytest.fail(f"draft-start connected to {url}"),
+    )
+    assert start_code == 0, started
+    item_code, item = waapi_gateway.execute_gateway(
+        [
+            "--version", "2021.1", "request-array-item", "object.create",
+            "--schema-digest", contract.schema_digest,
+            "--array-handle", children.handle,
+            "--index", "0", "--shape", "object",
+        ],
+        env=env,
+        client_factory=lambda url: pytest.fail(f"item disclosure connected to {url}"),
+    )
+    assert item_code == 0, item
+    append_code, appended = waapi_gateway.execute_gateway(
+        [
+            "--version", "2021.1", "draft-apply", started["draft"]["draft_id"],
+            "--task-authority", started["task_authority"],
+            "--expected-revision", "1", "--compact", "--facts",
+            "--action", "add_typed_fact", "--fact-action", "append",
+            "--field-handle", children.handle, "--value-type", "object",
+            "--fact-value", item["handle"],
+            "--action", "add_typed_fact", "--fact-action", "map-put",
+            "--field-handle", item["handle"], "--key", "type",
+            "--value-type", "string", "--fact-value", "RandomSequenceContainer",
+            "--action", "add_typed_fact", "--fact-action", "map-put",
+            "--field-handle", item["handle"], "--key", "name",
+            "--value-type", "string", "--fact-value", "Alert",
+        ],
+        env=env,
+        client_factory=lambda url: pytest.fail(f"draft apply connected to {url}"),
+    )
+    assert append_code == 0, appended
+    children_argv = next(
+        row["argv"]
+        for row in item["continuation"]["nested_container_disclosures"]
+        if row["key"] == "children"
+    )
+    child_code, child_array = waapi_gateway.execute_gateway(
+        ["--version", "2021.1", *children_argv],
+        env=env,
+        client_factory=lambda url: pytest.fail(f"child disclosure connected to {url}"),
+    )
+    assert child_code == 0, child_array
+    put_code, put = waapi_gateway.execute_gateway(
+        [
+            "--version", "2021.1", "draft-apply", started["draft"]["draft_id"],
+            "--task-authority", started["task_authority"],
+            "--expected-revision", str(appended["draft"]["revision"]),
+            "--compact", "--facts",
+            *child_array["continuation"]["deferred_fact"]["argv"],
+        ],
+        env=env,
+        client_factory=lambda url: pytest.fail(f"parent fact connected to {url}"),
+    )
+    assert put_code == 0, put
+    continuation = put["draft"]["action_result"]["construction_continuation"]
+    assert continuation["resume_previous_container_response"] == {
+        "contract": "waapi-skill.typed-container-handle/v1",
+        "response_handle": child_array["handle"],
+        "completed_candidate": "deferred_fact_queue",
+        "decision_pointer": "/continuation/next_command_decision/evaluate_in_order",
+        "selection": "first_remaining_business_present_candidate_in_order",
+        "continue_in_same_turn": True,
+    }
+    binding = put["draft"]["next_action_binding"]
+    assert binding["resume_previous_container_response"] == continuation[
+        "resume_previous_container_response"
+    ]
+    assert "root_dynamic_disclosure_commands" not in binding
+    assert "next_phase_decision" not in binding
 
 
 def test_public_object_create_draft_start_uses_the_dedicated_typed_contract(

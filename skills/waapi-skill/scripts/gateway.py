@@ -4200,11 +4200,23 @@ def typed_topic_contract_payload(contract: Any) -> dict[str, Any]:
     payload.pop("top_level_fact_plan", None)
     payload["fields"] = contract.gateway_field_table()
     payload["input_shape"] = "typed-facts"
+    dynamic_commands: dict[str, str] = {}
+    for field in contract.fields:
+        fact_construction = field.as_dict().get("fact_construction", {})
+        if not isinstance(fact_construction, Mapping):
+            continue
+        if fact_construction.get("complex_member_disclosure") == (
+            "request-map-container"
+        ):
+            dynamic_commands["map_value"] = "request-map-container"
+        if fact_construction.get("complex_item_disclosure") == "request-array-item":
+            dynamic_commands["array_item"] = "request-array-item"
     payload["continuation"] = {
-        "dynamic_container_commands": {
-            "map_value": "request-map-container",
-            "array_item": "request-array-item",
-        },
+        **(
+            {"dynamic_container_commands": dynamic_commands}
+            if dynamic_commands
+            else {}
+        ),
         "request_key": contract.uri,
     }
     return payload
@@ -13348,6 +13360,22 @@ def _operation_draft_compact_action_projection(
         }
         if isinstance(key, str):
             continuation["current_key"] = key
+        if fact_action == "map-put" and dynamic_value is not None:
+            continuation["next_rule"] = (
+                "resume_previous_container_response_after_deferred_fact_queue"
+            )
+            continuation["resume_previous_container_response"] = {
+                "contract": "waapi-skill.typed-container-handle/v1",
+                "response_handle": dynamic_value,
+                "completed_candidate": "deferred_fact_queue",
+                "decision_pointer": (
+                    "/continuation/next_command_decision/evaluate_in_order"
+                ),
+                "selection": (
+                    "first_remaining_business_present_candidate_in_order"
+                ),
+                "continue_in_same_turn": True,
+            }
         action_result["construction_continuation"] = continuation
     if action.get("fact_action") == "choose" and isinstance(
         action.get("value"), str
@@ -13757,6 +13785,24 @@ def operation_draft_payload(
                 if isinstance(action_result, Mapping)
                 else None
             )
+            resume_previous = (
+                construction_continuation.get(
+                    "resume_previous_container_response"
+                )
+                if isinstance(construction_continuation, Mapping)
+                else None
+            )
+            if isinstance(resume_previous, Mapping):
+                for stale_key in (
+                    "typed_fact_batch_discipline",
+                    "selected_branch_fact_completion",
+                    "root_dynamic_disclosure_commands",
+                    "next_phase_decision",
+                ):
+                    next_action_binding.pop(stale_key, None)
+                next_action_binding["resume_previous_container_response"] = dict(
+                    resume_previous
+                )
             if compact_actions is not None and not isinstance(
                 construction_continuation, Mapping
             ):

@@ -271,6 +271,134 @@ def test_compact_generic_typed_fact_receipt_accepts_closed_construction_continua
     assert summary["target_count"] == 1
 
 
+def test_compact_generic_typed_fact_receipt_accepts_exact_container_resume() -> None:
+    resume = {
+        "contract": "waapi-skill.typed-container-handle/v1",
+        "response_handle": "trm1-111111111111111111111111",
+        "completed_candidate": "deferred_fact_queue",
+        "decision_pointer": "/continuation/next_command_decision/evaluate_in_order",
+        "selection": "first_remaining_business_present_candidate_in_order",
+        "continue_in_same_turn": True,
+    }
+    payload = {
+        "action_result": {
+            "contract": "waapi-skill.operation-draft-action-result/v1",
+            "action": "add_typed_fact",
+            "created_handles": ["tdh1-c12aa1ea49a4d727357b105b"],
+            "affected_handles": ["trm1-4dedc2c7c0aea1301b0d773f"],
+            "construction_continuation": {
+                "source": "most_recent_typed_container_handle_response",
+                "response_was_complete_not_truncated": True,
+                "current_handle": "trm1-4dedc2c7c0aea1301b0d773f",
+                "completed_fact_action": "map-put",
+                "next_rule": (
+                    "resume_previous_container_response_after_deferred_fact_queue"
+                ),
+                "stop_cancel_or_claim_truncation_before_current_root_is_complete": (
+                    "invalid"
+                ),
+                "current_key": "children",
+                "resume_previous_container_response": resume,
+            },
+        },
+        "current_facts_summary": {
+            "contract": "waapi-skill.operation-draft-facts-summary/v1",
+            "target_count": 1,
+            "handle_count": 1,
+            "canonical_sha256": "1" * 64,
+        },
+        "next_action_binding": {
+            "contract": "waapi-skill.operation-draft-next-action/v1",
+            "shell_tool_timeout_ms": 30_000,
+            "fixed_argv_prefix": [
+                "python", "/owned/run.py", "gateway.py", "draft-apply",
+                "od1-0123456789abcdef0123456789abcdef",
+                "--task-authority",
+                "da1-0123456789abcdef0123456789abcdef01234567",
+                "--expected-revision", "2", "--compact", "--facts",
+            ],
+            "append_one_or_more_complete_typed_actions": [
+                "--action", "<action-name>", "<typed-fact-arguments>",
+            ],
+            "replace_only": ["<action-name>", "<typed-fact-arguments>"],
+            "resume_previous_container_response": resume,
+        },
+    }
+
+    action, created, affected, summary = broker_module._draft_compact_action_result(
+        payload
+    )
+
+    assert action == "add_typed_fact"
+    assert created == {"tdh1-c12aa1ea49a4d727357b105b"}
+    assert affected == {"trm1-4dedc2c7c0aea1301b0d773f"}
+    assert summary["canonical_sha256"] == "1" * 64
+
+
+def test_compact_generic_typed_fact_receipt_rejects_misbound_container_resume() -> None:
+    resume = {
+        "contract": "waapi-skill.typed-container-handle/v1",
+        "response_handle": "trm1-111111111111111111111111",
+        "completed_candidate": "deferred_fact_queue",
+        "decision_pointer": "/continuation/next_command_decision/evaluate_in_order",
+        "selection": "first_remaining_business_present_candidate_in_order",
+        "continue_in_same_turn": True,
+    }
+    payload = {
+        "action_result": {
+            "contract": "waapi-skill.operation-draft-action-result/v1",
+            "action": "add_typed_fact",
+            "created_handles": ["tdh1-c12aa1ea49a4d727357b105b"],
+            "affected_handles": ["trm1-4dedc2c7c0aea1301b0d773f"],
+            "construction_continuation": {
+                "source": "most_recent_typed_container_handle_response",
+                "response_was_complete_not_truncated": True,
+                "current_handle": "trm1-4dedc2c7c0aea1301b0d773f",
+                "completed_fact_action": "map-put",
+                "next_rule": (
+                    "resume_previous_container_response_after_deferred_fact_queue"
+                ),
+                "stop_cancel_or_claim_truncation_before_current_root_is_complete": (
+                    "invalid"
+                ),
+                "current_key": "children",
+                "resume_previous_container_response": resume,
+            },
+        },
+        "current_facts_summary": {
+            "contract": "waapi-skill.operation-draft-facts-summary/v1",
+            "target_count": 1,
+            "handle_count": 1,
+            "canonical_sha256": "1" * 64,
+        },
+        "next_action_binding": {
+            "contract": "waapi-skill.operation-draft-next-action/v1",
+            "shell_tool_timeout_ms": 30_000,
+            "fixed_argv_prefix": [
+                "python", "/owned/run.py", "gateway.py", "draft-apply",
+                "od1-0123456789abcdef0123456789abcdef",
+                "--task-authority",
+                "da1-0123456789abcdef0123456789abcdef01234567",
+                "--expected-revision", "2", "--compact", "--facts",
+            ],
+            "append_one_or_more_complete_typed_actions": [
+                "--action", "<action-name>", "<typed-fact-arguments>",
+            ],
+            "replace_only": ["<action-name>", "<typed-fact-arguments>"],
+            "resume_previous_container_response": {
+                **resume,
+                "response_handle": "trm1-222222222222222222222222",
+            },
+        },
+    }
+
+    with pytest.raises(
+        GatewayInvocationError,
+        match="compact Draft action response has an invalid bounded projection",
+    ):
+        broker_module._draft_compact_action_result(payload)
+
+
 @pytest.mark.parametrize(
     ("key", "value"),
     (

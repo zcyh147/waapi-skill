@@ -2162,7 +2162,7 @@ def _valid_draft_construction_continuation(
         "stop_cancel_or_claim_truncation_before_current_root_is_complete",
     }
     if not required.issubset(value) or not set(value).issubset(
-        required | {"current_key"}
+        required | {"current_key", "resume_previous_container_response"}
     ):
         return False
     current_handle = value.get("current_handle")
@@ -2181,6 +2181,30 @@ def _valid_draft_construction_continuation(
     }
     current_key = value.get("current_key")
     key_required = completed_fact_action in {"map-put", "choose-dynamic"}
+    resume = value.get("resume_previous_container_response")
+    resume_valid = resume is None or (
+        completed_fact_action == "map-put"
+        and isinstance(resume, Mapping)
+        and set(resume)
+        == {
+            "contract",
+            "response_handle",
+            "completed_candidate",
+            "decision_pointer",
+            "selection",
+            "continue_in_same_turn",
+        }
+        and resume.get("contract") == "waapi-skill.typed-container-handle/v1"
+        and isinstance(resume.get("response_handle"), str)
+        and str(resume["response_handle"]).startswith("trm1-")
+        and _DRAFT_HANDLE_RE.fullmatch(str(resume["response_handle"])) is not None
+        and resume.get("completed_candidate") == "deferred_fact_queue"
+        and resume.get("decision_pointer")
+        == "/continuation/next_command_decision/evaluate_in_order"
+        and resume.get("selection")
+        == "first_remaining_business_present_candidate_in_order"
+        and resume.get("continue_in_same_turn") is True
+    )
     try:
         key_valid = (
             isinstance(current_key, str)
@@ -2197,12 +2221,66 @@ def _valid_draft_construction_continuation(
         and _DRAFT_HANDLE_RE.fullmatch(current_handle) is not None
         and current_handle in {*created_handles, *affected_handles}
         and completed_fact_action in expected_rules
-        and value.get("next_rule") == expected_rules.get(completed_fact_action)
+        and value.get("next_rule")
+        == (
+            "resume_previous_container_response_after_deferred_fact_queue"
+            if resume is not None
+            else expected_rules.get(completed_fact_action)
+        )
         and value.get(
             "stop_cancel_or_claim_truncation_before_current_root_is_complete"
         )
         == "invalid"
         and (key_valid if key_required else "current_key" not in value)
+        and resume_valid
+    )
+
+
+def _valid_draft_resume_action_binding(
+    value: Any,
+    *,
+    construction_continuation: Any,
+) -> bool:
+    if not isinstance(construction_continuation, Mapping):
+        return True
+    resume = construction_continuation.get("resume_previous_container_response")
+    if resume is None:
+        return True
+    if (
+        not isinstance(value, Mapping)
+        or set(value)
+        != {
+            "contract",
+            "shell_tool_timeout_ms",
+            "fixed_argv_prefix",
+            "append_one_or_more_complete_typed_actions",
+            "replace_only",
+            "resume_previous_container_response",
+        }
+        or value.get("contract")
+        != "waapi-skill.operation-draft-next-action/v1"
+        or value.get("shell_tool_timeout_ms") != GATEWAY_SHELL_TOOL_TIMEOUT_MS
+        or value.get("resume_previous_container_response") != resume
+        or value.get("append_one_or_more_complete_typed_actions")
+        != ["--action", "<action-name>", "<typed-fact-arguments>"]
+        or value.get("replace_only")
+        != ["<action-name>", "<typed-fact-arguments>"]
+        or not isinstance(value.get("fixed_argv_prefix"), list)
+    ):
+        return False
+    prefix = value["fixed_argv_prefix"]
+    return (
+        len(prefix) == 11
+        and all(isinstance(token, str) and token for token in prefix)
+        and prefix[0] == "python"
+        and prefix[2:4] == ["gateway.py", "draft-apply"]
+        and _DRAFT_ID_RE.fullmatch(prefix[4]) is not None
+        and prefix[5] == "--task-authority"
+        and _DRAFT_AUTHORITY_RE.fullmatch(prefix[6]) is not None
+        and prefix[7] == "--expected-revision"
+        and prefix[8].isdigit()
+        and int(prefix[8]) > 0
+        and prefix[9:] == ["--compact", "--facts"]
     )
 
 
@@ -2301,6 +2379,10 @@ def _draft_compact_action_result(
             and not _valid_draft_completion_candidate(
                 next_action_binding.get("completion_candidate")
             )
+        )
+        or not _valid_draft_resume_action_binding(
+            next_action_binding,
+            construction_continuation=result.get("construction_continuation"),
         )
         or "current_facts" in draft
     ):
@@ -9525,6 +9607,34 @@ class CodexGatewayBroker:
             )
             if compact_result is not None:
                 result_action, _created, affected, summary = compact_result
+                action_result = response_draft.get("action_result")
+                construction_continuation = (
+                    action_result.get("construction_continuation")
+                    if isinstance(action_result, Mapping)
+                    else None
+                )
+                resume_previous = (
+                    construction_continuation.get(
+                        "resume_previous_container_response"
+                    )
+                    if isinstance(construction_continuation, Mapping)
+                    else None
+                )
+                expected_last_action = (
+                    expected_replay_actions[-1]
+                    if expected_replay_actions
+                    else {}
+                )
+                resume_matches = resume_previous is None or (
+                    isinstance(resume_previous, Mapping)
+                    and expected_last_action.get("fact_action") == "map-put"
+                    and resume_previous.get("response_handle")
+                    == expected_last_action.get("value")
+                    and construction_continuation.get("current_handle")
+                    == expected_last_action.get("field_handle")
+                    and construction_continuation.get("current_key")
+                    == expected_last_action.get("key")
+                )
                 expected_affected = {
                     value
                     for action in expected_replay_actions
@@ -9535,6 +9645,7 @@ class CodexGatewayBroker:
                 projected_handles = _draft_projection_handles(projected_facts)
                 compact_matches = (
                     not remaining_handles
+                    and resume_matches
                     and result_action
                     == ("batch" if len(action_names) > 1 else action_names[0])
                     and affected == expected_affected

@@ -366,7 +366,6 @@ def test_topic_schema_discloses_one_typed_continuation_offline(tmp_path: Path) -
         payload["event_match"]["schema_digest"],
     ]
     assert payload["event_match"]["continuation"]["dynamic_container_commands"] == {
-        "map_value": "request-map-container",
         "array_item": "request-array-item",
     }
     serialized = json.dumps(payload, sort_keys=True)
@@ -403,6 +402,7 @@ def test_scalar_topic_array_does_not_advertise_container_disclosure(
             "must_not_accompany": ["append"],
         },
     }
+    assert "dynamic_container_commands" not in payload["options"]["continuation"]
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
