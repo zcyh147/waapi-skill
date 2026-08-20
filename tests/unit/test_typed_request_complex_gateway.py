@@ -1329,9 +1329,10 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     assert root_projected["response_integrity"] == {
         "complete": True,
         "truncated": False,
-        "projection": "compact_lossless_container_contract",
-        "continue_with_returned_continuation": True,
     }
+    assert root_encoded.index('"response_integrity":{') < root_encoded.index(
+        '"continuation":{'
+    ) < root_encoded.index('"child_contract":{')
     assert list(root_projected["continuation"])[:4] == [
         "next_command_decision",
         "root_fact_queue_anchor",
@@ -1389,6 +1390,9 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     assert projected["handle"] == leaf["handle"]
     assert projected["schema_lineage_token"] == leaf["schema_lineage_token"]
     assert projected["response_integrity"] == root_projected["response_integrity"]
+    assert encoded.index('"response_integrity":{') < encoded.index(
+        '"continuation":{'
+    ) < encoded.index('"child_contract":{')
     assert projected["child_contract"]["fixed_scalar_member_fact_table"] == (
         leaf["child_contract"]["fixed_scalar_member_fact_table"]
     )

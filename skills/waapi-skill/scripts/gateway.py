@@ -2268,17 +2268,19 @@ def gateway_stdout_payload(value: Any) -> Any:
             "schema_lineage_authority",
             "construction_state",
             "session_context",
+            "child_contract",
+            "continuation",
+            "response_integrity",
         }
     }
     projected["response_integrity"] = {
         "complete": True,
         "truncated": False,
-        "projection": "compact_lossless_container_contract",
-        "continue_with_returned_continuation": True,
     }
     raw_child_contract = value.get("child_contract")
+    projected_child_contract: dict[str, Any] | None = None
     if isinstance(raw_child_contract, Mapping):
-        projected["child_contract"] = {
+        projected_child_contract = {
             key: item
             for key, item in raw_child_contract.items()
             if key not in {"fact_literal_policy", "fixed_container_members"}
@@ -2365,6 +2367,8 @@ def gateway_stdout_payload(value: Any) -> Any:
             continue
         continuation[key] = item
     projected["continuation"] = continuation
+    if projected_child_contract is not None:
+        projected["child_contract"] = projected_child_contract
     return projected
 
 
