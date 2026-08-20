@@ -124,6 +124,7 @@ from wwise_waapi.typed_requests import (  # noqa: E402  # pyright: ignore[report
     dynamic_array_item_choices,
     dynamic_array_item_handle,
     dynamic_container_disclosure,
+    dynamic_fixed_container_members,
     dynamic_map_container_choices,
     dynamic_map_entry_handle,
     materialize_typed_request,
@@ -4805,6 +4806,81 @@ def _next_array_sibling_disclosure(
     return {"business_sibling_transition": transition}
 
 
+def _next_map_sibling_disclosure(
+    args: argparse.Namespace,
+    *,
+    contract: TypedRequestContract,
+    parent_schema: Mapping[str, Any] | None,
+    parent_section: str | None,
+    current_business_value_pointer: str | None,
+) -> dict[str, Any]:
+    """Expose the next schema-ordered complex member after one map branch."""
+
+    if (
+        args.command != "request-map-container"
+        or args.parent_schema_token is None
+        or parent_schema is None
+        or parent_section is None
+        or current_business_value_pointer is None
+    ):
+        return {}
+    members = dynamic_fixed_container_members(
+        contract,
+        parent_schema=parent_schema,
+        parent_section=parent_section,
+    )
+    current_indexes = tuple(
+        index
+        for index, row in enumerate(members)
+        if row.get("key") == args.key and row.get("shape") == args.shape
+    )
+    if len(current_indexes) != 1:
+        return {}
+    for row in members[current_indexes[0] + 1 :]:
+        key = row.get("key")
+        shape = row.get("shape")
+        if not isinstance(key, str) or shape not in {"object", "array"}:
+            continue
+        if not dynamic_map_container_choices(
+            contract,
+            map_handle=args.map_handle,
+            key=key,
+            shape=shape,
+            parent_schema=parent_schema,
+            parent_section=parent_section,
+        ):
+            continue
+        return {
+            "business_sibling_transition": {
+                "condition": "current_business_request_contains_next_complex_member",
+                "business_value_pointer": (
+                    f"{current_business_value_pointer.rsplit('/', 1)[0]}/"
+                    f"{key.replace('~', '~0').replace('/', '~1')}"
+                ),
+                "key": key,
+                "after": "current_branch_descendant_disclosures",
+                "must_precede": "current_root_deferred_facts",
+                "absent_member_forbidden": True,
+                "is_next_command": True,
+                "argv_by_shape": {
+                    shape: [
+                        "request-map-container",
+                        args.api,
+                        "--map-handle",
+                        args.map_handle,
+                        "--key",
+                        key,
+                        "--shape",
+                        shape,
+                        "--parent-schema-token",
+                        args.parent_schema_token,
+                    ]
+                },
+            }
+        }
+    return {}
+
+
 def _root_dynamic_disclosure_commands(
     contract: TypedRequestContract,
 ) -> dict[str, Any]:
@@ -5452,6 +5528,11 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             child_contract=child_contract,
             lineage_token=lineage_token,
         )
+        if branch_continuation:
+            # A branch response owns the sole next container command. Direct
+            # schema siblings are disclosed by the selected branch response,
+            # after the Gateway has revalidated that exact parent lineage.
+            nested_container_disclosures = []
         next_item_disclosure = _next_array_item_disclosure(
             args,
             contract=contract,
@@ -5465,6 +5546,14 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             parent_section=parent_section,
             current_business_value_pointer=current_business_value_pointer,
         )
+        if not next_sibling_disclosure:
+            next_sibling_disclosure = _next_map_sibling_disclosure(
+                args,
+                contract=contract,
+                parent_schema=parent_schema,
+                parent_section=parent_section,
+                current_business_value_pointer=current_business_value_pointer,
+            )
         deferred_fact = _deferred_dynamic_fact_payload(
             fact,
             draft_shape=draft_shape,

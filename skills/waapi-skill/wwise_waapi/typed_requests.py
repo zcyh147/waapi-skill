@@ -177,6 +177,7 @@ class TypedFieldContract:
     fixed_map_keys: tuple[str, ...] = ()
     variant_groups: tuple[tuple[Mapping[str, Any], ...], ...] = ()
     branch_keyword: str | None = None
+    description: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -287,6 +288,8 @@ class TypedFieldContract:
         )
         if patterns:
             payload["patterns"] = patterns
+        if self.description is not None:
+            payload["description"] = self.description
         if self.shape == "array":
             payload["minimum_items"] = self.minimum_items
             payload["maximum_items"] = self.maximum_items
@@ -1802,6 +1805,26 @@ def dynamic_container_disclosure(
         ),
         "schema_lineage": dict(schema),
     }
+
+
+def dynamic_fixed_container_members(
+    contract: TypedRequestContract,
+    *,
+    parent_schema: Mapping[str, Any],
+    parent_section: str,
+) -> tuple[dict[str, Any], ...]:
+    """Return direct complex members from one revalidated dynamic parent."""
+
+    root_schema = contract.schema_roots.get(parent_section)
+    if root_schema is None:
+        raise TypedRequestError("Dynamic container section is unknown")
+    return tuple(
+        _fixed_container_members(
+            parent_schema,
+            root_schema=root_schema,
+            graph=contract.definition_graph,
+        )
+    )
 
 
 def _dynamic_map_branch_payloads(
@@ -3996,6 +4019,13 @@ def _collect_object_fields(
                     label=f"{name}.maxItems",
                 ),
                 unique_items=child.get("uniqueItems") is True,
+                description=(
+                    str(child["description"])
+                    if isinstance(child.get("description"), str)
+                    and child["description"]
+                    and child.get("x-discloseDescription") is True
+                    else None
+                ),
             )
         )
 

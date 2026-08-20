@@ -41,6 +41,7 @@ from tests.semantic.support.codex_media_pool_runtime_v3 import (
     WINE_Z_DRIVE_TARGET,
 )
 from tests.semantic.support.codex_gateway_broker import (
+    DraftTypedActionBatchArgument,
     ExpectedGatewayStep,
     MetadataTokenProjection,
 )
@@ -1332,12 +1333,15 @@ def test_typed_profile_set03_builds_schema_first_metadata_protocol(
     binding = next(
         candidate
         for step in protocol.steps
+        for argument in (None, *step.arguments)
         for candidate in (
-            step.metadata_binding,
-            *(
-                getattr(argument, "metadata_binding", None)
-                for argument in step.arguments
-            ),
+            (step.metadata_binding,)
+            if argument is None
+            else (
+                tuple(action.metadata_binding for action in argument.actions)
+                if isinstance(argument, DraftTypedActionBatchArgument)
+                else (getattr(argument, "metadata_binding", None),)
+            )
         )
         if candidate is not None
     )
@@ -1692,11 +1696,15 @@ def test_compound_object_protocol_binds_volume_to_trusted_live_metadata(
     )
     if metadata_binding is None:
         metadata_binding = next(
-            argument.metadata_binding
+            candidate
             for step in protocol.steps
             for argument in step.arguments
-            if hasattr(argument, "metadata_binding")
-            and argument.metadata_binding is not None
+            for candidate in (
+                tuple(action.metadata_binding for action in argument.actions)
+                if isinstance(argument, DraftTypedActionBatchArgument)
+                else (getattr(argument, "metadata_binding", None),)
+            )
+            if candidate is not None
         )
     assert metadata_binding.object_type == object_type
     assert metadata_binding.required_tokens == ("Volume",)

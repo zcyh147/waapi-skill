@@ -965,8 +965,10 @@ class DraftActionResponseBinding:
                     self.response_pointer.startswith("/draft/current_facts/")
                     and self.response_pointer.endswith("/handle")
                 )
-                or self.response_pointer
-                == "/draft/action_result/created_handles/0"
+                or re.fullmatch(
+                    r"/draft/action_result/created_handles/(0|[1-9][0-9]*)",
+                    self.response_pointer,
+                )
                 or self.response_pointer == "/handle"
                 or re.fullmatch(r"/choices/(0|[1-9][0-9]*)/handle", self.response_pointer)
                 or re.fullmatch(
@@ -1237,7 +1239,7 @@ class DraftTypedActionArgument:
 
 @dataclass(frozen=True, slots=True)
 class DraftTypedActionBatchArgument:
-    """One atomic ordered batch of generic typed Draft facts."""
+    """One atomic ordered batch of independent typed Draft actions."""
 
     actions: tuple[DraftTypedActionArgument, ...]
 
@@ -1247,14 +1249,13 @@ class DraftTypedActionBatchArgument:
             or not 2 <= len(self.actions) <= MAX_TYPED_ACTIONS_PER_APPLY
             or any(
                 not isinstance(action, DraftTypedActionArgument)
-                or action.expected.get("action") != "add_typed_fact"
                 or action.query_identity_bindings
                 for action in self.actions
             )
             or len({action.operation for action in self.actions}) != 1
         ):
             raise ValueError(
-                "DraftTypedActionBatchArgument requires 2-6 ordered generic facts"
+                "DraftTypedActionBatchArgument requires 2-6 ordered independent actions"
             )
 
     @property

@@ -41,7 +41,7 @@ After a selected-subset gate, choose one first transaction-contract branch:
 | A named operation using only closed schema fields and side effects | its named `operation-schema` directly |
 | A known native URI without a named route | `request-schema <uri>` and follow its sole typed continuation |
 
-For direct `audio.import`, schema owns fixed fields and Event/Switch Assignation; metadata selects dynamic tokens and `draft-check` revalidates them. Table imports start `operation-schema audio.importTabDelimited`; dynamic columns stay metadata-first. Use `operations` only for inventory. Dedicated operations own their URIs; exact reflected routes start with `request-schema`. Undo Group uses only `waapi.undoGroup`.
+For direct `audio.import`, schema owns fixed fields and Event/Switch Assignation; metadata selects dynamic tokens and `draft-check` revalidates them. Table imports start `operation-schema audio.importTabDelimited`; dynamic columns stay metadata-first. Use `operations` only for inventory, `request-schema` for exact reflected routes, and `waapi.undoGroup` for Undo Group.
 
 Follow the schema's sole `input_mode`. No schema-to-preview shortcut. Reuse evidence-bound live property/reference accessors: remove one leading `@` (`@Foo` becomes `Foo`); `OutputBus` remains `OutputBus`; never infer a token. For `inline_typed`, run only the returned `typed-operation` continuation; Gateway owns the complete request and Preview. For `composer`, run `composer.start.gateway_argv`, then only the selected `action_argv`; Gateway serializes and `draft-check` validates metadata. Start `object.set` rows with `add_target --target ...`. Start every `audio.import` row with one `add_import_row`: include `--assignment none`, or `--assignment switch VALUE` only when requested. Corrections keep the same draft; run its `preview-from-draft` unchanged. `--apply` marks a preview, not execution. Exact reflected URIs use `request-schema`; follow its sole typed continuation.
 
@@ -93,7 +93,7 @@ Existing-root status alone does not select `object.set`. One object's single ren
 
 When the user gives one Bank's complete desired final inclusion set, use one `soundbank.setInclusions` `replace` transaction: omitted existing rows such as Debug rows are removed without being named individually, and every other Bank remains outside that transaction. Do not split that final-state request into `add` and `remove` transactions.
 
-When one workflow first saves exact inclusions and then generates that same Bank, the verified saved Bank is the generation input. The later `soundbank.generate` item names the Bank and its artifact expectation; do not repeat the earlier Event identities or inclusion filters inside it. Preserve the requested platforms/languages. For connected-Authoring generation, `io_root` is the caller-trusted absolute ancestor that contains the active project, its cache, and every requested platform Bank/media destination. A narrower release-output directory is not automatically that root. Use an explicitly supplied trusted root unchanged; when none is available, ask for one instead of guessing or silently broadening confinement.
+When saved inclusions precede generation, the verified Bank is the input; generation repeats only Bank/artifact expectation and preserves platforms/languages. Its `io_root` is the supplied trusted absolute ancestor of project, cache, and every platform Bank/media destination—not merely an output folder. Reuse it unchanged or ask for one.
 
 Batch size alone never establishes file-workflow intent. If a table workflow is explicit but no caller-owned TSV exists, ask for it instead of creating one. Keep an import's requested Event or Switch side effect inside that same `audio.import` transaction. If saved inclusions and artifact generation are both requested, use two ordered transactions under the current policy.
 
@@ -129,9 +129,9 @@ For `object.create`, `object.set`, and direct `audio.import`, read the named sch
 
 The operation preview performs final live typed validation and remains authoritative. Do not add a separate property-info check for a token already proved in the visible conversation, and never inspect metadata-cache files.
 
-For direct imports, discover only requested dynamic `properties[]`/`references[]`; for table imports, only dynamic `Property[...]`, `Reference[...]`, or `@...` columns. Fixed fields and side effects never trigger discovery. `Notes` and `Audio Source Notes` are fixed import columns, not Sound metadata queries; Event, Dialogue Event, and Switch Assignation are schema-owned too. Requested infinite looping needs separate “looping enabled” and “looping infinite” phrases; per-object limits need separate “ignore parent playback limit”, “sound instance limit enabled”, and “maximum sound instances” phrases; `volume` and `output bus` are other concepts. These are search phrases, not permission to guess tokens.
+For direct imports, discover only requested dynamic `properties[]`/`references[]`; for table imports, only dynamic `Property[...]`, `Reference[...]`, or `@...` columns. Fixed fields and side effects never trigger discovery: `Notes` and `Audio Source Notes` are fixed import columns, not Sound metadata queries; Event, Dialogue Event, and Switch Assignation are schema-owned too. Search each looping, playback-limit, volume, and output-bus concept separately; phrases never authorize guessed tokens.
 
-For a user-supplied existing Lua file in connected Authoring, select the named `lua.executeCoreFile` operation. `lua.executeCliFile` is only the explicit WwiseConsole/CLI file route; there is no `lua.executeFile` operation. Read the named operation schema and follow its Composer continuation without renaming it.
+For a user-supplied Lua file, use `lua.executeCoreFile` in Authoring or `lua.executeCliFile` only for explicit Console/CLI; there is no `lua.executeFile` operation. Follow the named schema unchanged.
 
 ### Compact import and value rules
 
@@ -206,7 +206,7 @@ Normal prose covers only objects, changes, results, risks, and whether anything 
 
 ## Continue only from Gateway-owned commands
 
-The user's current intent authorizes an action; transaction state only constrains which actions are legal. For every later phase, execute only the field named by `next_command.copy_instruction.source_field`. Require the complete instruction and named field, then copy that entire string verbatim as one shell tool call, including `python`, the absolute launcher path, `gateway.py`, id, and token. Windows v2 normally selects the short `model_command`; its encoded `shell_command` remains an audit/fallback representation and is executable only when the complete instruction explicitly names it. Do not render diagnostic `full_argv`, choose another field, re-quote, shorten, normalize, or rebuild any path/token segment. If output truncation leaves a command field without the complete instruction and selected final source, stop; never infer fallback from the visible field.
+User intent authorizes; transaction state only constrains legality. For every later phase, execute only the field named by `next_command.copy_instruction.source_field`, copying the complete string verbatim once. Windows normally selects `model_command`; encoded `shell_command` is audit/fallback unless explicitly selected. Do not render diagnostic `full_argv` or rebuild any segment. Truncated/incomplete instructions stop without inferred fallback.
 
 Treat every phase as separately gated and inspect its complete JSON before the next:
 
@@ -230,11 +230,11 @@ Each later intended change still creates its own executable preview; completing 
 - `verification_deferred`: a later user-requested verify is safe; never re-execute.
 - `verification_failed`, `repreview_required`, `execution_cancelled`, or a structured boundary: report the actual failure/next decision without claiming completion or retrying mutation.
 - `execution_succeeded_persistence_failed`: WAAPI reported execution but the journal failed; preserve the uncertainty and never replay automatically.
-- `indeterminate`: execution may have reached Wwise. Stop immediately after the complete execute JSON. Do not verify, retry, call another Gateway route, inspect files/evidence, or perform any follow-up tool action. A later diagnosis needs a new user request and a packaged read-only route.
+- `indeterminate`: execution may have reached Wwise. Do not verify, retry, call another Gateway route, or use another tool. A later diagnosis needs a new user request and a packaged read-only route.
 
-`ak.wwise.cli.migrate` is the narrow exception to normal verify flow. Its one complete `execute` JSON is the terminal Skill boundary even when state says `executed_unverified`. Run no more Agent tools: do not reopen/query the project or inspect `.wproj`, `.wwu`, broker/lifecycle/log/oracle artifacts. Only the caller-owned harness outside the Skill sequence may close Wwise, reopen the migrated project, and establish final business proof.
+`ak.wwise.cli.migrate` ends at complete `execute`, even when `executed_unverified`; run no later Agent tools/reads. Only the caller-owned harness outside the Skill sequence may reopen and prove it.
 
-Managed openers may return a pending or unknown cleanup companion (for example Bank load, Game Object registration, Profiler capture, meter/remote/transport, or UI command registration). Do not hide that obligation or uncertainty. Explain the business cleanup naturally and use only a later packaged transaction when the user authorizes it. Never synthesize cleanup code. Work Unit load/unload is an available reversal, not automatic cleanup; Undo Group cleanup remains inside its same-connection composite.
+Managed openers may leave cleanup uncertain. Report it and use only a later authorized packaged transaction; never synthesize code. Work Unit reversal and same-connection Undo cleanup stay explicit.
 
 For ordinary prose, hide internal ids, hashes, tokens, raw commands, and state labels unless the user requests diagnostics. For an exact machine-readable answer, serialize the successful Gateway `agent_result` verbatim; do not rebuild it from summaries. Failed/deferred/indeterminate payloads have no successful projection and must not be fabricated.
 <!-- WAAPI_OPERATE_REFERENCE_END -->

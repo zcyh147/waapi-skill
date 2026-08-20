@@ -449,13 +449,7 @@ silently dropping an event. Every exit always attempts to unsubscribe and emits
 one terminal NDJSON record. Relay events immediately; do not restart between
 events or wait for the terminal record.
 
-For `ak.wwise.core.soundbank.generated`, the gateway itself keeps the ordinary 10-second omitted-duration default. The Skill must explicitly pass gateway-global `--timeout 120` and tell the user that this subscription will use 120 seconds. This is an explicit Skill-selected timeout, not a different gateway default; a user-supplied positive finite duration or explicit no-time-limit bounded wait still takes precedence. Run `topic-schema` and use its exact typed option handles for the four return fields `id,name,type,path`; set event count to requested
-Bank × platform × language cells. Add typed match facts for `soundbank.name` or
-`platform.name` only when one explicit name is common to all
-cells; otherwise submit no match facts. Never
-discover or inject a GUID for this predicate.
-Use the exact leaf scalar handle when `topic-schema` exposes one (for example
-`soundbank.name`); do not replace that fact with `map-put` on its parent map.
+For `ak.wwise.core.soundbank.generated`, the gateway itself keeps the ordinary 10-second omitted-duration default. The Skill must explicitly pass gateway-global `--timeout 120` and tell the user that this subscription will use 120 seconds. This is an explicit Skill-selected timeout, not a different gateway default; a user-supplied positive finite duration or explicit no-time-limit bounded wait still takes precedence. Run `topic-schema`; use its exact typed option handles for `id,name,type,path`, set event count to Bank × platform × language cells, and match `soundbank.name`/`platform.name` only when one explicit name covers every cell. Otherwise omit matches; never inject a GUID. Use the leaf handle, not its parent map.
 Conversely, use `map-put` only where the schema exposes an open map without a
 leaf scalar. If every requested cell shares one platform, that platform is a
 common explicit name and its typed match fact is required even when the Bank

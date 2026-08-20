@@ -285,28 +285,88 @@ def build_object_set_composer_transaction_steps(
         ),
     ]
     latest_revision_step = f"{label}.draft-start"
-    issued_handle_steps: dict[int, str] = {}
-    for index, (action, identity_bindings) in enumerate(
-        action_specs,
-        start=1,
-    ):
-        action_name = f"{label}.action.{index:03d}"
-        action = dict(action)
-        response_bindings: tuple[DraftActionResponseBinding, ...] = ()
-        parent_handle = action.get("parent_handle")
-        if isinstance(parent_handle, str) and parent_handle.startswith("@action:"):
-            parent_index = int(parent_handle.removeprefix("@action:"))
-            parent_step = issued_handle_steps.get(parent_index)
-            if parent_step is None:
-                raise V3ProtocolError("object.set Composer child parent is unavailable")
-            action.pop("parent_handle")
-            response_bindings = (
-                DraftActionResponseBinding(
-                    "/parent_handle",
-                    parent_step,
-                    "/draft/action_result/created_handles/0",
-                ),
+    issued_handle_bindings: dict[int, tuple[str, str]] = {}
+    action_cursor = 0
+    action_step_index = 0
+    while action_cursor < len(action_specs):
+        available_parent_actions = frozenset(issued_handle_bindings)
+        batch_rows: list[
+            tuple[
+                int,
+                Mapping[str, Any],
+                tuple[DraftActionQueryIdentityBinding, ...],
+            ]
+        ] = []
+        for offset in range(
+            action_cursor,
+            min(len(action_specs), action_cursor + MAX_TYPED_ACTIONS_PER_APPLY),
+        ):
+            action, identity_bindings = action_specs[offset]
+            parent_handle = action.get("parent_handle")
+            parent_index = (
+                int(parent_handle.removeprefix("@action:"))
+                if isinstance(parent_handle, str)
+                and parent_handle.startswith("@action:")
+                else None
             )
+            if parent_index is not None and parent_index not in available_parent_actions:
+                break
+            if identity_bindings and batch_rows:
+                break
+            batch_rows.append((offset + 1, action, identity_bindings))
+            if identity_bindings:
+                break
+        if not batch_rows:
+            raise V3ProtocolError("object.set Composer child parent is unavailable")
+
+        action_step_index += 1
+        action_name = f"{label}.action.{action_step_index:03d}"
+        typed_actions: list[DraftTypedActionArgument] = []
+        created_handle_index = 0
+        for original_index, raw_action, identity_bindings in batch_rows:
+            action = dict(raw_action)
+            response_bindings: tuple[DraftActionResponseBinding, ...] = ()
+            parent_handle = action.get("parent_handle")
+            if isinstance(parent_handle, str) and parent_handle.startswith("@action:"):
+                parent_index = int(parent_handle.removeprefix("@action:"))
+                parent_step, response_pointer = issued_handle_bindings[parent_index]
+                action.pop("parent_handle")
+                response_bindings = (
+                    DraftActionResponseBinding(
+                        "/parent_handle",
+                        parent_step,
+                        response_pointer,
+                    ),
+                )
+            typed_actions.append(
+                DraftTypedActionArgument(
+                    expected=action,
+                    response_bindings=response_bindings,
+                    query_identity_bindings=identity_bindings,
+                    metadata_binding=(
+                        metadata_binding
+                        if action.get("action") == "add_target"
+                        and any(
+                            name in action
+                            for name in ("properties", "references")
+                        )
+                        else None
+                    ),
+                )
+            )
+            if action.get("action") in {"add_target", "add_child"}:
+                issued_handle_bindings[original_index] = (
+                    action_name,
+                    f"/draft/action_result/created_handles/{created_handle_index}",
+                )
+                created_handle_index += 1
+
+        typed_argument: DraftTypedActionArgument | DraftTypedActionBatchArgument
+        typed_argument = (
+            typed_actions[0]
+            if len(typed_actions) == 1
+            else DraftTypedActionBatchArgument(tuple(typed_actions))
+        )
         steps.append(
             ExpectedGatewayStep(
                 name=action_name,
@@ -319,26 +379,12 @@ def build_object_set_composer_transaction_steps(
                     ResponseBinding(latest_revision_step, "/draft/revision"),
                     "--compact",
                     "--facts",
-                    DraftTypedActionArgument(
-                        expected=action,
-                        response_bindings=response_bindings,
-                        query_identity_bindings=identity_bindings,
-                        metadata_binding=(
-                            metadata_binding
-                            if action.get("action") == "add_target"
-                            and any(
-                                name in action
-                                for name in ("properties", "references")
-                            )
-                            else None
-                        ),
-                    ),
+                    typed_argument,
                 ),
             )
         )
-        if action.get("action") in {"add_target", "add_child"}:
-            issued_handle_steps[index] = action_name
         latest_revision_step = action_name
+        action_cursor += len(batch_rows)
     check_name = f"{label}.check"
     preview_name = f"{label}.preview"
     show_name = f"{label}.transaction-show"
@@ -564,12 +610,18 @@ def build_audio_import_composer_transaction_steps(
         ),
     ]
     latest_revision_step = f"{label}.draft-start"
-    for index, (
-        action,
-        action_metadata,
-        response_bindings,
-    ) in enumerate(action_specs, start=1):
-        action_name = f"{label}.action.{index:03d}"
+    for offset in range(0, len(action_specs), MAX_TYPED_ACTIONS_PER_APPLY):
+        batch = tuple(action_specs[offset : offset + MAX_TYPED_ACTIONS_PER_APPLY])
+        action_name = f"{label}.action.{offset // MAX_TYPED_ACTIONS_PER_APPLY + 1:03d}"
+        action_arguments = tuple(
+            DraftTypedActionArgument(
+                expected=action,
+                response_bindings=response_bindings,
+                operation="audio.import",
+                metadata_binding=action_metadata,
+            )
+            for action, action_metadata, response_bindings in batch
+        )
         steps.append(
             ExpectedGatewayStep(
                 name=action_name,
@@ -582,11 +634,10 @@ def build_audio_import_composer_transaction_steps(
                     ResponseBinding(latest_revision_step, "/draft/revision"),
                     "--compact",
                     "--facts",
-                    DraftTypedActionArgument(
-                        expected=action,
-                        response_bindings=response_bindings,
-                        operation="audio.import",
-                        metadata_binding=action_metadata,
+                    (
+                        action_arguments[0]
+                        if len(action_arguments) == 1
+                        else DraftTypedActionBatchArgument(action_arguments)
                     ),
                 ),
             )
@@ -751,16 +802,29 @@ def materialize_audio_import_composer_protocol_request(
         if step.subcommand != "draft-apply":
             continue
         argument = step.arguments[-1] if step.arguments else None
-        if (
-            not isinstance(argument, DraftTypedActionArgument)
-            or argument.operation != "audio.import"
-            or argument.query_identity_bindings
+        action_arguments = (
+            (argument,)
+            if isinstance(argument, DraftTypedActionArgument)
+            else (
+                argument.actions
+                if isinstance(argument, DraftTypedActionBatchArgument)
+                else ()
+            )
+        )
+        if not action_arguments or any(
+            action.operation != "audio.import" or action.query_identity_bindings
+            for action in action_arguments
         ):
             raise V3ProtocolError(
                 "audio.import Composer protocol contains a dynamic action"
             )
-        action_entries.append(
-            (step.name, argument.expected, argument.response_bindings)
+        action_entries.extend(
+            (
+                f"{step.name}.{index:03d}",
+                action.expected,
+                action.response_bindings,
+            )
+            for index, action in enumerate(action_arguments, start=1)
         )
     try:
         return _materialize_audio_import_composer_action_entries(
@@ -977,7 +1041,7 @@ def materialize_typed_transaction_protocol_requests(
             )
         else:
             composition = new_composition(operation, version)
-            issued_handles: dict[str, str] = {}
+            issued_handles: dict[tuple[str, str], str] = {}
 
             def composition_handles(value: Any) -> set[str]:
                 if isinstance(value, Mapping):
@@ -1019,11 +1083,14 @@ def materialize_typed_transaction_protocol_requests(
                 # disclosure response must bind at runtime.  Query-identity
                 # bindings likewise retain the reviewed path form in evidence;
                 # the Broker separately proves the live GUID/path equivalence.
-                prior_handles = composition_handles(composition)
+                created_handle_index = 0
                 for action_argument in action_arguments:
+                    prior_handles = composition_handles(composition)
                     action = dict(action_argument.expected)
                     for binding in action_argument.response_bindings:
-                        bound = issued_handles.get(binding.step)
+                        bound = issued_handles.get(
+                            (binding.step, binding.response_pointer)
+                        )
                         if bound is not None:
                             action[binding.pointer.removeprefix("/")] = bound
                     try:
@@ -1037,13 +1104,22 @@ def materialize_typed_transaction_protocol_requests(
                         raise V3ProtocolError(
                             "typed transaction action cannot be replayed"
                         ) from exc
-                created = sorted(composition_handles(composition) - prior_handles)
-                if len(created) == 1:
-                    issued_handles[step.name] = created[0]
-                elif created and len(action_arguments) == 1:
-                    raise V3ProtocolError(
-                        "typed transaction action created ambiguous handles"
+                    created = sorted(
+                        composition_handles(composition) - prior_handles
                     )
+                    if len(created) == 1:
+                        issued_handles[
+                            (
+                                step.name,
+                                "/draft/action_result/created_handles/"
+                                f"{created_handle_index}",
+                            )
+                        ] = created[0]
+                        created_handle_index += 1
+                    elif created:
+                        raise V3ProtocolError(
+                            "typed transaction action created ambiguous handles"
+                        )
             try:
                 request = materialize_operation_request(
                     operation,
@@ -1319,8 +1395,43 @@ def _build_generic_typed_draft_transaction_steps(
         ],
     ) -> None:
         nonlocal action_step_index, revision_step
-        for offset in range(0, len(rows), MAX_TYPED_ACTIONS_PER_APPLY):
-            batch = tuple(rows[offset : offset + MAX_TYPED_ACTIONS_PER_APPLY])
+        atomic_groups: list[tuple[Any, ...]] = []
+        row_index = 0
+        while row_index < len(rows):
+            row = rows[row_index]
+            fact = row[1]
+            if fact.action != "choose-dynamic":
+                atomic_groups.append((row,))
+                row_index += 1
+                continue
+            if row_index + 1 >= len(rows):
+                raise V3ProtocolError(
+                    "typed Draft dynamic choice is missing its value fact"
+                )
+            paired_row = rows[row_index + 1]
+            paired_fact = paired_row[1]
+            if (
+                paired_fact.action != "map-put"
+                or paired_fact.handle != fact.handle
+                or paired_fact.key != fact.key
+            ):
+                raise V3ProtocolError(
+                    "typed Draft dynamic choice differs from its value fact"
+                )
+            atomic_groups.append((row, paired_row))
+            row_index += 2
+
+        batches: list[tuple[Any, ...]] = []
+        pending: list[Any] = []
+        for group in atomic_groups:
+            if pending and len(pending) + len(group) > MAX_TYPED_ACTIONS_PER_APPLY:
+                batches.append(tuple(pending))
+                pending = []
+            pending.extend(group)
+        if pending:
+            batches.append(tuple(pending))
+
+        for batch in batches:
             action_step_index += 1
             step_name = f"{label}.action.{action_step_index:03d}"
             action_arguments = tuple(

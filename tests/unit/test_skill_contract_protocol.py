@@ -21,6 +21,20 @@ TYPED_INPUT_ADR = (
 ).read_text(encoding="utf-8")
 
 
+def test_skill_entry_stays_within_one_complete_agent_tool_read() -> None:
+    assert len(SKILL.encode("utf-8")) <= 30 * 1024
+
+
+def test_lane_references_stay_within_one_complete_agent_tool_read() -> None:
+    for name, content in {
+        "waapi-query.md": QUERY,
+        "waapi-setup.md": SETUP,
+        "waapi-operate.md": OPERATE,
+        "waapi-coverage.md": COVERAGE,
+    }.items():
+        assert len(content.encode("utf-8")) <= 30 * 1024, name
+
+
 def test_composer_domain_terms_and_architecture_decision_are_frozen() -> None:
     for term in (
         "Business Orchestration",
@@ -1070,11 +1084,11 @@ def test_operate_policy_and_gateway_owned_continuation_are_closed() -> None:
     ) in compact
     assert "On `LOCAL_WAAPI_HOST_REQUIRED`, report and stop" in OPERATE
     assert "execute only the field named by `next_command.copy_instruction.source_field`" in compact
-    assert "copy that entire string verbatim as one shell tool call" in compact
-    assert "normally selects the short `model_command`" in compact
-    assert "encoded `shell_command` remains an audit/fallback representation" in compact
+    assert "copying the complete string verbatim once" in compact
+    assert "Windows normally selects `model_command`" in compact
+    assert "encoded `shell_command` is audit/fallback unless explicitly selected" in compact
     assert "Do not render diagnostic `full_argv`" in compact
-    assert "never infer fallback from the visible field" in compact
+    assert "Truncated/incomplete instructions stop without inferred fallback" in compact
     assert "run `confirm --help`" in compact
     assert "a status/check request stops after `transaction-show`" in compact
     assert "a verify-only request never executes" in compact
@@ -1101,12 +1115,12 @@ def test_operate_terminal_states_migration_and_cleanup_are_fail_closed() -> None
         assert state in OPERATE
     assert "Do not verify, retry, call another Gateway route" in compact
     assert "A later diagnosis needs a new user request" in compact
-    assert "`ak.wwise.cli.migrate` is the narrow exception" in compact
-    assert "Run no more Agent tools" in compact
+    assert "`ak.wwise.cli.migrate` ends at complete `execute`" in compact
+    assert "run no later Agent tools/reads" in compact
     assert "caller-owned harness outside the Skill sequence" in compact
-    assert "Do not hide that obligation or uncertainty" in compact
-    assert "Never synthesize cleanup code" in compact
-    assert "Work Unit load/unload is an available reversal" in compact
+    assert "Managed openers may leave cleanup uncertain" in compact
+    assert "never synthesize code" in compact
+    assert "Work Unit reversal" in compact
     assert "serialize the successful Gateway `agent_result` verbatim" in compact
 
 
@@ -1222,3 +1236,8 @@ def test_named_api_result_uses_status_only_as_preflight() -> None:
     assert "does not replace that independently requested API call" in SKILL
     assert "needs only this `SKILL.md`" in SKILL
     assert "do not read the setup or query reference" in SKILL
+    assert (
+        "Treat the named `getInfo` result's `processId` as the requested live "
+        "process identity" in SKILL
+    )
+    assert "finish from that Gateway evidence without a system process lookup" in SKILL

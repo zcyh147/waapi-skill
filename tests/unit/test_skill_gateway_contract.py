@@ -230,10 +230,10 @@ def test_existing_transaction_continuation_precedes_named_operation_schema() -> 
     assert "transaction-show <transaction-id> --summary-only" in operate
     assert "Do not call `operations`, `operation-schema`, or `request-schema` first" in operate
     assert "execute only the field named by `next_command.copy_instruction.source_field`" in operate
-    assert "copy that entire string verbatim as one shell tool call" in operate
-    assert "normally selects the short `model_command`" in operate
-    assert "encoded `shell_command` remains an audit/fallback representation" in operate
-    assert "never infer fallback from the visible field" in operate
+    assert "copying the complete string verbatim once" in operate
+    assert "Windows normally selects `model_command`" in operate
+    assert "encoded `shell_command` is audit/fallback unless explicitly selected" in operate
+    assert "Truncated/incomplete instructions stop without inferred fallback" in operate
     assert operate.index("## Choose the phase and first Gateway command") < operate.index(
         "## Continue only from Gateway-owned commands"
     )

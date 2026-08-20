@@ -464,20 +464,14 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
         ]
     ] == [
         "branch_disclosure",
-        "nested_container_disclosures",
         "deferred_fact_queue",
         "business_sibling_transition",
     ]
     assert item["continuation"]["next_command_decision"][
         "draft_check_or_cancel_with_remaining_candidate_or_deferred_fact"
     ] == "invalid"
-    nested = item["continuation"]["nested_container_disclosures"]
-    assert [(row["key"], row["shape"]) for row in nested] == [
-        ("filters", "array"),
-    ]
-    assert item["continuation"]["nested_container_order"] == (
-        "branch_then_schema_members_then_descendants_then_facts"
-    )
+    assert "nested_container_disclosures" not in item["continuation"]
+    assert "nested_container_order" not in item["continuation"]
     assert item["continuation"]["request_wide_order"] == {
         "phase": "dynamic_disclosure",
         "root_boundary": "finish_current_root_disclosures_and_facts_before_next_root",
@@ -606,7 +600,31 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
         for row in identity["continuation"]["next_command_decision"][
             "evaluate_in_order"
         ]
-    ] == ["deferred_fact_queue"]
+    ] == ["business_sibling_transition", "deferred_fact_queue"]
+    sibling = identity["continuation"]["business_sibling_transition"]
+    assert sibling["business_value_pointer"] == "/args/inclusions/0/filters"
+    assert sibling["is_next_command"] is True
+    assert sibling["argv_by_shape"] == {
+        "array": [
+            "request-map-container",
+            "soundbank.setInclusions",
+            "--map-handle",
+            item["handle"],
+            "--key",
+            "filters",
+            "--shape",
+            "array",
+            "--parent-schema-token",
+            item["schema_lineage_token"],
+        ]
+    }
+    filters_protocol_disclosure = next(
+        step for step in protocol.steps if step.name == "tx01.disclose.003"
+    )
+    assert tuple(sibling["argv_by_shape"]["array"][1:]) == tuple(
+        resolve_item_binding(value)
+        for value in filters_protocol_disclosure.arguments
+    )
     assert identity["continuation"]["deferred_fact"]["argv"] == [
         "--action", "add_typed_fact", "--fact-action", "map-put",
         "--field-handle", item["handle"], "--value-type", "object",
@@ -875,6 +893,30 @@ def test_soundbank_collection_limits_are_registry_owned_and_disclosed(
 ) -> None:
     contract = draft_operation_request_contract(operation, "2025.1")
     assert _field(contract, path, shape="array").maximum_items == limit
+
+
+def test_generate_public_schema_explains_the_skip_languages_boolean(
+    tmp_path: Path,
+) -> None:
+    code, payload = gateway.execute_gateway(
+        ["--version", "2024.1", "operation-schema", "soundbank.generate"],
+        env=_env(tmp_path, "2024.1"),
+        client_factory=lambda url: pytest.fail(
+            f"operation-schema connected to {url}"
+        ),
+    )
+
+    assert code == 0, payload
+    skip_languages = next(
+        field
+        for field in payload["composer"]["typed_request_fields"]
+        if field["path"] == ["args", "skip_languages"]
+    )
+    assert skip_languages["description"] == (
+        "Batch switch derived from the complete soundbanks[] list: true exactly "
+        "when every SoundBank is nonlocalized, and false when any SoundBank is "
+        "localized or mixed."
+    )
 
 
 def test_generate_identity_collection_limit_is_registry_owned() -> None:

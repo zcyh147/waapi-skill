@@ -31,6 +31,7 @@ from tests.semantic.support.codex_integration_rifle_runtime_v2 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     DraftTypedActionArgument,
+    DraftTypedActionBatchArgument,
     gateway_step_sequence_matches,
 )
 from tests.semantic.support.codex_integration_workflows_v2 import (
@@ -728,7 +729,7 @@ def test_prepares_exact_gateway_checked_use_existing_batch(
         "tx01.execute",
         "tx01.verify",
     )
-    assert prepared.protocol.turn_prefix_counts == (10, 14)
+    assert prepared.protocol.turn_prefix_counts == (6, 10)
     assert prepared.protocol.commutative_read_only_step_groups == (
         ("tx01.operation-schema", "metadata.discover"),
     )
@@ -736,10 +737,6 @@ def test_prepares_exact_gateway_checked_use_existing_batch(
         (
             "metadata.discover",
             "tx01.draft-start",
-            "tx01.action.001",
-            "tx01.action.002",
-            "tx01.action.003",
-            "tx01.action.004",
         ),
     )
     assert METADATA_QUERIES == ("volume", "output bus")
@@ -759,11 +756,14 @@ def test_rifle_composer_preserves_every_exact_import_row(
     version: str,
 ) -> None:
     prepared, _fake, _runtime = _prepared(tmp_path, version=version)
-    action_arguments = [
+    action_containers = [
         step.arguments[-1]
         for step in prepared.protocol.steps
         if step.name.startswith("tx01.action.")
     ]
+    assert len(action_containers) == 1
+    assert isinstance(action_containers[0], DraftTypedActionBatchArgument)
+    action_arguments = list(action_containers[0].actions)
     assert len(action_arguments) == 5
     assert all(
         isinstance(argument, DraftTypedActionArgument)
@@ -877,7 +877,7 @@ def test_rifle_setup_accepts_only_dependency_valid_action_orders(
     version: str,
 ) -> None:
     prepared, _fake, _runtime = _prepared(tmp_path, version=version)
-    canonical = tuple(step.name for step in prepared.protocol.steps[:8])
+    canonical = tuple(step.name for step in prepared.protocol.steps[:4])
     groups = prepared.protocol.commutative_read_only_step_groups
     setup_groups = prepared.protocol.commutative_composer_setup_step_groups
 
@@ -886,10 +886,6 @@ def test_rifle_setup_accepts_only_dependency_valid_action_orders(
         "metadata.discover",
         "tx01.draft-start",
         "tx01.action.001",
-        "tx01.action.002",
-        "tx01.action.003",
-        "tx01.action.004",
-        "tx01.action.005",
     )
     assert gateway_step_sequence_matches(
         canonical, canonical, groups, setup_groups
@@ -908,12 +904,8 @@ def test_rifle_setup_accepts_only_dependency_valid_action_orders(
         (
             "tx01.operation-schema",
             "tx01.draft-start",
-            "tx01.action.001",
-            "tx01.action.002",
             "metadata.discover",
-            "tx01.action.003",
-            "tx01.action.004",
-            "tx01.action.005",
+            "tx01.action.001",
         ),
         groups,
         setup_groups,
@@ -935,10 +927,6 @@ def test_rifle_canonical_setup_round_trips_prompt_provenance(
         [
             "metadata.discover",
             "tx01.draft-start",
-            "tx01.action.001",
-            "tx01.action.002",
-            "tx01.action.003",
-            "tx01.action.004",
         ]
     ]
     assert deserialize_protocol(serialized) == prepared.protocol

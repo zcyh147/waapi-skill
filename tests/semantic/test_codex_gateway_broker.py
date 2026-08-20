@@ -2019,6 +2019,74 @@ def test_broker_executes_one_atomic_generic_typed_draft_batch(
         "action_count": len(batches[0].actions),
         "applied_atomically": True,
     }
+
+
+def test_object_set_protocol_batches_independent_targets_through_public_gateway(
+    tmp_path: Path,
+) -> None:
+    skill = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.set",
+        "arguments": {
+            "objects": [
+                {
+                    "object": {"kind": "path", "value": rf"\Root\Target{index}"},
+                    "notes": f"note-{index}",
+                }
+                for index in range(3)
+            ]
+        },
+    }
+    protocol = build_transaction_protocol((request,))
+    action_steps = tuple(
+        step for step in protocol.steps if step.subcommand == "draft-apply"
+    )
+    assert len(action_steps) == 1
+    batch = action_steps[0].arguments[-1]
+    assert isinstance(batch, DraftTypedActionBatchArgument)
+    assert [action.expected["action"] for action in batch.actions] == [
+        "add_target",
+        "add_target",
+        "add_target",
+    ]
+
+    payloads: dict[str, Mapping[str, object]] = {}
+
+    def pointer(payload: object, value: str) -> object:
+        current = payload
+        for token in value.removeprefix("/").split("/"):
+            assert isinstance(current, (dict, list))
+            current = current[int(token)] if isinstance(current, list) else current[token]
+        return current
+
+    last_action_index = protocol.steps.index(action_steps[0])
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=protocol.steps,
+        expected_wwise_version="2022.1",
+        transport="tcp",
+        working_root=tmp_path / "broker-root",
+    ) as broker:
+        for step in protocol.steps[: last_action_index + 1]:
+            argv: list[str] = [step.subcommand]
+            for argument in step.arguments:
+                if isinstance(argument, ResponseBinding):
+                    argv.append(str(pointer(payloads[argument.step], argument.pointer)))
+                elif isinstance(argument, DraftTypedActionBatchArgument):
+                    for action_argument in argument.actions:
+                        argv.extend(typed_action_cli_arguments(action_argument.expected))
+                else:
+                    assert isinstance(argument, str)
+                    argv.append(argument)
+            result = run_model_command(broker, argv)
+            assert result.returncode == 0, result.stderr
+            payloads[step.name] = json.loads(result.stdout[result.stdout.index("{") :])
+
+    draft = payloads[action_steps[0].name]["draft"]
+    assert isinstance(draft, Mapping)
+    assert draft["revision"] == 4
 def test_numbered_draft_actions_follow_handle_dependencies_not_fixture_order(
     tmp_path: Path,
 ) -> None:
@@ -2237,10 +2305,12 @@ def test_audio_import_numbered_actions_remain_strictly_ordered(tmp_path: Path) -
         "draft": {"draft_id": draft_id, "revision": 1},
     }
     first_action = steps[first_action_index]
-    assert isinstance(first_action.arguments[-1], DraftTypedActionArgument)
-    assert "switch_assignment" not in first_action.arguments[-1].expected
+    batch = first_action.arguments[-1]
+    assert isinstance(batch, DraftTypedActionBatchArgument)
+    assert len(batch.actions) == 2
+    assert "switch_assignment" not in batch.actions[0].expected
 
-    unexpected_assignment = dict(first_action.arguments[-1].expected)
+    unexpected_assignment = dict(batch.actions[0].expected)
     unexpected_assignment["switch_assignment"] = None
     unexpected_argv = (
         "draft-apply",
@@ -2250,13 +2320,13 @@ def test_audio_import_numbered_actions_remain_strictly_ordered(tmp_path: Path) -
         "--expected-revision",
         "1",
         "--compact",
-        "--action-json",
-        json.dumps(unexpected_assignment, separators=(",", ":")),
+        "--facts",
+        *typed_action_cli_arguments(unexpected_assignment),
+        *typed_action_cli_arguments(batch.actions[1].expected),
     )
     with pytest.raises(GatewayInvocationError, match="typed Draft action"):
         broker._validate_step(first_action, unexpected_argv)  # noqa: SLF001
 
-    second_action = steps[first_action_index + 1]
     out_of_order = (
         "draft-apply",
         draft_id,
@@ -2265,15 +2335,12 @@ def test_audio_import_numbered_actions_remain_strictly_ordered(tmp_path: Path) -
         "--expected-revision",
         "1",
         "--compact",
-        "--action-json",
-        json.dumps(
-            second_action.arguments[-1].expected,
-            separators=(",", ":"),
-        ),
+        "--facts",
+        *typed_action_cli_arguments(batch.actions[1].expected),
+        *typed_action_cli_arguments(batch.actions[0].expected),
     )
 
-    assert broker._match_dependency_ready_draft_action(out_of_order) is None  # noqa: SLF001
-    with pytest.raises(GatewayInvocationError, match="typed Draft action"):
+    with pytest.raises(GatewayInvocationError, match="typed Draft batch"):
         broker._validate_step(steps[first_action_index], out_of_order)  # noqa: SLF001
 
 

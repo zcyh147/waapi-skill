@@ -175,7 +175,7 @@ def test_consumed_composer_order_rebinds_each_revision_to_its_actual_predecessor
                     },
                     "properties": [{"name": "Volume", "value": index}],
                 }
-                for index in range(1, 4)
+                for index in range(1, 8)
             ]
         },
     }
@@ -186,18 +186,10 @@ def test_consumed_composer_order_rebinds_each_revision_to_its_actual_predecessor
     action_steps = [
         step for step in canonical if step.subcommand == "draft-apply"
     ]
-    reordered_actions = [
-        *(
-            step
-            for step in action_steps
-            if step.arguments[-1].expected["action"] == "add_target"
-        ),
-        *(
-            step
-            for step in action_steps
-            if step.arguments[-1].expected["action"] != "add_target"
-        ),
-    ]
+    assert len(action_steps) == 2
+    assert isinstance(action_steps[0].arguments[-1], DraftTypedActionBatchArgument)
+    assert isinstance(action_steps[1].arguments[-1], DraftTypedActionArgument)
+    reordered_actions = list(reversed(action_steps))
     consumed = [step.name for step in canonical]
     action_indexes = [
         index

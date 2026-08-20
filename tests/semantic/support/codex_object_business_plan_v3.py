@@ -37,7 +37,10 @@ from tests.semantic.support.codex_filesystem_security import (
     CodexFileSecurityError,
     read_bounded_exclusive_regular_file,
 )
-from tests.semantic.support.codex_gateway_broker import DraftActionMetadataBinding
+from tests.semantic.support.codex_gateway_broker import (
+    DraftActionMetadataBinding,
+    DraftTypedActionBatchArgument,
+)
 from tests.semantic.support.codex_object_heavy_v3 import (
     OBJECT_COMPOUND_CROSS_VERSION_CASE_VERSIONS,
     ObjectHeavyRecipe,
@@ -1642,18 +1645,18 @@ def _compound_metadata_protocol(
             )
         metadata_queries = ("volume",)
         required_tokens = ("Volume",)
-    metadata_bindings = tuple(
-        binding
-        for step in protocol.steps
-        for binding in (
-            step.metadata_binding,
-            *(
-                getattr(argument, "metadata_binding", None)
-                for argument in step.arguments
-            ),
+    metadata_bindings: list[DraftActionMetadataBinding] = []
+    for step in protocol.steps:
+        candidates: list[object] = [step.metadata_binding]
+        for argument in step.arguments:
+            candidates.append(getattr(argument, "metadata_binding", None))
+            if isinstance(argument, DraftTypedActionBatchArgument):
+                candidates.extend(action.metadata_binding for action in argument.actions)
+        metadata_bindings.extend(
+            binding
+            for binding in candidates
+            if isinstance(binding, DraftActionMetadataBinding)
         )
-        if isinstance(binding, DraftActionMetadataBinding)
-    )
     metadata_arguments = tuple(dict.fromkeys(metadata_bindings))
     if (
         len(metadata_arguments) != 1

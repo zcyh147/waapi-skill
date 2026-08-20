@@ -440,10 +440,19 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
     )
     assert import_preview.subcommand == "preview-from-draft"
     assert "--request-json" not in import_preview.arguments
-    import_actions = [
+    import_action_containers = [
         step.arguments[-1]
         for step in protocol.steps
         if step.name.startswith("tx01.action.")
+    ]
+    import_actions = [
+        action
+        for container in import_action_containers
+        for action in (
+            container.actions
+            if isinstance(container, DraftTypedActionBatchArgument)
+            else (container,)
+        )
     ]
     assert import_actions
     assert all(
@@ -469,18 +478,28 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         for step in protocol.steps
         if step.name.startswith("tx02.action.")
     ]
-    assert len(action_steps) == 5
+    assert len(action_steps) == 1
     assert all(step.subcommand == "draft-apply" for step in action_steps)
-    assert all(
-        isinstance(step.arguments[-1], DraftTypedActionArgument)
+    action_arguments = [
+        action
         for step in action_steps
+        for action in (
+            step.arguments[-1].actions
+            if isinstance(step.arguments[-1], DraftTypedActionBatchArgument)
+            else (step.arguments[-1],)
+        )
+    ]
+    assert len(action_arguments) == 5
+    assert all(
+        isinstance(argument, DraftTypedActionArgument)
+        for argument in action_arguments
     )
     assert all(
-        step.arguments[-1].metadata_binding is not None
-        and step.arguments[-1].metadata_binding.step == "tx02.metadata"
-        for step in action_steps
+        argument.metadata_binding is not None
+        and argument.metadata_binding.step == "tx02.metadata"
+        for argument in action_arguments
     )
-    assert action_steps[0].arguments[-1].expected == {
+    assert action_arguments[0].expected == {
         "contract": "waapi-skill.operation-draft-action/v1",
         "action": "add_target",
         "selector": {
@@ -497,9 +516,9 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         ],
     }
     add_targets = [
-        step.arguments[-1].expected
-        for step in action_steps
-        if step.arguments[-1].expected["action"] == "add_target"
+        argument.expected
+        for argument in action_arguments
+        if argument.expected["action"] == "add_target"
     ]
     assert [
         (row["selector"], row["properties"])
@@ -574,10 +593,11 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         for step in serialized["steps"]
         if step["name"].startswith("tx02.action.")
     ]
-    assert all(
-        step["arguments"][-1]["kind"] == "draft_typed_action"
-        for step in serialized_action_steps
+    assert len(serialized_action_steps) == 1
+    assert serialized_action_steps[0]["arguments"][-1]["kind"] == (
+        "draft_typed_action_batch"
     )
+    assert len(serialized_action_steps[0]["arguments"][-1]["actions"]) == 5
     assert deserialize_protocol(serialized) == protocol
     plan_steps = _workflow_plan_steps(
         protocol,

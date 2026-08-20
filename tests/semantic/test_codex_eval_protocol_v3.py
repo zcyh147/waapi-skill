@@ -23,6 +23,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     wait_topic_step,
 )
 from tests.semantic.support.codex_gateway_broker import (
+    DraftActionResponseBinding,
     DraftTypedActionArgument,
     DraftTypedActionBatchArgument,
     DraftActionMetadataBinding,
@@ -205,6 +206,22 @@ def _audio_import_request() -> dict[str, object]:
     }
 
 
+def _typed_draft_action_arguments(
+    steps: tuple[ExpectedGatewayStep, ...],
+) -> list[DraftTypedActionArgument]:
+    actions: list[DraftTypedActionArgument] = []
+    for step in steps:
+        if step.subcommand != "draft-apply":
+            continue
+        argument = step.arguments[-1]
+        if isinstance(argument, DraftTypedActionBatchArgument):
+            actions.extend(argument.actions)
+        else:
+            assert isinstance(argument, DraftTypedActionArgument)
+            actions.append(argument)
+    return actions
+
+
 def test_audio_import_composer_emits_ordered_typed_actions_without_full_json() -> None:
     metadata = DraftActionMetadataBinding(
         step="tx01.metadata",
@@ -216,11 +233,7 @@ def test_audio_import_composer_emits_ordered_typed_actions_without_full_json() -
         label="tx01",
         metadata_binding=metadata,
     )
-    action_arguments = [
-        step.arguments[-1]
-        for step in steps
-        if step.subcommand == "draft-apply"
-    ]
+    action_arguments = _typed_draft_action_arguments(steps)
 
     assert all(isinstance(value, DraftTypedActionArgument) for value in action_arguments)
     assert [value.operation for value in action_arguments] == ["audio.import"] * 5
@@ -248,14 +261,12 @@ def test_audio_import_switch_assignment_is_part_of_the_initial_row_action() -> N
     switch_assignment = "Snow"
     request["arguments"]["imports"][0]["switch_assignment"] = switch_assignment  # type: ignore[index]
 
-    action_arguments = [
-        step.arguments[-1]
-        for step in build_audio_import_composer_transaction_steps(
+    action_arguments = _typed_draft_action_arguments(
+        build_audio_import_composer_transaction_steps(
             request,
             label="tx01",
         )
-        if step.subcommand == "draft-apply"
-    ]
+    )
 
     row = action_arguments[-1]
     assert row.expected["action"] == "add_import_row"
@@ -266,14 +277,12 @@ def test_audio_import_switch_assignment_is_part_of_the_initial_row_action() -> N
     assert row.response_bindings == ()
 
     request["arguments"]["imports"][0].pop("switch_assignment")  # type: ignore[index]
-    ordinary_row = [
-        step.arguments[-1]
-        for step in build_audio_import_composer_transaction_steps(
+    ordinary_row = _typed_draft_action_arguments(
+        build_audio_import_composer_transaction_steps(
             request,
             label="tx01",
         )
-        if step.subcommand == "draft-apply"
-    ][-1]
+    )[-1]
     assert ordinary_row.expected["action"] == "add_import_row"
     assert ordinary_row.expected["assignment"] == {"mode": "none"}
     assert ordinary_row.response_bindings == ()
@@ -323,11 +332,7 @@ def test_object_set_composer_lets_gateway_own_schema_defaults() -> None:
         ),
         label="tx01",
     )
-    actions = [
-        step.arguments[-1].expected
-        for step in steps
-        if step.subcommand == "draft-apply"
-    ]
+    actions = [argument.expected for argument in _typed_draft_action_arguments(steps)]
 
     assert actions == [
         {
@@ -352,11 +357,7 @@ def test_object_set_composer_keeps_nondefault_request_options_explicit() -> None
         ),
         label="tx01",
     )
-    actions = [
-        step.arguments[-1].expected
-        for step in steps
-        if step.subcommand == "draft-apply"
-    ]
+    actions = [argument.expected for argument in _typed_draft_action_arguments(steps)]
 
     assert actions[:4] == [
         {
@@ -383,6 +384,44 @@ def test_object_set_composer_keeps_nondefault_request_options_explicit() -> None
             "name": "auto_add_to_source_control",
             "value": True,
         },
+    ]
+
+
+def test_object_set_protocol_batches_sibling_children_after_parent_handle() -> None:
+    request = _object_set_request()
+    request["arguments"]["objects"][0]["children"] = [  # type: ignore[index]
+        {"type": "Sound", "name": "Light"},
+        {"type": "Sound", "name": "Heavy"},
+    ]
+
+    steps = build_object_set_composer_transaction_steps(request, label="tx01")
+    action_steps = tuple(
+        step for step in steps if step.subcommand == "draft-apply"
+    )
+
+    assert len(action_steps) == 2
+    assert isinstance(action_steps[0].arguments[-1], DraftTypedActionArgument)
+    child_batch = action_steps[1].arguments[-1]
+    assert isinstance(child_batch, DraftTypedActionBatchArgument)
+    assert [action.expected["action"] for action in child_batch.actions] == [
+        "add_child",
+        "add_child",
+    ]
+    assert [action.response_bindings for action in child_batch.actions] == [
+        (
+            DraftActionResponseBinding(
+                "/parent_handle",
+                "tx01.action.001",
+                "/draft/action_result/created_handles/0",
+            ),
+        ),
+        (
+            DraftActionResponseBinding(
+                "/parent_handle",
+                "tx01.action.001",
+                "/draft/action_result/created_handles/0",
+            ),
+        ),
     ]
 
 
@@ -579,11 +618,7 @@ def test_commutative_composer_setup_groups_are_narrow_and_cannot_cross_turns() -
 def test_non_object_transaction_request_uses_typed_composer_actions() -> None:
     protocol = build_transaction_protocol([_audio_import_request()])
 
-    actions = tuple(
-        step.arguments[-1]
-        for step in protocol.steps
-        if step.subcommand == "draft-apply"
-    )
+    actions = tuple(_typed_draft_action_arguments(protocol.steps))
     assert actions
     assert all(isinstance(value, DraftTypedActionArgument) for value in actions)
     assert all(value.operation == "audio.import" for value in actions)
@@ -915,13 +950,9 @@ def test_metadata_transaction_protocol_selects_closed_audio_import_equivalence()
         required_tokens=("IsLoopingEnabled",),
         equivalence="audio_import_v1",
     )
-    action_arguments = [
-        step.arguments[-1]
-        for step in protocol.steps
-        if step.subcommand == "draft-apply"
-    ]
+    action_arguments = _typed_draft_action_arguments(protocol.steps)
 
-    assert protocol.turn_prefix_counts == (7, 11)
+    assert protocol.turn_prefix_counts == (6, 10)
     assert tuple(step.subcommand for step in protocol.steps[:2]) == (
         "operation-schema",
         "metadata",
@@ -947,6 +978,37 @@ def test_metadata_transaction_protocol_selects_closed_audio_import_equivalence()
     assert "preview-from-draft" in {
         step.subcommand for step in protocol.steps
     }
+
+
+def test_audio_import_protocol_batches_the_first_six_independent_actions() -> None:
+    request = _audio_import_request()
+    request["arguments"]["imports"] = [
+        {
+            "audio_file": native_absolute_test_path("audio", f"source-{index}.wav"),
+            "object_path": rf"\Actor-Mixer Hierarchy\Default Work Unit\Target{index}",
+            "object_type": "Sound SFX",
+            "import_language": "SFX",
+        }
+        for index in range(5)
+    ]
+    request["arguments"].pop("defaults")
+    request["arguments"].pop("auto_add_to_source_control")
+    request["arguments"]["import_operation"] = "useExisting"
+
+    steps = build_audio_import_composer_transaction_steps(request, label="tx01")
+    actions = tuple(step for step in steps if step.subcommand == "draft-apply")
+
+    assert len(actions) == 1
+    batch = actions[0].arguments[-1]
+    assert isinstance(batch, DraftTypedActionBatchArgument)
+    assert [action.expected["action"] for action in batch.actions] == [
+        "set_import_operation",
+        "add_import_row",
+        "add_import_row",
+        "add_import_row",
+        "add_import_row",
+        "add_import_row",
+    ]
 
 
 def test_metadata_transaction_protocol_selects_closed_tab_import_equivalence() -> None:
@@ -1318,6 +1380,72 @@ def test_media_pool_read_draft_appends_typed_post_filter() -> None:
             options={"return": ["Filename"]},
             post_filter={},
         )
+
+
+def test_media_pool_read_draft_keeps_dynamic_choice_and_value_in_one_batch() -> None:
+    steps = typed_read_draft_steps(
+        "media",
+        "ak.wwise.core.mediaPool.get",
+        version="2025.1",
+        args={
+            "databases": [r"\Databases\Project Originals"],
+            "filters": [
+                {
+                    "type": "field",
+                    "field": "Filename",
+                    "operator": "contains",
+                    "value": "footstep",
+                },
+                {
+                    "type": "field",
+                    "field": "WAV/Duration",
+                    "operator": "lessThan",
+                    "value": 0.8,
+                },
+            ],
+            "maxResults": 200,
+        },
+        options={
+            "return": [
+                "Path",
+                "FileId",
+                "Db",
+                "Filename",
+                "WAV/Duration",
+                "WAV/Sample Rate",
+                "WAV/Channels",
+            ]
+        },
+        post_filter={
+            "field": "Filename",
+            "operator": "containsCaseSensitive",
+            "value": "footstep",
+            "limit": 20,
+        },
+    )
+
+    action_batches = []
+    for step in steps:
+        if step.subcommand != "draft-apply":
+            continue
+        argument = step.arguments[-1]
+        actions = (
+            argument.actions
+            if isinstance(argument, DraftTypedActionBatchArgument)
+            else (argument,)
+        )
+        action_batches.append(tuple(action.expected for action in actions))
+
+    assert tuple(len(batch) for batch in action_batches) == (6, 3, 5, 4, 5, 4)
+    assert all(batch[-1]["fact_action"] != "choose-dynamic" for batch in action_batches)
+    for batch in action_batches:
+        for index, action in enumerate(batch):
+            if action["fact_action"] != "choose-dynamic":
+                continue
+            paired = batch[index + 1]
+            assert paired["fact_action"] == "map-put"
+            assert paired["field_handle"] == action["field_handle"]
+            assert paired["key"] == action["key"]
 
 
 def test_wait_topic_and_operation_requests_use_typed_inputs() -> None:

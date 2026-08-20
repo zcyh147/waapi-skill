@@ -2344,8 +2344,8 @@ def test_generated_topic_reference_closes_model_owned_request_fields() -> None:
     assert "`id,name,type,path`" in reference
     assert "`soundbank.name`" in reference
     assert "`platform.name`" in reference
-    assert "otherwise submit no match facts" in reference
-    assert "Never discover or inject a GUID" in reference
+    assert "Otherwise omit matches" in reference
+    assert "never inject a GUID" in reference
 
 
 def test_all_25_cases_emit_registry_valid_closed_operation_requests(

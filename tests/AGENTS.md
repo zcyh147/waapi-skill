@@ -163,6 +163,22 @@ suite. A partial, quota-blocked, prerequisite-blocked, or interrupted campaign
 is incomplete even if its selected profile is named `formal_98` or
 `full_cross_version_168`.
 
+### Failure-first campaign scheduling
+
+After a frozen full-profile root exposes ordinary semantic failures, repair the
+shared deterministic causes before spending more Fresh Agent tokens. First run
+tight non-live regressions for every prior failure family. A later formal root
+may schedule those previously failing units first only when the selected full
+profile, candidate, immutable options, and evidence root remain unchanged and
+each selected unit still runs at most once. If the priority units pass, continue
+the remaining units in that same root; do not rerun the priority units.
+
+Do not combine targeted roots into a full-profile PASS. If the runner cannot
+change priority without changing its sealed selection contract, keep the normal
+full-profile order instead of adding a second campaign path. A failed root stays
+frozen without verify-only replay; final acceptance still requires one complete
+passing root per host followed by its identical verify-only audit.
+
 The focused `modification_policy_9` campaign is separate from those historical
 v2 totals. Its sealed
 `campaign-modification-policy-9-c7` run passed 9/9 Wwise 2022.1 tasks and all

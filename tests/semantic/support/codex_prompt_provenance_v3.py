@@ -2162,10 +2162,8 @@ def _audio_import_composer_row_origins(
     steps = protocol_value.get("steps")
     if not isinstance(steps, list):
         raise PromptProvenanceError("protocol steps are unavailable")
-    action_rows: list[tuple[int, int, str, Mapping[str, Any]]] = []
-    assignment_edits: dict[
-        str, tuple[int, int, Mapping[str, Any]]
-    ] = {}
+    action_rows: list[tuple[str, str, Mapping[str, Any]]] = []
+    assignment_edits: dict[str, tuple[str, Mapping[str, Any]]] = {}
     for step_index, step in enumerate(steps):
         if not isinstance(step, Mapping) or step.get("subcommand") != "draft-apply":
             continue
@@ -2173,61 +2171,76 @@ def _audio_import_composer_row_origins(
         if not isinstance(arguments, list):
             raise PromptProvenanceError("draft-apply arguments are invalid")
         for argument_index, argument in enumerate(arguments):
-            if (
-                not isinstance(argument, Mapping)
-                or argument.get("kind") != "draft_typed_action"
-                or argument.get("operation") != "audio.import"
-            ):
+            if not isinstance(argument, Mapping):
                 continue
-            action = argument.get("value")
-            if not isinstance(action, Mapping) or action.get("contract") != (
-                "waapi-skill.operation-draft-action/v1"
-            ):
-                continue
-            action_name = action.get("action")
-            step_name = step.get("name")
-            if not isinstance(step_name, str) or not step_name:
-                raise PromptProvenanceError("typed row step name is invalid")
-            if action_name in {
-                "add_import_row",
-                "add_import_row_without_switch_assignment",
-                "add_switch_assigned_import_row",
-            }:
-                action_rows.append(
-                    (step_index, argument_index, step_name, action)
-                )
-            elif action_name == "assign_import_row_switch" or (
-                action_name == "set_import_row_field"
-                and action.get("name") == "switch_assignment"
-            ):
-                bindings = argument.get("response_bindings")
-                if (
-                    frozenset(action)
-                    not in {
-                        frozenset(
-                            {"contract", "action", "name", "value"}
-                        ),
-                        frozenset({"contract", "action", "switch"}),
-                    }
-                    or not isinstance(bindings, list)
-                    or len(bindings) != 1
-                    or not isinstance(bindings[0], Mapping)
-                    or set(bindings[0])
-                    != {"pointer", "step", "response_pointer"}
-                    or bindings[0].get("pointer") != "/import_handle"
-                    or bindings[0].get("response_pointer")
-                    != "/draft/action_result/created_handles/0"
-                    or not isinstance(bindings[0].get("step"), str)
-                    or bindings[0]["step"] in assignment_edits
-                ):
+            origin_base = f"/steps/{step_index}/arguments/{argument_index}"
+            candidates: list[tuple[Mapping[str, Any], str]] = []
+            if argument.get("kind") == "draft_typed_action":
+                candidates.append((argument, origin_base))
+            elif argument.get("kind") == "draft_typed_action_batch":
+                actions = argument.get("actions")
+                if not isinstance(actions, list):
                     raise PromptProvenanceError(
-                        "audio.import switch-assignment edit binding is invalid"
+                        "audio.import typed action batch is invalid"
                     )
-                assignment_edits[str(bindings[0]["step"])] = (
-                    step_index,
-                    argument_index,
-                    action,
+                candidates.extend(
+                    (candidate, f"{origin_base}/actions/{action_index}")
+                    for action_index, candidate in enumerate(actions)
+                    if isinstance(candidate, Mapping)
                 )
+                if len(candidates) != len(actions):
+                    raise PromptProvenanceError(
+                        "audio.import typed action batch is invalid"
+                    )
+            for candidate, candidate_base in candidates:
+                if candidate.get("operation") != "audio.import":
+                    continue
+                action = candidate.get("value")
+                if not isinstance(action, Mapping) or action.get("contract") != (
+                    "waapi-skill.operation-draft-action/v1"
+                ):
+                    continue
+                action_name = action.get("action")
+                step_name = step.get("name")
+                if not isinstance(step_name, str) or not step_name:
+                    raise PromptProvenanceError("typed row step name is invalid")
+                if action_name in {
+                    "add_import_row",
+                    "add_import_row_without_switch_assignment",
+                    "add_switch_assigned_import_row",
+                }:
+                    action_rows.append((candidate_base, step_name, action))
+                elif action_name == "assign_import_row_switch" or (
+                    action_name == "set_import_row_field"
+                    and action.get("name") == "switch_assignment"
+                ):
+                    bindings = candidate.get("response_bindings")
+                    if (
+                        frozenset(action)
+                        not in {
+                            frozenset(
+                                {"contract", "action", "name", "value"}
+                            ),
+                            frozenset({"contract", "action", "switch"}),
+                        }
+                        or not isinstance(bindings, list)
+                        or len(bindings) != 1
+                        or not isinstance(bindings[0], Mapping)
+                        or set(bindings[0])
+                        != {"pointer", "step", "response_pointer"}
+                        or bindings[0].get("pointer") != "/import_handle"
+                        or bindings[0].get("response_pointer")
+                        != "/draft/action_result/created_handles/0"
+                        or not isinstance(bindings[0].get("step"), str)
+                        or bindings[0]["step"] in assignment_edits
+                    ):
+                        raise PromptProvenanceError(
+                            "audio.import switch-assignment edit binding is invalid"
+                        )
+                    assignment_edits[str(bindings[0]["step"])] = (
+                        candidate_base,
+                        action,
+                    )
     if len(action_rows) != len(rows):
         raise PromptProvenanceError(
             "audio.import visible rows differ from typed row actions"
@@ -2236,7 +2249,7 @@ def _audio_import_composer_row_origins(
     used_assignment_edits: set[str] = set()
     for row_index, (
         row,
-        (step_index, argument_index, step_name, action),
+        (origin_base, step_name, action),
     ) in enumerate(
         zip(rows, action_rows, strict=True)
     ):
@@ -2256,7 +2269,7 @@ def _audio_import_composer_row_origins(
         if not has_assignment:
             edit = assignment_edits.get(step_name)
             if edit is not None:
-                edit_step_index, edit_argument_index, edit_action = edit
+                _edit_origin_base, edit_action = edit
                 action_fields["switch_assignment"] = edit_action.get(
                     "switch",
                     edit_action.get("value"),
@@ -2278,11 +2291,11 @@ def _audio_import_composer_row_origins(
             )
         for pointer, _leaf in _walk_leaves(row):
             if pointer == "/switch_assignment" and step_name in assignment_edits:
-                edit_step_index, edit_argument_index, _edit_action = (
+                edit_origin_base, _edit_action = (
                     assignment_edits[step_name]
                 )
                 origins[f"/{row_index}{pointer}"] = (
-                    f"/steps/{edit_step_index}/arguments/{edit_argument_index}"
+                    edit_origin_base
                     + (
                         "/value/switch"
                         if "switch" in _edit_action
@@ -2296,8 +2309,7 @@ def _audio_import_composer_row_origins(
                     else pointer
                 )
                 origins[f"/{row_index}{pointer}"] = (
-                    f"/steps/{step_index}/arguments/{argument_index}/value"
-                    f"{action_pointer}"
+                    f"{origin_base}/value{action_pointer}"
                 )
     if used_assignment_edits != set(assignment_edits):
         raise PromptProvenanceError(

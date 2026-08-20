@@ -16,6 +16,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     DraftTypedActionArgument,
+    DraftTypedActionBatchArgument,
     project_required_metadata_tokens,
 )
 from tests.semantic.support.codex_import_assets_v3 import (
@@ -393,10 +394,19 @@ def test_compound_direct_import_binds_defaults_row_overrides_and_inline_wav(
         if step.subcommand == "preview-from-draft"
     )
     assert protocol.turn_prefix_counts == (preview_index, len(protocol.steps))
-    action_arguments = [
+    action_containers = [
         step.arguments[-1]
         for step in protocol.steps
         if step.subcommand == "draft-apply"
+    ]
+    action_arguments = [
+        action
+        for container in action_containers
+        for action in (
+            container.actions
+            if isinstance(container, DraftTypedActionBatchArgument)
+            else (container,)
+        )
     ]
     assert action_arguments
     assert all(isinstance(item, DraftTypedActionArgument) for item in action_arguments)

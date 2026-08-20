@@ -23,6 +23,7 @@ from tests.semantic.support.codex_integration_fixture_tree_v2 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     DraftTypedActionArgument,
+    DraftTypedActionBatchArgument,
     CodexGatewayBroker,
     GatewayInvocationError,
     InlineTypedOperationArgument,
@@ -584,8 +585,8 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
         "surface_group_path": case.fake._path("surface_group"),
         "footsteps_event_path": case.fake._path("play_footsteps_event"),
     }
-    assert prepared.protocol.turn_prefix_counts == (9, 15, 19)
-    assert len(prepared.protocol.steps) == 19
+    assert prepared.protocol.turn_prefix_counts == (5, 11, 15)
+    assert len(prepared.protocol.steps) == 15
     assert [
         (step.name, step.subcommand)
         for step in prepared.protocol.steps[:2]
@@ -624,11 +625,14 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
     )
     assert import_preview_step.subcommand == "preview-from-draft"
     assert "--request-json" not in import_preview_step.arguments
-    import_actions = [
+    import_action_containers = [
         step.arguments[-1]
         for step in prepared.protocol.steps
         if step.name.startswith("tx01.action.")
     ]
+    assert len(import_action_containers) == 1
+    assert isinstance(import_action_containers[0], DraftTypedActionBatchArgument)
+    import_actions = list(import_action_containers[0].actions)
     assert len(import_actions) == 5
     assert all(
         isinstance(argument, DraftTypedActionArgument)
@@ -837,7 +841,7 @@ def test_observer_preserves_exact_terminal_indeterminate_execute(
         },
     )
 
-    assert case.prepared.protocol.turn_prefix_counts == (9, 15, 19)
+    assert case.prepared.protocol.turn_prefix_counts == (5, 11, 15)
     assert case.prepared.operation_requests[0]["arguments"]["imports"][0][
         "switch_assignment"
     ] == "Snow"

@@ -3288,6 +3288,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 },
                 "skip_languages": {
                     "type": "boolean",
+                    "x-discloseDescription": True,
                     "description": (
                         "Batch switch derived from the complete soundbanks[] list: "
                         "true exactly when every SoundBank is nonlocalized, and "

@@ -24,6 +24,7 @@ from tests.semantic.support.codex_typed_input_profile import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     DraftActionMetadataBinding,
+    DraftTypedActionBatchArgument,
     MetadataTokenProjection,
 )
 from tests.semantic.support.codex_object_business_plan_v3 import (
@@ -432,12 +433,15 @@ def test_compound_object_metadata_protocol_is_archived_and_revalidated(
     metadata_binding = next(
         binding
         for step in protocol.steps
+        for argument in (None, *step.arguments)
         for binding in (
-            step.metadata_binding,
-            *(
-                getattr(argument, "metadata_binding", None)
-                for argument in step.arguments
-            ),
+            (step.metadata_binding,)
+            if argument is None
+            else (
+                tuple(action.metadata_binding for action in argument.actions)
+                if isinstance(argument, DraftTypedActionBatchArgument)
+                else (getattr(argument, "metadata_binding", None),)
+            )
         )
         if isinstance(binding, DraftActionMetadataBinding)
     )
