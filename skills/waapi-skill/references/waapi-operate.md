@@ -35,7 +35,7 @@ After a selected-subset gate, choose one first transaction-contract branch:
 
 | Request | First transaction-contract sequence |
 |---|---|
-| `object.create` | Only an explicit same-name-root check triggers preflight; parent path alone does not. Then `operation-schema object.create` first; metadata. |
+| `object.create` | Preflight: explicit pre-Preview same-name-root type/path only; not parent/sibling or later verification. Then `operation-schema`; metadata. |
 | `object.set` or `audio.import` | its named `operation-schema` first; for naturally described dynamic properties/references, run one metadata discovery next, then Composer actions. |
 | Any other operation with an explicitly requested unknown dynamic property/reference token | one metadata discovery first, then its named `operation-schema` |
 | A named operation using only closed schema fields and side effects | its named `operation-schema` directly |

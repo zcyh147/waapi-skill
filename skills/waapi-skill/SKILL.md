@@ -159,7 +159,7 @@ Conditional read for a query not fully covered by the fixed commands, exact-iden
 
 Use operate for project-changing work: create, move, copy, delete, property/reference edits, imports, soundbanks, switch assignments, and design previews. An exact path/GUID identity preflight inside a change request is part of the operate lane; read only `references/waapi-operate.md` for that task.
 
-Finish any required selected-subset exact-ID readback first. Finish any user-requested exact path/type preflight before `operation-schema object.create`. Only an explicit request to verify/check an existing same-name request root triggers it; a supplied parent path alone does not.
+Finish any required selected-subset exact-ID readback first. Finish any user-requested exact path/type preflight before `operation-schema object.create`. Only an explicit before-preview type/path check of the same-name request root triggers it; a parent path, preserved sibling, or post-execution verification does not.
 After that preflight, `object.create` runs `operation-schema`, then `metadata discover` for every prompt-present dynamic property/reference token, and only then `draft-start`; without such fields it starts the Draft directly. `object.set` and `audio.import` run their
 schema, then discover naturally described dynamic tokens; Composer `draft-check`
 revalidates them and dependencies. For other

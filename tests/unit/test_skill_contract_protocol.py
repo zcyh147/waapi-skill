@@ -239,10 +239,9 @@ def test_operate_identity_preflight_stays_in_the_operate_reference_lane() -> Non
         "Finish any user-requested exact path/type preflight before "
         "`operation-schema object.create`"
     ) in operate_compact
-    assert (
-        "Only an explicit request to verify/check an existing same-name request "
-        "root triggers it; a supplied parent path alone does not"
-    ) in operate_compact
+    assert "before-preview type/path check" in operate_compact
+    assert "preserved sibling" in operate_compact
+    assert "post-execution verification does not" in operate_compact
     assert (
         "After that preflight, `object.create` runs `operation-schema`, then "
         "`metadata discover` for every prompt-present dynamic property/reference "
@@ -757,12 +756,12 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "Do not call `operations`, `operation-schema`, or `request-schema` first" in OPERATE
     assert "`object.set` or `audio.import`" in OPERATE
     assert "run one metadata discovery next, then Composer actions" in OPERATE
-    assert "`operation-schema object.create` first" in OPERATE
-    assert "Only an explicit same-name-root check triggers preflight" in compact
-    assert "parent path alone does not" in compact
+    assert "Then `operation-schema`; metadata" in OPERATE
+    assert "pre-Preview same-name-root type/path only" in OPERATE
+    assert "not parent/sibling or later verification" in compact
     assert compact.index(
-        "Only an explicit same-name-root check triggers preflight"
-    ) < compact.index("`operation-schema object.create` first")
+        "pre-Preview same-name-root type/path only"
+    ) < compact.index("Then `operation-schema`; metadata")
     assert "selected-subset identity gate" in OPERATE
     assert "exact-ID read back every selected" in OPERATE
     assert "These bounded read-only checks precede the transaction contract" in OPERATE
