@@ -184,7 +184,6 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
     nested_code, nested_children = waapi_gateway.execute_gateway(
         [
             "--version", "2025.1", "request-map-container", "object.create",
-            "--schema-digest", payload["composer"]["typed_request_schema_digest"],
             "--map-handle", container["handle"], "--key", "children",
             "--shape", "array", "--parent-schema-token",
             container["schema_lineage_token"],
@@ -207,8 +206,6 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
             "object": [
                 "request-array-item",
                 "object.create",
-                "--schema-digest",
-                payload["composer"]["typed_request_schema_digest"],
                 "--array-handle",
                 nested_children["handle"],
                 "--index",
@@ -229,7 +226,6 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
     grandchild_code, grandchild = waapi_gateway.execute_gateway(
         [
             "--version", "2025.1", "request-array-item", "object.create",
-            "--schema-digest", payload["composer"]["typed_request_schema_digest"],
             "--array-handle", nested_children["handle"], "--index", "0",
             "--shape", "object", "--parent-schema-token",
             nested_children["schema_lineage_token"],
@@ -267,7 +263,7 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
                 "current_business_object_has_no_properties_references_or_children"
             ),
             "nested_container_disclosures": "forbidden",
-            "next_action": "next_sibling_disclosure_or_deferred_fact_queue",
+            "next_action": "deferred_fact_queue_then_next_sibling_disclosure",
         },
         "evaluate_in_order": [
             {
@@ -285,18 +281,6 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
                 ),
             },
             {
-                "candidate": "next_sibling_disclosure",
-                "condition": (
-                    "current_object_has_no_business_present_nested_member_and_"
-                    "business_value_pointer_is_present"
-                ),
-                "business_value_pointer": "/args/children/0/children/1",
-                "command_pointer": (
-                    "/continuation/next_sibling_disclosure/argv_by_shape/"
-                    "<exact-business-shape>"
-                ),
-            },
-            {
                 "candidate": "deferred_fact_queue",
                 "condition": (
                     "no_earlier_business_present_disclosure_for_exact_current_object"
@@ -307,8 +291,22 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
                 ),
                 "start_at": "outermost_disclosed_root_response",
                 "first_command_pointer": "/continuation/deferred_fact/argv",
-                "batch_facts": "next_up_to_6_deferred_facts_in_queue_order",
+                "batch_facts": (
+                    "current_root_only_next_up_to_6_deferred_facts_in_queue_order"
+                ),
                 "first_fact_only": "invalid",
+            },
+            {
+                "candidate": "next_sibling_disclosure",
+                "condition": (
+                    "current_object_has_no_business_present_nested_member_and_"
+                    "business_value_pointer_is_present"
+                ),
+                "business_value_pointer": "/args/children/0/children/1",
+                "command_pointer": (
+                    "/continuation/next_sibling_disclosure/argv_by_shape/"
+                    "<exact-business-shape>"
+                ),
             },
         ],
         "first_true_candidate_is_the_only_next_action": True,
@@ -326,7 +324,7 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
             "disclosure_condition": (
                 "current_business_request_contains_that_index"
             ),
-            "allowed_after": "current_item_descendant_disclosures",
+            "allowed_after": "current_root_fact_apply_success",
             "absent_index_forbidden": True,
             "is_next_command": False,
         },
@@ -335,16 +333,13 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         "condition": "current_business_request_contains_next_complex_item",
         "business_value_pointer": "/args/children/0/children/1",
         "index": 1,
-        "must_follow": "current_item_descendant_disclosures",
-        "must_precede": "current_root_deferred_facts",
+        "must_follow": "current_root_fact_apply_success",
         "absent_or_scalar_next_item_forbidden": True,
-        "is_next_command": True,
+        "is_next_command": False,
         "argv_by_shape": {
             "object": [
                 "request-array-item",
                 "object.create",
-                "--schema-digest",
-                payload["composer"]["typed_request_schema_digest"],
                 "--array-handle",
                 nested_children["handle"],
                 "--index",
@@ -398,14 +393,12 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         "candidate_pointer": "/continuation/nested_container_disclosures",
         "selection": "first_business_present_member_by_queue_index",
         "repeat_for_descendants": True,
-        "when_none": "follow_next_sibling_then_drain_deferred_fact_queue",
+        "when_none": "drain_deferred_fact_queue_then_follow_next_sibling",
         "is_next_command": True,
     }
     assert grandchild["continuation"]["deferred_fact"]["blocked_by"] == [
         "ancestor_deferred_parent_facts",
         "ancestor_child_contract_facts",
-        "next_sibling_disclosure",
-        "all_descendant_disclosures",
     ]
     assert grandchild["continuation"]["deferred_fact"]["consume_once"] is True
     assert grandchild["continuation"]["deferred_fact"]["replay_allowed"] is False
@@ -413,6 +406,9 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
     assert scalar_table["shared_policy"] == {
         "condition": "current_business_request_contains_member",
         "execute_after": "deferred_parent_fact",
+        "queue_phase": "child_contract",
+        "queue_order_ref": "/continuation/request_wide_order/deferred_fact_queue",
+        "must_precede": "all_descendant_response_facts",
         "is_next_command": False,
         "consume_once": True,
         "replay_allowed": False,

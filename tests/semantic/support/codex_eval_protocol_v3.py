@@ -1177,8 +1177,11 @@ def _build_generic_typed_draft_transaction_steps(
             disclosure_group_order.append(disclosure_root)
         command_arguments: list[Any] = [
             operation,
-            "--schema-digest",
-            contract.schema_digest,
+            *(
+                ()
+                if parent_token_arguments
+                else ("--schema-digest", contract.schema_digest)
+            ),
             (
                 "--array-handle"
                 if disclosure.command == "request-array-item"
@@ -1435,8 +1438,11 @@ def _typed_disclosure_protocol_steps(
             )
         command_arguments: list[Any] = [
             operation,
-            "--schema-digest",
-            schema_digest,
+            *(
+                ()
+                if parent_token_arguments
+                else ("--schema-digest", schema_digest)
+            ),
             (
                 "--array-handle"
                 if disclosure.command == "request-array-item"

@@ -141,6 +141,11 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
                 "child_contract_facts",
                 "descendant_response_nodes",
             ],
+            "forbidden": [
+                "descendant_fact_before_current_node_parent_or_child_facts",
+                "next_sibling_disclosure_before_current_root_facts",
+                "one_fact_apply_batch_spanning_sibling_roots",
+            ],
         },
         "this_handle_is_not_a_complete_request": True,
     }
@@ -153,7 +158,7 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
         "prefix_source": (
             "latest_draft_response.next_action_binding.fixed_argv_prefix"
         ),
-        "batch_scope": "next_current_root_deferred_facts",
+        "batch_scope": "current_root_only_next_deferred_facts",
         "complete_action_groups_in_queue_order": True,
         "maximum_actions": 6,
         "copy_returned_handles_exactly": True,
@@ -166,7 +171,7 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
         if row["candidate"] == "deferred_fact_queue"
     )
     assert deferred_candidate["batch_facts"] == (
-        "next_up_to_6_deferred_facts_in_queue_order"
+        "current_root_only_next_up_to_6_deferred_facts_in_queue_order"
     )
     assert deferred_candidate["first_fact_only"] == "invalid"
     assert item["child_contract"]["fact_literal_policy"] == {
@@ -253,7 +258,7 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
         "business_value_pointer"
     ] == "/args/filters/1"
     assert item["continuation"]["next_sibling_disclosure"]["must_follow"] == (
-        "current_root_deferred_facts"
+        "current_root_fact_apply_success"
     )
     assert next(iter(item["continuation"])) == "next_command_decision"
     assert [
@@ -1128,6 +1133,32 @@ def test_schema_lineage_token_cannot_invent_a_child_schema(
     token = parent["schema_lineage_token"]
     assert token.startswith("trl2-")
     assert len(token) < 96
+    wrong_digest_code, wrong_digest = gateway.execute_gateway(
+        [
+            "request-map-container", VALIDATE_URI,
+            "--schema-digest", "0" * 64,
+            "--map-handle", parent["handle"],
+            "--key", "child", "--shape", "object",
+            "--parent-schema-token", token,
+        ],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda _url: pytest.fail("wrong digest must fail offline"),
+    )
+    assert wrong_digest_code == 2
+    assert wrong_digest["ok"] is False
+
+    root_without_digest_code, root_without_digest = gateway.execute_gateway(
+        [
+            "request-map-container", VALIDATE_URI,
+            "--map-handle", args_handle,
+            "--key", "nested", "--shape", "object",
+        ],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda _url: pytest.fail("unbound root must fail offline"),
+    )
+    assert root_without_digest_code == 2
+    assert root_without_digest["ok"] is False
+
     from base64 import urlsafe_b64decode, urlsafe_b64encode
     raw = token.removeprefix("trl2-")
     decoded = json.loads(

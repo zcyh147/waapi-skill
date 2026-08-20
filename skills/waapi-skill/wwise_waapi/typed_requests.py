@@ -367,6 +367,11 @@ class TypedRequestContract:
             "business_fact_selection": (
                 "submit only prompt-present values; omit absent defaults"
             ),
+            "branch_selection_authority": (
+                "choose the branch matching the current user business value "
+                "representation; do not replace it with an equivalent selector "
+                "learned from a prior read"
+            ),
             "business_pointer_source": "typed_request_fields.path",
             "fact_batching": (
                 "submit schema-ordered facts in full batches of 6; the final "

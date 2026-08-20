@@ -68,6 +68,12 @@ def test_object_create_top_level_facts_precede_dynamic_container_disclosure() ->
                 {
                     "type": "Sound",
                     "name": "TypedChild",
+                    "children": [
+                        {
+                            "type": "Sound",
+                            "name": "TypedGrandchild",
+                        }
+                    ],
                 }
             ],
         },
@@ -80,6 +86,22 @@ def test_object_create_top_level_facts_precede_dynamic_container_disclosure() ->
     assert any(
         step.subcommand == "draft-apply"
         for step in protocol.steps[2:first_disclosure]
+    )
+    disclosures = tuple(
+        step
+        for step in protocol.steps
+        if step.subcommand in {"request-array-item", "request-map-container"}
+    )
+    assert any(
+        "--schema-digest" in step.arguments
+        and "--parent-schema-token" not in step.arguments
+        for step in disclosures
+    )
+    assert any("--parent-schema-token" in step.arguments for step in disclosures)
+    assert all(
+        "--schema-digest" not in step.arguments
+        for step in disclosures
+        if "--parent-schema-token" in step.arguments
     )
 
 

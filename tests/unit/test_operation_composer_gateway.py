@@ -978,6 +978,10 @@ def test_object_create_schema_puts_the_top_level_fact_plan_before_large_fields(
     assert table["business_fact_selection"] == (
         "submit only prompt-present values; omit absent defaults"
     )
+    assert table["branch_selection_authority"] == (
+        "choose the branch matching the current user business value representation; "
+        "do not replace it with an equivalent selector learned from a prior read"
+    )
     assert table["business_pointer_source"] == (
         "typed_request_field_table parent_row lineage and this plan's "
         "top-level names"

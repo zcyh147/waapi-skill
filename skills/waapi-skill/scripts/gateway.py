@@ -1131,7 +1131,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Issue a schema-bound child handle for one open-map key",
     )
     request_map_container.add_argument("api")
-    request_map_container.add_argument("--schema-digest", required=True)
+    request_map_container.add_argument("--schema-digest")
     request_map_container.add_argument("--map-handle", required=True)
     request_map_container.add_argument("--key", required=True)
     request_map_container.add_argument("--shape", choices=("object", "array"), required=True)
@@ -1150,7 +1150,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Issue a schema-bound child handle for one ordered complex array item",
     )
     request_array_item.add_argument("api")
-    request_array_item.add_argument("--schema-digest", required=True)
+    request_array_item.add_argument("--schema-digest")
     request_array_item.add_argument("--array-handle", required=True)
     request_array_item.add_argument("--index", required=True, type=int)
     request_array_item.add_argument("--shape", choices=("object", "array"), required=True)
@@ -4112,6 +4112,20 @@ def typed_topic_contract_payload(contract: Any) -> dict[str, Any]:
     return payload
 
 
+def _container_schema_binding_argv(
+    contract: TypedRequestContract,
+    *,
+    parent_schema_token: str | None,
+) -> list[str]:
+    """Bind a root container by digest or a nested container by exact lineage."""
+
+    return (
+        []
+        if parent_schema_token is not None
+        else ["--schema-digest", contract.schema_digest]
+    )
+
+
 def _dynamic_branch_disclosure_continuation(
     args: argparse.Namespace,
     *,
@@ -4145,8 +4159,10 @@ def _dynamic_branch_disclosure_continuation(
         command = [
             args.command,
             args.api,
-            "--schema-digest",
-            contract.schema_digest,
+            *_container_schema_binding_argv(
+                contract,
+                parent_schema_token=args.parent_schema_token,
+            ),
             *(
                 ["--map-handle", args.map_handle, "--key", args.key]
                 if args.command == "request-map-container"
@@ -4171,8 +4187,6 @@ def _dynamic_branch_disclosure_continuation(
         command = [
             "request-map-container",
             args.api,
-            "--schema-digest",
-            contract.schema_digest,
             "--map-handle",
             child_handle,
             "--key",
@@ -4238,8 +4252,6 @@ def _fixed_nested_container_disclosures(
                 "argv": [
                     "request-map-container",
                     args.api,
-                    "--schema-digest",
-                    contract.schema_digest,
                     "--map-handle",
                     child_handle,
                     "--key",
@@ -4529,6 +4541,11 @@ def _compact_fixed_scalar_member_facts(child_contract: dict[str, Any]) -> None:
         "shared_policy": {
             "condition": "current_business_request_contains_member",
             "execute_after": "deferred_parent_fact",
+            "queue_phase": "child_contract",
+            "queue_order_ref": (
+                "/continuation/request_wide_order/deferred_fact_queue"
+            ),
+            "must_precede": "all_descendant_response_facts",
             "is_next_command": False,
             "consume_once": True,
             "replay_allowed": False,
@@ -4634,8 +4651,6 @@ def _next_array_item_disclosure(
         argv_by_shape[shape] = [
             "request-array-item",
             args.api,
-            "--schema-digest",
-            contract.schema_digest,
             "--array-handle",
             child_handle,
             "--index",
@@ -4697,8 +4712,10 @@ def _next_array_sibling_disclosure(
         argv_by_shape[shape] = [
             "request-array-item",
             args.api,
-            "--schema-digest",
-            contract.schema_digest,
+            *_container_schema_binding_argv(
+                contract,
+                parent_schema_token=args.parent_schema_token,
+            ),
             "--array-handle",
             args.array_handle,
             "--index",
@@ -4715,7 +4732,6 @@ def _next_array_sibling_disclosure(
         return {}
     if current_business_value_pointer is None:
         return {}
-    nested_sibling = args.parent_schema_token is not None
     return {
         "next_sibling_disclosure": {
             "condition": "current_business_request_contains_next_complex_item",
@@ -4723,18 +4739,9 @@ def _next_array_sibling_disclosure(
                 f"{current_business_value_pointer.rsplit('/', 1)[0]}/{next_index}"
             ),
             "index": next_index,
-            "must_follow": (
-                "current_item_descendant_disclosures"
-                if nested_sibling
-                else "current_root_deferred_facts"
-            ),
-            **(
-                {"must_precede": "current_root_deferred_facts"}
-                if nested_sibling
-                else {}
-            ),
+            "must_follow": "current_root_fact_apply_success",
             "absent_or_scalar_next_item_forbidden": True,
-            "is_next_command": nested_sibling,
+            "is_next_command": False,
             "argv_by_shape": argv_by_shape,
         }
     }
@@ -4863,8 +4870,8 @@ def _dynamic_next_command_decision(
                 "start_at": "outermost_disclosed_root_response",
                 "first_command_pointer": "/continuation/deferred_fact/argv",
                 "batch_facts": (
-                    f"next_up_to_{MAX_TYPED_ACTIONS_PER_APPLY}_deferred_facts_"
-                    "in_queue_order"
+                    f"current_root_only_next_up_to_{MAX_TYPED_ACTIONS_PER_APPLY}_"
+                    "deferred_facts_in_queue_order"
                 ),
                 "first_fact_only": "invalid",
             }
@@ -4920,7 +4927,7 @@ def _dynamic_next_command_decision(
                         ),
                         "nested_container_disclosures": "forbidden",
                         "next_action": (
-                            "next_sibling_disclosure_or_deferred_fact_queue"
+                            "deferred_fact_queue_then_next_sibling_disclosure"
                         ),
                     }
                 }
@@ -5089,7 +5096,14 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             if args.api.startswith(TOPIC_MATCH_OPERATION_PREFIX)
             else None
         )
-        if args.schema_digest != contract.schema_digest:
+        if args.schema_digest is None and args.parent_schema_token is None:
+            raise GatewayInputError(
+                "A root typed container requires its exact schema digest"
+            )
+        if (
+            args.schema_digest is not None
+            and args.schema_digest != contract.schema_digest
+        ):
             raise GatewayInputError("Typed request schema digest is stale")
         parent_handle = (
             args.map_handle
@@ -5138,8 +5152,10 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                         "choice_argv": [
                             "request-map-container",
                             args.api,
-                            "--schema-digest",
-                            contract.schema_digest,
+                            *_container_schema_binding_argv(
+                                contract,
+                                parent_schema_token=args.parent_schema_token,
+                            ),
                             "--map-handle",
                             args.map_handle,
                             "--key",
@@ -5207,8 +5223,10 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                         "choice_argv": [
                             "request-array-item",
                             args.api,
-                            "--schema-digest",
-                            contract.schema_digest,
+                            *_container_schema_binding_argv(
+                                contract,
+                                parent_schema_token=args.parent_schema_token,
+                            ),
                             "--array-handle",
                             args.array_handle,
                             "--index",
@@ -5360,8 +5378,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             if next_sibling_disclosure:
                 sibling = next_sibling_disclosure["next_sibling_disclosure"]
                 if sibling.get("is_next_command") is True:
-                    blocked_by.append("next_sibling_disclosure")
-                blocked_by.append("all_descendant_disclosures")
+                    blocked_by.extend(
+                        ["next_sibling_disclosure", "all_descendant_disclosures"]
+                    )
             if blocked_by:
                 deferred_fact["deferred_fact"]["blocked_by"] = blocked_by
         response = {
@@ -5410,9 +5429,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                                 "current_business_request_contains_that_index"
                             ),
                             "allowed_after": (
-                                "current_item_descendant_disclosures"
-                                if args.parent_schema_token is not None
-                                else "current_root_deferred_facts"
+                                "current_root_fact_apply_success"
                             ),
                             "absent_index_forbidden": True,
                             "is_next_command": False,
@@ -5454,6 +5471,11 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                             "child_contract_facts",
                             "descendant_response_nodes",
                         ],
+                        "forbidden": [
+                            "descendant_fact_before_current_node_parent_or_child_facts",
+                            "next_sibling_disclosure_before_current_root_facts",
+                            "one_fact_apply_batch_spanning_sibling_roots",
+                        ],
                     },
                     "this_handle_is_not_a_complete_request": True,
                 },
@@ -5471,7 +5493,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                                 "latest_draft_response.next_action_binding."
                                 "fixed_argv_prefix"
                             ),
-                            "batch_scope": "next_current_root_deferred_facts",
+                            "batch_scope": "current_root_only_next_deferred_facts",
                             "complete_action_groups_in_queue_order": True,
                             "maximum_actions": MAX_TYPED_ACTIONS_PER_APPLY,
                             "copy_returned_handles_exactly": True,
