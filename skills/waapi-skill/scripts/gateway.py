@@ -1146,14 +1146,6 @@ def build_parser() -> argparse.ArgumentParser:
         "--member-key",
         help="Exact child-object key whose opaque branch choices must be disclosed",
     )
-    request_map_container.add_argument(
-        "--no-dynamic-descendants",
-        action="store_true",
-        help=(
-            "Assert that this exact business object has no object or array "
-            "descendants, so the response omits inapplicable nested continuations"
-        ),
-    )
     request_map_container.add_argument("--parent-schema-token")
 
     request_array_item = subparsers.add_parser(
@@ -1172,14 +1164,6 @@ def build_parser() -> argparse.ArgumentParser:
     request_array_item.add_argument(
         "--member-key",
         help="Exact child-object key whose opaque branch choices must be disclosed",
-    )
-    request_array_item.add_argument(
-        "--no-dynamic-descendants",
-        action="store_true",
-        help=(
-            "Assert that this exact business object has no object or array "
-            "descendants, so the response omits inapplicable nested continuations"
-        ),
     )
     request_array_item.add_argument("--parent-schema-token")
 
@@ -2299,6 +2283,7 @@ def gateway_stdout_payload(value: Any) -> Any:
         return projected
     raw_decision = raw_continuation.get("next_command_decision")
     continuation: dict[str, Any] = {}
+    candidate_keys: list[str] = []
     if isinstance(raw_decision, Mapping):
         decision = {
             key: raw_decision[key]
@@ -2331,7 +2316,24 @@ def gateway_stdout_payload(value: Any) -> Any:
                 else row
                 for row in evaluate
             ]
+            candidate_key_by_name = {
+                "branch_disclosure": "branch_disclosure",
+                "nested_container_disclosures": "nested_container_disclosures",
+                "next_item_disclosure": "next_item_disclosure",
+                "business_sibling_transition": "business_sibling_transition",
+                "deferred_fact_queue": "deferred_fact",
+            }
+            candidate_keys = [
+                candidate_key_by_name[name]
+                for row in decision["evaluate_in_order"]
+                if isinstance(row, Mapping)
+                and isinstance((name := row.get("candidate")), str)
+                and name in candidate_key_by_name
+            ]
         continuation["next_command_decision"] = decision
+    for key in candidate_keys:
+        if key in raw_continuation and key not in continuation:
+            continuation[key] = raw_continuation[key]
     for key, item in raw_continuation.items():
         if key in {
             "draft_fact_execution",
@@ -2340,7 +2342,7 @@ def gateway_stdout_payload(value: Any) -> Any:
             "next_command_decision",
             "request_wide_order",
             "root_fact_queue_anchor",
-        }:
+        } or key in continuation:
             continue
         continuation[key] = item
     projected["continuation"] = continuation
@@ -4810,27 +4812,8 @@ def _next_array_item_disclosure(
                 "schema_does_not_require_another_item": True,
                 "do_not_disclose_absent_index": True,
             },
-            **_no_dynamic_descendants_argv_by_shape(argv_by_shape),
             "argv_by_shape": argv_by_shape,
         }
-    }
-
-
-def _no_dynamic_descendants_argv_by_shape(
-    argv_by_shape: Mapping[str, Sequence[str]],
-) -> dict[str, Any]:
-    """Return the exact object-leaf variant beside one container continuation."""
-
-    object_argv = argv_by_shape.get("object")
-    if object_argv is None:
-        return {}
-    return {
-        "no_dynamic_descendants_condition": (
-            "exact_business_object_contains_no_object_or_array_descendants"
-        ),
-        "no_dynamic_descendants_argv_by_shape": {
-            "object": [*object_argv, "--no-dynamic-descendants"]
-        },
     }
 
 
@@ -4916,7 +4899,6 @@ def _next_array_sibling_disclosure(
         ),
         "absent_or_scalar_next_item_forbidden": True,
         "is_next_command": nested_sibling,
-        **_no_dynamic_descendants_argv_by_shape(argv_by_shape),
         "argv_by_shape": argv_by_shape,
     }
     return {"business_sibling_transition": transition}
@@ -4992,7 +4974,6 @@ def _next_map_sibling_disclosure(
                 "must_precede": "current_root_deferred_facts",
                 "absent_member_forbidden": True,
                 "is_next_command": True,
-                **_no_dynamic_descendants_argv_by_shape(argv_by_shape),
                 "argv_by_shape": argv_by_shape,
             }
         }
@@ -5038,7 +5019,6 @@ def _root_dynamic_disclosure_commands(
                 "business_value_pointer": (
                     f"/{field.section}/" + "/".join(field.path)
                 ),
-                **_no_dynamic_descendants_argv_by_shape(argv_by_shape),
                 "argv_by_shape": argv_by_shape,
             }
         )
@@ -5410,10 +5390,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             and args.schema_digest != contract.schema_digest
         ):
             raise GatewayInputError("Typed request schema digest is stale")
-        if args.no_dynamic_descendants and args.shape != "object":
-            raise GatewayInputError(
-                "--no-dynamic-descendants is valid only for an object value"
-            )
         parent_handle = (
             args.map_handle
             if args.command == "request-map-container"
@@ -5474,11 +5450,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                             *(
                                 ["--parent-schema-token", args.parent_schema_token]
                                 if args.parent_schema_token is not None
-                                else []
-                            ),
-                            *(
-                                ["--no-dynamic-descendants"]
-                                if args.no_dynamic_descendants
                                 else []
                             ),
                             "--choice-handle",
@@ -5550,11 +5521,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                             *(
                                 ["--parent-schema-token", args.parent_schema_token]
                                 if args.parent_schema_token is not None
-                                else []
-                            ),
-                            *(
-                                ["--no-dynamic-descendants"]
-                                if args.no_dynamic_descendants
                                 else []
                             ),
                             "--choice-handle",
@@ -5632,8 +5598,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             child_contract=child_contract,
             lineage_token=lineage_token,
         )
-        if args.no_dynamic_descendants:
-            nested_container_disclosures = []
         if current_business_value_pointer is not None:
             scalar_member_facts = child_contract.get("fixed_scalar_member_facts")
             if isinstance(scalar_member_facts, list):
@@ -5731,11 +5695,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "parent_handle": parent_handle,
             "key": key,
             "shape": args.shape,
-            **(
-                {"no_dynamic_descendants": True}
-                if args.no_dynamic_descendants
-                else {}
-            ),
             "handle": child_handle,
             **(
                 {

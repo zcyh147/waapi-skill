@@ -218,24 +218,6 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
             "schema_does_not_require_another_item": True,
             "do_not_disclose_absent_index": True,
         },
-        "no_dynamic_descendants_condition": (
-            "exact_business_object_contains_no_object_or_array_descendants"
-        ),
-        "no_dynamic_descendants_argv_by_shape": {
-            "object": [
-                "request-array-item",
-                "object.create",
-                "--array-handle",
-                nested_children["handle"],
-                "--index",
-                "<zero_based_business_present_index>",
-                "--shape",
-                "object",
-                "--parent-schema-token",
-                nested_children["schema_lineage_token"],
-                "--no-dynamic-descendants",
-            ]
-        },
         "argv_by_shape": {
             "object": [
                 "request-array-item",
@@ -296,24 +278,6 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         },
         "absent_or_scalar_next_item_forbidden": True,
         "is_next_command": True,
-        "no_dynamic_descendants_condition": (
-            "exact_business_object_contains_no_object_or_array_descendants"
-        ),
-        "no_dynamic_descendants_argv_by_shape": {
-            "object": [
-                "request-array-item",
-                "object.create",
-                "--array-handle",
-                nested_children["handle"],
-                "--index",
-                "1",
-                "--shape",
-                "object",
-                "--parent-schema-token",
-                nested_children["schema_lineage_token"],
-                "--no-dynamic-descendants",
-            ]
-        },
         "argv_by_shape": {
             "object": [
                 "request-array-item",

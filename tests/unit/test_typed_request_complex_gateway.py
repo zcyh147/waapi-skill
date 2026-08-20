@@ -1326,7 +1326,11 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     )
     assert len((root_encoded + "\n").encode("utf-8")) < 7 * 1024
     assert "session_context" not in root_projected
-    assert next(iter(root_projected["continuation"])) == "next_command_decision"
+    assert list(root_projected["continuation"])[:3] == [
+        "next_command_decision",
+        "nested_container_disclosures",
+        "deferred_fact",
+    ]
     assert "root_fact_queue_anchor" not in root_projected["continuation"]
     assert "request_wide_order" not in root_projected["continuation"]
     assert root_projected["continuation"]["next_command_decision"][
@@ -1346,7 +1350,7 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     leaf_argv = [
         "0" if token == "<zero_based_business_present_index>" else token
         for token in child_array["continuation"]["next_item_disclosure"][
-            "no_dynamic_descendants_argv_by_shape"
+            "argv_by_shape"
         ]["object"]
     ]
     code, leaf = gateway.execute_gateway(
@@ -1367,16 +1371,19 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     assert projected["continuation"]["next_command_decision"][
         "evaluate_in_order"
     ][-1]["first_command_pointer"] == "/continuation/deferred_fact/argv"
-    assert "nested_container_disclosures" not in projected["continuation"]
     assert projected["continuation"]["next_command_decision"][
         "evaluate_in_order"
     ][0]["candidate"] == "business_sibling_transition"
-    assert "--no-dynamic-descendants" in projected["continuation"][
-        "business_sibling_transition"
-    ]["no_dynamic_descendants_argv_by_shape"]["object"]
+    assert list(projected["continuation"])[:4] == [
+        "next_command_decision",
+        "business_sibling_transition",
+        "nested_container_disclosures",
+        "deferred_fact",
+    ]
+    assert "--no-dynamic-descendants" not in encoded
 
 
-def test_no_dynamic_descendants_rejects_a_non_object_container(
+def test_dynamic_container_schema_exposes_one_standard_argv_per_shape(
     tmp_path: Path,
 ) -> None:
     contract = draft_operation_request_contract("object.create", "2021.1")
@@ -1399,15 +1406,13 @@ def test_no_dynamic_descendants_rejects_a_non_object_container(
             "--index",
             "0",
             "--shape",
-            "array",
-            "--no-dynamic-descendants",
+            "object",
         ],
         env=_env(tmp_path, "2021.1"),
-        client_factory=lambda _url: pytest.fail("rejection must be offline"),
+        client_factory=lambda _url: pytest.fail("disclosure must be offline"),
     )
 
-    assert code == 2
-    assert payload["ok"] is False
-    assert payload["message"] == (
-        "--no-dynamic-descendants is valid only for an object value"
-    )
+    assert code == 0, payload
+    encoded = gateway.gateway_stdout_json_encoder(payload).encode(payload)
+    assert "no_dynamic_descendants" not in encoded
+    assert "--no-dynamic-descendants" not in encoded
