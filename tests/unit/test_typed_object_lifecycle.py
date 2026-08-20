@@ -19,6 +19,9 @@ from wwise_waapi.typed_operations import (  # pyright: ignore[reportMissingImpor
     draft_operation_request_contract,
     materialize_inline_operation_request,
 )
+from wwise_waapi.typed_requests import (  # pyright: ignore[reportMissingImports]
+    typed_request_construction_for_values,
+)
 
 SCRIPT_PATH = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill" / "scripts" / "gateway.py"
 SPEC = importlib.util.spec_from_file_location("waapi_typed_object_lifecycle_gateway", SCRIPT_PATH)
@@ -84,6 +87,43 @@ def test_object_create_uses_shared_recursive_typed_core(version: str) -> None:
     assert any(field["name"] == "children" for field in payload["fields"])
     assert payload["continuation"]["subcommand"] == "draft-start"
     assert payload["continuation"]["operation"] == "object.create"
+
+
+def test_object_create_inverse_facts_follow_the_public_child_contract_order() -> None:
+    contract = draft_operation_request_contract("object.create", "2023.1")
+    construction = typed_request_construction_for_values(
+        contract,
+        args={
+            "parent": {"kind": "path", "value": PARENT[1]},
+            "type": "ActorMixer",
+            "name": "Impact_Library",
+            "on_name_conflict": "rename",
+            "children": [
+                {
+                    "type": "RandomSequenceContainer",
+                    "name": "Metal",
+                    "notes": "reviewed",
+                    "children": [
+                        {"type": "Sound", "name": "Light"},
+                        {"type": "Sound", "name": "Heavy"},
+                    ],
+                }
+            ],
+        },
+        options={},
+    )
+
+    root_children = next(
+        fact
+        for fact in construction.facts
+        if fact.action == "append" and fact.handle.startswith("trh1-")
+    )
+    member_keys = [
+        fact.key
+        for fact in construction.facts
+        if fact.action == "map-put" and fact.handle == root_children.value
+    ]
+    assert member_keys == ["type", "name", "notes", "children"]
 
 
 def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path: Path) -> None:
@@ -192,6 +232,7 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
     assert grandchild["child_contract"]["required_keys"] == ["type", "name"]
     assert grandchild["business_value_scope"] == {
         "current_value_pointer": "/args/children/0/children/0",
+        "outermost_disclosed_root_pointer": "/args/children/0",
         "current_value_only": True,
         "unrelated_prompt_objects_do_not_satisfy_member_conditions": True,
     }
@@ -206,6 +247,11 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
             "complete": False,
             "confirmation_before_preview": "invalid",
             "final_response_before_preview": "invalid",
+        },
+        "deferred_fact_root_barrier": {
+            "outermost_disclosed_root_pointer": "/args/children/0",
+            "start_at_response_with_current_value_pointer": "/args/children/0",
+            "descendant_facts_before_root_parent_and_child_facts": "forbidden",
         },
         "if_current_business_object_is_declared_leaf": {
             "condition": (

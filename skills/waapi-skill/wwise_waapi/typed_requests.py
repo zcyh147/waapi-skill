@@ -1835,6 +1835,34 @@ def typed_schema_lineage_business_pointer(
     return "/" + "/".join(escape(part) for part in parts)
 
 
+def typed_schema_lineage_root_business_pointer(
+    contract: TypedRequestContract,
+    *,
+    child_handle: str,
+    token: str,
+) -> str:
+    """Return the outermost dynamic value location named by a lineage token."""
+
+    if not child_handle.startswith(TYPED_DYNAMIC_HANDLE_PREFIX):
+        raise TypedRequestError("Typed schema lineage child handle is invalid")
+    steps = _decode_lineage_steps(token)
+    if not steps:
+        raise TypedRequestError("Typed schema lineage token is empty")
+    root_handle = steps[0]["parent_handle"]
+    root = next(
+        (field for field in contract.fields if field.handle == root_handle),
+        None,
+    )
+    if root is None:
+        raise TypedRequestError("Typed schema lineage token has no request root")
+
+    def escape(value: object) -> str:
+        return str(value).replace("~", "~0").replace("/", "~1")
+
+    parts = [root.section, *root.path, str(steps[0]["key"])]
+    return "/" + "/".join(escape(part) for part in parts)
+
+
 def _decode_lineage_steps(token: str) -> list[Mapping[str, Any]]:
     from base64 import urlsafe_b64decode
     import json
@@ -3271,7 +3299,18 @@ def _append_dynamic_object_members(
         graph=contract.definition_graph,
         section=section,
     )
-    schema_keys = (*dynamic.required_map_keys, *dynamic.fixed_map_keys)
+    expanded_schema = _expanded_schema(
+        schema,
+        root_schema=contract.schema_roots[section],
+        graph=contract.definition_graph,
+    )
+    fixed_properties = expanded_schema.get("properties", {})
+    if not isinstance(fixed_properties, Mapping):
+        raise TypedRequestError("Typed dynamic object properties are malformed")
+    schema_keys = (
+        *dynamic.required_map_keys,
+        *(key for key in fixed_properties if isinstance(key, str)),
+    )
     ordered_keys = list(dict.fromkeys(key for key in schema_keys if key in value))
     ordered_keys.extend(sorted(set(value) - set(ordered_keys)))
     for key in ordered_keys:

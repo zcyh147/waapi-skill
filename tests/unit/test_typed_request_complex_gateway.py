@@ -275,6 +275,7 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
     assert item["continuation"]["deferred_fact"]["is_next_command"] is False
     assert item["business_value_scope"] == {
         "current_value_pointer": "/args/filters/0",
+        "outermost_disclosed_root_pointer": "/args/filters/0",
         "current_value_only": True,
         "unrelated_prompt_objects_do_not_satisfy_member_conditions": True,
     }

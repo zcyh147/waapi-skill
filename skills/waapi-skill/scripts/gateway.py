@@ -130,6 +130,7 @@ from wwise_waapi.typed_requests import (  # noqa: E402  # pyright: ignore[report
     parse_typed_schema_lineage_token,
     request_contract,
     typed_schema_lineage_business_pointer,
+    typed_schema_lineage_root_business_pointer,
     typed_schema_lineage_token,
 )
 from wwise_waapi.typed_queries import (  # noqa: E402  # pyright: ignore[reportMissingImports]
@@ -4726,6 +4727,7 @@ def _next_nested_disclosure_selector(
 def _dynamic_next_command_decision(
     *,
     draft_shape: bool,
+    outermost_disclosed_root_pointer: str | None,
     branch_continuation: Mapping[str, Any],
     nested_container_disclosures: Sequence[Mapping[str, Any]],
     next_item_disclosure: Mapping[str, Any],
@@ -4848,6 +4850,23 @@ def _dynamic_next_command_decision(
                     }
                 }
                 if draft_shape
+                else {}
+            ),
+            **(
+                {
+                    "deferred_fact_root_barrier": {
+                        "outermost_disclosed_root_pointer": (
+                            outermost_disclosed_root_pointer
+                        ),
+                        "start_at_response_with_current_value_pointer": (
+                            outermost_disclosed_root_pointer
+                        ),
+                        "descendant_facts_before_root_parent_and_child_facts": (
+                            "forbidden"
+                        ),
+                    }
+                }
+                if outermost_disclosed_root_pointer is not None
                 else {}
             ),
             **(
@@ -5215,10 +5234,18 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 child_handle=child_handle,
                 token=lineage_token,
             )
+            outermost_disclosed_root_pointer = (
+                typed_schema_lineage_root_business_pointer(
+                    contract,
+                    child_handle=child_handle,
+                    token=lineage_token,
+                )
+            )
         except TypedRequestError:
             # Legacy unlineaged dynamic parents remain usable for their bounded
             # current response, but cannot claim a canonical business pointer.
             current_business_value_pointer = None
+            outermost_disclosed_root_pointer = None
         nested_container_disclosures = _fixed_nested_container_disclosures(
             args,
             contract=contract,
@@ -5310,6 +5337,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 {
                     "business_value_scope": {
                         "current_value_pointer": current_business_value_pointer,
+                        "outermost_disclosed_root_pointer": (
+                            outermost_disclosed_root_pointer
+                        ),
                         "current_value_only": True,
                         "unrelated_prompt_objects_do_not_satisfy_member_conditions": True,
                     }
@@ -5356,6 +5386,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                         (draft_shape or undo_child_shape)
                         and not query_shape
                         and topic_prefix is None
+                    ),
+                    outermost_disclosed_root_pointer=(
+                        outermost_disclosed_root_pointer
                     ),
                     branch_continuation=branch_continuation,
                     nested_container_disclosures=nested_container_disclosures,
