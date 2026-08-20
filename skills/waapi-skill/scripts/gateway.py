@@ -2283,24 +2283,24 @@ def gateway_stdout_payload(value: Any) -> Any:
             "business_value_scope",
             "schema_lineage_authority",
             "construction_state",
+            "session_context",
         }
     }
+    raw_child_contract = value.get("child_contract")
+    if isinstance(raw_child_contract, Mapping):
+        projected["child_contract"] = {
+            key: item
+            for key, item in raw_child_contract.items()
+            if key not in {"fact_literal_policy", "fixed_container_members"}
+            and item not in (None, False, [], {})
+        }
     raw_continuation = value.get("continuation")
     if not isinstance(raw_continuation, Mapping):
         return projected
-    continuation = {
-        key: item
-        for key, item in raw_continuation.items()
-        if key
-        not in {
-            "draft_fact_execution",
-            "nested_container_order",
-            "next_business_present_nested_disclosure",
-        }
-    }
     raw_decision = raw_continuation.get("next_command_decision")
+    continuation: dict[str, Any] = {}
     if isinstance(raw_decision, Mapping):
-        continuation["next_command_decision"] = {
+        decision = {
             key: raw_decision[key]
             for key in (
                 "preview_construction_boundary",
@@ -2310,6 +2310,39 @@ def gateway_stdout_payload(value: Any) -> Any:
             )
             if key in raw_decision
         }
+        evaluate = decision.get("evaluate_in_order")
+        if isinstance(evaluate, list):
+            decision["evaluate_in_order"] = [
+                {
+                    **row,
+                    **(
+                        {
+                            "first_command_pointer": (
+                                "/continuation/deferred_fact/argv"
+                            )
+                        }
+                        if isinstance(row, Mapping)
+                        and row.get("first_command_pointer")
+                        == "/continuation/root_fact_queue_anchor/first_fact_argv"
+                        else {}
+                    ),
+                }
+                if isinstance(row, Mapping)
+                else row
+                for row in evaluate
+            ]
+        continuation["next_command_decision"] = decision
+    for key, item in raw_continuation.items():
+        if key in {
+            "draft_fact_execution",
+            "nested_container_order",
+            "next_business_present_nested_disclosure",
+            "next_command_decision",
+            "request_wide_order",
+            "root_fact_queue_anchor",
+        }:
+            continue
+        continuation[key] = item
     projected["continuation"] = continuation
     return projected
 
@@ -5754,6 +5787,25 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             },
             "continuation": {
                 **next_sibling_disclosure,
+                # Copy-ready nested commands are the current response's
+                # actionable continuation. Keep the complete schema-ordered
+                # list before repeated queue and request-wide guidance so
+                # every exact candidate remains visible in a bounded
+                # shell-tool prefix.
+                **(
+                    {
+                        "nested_container_disclosures": (
+                            nested_container_disclosures
+                        ),
+                        "nested_container_order": (
+                            "branch_then_schema_members_then_descendants_then_facts"
+                            if branch_continuation
+                            else "schema_members_then_descendants_then_facts"
+                        ),
+                    }
+                    if nested_container_disclosures
+                    else {}
+                ),
                 **_root_fact_queue_anchor(
                     contract=contract,
                     child_handle=child_handle,
@@ -5843,20 +5895,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                         ]
                     }
                     if topic_prefix is not None
-                    else {}
-                ),
-                **(
-                    {
-                        "nested_container_disclosures": (
-                            nested_container_disclosures
-                        ),
-                        "nested_container_order": (
-                            "branch_then_schema_members_then_descendants_then_facts"
-                            if branch_continuation
-                            else "schema_members_then_descendants_then_facts"
-                        ),
-                    }
-                    if nested_container_disclosures
                     else {}
                 ),
                 **branch_continuation,

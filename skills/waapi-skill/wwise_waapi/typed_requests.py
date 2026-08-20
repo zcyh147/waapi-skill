@@ -386,6 +386,41 @@ class TypedRequestContract:
                 child_fields_by_parent.setdefault(parent_handle, []).append(
                     child_field
                 )
+        branch_choice_rows: list[list[Any]] = []
+        for field in field_payloads:
+            if field.get("parent_handle") is not None or field.get("shape") != "branch":
+                continue
+            handle = field.get("handle")
+            path = field.get("path")
+            if not isinstance(handle, str) or not isinstance(path, list):
+                continue
+            constant_field: str | None = None
+            handles: dict[str, str] = {}
+            for choice in child_fields_by_parent.get(handle, []):
+                constants = choice.get("branch_choice_constants")
+                choice_handle = choice.get("handle")
+                if (
+                    not isinstance(constants, Mapping)
+                    or len(constants) != 1
+                    or not isinstance(choice_handle, str)
+                ):
+                    continue
+                name, value = next(iter(constants.items()))
+                if not isinstance(name, str) or not isinstance(value, str):
+                    continue
+                if constant_field is not None and constant_field != name:
+                    handles = {}
+                    break
+                constant_field = name
+                handles[value] = choice_handle
+            if constant_field is not None and handles:
+                branch_choice_rows.append(
+                    [
+                        handle,
+                        constant_field,
+                        [[name, value] for name, value in handles.items()],
+                    ]
+                )
         rows: list[list[Any]] = []
         for field in field_payloads:
             path = field.get("path")
@@ -441,6 +476,10 @@ class TypedRequestContract:
                 "row business_pointer; a prior read result is proof only and must "
                 "never replace that value or its representation"
             ),
+            "branch_choice_handle_table": {
+                "columns": ["field_handle", "constant_field", "choices"],
+                "rows": branch_choice_rows,
+            },
             "business_pointer_source": "this table's business_pointer column",
             "fact_batching": (
                 "count each literal --action; submit facts 1..6, then read the "

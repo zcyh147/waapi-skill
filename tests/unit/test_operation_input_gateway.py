@@ -222,6 +222,35 @@ def test_inline_operation_schema_exposes_one_typed_continuation(tmp_path: Path) 
 def test_generic_draft_start_requires_first_fact_batch_before_disclosure(
     tmp_path: Path,
 ) -> None:
+    schema_code, schema = offline_execute(
+        tmp_path,
+        "operation-schema",
+        "object.create",
+        version="2021.1",
+    )
+    assert schema_code == 0, schema
+    schema = json.loads(
+        waapi_gateway.gateway_stdout_json_encoder(schema).encode(schema)
+    )
+    branch_table = schema["composer"]["top_level_fact_plan"][
+        "branch_choice_handle_table"
+    ]
+    assert branch_table["columns"] == [
+        "field_handle",
+        "constant_field",
+        "choices",
+    ]
+    assert branch_table["rows"][0] == [
+        "trh1-04ddc827227ba0c5ff771edd",
+        "kind",
+        [
+            ["id", "trh1-a5081819643837eefc0e55fb"],
+            ["path", "trh1-29073152c568e1f82b5621b7"],
+            ["exact-type-name", "trh1-022ff465c2cb2094f5442531"],
+            ["direct-child", "trh1-9b6f1d5e8be362bdbfda1cf8"],
+            ["scoped-name", "trh1-059c99da4210b53a0d7a5c4c"],
+        ],
+    ]
     code, payload = offline_execute(
         tmp_path,
         "--state-dir",

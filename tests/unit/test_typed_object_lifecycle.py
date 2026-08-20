@@ -180,6 +180,16 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         ("references", "array"),
         ("children", "array"),
     ]
+    public_container = waapi_gateway.gateway_stdout_payload(container)
+    encoded_container = waapi_gateway.gateway_stdout_json_encoder(
+        public_container
+    ).encode(public_container)
+    decision_offset = encoded_container.index('"next_command_decision":{')
+    nested_offset = encoded_container.index('"nested_container_disclosures":[')
+    children_offset = encoded_container.index('"key":"children"', nested_offset)
+    assert decision_offset < nested_offset
+    assert '"request_wide_order"' not in encoded_container
+    assert children_offset < 4096
     assert "action_argv" not in container["continuation"]
     deferred_argv = container["continuation"]["deferred_fact"]["argv"]
     assert deferred_argv[
@@ -337,8 +347,10 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         "batch_limit": 6,
     }
     next_decision = grandchild["continuation"]["next_command_decision"]
-    assert list(grandchild["continuation"])[:3] == [
+    assert list(grandchild["continuation"])[:5] == [
         "business_sibling_transition",
+        "nested_container_disclosures",
+        "nested_container_order",
         "root_fact_queue_anchor",
         "next_command_decision",
     ]

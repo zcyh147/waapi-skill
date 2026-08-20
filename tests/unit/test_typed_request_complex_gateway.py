@@ -1320,6 +1320,18 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
         client_factory=lambda _url: pytest.fail("disclosure must be offline"),
     )
     assert code == 0, root
+    root_projected = gateway.gateway_stdout_payload(root)
+    root_encoded = gateway.gateway_stdout_json_encoder(root_projected).encode(
+        root_projected
+    )
+    assert len((root_encoded + "\n").encode("utf-8")) < 7 * 1024
+    assert "session_context" not in root_projected
+    assert next(iter(root_projected["continuation"])) == "next_command_decision"
+    assert "root_fact_queue_anchor" not in root_projected["continuation"]
+    assert "request_wide_order" not in root_projected["continuation"]
+    assert root_projected["continuation"]["next_command_decision"][
+        "evaluate_in_order"
+    ][0]["candidate"] == "nested_container_disclosures"
     child_array_argv = next(
         row["argv"]
         for row in root["continuation"]["nested_container_disclosures"]
@@ -1354,7 +1366,7 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     )
     assert projected["continuation"]["next_command_decision"][
         "evaluate_in_order"
-    ] == leaf["continuation"]["next_command_decision"]["evaluate_in_order"]
+    ][-1]["first_command_pointer"] == "/continuation/deferred_fact/argv"
     assert "nested_container_disclosures" not in projected["continuation"]
     assert projected["continuation"]["next_command_decision"][
         "evaluate_in_order"

@@ -1487,17 +1487,26 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             MAX_INLINE_COMPOSER_FIELD_PROJECTION_BYTES
         )
         top_level_fact_plan = typed.top_level_fact_plan()
+        if compact_field_table:
+            top_level_fact_plan = {
+                key: value
+                for key, value in top_level_fact_plan.items()
+                if key
+                not in {
+                    "branch_fact_expansion",
+                    "business_fact_selection",
+                    "business_pointer_source",
+                    "fact_batching",
+                }
+            }
         if operation == "object.create":
             top_level_fact_plan = {
                 **top_level_fact_plan,
                 "branch_selection_authority": (
-                    "parent=/args/parent direct container; preflight merge-target "
-                    "GUID=proof only, never parent; preserve each business_pointer "
-                    "representation"
+                    "parent=/args/parent; merge-target GUID is proof only"
                 ),
                 "dynamic_disclosure_authority": (
-                    "metadata property=>/args/properties; reference=>/args/references; "
-                    "order=properties,references,children"
+                    "properties,references,children in that order"
                 ),
             }
         return {

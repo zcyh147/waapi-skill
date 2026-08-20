@@ -975,31 +975,20 @@ def test_object_create_schema_puts_the_top_level_fact_plan_before_large_fields(
     assert conflict["phase"] == "fact"
     assert conflict["action"] == "set"
     assert children["phase"] == "disclosure"
-    assert table["business_fact_selection"] == (
-        "submit only prompt-present values; omit absent defaults"
-    )
     assert table["branch_selection_authority"] == (
-        "parent=/args/parent direct container; preflight merge-target GUID=proof "
-        "only, never parent; preserve each business_pointer representation"
+        "parent=/args/parent; merge-target GUID is proof only"
     )
     assert table["dynamic_disclosure_authority"] == (
-        "metadata property=>/args/properties; reference=>/args/references; "
-        "order=properties,references,children"
+        "properties,references,children in that order"
     )
-    assert table["business_pointer_source"] == (
-        "this table's business_pointer column"
-    )
+    assert not {
+        "branch_fact_expansion",
+        "business_fact_selection",
+        "business_pointer_source",
+        "fact_batching",
+    }.intersection(table)
     parent = next(field for field in plan if field["name"] == "parent")
     assert parent["business_pointer"] == "/args/parent"
-    assert table["fact_batching"] == (
-        "count each literal --action; submit facts 1..6, then read the response "
-        "before submitting facts 7..12; never put a seventh action in one "
-        "draft-apply; the final batch contains every remaining fact up to 6"
-    )
-    assert table["branch_fact_expansion"] == (
-        "after choose, immediately set every required selected-branch "
-        "constant and business value before the next top-level fact"
-    )
     assert composer["construction_order"]["branch_constants"] == (
         "set selected branch constants before disclosure"
     )
