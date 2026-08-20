@@ -2812,7 +2812,27 @@ def audit_session_events(
         and isinstance((item := event.get("item")), Mapping)
         and isinstance(item.get("type"), str)
     }
-    unexpected_item_types = tuple(sorted(observed_item_types - {"agent_message", "command_execution"}))
+    allowed_item_types = {"agent_message", "command_execution"}
+    completed_error_items = tuple(
+        item
+        for event in events
+        if event.get("type") == "item.completed"
+        and isinstance((item := event.get("item")), Mapping)
+        and item.get("type") == "error"
+    )
+    completed_turn = sum(
+        event.get("type") == "turn.completed" for event in events
+    ) == 1 and not any(event.get("type") == "turn.failed" for event in events)
+    if completed_turn and completed_error_items and all(
+        isinstance((message := item.get("message")), str)
+        and message.startswith(
+            "Falling back from WebSockets to HTTPS transport. "
+            "stream disconnected before completion:"
+        )
+        for item in completed_error_items
+    ):
+        allowed_item_types.add("error")
+    unexpected_item_types = tuple(sorted(observed_item_types - allowed_item_types))
     return CodexSessionAudit(
         thread_started_count=sum(event.get("type") == "thread.started" for event in events),
         turn_started_count=sum(event.get("type") == "turn.started" for event in events),

@@ -150,6 +150,50 @@ def test_typed_profile_object_create_batches_fit_windows_command_transport() -> 
     assert max(encoded_lengths) < 30_000
 
 
+def test_typed_profile_object_create_applies_each_disclosed_node_before_the_next(
+) -> None:
+    profile = load_typed_input_profile(
+        Path(__file__).resolve().parent / "data" / "typed-input-v1" / "profile.json"
+    )
+    unit = next(
+        row
+        for row in profile.units
+        if row.unit_id == "TYP21-DEDICATED-OBJECT-CREATE"
+    )
+    recipe = build_object_heavy_v3_recipe(unit.base_scenario_id, unit.version)
+    protocol = build_transaction_protocol(
+        (recipe.request.as_dict(version=unit.version),)
+    )
+    construction = tuple(
+        step
+        for step in protocol.steps
+        if ".action." in step.name or ".disclose." in step.name
+    )
+
+    assert [step.name for step in construction[:9]] == [
+        "tx01.action.001",
+        "tx01.disclose.001",
+        "tx01.action.002",
+        "tx01.disclose.002",
+        "tx01.action.003",
+        "tx01.disclose.003",
+        "tx01.action.004",
+        "tx01.disclose.004",
+        "tx01.action.005",
+    ]
+    action_sizes = []
+    for step in construction:
+        if ".action." not in step.name:
+            continue
+        argument = step.arguments[-1]
+        action_sizes.append(
+            len(argument.actions)
+            if isinstance(argument, DraftTypedActionBatchArgument)
+            else 1
+        )
+    assert action_sizes == [6, 4, 1, 3, 3, 4, 1, 3, 3, 4, 1, 3, 3]
+
+
 def test_typed_profile_object_create_uses_one_standard_disclosure_argv() -> None:
     profile = load_typed_input_profile(
         Path(__file__).resolve().parent / "data" / "typed-input-v1" / "profile.json"

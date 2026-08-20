@@ -104,7 +104,7 @@ def test_media_pool_schema_marks_scalar_array_items_as_append_facts(
     }
 
 
-def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes(
+def test_media_pool_dynamic_child_applies_parent_before_descendant_disclosure(
     tmp_path: Path,
 ) -> None:
     contract = request_contract("2025.1", MEDIA_POOL_URI)
@@ -125,7 +125,7 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
     assert item["construction_state"] == {
         "complete": False,
         "disclosure_replay_allowed": False,
-        "next_phase": "finish_dynamic_disclosures_then_apply_deferred_facts",
+        "next_phase": "apply_current_node_facts_then_continue_dynamic_disclosures",
         "completion_boundary": "draft-check",
         "construction_boundary": {
             "phase": "read_request_construction",
@@ -136,10 +136,8 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
         },
     }
     assert item["continuation"]["request_wide_order"] == {
-        "phase": "dynamic_disclosure",
-        "root_boundary": (
-            "finish_current_root_disclosures_and_facts_before_next_root"
-        ),
+        "phase": "node_local_disclosure_then_facts",
+        "root_boundary": "finish_current_root_nodes_before_next_root",
         "traversal": "response_tree_preorder",
         "nested_member_order": "schema_property_order",
         "child_fact_order": "child_contract_schema_order",
@@ -148,12 +146,12 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
             "node_steps": [
                 "deferred_parent_fact",
                 "child_contract_facts",
-                "descendant_response_nodes",
+                "then_descendant_response_nodes",
             ],
             "forbidden": [
                 "descendant_fact_before_current_node_parent_or_child_facts",
                 "next_outer_sibling_disclosure_before_current_root_facts",
-                "one_fact_apply_batch_spanning_sibling_roots",
+                "one_fact_apply_batch_spanning_disclosed_nodes",
             ],
         },
         "this_handle_is_not_a_complete_request": True,
@@ -167,7 +165,7 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
         "prefix_source": (
             "latest_draft_response.next_action_binding.fixed_argv_prefix"
         ),
-        "batch_scope": "current_root_only_next_deferred_facts",
+        "batch_scope": "current_disclosed_node_only",
         "complete_action_groups_in_queue_order": True,
         "maximum_actions": 6,
         "count_each_literal_action_flag": True,
@@ -182,9 +180,11 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
         if row["candidate"] == "deferred_fact_queue"
     )
     assert deferred_candidate["batch_facts"] == (
-        "current_root_only_next_up_to_6_deferred_facts_in_queue_order"
+        "current_disclosed_node_only_up_to_6_facts_in_queue_order"
     )
-    assert deferred_candidate["first_fact_only"] == "invalid"
+    assert deferred_candidate["first_fact_only"] == (
+        "valid_only_when_current_node_has_no_other_business_facts"
+    )
     assert item["child_contract"]["fact_literal_policy"] == {
         "copy_handles_and_choice_handles_exactly": True,
         "placeholder_or_added_punctuation": "invalid",
@@ -245,7 +245,7 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
     assert string_value["map_put_required"] is True
     assert string_value["map_put_value_source"] == "business_value"
     assert item["continuation"]["deferred_fact"]["execute_after"] == (
-        "all_dynamic_disclosures_for_current_root"
+        "current_container_disclosure"
     )
     assert item["continuation"]["deferred_fact"]["queue_phase"] == (
         "parent_response"
@@ -1328,9 +1328,9 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     assert "session_context" not in root_projected
     assert list(root_projected["continuation"])[:4] == [
         "next_command_decision",
-        "nested_container_disclosures",
         "root_fact_queue_anchor",
         "deferred_fact",
+        "nested_container_disclosures",
     ]
     assert root_projected["continuation"]["root_fact_queue_anchor"] == root[
         "continuation"
@@ -1338,7 +1338,7 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     assert "request_wide_order" not in root_projected["continuation"]
     assert root_projected["continuation"]["next_command_decision"][
         "evaluate_in_order"
-    ][0]["candidate"] == "nested_container_disclosures"
+    ][0]["candidate"] == "deferred_fact_queue"
     child_array_argv = next(
         row["argv"]
         for row in root["continuation"]["nested_container_disclosures"]
@@ -1373,7 +1373,7 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     )
     assert projected["continuation"]["next_command_decision"][
         "evaluate_in_order"
-    ][-1]["first_command_pointer"] == (
+    ][0]["first_command_pointer"] == (
         "/continuation/root_fact_queue_anchor/first_fact_argv"
     )
     assert projected["continuation"]["root_fact_queue_anchor"] == leaf[
@@ -1381,13 +1381,13 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     ]["root_fact_queue_anchor"]
     assert projected["continuation"]["next_command_decision"][
         "evaluate_in_order"
-    ][0]["candidate"] == "business_sibling_transition"
+    ][0]["candidate"] == "deferred_fact_queue"
     assert list(projected["continuation"])[:5] == [
         "next_command_decision",
-        "business_sibling_transition",
-        "nested_container_disclosures",
         "root_fact_queue_anchor",
         "deferred_fact",
+        "nested_container_disclosures",
+        "business_sibling_transition",
     ]
     assert "--no-dynamic-descendants" not in encoded
 
@@ -1405,7 +1405,7 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     assert code == 0, last_leaf
     last_projected = gateway.gateway_stdout_payload(last_leaf)
     last_decision = last_projected["continuation"]["next_command_decision"]
-    assert last_decision["evaluate_in_order"][-1]["first_command_pointer"] == (
+    assert last_decision["evaluate_in_order"][0]["first_command_pointer"] == (
         "/continuation/root_fact_queue_anchor/first_fact_argv"
     )
     assert last_projected["continuation"]["root_fact_queue_anchor"] == root[

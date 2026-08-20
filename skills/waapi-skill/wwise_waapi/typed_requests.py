@@ -924,6 +924,7 @@ class TypedRequestDisclosure:
     key: str
     shape: str
     child_handle: str
+    fact_index: int
     choice_handle: str | None = None
     choice_index: int | None = None
     parent_child_handle: str | None = None
@@ -3261,6 +3262,7 @@ def _append_value_facts(
                         key=str(index),
                         shape=item_type,
                         child_handle=handle,
+                        fact_index=len(facts),
                         choice_handle=choice,
                         choice_index=(
                             next(
@@ -3475,6 +3477,7 @@ def _append_dynamic_container_facts(
                         key=str(index),
                         shape=item_type,
                         child_handle=child,
+                        fact_index=len(facts),
                         choice_handle=choice,
                         choice_index=(
                             next(
@@ -3631,6 +3634,7 @@ def _append_dynamic_object_members(
                     key=key,
                     shape=item_type,
                     child_handle=child,
+                    fact_index=len(facts),
                     choice_handle=choice_handle,
                     choice_index=(
                         next(

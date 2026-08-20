@@ -4092,6 +4092,55 @@ def test_session_audit_rejects_duplicate_threads_missing_completion_and_collab()
     assert audit.passed is False
 
 
+def test_session_audit_accepts_completed_websocket_to_https_fallback() -> None:
+    events = [
+        {"type": "thread.started", "thread_id": "thread-1"},
+        {"type": "turn.started"},
+        {
+            "type": "item.completed",
+            "item": {
+                "id": "transport-1",
+                "type": "error",
+                "message": (
+                    "Falling back from WebSockets to HTTPS transport. "
+                    "stream disconnected before completion: tls handshake eof"
+                ),
+            },
+        },
+        {
+            "type": "item.completed",
+            "item": {"id": "message-1", "type": "agent_message", "text": "done"},
+        },
+        {"type": "turn.completed", "usage": {}},
+    ]
+
+    audit = audit_session_events(events)
+
+    assert audit.unexpected_item_types == ()
+    assert audit.passed is True
+
+
+def test_session_audit_rejects_other_error_items_after_a_completed_turn() -> None:
+    events = [
+        {"type": "thread.started", "thread_id": "thread-1"},
+        {"type": "turn.started"},
+        {
+            "type": "item.completed",
+            "item": {
+                "id": "error-1",
+                "type": "error",
+                "message": "model output could not be decoded",
+            },
+        },
+        {"type": "turn.completed", "usage": {}},
+    ]
+
+    audit = audit_session_events(events)
+
+    assert audit.unexpected_item_types == ("error",)
+    assert audit.passed is False
+
+
 def test_windows_operator_scan_preserves_backslash_paths_and_rejects_composition() -> None:
     command = r'python C:\ProgramData\waapi-skill\scripts\run.py gateway.py status'
 

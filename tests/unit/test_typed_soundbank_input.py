@@ -473,8 +473,8 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
     assert "nested_container_disclosures" not in item["continuation"]
     assert "nested_container_order" not in item["continuation"]
     assert item["continuation"]["request_wide_order"] == {
-        "phase": "dynamic_disclosure",
-        "root_boundary": "finish_current_root_disclosures_and_facts_before_next_root",
+        "phase": "node_local_disclosure_then_facts",
+        "root_boundary": "finish_current_root_nodes_before_next_root",
         "traversal": "response_tree_preorder",
         "nested_member_order": "schema_property_order",
         "child_fact_order": "child_contract_schema_order",
@@ -483,12 +483,12 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
             "node_steps": [
                 "deferred_parent_fact",
                 "child_contract_facts",
-                "descendant_response_nodes",
+                "then_descendant_response_nodes",
             ],
             "forbidden": [
                 "descendant_fact_before_current_node_parent_or_child_facts",
                 "next_outer_sibling_disclosure_before_current_root_facts",
-                "one_fact_apply_batch_spanning_sibling_roots",
+                "one_fact_apply_batch_spanning_disclosed_nodes",
             ],
         },
         "this_handle_is_not_a_complete_request": True,
@@ -600,10 +600,10 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
         for row in identity["continuation"]["next_command_decision"][
             "evaluate_in_order"
         ]
-    ] == ["business_sibling_transition", "deferred_fact_queue"]
+    ] == ["deferred_fact_queue", "business_sibling_transition"]
     sibling = identity["continuation"]["business_sibling_transition"]
     assert sibling["business_value_pointer"] == "/args/inclusions/0/filters"
-    assert sibling["is_next_command"] is True
+    assert sibling["is_next_command"] is False
     assert sibling["argv_by_shape"] == {
         "array": [
             "request-map-container",

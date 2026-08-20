@@ -211,8 +211,8 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
     assert nested_children["continuation"]["next_item_disclosure"] == {
         "condition": "for_each_business_present_item",
         "index_order": "ascending_zero_based_index",
-        "must_finish_before": "deferred_fact",
-        "is_next_command": True,
+        "after_current_node_fact_apply_success": True,
+        "is_next_command": False,
         "business_cardinality_authority": {
             "source": "current_business_request",
             "schema_does_not_require_another_item": True,
@@ -233,12 +233,7 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
             ]
         },
     }
-    assert nested_children["continuation"]["deferred_fact"]["blocked_by"] == [
-        "ancestor_deferred_parent_facts",
-        "ancestor_child_contract_facts",
-        "next_item_disclosure",
-        "all_descendant_disclosures",
-    ]
+    assert "blocked_by" not in nested_children["continuation"]["deferred_fact"]
     grandchild_code, grandchild = waapi_gateway.execute_gateway(
         [
             "--version", "2025.1", "request-array-item", "object.create",
@@ -267,17 +262,18 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         "first_when_current_business_object_is_leaf": True,
         "leaf_nested_container_disclosures": "forbidden",
         "otherwise_after": (
-            "all_business_present_current_item_descendant_disclosures_if_any"
+            "current_node_fact_apply_success_then_all_business_present_"
+            "current_item_descendant_nodes_if_any"
         ),
-        "must_precede": "current_root_deferred_facts",
+        "after_current_node_facts": True,
         "when_absent": {
             "next_action": (
-                "unwind_drain_current_root_deferred_facts_then_use_nearest_"
-                "ancestor_business_sibling_exact_argv"
+                "finish_current_node_then_use_nearest_ancestor_business_"
+                "sibling_exact_argv"
             ),
         },
         "absent_or_scalar_next_item_forbidden": True,
-        "is_next_command": True,
+        "is_next_command": False,
         "argv_by_shape": {
             "object": [
                 "request-array-item",
@@ -340,21 +336,26 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         },
         "evaluate_in_order": [
             {
-                "candidate": "business_sibling_transition",
-                "condition": (
-                    "explicit_leaf_or_no_business_nested_member_and_sibling_present"
+                "candidate": "deferred_fact_queue",
+                "condition": "current_disclosed_node_has_unapplied_business_facts",
+                "action": (
+                    "apply_current_node_parent_fact_then_business_present_"
+                    "child_contract_facts_in_schema_order"
                 ),
-                "business_value_pointer": "/args/children/0/children/1",
-                "command_pointer": (
-                    "/continuation/business_sibling_transition/argv_by_shape/"
-                    "<exact-business-shape>"
+                "start_at": "current_disclosed_node_response",
+                "first_command_pointer": (
+                    "/continuation/root_fact_queue_anchor/first_fact_argv"
                 ),
-                "explicit_leaf_rule": {
-                    "user_says_no_properties_references_children": (
-                        "copy_exact_command_now"
-                    ),
-                    "nested_disclosures": "forbidden",
-                },
+                "batch_facts": (
+                    "current_disclosed_node_only_up_to_6_facts_in_queue_order"
+                ),
+                "stop_before": "first_descendant_or_sibling_parent_fact",
+                "after_success": (
+                    "re_evaluate_remaining_candidates_from_this_response"
+                ),
+                "first_fact_only": (
+                    "valid_only_when_current_node_has_no_other_business_facts"
+                ),
             },
             {
                 "candidate": "nested_container_disclosures",
@@ -371,22 +372,21 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
                 ),
             },
             {
-                "candidate": "deferred_fact_queue",
+                "candidate": "business_sibling_transition",
                 "condition": (
-                    "no_earlier_business_present_disclosure_for_exact_current_object"
+                    "explicit_leaf_or_no_business_nested_member_and_sibling_present"
                 ),
-                "action": (
-                    "return_to_outermost_disclosed_root_then_drain_"
-                    "response_tree_preorder"
+                "business_value_pointer": "/args/children/0/children/1",
+                "command_pointer": (
+                    "/continuation/business_sibling_transition/argv_by_shape/"
+                    "<exact-business-shape>"
                 ),
-                "start_at": "outermost_disclosed_root_response",
-                "first_command_pointer": (
-                    "/continuation/root_fact_queue_anchor/first_fact_argv"
-                ),
-                "batch_facts": (
-                    "current_root_only_next_up_to_6_deferred_facts_in_queue_order"
-                ),
-                "first_fact_only": "invalid",
+                "explicit_leaf_rule": {
+                    "user_says_no_properties_references_children": (
+                        "copy_exact_command_now"
+                    ),
+                    "nested_disclosures": "forbidden",
+                },
             },
         ],
         "first_true_candidate_is_the_only_next_action": True,
@@ -405,7 +405,8 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
                 "current_business_request_contains_that_index"
             ),
             "allowed_after": (
-                "all_business_present_current_item_descendant_disclosures_if_any"
+                "current_node_fact_apply_success_then_all_business_present_"
+                "current_item_descendant_nodes_if_any"
             ),
             "absent_index_forbidden": True,
             "is_next_command": False,
@@ -414,7 +415,9 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
     assert grandchild["construction_state"] == {
         "complete": False,
         "disclosure_replay_allowed": False,
-        "next_phase": "finish_dynamic_disclosures_then_apply_deferred_facts",
+        "next_phase": (
+            "apply_current_node_facts_then_continue_dynamic_disclosures"
+        ),
         "completion_boundary": "draft-check_then_preview",
         "construction_boundary": {
             "phase": "preview_construction",
@@ -428,7 +431,7 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         "response_tree_preorder"
     )
     assert grandchild["continuation"]["nested_container_order"] == (
-        "schema_members_then_descendants_then_facts"
+        "current_node_facts_then_schema_members_then_descendants"
     )
     assert all(
         row["condition"] == "current_business_request_contains_member"
@@ -454,18 +457,13 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         "selection": "first_business_present_member_by_queue_index",
         "repeat_for_descendants": True,
         "when_none": (
-            "follow_business_sibling_transition_then_drain_deferred_fact_queue"
+            "drain_deferred_fact_queue_then_follow_business_sibling_transition"
         ),
         "is_next_command": False,
         "becomes_next_command_only_after_exact_business_pointer_match": True,
         "absent_business_pointer": "forbidden",
     }
-    assert grandchild["continuation"]["deferred_fact"]["blocked_by"] == [
-        "ancestor_deferred_parent_facts",
-        "ancestor_child_contract_facts",
-        "business_sibling_transition",
-        "all_descendant_disclosures",
-    ]
+    assert "blocked_by" not in grandchild["continuation"]["deferred_fact"]
     assert grandchild["continuation"]["deferred_fact"]["consume_once"] is True
     assert grandchild["continuation"]["deferred_fact"]["replay_allowed"] is False
     scalar_table = grandchild["child_contract"]["fixed_scalar_member_fact_table"]
@@ -548,6 +546,142 @@ def test_public_object_create_draft_start_uses_the_dedicated_typed_contract(
     assert apply_code == 0, applied
     assert applied["draft"]["revision"] == 2
     assert applied["draft"]["current_facts"][0]["value"] == "ActorMixer"
+
+
+def test_object_create_node_local_disclosures_and_fact_batches_are_executable(
+    tmp_path: Path,
+) -> None:
+    arguments = {
+        "parent": {"kind": "path", "value": PARENT[1]},
+        "type": "ActorMixer",
+        "name": "NodeLocal",
+        "children": [
+            {"type": "Sound", "name": "A"},
+            {"type": "Sound", "name": "B"},
+        ],
+    }
+    contract = draft_operation_request_contract("object.create", "2025.1")
+    construction = typed_request_construction_for_values(
+        contract,
+        args=arguments,
+        options={},
+    )
+    state_dir = tmp_path / "state"
+    code, started = waapi_gateway.execute_gateway(
+        [
+            "--version", "2025.1", "--state-dir", str(state_dir),
+            "draft-start", "object.create",
+        ],
+        env=_gateway_env(tmp_path),
+        client_factory=lambda url: (_ for _ in ()).throw(AssertionError(url)),
+    )
+    assert code == 0, started
+    revision = started["draft"]["revision"]
+
+    def action_argv(fact: Any) -> list[str]:
+        argv = [
+            "--action", "add_typed_fact",
+            "--fact-action", fact.action,
+            "--field-handle", fact.handle,
+        ]
+        if fact.action in {"set", "append", "map-put"}:
+            argv.extend(
+                ["--value-type", fact.value_type, "--fact-value", fact.value]
+            )
+            if fact.action == "map-put":
+                assert fact.key is not None
+                argv.extend(["--key", fact.key])
+        elif fact.action in {"choose", "choose-dynamic"}:
+            argv.extend(["--fact-value", fact.value])
+            if fact.action == "choose-dynamic":
+                assert fact.key is not None
+                argv.extend(["--key", fact.key])
+        return argv
+
+    def apply(facts: tuple[Any, ...]) -> None:
+        nonlocal revision
+        argv = [
+            "--version", "2025.1", "--state-dir", str(state_dir),
+            "draft-apply", started["draft"]["draft_id"],
+            "--task-authority", started["task_authority"],
+            "--expected-revision", str(revision),
+            "--compact", "--facts",
+        ]
+        for fact in facts:
+            argv.extend(action_argv(fact))
+        apply_code, applied = waapi_gateway.execute_gateway(
+            argv,
+            env=_gateway_env(tmp_path),
+            client_factory=lambda url: (_ for _ in ()).throw(AssertionError(url)),
+        )
+        assert apply_code == 0, applied
+        revision = applied["draft"]["revision"]
+
+    first_disclosure = construction.disclosures[0]
+    apply(construction.facts[: first_disclosure.fact_index])
+    responses: dict[str, Mapping[str, Any]] = {}
+    for index, disclosure in enumerate(construction.disclosures):
+        parent_response = (
+            responses.get(disclosure.parent_child_handle)
+            if disclosure.parent_child_handle is not None
+            else None
+        )
+        parent_handle = (
+            parent_response["handle"]
+            if parent_response is not None
+            else disclosure.parent_handle
+        )
+        disclosure_argv = [
+            "--version", "2025.1", disclosure.command, "object.create",
+            *(
+                ["--parent-schema-token", parent_response["schema_lineage_token"]]
+                if parent_response is not None
+                else ["--schema-digest", contract.schema_digest]
+            ),
+            (
+                "--array-handle"
+                if disclosure.command == "request-array-item"
+                else "--map-handle"
+            ),
+            parent_handle,
+            "--index" if disclosure.command == "request-array-item" else "--key",
+            disclosure.key,
+            "--shape", disclosure.shape,
+        ]
+        disclose_code, disclosed = waapi_gateway.execute_gateway(
+            disclosure_argv,
+            env=_gateway_env(tmp_path),
+            client_factory=lambda url: (_ for _ in ()).throw(AssertionError(url)),
+        )
+        assert disclose_code == 0, disclosed
+        responses[disclosure.child_handle] = disclosed
+        next_fact_index = (
+            construction.disclosures[index + 1].fact_index
+            if index + 1 < len(construction.disclosures)
+            else len(construction.facts)
+        )
+        apply(construction.facts[disclosure.fact_index : next_fact_index])
+
+    inspect_code, inspected = waapi_gateway.execute_gateway(
+        [
+            "--version", "2025.1", "--state-dir", str(state_dir),
+            "draft-inspect", started["draft"]["draft_id"],
+            "--task-authority", started["task_authority"],
+        ],
+        env=_gateway_env(tmp_path),
+        client_factory=lambda url: (_ for _ in ()).throw(AssertionError(url)),
+    )
+    assert inspect_code == 0, inspected
+    assert [
+        (
+            row["fact_action"], row["field_handle"], row.get("key"),
+            row.get("value_type"), row.get("value"),
+        )
+        for row in inspected["draft"]["current_facts"]
+    ] == [
+        (fact.action, fact.handle, fact.key, fact.value_type, fact.value)
+        for fact in construction.facts
+    ]
 
 
 @pytest.mark.parametrize("version", VERSIONS)

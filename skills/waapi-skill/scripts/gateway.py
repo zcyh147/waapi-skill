@@ -4340,11 +4340,11 @@ def _dynamic_deferred_queue_contract() -> dict[str, Any]:
     """Return the one request-wide ordering contract for returned-handle facts."""
 
     return {
-        "scope": "current_disclosed_root",
+        "scope": "current_disclosed_node",
         "root_boundary": (
-            "current_root_disclosures_then_current_root_facts_before_next_root"
+            "current_node_parent_and_member_facts_before_descendant_or_sibling_disclosure"
         ),
-        "drain_after": "root_dynamic_disclosures",
+        "drain_after": "current_container_disclosure",
         "traversal": "response_tree_preorder",
         "node_steps": [
             "deferred_parent_fact",
@@ -4666,7 +4666,7 @@ def _deferred_dynamic_fact_payload(
     return {
         "deferred_fact": {
             "argv": argv,
-            "execute_after": "all_dynamic_disclosures_for_current_root",
+            "execute_after": "current_container_disclosure",
             "queue_phase": "parent_response",
             "queue_order_ref": (
                 "/continuation/request_wide_order/deferred_fact_queue"
@@ -4743,7 +4743,7 @@ def _next_array_item_disclosure(
     child_handle: str,
     lineage_token: str,
 ) -> dict[str, Any]:
-    """Expose the sole nested-array continuation before its parent fact."""
+    """Expose the sole nested-array continuation after its parent fact."""
 
     if args.shape != "array":
         return {}
@@ -4790,8 +4790,8 @@ def _next_array_item_disclosure(
         "next_item_disclosure": {
             "condition": "for_each_business_present_item",
             "index_order": "ascending_zero_based_index",
-            "must_finish_before": "deferred_fact",
-            "is_next_command": True,
+            "after_current_node_fact_apply_success": True,
+            "is_next_command": False,
             "business_cardinality_authority": {
                 "source": "current_business_request",
                 "schema_does_not_require_another_item": True,
@@ -4868,14 +4868,14 @@ def _next_array_sibling_disclosure(
                 "first_when_current_business_object_is_leaf": True,
                 "leaf_nested_container_disclosures": "forbidden",
                 "otherwise_after": (
-                    "all_business_present_current_item_"
-                    "descendant_disclosures_if_any"
+                    "current_node_fact_apply_success_then_all_business_present_"
+                    "current_item_descendant_nodes_if_any"
                 ),
-                "must_precede": "current_root_deferred_facts",
+                "after_current_node_facts": True,
                 "when_absent": {
                     "next_action": (
-                        "unwind_drain_current_root_deferred_facts_then_use_nearest_"
-                        "ancestor_business_sibling_exact_argv"
+                        "finish_current_node_then_use_nearest_ancestor_business_"
+                        "sibling_exact_argv"
                     )
                 },
             }
@@ -4883,7 +4883,7 @@ def _next_array_sibling_disclosure(
             else {"after": "current_root_fact_apply_success"}
         ),
         "absent_or_scalar_next_item_forbidden": True,
-        "is_next_command": nested_sibling,
+        "is_next_command": False,
         "argv_by_shape": argv_by_shape,
     }
     return {"business_sibling_transition": transition}
@@ -4956,9 +4956,9 @@ def _next_map_sibling_disclosure(
                 ),
                 "key": key,
                 "after": "current_branch_descendant_disclosures",
-                "must_precede": "current_root_deferred_facts",
+                "after_current_node_facts": True,
                 "absent_member_forbidden": True,
-                "is_next_command": True,
+                "is_next_command": False,
                 "argv_by_shape": argv_by_shape,
             }
         }
@@ -5103,7 +5103,34 @@ def _dynamic_next_command_decision(
         if isinstance(sibling, Mapping) and sibling
         else None
     )
-    if nested_sibling and sibling_candidate is not None:
+    deferred_candidate = (
+        {
+            "candidate": "deferred_fact_queue",
+            "condition": "current_disclosed_node_has_unapplied_business_facts",
+            "action": (
+                "apply_current_node_parent_fact_then_business_present_"
+                "child_contract_facts_in_schema_order"
+            ),
+            "start_at": "current_disclosed_node_response",
+            "first_command_pointer": (
+                "/continuation/root_fact_queue_anchor/first_fact_argv"
+                if outermost_disclosed_root_pointer is not None
+                else "/continuation/deferred_fact/argv"
+            ),
+            "batch_facts": (
+                "current_disclosed_node_only_up_to_"
+                f"{MAX_TYPED_ACTIONS_PER_APPLY}_facts_in_queue_order"
+            ),
+            "stop_before": "first_descendant_or_sibling_parent_fact",
+            "after_success": "re_evaluate_remaining_candidates_from_this_response",
+            "first_fact_only": "valid_only_when_current_node_has_no_other_business_facts",
+        }
+        if deferred_fact
+        else None
+    )
+    if draft_shape and deferred_candidate is not None:
+        candidates.append(deferred_candidate)
+    if not draft_shape and nested_sibling and sibling_candidate is not None:
         candidates.append(sibling_candidate)
     if nested_container_disclosures:
         candidates.append(
@@ -5134,31 +5161,9 @@ def _dynamic_next_command_decision(
             }
         )
 
-    if deferred_fact:
-        candidates.append(
-            {
-                "candidate": "deferred_fact_queue",
-                "condition": (
-                    "no_earlier_business_present_disclosure_for_exact_current_object"
-                ),
-                "action": (
-                    "return_to_outermost_disclosed_root_then_drain_"
-                    "response_tree_preorder"
-                ),
-                "start_at": "outermost_disclosed_root_response",
-                "first_command_pointer": (
-                    "/continuation/root_fact_queue_anchor/first_fact_argv"
-                    if outermost_disclosed_root_pointer is not None
-                    else "/continuation/deferred_fact/argv"
-                ),
-                "batch_facts": (
-                    f"current_root_only_next_up_to_{MAX_TYPED_ACTIONS_PER_APPLY}_"
-                    "deferred_facts_in_queue_order"
-                ),
-                "first_fact_only": "invalid",
-            }
-        )
-    if not nested_sibling and sibling_candidate is not None:
+    if not draft_shape and deferred_candidate is not None:
+        candidates.append(deferred_candidate)
+    if sibling_candidate is not None and (draft_shape or not nested_sibling):
         candidates.append(sibling_candidate)
 
     return {
@@ -5647,26 +5652,8 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         )
         if "deferred_fact" in deferred_fact:
             blocked_by: list[str] = []
-            if args.parent_schema_token is not None:
-                blocked_by.extend(
-                    [
-                        "ancestor_deferred_parent_facts",
-                        "ancestor_child_contract_facts",
-                    ]
-                )
-            if next_item_disclosure:
-                blocked_by.extend(
-                    ["next_item_disclosure", "all_descendant_disclosures"]
-                )
-            if next_sibling_disclosure:
-                sibling = next_sibling_disclosure["business_sibling_transition"]
-                if sibling.get("is_next_command") is True:
-                    blocked_by.extend(
-                        [
-                            "business_sibling_transition",
-                            "all_descendant_disclosures",
-                        ]
-                    )
+            if branch_continuation:
+                blocked_by.append("branch_disclosure")
             if blocked_by:
                 deferred_fact["deferred_fact"]["blocked_by"] = blocked_by
         response = {
@@ -5715,8 +5702,8 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                                 "current_business_request_contains_that_index"
                             ),
                             "allowed_after": (
-                                "all_business_present_current_item_"
-                                "descendant_disclosures_if_any"
+                                "current_node_fact_apply_success_then_all_"
+                                "business_present_current_item_descendant_nodes_if_any"
                                 if args.parent_schema_token is not None
                                 else "current_root_fact_apply_success"
                             ),
@@ -5742,9 +5729,10 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                             nested_container_disclosures
                         ),
                         "nested_container_order": (
-                            "branch_then_schema_members_then_descendants_then_facts"
+                            "branch_then_current_node_facts_then_schema_members_"
+                            "then_descendants"
                             if branch_continuation
-                            else "schema_members_then_descendants_then_facts"
+                            else "current_node_facts_then_schema_members_then_descendants"
                         ),
                     }
                     if nested_container_disclosures
@@ -5778,9 +5766,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     deferred_fact=deferred_fact,
                 ),
                 "request_wide_order": {
-                    "phase": "dynamic_disclosure",
+                    "phase": "node_local_disclosure_then_facts",
                     "root_boundary": (
-                        "finish_current_root_disclosures_and_facts_before_next_root"
+                        "finish_current_root_nodes_before_next_root"
                     ),
                     "traversal": "response_tree_preorder",
                     "nested_member_order": "schema_property_order",
@@ -5790,12 +5778,12 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                         "node_steps": [
                             "deferred_parent_fact",
                             "child_contract_facts",
-                            "descendant_response_nodes",
+                            "then_descendant_response_nodes",
                         ],
                         "forbidden": [
                             "descendant_fact_before_current_node_parent_or_child_facts",
                             "next_outer_sibling_disclosure_before_current_root_facts",
-                            "one_fact_apply_batch_spanning_sibling_roots",
+                            "one_fact_apply_batch_spanning_disclosed_nodes",
                         ],
                     },
                     "this_handle_is_not_a_complete_request": True,
@@ -5814,7 +5802,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                                 "latest_draft_response.next_action_binding."
                                 "fixed_argv_prefix"
                             ),
-                            "batch_scope": "current_root_only_next_deferred_facts",
+                            "batch_scope": "current_disclosed_node_only",
                             "complete_action_groups_in_queue_order": True,
                             "maximum_actions": MAX_TYPED_ACTIONS_PER_APPLY,
                             "count_each_literal_action_flag": True,
@@ -5863,7 +5851,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 "complete": False,
                 "disclosure_replay_allowed": False,
                 "next_phase": (
-                    "finish_dynamic_disclosures_then_apply_deferred_facts"
+                    "apply_current_node_facts_then_continue_dynamic_disclosures"
                 ),
                 "completion_boundary": (
                     "draft-check" if read_only_draft else "draft-check_then_preview"

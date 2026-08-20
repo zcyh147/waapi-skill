@@ -1229,10 +1229,14 @@ def _build_generic_typed_draft_transaction_steps(
     disclosure_group_order: list[str] = []
     disclosure_group_by_step: dict[str, str] = {}
     disclosure_root_by_child: dict[str, str] = {}
+    ordered_disclosure_steps: list[
+        tuple[Any, tuple[ExpectedGatewayStep, ...]]
+    ] = []
     for disclosure_index, disclosure in enumerate(
         construction.disclosures,
         start=1,
     ):
+        current_disclosure_steps: list[ExpectedGatewayStep] = []
         base_name = f"{label}.disclose.{disclosure_index:03d}"
         parent_argument: Any = disclosure.parent_handle
         parent_token_arguments: tuple[Any, ...] = ()
@@ -1296,6 +1300,7 @@ def _build_generic_typed_draft_transaction_steps(
                     tuple(command_arguments),
                 )
                 disclosure_groups[disclosure_root].append(choice_step)
+                current_disclosure_steps.append(choice_step)
                 disclosure_group_by_step[choice_name] = disclosure_root
                 choice_source = choice_name
                 choice_pointer = f"/choices/{disclosure.choice_index}/handle"
@@ -1316,10 +1321,14 @@ def _build_generic_typed_draft_transaction_steps(
             base_name, disclosure.command, tuple(command_arguments)
         )
         disclosure_groups[disclosure_root].append(disclosure_step)
+        current_disclosure_steps.append(disclosure_step)
         disclosure_group_by_step[base_name] = disclosure_root
         disclosure_by_child[disclosure.child_handle] = base_name
         disclosure_root_by_child[disclosure.child_handle] = disclosure_root
         disclosed_handle_bindings[disclosure.child_handle] = (base_name, "/handle")
+        ordered_disclosure_steps.append(
+            (disclosure, tuple(current_disclosure_steps))
+        )
     fact_rows: list[
         tuple[int, Any, tuple[DraftActionResponseBinding, ...], Mapping[str, Any]]
     ] = []
@@ -1467,9 +1476,66 @@ def _build_generic_typed_draft_transaction_steps(
             revision_step = step_name
 
     append_fact_rows(independent_rows)
-    for root in disclosure_group_order:
-        steps.extend(disclosure_groups[root])
-        append_fact_rows(dependent_rows_by_group[root])
+    interleave_disclosed_nodes = bool(construction.disclosures)
+    if interleave_disclosed_nodes:
+        fact_indexes = [
+            disclosure.fact_index for disclosure in construction.disclosures
+        ]
+        if fact_indexes != sorted(set(fact_indexes)):
+            raise V3ProtocolError(
+                "typed Draft disclosure fact indexes are not strictly ordered"
+            )
+        covered_dependent_indexes: set[int] = set()
+        position = 0
+        while position < len(ordered_disclosure_steps):
+            disclosure, disclosure_steps = ordered_disclosure_steps[position]
+            grouped_steps = list(disclosure_steps)
+            next_position = position + 1
+            if next_position < len(ordered_disclosure_steps):
+                next_disclosure, next_steps = ordered_disclosure_steps[next_position]
+                if (
+                    next_disclosure.parent_child_handle == disclosure.child_handle
+                    and next_disclosure.parent_choice_group_index is not None
+                ):
+                    grouped_steps.extend(next_steps)
+                    next_position += 1
+            steps.extend(grouped_steps)
+            next_fact_index = (
+                construction.disclosures[next_position].fact_index
+                if next_position < len(construction.disclosures)
+                else len(construction.facts)
+            )
+            node_fact_index = disclosure.fact_index
+            if node_fact_index > 0:
+                possible_choice = construction.facts[node_fact_index - 1]
+                if (
+                    possible_choice.action == "choose-dynamic"
+                    and possible_choice.handle == disclosure.parent_handle
+                    and possible_choice.key == disclosure.key
+                ):
+                    node_fact_index -= 1
+            node_rows = tuple(
+                row
+                for row in fact_rows
+                if node_fact_index <= row[0] - 1 < next_fact_index
+                and row[2]
+            )
+            if not node_rows:
+                raise V3ProtocolError(
+                    "typed Draft disclosure has no dependent node facts"
+                )
+            covered_dependent_indexes.update(row[0] for row in node_rows)
+            append_fact_rows(node_rows)
+            position = next_position
+        expected_dependent_indexes = {row[0] for row in fact_rows if row[2]}
+        if covered_dependent_indexes != expected_dependent_indexes:
+            raise V3ProtocolError(
+                "typed Draft node-local fact schedule is incomplete"
+            )
+    else:
+        for root in disclosure_group_order:
+            steps.extend(disclosure_groups[root])
+            append_fact_rows(dependent_rows_by_group[root])
     check_name = f"{label}.check"
     check_trailing: tuple[Any, ...] = ()
     if post_filter is not None:
