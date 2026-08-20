@@ -150,6 +150,48 @@ def test_typed_profile_object_create_batches_fit_windows_command_transport() -> 
     assert max(encoded_lengths) < 30_000
 
 
+def test_typed_profile_object_create_marks_only_sound_items_without_dynamic_descendants() -> None:
+    profile = load_typed_input_profile(
+        Path(__file__).resolve().parent / "data" / "typed-input-v1" / "profile.json"
+    )
+    unit = next(
+        row
+        for row in profile.units
+        if row.unit_id == "TYP21-DEDICATED-OBJECT-CREATE"
+    )
+    recipe = build_object_heavy_v3_recipe(unit.base_scenario_id, unit.version)
+    protocol = build_transaction_protocol(
+        (recipe.request.as_dict(version=unit.version),)
+    )
+    disclosures = tuple(
+        step
+        for step in protocol.steps
+        if step.subcommand in {"request-array-item", "request-map-container"}
+    )
+
+    assert tuple(
+        step.name
+        for step in disclosures
+        if "--no-dynamic-descendants" in step.arguments
+    ) == (
+        "tx01.disclose.003",
+        "tx01.disclose.004",
+        "tx01.disclose.007",
+        "tx01.disclose.008",
+        "tx01.disclose.011",
+        "tx01.disclose.012",
+    )
+    assert all(
+        "--no-dynamic-descendants" not in step.arguments
+        for step in disclosures
+        if step.name in {
+            "tx01.disclose.001",
+            "tx01.disclose.005",
+            "tx01.disclose.009",
+        }
+    )
+
+
 def _object_set_request(**options: object) -> dict[str, object]:
     return {
         "contract": "waapi-skill.operation-request/v1",

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Mapping, Sequence
 
 from .canonical import canonical_json_bytes, canonical_sha256
@@ -889,6 +889,7 @@ class TypedRequestDisclosure:
     choice_index: int | None = None
     parent_child_handle: str | None = None
     parent_choice_group_index: int | None = None
+    no_dynamic_descendants: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -3215,6 +3216,7 @@ def _append_value_facts(
                     shape=item_type,
                     choice_handle=choice,
                 )
+                disclosure_index = len(disclosures)
                 disclosures.append(
                     TypedRequestDisclosure(
                         command="request-array-item",
@@ -3252,6 +3254,11 @@ def _append_value_facts(
                     section=section,
                     disclosures=disclosures,
                 )
+                if item_type == "object" and len(disclosures) == disclosure_index + 1:
+                    disclosures[disclosure_index] = replace(
+                        disclosures[disclosure_index],
+                        no_dynamic_descendants=True,
+                    )
             else:
                 facts.append(
                     TypedRequestFact(
@@ -3429,6 +3436,7 @@ def _append_dynamic_container_facts(
                     parent_schema=schema,
                     parent_section=section,
                 )
+                disclosure_index = len(disclosures)
                 disclosures.append(
                     TypedRequestDisclosure(
                         command="request-array-item",
@@ -3469,6 +3477,11 @@ def _append_dynamic_container_facts(
                     section=section,
                     disclosures=disclosures,
                 )
+                if item_type == "object" and len(disclosures) == disclosure_index + 1:
+                    disclosures[disclosure_index] = replace(
+                        disclosures[disclosure_index],
+                        no_dynamic_descendants=True,
+                    )
             else:
                 facts.append(
                     TypedRequestFact(

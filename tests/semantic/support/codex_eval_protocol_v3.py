@@ -1273,6 +1273,11 @@ def _build_generic_typed_draft_transaction_steps(
             "--shape",
             disclosure.shape,
             *parent_token_arguments,
+            *(
+                ("--no-dynamic-descendants",)
+                if disclosure.no_dynamic_descendants
+                else ()
+            ),
         ]
         if disclosure.choice_handle is not None:
             if disclosure.choice_index is None:
@@ -1565,6 +1570,11 @@ def _typed_disclosure_protocol_steps(
             "--shape",
             disclosure.shape,
             *parent_token_arguments,
+            *(
+                ("--no-dynamic-descendants",)
+                if disclosure.no_dynamic_descendants
+                else ()
+            ),
         ]
         if disclosure.choice_handle is not None:
             if disclosure.choice_index is None:

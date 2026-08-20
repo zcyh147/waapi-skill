@@ -1334,7 +1334,7 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     leaf_argv = [
         "0" if token == "<zero_based_business_present_index>" else token
         for token in child_array["continuation"]["next_item_disclosure"][
-            "argv_by_shape"
+            "no_dynamic_descendants_argv_by_shape"
         ]["object"]
     ]
     code, leaf = gateway.execute_gateway(
@@ -1355,3 +1355,47 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     assert projected["continuation"]["next_command_decision"][
         "evaluate_in_order"
     ] == leaf["continuation"]["next_command_decision"]["evaluate_in_order"]
+    assert "nested_container_disclosures" not in projected["continuation"]
+    assert projected["continuation"]["next_command_decision"][
+        "evaluate_in_order"
+    ][0]["candidate"] == "business_sibling_transition"
+    assert "--no-dynamic-descendants" in projected["continuation"][
+        "business_sibling_transition"
+    ]["no_dynamic_descendants_argv_by_shape"]["object"]
+
+
+def test_no_dynamic_descendants_rejects_a_non_object_container(
+    tmp_path: Path,
+) -> None:
+    contract = draft_operation_request_contract("object.create", "2021.1")
+    children = next(
+        field
+        for field in contract.fields
+        if field.path == ("children",) and field.shape == "array"
+    )
+
+    code, payload = gateway.execute_gateway(
+        [
+            "--version",
+            "2021.1",
+            "request-array-item",
+            "object.create",
+            "--schema-digest",
+            contract.schema_digest,
+            "--array-handle",
+            children.handle,
+            "--index",
+            "0",
+            "--shape",
+            "array",
+            "--no-dynamic-descendants",
+        ],
+        env=_env(tmp_path, "2021.1"),
+        client_factory=lambda _url: pytest.fail("rejection must be offline"),
+    )
+
+    assert code == 2
+    assert payload["ok"] is False
+    assert payload["message"] == (
+        "--no-dynamic-descendants is valid only for an object value"
+    )
