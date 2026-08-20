@@ -219,6 +219,30 @@ def test_inline_operation_schema_exposes_one_typed_continuation(tmp_path: Path) 
     assert "request-json" not in json.dumps(payload["typed_operation"])
 
 
+def test_generic_draft_start_requires_first_fact_batch_before_disclosure(
+    tmp_path: Path,
+) -> None:
+    code, payload = offline_execute(
+        tmp_path,
+        "--state-dir",
+        str(tmp_path / "state"),
+        "draft-start",
+        "object.create",
+        version="2021.1",
+    )
+
+    assert code == 0, payload
+    binding = payload["draft"]["next_action_binding"]
+    assert binding["required_next_phase"] == "typed_fact_batch"
+    assert binding["fact_order_source"] == (
+        "/operation-schema/composer/construction_order"
+    )
+    assert binding["first_batch_rule"] == (
+        "submit the next 1..6 prompt-present facts in published schema order"
+    )
+    assert binding["dynamic_disclosure_before_first_fact"] == "invalid"
+
+
 def test_typed_operation_materializes_exact_request_into_the_single_preview_ingress(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -13186,6 +13186,32 @@ def operation_draft_payload(
                     "precompute_or_increment_revision": False,
                 }
             )
+            if (
+                record.revision == 1
+                and record.check is None
+                and (
+                    record.operation.startswith("ak.")
+                    or (
+                        record.operation in DRAFT_TYPED_OPERATIONS
+                        and record.operation != "waapi.undoGroup"
+                    )
+                )
+            ):
+                next_action_binding.update(
+                    {
+                        "required_next_phase": "typed_fact_batch",
+                        "fact_order_source": (
+                            "/operation-schema/composer/construction_order"
+                            if not record.operation.startswith("ak.")
+                            else "/request-schema/construction_order"
+                        ),
+                        "first_batch_rule": (
+                            "submit the next 1..6 prompt-present facts in "
+                            "published schema order"
+                        ),
+                        "dynamic_disclosure_before_first_fact": "invalid",
+                    }
+                )
         if record.check is not None:
             next_action_binding.update(
                 {
