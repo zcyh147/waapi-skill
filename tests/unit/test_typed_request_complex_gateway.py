@@ -128,38 +128,19 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
     }
     assert item["continuation"]["request_wide_order"] == {
         "phase": "dynamic_disclosure",
-        "finish_current_root_disclosure_chain_first": True,
-        "disclosure_chain_definition": (
-            "only branch_disclosure and nested_container_disclosures; "
-            "child_contract branch choices are typed facts"
+        "root_boundary": (
+            "finish_current_root_disclosures_and_facts_before_next_root"
         ),
-        "array_item_order": "ascending_business_present_index",
-        "array_item_traversal": (
-            "response_tree_preorder_finish_item_descendants_before_next_sibling"
-        ),
-        "absent_array_item_disclosure_forbidden": True,
+        "traversal": "response_tree_preorder",
         "nested_member_order": "schema_property_order",
         "child_fact_order": "child_contract_schema_order",
-        "facts_using_returned_handles": (
-            "after_current_root_dynamic_disclosures_in_deferred_fact_queue_order"
-        ),
         "deferred_fact_queue": {
-            "scope": "current_disclosed_root",
-            "root_boundary": (
-                "current_root_disclosures_then_current_root_facts_before_next_root"
-            ),
-            "drain_after": "root_dynamic_disclosures",
             "traversal": "response_tree_preorder",
             "node_steps": [
                 "deferred_parent_fact",
                 "child_contract_facts",
                 "descendant_response_nodes",
             ],
-            "parent_dependency": (
-                "deferred_parent_fact_before_every_fact_using_response_handle"
-            ),
-            "array_traversal": "response_tree_preorder_within_current_root",
-            "sibling_order": "ascending_business_present_index",
         },
         "this_handle_is_not_a_complete_request": True,
     }
@@ -169,25 +150,13 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
         "--fact-value", item["handle"],
     ]
     assert item["continuation"]["draft_fact_execution"] == {
-        "fact_argv_role": "append_after_latest_draft_apply_next_command_facts_marker",
-        "required_prefix_order": [
-            "draft-apply",
-            "<draft_id>",
-            "--task-authority",
-            "<task_authority>",
-            "--expected-revision",
-            "<latest_revision>",
-            "--compact",
-            "--facts",
-        ],
-        "fact_argv_must_follow_prefix": True,
-        "atomic_batch_scope": "next_current_root_deferred_fact_chunk",
+        "prefix_source": (
+            "latest_draft_response.next_action_binding.fixed_argv_prefix"
+        ),
+        "batch_scope": "next_current_root_deferred_facts",
         "complete_action_groups_in_queue_order": True,
-        "dispatch_after_complete_chunk": True,
-            "maximum_actions": 6,
-        "inserting_fact_before_expected_revision": "invalid",
+        "maximum_actions": 6,
         "copy_returned_handles_exactly": True,
-        "placeholder_or_added_punctuation": "invalid",
     }
     deferred_candidate = next(
         row

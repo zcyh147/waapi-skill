@@ -56,6 +56,10 @@ MAX_COMPOSER_ACTION_BYTES = 32 * 1024
 # bespoke action surface or audio.import's separate media-aware ceiling.
 MAX_TYPED_COMPOSER_ACTION_BYTES = 72 * 1024
 MAX_AUDIO_IMPORT_COMPOSER_ACTION_BYTES = 384 * 1024
+# A field projection this large leaves too little of the fixed 32 KiB agent
+# output budget for the operation identity and the sole construction route.
+# The same fields remain losslessly available through the shared compact table.
+MAX_INLINE_COMPOSER_FIELD_PROJECTION_BYTES = 18 * 1024
 _TARGET_HANDLE_PATTERN = re.compile(r"^odh1-[0-9a-f]{24}$")
 _TYPED_FACT_HANDLE_PATTERN = re.compile(r"^tdh1-[0-9a-f]{24}$")
 _UNDO_CHILD_HANDLE_PATTERN = re.compile(r"^uch1-[0-9a-f]{24}$")
@@ -1479,6 +1483,15 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             public_field = dict(field)
             public_field.pop("fact_construction", None)
             field_payloads.append(public_field)
+        compact_field_table = len(canonical_json_bytes(field_payloads)) > (
+            MAX_INLINE_COMPOSER_FIELD_PROJECTION_BYTES
+        )
+        top_level_fact_plan = typed.top_level_fact_plan()
+        if compact_field_table:
+            top_level_fact_plan["business_pointer_source"] = (
+                "typed_request_field_table parent_row lineage and this plan's "
+                "top-level names"
+            )
         return {
             "contract": OPERATION_COMPOSER_CONTRACT,
             "operation": operation,
@@ -1512,8 +1525,17 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             },
             "typed_request_schema_digest": typed.schema_digest,
             "construction_order": typed.gateway_construction_order(),
-            "top_level_fact_plan": typed.top_level_fact_plan(),
-            "typed_request_fields": field_payloads,
+            "top_level_fact_plan": top_level_fact_plan,
+            **(
+                {
+                    "typed_request_field_table": typed.gateway_field_table(
+                        direct_actions_override=False,
+                        include_fact_construction=False,
+                    )
+                }
+                if compact_field_table
+                else {"typed_request_fields": field_payloads}
+            ),
             **(
                 {
                     "start_preconditions": {

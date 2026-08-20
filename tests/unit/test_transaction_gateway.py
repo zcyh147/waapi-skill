@@ -39,7 +39,10 @@ from wwise_waapi.platform_commands import (  # pyright: ignore[reportMissingImpo
     encode_windows_model_argv,
     encode_windows_powershell_argv,
 )
-from wwise_waapi.typed_requests import request_contract  # pyright: ignore[reportMissingImports]
+from wwise_waapi.typed_requests import (  # pyright: ignore[reportMissingImports]
+    expand_gateway_field_table,
+    request_contract,
+)
 from wwise_waapi.operation_composer import (  # pyright: ignore[reportMissingImports]
     OPERATION_DRAFT_ACTION_CONTRACT,
     apply_composer_action,
@@ -63,6 +66,14 @@ waapi_gateway.execute_gateway = bind_canonical_preview_fixture(waapi_gateway)
 
 PARENT_GUID = "{22222222-2222-2222-2222-222222222222}"
 OBJECT_GUID = "{33333333-3333-3333-3333-333333333333}"
+
+
+def _composer_fields(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
+    composer = payload["composer"]
+    fields = composer.get("typed_request_fields")
+    if isinstance(fields, list):
+        return fields
+    return expand_gateway_field_table(composer["typed_request_field_table"])
 CREATED_GUID = "{44444444-4444-4444-4444-444444444444}"
 PROJECT_GUID = "{11111111-1111-1111-1111-111111111111}"
 PARENT_PATH = r"\Actor-Mixer Hierarchy\Default Work Unit\WAAPI Sandbox"
@@ -1785,7 +1796,7 @@ def test_object_create_operation_schema_discloses_versioned_parent_and_merge_con
     assert payload["composer"]["version"] == version
     root_fields = [
         field
-        for field in payload["composer"]["typed_request_fields"]
+        for field in _composer_fields(payload)
         if len(field["path"]) == 2
     ]
     assert any(field["path"] == ["args", "parent"] for field in root_fields)
@@ -1905,7 +1916,7 @@ def test_soundbank_generate_operation_schema_closes_batch_language_scope(
     assert exit_code == 0
     root_fields = {
         tuple(field["path"]): field
-        for field in payload["composer"]["typed_request_fields"]
+        for field in _composer_fields(payload)
         if len(field["path"]) == 2
     }
     assert root_fields[("args", "soundbanks")]["maximum_items"] == 64

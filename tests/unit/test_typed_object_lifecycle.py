@@ -20,6 +20,7 @@ from wwise_waapi.typed_operations import (  # pyright: ignore[reportMissingImpor
     materialize_inline_operation_request,
 )
 from wwise_waapi.typed_requests import (  # pyright: ignore[reportMissingImports]
+    expand_gateway_field_table,
     typed_request_construction_for_values,
 )
 
@@ -38,6 +39,14 @@ def _gateway_env(tmp_path: Path) -> dict[str, str]:
         encoding="utf-8",
     )
     return {"WAAPI_SKILL_CONFIG_PATH": str(config), "WWISE_VERSION": "2025.1"}
+
+
+def _composer_fields(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
+    composer = payload["composer"]
+    fields = composer.get("typed_request_fields")
+    if isinstance(fields, list):
+        return fields
+    return expand_gateway_field_table(composer["typed_request_field_table"])
 
 
 VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
@@ -139,11 +148,11 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         "draft-start",
         "object.create",
     ]
-    assert payload["composer"]["typed_request_fields"]
+    assert payload["composer"]["typed_request_field_table"]["rows"]
 
     children = next(
         field
-        for field in payload["composer"]["typed_request_fields"]
+        for field in _composer_fields(payload)
         if field["name"] == "children"
     )
     container_code, container = waapi_gateway.execute_gateway(
@@ -360,13 +369,11 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
             "before": "continue_no_confirm_no_end",
         },
     }
-    assert grandchild["continuation"]["request_wide_order"][
-        "array_item_traversal"
-    ] == "response_tree_preorder_finish_item_descendants_before_next_sibling"
+    assert grandchild["continuation"]["request_wide_order"]["traversal"] == (
+        "response_tree_preorder"
+    )
     assert grandchild["continuation"]["nested_container_order"] == (
-        "for the current array item, disclose every business-present member "
-        "and its descendants in this order before the next sibling; after the "
-        "current root disclosures, drain its deferred facts"
+        "schema_members_then_descendants_then_facts"
     )
     assert all(
         row["condition"] == "current_business_request_contains_member"
@@ -402,70 +409,31 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
     ]
     assert grandchild["continuation"]["deferred_fact"]["consume_once"] is True
     assert grandchild["continuation"]["deferred_fact"]["replay_allowed"] is False
-    assert grandchild["child_contract"]["fixed_scalar_member_facts"] == [
-        {
-            "key": "type",
-            "business_value_pointer": "/args/children/0/children/0/type",
-            "condition": "current_business_request_contains_member",
-            "required": True,
-            "accepted_types": ["string"],
-            "description": (
-                "Exact Wwise request token. Natural mappings: Actor Mixer -> "
-                "ActorMixer; Random Container / 随机容器 -> "
-                "RandomSequenceContainer (never RandomContainer); Blend "
-                "Container / 混合容器 -> BlendContainer; Sound -> Sound. "
-                "Wwise 2025.1 reflects an Actor Mixer as PropertyContainer, "
-                "but its object.create request token remains ActorMixer."
-            ),
-            "fact_argv_by_type": {
-                "string": [
-                    "--action", "add_typed_fact", "--fact-action", "map-put",
-                    "--field-handle", grandchild["handle"], "--value-type", "string",
-                    "--fact-value", "<business-value>", "--key", "type",
-                ]
-            },
-            "execute_after": "deferred_parent_fact",
-            "is_next_command": False,
-            "consume_once": True,
-            "replay_allowed": False,
-        },
-        {
-            "key": "name",
-            "business_value_pointer": "/args/children/0/children/0/name",
-            "condition": "current_business_request_contains_member",
-            "required": True,
-            "accepted_types": ["string"],
-            "fact_argv_by_type": {
-                "string": [
-                    "--action", "add_typed_fact", "--fact-action", "map-put",
-                    "--field-handle", grandchild["handle"], "--value-type", "string",
-                    "--fact-value", "<business-value>", "--key", "name",
-                ]
-            },
-            "execute_after": "deferred_parent_fact",
-            "is_next_command": False,
-            "consume_once": True,
-            "replay_allowed": False,
-        },
-        {
-            "key": "notes",
-            "business_value_pointer": "/args/children/0/children/0/notes",
-            "condition": "current_business_request_contains_member",
-            "required": False,
-            "accepted_types": ["string"],
-            "fact_argv_by_type": {
-                "string": [
-                    "--action", "add_typed_fact", "--fact-action", "map-put",
-                    "--field-handle", grandchild["handle"], "--value-type", "string",
-                    "--fact-value", "<business-value>", "--key", "notes",
-                ]
-            },
-            "execute_after": "deferred_parent_fact",
-            "is_next_command": False,
-            "consume_once": True,
-            "replay_allowed": False,
-        },
+    scalar_table = grandchild["child_contract"]["fixed_scalar_member_fact_table"]
+    assert scalar_table["shared_policy"] == {
+        "condition": "current_business_request_contains_member",
+        "execute_after": "deferred_parent_fact",
+        "is_next_command": False,
+        "consume_once": True,
+        "replay_allowed": False,
+    }
+    scalar_rows = [
+        dict(zip(scalar_table["columns"], row, strict=True))
+        for row in scalar_table["rows"]
     ]
+    assert [row["key"] for row in scalar_rows] == ["type", "name", "notes"]
+    assert [row["required"] for row in scalar_rows] == [True, True, False]
+    assert [row["business_value_pointer"] for row in scalar_rows] == [
+        "/args/children/0/children/0/type",
+        "/args/children/0/children/0/name",
+        "/args/children/0/children/0/notes",
+    ]
+    for row in scalar_rows:
+        argv = row["fact_argv_by_type"]["string"]
+        assert argv[argv.index("--field-handle") + 1] == grandchild["handle"]
+        assert argv[argv.index("--key") + 1] == row["key"]
+    encoded = waapi_gateway.gateway_stdout_json_encoder(grandchild).encode(grandchild)
+    assert len((encoded + "\n").encode("utf-8")) < 12 * 1024
 
 
 def test_public_object_create_draft_start_uses_the_dedicated_typed_contract(
@@ -497,7 +465,7 @@ def test_public_object_create_draft_start_uses_the_dedicated_typed_contract(
 
     type_handle = next(
         field["handle"]
-        for field in schema["composer"]["typed_request_fields"]
+        for field in _composer_fields(schema)
         if field["path"] == ["args", "type"]
     )
     apply_code, applied = waapi_gateway.execute_gateway(

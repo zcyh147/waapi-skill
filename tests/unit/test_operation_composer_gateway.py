@@ -28,6 +28,12 @@ from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImp
     operation_input_mode,
     operation_request_schema_digest,
 )
+from wwise_waapi.typed_requests import (  # pyright: ignore[reportMissingImports]
+    expand_gateway_field_table,
+)
+from wwise_waapi.typed_operations import (  # pyright: ignore[reportMissingImports]
+    draft_operation_request_contract,
+)
 
 SCRIPT_PATH = (
     Path(__file__).resolve().parents[2]
@@ -51,6 +57,13 @@ TARGET_ID = "{01234567-89AB-CDEF-0123-456789ABCDEF}"
 PARENT_ID = "{11111111-1111-1111-1111-111111111111}"
 PROJECT_ID = "{22222222-2222-2222-2222-222222222222}"
 ACTION_CONTRACT = "waapi-skill.operation-draft-action/v1"
+
+
+def _composer_fields(composer: Mapping[str, Any]) -> list[dict[str, Any]]:
+    fields = composer.get("typed_request_fields")
+    if isinstance(fields, list):
+        return fields
+    return expand_gateway_field_table(composer["typed_request_field_table"])
 
 
 BASE_ACTION_FIELDS = {
@@ -761,7 +774,7 @@ def test_public_composer_fields_bind_fact_action_before_disclosure(
     assert code == 0, payload
     field = next(
         item
-        for item in payload["composer"]["typed_request_fields"]
+        for item in _composer_fields(payload["composer"])
         if item["path"] == path
     )
     if "constant_fact_required" in expected:
@@ -795,18 +808,18 @@ def test_choose_response_discloses_the_selected_branch_constant_before_disclosur
     assert code == 0, schema
     parent = next(
         field
-        for field in schema["composer"]["typed_request_fields"]
+        for field in _composer_fields(schema["composer"])
         if field["path"] == ["args", "parent"] and field["shape"] == "branch"
     )
     path_choice = next(
         field
-        for field in schema["composer"]["typed_request_fields"]
+        for field in _composer_fields(schema["composer"])
         if field.get("parent_handle") == parent["handle"]
         and field.get("branch_choice_constants") == {"kind": "path"}
     )
     kind = next(
         field
-        for field in schema["composer"]["typed_request_fields"]
+        for field in _composer_fields(schema["composer"])
         if field.get("parent_handle") == path_choice["handle"]
         and field["name"] == "kind"
     )
@@ -931,14 +944,26 @@ def test_object_create_schema_puts_the_top_level_fact_plan_before_large_fields(
 
     assert code == 0, payload
     encoded = waapi_gateway.gateway_stdout_json_encoder(payload).encode(payload)
-    assert len((encoded + "\n").encode("utf-8")) < 32 * 1024
+    assert len((encoded + "\n").encode("utf-8")) < 20 * 1024
     composer = payload["composer"]
     assert list(composer).index("construction_order") < list(composer).index(
-        "typed_request_fields"
+        "typed_request_field_table"
     )
     assert list(composer).index("top_level_fact_plan") < list(
         composer
-    ).index("typed_request_fields")
+    ).index("typed_request_field_table")
+    assert "typed_request_fields" not in composer
+    assert composer["typed_request_field_table"]["contract"] == (
+        "waapi-skill.compact-typed-field-table/v1"
+    )
+    expected_fields = []
+    for field in draft_operation_request_contract(
+        "object.create", "2021.1"
+    ).gateway_field_payloads():
+        expected = dict(field)
+        expected.pop("fact_construction", None)
+        expected_fields.append(expected)
+    assert _composer_fields(composer) == expected_fields
     table = composer["top_level_fact_plan"]
     plan = [
         dict(zip(table["columns"], row, strict=True)) for row in table["rows"]
@@ -953,7 +978,10 @@ def test_object_create_schema_puts_the_top_level_fact_plan_before_large_fields(
     assert table["business_fact_selection"] == (
         "submit only prompt-present values; omit absent defaults"
     )
-    assert table["business_pointer_source"] == "typed_request_fields.path"
+    assert table["business_pointer_source"] == (
+        "typed_request_field_table parent_row lineage and this plan's "
+        "top-level names"
+    )
     assert table["fact_batching"] == (
         "submit schema-ordered facts in full batches of 6; the final fact "
         "batch contains every remaining fact"
@@ -968,7 +996,7 @@ def test_object_create_schema_puts_the_top_level_fact_plan_before_large_fields(
 
     properties = next(
         field
-        for field in composer["typed_request_fields"]
+        for field in _composer_fields(composer)
         if field["path"] == ["args", "properties"]
     )
     item_code, item = execute(

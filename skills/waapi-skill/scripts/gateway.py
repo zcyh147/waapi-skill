@@ -4494,6 +4494,48 @@ def _bind_dynamic_branch_facts(
             )
 
 
+def _compact_fixed_scalar_member_facts(child_contract: dict[str, Any]) -> None:
+    """Table repeated scalar fact policy without losing any public fact argv."""
+
+    rows = child_contract.get("fixed_scalar_member_facts")
+    if not isinstance(rows, list) or len(rows) < 3:
+        return
+    columns = [
+        "key",
+        "required",
+        "accepted_types",
+        "business_value_pointer",
+        "fact_argv_by_type",
+        "description",
+    ]
+    table_rows: list[list[Any]] = []
+    for row in rows:
+        if not isinstance(row, Mapping):
+            return
+        table_rows.append(
+            [
+                row.get("key"),
+                row.get("required") is True,
+                row.get("accepted_types", []),
+                row.get("business_value_pointer"),
+                row.get("fact_argv_by_type", {}),
+                row.get("description"),
+            ]
+        )
+    child_contract.pop("fixed_scalar_member_facts")
+    child_contract["fixed_scalar_member_fact_table"] = {
+        "columns": columns,
+        "rows": table_rows,
+        "shared_policy": {
+            "condition": "current_business_request_contains_member",
+            "execute_after": "deferred_parent_fact",
+            "is_next_command": False,
+            "consume_once": True,
+            "replay_allowed": False,
+        },
+    }
+
+
 def _deferred_dynamic_fact_payload(
     fact: Sequence[str],
     *,
@@ -5274,6 +5316,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 row["business_value_pointer"] = (
                     f"{current_business_value_pointer}/{key_value}"
                 )
+        _compact_fixed_scalar_member_facts(child_contract)
         branch_continuation = _dynamic_branch_disclosure_continuation(
             args,
             contract=contract,
@@ -5398,23 +5441,20 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 ),
                 "request_wide_order": {
                     "phase": "dynamic_disclosure",
-                    "finish_current_root_disclosure_chain_first": True,
-                    "disclosure_chain_definition": (
-                        "only branch_disclosure and nested_container_disclosures; "
-                        "child_contract branch choices are typed facts"
+                    "root_boundary": (
+                        "finish_current_root_disclosures_and_facts_before_next_root"
                     ),
-                    "array_item_order": "ascending_business_present_index",
-                    "array_item_traversal": (
-                        "response_tree_preorder_finish_item_descendants_before_next_sibling"
-                    ),
-                    "absent_array_item_disclosure_forbidden": True,
+                    "traversal": "response_tree_preorder",
                     "nested_member_order": "schema_property_order",
                     "child_fact_order": "child_contract_schema_order",
-                    "facts_using_returned_handles": (
-                        "after_current_root_dynamic_disclosures_in_"
-                        "deferred_fact_queue_order"
-                    ),
-                    "deferred_fact_queue": _dynamic_deferred_queue_contract(),
+                    "deferred_fact_queue": {
+                        "traversal": "response_tree_preorder",
+                        "node_steps": [
+                            "deferred_parent_fact",
+                            "child_contract_facts",
+                            "descendant_response_nodes",
+                        ],
+                    },
                     "this_handle_is_not_a_complete_request": True,
                 },
                 "subcommand": (
@@ -5427,27 +5467,14 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 **(
                     {
                         "draft_fact_execution": {
-                            "fact_argv_role": (
-                                "append_after_latest_draft_apply_next_command_facts_marker"
+                            "prefix_source": (
+                                "latest_draft_response.next_action_binding."
+                                "fixed_argv_prefix"
                             ),
-                            "required_prefix_order": [
-                                "draft-apply",
-                                "<draft_id>",
-                                "--task-authority",
-                                "<task_authority>",
-                                "--expected-revision",
-                                "<latest_revision>",
-                                "--compact",
-                                "--facts",
-                            ],
-                            "fact_argv_must_follow_prefix": True,
-                            "atomic_batch_scope": "next_current_root_deferred_fact_chunk",
+                            "batch_scope": "next_current_root_deferred_facts",
                             "complete_action_groups_in_queue_order": True,
-                            "dispatch_after_complete_chunk": True,
                             "maximum_actions": MAX_TYPED_ACTIONS_PER_APPLY,
-                            "inserting_fact_before_expected_revision": "invalid",
                             "copy_returned_handles_exactly": True,
-                            "placeholder_or_added_punctuation": "invalid",
                         }
                     }
                     if (draft_shape or undo_child_shape)
@@ -5474,33 +5501,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                             nested_container_disclosures
                         ),
                         "nested_container_order": (
-                            (
-                                "for the current array item, follow "
-                                "branch_disclosure first, then disclose every "
-                                "business-present member and its descendants in "
-                                "this order before the next sibling; after the "
-                                "current root disclosures, drain its deferred facts"
-                            )
+                            "branch_then_schema_members_then_descendants_then_facts"
                             if branch_continuation
-                            else (
-                                "for the current array item, disclose every "
-                                "business-present member and its descendants in this "
-                                "order before the next sibling; after the current root "
-                                "disclosures, drain its deferred facts"
-                            )
-                        )
-                        if args.command == "request-array-item"
-                        else (
-                            (
-                                "follow branch_disclosure first, then disclose every "
-                                "business-present member in this order before "
-                                "the deferred_fact queue"
-                            )
-                            if branch_continuation
-                            else (
-                                "disclose every business-present member in this order "
-                                "before the deferred_fact queue"
-                            )
+                            else "schema_members_then_descendants_then_facts"
                         ),
                     }
                     if nested_container_disclosures

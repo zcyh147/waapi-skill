@@ -380,7 +380,12 @@ class TypedRequestContract:
             "rows": rows,
         }
 
-    def gateway_field_table(self) -> dict[str, Any]:
+    def gateway_field_table(
+        self,
+        *,
+        direct_actions_override: bool | None = None,
+        include_fact_construction: bool = True,
+    ) -> dict[str, Any]:
         """Return a compact, lossless table for large discovery documents."""
 
         fields = self.gateway_field_payloads()
@@ -396,6 +401,8 @@ class TypedRequestContract:
             DIRECT_ACTION_FIELD_TABLE_MIN_ROWS
             <= len(fields)
             <= COPY_READY_FIELD_TABLE_MAX_ROWS
+            if direct_actions_override is None
+            else direct_actions_override
         )
         handle_prefix = (
             "trh1-"
@@ -448,6 +455,8 @@ class TypedRequestContract:
                 and not (key == "unique_items" and value is False)
             }
             fact_construction = constraints.pop("fact_construction", {})
+            if not include_fact_construction:
+                fact_construction = {}
             map_payload = constraints.get("map")
             if isinstance(map_payload, Mapping):
                 compact_map = dict(map_payload)
@@ -488,13 +497,19 @@ class TypedRequestContract:
                 if direct_actions
                 else fact_action_code
             )
-            if public_fact_action in fact_action_codes:
-                fact_action_index = fact_action_codes.index(public_fact_action)
-                if fact_action_definitions[fact_action_index] != fact_construction:
-                    raise TypedRequestError(
-                        "Compact field action code has inconsistent semantics"
-                    )
+            exact_action_indexes = [
+                index
+                for index, action_code in enumerate(fact_action_codes)
+                if action_code == public_fact_action
+                and fact_action_definitions[index] == fact_construction
+            ]
+            if exact_action_indexes:
+                fact_action_index = exact_action_indexes[0]
             else:
+                if direct_actions and public_fact_action in fact_action_codes:
+                    raise TypedRequestError(
+                        "Compact direct field action has inconsistent semantics"
+                    )
                 fact_action_index = len(fact_action_codes)
                 fact_action_codes.append(public_fact_action)
                 fact_action_definitions.append(dict(fact_construction))
@@ -869,6 +884,104 @@ class MaterializedTypedRequest:
             "args": dict(self.args),
             "options": dict(self.options),
         }
+
+
+def expand_gateway_field_table(table: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Expand one public compact field table into its canonical field rows."""
+
+    if table.get("contract") != "waapi-skill.compact-typed-field-table/v1":
+        raise TypedRequestError("Compact typed field table contract is invalid")
+    columns = table.get("columns")
+    rows = table.get("rows")
+    shape_codes = table.get("shape_codes")
+    accepted_type_sets = table.get("accepted_type_sets")
+    constraint_sets = table.get("constraint_sets")
+    section = table.get("section")
+    if (
+        not isinstance(columns, list)
+        or not all(isinstance(column, str) for column in columns)
+        or not isinstance(rows, list)
+        or not isinstance(shape_codes, list)
+        or not isinstance(accepted_type_sets, list)
+        or not isinstance(constraint_sets, list)
+        or not isinstance(section, str)
+    ):
+        raise TypedRequestError("Compact typed field table is malformed")
+    required_columns = {
+        "parent_row",
+        "name",
+        "shape_code",
+        "accepted_type_set",
+        "constraint_set",
+    }
+    handle_column = (
+        "handle_suffix" if "handle_suffix" in columns else "handle"
+    )
+    if handle_column not in columns or not required_columns.issubset(columns):
+        raise TypedRequestError("Compact typed field table columns are invalid")
+    handle_prefix = table.get("handle_prefix", "")
+    if not isinstance(handle_prefix, str):
+        raise TypedRequestError("Compact typed field handle prefix is invalid")
+
+    expanded: list[dict[str, Any]] = []
+    for index, values in enumerate(rows):
+        if not isinstance(values, list) or len(values) != len(columns):
+            raise TypedRequestError("Compact typed field row is malformed")
+        row = dict(zip(columns, values, strict=True))
+        try:
+            shape = shape_codes[row["shape_code"]]
+            accepted_types = accepted_type_sets[row["accepted_type_set"]]
+            constraints = constraint_sets[row["constraint_set"]]
+        except (IndexError, KeyError, TypeError):
+            raise TypedRequestError(
+                "Compact typed field row index is invalid"
+            ) from None
+        if (
+            not isinstance(shape, str)
+            or not isinstance(accepted_types, list)
+            or not all(isinstance(value, str) for value in accepted_types)
+            or not isinstance(constraints, Mapping)
+            or not isinstance(row.get(handle_column), str)
+            or not isinstance(row.get("name"), str)
+        ):
+            raise TypedRequestError("Compact typed field row value is invalid")
+        parent_row = row.get("parent_row")
+        if parent_row is None:
+            path = [section, row["name"]]
+            parent_handle = None
+        else:
+            if (
+                isinstance(parent_row, bool)
+                or not isinstance(parent_row, int)
+                or parent_row < 0
+                or parent_row >= index
+            ):
+                raise TypedRequestError("Compact typed field parent is invalid")
+            parent = expanded[parent_row]
+            parent_handle = parent["handle"]
+            path = list(parent["path"])
+            if not (
+                parent["shape"] == "branch" and shape in {"object", "scalar"}
+            ):
+                path.append(row["name"])
+        payload: dict[str, Any] = {
+            "handle": f"{handle_prefix}{row[handle_column]}",
+            "section": section,
+            "name": row["name"],
+            "path": path,
+            "required": False,
+            "shape": shape,
+            "accepted_types": list(accepted_types),
+        }
+        payload.update(dict(constraints))
+        if parent_handle is not None:
+            payload["parent_handle"] = parent_handle
+        if shape == "array":
+            payload.setdefault("minimum_items", None)
+            payload.setdefault("maximum_items", None)
+            payload.setdefault("unique_items", False)
+        expanded.append(payload)
+    return expanded
 
 
 def request_contract(version: str, uri: str) -> TypedRequestContract:
