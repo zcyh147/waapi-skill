@@ -238,7 +238,12 @@ def test_generic_draft_start_requires_first_fact_batch_before_disclosure(
         "/operation-schema/composer/construction_order"
     )
     assert binding["first_batch_rule"] == (
-        "submit the next 1..6 prompt-present facts in published schema order"
+        "submit the next 6 schema-ordered facts when available; otherwise "
+        "submit every remaining fact before disclosure"
+    )
+    assert binding["branch_choice_rule"] == (
+        "after choose, add required selected-branch constant and prompt-value "
+        "facts before the next top-level fact"
     )
     assert binding["dynamic_disclosure_before_first_fact"] == "invalid"
 

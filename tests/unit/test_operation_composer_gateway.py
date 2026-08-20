@@ -954,6 +954,14 @@ def test_object_create_schema_puts_the_top_level_fact_plan_before_large_fields(
         "submit only prompt-present values; omit absent defaults"
     )
     assert table["business_pointer_source"] == "typed_request_fields.path"
+    assert table["fact_batching"] == (
+        "submit schema-ordered facts in full batches of 6; the final fact "
+        "batch contains every remaining fact"
+    )
+    assert table["branch_fact_expansion"] == (
+        "after choose, immediately set every required selected-branch "
+        "constant and business value before the next top-level fact"
+    )
     assert composer["construction_order"]["branch_constants"] == (
         "set selected branch constants before disclosure"
     )

@@ -663,6 +663,13 @@ def test_all_agent_cat_references_fit_the_single_read_window() -> None:
         assert lf_bytes + reference.count("\n") <= 32_768, f"{name} CRLF checkout"
 
 
+def test_media_pool_contains_value_is_disclosed_as_literal_text() -> None:
+    assert (
+        "`contains` takes literal text, never regex syntax or inline modifiers"
+        in QUERY
+    )
+
+
 def test_operate_reference_is_a_bounded_single_read_control_plane() -> None:
     marker = "<!-- WAAPI_OPERATE_REFERENCE_END -->"
     assert len(OPERATE.encode("utf-8")) <= 32_768

@@ -13206,8 +13206,14 @@ def operation_draft_payload(
                             else "/request-schema/construction_order"
                         ),
                         "first_batch_rule": (
-                            "submit the next 1..6 prompt-present facts in "
-                            "published schema order"
+                            "submit the next 6 schema-ordered facts when "
+                            "available; otherwise submit every remaining fact "
+                            "before disclosure"
+                        ),
+                        "branch_choice_rule": (
+                            "after choose, add required selected-branch "
+                            "constant and prompt-value facts before the next "
+                            "top-level fact"
                         ),
                         "dynamic_disclosure_before_first_fact": "invalid",
                     }

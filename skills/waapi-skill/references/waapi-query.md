@@ -59,7 +59,8 @@ nested typed facts and optional closed result filter.
    with no `weight`. Operators are `equals`, `notEquals`, `contains`,
    `startsWith`, `endsWith`, `matchesRegex`, `lessThan`, `greaterThan`,
    `lessThanOrEqual`, and `greaterThanOrEqual`. “Between/from A to B” is
-   inclusive. Convert kHz to integer Hz, mono/stereo to `1`/`2`, bit depth to an
+   inclusive. `contains` takes literal text, never regex syntax or inline modifiers.
+   Convert kHz to integer Hz, mono/stereo to `1`/`2`, bit depth to an
    integer, and seconds to JSON numbers (`8.0` when whole). Do not add
    search, paging, sort, description, or similarity args.
 3. Use the user's maximum, else `100`; range is 1–200, with at most 16 filters

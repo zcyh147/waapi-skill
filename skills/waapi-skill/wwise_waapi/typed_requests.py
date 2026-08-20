@@ -368,6 +368,14 @@ class TypedRequestContract:
                 "submit only prompt-present values; omit absent defaults"
             ),
             "business_pointer_source": "typed_request_fields.path",
+            "fact_batching": (
+                "submit schema-ordered facts in full batches of 6; the final "
+                "fact batch contains every remaining fact"
+            ),
+            "branch_fact_expansion": (
+                "after choose, immediately set every required selected-branch "
+                "constant and business value before the next top-level fact"
+            ),
             "columns": ["handle", "name", "phase", "action"],
             "rows": rows,
         }
