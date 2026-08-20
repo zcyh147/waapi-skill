@@ -13167,9 +13167,20 @@ def operation_draft_payload(
         **projection,
     }
     if record.state is OperationDraftState.EDITABLE:
+        generic_typed_draft = record.operation.startswith("ak.") or (
+            record.operation in DRAFT_TYPED_OPERATIONS
+            and record.operation != "waapi.undoGroup"
+        )
         next_action_binding: dict[str, Any] = {
             "contract": "waapi-skill.operation-draft-next-action/v1",
         }
+        if generic_typed_draft:
+            next_action_binding["typed_fact_batch_discipline"] = {
+                "batch_size": "6 until fewer than 6 facts remain",
+                "top_level_facts_before_dynamic_disclosure": True,
+                "branch_choice_requires_selected_branch_facts": True,
+                "schema_candidates_without_business_values": "skip",
+            }
         if compact_actions is not None:
             next_action_binding["shell_tool_timeout_ms"] = (
                 GATEWAY_SHELL_TOOL_TIMEOUT_MS
@@ -13189,13 +13200,7 @@ def operation_draft_payload(
             if (
                 record.revision == 1
                 and record.check is None
-                and (
-                    record.operation.startswith("ak.")
-                    or (
-                        record.operation in DRAFT_TYPED_OPERATIONS
-                        and record.operation != "waapi.undoGroup"
-                    )
-                )
+                and generic_typed_draft
             ):
                 next_action_binding.update(
                     {

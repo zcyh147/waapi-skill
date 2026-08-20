@@ -285,6 +285,14 @@ def test_draft_apply_batches_ordered_typed_actions_in_one_atomic_write(
         [handles["gameObject"], handles["position.orientationFront.x"]]
     )
     assert len(payload["draft"]["action_result"]["created_handles"]) == 2
+    assert payload["draft"]["next_action_binding"][
+        "typed_fact_batch_discipline"
+    ] == {
+        "batch_size": "6 until fewer than 6 facts remain",
+        "top_level_facts_before_dynamic_disclosure": True,
+        "branch_choice_requires_selected_branch_facts": True,
+        "schema_candidates_without_business_values": "skip",
+    }
     assert payload["draft"]["next_action_binding"]["completion_candidate"][
         "fixed_argv_prefix"
     ][-1] == "3"
