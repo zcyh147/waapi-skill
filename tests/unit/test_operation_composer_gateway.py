@@ -997,6 +997,19 @@ def test_object_create_schema_puts_the_top_level_fact_plan_before_large_fields(
     assert composer["construction_order"]["branch_constants"] == (
         "set selected branch constants before disclosure"
     )
+    dynamic = composer["dynamic_container_commands"]
+    assert dynamic["schema_binding_choice"] == {
+        "root_handle": "schema_digest_required_parent_schema_token_forbidden",
+        "returned_child_handle": (
+            "parent_schema_token_required_schema_digest_forbidden"
+        ),
+        "both_or_neither": "invalid",
+    }
+    assert "--schema-digest" not in dynamic["nested_map_value_argv"]
+    assert "--schema-digest" not in dynamic["nested_array_item_argv"]
+    assert "--parent-schema-token" in dynamic["nested_map_value_argv"]
+    assert "--parent-schema-token" in dynamic["nested_array_item_argv"]
+    assert "nested_parent_argv" not in dynamic
 
     properties = next(
         field

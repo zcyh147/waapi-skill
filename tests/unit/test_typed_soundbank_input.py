@@ -493,7 +493,7 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
             ],
             "forbidden": [
                 "descendant_fact_before_current_node_parent_or_child_facts",
-                "next_sibling_disclosure_before_current_root_facts",
+                "next_outer_sibling_disclosure_before_current_root_facts",
                 "one_fact_apply_batch_spanning_sibling_roots",
             ],
         },

@@ -132,6 +132,7 @@ from wwise_waapi.typed_requests import (  # noqa: E402  # pyright: ignore[report
     typed_schema_lineage_business_pointer,
     typed_schema_lineage_root_business_pointer,
     typed_schema_lineage_token,
+    typed_container_command_contract,
 )
 from wwise_waapi.typed_queries import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     ADVANCED_TYPED_QUERY_OPERATION,
@@ -3969,45 +3970,22 @@ def operation_composer_input_contract(
             "map_value": "request-map-container",
             "array_item": "request-array-item",
             "schema_digest": contract.get("typed_request_schema_digest"),
-            "map_value_argv": [
-                "request-map-container",
+            **typed_container_command_contract(
                 operation,
-                "--schema-digest",
-                contract.get("typed_request_schema_digest"),
-                "--map-handle",
-                "<parent_handle>",
-                "--key",
-                "<key>",
-                "--shape",
-                "<object|array>",
-            ],
-            "array_item_argv": [
-                "request-array-item",
-                operation,
-                "--schema-digest",
-                contract.get("typed_request_schema_digest"),
-                "--array-handle",
-                "<parent_handle>",
-                "--index",
-                "<zero_based_index>",
-                "--shape",
-                "<object|array>",
-            ],
+                str(contract.get("typed_request_schema_digest")),
+            ),
             "draft_binding": False,
-            "nested_parent_argv": [
-                "--parent-schema-token",
-                "<schema_lineage_token_from_parent_disclosure>",
-            ],
             "scalar_map_entry_action": (
                 "use draft-apply add_typed_fact with fact-action map-put directly; "
                 "request-map-container is only for an object or array value"
             ),
             "sequence": (
-                "disclose each complex child with the operation and schema digest; "
+                "use a root argv template only for a top-level handle; use the "
+                "matching nested argv template unchanged for a returned child; "
                 "then add the append/map-put Draft fact with the returned child handle; "
-                "disclosure never consumes or changes the Draft revision; a nested "
-                "child must append --parent-schema-token with the exact token returned "
-                "by its parent disclosure; do not add --member-key until the parent "
+                "disclosure never consumes or changes the Draft revision; do not "
+                "combine schema digest with parent lineage; do not add --member-key "
+                "until the parent "
                 "response explicitly returns branch_disclosure"
             ),
         },
@@ -4732,6 +4710,7 @@ def _next_array_sibling_disclosure(
         return {}
     if current_business_value_pointer is None:
         return {}
+    nested_sibling = args.parent_schema_token is not None
     return {
         "next_sibling_disclosure": {
             "condition": "current_business_request_contains_next_complex_item",
@@ -4739,9 +4718,18 @@ def _next_array_sibling_disclosure(
                 f"{current_business_value_pointer.rsplit('/', 1)[0]}/{next_index}"
             ),
             "index": next_index,
-            "must_follow": "current_root_fact_apply_success",
+            "must_follow": (
+                "current_item_descendant_disclosures"
+                if nested_sibling
+                else "current_root_fact_apply_success"
+            ),
+            **(
+                {"must_precede": "current_root_deferred_facts"}
+                if nested_sibling
+                else {}
+            ),
             "absent_or_scalar_next_item_forbidden": True,
-            "is_next_command": False,
+            "is_next_command": nested_sibling,
             "argv_by_shape": argv_by_shape,
         }
     }
@@ -4921,13 +4909,26 @@ def _dynamic_next_command_decision(
             **(
                 {
                     "if_current_business_object_is_declared_leaf": {
+                        "evaluate_before_candidate_commands": True,
                         "condition": (
                             "current_business_object_has_no_properties_"
                             "references_or_children"
                         ),
                         "nested_container_disclosures": "forbidden",
                         "next_action": (
-                            "deferred_fact_queue_then_next_sibling_disclosure"
+                            "next_sibling_disclosure_then_deferred_fact_queue"
+                            if nested_sibling
+                            else "deferred_fact_queue_then_next_sibling_disclosure"
+                        ),
+                        **(
+                            {
+                                "next_command_pointer": (
+                                    "/continuation/next_sibling_disclosure/"
+                                    "argv_by_shape/<exact-business-shape>"
+                                )
+                            }
+                            if nested_sibling
+                            else {}
                         ),
                     }
                 }
@@ -5429,7 +5430,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                                 "current_business_request_contains_that_index"
                             ),
                             "allowed_after": (
-                                "current_root_fact_apply_success"
+                                "current_item_descendant_disclosures"
+                                if args.parent_schema_token is not None
+                                else "current_root_fact_apply_success"
                             ),
                             "absent_index_forbidden": True,
                             "is_next_command": False,
@@ -5473,7 +5476,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                         ],
                         "forbidden": [
                             "descendant_fact_before_current_node_parent_or_child_facts",
-                            "next_sibling_disclosure_before_current_root_facts",
+                            "next_outer_sibling_disclosure_before_current_root_facts",
                             "one_fact_apply_batch_spanning_sibling_roots",
                         ],
                     },

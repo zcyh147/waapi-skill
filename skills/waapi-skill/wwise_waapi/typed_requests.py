@@ -54,6 +54,71 @@ MAX_TYPED_SCHEMA_NODES = 1024
 MAX_TYPED_SCHEMA_DEPTH = 16
 
 
+def typed_container_command_contract(
+    uri: str,
+    schema_digest: str,
+) -> dict[str, Any]:
+    """Return the sole root and nested dynamic-container argv templates."""
+
+    return {
+        "map_value_argv": [
+            "request-map-container",
+            uri,
+            "--schema-digest",
+            schema_digest,
+            "--map-handle",
+            "<parent_handle>",
+            "--key",
+            "<key>",
+            "--shape",
+            "<object|array>",
+        ],
+        "array_item_argv": [
+            "request-array-item",
+            uri,
+            "--schema-digest",
+            schema_digest,
+            "--array-handle",
+            "<parent_handle>",
+            "--index",
+            "<zero_based_index>",
+            "--shape",
+            "<object|array>",
+        ],
+        "nested_map_value_argv": [
+            "request-map-container",
+            uri,
+            "--map-handle",
+            "<returned_parent_handle>",
+            "--key",
+            "<key>",
+            "--shape",
+            "<object|array>",
+            "--parent-schema-token",
+            "<same_parent_response_schema_lineage_token>",
+        ],
+        "nested_array_item_argv": [
+            "request-array-item",
+            uri,
+            "--array-handle",
+            "<returned_parent_handle>",
+            "--index",
+            "<zero_based_index>",
+            "--shape",
+            "<object|array>",
+            "--parent-schema-token",
+            "<same_parent_response_schema_lineage_token>",
+        ],
+        "schema_binding_choice": {
+            "root_handle": "schema_digest_required_parent_schema_token_forbidden",
+            "returned_child_handle": (
+                "parent_schema_token_required_schema_digest_forbidden"
+            ),
+            "both_or_neither": "invalid",
+        },
+    }
+
+
 def _copy_ready_fact_action(uri: str, action: str) -> str:
     """Render one compact-table action as the exact public Topic flag."""
 
@@ -657,44 +722,20 @@ class TypedRequestContract:
                     continuation["dynamic_container_commands"] = {
                         "map_value": "request-map-container",
                         "array_item": "request-array-item",
-                        "map_value_argv": [
-                            "request-map-container",
+                        **typed_container_command_contract(
                             self.uri,
-                            "--schema-digest",
                             self.schema_digest,
-                            "--map-handle",
-                            "<parent_handle>",
-                            "--key",
-                            "<key>",
-                            "--shape",
-                            "<object|array>",
-                        ],
-                        "array_item_argv": [
-                            "request-array-item",
-                            self.uri,
-                            "--schema-digest",
-                            self.schema_digest,
-                            "--array-handle",
-                            "<parent_handle>",
-                            "--index",
-                            "<zero_based_index>",
-                            "--shape",
-                            "<object|array>",
-                        ],
+                        ),
                         "draft_binding": False,
-                        "nested_parent_argv": [
-                            "--parent-schema-token",
-                            "<schema_lineage_token_from_parent_disclosure>",
-                        ],
                         "scalar_map_entry_action": (
                             "append one --map-put <map_handle> <key> <type> <value> "
                             "fact directly; request-map-container is only for an "
                             "object or array value"
                         ),
                         "sequence": (
-                            "use the root template only for a top-level handle; "
-                            "for a returned child handle append nested_parent_argv "
-                            "with that same response's schema_lineage_token"
+                            "use a root argv template only for a top-level handle; "
+                            "use the matching nested argv template unchanged for a "
+                            "returned child handle"
                         ),
                     }
                 input_shape = "inline"
@@ -726,8 +767,10 @@ class TypedRequestContract:
                         "preserve_value_text_exactly": True,
                     },
                     "schema_digest_usage": (
-                        "the digest binds request-map-container/request-array-item; "
-                        "do not pass it to draft-start"
+                        "the digest binds only a root request-map-container or "
+                        "request-array-item; a returned child uses only its parent "
+                        "schema token; do not pass it to draft-start and do not pass "
+                        "the parent schema token there either"
                     ),
                     "business_values_required": True,
                     "action_argv": {
@@ -753,35 +796,11 @@ class TypedRequestContract:
                     "dynamic_container_commands": {
                         "map_value": "request-map-container",
                         "array_item": "request-array-item",
-                        "map_value_argv": [
-                            "request-map-container",
+                        **typed_container_command_contract(
                             self.uri,
-                            "--schema-digest",
                             self.schema_digest,
-                            "--map-handle",
-                            "<parent_handle>",
-                            "--key",
-                            "<key>",
-                            "--shape",
-                            "<object|array>",
-                        ],
-                        "array_item_argv": [
-                            "request-array-item",
-                            self.uri,
-                            "--schema-digest",
-                            self.schema_digest,
-                            "--array-handle",
-                            "<parent_handle>",
-                            "--index",
-                            "<zero_based_index>",
-                            "--shape",
-                            "<object|array>",
-                        ],
+                        ),
                         "draft_binding": False,
-                        "nested_parent_argv": [
-                            "--parent-schema-token",
-                            "<schema_lineage_token_from_parent_disclosure>",
-                        ],
                         "scalar_map_entry_action": (
                             "use draft-apply add_typed_fact with fact-action map-put "
                             "directly; request-map-container is only for an object "
@@ -790,8 +809,8 @@ class TypedRequestContract:
                         "sequence": (
                             "disclose a complex item without --member-key first; "
                             "follow a returned choice continuation exactly; for a "
-                            "returned child handle append nested_parent_argv with "
-                            "that same response's schema_lineage_token"
+                            "returned child handle copy the matching nested argv "
+                            "template unchanged"
                         ),
                     },
                     "completion": (

@@ -143,7 +143,7 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
             ],
             "forbidden": [
                 "descendant_fact_before_current_node_parent_or_child_facts",
-                "next_sibling_disclosure_before_current_root_facts",
+                "next_outer_sibling_disclosure_before_current_root_facts",
                 "one_fact_apply_batch_spanning_sibling_roots",
             ],
         },
@@ -660,6 +660,11 @@ def test_complex_schema_discloses_one_complete_non_json_continuation(tmp_path: P
         schema["schema_digest"],
         "--array-handle",
     ]
+    assert "--schema-digest" not in dynamic["nested_map_value_argv"]
+    assert "--schema-digest" not in dynamic["nested_array_item_argv"]
+    assert "--parent-schema-token" in dynamic["nested_map_value_argv"]
+    assert "--parent-schema-token" in dynamic["nested_array_item_argv"]
+    assert "nested_parent_argv" not in dynamic
     assert continuation["gateway_argv_prefix"] == [
         "typed-call",
         VALIDATE_URI,
