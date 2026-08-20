@@ -156,6 +156,7 @@ def test_initial_skill_bootstrap_is_the_only_combined_read_exception() -> None:
     assert "Never combine it with `pwd`, `git`, `rg`, `ls`, `find`, `printf`" in SKILL
     assert "Choose by command host, not Wwise/Codex version or path spelling" in frontmatter
     assert "POSIX uses `cat '<literal-locator>'` or exact `sed -n '1,$p'" in frontmatter
+    assert "whitespace-free POSIX locator uses unquoted `cat <literal-locator>`" in frontmatter
     assert (
         "native Windows uses exact "
         "`Get-Content -Raw -Encoding UTF8 '<literal-locator>'`" in frontmatter

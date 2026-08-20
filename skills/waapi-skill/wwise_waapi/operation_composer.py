@@ -1491,9 +1491,13 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             top_level_fact_plan = {
                 **top_level_fact_plan,
                 "branch_selection_authority": (
-                    "object.create parent is /args/parent (the direct container); "
-                    "a preflight merge-target GUID is proof only, never the parent; "
-                    "preserve every business_pointer representation"
+                    "parent=/args/parent direct container; preflight merge-target "
+                    "GUID=proof only, never parent; preserve each business_pointer "
+                    "representation"
+                ),
+                "dynamic_disclosure_authority": (
+                    "metadata property=>/args/properties; reference=>/args/references; "
+                    "order=properties,references,children"
                 ),
             }
         return {

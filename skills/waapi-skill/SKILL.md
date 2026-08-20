@@ -1,6 +1,6 @@
 ---
 name: waapi-skill
-description: Use this Skill for any Wwise/WAAPI version, project, query, object/property, import, SoundBank, switch, topic, setup, or change—even without “WAAPI”. Use only its Python runtime, versioned resources/builders, bounded subscriptions, and safe dispatcher. Read only the injected SKILL.md locator first; never search for or infer it. Choose by command host, not Wwise/Codex version or path spelling. POSIX uses `cat '<literal-locator>'` or exact `sed -n '1,$p' '<literal-locator>'`; native Windows uses exact `Get-Content -Raw -Encoding UTF8 '<literal-locator>'` in PowerShell Core. Never cross-use/wrap these forms or combine the read with unrelated action.
+description: Use this Skill for any Wwise/WAAPI version, project, query, object/property, import, SoundBank, switch, topic, setup, or change—even without “WAAPI”. Use only its Python runtime, versioned resources/builders, bounded subscriptions, and safe dispatcher. Read only the injected SKILL.md locator first; never search for or infer it. Choose by command host, not Wwise/Codex version or path spelling. POSIX uses `cat '<literal-locator>'` or exact `sed -n '1,$p' '<literal-locator>'`; a whitespace-free POSIX locator uses unquoted `cat <literal-locator>` to avoid an incomplete quote; native Windows uses exact `Get-Content -Raw -Encoding UTF8 '<literal-locator>'` in PowerShell Core. Never cross-use/wrap these forms or combine the read with unrelated action.
 ---
 
 # Wwise WAAPI Skill
@@ -168,6 +168,7 @@ revalidates them and dependencies. For other
 operations, only an explicit unknown dynamic property/reference token needs
 metadata in the order stated by the operate reference. Never infer a token or
 scope.
+For `object.create`, metadata proves the matching top-level `properties` or `references` pointer present; after scalar facts, follow every prompt-present disclosure row in schema-table order and finish both before `children`. Never jump to the child tree while a requested metadata-proven field remains undisclosed.
 
 Apply the canonical policy from the latest gateway `session_context`:
 
