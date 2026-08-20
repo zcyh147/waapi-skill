@@ -4756,7 +4756,9 @@ def _next_nested_disclosure_selector(
                 ).get("is_next_command") is True
                 else "drain_deferred_fact_queue_then_follow_next_sibling"
             ),
-            "is_next_command": True,
+            "is_next_command": False,
+            "becomes_next_command_only_after_exact_business_pointer_match": True,
+            "absent_business_pointer": "forbidden",
         }
     }
 
@@ -5499,6 +5501,10 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                             "batch_scope": "current_root_only_next_deferred_facts",
                             "complete_action_groups_in_queue_order": True,
                             "maximum_actions": MAX_TYPED_ACTIONS_PER_APPLY,
+                            "count_each_literal_action_flag": True,
+                            "seventh_action": (
+                                "stop_before_it_execute_first_six_then_read_response"
+                            ),
                             "copy_returned_handles_exactly": True,
                         }
                     }

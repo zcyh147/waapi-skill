@@ -979,16 +979,19 @@ def test_object_create_schema_puts_the_top_level_fact_plan_before_large_fields(
         "submit only prompt-present values; omit absent defaults"
     )
     assert table["branch_selection_authority"] == (
-        "choose the branch matching the current user business value representation; "
-        "do not replace it with an equivalent selector learned from a prior read"
+        "choose the branch matching the exact current user value at the row "
+        "business_pointer; a prior read result is proof only and must never replace "
+        "that value or its representation"
     )
     assert table["business_pointer_source"] == (
-        "typed_request_field_table parent_row lineage and this plan's "
-        "top-level names"
+        "this table's business_pointer column"
     )
+    parent = next(field for field in plan if field["name"] == "parent")
+    assert parent["business_pointer"] == "/args/parent"
     assert table["fact_batching"] == (
-        "submit schema-ordered facts in full batches of 6; the final fact "
-        "batch contains every remaining fact"
+        "count each literal --action; submit facts 1..6, then read the response "
+        "before submitting facts 7..12; never put a seventh action in one "
+        "draft-apply; the final batch contains every remaining fact up to 6"
     )
     assert table["branch_fact_expansion"] == (
         "after choose, immediately set every required selected-branch "

@@ -400,7 +400,9 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         "selection": "first_business_present_member_by_queue_index",
         "repeat_for_descendants": True,
         "when_none": "follow_next_sibling_then_drain_deferred_fact_queue",
-        "is_next_command": True,
+        "is_next_command": False,
+        "becomes_next_command_only_after_exact_business_pointer_match": True,
+        "absent_business_pointer": "forbidden",
     }
     assert grandchild["continuation"]["deferred_fact"]["blocked_by"] == [
         "ancestor_deferred_parent_facts",

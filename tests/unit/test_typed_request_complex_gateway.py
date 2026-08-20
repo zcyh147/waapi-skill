@@ -85,7 +85,15 @@ def test_media_pool_schema_marks_scalar_array_items_as_append_facts(
     assert plan["business_fact_selection"] == (
         "submit only prompt-present values; omit absent defaults"
     )
-    assert plan["business_pointer_source"] == "typed_request_fields.path"
+    assert plan["business_pointer_source"] == (
+        "this table's business_pointer column"
+    )
+    plan_rows = [
+        dict(zip(plan["columns"], row, strict=True)) for row in plan["rows"]
+    ]
+    assert next(row for row in plan_rows if row["name"] == "filters")[
+        "business_pointer"
+    ] == "/args/filters"
     filter_row = next(row for row in plan["rows"] if row[1] == "filters")
     assert filter_row[0] == filters["handle"]
     assert filters["fact_construction"]["business_cardinality_authority"] == {
@@ -161,6 +169,8 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
         "batch_scope": "current_root_only_next_deferred_facts",
         "complete_action_groups_in_queue_order": True,
         "maximum_actions": 6,
+        "count_each_literal_action_flag": True,
+        "seventh_action": "stop_before_it_execute_first_six_then_read_response",
         "copy_returned_handles_exactly": True,
     }
     deferred_candidate = next(

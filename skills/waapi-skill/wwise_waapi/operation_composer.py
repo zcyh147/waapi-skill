@@ -1487,11 +1487,6 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             MAX_INLINE_COMPOSER_FIELD_PROJECTION_BYTES
         )
         top_level_fact_plan = typed.top_level_fact_plan()
-        if compact_field_table:
-            top_level_fact_plan["business_pointer_source"] = (
-                "typed_request_field_table parent_row lineage and this plan's "
-                "top-level names"
-            )
         return {
             "contract": OPERATION_COMPOSER_CONTRACT,
             "operation": operation,
