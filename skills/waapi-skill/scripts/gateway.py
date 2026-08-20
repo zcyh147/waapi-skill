@@ -2282,9 +2282,16 @@ def gateway_stdout_payload(value: Any) -> Any:
     if not isinstance(raw_continuation, Mapping):
         return projected
     raw_decision = raw_continuation.get("next_command_decision")
+    raw_root_anchor = raw_continuation.get("root_fact_queue_anchor")
+    raw_deferred_fact = raw_continuation.get("deferred_fact")
+    include_root_anchor = isinstance(raw_root_anchor, Mapping) and (
+        raw_continuation.get("subcommand") != "draft-apply"
+        or not isinstance(raw_deferred_fact, Mapping)
+        or raw_root_anchor.get("first_fact_argv") == raw_deferred_fact.get("argv")
+    )
     continuation: dict[str, Any] = {}
     candidate_keys: list[str] = []
-    if isinstance(raw_continuation.get("root_fact_queue_anchor"), Mapping):
+    if include_root_anchor:
         candidate_keys.append("root_fact_queue_anchor")
     if isinstance(raw_decision, Mapping):
         decision = {
@@ -2321,7 +2328,24 @@ def gateway_stdout_payload(value: Any) -> Any:
         continuation["next_command_decision"] = decision
     for key in candidate_keys:
         if key in raw_continuation and key not in continuation:
-            continuation[key] = raw_continuation[key]
+            item = raw_continuation[key]
+            if (
+                key == "deferred_fact"
+                and raw_continuation.get("subcommand") == "draft-apply"
+                and not include_root_anchor
+                and isinstance(item, Mapping)
+            ):
+                item = {
+                    **item,
+                    "complete_command_assembly": {
+                        "fixed_argv_prefix_source": (
+                            "most_recent_successful_draft_action_response/"
+                            "draft/next_action_binding/fixed_argv_prefix"
+                        ),
+                        "append_this_fact_argv_exactly": True,
+                    },
+                }
+            continuation[key] = item
     for key, item in raw_continuation.items():
         if key in {
             "draft_fact_execution",
@@ -2329,7 +2353,9 @@ def gateway_stdout_payload(value: Any) -> Any:
             "next_business_present_nested_disclosure",
             "next_command_decision",
             "request_wide_order",
-        } or key in continuation:
+        } or key in continuation or (
+            key == "root_fact_queue_anchor" and not include_root_anchor
+        ):
             continue
         continuation[key] = item
     projected["continuation"] = continuation
