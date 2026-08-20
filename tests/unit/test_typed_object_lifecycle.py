@@ -248,20 +248,39 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         "unrelated_prompt_objects_do_not_satisfy_member_conditions": True,
     }
     assert next(iter(grandchild["continuation"])) == (
-        "business_leaf_transition"
+        "business_sibling_transition"
     )
-    assert grandchild["continuation"]["business_leaf_transition"] == {
-        "first": True,
-        "condition": "business_leaf_no_properties_references_children",
-        "nested_container_disclosures": "forbidden",
-        "when_next_sibling_present": {
-            "exact_command_pointer": (
-                "/continuation/next_sibling_disclosure/argv_by_shape/"
-                "<exact-business-shape>"
+    assert grandchild["continuation"]["business_sibling_transition"] == {
+        "condition": "current_business_request_contains_next_complex_item",
+        "business_value_pointer": "/args/children/0/children/1",
+        "index": 1,
+        "first_when_current_business_object_is_leaf": True,
+        "leaf_nested_container_disclosures": "forbidden",
+        "otherwise_after": (
+            "all_business_present_current_item_descendant_disclosures_if_any"
+        ),
+        "must_precede": "current_root_deferred_facts",
+        "when_absent": {
+            "next_action": (
+                "unwind_drain_current_root_deferred_facts_then_use_nearest_"
+                "ancestor_business_sibling_exact_argv"
             ),
         },
-        "when_absent": {
-            "next_action": "nearest_ancestor_sibling_else_deferred_fact_queue",
+        "absent_or_scalar_next_item_forbidden": True,
+        "is_next_command": True,
+        "argv_by_shape": {
+            "object": [
+                "request-array-item",
+                "object.create",
+                "--array-handle",
+                nested_children["handle"],
+                "--index",
+                "1",
+                "--shape",
+                "object",
+                "--parent-schema-token",
+                nested_children["schema_lineage_token"],
+            ]
         },
     }
     assert grandchild["continuation"]["root_fact_queue_anchor"] == {
@@ -282,10 +301,9 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         "batch_limit": 6,
     }
     next_decision = grandchild["continuation"]["next_command_decision"]
-    assert list(grandchild["continuation"])[:4] == [
-        "business_leaf_transition",
+    assert list(grandchild["continuation"])[:3] == [
+        "business_sibling_transition",
         "root_fact_queue_anchor",
-        "next_sibling_disclosure",
         "next_command_decision",
     ]
     assert next_decision == {
@@ -324,14 +342,14 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
                 ),
             },
             {
-                "candidate": "next_sibling_disclosure",
+                "candidate": "business_sibling_transition",
                 "condition": (
                     "current_object_has_no_business_present_nested_member_and_"
                     "business_value_pointer_is_present"
                 ),
                 "business_value_pointer": "/args/children/0/children/1",
                 "command_pointer": (
-                    "/continuation/next_sibling_disclosure/argv_by_shape/"
+                    "/continuation/business_sibling_transition/argv_by_shape/"
                     "<exact-business-shape>"
                 ),
             },
@@ -376,31 +394,6 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
             "is_next_command": False,
         },
     }
-    assert grandchild["continuation"]["next_sibling_disclosure"] == {
-        "condition": "current_business_request_contains_next_complex_item",
-        "business_value_pointer": "/args/children/0/children/1",
-        "index": 1,
-        "must_follow": (
-            "all_business_present_current_item_descendant_disclosures_if_any"
-        ),
-        "must_precede": "current_root_deferred_facts",
-        "absent_or_scalar_next_item_forbidden": True,
-        "is_next_command": True,
-        "argv_by_shape": {
-            "object": [
-                "request-array-item",
-                "object.create",
-                "--array-handle",
-                nested_children["handle"],
-                "--index",
-                "1",
-                "--shape",
-                "object",
-                "--parent-schema-token",
-                nested_children["schema_lineage_token"],
-            ]
-        },
-    }
     assert grandchild["construction_state"] == {
         "complete": False,
         "disclosure_replay_allowed": False,
@@ -443,7 +436,9 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         "candidate_pointer": "/continuation/nested_container_disclosures",
         "selection": "first_business_present_member_by_queue_index",
         "repeat_for_descendants": True,
-        "when_none": "follow_next_sibling_then_drain_deferred_fact_queue",
+        "when_none": (
+            "follow_business_sibling_transition_then_drain_deferred_fact_queue"
+        ),
         "is_next_command": False,
         "becomes_next_command_only_after_exact_business_pointer_match": True,
         "absent_business_pointer": "forbidden",
@@ -451,7 +446,7 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
     assert grandchild["continuation"]["deferred_fact"]["blocked_by"] == [
         "ancestor_deferred_parent_facts",
         "ancestor_child_contract_facts",
-        "next_sibling_disclosure",
+        "business_sibling_transition",
         "all_descendant_disclosures",
     ]
     assert grandchild["continuation"]["deferred_fact"]["consume_once"] is True

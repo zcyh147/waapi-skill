@@ -4773,57 +4773,36 @@ def _next_array_sibling_disclosure(
     if current_business_value_pointer is None:
         return {}
     nested_sibling = args.parent_schema_token is not None
-    return {
-        "next_sibling_disclosure": {
-            "condition": "current_business_request_contains_next_complex_item",
-            "business_value_pointer": (
-                f"{current_business_value_pointer.rsplit('/', 1)[0]}/{next_index}"
-            ),
-            "index": next_index,
-            "must_follow": (
-                "all_business_present_current_item_descendant_disclosures_if_any"
-                if nested_sibling
-                else "current_root_fact_apply_success"
-            ),
-            **(
-                {"must_precede": "current_root_deferred_facts"}
-                if nested_sibling
-                else {}
-            ),
-            "absent_or_scalar_next_item_forbidden": True,
-            "is_next_command": nested_sibling,
-            "argv_by_shape": argv_by_shape,
-        }
-    }
-
-
-def _business_declared_leaf_transition(
-    *,
-    current_business_value_pointer: str | None,
-    nested_container_disclosures: Sequence[Mapping[str, Any]],
-    next_sibling_disclosure: Mapping[str, Any],
-) -> dict[str, Any]:
-    """Put the exact leaf escape before optional descendant disclosures."""
-
-    if current_business_value_pointer is None or not nested_container_disclosures:
-        return {}
-    sibling = next_sibling_disclosure.get("next_sibling_disclosure", {})
     transition: dict[str, Any] = {
-        "first": True,
-        "condition": "business_leaf_no_properties_references_children",
-        "nested_container_disclosures": "forbidden",
+        "condition": "current_business_request_contains_next_complex_item",
+        "business_value_pointer": (
+            f"{current_business_value_pointer.rsplit('/', 1)[0]}/{next_index}"
+        ),
+        "index": next_index,
+        **(
+            {
+                "first_when_current_business_object_is_leaf": True,
+                "leaf_nested_container_disclosures": "forbidden",
+                "otherwise_after": (
+                    "all_business_present_current_item_"
+                    "descendant_disclosures_if_any"
+                ),
+                "must_precede": "current_root_deferred_facts",
+                "when_absent": {
+                    "next_action": (
+                        "unwind_drain_current_root_deferred_facts_then_use_nearest_"
+                        "ancestor_business_sibling_exact_argv"
+                    )
+                },
+            }
+            if nested_sibling
+            else {"after": "current_root_fact_apply_success"}
+        ),
+        "absent_or_scalar_next_item_forbidden": True,
+        "is_next_command": nested_sibling,
+        "argv_by_shape": argv_by_shape,
     }
-    if isinstance(sibling, Mapping) and sibling:
-        transition["when_next_sibling_present"] = {
-            "exact_command_pointer": (
-                "/continuation/next_sibling_disclosure/argv_by_shape/"
-                "<exact-business-shape>"
-            ),
-        }
-    transition["when_absent"] = {
-        "next_action": "nearest_ancestor_sibling_else_deferred_fact_queue",
-    }
-    return {"business_leaf_transition": transition}
+    return {"business_sibling_transition": transition}
 
 
 def _next_nested_disclosure_selector(
@@ -4841,11 +4820,14 @@ def _next_nested_disclosure_selector(
             "selection": "first_business_present_member_by_queue_index",
             "repeat_for_descendants": True,
             "when_none": (
-                "follow_next_sibling_then_drain_deferred_fact_queue"
+                "follow_business_sibling_transition_then_drain_deferred_fact_queue"
                 if next_sibling_disclosure.get(
-                    "next_sibling_disclosure", {}
+                    "business_sibling_transition", {}
                 ).get("is_next_command") is True
-                else "drain_deferred_fact_queue_then_follow_next_sibling"
+                else (
+                    "drain_deferred_fact_queue_then_follow_"
+                    "business_sibling_transition"
+                )
             ),
             "is_next_command": False,
             "becomes_next_command_only_after_exact_business_pointer_match": True,
@@ -4915,20 +4897,20 @@ def _dynamic_next_command_decision(
             }
         )
 
-    sibling = next_sibling_disclosure.get("next_sibling_disclosure", {})
+    sibling = next_sibling_disclosure.get("business_sibling_transition", {})
     nested_sibling = (
         isinstance(sibling, Mapping) and sibling.get("is_next_command") is True
     )
     sibling_candidate = (
         {
-            "candidate": "next_sibling_disclosure",
+            "candidate": "business_sibling_transition",
             "condition": (
                 "current_object_has_no_business_present_nested_member_and_"
                 "business_value_pointer_is_present"
             ),
             "business_value_pointer": sibling.get("business_value_pointer"),
             "command_pointer": (
-                "/continuation/next_sibling_disclosure/argv_by_shape/"
+                "/continuation/business_sibling_transition/argv_by_shape/"
                 "<exact-business-shape>"
             ),
         }
@@ -5449,10 +5431,13 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     ["next_item_disclosure", "all_descendant_disclosures"]
                 )
             if next_sibling_disclosure:
-                sibling = next_sibling_disclosure["next_sibling_disclosure"]
+                sibling = next_sibling_disclosure["business_sibling_transition"]
                 if sibling.get("is_next_command") is True:
                     blocked_by.extend(
-                        ["next_sibling_disclosure", "all_descendant_disclosures"]
+                        [
+                            "business_sibling_transition",
+                            "all_descendant_disclosures",
+                        ]
                     )
             if blocked_by:
                 deferred_fact["deferred_fact"]["blocked_by"] = blocked_by
@@ -5517,11 +5502,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 ),
             },
             "continuation": {
-                **_business_declared_leaf_transition(
-                    current_business_value_pointer=current_business_value_pointer,
-                    nested_container_disclosures=nested_container_disclosures,
-                    next_sibling_disclosure=next_sibling_disclosure,
-                ),
+                **next_sibling_disclosure,
                 **_root_fact_queue_anchor(
                     contract=contract,
                     child_handle=child_handle,
@@ -5534,7 +5515,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     query_shape=query_shape,
                     topic_prefix=topic_prefix,
                 ),
-                **next_sibling_disclosure,
                 **_dynamic_next_command_decision(
                     draft_shape=(
                         (draft_shape or undo_child_shape)

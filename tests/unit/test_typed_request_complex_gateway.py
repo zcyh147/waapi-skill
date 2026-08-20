@@ -263,14 +263,16 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
         "current_value_only": True,
         "unrelated_prompt_objects_do_not_satisfy_member_conditions": True,
     }
-    assert item["continuation"]["next_sibling_disclosure"]["is_next_command"] is False
-    assert item["continuation"]["next_sibling_disclosure"][
+    assert item["continuation"]["business_sibling_transition"][
+        "is_next_command"
+    ] is False
+    assert item["continuation"]["business_sibling_transition"][
         "business_value_pointer"
     ] == "/args/filters/1"
-    assert item["continuation"]["next_sibling_disclosure"]["must_follow"] == (
+    assert item["continuation"]["business_sibling_transition"]["after"] == (
         "current_root_fact_apply_success"
     )
-    assert next(iter(item["continuation"])) == "root_fact_queue_anchor"
+    assert next(iter(item["continuation"])) == "business_sibling_transition"
     assert item["continuation"]["root_fact_queue_anchor"][
         "first_fact_argv"
     ] == item["continuation"]["deferred_fact"]["argv"]
@@ -279,7 +281,7 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
         for row in item["continuation"]["next_command_decision"][
             "evaluate_in_order"
         ]
-    ] == ["deferred_fact_queue", "next_sibling_disclosure"]
+    ] == ["deferred_fact_queue", "business_sibling_transition"]
     assert item["continuation"]["next_command_decision"][
         "draft_check_or_cancel_with_remaining_candidate_or_deferred_fact"
     ] == "invalid"
@@ -289,7 +291,7 @@ def test_media_pool_dynamic_child_defers_parent_append_until_disclosure_finishes
     assert item["continuation"]["next_command_decision"][
         "candidate_without_its_exact_business_pointer"
     ] == "forbidden"
-    assert "next_sibling_disclosure" not in item["continuation"][
+    assert "business_sibling_transition" not in item["continuation"][
         "deferred_fact"
     ].get("blocked_by", ())
     assert "deferred_action_argv" not in item["continuation"]

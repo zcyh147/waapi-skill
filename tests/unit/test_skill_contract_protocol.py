@@ -240,6 +240,10 @@ def test_operate_identity_preflight_stays_in_the_operate_reference_lane() -> Non
         "`operation-schema object.create`"
     ) in operate_compact
     assert (
+        "Only an explicit request to verify/check an existing same-name request "
+        "root triggers it; a supplied parent path alone does not"
+    ) in operate_compact
+    assert (
         "After that preflight, `object.create` runs `operation-schema`, then "
         "`metadata discover` for every prompt-present dynamic property/reference "
         "token, and only then `draft-start`"
@@ -754,9 +758,10 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "`object.set` or `audio.import`" in OPERATE
     assert "run one metadata discovery next, then Composer actions" in OPERATE
     assert "`operation-schema object.create` first" in OPERATE
-    assert "Its user-requested exact path/type preflight comes first" in compact
+    assert "Only an explicit same-name-root check triggers preflight" in compact
+    assert "parent path alone does not" in compact
     assert compact.index(
-        "Its user-requested exact path/type preflight comes first"
+        "Only an explicit same-name-root check triggers preflight"
     ) < compact.index("`operation-schema object.create` first")
     assert "selected-subset identity gate" in OPERATE
     assert "exact-ID read back every selected" in OPERATE

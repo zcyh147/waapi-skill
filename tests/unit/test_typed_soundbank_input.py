@@ -466,7 +466,7 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
         "branch_disclosure",
         "nested_container_disclosures",
         "deferred_fact_queue",
-        "next_sibling_disclosure",
+        "business_sibling_transition",
     ]
     assert item["continuation"]["next_command_decision"][
         "draft_check_or_cancel_with_remaining_candidate_or_deferred_fact"
