@@ -3327,6 +3327,32 @@ def _exact_wwise_build(value: Any) -> str:
     return ".".join(str(item) for item in fields)
 
 
+def _final_response_has_complete_build_identity(
+    response: str,
+    *,
+    expected_build: str,
+) -> bool:
+    """Accept the exact build tuple either joined or explicitly split by label."""
+
+    folded = response.casefold()
+    expected = expected_build.casefold()
+    if expected in folded:
+        return True
+    release, separator, build = expected.rpartition(".")
+    if not separator or not release or not build.isdigit():
+        return False
+    line_pattern = re.compile(
+        rf"(?im)^[^\n]*\bwwise\b[^\n]{{0,96}}"
+        rf"(?<![0-9.])v?{re.escape(release)}(?![0-9.])"
+        rf"[^\n]{{0,48}}(?:build|构建)\s*[:：#]?\s*"
+        rf"{re.escape(build)}(?!\d)[^\n]*$"
+    )
+    return any(
+        not any(token in match.group(0) for token in ("not ", "不是", "并非", "wrong"))
+        for match in line_pattern.finditer(folded)
+    )
+
+
 def _status_project_identity(
     project_path: Path,
     *,
@@ -4423,7 +4449,12 @@ def _prepare_case(
             if snapshot_get_info() != project_digest:
                 failures.append("read-only getInfo task changed project documents")
             folded = result.final_response.casefold()
-            if str(process_id) not in folded or expected_build.casefold() not in folded:
+            if str(process_id) not in folded or not (
+                _final_response_has_complete_build_identity(
+                    result.final_response,
+                    expected_build=expected_build,
+                )
+            ):
                 failures.append(
                     "final response omits the exact process or complete build identity"
                 )

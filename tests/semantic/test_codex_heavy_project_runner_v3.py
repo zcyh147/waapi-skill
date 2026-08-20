@@ -967,11 +967,32 @@ def test_prepare_get_info_case_binds_exact_live_process_and_result(
         SimpleNamespace(final_response="Wwise 2021.1.14.8108，进程 4242。"),
     )
     assert verification.passed is True
+    split_build = prepared.verify_final(
+        {"agent_result": baseline},
+        SimpleNamespace(
+            final_response="Wwise v2021.1.14，build 8108，进程 4242。"
+        ),
+    )
+    assert split_build.passed is True
     incomplete = prepared.verify_final(
         {"agent_result": baseline},
         SimpleNamespace(final_response="Wwise 2021.1，进程 4242。"),
     )
     assert incomplete.passed is False
+    wrong_split_build = prepared.verify_final(
+        {"agent_result": baseline},
+        SimpleNamespace(
+            final_response="Wwise v2021.1.14，build 8109，进程 4242。"
+        ),
+    )
+    assert wrong_split_build.passed is False
+    negated_split_build = prepared.verify_final(
+        {"agent_result": baseline},
+        SimpleNamespace(
+            final_response="Wwise 不是 v2021.1.14，build 8108，进程 4242。"
+        ),
+    )
+    assert negated_split_build.passed is False
 
 
 @pytest.mark.parametrize(
