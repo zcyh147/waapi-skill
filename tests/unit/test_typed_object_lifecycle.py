@@ -328,6 +328,23 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         },
         "evaluate_in_order": [
             {
+                "candidate": "business_sibling_transition",
+                "condition": (
+                    "explicit_leaf_or_no_business_nested_member_and_sibling_present"
+                ),
+                "business_value_pointer": "/args/children/0/children/1",
+                "command_pointer": (
+                    "/continuation/business_sibling_transition/argv_by_shape/"
+                    "<exact-business-shape>"
+                ),
+                "explicit_leaf_rule": {
+                    "user_says_no_properties_references_children": (
+                        "copy_exact_command_now"
+                    ),
+                    "nested_disclosures": "forbidden",
+                },
+            },
+            {
                 "candidate": "nested_container_disclosures",
                 "condition": (
                     "first_business_present_member_by_queue_index_on_exact_current_object"
@@ -339,18 +356,6 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
                 ],
                 "command_pointer": (
                     "/continuation/nested_container_disclosures/<selected>/argv"
-                ),
-            },
-            {
-                "candidate": "business_sibling_transition",
-                "condition": (
-                    "current_object_has_no_business_present_nested_member_and_"
-                    "business_value_pointer_is_present"
-                ),
-                "business_value_pointer": "/args/children/0/children/1",
-                "command_pointer": (
-                    "/continuation/business_sibling_transition/argv_by_shape/"
-                    "<exact-business-shape>"
                 ),
             },
             {

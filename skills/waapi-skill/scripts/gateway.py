@@ -4805,6 +4805,56 @@ def _next_array_sibling_disclosure(
     return {"business_sibling_transition": transition}
 
 
+def _root_dynamic_disclosure_commands(
+    contract: TypedRequestContract,
+) -> dict[str, Any]:
+    """Return exact copy-ready commands for every complex root array."""
+
+    rows: list[dict[str, Any]] = []
+    for field in contract.fields:
+        if field.parent_handle is not None or field.shape != "array":
+            continue
+        argv_by_shape: dict[str, list[str]] = {}
+        for shape in ("object", "array"):
+            if not dynamic_array_item_choices(
+                contract,
+                array_handle=field.handle,
+                index=0,
+                shape=shape,
+            ):
+                continue
+            argv_by_shape[shape] = [
+                "request-array-item",
+                contract.uri,
+                "--schema-digest",
+                contract.schema_digest,
+                "--array-handle",
+                field.handle,
+                "--index",
+                "0",
+                "--shape",
+                shape,
+            ]
+        if not argv_by_shape:
+            continue
+        rows.append(
+            {
+                "name": field.name,
+                "field_handle": field.handle,
+                "business_value_pointer": (
+                    f"/{field.section}/" + "/".join(field.path)
+                ),
+                "argv_by_shape": argv_by_shape,
+            }
+        )
+    return {
+        "selection": "first unsubmitted business-present root in schema order",
+        "rows": rows,
+        "copy_selected_argv_exactly": True,
+        "reconstruct_schema_digest_or_handle": "invalid",
+    }
+
+
 def _next_nested_disclosure_selector(
     rows: Sequence[Mapping[str, Any]],
     *,
@@ -4868,6 +4918,33 @@ def _dynamic_next_command_decision(
                 "command_pointer": "/continuation/branch_disclosure",
             }
         )
+    sibling = next_sibling_disclosure.get("business_sibling_transition", {})
+    nested_sibling = (
+        isinstance(sibling, Mapping) and sibling.get("is_next_command") is True
+    )
+    sibling_candidate = (
+        {
+            "candidate": "business_sibling_transition",
+            "condition": (
+                "explicit_leaf_or_no_business_nested_member_and_sibling_present"
+            ),
+            "business_value_pointer": sibling.get("business_value_pointer"),
+            "command_pointer": (
+                "/continuation/business_sibling_transition/argv_by_shape/"
+                "<exact-business-shape>"
+            ),
+            "explicit_leaf_rule": {
+                "user_says_no_properties_references_children": (
+                    "copy_exact_command_now"
+                ),
+                "nested_disclosures": "forbidden",
+            },
+        }
+        if isinstance(sibling, Mapping) and sibling
+        else None
+    )
+    if nested_sibling and sibling_candidate is not None:
+        candidates.append(sibling_candidate)
     if nested_container_disclosures:
         candidates.append(
             {
@@ -4897,28 +4974,6 @@ def _dynamic_next_command_decision(
             }
         )
 
-    sibling = next_sibling_disclosure.get("business_sibling_transition", {})
-    nested_sibling = (
-        isinstance(sibling, Mapping) and sibling.get("is_next_command") is True
-    )
-    sibling_candidate = (
-        {
-            "candidate": "business_sibling_transition",
-            "condition": (
-                "current_object_has_no_business_present_nested_member_and_"
-                "business_value_pointer_is_present"
-            ),
-            "business_value_pointer": sibling.get("business_value_pointer"),
-            "command_pointer": (
-                "/continuation/business_sibling_transition/argv_by_shape/"
-                "<exact-business-shape>"
-            ),
-        }
-        if isinstance(sibling, Mapping) and sibling
-        else None
-    )
-    if nested_sibling and sibling_candidate is not None:
-        candidates.append(sibling_candidate)
     if deferred_fact:
         candidates.append(
             {
@@ -13353,12 +13408,37 @@ def operation_draft_payload(
             "contract": "waapi-skill.operation-draft-next-action/v1",
         }
         if generic_typed_draft:
+            typed_draft_contract = (
+                request_contract(record.version, record.operation)
+                if record.operation.startswith("ak.")
+                else draft_operation_request_contract(
+                    record.operation,
+                    record.version,
+                )
+            )
             next_action_binding["typed_fact_batch_discipline"] = {
                 "batch_size": "6 until fewer than 6 facts remain",
                 "top_level_facts_before_dynamic_disclosure": True,
                 "branch_choice_requires_selected_branch_facts": True,
                 "schema_candidates_without_business_values": "skip",
             }
+            next_action_binding["selected_branch_fact_completion"] = {
+                "choose_only": "invalid",
+                "same_batch_before_next_top_level_fact": True,
+                "path_selector_exact_sequence": [
+                    "choose branch handle with the path choice handle",
+                    "set selected path choice kind handle to string path",
+                    "set selected path choice value handle to the exact business path",
+                ],
+                "copy_handles_from_operation_schema_exactly": True,
+            }
+            root_disclosures = _root_dynamic_disclosure_commands(
+                typed_draft_contract
+            )
+            if root_disclosures["rows"]:
+                next_action_binding["root_dynamic_disclosure_commands"] = (
+                    root_disclosures
+                )
             next_action_binding["next_phase_decision"] = {
                 "business_presence_source": "current_user_business_request",
                 "evaluate_in_order": [

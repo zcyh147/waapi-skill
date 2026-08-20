@@ -245,7 +245,74 @@ def test_generic_draft_start_requires_first_fact_batch_before_disclosure(
         "after choose, add required selected-branch constant and prompt-value "
         "facts before the next top-level fact"
     )
+    assert binding["selected_branch_fact_completion"] == {
+        "choose_only": "invalid",
+        "same_batch_before_next_top_level_fact": True,
+        "path_selector_exact_sequence": [
+            "choose branch handle with the path choice handle",
+            "set selected path choice kind handle to string path",
+            "set selected path choice value handle to the exact business path",
+        ],
+        "copy_handles_from_operation_schema_exactly": True,
+    }
     assert binding["dynamic_disclosure_before_first_fact"] == "invalid"
+    disclosures = binding["root_dynamic_disclosure_commands"]
+    assert disclosures["selection"] == (
+        "first unsubmitted business-present root in schema order"
+    )
+    children = next(
+        row for row in disclosures["rows"] if row["name"] == "children"
+    )
+    assert children["business_value_pointer"] == "/args/children"
+    assert children["argv_by_shape"]["object"] == [
+        "request-array-item",
+        "object.create",
+        "--schema-digest",
+        payload["draft"]["binding"]["schema_digest"],
+        "--array-handle",
+        children["field_handle"],
+        "--index",
+        "0",
+        "--shape",
+        "object",
+    ]
+    assert disclosures["copy_selected_argv_exactly"] is True
+
+    type_handle = next(
+        field.handle
+        for field in waapi_gateway.draft_operation_request_contract(
+            "object.create", "2021.1"
+        ).fields
+        if field.parent_handle is None and field.name == "type"
+    )
+    apply_code, applied = offline_execute(
+        tmp_path,
+        "--state-dir",
+        str(tmp_path / "state"),
+        "draft-apply",
+        payload["draft"]["draft_id"],
+        "--task-authority",
+        payload["task_authority"],
+        "--expected-revision",
+        "1",
+        "--compact",
+        "--facts",
+        "--action",
+        "add_typed_fact",
+        "--fact-action",
+        "set",
+        "--field-handle",
+        type_handle,
+        "--value-type",
+        "string",
+        "--fact-value",
+        "ActorMixer",
+        version="2021.1",
+    )
+    assert apply_code == 0, applied
+    assert applied["draft"]["next_action_binding"][
+        "root_dynamic_disclosure_commands"
+    ] == disclosures
 
 
 def test_object_create_prioritizes_collision_policy_before_optional_containers(
