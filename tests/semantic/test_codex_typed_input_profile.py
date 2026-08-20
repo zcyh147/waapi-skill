@@ -182,6 +182,30 @@ def test_create_merge_prompt_keeps_the_existing_node_out_of_the_parent_role() ->
     )
 
 
+def test_object_create_prompts_declare_the_requested_sound_leaves() -> None:
+    profile = load_typed_input_profile(PROFILE_PATH)
+    units = [
+        unit
+        for unit in profile.units
+        if unit.unit_id
+        in {
+            "TYP21-DEDICATED-OBJECT-CREATE",
+            "TYP23-DEDICATED-OBJECT-CREATE",
+        }
+    ]
+
+    assert len(units) == 2
+    assert all("Sound 都是叶节点" in unit.scenario.prompt for unit in units)
+    assert all(
+        "不再添加子对象、属性或引用" in unit.scenario.prompt for unit in units
+    )
+    assert all(
+        command not in unit.scenario.prompt
+        for unit in units
+        for command in ("request-map-container", "--parent-schema-token")
+    )
+
+
 def test_2025_metadata_prompt_uses_the_exact_version_owned_container_path() -> None:
     profile = load_typed_input_profile(PROFILE_PATH)
     unit = next(

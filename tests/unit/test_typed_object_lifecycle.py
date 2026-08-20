@@ -201,6 +201,10 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         "schema_members_are_not_business_facts": True,
         "candidate_without_its_exact_business_pointer": "forbidden",
         "conditional_candidates_do_not_block_when_absent": True,
+        "declared_leaf_object": {
+            "nested_container_disclosures": "forbidden",
+            "next_action": "next_sibling_disclosure_or_deferred_fact_queue",
+        },
         "evaluate_in_order": [
             {
                 "candidate": "nested_container_disclosures",

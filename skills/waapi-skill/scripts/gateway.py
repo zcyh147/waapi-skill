@@ -4823,6 +4823,18 @@ def _dynamic_next_command_decision(
             "schema_members_are_not_business_facts": True,
             "candidate_without_its_exact_business_pointer": "forbidden",
             "conditional_candidates_do_not_block_when_absent": True,
+            **(
+                {
+                    "declared_leaf_object": {
+                        "nested_container_disclosures": "forbidden",
+                        "next_action": (
+                            "next_sibling_disclosure_or_deferred_fact_queue"
+                        ),
+                    }
+                }
+                if nested_container_disclosures
+                else {}
+            ),
             "evaluate_in_order": candidates,
             "first_true_candidate_is_the_only_next_action": True,
             **(
@@ -13180,6 +13192,27 @@ def operation_draft_payload(
                 "top_level_facts_before_dynamic_disclosure": True,
                 "branch_choice_requires_selected_branch_facts": True,
                 "schema_candidates_without_business_values": "skip",
+            }
+            next_action_binding["next_phase_decision"] = {
+                "business_presence_source": "current_user_business_request",
+                "evaluate_in_order": [
+                    {
+                        "candidate": "remaining_top_level_fact_batch",
+                        "condition": (
+                            "unsubmitted_top_level_or_selected_branch_fact_is_present"
+                        ),
+                        "action": (
+                            "use_fixed_argv_prefix_for_next_full_or_final_batch"
+                        ),
+                    },
+                    {
+                        "candidate": "dynamic_disclosure",
+                        "condition": (
+                            "no_remaining_top_level_or_selected_branch_fact"
+                        ),
+                    },
+                ],
+                "first_true_candidate_is_the_only_next_phase": True,
             }
         if compact_actions is not None:
             next_action_binding["shell_tool_timeout_ms"] = (

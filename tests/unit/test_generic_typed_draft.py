@@ -293,6 +293,23 @@ def test_draft_apply_batches_ordered_typed_actions_in_one_atomic_write(
         "branch_choice_requires_selected_branch_facts": True,
         "schema_candidates_without_business_values": "skip",
     }
+    assert payload["draft"]["next_action_binding"]["next_phase_decision"] == {
+        "business_presence_source": "current_user_business_request",
+        "evaluate_in_order": [
+            {
+                "candidate": "remaining_top_level_fact_batch",
+                "condition": (
+                    "unsubmitted_top_level_or_selected_branch_fact_is_present"
+                ),
+                "action": "use_fixed_argv_prefix_for_next_full_or_final_batch",
+            },
+            {
+                "candidate": "dynamic_disclosure",
+                "condition": "no_remaining_top_level_or_selected_branch_fact",
+            },
+        ],
+        "first_true_candidate_is_the_only_next_phase": True,
+    }
     assert payload["draft"]["next_action_binding"]["completion_candidate"][
         "fixed_argv_prefix"
     ][-1] == "3"
