@@ -197,6 +197,25 @@ def test_create_merge_prompt_keeps_the_existing_node_out_of_the_parent_role() ->
     )
 
 
+def test_metadata_set_prompt_names_each_exact_target_path() -> None:
+    profile = load_typed_input_profile(PROFILE_PATH)
+    unit = next(
+        unit
+        for unit in profile.units
+        if unit.unit_id == "TYP22-METADATA-OBJECT-SET"
+    )
+
+    root = r"\Actor-Mixer Hierarchy\Default Work Unit\SemanticLab\Ambience"
+    assert all(
+        f"`{root}\\{name}`" in unit.scenario.prompt
+        for name in ("Day", "Night", "Storm")
+    )
+    assert all(
+        command not in unit.scenario.prompt
+        for command in ("operation-schema", "draft-start", "--target")
+    )
+
+
 def test_object_create_prompts_declare_the_requested_sound_leaves() -> None:
     profile = load_typed_input_profile(PROFILE_PATH)
     units = [
