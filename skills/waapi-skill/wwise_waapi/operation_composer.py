@@ -1502,9 +1502,16 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
         if operation == "object.create":
             top_level_fact_plan = {
                 **top_level_fact_plan,
-                "branch_selection_authority": (
-                    "parent=/args/parent; merge-target GUID is proof only"
-                ),
+                "branch_selection_authority": {
+                    "business_pointer": "/args/parent",
+                    "preserve_explicit_user_selector_kind_and_value": True,
+                    "when_explicit_parent_path_is_present": (
+                        "choose_path_branch_and_set_that_exact_parent_path"
+                    ),
+                    "queried_same_name_merge_target_guid_as_parent": (
+                        "forbidden_identity_proof_only"
+                    ),
+                },
                 "dynamic_disclosure_authority": (
                     "properties,references,children in that order"
                 ),

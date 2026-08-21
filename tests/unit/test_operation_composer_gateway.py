@@ -944,7 +944,7 @@ def test_object_create_schema_puts_the_top_level_fact_plan_before_large_fields(
 
     assert code == 0, payload
     encoded = waapi_gateway.gateway_stdout_json_encoder(payload).encode(payload)
-    assert len((encoded + "\n").encode("utf-8")) < 20 * 1024
+    assert len((encoded + "\n").encode("utf-8")) < 21 * 1024
     composer = payload["composer"]
     assert list(composer).index("construction_order") < list(composer).index(
         "typed_request_field_table"
@@ -975,9 +975,16 @@ def test_object_create_schema_puts_the_top_level_fact_plan_before_large_fields(
     assert conflict["phase"] == "fact"
     assert conflict["action"] == "set"
     assert children["phase"] == "disclosure"
-    assert table["branch_selection_authority"] == (
-        "parent=/args/parent; merge-target GUID is proof only"
-    )
+    assert table["branch_selection_authority"] == {
+        "business_pointer": "/args/parent",
+        "preserve_explicit_user_selector_kind_and_value": True,
+        "when_explicit_parent_path_is_present": (
+            "choose_path_branch_and_set_that_exact_parent_path"
+        ),
+        "queried_same_name_merge_target_guid_as_parent": (
+            "forbidden_identity_proof_only"
+        ),
+    }
     assert table["dynamic_disclosure_authority"] == (
         "properties,references,children in that order"
     )
