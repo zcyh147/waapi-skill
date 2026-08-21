@@ -1314,8 +1314,8 @@ def test_v3_task_seals_exact_task_local_skill_reads_and_runner(
             instructions
         )
     else:
-        assert f"cat '{task_skill / 'SKILL.md'}'" in instructions
-        assert f"cat '{task_skill / 'references' / 'waapi-operate.md'}'" in (
+        assert "cat '.agents/skills/waapi-skill/SKILL.md'" in instructions
+        assert "cat '.agents/skills/waapi-skill/references/waapi-operate.md'" in (
             instructions
         )
         assert f"python '{task_skill / 'scripts' / 'run.py'}' gateway.py" in (

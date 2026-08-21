@@ -48,7 +48,9 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "fixed_argv_prefix, every opaque handle, schema digest, and response-bound token; "
     "replace only explicit placeholders and never reconstruct a runner path. "
     "Repeat each typed fact template in full; replace one business value with one "
-    "shell argv literal, preserving whitespace inside that item. A successful "
+    "shell argv literal, preserving whitespace inside that item. If batch_size "
+    "is 6, submit exactly six complete action groups unless fewer "
+    "business-present facts remain. A successful "
     "draft-check is not a Preview: execute its next_command before answering or "
     "asking confirmation unless it declares requires_later_user_message. On "
     "native Windows the exact first command is Get-Content -Raw -Encoding UTF8 "
@@ -133,7 +135,9 @@ def semantic_task_developer_instructions(
                     f"'.agents\\skills\\waapi-skill\\{relative_windows}'"
                 )
             else:
-                path = posix_source.joinpath(*PurePosixPath(relative).parts)
+                path = PurePosixPath(".agents/skills/waapi-skill").joinpath(
+                    *PurePosixPath(relative).parts
+                )
                 quoted = "'" + str(path).replace("'", "'\"'\"'") + "'"
                 commands.append(f"cat {quoted}")
         turn_rows.append(
