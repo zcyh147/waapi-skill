@@ -1386,7 +1386,7 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
 
     projected = gateway.gateway_stdout_payload(leaf)
     encoded = gateway.gateway_stdout_json_encoder(projected).encode(projected)
-    assert len((encoded + "\n").encode("utf-8")) < 6 * 1024
+    assert len((encoded + "\n").encode("utf-8")) < 5 * 1024
     assert projected["handle"] == leaf["handle"]
     assert projected["schema_lineage_token"] == leaf["schema_lineage_token"]
     assert projected["response_integrity"] == root_projected["response_integrity"]
@@ -1396,12 +1396,58 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     projected_scalar_table = projected["child_contract"][
         "fixed_scalar_member_fact_table"
     ]
-    assert projected_scalar_table["columns"] == leaf["child_contract"][
+    assert projected_scalar_table["columns"] == [
+        "key",
+        "required",
+        "accepted_types",
+        "business_value_pointer",
+    ]
+    raw_scalar_table = leaf["child_contract"][
         "fixed_scalar_member_fact_table"
-    ]["columns"]
-    assert projected_scalar_table["rows"] == leaf["child_contract"][
-        "fixed_scalar_member_fact_table"
-    ]["rows"]
+    ]
+    assert projected_scalar_table["rows"] == [
+        row[:4] for row in raw_scalar_table["rows"]
+    ]
+    assert projected_scalar_table["fact_command_assembly"] == {
+        "fixed_argv_prefix": [
+            "--action",
+            "add_typed_fact",
+            "--fact-action",
+            "map-put",
+            "--field-handle",
+            leaf["handle"],
+        ],
+        "append_for_each_business_present_row": [
+            "--value-type",
+            "<selected-accepted-type>",
+            "--fact-value",
+            "<business-value>",
+            "--key",
+            "<row-key>",
+        ],
+        "row_order": "table_order",
+        "batch_limit": 6,
+        "type_value_authority": (
+            "operation-schema/composer/typed-request-type-description"
+        ),
+    }
+    fact_prefix = projected_scalar_table["fact_command_assembly"][
+        "fixed_argv_prefix"
+    ]
+    for projected_row, raw_row in zip(
+        projected_scalar_table["rows"], raw_scalar_table["rows"], strict=True
+    ):
+        key, _required, accepted_types, _business_pointer = projected_row
+        assert len(accepted_types) == 1
+        assert [
+            *fact_prefix,
+            "--value-type",
+            accepted_types[0],
+            "--fact-value",
+            "<business-value>",
+            "--key",
+            key,
+        ] == raw_row[4][accepted_types[0]]
     assert "shared_policy" not in projected_scalar_table
     assert projected["continuation"]["next_command_decision"][
         "evaluate_in_order"

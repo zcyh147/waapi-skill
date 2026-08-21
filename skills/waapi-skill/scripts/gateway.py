@@ -2291,11 +2291,59 @@ def gateway_stdout_payload(value: Any) -> Any:
             "fixed_scalar_member_fact_table"
         )
         if compact_recursive_object and isinstance(scalar_table, Mapping):
-            projected_child_contract["fixed_scalar_member_fact_table"] = {
-                key: scalar_table[key]
-                for key in ("columns", "rows")
-                if key in scalar_table
-            }
+            columns = scalar_table.get("columns")
+            rows = scalar_table.get("rows")
+            kept_columns = (
+                "key",
+                "required",
+                "accepted_types",
+                "business_value_pointer",
+            )
+            if (
+                isinstance(columns, list)
+                and all(name in columns for name in kept_columns)
+                and isinstance(rows, list)
+                and all(isinstance(row, list) for row in rows)
+                and isinstance(value.get("handle"), str)
+            ):
+                kept_indexes = [columns.index(name) for name in kept_columns]
+                if all(
+                    all(index < len(row) for index in kept_indexes)
+                    for row in rows
+                ):
+                    projected_child_contract[
+                        "fixed_scalar_member_fact_table"
+                    ] = {
+                        "columns": list(kept_columns),
+                        "rows": [
+                            [row[index] for index in kept_indexes]
+                            for row in rows
+                        ],
+                        "fact_command_assembly": {
+                            "fixed_argv_prefix": [
+                                "--action",
+                                "add_typed_fact",
+                                "--fact-action",
+                                "map-put",
+                                "--field-handle",
+                                value["handle"],
+                            ],
+                            "append_for_each_business_present_row": [
+                                "--value-type",
+                                "<selected-accepted-type>",
+                                "--fact-value",
+                                "<business-value>",
+                                "--key",
+                                "<row-key>",
+                            ],
+                            "row_order": "table_order",
+                            "batch_limit": MAX_TYPED_ACTIONS_PER_APPLY,
+                            "type_value_authority": (
+                                "operation-schema/composer/"
+                                "typed-request-type-description"
+                            ),
+                        },
+                    }
     raw_continuation = value.get("continuation")
     if not isinstance(raw_continuation, Mapping):
         return projected
