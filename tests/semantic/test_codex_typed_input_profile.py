@@ -62,11 +62,13 @@ def test_typed_input_profile_is_a_fixed_five_version_25_task_contract() -> None:
         for unit in profile.units
         if unit.scenario.api == "ak.wwise.core.executeLuaScript"
     )
-    assert all(
-        '`wa_args` 的完整内容是 `{"count":3}`' in unit.scenario.prompt
-        for unit in profile.units
-        if unit.unit_id == "TYP25-CODE-LUA-FILE"
+    lua_unit = next(
+        unit for unit in profile.units if unit.unit_id == "TYP25-CODE-LUA-FILE"
     )
+    rendered_lua_prompt = lua_unit.scenario.prompt.format_map(
+        {"script_file": "/owned/user-script.lua", "io_root": "/owned"}
+    )
+    assert '`wa_args` 的完整内容是 `{"count":3}`' in rendered_lua_prompt
     assert all(
         unit.scenario.confirmation_prompt
         == "确认，按刚才唯一的 immutable Preview 执行这份文件，并按弱验证边界报告结果。"
