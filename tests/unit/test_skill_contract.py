@@ -49,6 +49,17 @@ def test_skill_contract_prefers_fixed_live_query_before_discovery() -> None:
     assert "Do not search the repository to recover from a gateway error" in text
 
 
+def test_skill_contract_keeps_windows_reference_reads_on_the_short_task_locator() -> None:
+    text = doc_text("SKILL.md")
+
+    assert (
+        "Native Windows always copies the short task-local form "
+        "`Get-Content -Raw -Encoding UTF8 "
+        "'.agents\\skills\\waapi-skill\\references\\<file>.md'` exactly"
+    ) in text
+    assert "reconstructing a scenario-root absolute path" in text
+
+
 def test_skill_contract_requires_confirmation_before_retargeting_invalid_parent() -> None:
     text = doc_text("references/waapi-operate.md")
 

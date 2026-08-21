@@ -104,7 +104,10 @@ def test_lua_lanes_have_one_public_typed_draft(
         ]
         wa_args = next(row for row in plan if row["name"] == "wa_args")
         assert wa_args["phase"] == "fact"
-        assert wa_args["action"] == "map"
+        assert wa_args["action"] == "map-put"
+        assert plan_table["open_map_fact_rule"].endswith(
+            "using the exact member key, typed value, and business value"
+        )
         wa_args_map = next(
             field
             for field in payload["composer"]["typed_request_fields"]

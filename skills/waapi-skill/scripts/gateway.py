@@ -4530,7 +4530,7 @@ def _topic_top_level_fact_table(
                 f"--{prefix}-append", handle, value_type, "<business-value>",
             ]
             empty = [f"--{prefix}-present", handle]
-        elif action == "map":
+        elif action == "map-put":
             nonempty = [
                 f"--{prefix}-map-put", handle, "<business-map-member-key>",
                 "<type-of-business-map-member-value>",
@@ -4554,7 +4554,7 @@ def _topic_top_level_fact_table(
                 ],
             }
             if prefix == "match"
-            and action == "map"
+            and action == "map-put"
             and field.get("name") in {"language", "platform"}
             else None
         )

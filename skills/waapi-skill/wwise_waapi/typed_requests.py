@@ -460,7 +460,7 @@ class TypedRequestContract:
                 if shape == "branch"
                 else "array"
                 if shape == "array"
-                else "map"
+                else "map-put"
                 if shape == "map"
                 else "child"
             )
@@ -488,6 +488,11 @@ class TypedRequestContract:
                 "rows": branch_choice_rows,
             },
             "business_pointer_source": "this table's business_pointer column",
+            "open_map_fact_rule": (
+                "for every prompt-present member under a map business pointer, "
+                "submit one map-put on that row handle using the exact member key, "
+                "typed value, and business value"
+            ),
             "fact_batching": (
                 "count each literal --action; submit facts 1..6, then read the "
                 "response before submitting facts 7..12; never put a seventh "
