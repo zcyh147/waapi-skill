@@ -176,6 +176,15 @@ def test_create_merge_prompt_keeps_the_existing_node_out_of_the_parent_role() ->
     assert "GUID 只证明现有节点身份，不能替代这条父级路径" in unit.scenario.prompt
     assert "不要把 `Robot_VO` 自己当作新建父级" in unit.scenario.prompt
     assert "`Idle_A` Sound 也是叶节点" in unit.scenario.prompt
+    assert "仅是保持不变的验收条件，不属于本次新增 children" in (
+        unit.scenario.prompt
+    )
+    assert "不要为 `Idle` 或 `Idle_A` 生成任何新增事实" in (
+        unit.scenario.prompt
+    )
+    assert "本次新增 children 只有 `Alert`、`Combat`、`Damage`" in (
+        unit.scenario.prompt
+    )
     assert "A/B Sound 都是叶节点" in unit.scenario.prompt
     assert "不再添加子对象、属性或引用" in unit.scenario.prompt
     assert all(
