@@ -7,7 +7,7 @@ import signal
 import subprocess
 import sys
 import time
-from pathlib import Path, PureWindowsPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from types import SimpleNamespace
 from typing import Mapping, Sequence
 
@@ -1455,7 +1455,7 @@ def test_formal_bootstrap_instructions_bind_one_exact_windows_runner_prefix() ->
 
 
 def test_formal_task_instructions_bind_exact_posix_skill_read_schedule() -> None:
-    task_skill = Path(
+    task_skill = PurePosixPath(
         "/tmp/campaign/scenarios/001-TYP22/evidence/codex-task/agent-workspace/"
         ".agents/skills/waapi-skill"
     )

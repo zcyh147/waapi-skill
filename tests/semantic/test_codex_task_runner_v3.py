@@ -1301,9 +1301,26 @@ def test_v3_task_seals_exact_task_local_skill_reads_and_runner(
         / "waapi-skill"
     )
     instructions = captured[0]
-    assert f"cat '{task_skill / 'SKILL.md'}'" in instructions
-    assert f"cat '{task_skill / 'references' / 'waapi-operate.md'}'" in instructions
-    assert f"python '{task_skill / 'scripts' / 'run.py'}' gateway.py" in instructions
+    if os.name == "nt":
+        assert (
+            "Get-Content -Raw -Encoding UTF8 "
+            r"'.agents\skills\waapi-skill\SKILL.md'"
+        ) in instructions
+        assert (
+            "Get-Content -Raw -Encoding UTF8 "
+            r"'.agents\skills\waapi-skill\references\waapi-operate.md'"
+        ) in instructions
+        assert f"python '{task_skill / 'scripts' / 'run.py'}' 'gateway.py'" in (
+            instructions
+        )
+    else:
+        assert f"cat '{task_skill / 'SKILL.md'}'" in instructions
+        assert f"cat '{task_skill / 'references' / 'waapi-operate.md'}'" in (
+            instructions
+        )
+        assert f"python '{task_skill / 'scripts' / 'run.py'}' gateway.py" in (
+            instructions
+        )
     assert str(candidate_runner) not in instructions
 
 
