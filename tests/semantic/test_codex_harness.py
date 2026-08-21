@@ -1439,7 +1439,10 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "every prompt-required terminal scalar" in instructions
     assert "every prompt-present field" in instructions
     assert "copy booleans exactly" in instructions
-    assert "do not execute a root_dynamic_disclosure command" in instructions
+    assert (
+        "Finish prompt-present top-level facts before root_dynamic_disclosure"
+        in instructions
+    )
     assert "metadata query and limit" in instructions
     assert "shell_tool_timeout_ms" in instructions
     assert "A successful draft-check is not a Preview" in instructions
