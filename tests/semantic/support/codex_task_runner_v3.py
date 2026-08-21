@@ -185,6 +185,7 @@ def run_v3_codex_task(
     turn_observer: TurnObserver | None = None,
     project_modification_policy: str = "ask_before_changes",
     expected_primary_dispatch_count: int | None = None,
+    developer_instructions: str = "",
 ) -> V3TaskRun:
     """Run every natural turn in one exact, memory-isolated Codex thread."""
 
@@ -318,6 +319,7 @@ def run_v3_codex_task(
         allow_output_write=False,
         network_access=True,
         expected_gateway_errors=gateway_errors,
+        developer_instructions=developer_instructions,
     )
     broker = CodexGatewayBroker(
         skill_source=skill_source,

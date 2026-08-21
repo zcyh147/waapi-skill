@@ -110,7 +110,7 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
                 "--compact",
                 "--facts",
             ],
-            "append_one_or_more_complete_typed_actions": [
+            "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency": [
                 "--action",
                 "<action-name>",
                 "<typed-fact-arguments>",

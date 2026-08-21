@@ -2269,7 +2269,7 @@ def _valid_draft_resume_action_binding(
             "contract",
             "shell_tool_timeout_ms",
             "fixed_argv_prefix",
-            "append_one_or_more_complete_typed_actions",
+            "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency",
             "replace_only",
             "resume_previous_container_response",
         }
@@ -2277,7 +2277,9 @@ def _valid_draft_resume_action_binding(
         != "waapi-skill.operation-draft-next-action/v1"
         or value.get("shell_tool_timeout_ms") != GATEWAY_SHELL_TOOL_TIMEOUT_MS
         or value.get("resume_previous_container_response") != resume
-        or value.get("append_one_or_more_complete_typed_actions")
+        or value.get(
+            "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency"
+        )
         != ["--action", "<action-name>", "<typed-fact-arguments>"]
         or value.get("replace_only")
         != ["<action-name>", "<typed-fact-arguments>"]

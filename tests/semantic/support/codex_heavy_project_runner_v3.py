@@ -357,6 +357,7 @@ class HeavyProjectRunnerOptions:
     timeout_seconds: float
     live_environment: Mapping[str, str]
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None
+    developer_instructions: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -970,6 +971,7 @@ def run_heavy_project_unit(
                 policy_mode or "ask_before_changes"
             ),
             expected_primary_dispatch_count=_unit_primary_dispatch_count(unit),
+            developer_instructions=options.developer_instructions,
         )
         checks["task_passed"] = bool(task.passed)
         _validate_task_run(

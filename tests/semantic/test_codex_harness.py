@@ -1381,6 +1381,93 @@ def test_task_commands_start_non_ephemeral_then_resume_exact_thread_with_isolati
         )
 
 
+def test_task_and_prompt_audit_commands_seal_bootstrap_developer_instructions(
+    tmp_path: Path,
+) -> None:
+    bootstrap = (
+        "Before any other action, read the injected waapi-skill SKILL.md exactly once "
+        "using one standalone complete file-read command."
+    )
+    config = CodexHarnessConfig(
+        workspace=tmp_path,
+        skill_source=tmp_path / "skill",
+        codex_binary=tmp_path / "codex",
+        developer_instructions=bootstrap,
+    )
+
+    initial = build_task_exec_command(
+        config,
+        prompt="Read current Wwise info.",
+        writable_dir=tmp_path / "outputs",
+    )
+    followup = build_task_resume_command(
+        config,
+        thread_id="thread-exact-123",
+        prompt="Continue.",
+        writable_dir=tmp_path / "outputs",
+    )
+    audit = build_prompt_audit_command(config, prompt="Read current Wwise info.")
+
+    expected_override = f"developer_instructions={json.dumps(bootstrap)}"
+    for command in (initial, followup, audit):
+        assert command.count(expected_override) == 1
+        assert command[command.index(expected_override) - 1] == "-c"
+
+
+def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_rebuild() -> None:
+    instructions = (
+        codex_harness_module.SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
+    )
+
+    assert "Before any other action" in instructions
+    assert "one standalone complete file-read shell command" in instructions
+    assert "next_command.copy_instruction.source_field" in instructions
+    assert "preserve every quote" in instructions
+    assert "fixed_argv_prefix" in instructions
+    assert "opaque handle" in instructions
+    assert "never reconstruct" in instructions
+
+
+def test_prompt_audit_requires_exact_bootstrap_developer_instruction_once(
+    tmp_path: Path,
+) -> None:
+    skill = tmp_path / "waapi-skill"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    bootstrap = "Read the injected waapi-skill SKILL.md exactly once."
+    skill_line = f"- waapi-skill: target (file: {skill / 'SKILL.md'})"
+
+    accepted = audit_prompt_input_payload(
+        [
+            {"role": "developer", "content": bootstrap},
+            {"role": "developer", "content": skill_line},
+        ],
+        target_skill_source=skill,
+        expected_developer_instructions=bootstrap,
+    )
+    missing = audit_prompt_input_payload(
+        [{"role": "developer", "content": skill_line}],
+        target_skill_source=skill,
+        expected_developer_instructions=bootstrap,
+    )
+    duplicated = audit_prompt_input_payload(
+        [
+            {"role": "developer", "content": bootstrap},
+            {"role": "developer", "content": bootstrap},
+            {"role": "developer", "content": skill_line},
+        ],
+        target_skill_source=skill,
+        expected_developer_instructions=bootstrap,
+    )
+
+    assert accepted.developer_instructions_exact is True
+    assert accepted.passed is True
+    assert missing.developer_instructions_exact is False
+    assert missing.passed is False
+    assert duplicated.developer_instructions_exact is False
+    assert duplicated.passed is False
+
+
 def test_prompt_audit_command_uses_supported_global_flags_with_pristine_codex_home(tmp_path: Path) -> None:
     config = CodexHarnessConfig(
         workspace=tmp_path,

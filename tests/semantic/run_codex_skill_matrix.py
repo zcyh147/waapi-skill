@@ -81,6 +81,7 @@ from tests.semantic.support.codex_harness import (  # noqa: E402  # pyright: ign
     CodexHarnessConfig,
     CodexInfrastructureError,
     CodexRunResult,
+    SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS,
     WindowsPowerShellCoreHost,
     is_evaluation_sensitive_environment_key,
     normalized_gateway_command_argv,
@@ -767,6 +768,11 @@ def run_heavy_v3_unit(
             timeout_seconds=options.timeout_seconds,
             live_environment=live_environment,
             windows_powershell_core_host=options.windows_powershell_core_host,
+            developer_instructions=(
+                SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
+                if options.profile == TYPED_INPUT_PROFILE_ID
+                else ""
+            ),
         )
         return runner(unit, scenario_root=scenario_root, options=project_options)
 

@@ -356,6 +356,7 @@ def test_project_dispatch_passes_closed_runtime_options_without_starting_it(
         timeout_seconds: float
         live_environment: Mapping[str, str]
         windows_powershell_core_host: Any = None
+        developer_instructions: str = ""
 
     def fake_run(value: _Unit, *, scenario_root: Path, options: FakeOptions):
         observed.update(unit=value, root=scenario_root, options=options)
@@ -383,6 +384,56 @@ def test_project_dispatch_passes_closed_runtime_options_without_starting_it(
     assert runtime_options.service_tier == "default"
     assert runtime_options.live_environment["WWISE_TEST_CONFIG"] == str(
         options.live_config
+    )
+    assert runtime_options.developer_instructions == ""
+
+
+def test_typed_input_project_dispatch_seals_pre_action_developer_instructions(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    options = replace(_options(tmp_path), profile=matrix.TYPED_INPUT_PROFILE_ID)
+    unit = _Unit(
+        "TYP21-ZERO-GET-INFO",
+        "2021.1",
+        _Scenario("ak.wwise.core.getInfo"),
+    )
+    observed: dict[str, Any] = {}
+
+    @dataclass(frozen=True, slots=True)
+    class FakeOptions:
+        skill_source: Path
+        codex_binary: Path
+        auth_json: Path
+        model: str
+        reasoning_effort: str
+        service_tier: str
+        timeout_seconds: float
+        live_environment: Mapping[str, str]
+        windows_powershell_core_host: Any = None
+        developer_instructions: str = ""
+
+    def fake_run(value: _Unit, *, scenario_root: Path, options: FakeOptions):
+        observed.update(options=options)
+        return _Outcome(value.unit_id, value.version, "PASS")
+
+    module = SimpleNamespace(
+        PROJECT_RUNNER_APIS={"ak.wwise.core.getInfo"},
+        PROJECT_RUNNER_MODEL_RESOLVED_REQUEST_FIELDS={},
+        HeavyProjectRunnerOptions=FakeOptions,
+        run_heavy_project_unit=fake_run,
+    )
+    monkeypatch.setattr(matrix.importlib, "import_module", lambda _name: module)
+
+    outcome = matrix.run_heavy_v3_unit(
+        unit,
+        scenario_root=tmp_path / "case",
+        options=options,
+    )
+
+    assert outcome.passed
+    assert observed["options"].developer_instructions == (
+        matrix.SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
     )
 
 

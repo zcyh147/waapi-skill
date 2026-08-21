@@ -38,6 +38,18 @@ DEFAULT_MODEL = "gpt-5.6-sol"
 DEFAULT_REASONING_EFFORT = "medium"
 DEFAULT_SERVICE_TIER = "priority"
 DEFAULT_TIMEOUT_SECONDS = 180.0
+SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
+    "Before any other action, read the injected waapi-skill SKILL.md exactly once "
+    "with one standalone complete file-read shell command. Do not stat or probe the "
+    "file, combine that read with another command, or read SKILL.md again after the "
+    "successful complete read. Whenever a Gateway result supplies next_command, "
+    "execute exactly the complete string named by "
+    "next_command.copy_instruction.source_field and preserve every quote; never "
+    "reconstruct it from gateway_argv or full_argv. During typed Draft construction, "
+    "copy fixed_argv_prefix, every opaque handle, every schema digest, and every "
+    "response-bound token exactly from the latest authoritative response; replace only "
+    "explicit placeholders and never reconstruct a runner path."
+)
 WINDOWS_SEMANTIC_SANDBOX_MODE = "unelevated"
 WINDOWS_HARD_REAP_SECONDS = 5.0
 PROMPT_AUDIT_TIMEOUT_SECONDS = 30.0
@@ -1179,6 +1191,7 @@ class CodexPromptAudit:
     unexpected_skills: tuple[tuple[str, str], ...] = ()
     target_skill_count: int = 0
     target_skill_locator_matches: bool = False
+    developer_instructions_exact: bool = True
 
     @property
     def passed(self) -> bool:
@@ -1186,6 +1199,7 @@ class CodexPromptAudit:
             self.has_target_skill
             and self.target_skill_count == 1
             and self.target_skill_locator_matches
+            and self.developer_instructions_exact
             and not self.has_memory
             and not self.unexpected_skills
         )
@@ -1431,8 +1445,18 @@ class CodexHarnessConfig:
     allow_output_write: bool = True
     network_access: bool = True
     expected_gateway_errors: tuple[CodexGatewayErrorExpectation, ...] = ()
+    developer_instructions: str = ""
 
     def __post_init__(self) -> None:
+        if self.developer_instructions and (
+            self.developer_instructions != self.developer_instructions.strip()
+            or "\x00" in self.developer_instructions
+            or len(self.developer_instructions.encode("utf-8")) > 2048
+        ):
+            raise ValueError(
+                "CodexHarnessConfig.developer_instructions must be trimmed, NUL-free, "
+                "and at most 2048 UTF-8 bytes"
+            )
         commands = tuple(expectation.command for expectation in self.expected_gateway_errors)
         if len(commands) != len(set(commands)):
             raise ValueError("CodexHarnessConfig.expected_gateway_errors commands must be unique")
@@ -1579,6 +1603,7 @@ class CodexCliHarness:
             payload,
             target_skill_source=workspace_skill_install_path(self.config.workspace),
             system_skill_root=Path(env["CODEX_HOME"]) / "skills" / ".system",
+            expected_developer_instructions=self.config.developer_instructions,
         )
 
 
@@ -2453,18 +2478,24 @@ def inspect_isolated_environment(
 
 
 def build_prompt_audit_command(config: CodexHarnessConfig, *, prompt: str) -> list[str]:
-    return [
+    command = [
         str(config.codex_binary),
         "--disable",
         "memories",
-        "-c",
-        f'model="{config.model}"',
-        "-c",
-        f'model_reasoning_effort="{config.reasoning_effort}"',
-        "debug",
-        "prompt-input",
-        prompt,
     ]
+    command.extend(_developer_instructions_config_argv(config.developer_instructions))
+    command.extend(
+        (
+            "-c",
+            f'model="{config.model}"',
+            "-c",
+            f'model_reasoning_effort="{config.reasoning_effort}"',
+            "debug",
+            "prompt-input",
+            prompt,
+        )
+    )
+    return command
 
 
 def build_exec_command(config: CodexHarnessConfig, *, prompt: str, writable_dir: Path) -> list[str]:
@@ -2527,6 +2558,7 @@ def _build_exec_prefix(
                 f'windows.sandbox="{WINDOWS_SEMANTIC_SANDBOX_MODE}"',
             )
         )
+    command.extend(_developer_instructions_config_argv(config.developer_instructions))
     command.extend(
         [
             "--model",
@@ -2554,11 +2586,18 @@ def _build_exec_prefix(
     return command
 
 
+def _developer_instructions_config_argv(value: str) -> tuple[str, ...]:
+    if not value:
+        return ()
+    return ("-c", f"developer_instructions={json.dumps(value)}")
+
+
 def audit_prompt_input_payload(
     payload: Any,
     *,
     target_skill_source: Path | None = None,
     system_skill_root: Path | None = None,
+    expected_developer_instructions: str = "",
 ) -> CodexPromptAudit:
     serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True)
     serialized_casefold = serialized.casefold()
@@ -2577,6 +2616,7 @@ def audit_prompt_input_payload(
         else:
             unexpected.append((name, locator))
     target_locator_matches = len(target_entries) == 1
+    instruction_texts = prompt_instruction_texts(payload)
     return CodexPromptAudit(
         item_count=len(payload) if isinstance(payload, list) else 0,
         prompt_sha256=hashlib.sha256(serialized.encode("utf-8")).hexdigest(),
@@ -2592,6 +2632,10 @@ def audit_prompt_input_payload(
         unexpected_skills=tuple(unexpected),
         target_skill_count=len(target_entries),
         target_skill_locator_matches=target_locator_matches,
+        developer_instructions_exact=(
+            not expected_developer_instructions
+            or instruction_texts.count(expected_developer_instructions) == 1
+        ),
     )
 
 

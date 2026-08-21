@@ -610,6 +610,14 @@ def test_normal_object_set_schema_and_detail_expose_only_composer_input(
             "activates required dependency values"
         ),
         "unrequested_dependency_flags_are_not_action_fields": True,
+        "reference_companion_fact_policy": {
+            "submit_reference_only_when_that_is_the_user_fact": True,
+            "reference_does_not_authorize_a_companion_property_fact": True,
+            "gateway_owns_required_reference_activation": True,
+            "output_bus_example": (
+                "OutputBus does not authorize an OverrideOutput action field"
+            ),
+        },
         "selector_only_allowed_for": [
             "nested_children",
             "closed_lists",

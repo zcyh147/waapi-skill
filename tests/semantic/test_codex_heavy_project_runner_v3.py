@@ -7,6 +7,7 @@ import shutil
 import sys
 import threading
 import time
+from dataclasses import replace
 from pathlib import Path
 from types import MappingProxyType, SimpleNamespace
 
@@ -556,18 +557,28 @@ def test_project_runner_forwards_prepared_reference_schedule(
         captured["turn_reference_schedule"] = kwargs[
             "turn_reference_schedule"
         ]
+        captured["developer_instructions"] = kwargs[
+            "developer_instructions"
+        ]
         return _fake_task(kwargs["task_root"])
 
     monkeypatch.setattr(runner, "run_v3_codex_task", run_task)
 
+    options = replace(
+        _options(tmp_path),
+        developer_instructions="sealed bootstrap instructions",
+    )
     outcome = runner.run_heavy_project_unit(
         _unit(),
         scenario_root=tmp_path / "case",
-        options=_options(tmp_path),
+        options=options,
     )
 
     assert outcome.status == "PASS"
     assert captured["turn_reference_schedule"] == schedule
+    assert captured["developer_instructions"] == (
+        "sealed bootstrap instructions"
+    )
 
 
 def test_project_runner_api_union_is_exact_and_excludes_only_cli() -> None:

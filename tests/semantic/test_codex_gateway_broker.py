@@ -317,7 +317,7 @@ def test_compact_generic_typed_fact_receipt_accepts_exact_container_resume() -> 
                 "da1-0123456789abcdef0123456789abcdef01234567",
                 "--expected-revision", "2", "--compact", "--facts",
             ],
-            "append_one_or_more_complete_typed_actions": [
+            "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency": [
                 "--action", "<action-name>", "<typed-fact-arguments>",
             ],
             "replace_only": ["<action-name>", "<typed-fact-arguments>"],
@@ -384,7 +384,7 @@ def test_compact_generic_typed_fact_batch_accepts_exact_node_resume() -> None:
                 "da1-0123456789abcdef0123456789abcdef01234567",
                 "--expected-revision", "4", "--compact", "--facts",
             ],
-            "append_one_or_more_complete_typed_actions": [
+            "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency": [
                 "--action", "<action-name>", "<typed-fact-arguments>",
             ],
             "replace_only": ["<action-name>", "<typed-fact-arguments>"],
@@ -448,7 +448,7 @@ def test_compact_generic_typed_fact_receipt_rejects_misbound_container_resume() 
                 "da1-0123456789abcdef0123456789abcdef01234567",
                 "--expected-revision", "2", "--compact", "--facts",
             ],
-            "append_one_or_more_complete_typed_actions": [
+            "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency": [
                 "--action", "<action-name>", "<typed-fact-arguments>",
             ],
             "replace_only": ["<action-name>", "<typed-fact-arguments>"],

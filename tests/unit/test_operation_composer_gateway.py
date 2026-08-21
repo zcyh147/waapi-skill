@@ -202,6 +202,14 @@ def test_object_set_composer_discloses_every_exact_typed_action_shape(
             "activates required dependency values"
         ),
         "unrequested_dependency_flags_are_not_action_fields": True,
+        "reference_companion_fact_policy": {
+            "submit_reference_only_when_that_is_the_user_fact": True,
+            "reference_does_not_authorize_a_companion_property_fact": True,
+            "gateway_owns_required_reference_activation": True,
+            "output_bus_example": (
+                "OutputBus does not authorize an OverrideOutput action field"
+            ),
+        },
         "selector_only_allowed_for": [
             "nested_children",
             "closed_lists",
@@ -547,7 +555,7 @@ def test_object_set_typed_actions_build_one_target_scalar_fact_offline(
             "--compact",
             "--facts",
         ],
-        "append_one_or_more_complete_typed_actions": [
+            "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency": [
             "--action",
             "<action-name>",
             "<typed-fact-arguments>",
@@ -1378,7 +1386,9 @@ def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
         "--compact",
         "--facts",
     ]
-    assert draft["next_action_binding"]["append_one_or_more_complete_typed_actions"] == [
+    assert draft["next_action_binding"][
+        "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency"
+    ] == [
         "--action",
         "<action-name>",
         "<typed-fact-arguments>",
@@ -1387,7 +1397,7 @@ def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
         "contract",
         "shell_tool_timeout_ms",
         "fixed_argv_prefix",
-        "append_one_or_more_complete_typed_actions",
+        "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency",
         "completion_candidate",
         "replace_only",
     }

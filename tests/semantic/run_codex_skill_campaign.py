@@ -251,6 +251,7 @@ from tests.semantic.support.codex_harness import (  # noqa: E402
     CodexGatewayErrorExpectation,
     CodexHarnessConfig,
     CodexHarnessError,
+    SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS,
     WindowsPowerShellCoreHost,
     audit_session_events,
     build_task_exec_command,
@@ -3572,6 +3573,11 @@ def _validate_heavy_v3_retryable_failed_facts(
         sandbox_mode="workspace-write",
         allow_output_write=False,
         network_access=True,
+        developer_instructions=(
+            SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
+            if options.profile == TYPED_INPUT_PROFILE_ID
+            else ""
+        ),
     )
     expected_command = (
         build_task_exec_command(
@@ -5818,6 +5824,11 @@ def _validate_heavy_v3_codex_facts(
         sandbox_mode="workspace-write",
         allow_output_write=False,
         network_access=True,
+        developer_instructions=(
+            SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
+            if options.profile == TYPED_INPUT_PROFILE_ID
+            else ""
+        ),
     )
     expected_command = (
         build_task_exec_command(
