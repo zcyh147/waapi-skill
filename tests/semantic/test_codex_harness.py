@@ -1431,6 +1431,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "fixed_argv_prefix" in instructions
     assert "opaque handle" in instructions
     assert "never reconstruct" in instructions
+    assert "Never set or override a shell-tool working directory" in instructions
 
 
 def test_formal_bootstrap_instructions_bind_one_exact_windows_runner_prefix() -> None:

@@ -52,7 +52,9 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "explicit placeholders and never reconstruct a runner path. On native Windows, "
     "the exact standalone first command is Get-Content -Raw -Encoding UTF8 "
     "'.agents\\skills\\waapi-skill\\SKILL.md'; use this short task-local spelling "
-    "even when the injected inventory also displays a long absolute locator."
+    "even when the injected inventory also displays a long absolute locator. "
+    "Never set or override a shell-tool working directory; use the "
+    "harness-preconfigured task workspace exactly."
 )
 
 
