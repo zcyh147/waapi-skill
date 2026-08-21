@@ -1663,6 +1663,53 @@ def _fixed_scalar_members(
     return members
 
 
+def _scalar_array_item_contract(child: TypedFieldContract) -> dict[str, Any]:
+    """Project every direct scalar item variant of one dynamic array."""
+
+    if child.shape != "array":
+        return {}
+    scalar_variants = tuple(
+        variant
+        for variant in child.variants
+        if variant.get("type")
+        in {"string", "integer", "number", "boolean", "null"}
+    )
+    if not scalar_variants:
+        return {}
+    payload: dict[str, Any] = {
+        "accepted_types": sorted(
+            {
+                str(variant["type"])
+                for variant in scalar_variants
+                if isinstance(variant.get("type"), str)
+            }
+        )
+    }
+    enum_values = [
+        value
+        for variant in scalar_variants
+        for value in variant.get("enum", ())
+        if isinstance(variant.get("enum"), list)
+    ]
+    if enum_values:
+        payload["enum"] = enum_values
+    constant_values = [
+        variant["const"] for variant in scalar_variants if "const" in variant
+    ]
+    if constant_values:
+        payload["constant_values"] = constant_values
+    patterns = sorted(
+        {
+            str(variant["pattern"])
+            for variant in scalar_variants
+            if isinstance(variant.get("pattern"), str)
+        }
+    )
+    if patterns:
+        payload["patterns"] = patterns
+    return payload
+
+
 def dynamic_container_disclosure(
     contract: TypedRequestContract,
     *,
@@ -1830,6 +1877,13 @@ def dynamic_container_disclosure(
             schema,
             root_schema=root_schema,
             graph=contract.definition_graph,
+        ),
+        **(
+            {"scalar_array_item_contract": scalar_array_item_contract}
+            if (
+                scalar_array_item_contract := _scalar_array_item_contract(child)
+            )
+            else {}
         ),
         "branch_choices": branches,
         "member_key_disclosure_required": (

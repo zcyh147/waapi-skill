@@ -4955,6 +4955,52 @@ def _bind_dynamic_branch_facts(
             )
 
 
+def _bind_dynamic_scalar_array_facts(
+    child_contract: dict[str, Any],
+    *,
+    child_handle: str,
+    draft_shape: bool,
+    undo_child_shape: bool,
+    query_shape: bool,
+    topic_prefix: str | None,
+) -> None:
+    """Attach exact append facts for business-present scalar array items."""
+
+    item_contract = child_contract.pop("scalar_array_item_contract", None)
+    if not isinstance(item_contract, Mapping):
+        return
+    accepted_types = item_contract.get("accepted_types")
+    if not isinstance(accepted_types, list) or not all(
+        isinstance(value_type, str) for value_type in accepted_types
+    ):
+        return
+    argv_by_type: dict[str, list[str]] = {}
+    for value_type in accepted_types:
+        deferred = _deferred_dynamic_fact_payload(
+            ["--append", child_handle, value_type, "<business-value>"],
+            draft_shape=draft_shape,
+            undo_child_shape=undo_child_shape,
+            query_shape=query_shape,
+            topic_prefix=topic_prefix,
+        ).get("deferred_fact")
+        if isinstance(deferred, Mapping) and isinstance(deferred.get("argv"), list):
+            argv_by_type[value_type] = list(deferred["argv"])
+    if not argv_by_type:
+        return
+    child_contract["scalar_array_item_facts"] = {
+        **dict(item_contract),
+        "fact_argv_by_type": argv_by_type,
+        "repeat_for_each_business_item_in_order": True,
+        "execute_after": "deferred_parent_fact",
+        "queue_phase": "child_contract",
+        "queue_order_ref": (
+            "/continuation/request_wide_order/deferred_fact_queue"
+        ),
+        "consume_each_item_once": True,
+        "replay_allowed": False,
+    }
+
+
 def _compact_fixed_scalar_member_facts(child_contract: dict[str, Any]) -> None:
     """Table repeated scalar fact policy without losing any public fact argv."""
 
@@ -6031,6 +6077,14 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             query_shape=query_shape,
             topic_prefix=topic_prefix,
         )
+        _bind_dynamic_scalar_array_facts(
+            child_contract,
+            child_handle=child_handle,
+            draft_shape=draft_shape,
+            undo_child_shape=undo_child_shape,
+            query_shape=query_shape,
+            topic_prefix=topic_prefix,
+        )
         child_contract["fact_literal_policy"] = {
             "copy_handles_and_choice_handles_exactly": True,
             "placeholder_or_added_punctuation": "invalid",
@@ -6071,6 +6125,13 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             lineage_token=lineage_token,
         )
         if current_business_value_pointer is not None:
+            scalar_array_item_facts = child_contract.get(
+                "scalar_array_item_facts"
+            )
+            if isinstance(scalar_array_item_facts, dict):
+                scalar_array_item_facts["business_values_pointer"] = (
+                    current_business_value_pointer
+                )
             scalar_member_facts = child_contract.get("fixed_scalar_member_facts")
             if isinstance(scalar_member_facts, list):
                 for row in scalar_member_facts:

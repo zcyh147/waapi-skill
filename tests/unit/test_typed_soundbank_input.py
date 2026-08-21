@@ -532,7 +532,7 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
                     "inclusions": [
                         {
                             "object": {"kind": "id", "value": EVENT_ID},
-                            "filters": ["events"],
+                            "filters": ["events", "structures", "media"],
                         }
                     ],
                 },
@@ -809,6 +809,71 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
     assert [
         parse_typed_action_cli_arguments(argv) for argv in path_public_batch
     ] == [expected_path_action(action) for action in path_batch.actions]
+
+    filters_code, filters_payload = gateway.execute_gateway(
+        ["--version", "2025.1", *sibling["argv_by_shape"]["array"]],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda url: pytest.fail(
+            f"filters disclosure connected to {url}"
+        ),
+    )
+    assert filters_code == 0, filters_payload
+    filters_handle = filters_payload["handle"]
+    assert filters_payload["child_contract"]["scalar_array_item_facts"] == {
+        "accepted_types": ["string"],
+        "enum": ["events", "structures", "media"],
+        "business_values_pointer": "/args/inclusions/0/filters",
+        "fact_argv_by_type": {
+            "string": [
+                "--action", "add_typed_fact", "--fact-action", "append",
+                "--field-handle", filters_handle, "--value-type", "string",
+                "--fact-value", "<business-value>",
+            ]
+        },
+        "repeat_for_each_business_item_in_order": True,
+        "execute_after": "deferred_parent_fact",
+        "queue_phase": "child_contract",
+        "queue_order_ref": "/continuation/request_wide_order/deferred_fact_queue",
+        "consume_each_item_once": True,
+        "replay_allowed": False,
+    }
+    filters_action = next(
+        step for step in protocol.steps if step.name == "tx01.action.003"
+    ).arguments[-1]
+    assert isinstance(filters_action, DraftTypedActionBatchArgument)
+    filters_payloads = {
+        "tx01.disclose.001": item,
+        "tx01.disclose.003": filters_payload,
+    }
+
+    def expected_filters_action(action: object) -> dict[str, object]:
+        assert hasattr(action, "expected") and hasattr(action, "response_bindings")
+        bound = dict(action.expected)
+        for binding in action.response_bindings:
+            current: object = filters_payloads[binding.step]
+            for token in binding.response_pointer.removeprefix("/").split("/"):
+                assert isinstance(current, (dict, list))
+                current = (
+                    current[int(token)]
+                    if isinstance(current, list)
+                    else current[token]
+                )
+            bound[binding.pointer.removeprefix("/")] = current
+        return bound
+
+    append_template = filters_payload["child_contract"][
+        "scalar_array_item_facts"
+    ]["fact_argv_by_type"]["string"]
+    filters_public_batch = [
+        filters_payload["continuation"]["deferred_fact"]["argv"],
+        *(
+            [value if token == "<business-value>" else token for token in append_template]
+            for value in ("events", "structures", "media")
+        ),
+    ]
+    assert [
+        parse_typed_action_cli_arguments(argv) for argv in filters_public_batch
+    ] == [expected_filters_action(action) for action in filters_action.actions]
 
     for contradiction in (
         ["--shape", "array"],
