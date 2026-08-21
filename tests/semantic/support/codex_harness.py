@@ -20,6 +20,7 @@ from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Callable, Iterator, Mapping, Sequence
 
 from wwise_waapi.platform_commands import (
+    GATEWAY_SHELL_TOOL_TIMEOUT_MS,
     PlatformCommandError,
     WINDOWS_MODEL_COMMAND_FAMILY,
     WINDOWS_POWERSHELL_ENCODED_FAMILY,
@@ -47,12 +48,13 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "reconstruct it from gateway_argv or full_argv. For typed Drafts, copy "
     "fixed_argv_prefix, every opaque handle, schema digest, and response-bound token; "
     "replace only explicit placeholders and never reconstruct a runner path. "
-    "Repeat each typed fact template in full; replace one business value with one "
-    "shell argv literal, preserving whitespace inside that item. If batch_size "
-    "is 6, submit exactly six complete action groups unless fewer "
-    "business-present facts remain. When completion_candidate discloses "
-    "request_schema_terminal_arguments, append every prompt-required terminal "
-    "scalar before executing its copy_command. A successful "
+    "Repeat each typed fact template in full with one business value as one shell "
+    "argv literal. Account for every prompt-present field, array item, and map "
+    "entry; copy booleans exactly and never infer optional/default values. If "
+    "batch_size is 6, submit exactly six complete action groups unless fewer such "
+    "facts remain. Use only the operation-schema metadata query and limit. Append "
+    "every prompt-required terminal scalar disclosed by completion_candidate before "
+    "its copy_command, and apply shell_tool_timeout_ms to the shell tool call. A successful "
     "draft-check is not a Preview: execute its next_command before answering or "
     "asking confirmation unless it declares requires_later_user_message. On "
     "native Windows the exact first command is Get-Content -Raw -Encoding UTF8 "
@@ -3291,6 +3293,7 @@ def _selected_gateway_continuation(
         "gateway_argv",
         "full_argv",
         "copy_exactly",
+        "shell_tool_timeout_ms",
         "shell_family",
         "copy_instruction",
     }
@@ -3302,6 +3305,7 @@ def _selected_gateway_continuation(
     if (
         value.get("contract") != _TRANSACTION_NEXT_COMMAND_CONTRACT
         or value.get("copy_exactly") is not True
+        or value.get("shell_tool_timeout_ms") != GATEWAY_SHELL_TOOL_TIMEOUT_MS
         or not isinstance(value.get("command"), str)
         or not value.get("command")
         or not isinstance(instruction, Mapping)

@@ -101,6 +101,7 @@ def _closed_next_command(
         "gateway_argv": gateway_argv,
         "full_argv": list(full_argv),
         "copy_exactly": True,
+        "shell_tool_timeout_ms": 30_000,
         "shell_family": (
             "windows-powershell-encoded" if platform_name == "nt" else "posix-sh"
         ),
@@ -1435,7 +1436,11 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "Repeat each typed fact template in full" in instructions
     assert "one shell argv literal" in instructions
     assert "submit exactly six complete action groups" in instructions
-    assert "append every prompt-required terminal scalar" in instructions
+    assert "every prompt-required terminal scalar" in instructions
+    assert "every prompt-present field" in instructions
+    assert "copy booleans exactly" in instructions
+    assert "metadata query and limit" in instructions
+    assert "shell_tool_timeout_ms" in instructions
     assert "A successful draft-check is not a Preview" in instructions
     assert "requires_later_user_message" in instructions
 

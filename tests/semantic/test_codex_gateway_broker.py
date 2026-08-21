@@ -121,6 +121,12 @@ def _compact_next_action_binding(
             "condition": (
                 "all_current_business_request_facts_and_disclosures_submitted"
             ),
+            "business_completion_check": {
+                "source": "current_user_business_request",
+                "schema_required_fields_complete_is_insufficient": True,
+                "all_user_present_optional_map_and_constant_facts_required": True,
+                "exact_values_and_object_types_required": True,
+            },
             "is_next_command_when_condition_true": True,
             "fixed_argv_prefix": completion_argv,
             "copy_exactly": True,
@@ -575,6 +581,15 @@ def test_compact_receipt_rejects_missing_or_tampered_shell_tool_timeout(
         {
             **_compact_next_action_binding()["completion_candidate"],
             "copy_command": "python reconstructed-draft-check.py",
+        },
+        {
+            **_compact_next_action_binding()["completion_candidate"],
+            "business_completion_check": {
+                "source": "schema_required_fields",
+                "schema_required_fields_complete_is_insufficient": False,
+                "all_user_present_optional_map_and_constant_facts_required": False,
+                "exact_values_and_object_types_required": False,
+            },
         },
     ),
 )
@@ -1079,6 +1094,7 @@ def expected_fake_confirmation_next_command(
         "gateway_argv": list(gateway_argv),
         "full_argv": list(full_argv),
         "copy_exactly": True,
+        "shell_tool_timeout_ms": 30_000,
         "requires_explicit_user_confirmation": True,
     }
     model_command: str | None = None
@@ -1208,6 +1224,88 @@ def test_broker_projects_only_exact_candidate_continuation_to_task_install(
             invocation_runner=invocation_runner,
             platform_name=platform_name,
         )
+
+
+@pytest.mark.parametrize("platform_name", ("posix", "nt"))
+def test_broker_projects_draft_action_and_completion_prefixes_to_task_install(
+    tmp_path: Path,
+    platform_name: str,
+) -> None:
+    candidate_runner = tmp_path / "candidate" / "scripts" / "run.py"
+    candidate_runner.parent.mkdir(parents=True)
+    candidate_runner.write_text("# candidate\n", encoding="utf-8")
+    invocation_runner = (
+        tmp_path
+        / "agent workspace"
+        / ".agents"
+        / "skills"
+        / "waapi-skill"
+        / "scripts"
+        / "run.py"
+    )
+    action_prefix = [
+        "python",
+        str(candidate_runner.resolve(strict=True)),
+        "gateway.py",
+        "draft-apply",
+        "od1-0123456789abcdef0123456789abcdef",
+        "--task-authority",
+        "da1-0123456789abcdef0123456789abcdef01234567",
+        "--expected-revision",
+        "1",
+        "--compact",
+        "--facts",
+    ]
+    completion_prefix = [
+        "python",
+        str(candidate_runner.resolve(strict=True)),
+        "gateway.py",
+        "draft-check",
+        "od1-0123456789abcdef0123456789abcdef",
+        "--task-authority",
+        "da1-0123456789abcdef0123456789abcdef01234567",
+        "--expected-revision",
+        "2",
+    ]
+    payload = {
+        "contract": "waapi-skill.operation-draft-next-action/v1",
+        "shell_tool_timeout_ms": 30_000,
+        "fixed_argv_prefix": action_prefix,
+        "fixed_argv_prefix_copy": (
+            encode_windows_model_argv(action_prefix)
+            if platform_name == "nt"
+            else shlex.join(action_prefix)
+        ),
+        "completion_candidate": {
+            "fixed_argv_prefix": completion_prefix,
+            "copy_command": (
+                encode_windows_model_argv(completion_prefix)
+                if platform_name == "nt"
+                else shlex.join(completion_prefix)
+            ),
+        },
+    }
+
+    projected = broker_module._project_model_visible_runner(  # noqa: SLF001
+        payload,
+        candidate_runner=candidate_runner,
+        invocation_runner=invocation_runner,
+        platform_name=platform_name,
+    )
+
+    assert projected["fixed_argv_prefix"][1] == str(invocation_runner)
+    assert projected["fixed_argv_prefix_copy"] == (
+        encode_windows_model_argv(projected["fixed_argv_prefix"])
+        if platform_name == "nt"
+        else shlex.join(projected["fixed_argv_prefix"])
+    )
+    completion = projected["completion_candidate"]
+    assert completion["fixed_argv_prefix"][1] == str(invocation_runner)
+    assert completion["copy_command"] == (
+        encode_windows_model_argv(completion["fixed_argv_prefix"])
+        if platform_name == "nt"
+        else shlex.join(completion["fixed_argv_prefix"])
+    )
 
 
 FAKE_RUNNER = r'''from __future__ import annotations
@@ -1661,6 +1759,7 @@ elif command == "transaction-show":
         "gateway_argv": gateway_argv,
         "full_argv": full_argv,
         "copy_exactly": True,
+        "shell_tool_timeout_ms": 30000,
         "requires_explicit_user_confirmation": True,
         "shell_family": "windows-powershell-encoded" if os.name == "nt" else "posix-sh",
     }
@@ -7344,7 +7443,9 @@ def test_runner_timeout_kills_reaps_and_records_terminal_failure(tmp_path: Path)
         expected_steps=(ExpectedGatewayStep("status", "status"),),
         runner_environment={**os.environ, "FAKE_GATEWAY_MODE": "hang-ignore-term"},
         transport="tcp",
-        runner_timeout_seconds=0.05,
+        # Leave enough time for a cold Python interpreter to write its PID;
+        # the assertion below still proves the bounded timeout and hard reap.
+        runner_timeout_seconds=0.25,
     ) as broker:
         started = time.monotonic()
         failed = run_model_command(broker, ["status"])

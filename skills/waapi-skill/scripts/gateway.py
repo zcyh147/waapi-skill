@@ -4099,9 +4099,24 @@ def operation_composer_input_contract(
                     "--query",
                     "<requested-field-name>",
                     "--limit",
-                    "<1..8>",
+                    "<derived-from-query-count>",
                 ],
-                "replace_only": ["<requested-field-name>", "<1..8>"],
+                "replace_only": ["<requested-field-name>"],
+                "query_policy": {
+                    "include_only_requested_dynamic_property_or_reference_tokens": True,
+                    "known_target_fields_are_not_queries": [
+                        "name",
+                        "notes",
+                        "platform",
+                        "list_mode",
+                        "on_name_conflict",
+                    ],
+                },
+                "limit_by_query_count": {
+                    "1..2": 8,
+                    "3..4": 3,
+                    "5..8": 2,
+                },
             }
             contract = {**contract, "start_preconditions": exact_preconditions}
     audio_import_option_names = (
@@ -13766,6 +13781,7 @@ def transaction_next_command(
         "gateway_argv": normalized,
         "full_argv": full_argv,
         "copy_exactly": True,
+        "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
     }
     if requires_explicit_user_confirmation:
         payload["requires_explicit_user_confirmation"] = True
@@ -13821,6 +13837,30 @@ def operation_draft_copy_command(
         except PlatformCommandError:
             return encode_windows_powershell_argv(normalized)
     return shlex.join(normalized)
+
+
+def operation_draft_prefix_copy_binding(
+    full_argv: Sequence[str],
+) -> dict[str, Any]:
+    """Return one copy-ready Draft prefix plus its closed append policy."""
+
+    normalized = [str(value) for value in full_argv]
+    return {
+        "fixed_argv_prefix": normalized,
+        "fixed_argv_prefix_copy": operation_draft_copy_command(normalized),
+        "fixed_argv_prefix_copy_instruction": {
+            "contract": OPERATION_DRAFT_COMMAND_COPY_INSTRUCTION_CONTRACT,
+            "source_field": "fixed_argv_prefix_copy",
+            "action": "copy_verbatim_then_append_complete_typed_action_groups",
+            "forbidden_transformations": [
+                "reconstruct",
+                "shorten",
+                "normalize",
+                "substitute_path_segments",
+                "select_another_field",
+            ],
+        },
+    }
 
 
 def transaction_state_payload(command: str, record: Any, *, offline: bool) -> dict[str, Any]:
@@ -14344,6 +14384,13 @@ def operation_draft_payload(
                 ],
                 "first_true_candidate_is_the_only_next_phase": True,
             }
+        if generic_typed_draft and compact_actions is None:
+            next_action_binding["prompt_fact_completion_guard"] = {
+                "schema_optional_is_not_evidence_of_prompt_absence": True,
+                "account_for_every_prompt_present_scalar_array_item_and_map_entry": True,
+                "copy_boolean_values_exactly": True,
+                "infer_or_replace_prompt_values": "invalid",
+            }
         if compact_actions is not None:
             next_action_binding["shell_tool_timeout_ms"] = (
                 GATEWAY_SHELL_TOOL_TIMEOUT_MS
@@ -14409,21 +14456,27 @@ def operation_draft_payload(
                 }
             )
         else:
+            draft_apply_prefix = [
+                "python",
+                str(GATEWAY_RUNNER_PATH),
+                "gateway.py",
+                "draft-apply",
+                record.draft_id,
+                "--task-authority",
+                task_authority or "<task-authority-from-draft-start>",
+                "--expected-revision",
+                str(record.revision),
+                "--compact",
+                "--facts",
+            ]
+            if compact_actions is None:
+                next_action_binding.update(
+                    operation_draft_prefix_copy_binding(draft_apply_prefix)
+                )
+            else:
+                next_action_binding["fixed_argv_prefix"] = draft_apply_prefix
             next_action_binding.update(
                 {
-                    "fixed_argv_prefix": [
-                        "python",
-                        str(GATEWAY_RUNNER_PATH),
-                        "gateway.py",
-                        "draft-apply",
-                        record.draft_id,
-                        "--task-authority",
-                        task_authority or "<task-authority-from-draft-start>",
-                        "--expected-revision",
-                        str(record.revision),
-                        "--compact",
-                        "--facts",
-                    ],
                     "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency": [
                         "--action",
                         "<action-name>",
@@ -14484,6 +14537,12 @@ def operation_draft_payload(
                     "condition": (
                         "all_current_business_request_facts_and_disclosures_submitted"
                     ),
+                    "business_completion_check": {
+                        "source": "current_user_business_request",
+                        "schema_required_fields_complete_is_insufficient": True,
+                        "all_user_present_optional_map_and_constant_facts_required": True,
+                        "exact_values_and_object_types_required": True,
+                    },
                     "is_next_command_when_condition_true": True,
                     "fixed_argv_prefix": completion_argv,
                     "copy_exactly": True,

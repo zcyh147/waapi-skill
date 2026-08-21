@@ -2117,6 +2117,7 @@ def _valid_request_schema_terminal_arguments(value: Any) -> bool:
 def _valid_draft_completion_candidate(value: Any) -> bool:
     required_keys = {
         "condition",
+        "business_completion_check",
         "is_next_command_when_condition_true",
         "fixed_argv_prefix",
         "copy_exactly",
@@ -2135,6 +2136,13 @@ def _valid_draft_completion_candidate(value: Any) -> bool:
         )
         or value.get("condition")
         != "all_current_business_request_facts_and_disclosures_submitted"
+        or value.get("business_completion_check")
+        != {
+            "source": "current_user_business_request",
+            "schema_required_fields_complete_is_insufficient": True,
+            "all_user_present_optional_map_and_constant_facts_required": True,
+            "exact_values_and_object_types_required": True,
+        }
         or value.get("is_next_command_when_condition_true") is not True
         or value.get("copy_exactly") is not True
         or value.get("allowed_suffix_source")
@@ -6110,6 +6118,7 @@ def _project_next_command_runner(
         "gateway_argv",
         "full_argv",
         "copy_exactly",
+        "shell_tool_timeout_ms",
         "shell_family",
         "copy_instruction",
     }
@@ -6129,6 +6138,7 @@ def _project_next_command_runner(
     if (
         value.get("contract") != TRANSACTION_NEXT_COMMAND_CONTRACT
         or value.get("copy_exactly") is not True
+        or value.get("shell_tool_timeout_ms") != GATEWAY_SHELL_TOOL_TIMEOUT_MS
         or not isinstance(value.get("command"), str)
         or not value.get("command")
         or not isinstance(gateway_argv, list)
@@ -6212,6 +6222,7 @@ def _project_next_command_runner(
         "gateway_argv": list(gateway_argv),
         "full_argv": projected_argv,
         "copy_exactly": True,
+        "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
     }
     for key in ("requires_explicit_user_confirmation", "requires_later_user_message"):
         if key in value:
@@ -6242,6 +6253,118 @@ def _project_next_command_runner(
     return result
 
 
+def _draft_copy_command(
+    argv: Sequence[str],
+    *,
+    platform_name: str,
+) -> str:
+    """Render the one exact model-facing Draft command for a sealed argv."""
+
+    if platform_name == "nt":
+        try:
+            return encode_windows_model_argv(argv)
+        except PlatformCommandError:
+            return encode_windows_powershell_argv(argv)
+    if platform_name == "posix":
+        return shlex.join(argv)
+    raise GatewayInvocationError(
+        f"unsupported Gateway continuation platform {platform_name!r}"
+    )
+
+
+def _project_operation_draft_runner(
+    value: Mapping[str, Any],
+    *,
+    candidate_runner: Path,
+    invocation_runner: Path,
+    platform_name: str,
+) -> dict[str, Any]:
+    """Project closed Draft argv bindings onto the detached task Skill path."""
+
+    expected_candidate = str(candidate_runner.resolve(strict=True))
+
+    def project_prefix(
+        mapping: Mapping[str, Any],
+        prefix_key: str,
+        *,
+        copy_key: str | None = None,
+    ) -> dict[str, Any]:
+        projected = dict(mapping)
+        prefix = mapping.get(prefix_key)
+        if (
+            not isinstance(prefix, list)
+            or len(prefix) < 4
+            or any(not isinstance(token, str) for token in prefix)
+            or prefix[:1] != ["python"]
+            or prefix[1] != expected_candidate
+            or prefix[2] != "gateway.py"
+        ):
+            raise GatewayInvocationError(
+                "Gateway Draft continuation is not bound to the sealed candidate "
+                "runner"
+            )
+        projected_prefix = [*prefix]
+        projected_prefix[1] = str(invocation_runner)
+        projected[prefix_key] = projected_prefix
+        if copy_key is not None:
+            if mapping.get(copy_key) != _draft_copy_command(
+                prefix,
+                platform_name=platform_name,
+            ):
+                raise GatewayInvocationError(
+                    "Gateway Draft continuation command representation is not exact"
+                )
+            projected[copy_key] = _draft_copy_command(
+                projected_prefix,
+                platform_name=platform_name,
+            )
+        return projected
+
+    def project_binding(binding: Mapping[str, Any]) -> dict[str, Any]:
+        projected = dict(binding)
+        if "fixed_argv_prefix" in binding:
+            projected = project_prefix(
+                projected,
+                "fixed_argv_prefix",
+                copy_key=(
+                    "fixed_argv_prefix_copy"
+                    if "fixed_argv_prefix_copy" in binding
+                    else None
+                ),
+            )
+        if "fixed_full_argv_template" in binding:
+            projected = project_prefix(projected, "fixed_full_argv_template")
+        completion = binding.get("completion_candidate")
+        if isinstance(completion, Mapping):
+            projected["completion_candidate"] = project_prefix(
+                completion,
+                "fixed_argv_prefix",
+                copy_key="copy_command",
+            )
+        return projected
+
+    if value.get("contract") == "waapi-skill.operation-draft-next-action/v1":
+        return project_binding(value)
+
+    projected_draft = dict(value)
+    binding = value.get("next_action_binding")
+    if isinstance(binding, Mapping):
+        projected_draft["next_action_binding"] = project_binding(binding)
+    action_result = value.get("action_result")
+    if isinstance(action_result, Mapping):
+        projected_action = dict(action_result)
+        followups = action_result.get("required_followup_facts")
+        if isinstance(followups, list):
+            projected_action["required_followup_facts"] = [
+                project_prefix(row, "fixed_full_argv")
+                if isinstance(row, Mapping) and "fixed_full_argv" in row
+                else row
+                for row in followups
+            ]
+        projected_draft["action_result"] = projected_action
+    return projected_draft
+
+
 def _project_model_visible_runner(
     value: Any,
     *,
@@ -6254,6 +6377,16 @@ def _project_model_visible_runner(
     if isinstance(value, Mapping):
         if value.get("contract") == TRANSACTION_NEXT_COMMAND_CONTRACT:
             return _project_next_command_runner(
+                value,
+                candidate_runner=candidate_runner,
+                invocation_runner=invocation_runner,
+                platform_name=platform_name,
+            )
+        if value.get("contract") in {
+            "waapi-skill.operation-draft/v1",
+            "waapi-skill.operation-draft-next-action/v1",
+        }:
+            return _project_operation_draft_runner(
                 value,
                 candidate_runner=candidate_runner,
                 invocation_runner=invocation_runner,

@@ -83,6 +83,19 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
     task_authority = started["task_authority"]
     assert DRAFT_ID_RE.fullmatch(draft_id)
     assert TASK_AUTHORITY_RE.fullmatch(task_authority)
+    draft_apply_prefix = [
+        "python",
+        str(waapi_gateway.GATEWAY_RUNNER_PATH),
+        "gateway.py",
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        task_authority,
+        "--expected-revision",
+        "1",
+        "--compact",
+        "--facts",
+    ]
     assert started["draft"] == {
         "contract": "waapi-skill.operation-draft/v1",
         "draft_id": draft_id,
@@ -97,19 +110,26 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
             "maximum_actions": 6,
             "then_read_next_response": True,
             "precompute_or_increment_revision": False,
-            "fixed_argv_prefix": [
-                "python",
-                str(waapi_gateway.GATEWAY_RUNNER_PATH),
-                "gateway.py",
-                "draft-apply",
-                draft_id,
-                "--task-authority",
-                task_authority,
-                "--expected-revision",
-                "1",
-                "--compact",
-                "--facts",
-            ],
+            "fixed_argv_prefix": draft_apply_prefix,
+            "fixed_argv_prefix_copy": (
+                waapi_gateway.operation_draft_copy_command(draft_apply_prefix)
+            ),
+            "fixed_argv_prefix_copy_instruction": {
+                "contract": (
+                    "waapi-skill.operation-draft-command-copy-instruction/v1"
+                ),
+                "source_field": "fixed_argv_prefix_copy",
+                "action": (
+                    "copy_verbatim_then_append_complete_typed_action_groups"
+                ),
+                "forbidden_transformations": [
+                    "reconstruct",
+                    "shorten",
+                    "normalize",
+                    "substitute_path_segments",
+                    "select_another_field",
+                ],
+            },
             "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency": [
                 "--action",
                 "<action-name>",

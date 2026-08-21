@@ -113,6 +113,7 @@ def expected_transaction_next_command(
         "gateway_argv": normalized,
         "full_argv": full_argv,
         "copy_exactly": True,
+        "shell_tool_timeout_ms": 30_000,
     }
     if requires_explicit_user_confirmation:
         expected["requires_explicit_user_confirmation"] = True
@@ -2174,6 +2175,7 @@ def test_transaction_next_command_quotes_posix_shell_arguments_without_reconstru
         f"'tx with space' --confirmation-token ct1-{'0' * 24}"
     )
     assert shlex.split(payload["shell_command"]) == payload["full_argv"]
+    assert payload["shell_tool_timeout_ms"] == 30_000
     assert payload["copy_instruction"]["source_field"] == "shell_command"
     assert payload["copy_instruction"]["contract"] == (
         "waapi-skill.gateway-command-copy-instruction/v2"
@@ -2312,6 +2314,7 @@ def test_transaction_next_command_uses_the_v2_windows_shape_for_every_phase(
     assert payload["contract"] == "waapi-skill.gateway-next-command/v2"
     assert payload["command"] == command
     assert payload["gateway_argv"] == gateway_argv
+    assert payload["shell_tool_timeout_ms"] == 30_000
     assert decode_windows_powershell_argv(payload["shell_command"]) == tuple(
         payload["full_argv"]
     )

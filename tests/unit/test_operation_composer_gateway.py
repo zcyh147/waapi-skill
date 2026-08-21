@@ -547,6 +547,19 @@ def test_object_set_typed_actions_build_one_target_scalar_fact_offline(
     handle = target_fact["handle"]
     assert TARGET_HANDLE_RE.fullmatch(handle)
     assert target["draft"]["revision"] == 2
+    draft_apply_prefix = [
+        "python",
+        str(waapi_gateway.GATEWAY_RUNNER_PATH),
+        "gateway.py",
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "2",
+        "--compact",
+        "--facts",
+    ]
     assert target["draft"]["next_action_binding"] == {
         "contract": "waapi-skill.operation-draft-next-action/v1",
         "draft_id": draft_id,
@@ -556,20 +569,23 @@ def test_object_set_typed_actions_build_one_target_scalar_fact_offline(
         "maximum_actions": 6,
         "then_read_next_response": True,
         "precompute_or_increment_revision": False,
-        "fixed_argv_prefix": [
-            "python",
-            str(waapi_gateway.GATEWAY_RUNNER_PATH),
-            "gateway.py",
-            "draft-apply",
-            draft_id,
-            "--task-authority",
-            authority,
-            "--expected-revision",
-            "2",
-            "--compact",
-            "--facts",
-        ],
-            "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency": [
+        "fixed_argv_prefix": draft_apply_prefix,
+        "fixed_argv_prefix_copy": waapi_gateway.operation_draft_copy_command(
+            draft_apply_prefix
+        ),
+        "fixed_argv_prefix_copy_instruction": {
+            "contract": "waapi-skill.operation-draft-command-copy-instruction/v1",
+            "source_field": "fixed_argv_prefix_copy",
+            "action": "copy_verbatim_then_append_complete_typed_action_groups",
+            "forbidden_transformations": [
+                "reconstruct",
+                "shorten",
+                "normalize",
+                "substitute_path_segments",
+                "select_another_field",
+            ],
+        },
+        "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency": [
             "--action",
             "<action-name>",
             "<typed-fact-arguments>",
@@ -948,9 +964,24 @@ def test_public_object_set_schema_discloses_the_exact_default_container_metadata
         "--query",
         "<requested-field-name>",
         "--limit",
-        "<1..8>",
+        "<derived-from-query-count>",
     ]
-    assert exact["replace_only"] == ["<requested-field-name>", "<1..8>"]
+    assert exact["replace_only"] == ["<requested-field-name>"]
+    assert exact["query_policy"] == {
+        "include_only_requested_dynamic_property_or_reference_tokens": True,
+        "known_target_fields_are_not_queries": [
+            "name",
+            "notes",
+            "platform",
+            "list_mode",
+            "on_name_conflict",
+        ],
+    }
+    assert exact["limit_by_query_count"] == {
+        "1..2": 8,
+        "3..4": 3,
+        "5..8": 2,
+    }
 
 
 def test_object_create_schema_puts_the_top_level_fact_plan_before_large_fields(
@@ -1555,8 +1586,8 @@ def test_compact_weather_shaped_action_responses_remain_constant_size(
 
     assert len(response_sizes) == 15
     # The exact draft-check completion candidate includes its copy-ready shell
-    # command while keeping every action receipt comfortably below 3.2 KiB.
-    assert max(response_sizes) < 3_200
+    # command while keeping every action receipt comfortably below 3.5 KiB.
+    assert max(response_sizes) < 3_500
     assert max(response_sizes) - min(response_sizes) < 256
     inspect_code, inspected = execute(
         tmp_path,

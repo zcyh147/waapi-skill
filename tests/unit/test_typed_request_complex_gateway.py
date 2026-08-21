@@ -390,6 +390,12 @@ def test_media_pool_compact_draft_action_requires_read_result_not_preview(
         "condition": (
             "all_current_business_request_facts_and_disclosures_submitted"
         ),
+        "business_completion_check": {
+            "source": "current_user_business_request",
+            "schema_required_fields_complete_is_insufficient": True,
+            "all_user_present_optional_map_and_constant_facts_required": True,
+            "exact_values_and_object_types_required": True,
+        },
         "is_next_command_when_condition_true": True,
         "fixed_argv_prefix": completion_argv,
         "copy_exactly": True,
