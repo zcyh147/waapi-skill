@@ -260,6 +260,18 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
     assert next(iter(grandchild["continuation"])) == (
         "business_sibling_transition"
     )
+    sibling_argv = [
+        "request-array-item",
+        "object.create",
+        "--array-handle",
+        nested_children["handle"],
+        "--index",
+        "1",
+        "--shape",
+        "object",
+        "--parent-schema-token",
+        nested_children["schema_lineage_token"],
+    ]
     assert grandchild["continuation"]["business_sibling_transition"] == {
         "condition": "current_business_request_contains_next_complex_item",
         "business_value_pointer": "/args/children/0/children/1",
@@ -279,19 +291,16 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         },
         "absent_or_scalar_next_item_forbidden": True,
         "is_next_command": False,
-        "argv_by_shape": {
-            "object": [
-                "request-array-item",
-                "object.create",
-                "--array-handle",
-                nested_children["handle"],
-                "--index",
-                "1",
-                "--shape",
-                "object",
-                "--parent-schema-token",
-                nested_children["schema_lineage_token"],
-            ]
+        "argv_by_shape": {"object": sibling_argv},
+        "copy_command_by_shape": {
+            "object": waapi_gateway.operation_draft_copy_command(
+                [
+                    "python",
+                    str(waapi_gateway.GATEWAY_RUNNER_PATH),
+                    "gateway.py",
+                    *sibling_argv,
+                ]
+            )
         },
     }
     assert grandchild["continuation"]["root_fact_queue_anchor"] == {
