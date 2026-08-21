@@ -1668,7 +1668,7 @@ def _compound_metadata_protocol(
     object_type = get_codex_version_layout_v3(recipe.version).reflected_type(
         "ActorMixer"
     )
-    return build_metadata_transaction_protocol(
+    metadata_protocol = build_metadata_transaction_protocol(
         (recipe.request.as_dict(version=recipe.version),),
         object_type=object_type,
         metadata_queries=metadata_queries,
@@ -1683,13 +1683,24 @@ def _compound_metadata_protocol(
         ),
         schema_first=True,
     )
+    if profile_unit_id == "TYP23-DEDICATED-OBJECT-CREATE":
+        return build_object_merge_query_protocol(
+            scenario,
+            recipe,
+            base_protocol=metadata_protocol,
+            profile_unit_id=profile_unit_id,
+        )
+    return metadata_protocol
 
 
 def build_object_merge_query_protocol(
     scenario: Any,
     recipe: ObjectHeavyRecipe,
+    *,
+    base_protocol: V3GatewayProtocol | None = None,
+    profile_unit_id: str | None = None,
 ) -> V3GatewayProtocol | None:
-    """Require exact live type evidence for the compound same-name merge."""
+    """Require exact live type evidence for one reviewed same-name create."""
 
     fixture = getattr(scenario, "fixture", {})
     asset_spec = fixture.get("asset_spec") if isinstance(fixture, Mapping) else None
@@ -1698,6 +1709,62 @@ def build_object_merge_query_protocol(
         if isinstance(asset_spec, Mapping)
         else None
     )
+    typed_collision = profile_unit_id == "TYP23-DEDICATED-OBJECT-CREATE"
+    if typed_collision:
+        if (
+            recipe.scenario_id != "OBJ22-F-CREATE-03"
+            or recipe.api != "ak.wwise.core.object.create"
+            or recipe.version != "2023.1"
+            or getattr(scenario, "id", None) != recipe.scenario_id
+            or getattr(scenario, "api", None) != recipe.api
+            or recipe.version not in tuple(getattr(scenario, "versions", ()))
+            or not isinstance(recipe.request, OperationRequestSpec)
+            or not isinstance(base_protocol, V3GatewayProtocol)
+        ):
+            raise ObjectBusinessPlanError(
+                "typed object collision identity binding differs from its reviewed lane"
+            )
+        roots = tuple(
+            item for item in recipe.fixture.objects if item.key == "old_impact"
+        )
+        if len(roots) != 1:
+            raise ObjectBusinessPlanError(
+                "typed object collision must identify one protected existing root"
+            )
+        root = roots[0]
+        if (
+            not base_protocol.steps
+            or base_protocol.steps[0].subcommand != "operation-schema"
+        ):
+            raise ObjectBusinessPlanError(
+                "typed object collision requires one schema-first transaction"
+            )
+        query = query_object_step(
+            "object.collision-root",
+            (
+                "query-object",
+                "--path",
+                root.path,
+                "--return-field",
+                "id",
+                "--return-field",
+                "name",
+                "--return-field",
+                "type",
+                "--return-field",
+                "path",
+            ),
+        )
+        return V3GatewayProtocol(
+            steps=(query, *base_protocol.steps),
+            turn_prefix_counts=tuple(
+                value + 1 for value in base_protocol.turn_prefix_counts
+            ),
+        )
+    if profile_unit_id is not None:
+        raise ObjectBusinessPlanError(
+            "object merge query profile unit is outside its reviewed lane"
+        )
     if recipe.scenario_id != "OBJ22-F-CREATE-02":
         if binding is not None:
             raise ObjectBusinessPlanError(
@@ -1743,6 +1810,10 @@ def build_object_merge_query_protocol(
             "compound object merge must identify one existing request root"
         )
     root = roots[0]
+    if base_protocol is not None:
+        raise ObjectBusinessPlanError(
+            "compound object merge does not accept a foreign base protocol"
+        )
     return build_schema_query_transaction_protocol(
         (recipe.request.as_dict(version=recipe.version),),
         query_step=query_object_step(

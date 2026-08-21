@@ -351,6 +351,53 @@ def test_compound_object_2025_business_plan_compiles_and_archive_validates(
     )
 
 
+def test_typed_profile_collision_metadata_protocol_queries_before_schema(
+    tmp_path: Path,
+) -> None:
+    scenario, recipe, _base, _before, _manifest = _case(
+        "OBJ22-F-CREATE-03",
+        tmp_path,
+        "2023.1",
+    )
+    metadata = build_metadata_transaction_protocol(
+        (recipe.request.as_dict(version=recipe.version),),
+        object_type="ActorMixer",
+        metadata_queries=("volume",),
+        required_tokens=("Volume",),
+        expected_required_token_projection=(
+            MetadataTokenProjection("Volume", "property", "Real64"),
+        ),
+        equivalence="wire_exact",
+        schema_first=True,
+    )
+
+    protocol = build_object_merge_query_protocol(
+        scenario,
+        recipe,
+        base_protocol=metadata,
+        profile_unit_id="TYP23-DEDICATED-OBJECT-CREATE",
+    )
+
+    assert protocol is not None
+    assert [step.subcommand for step in protocol.steps[:3]] == [
+        "query-object",
+        "operation-schema",
+        "metadata",
+    ]
+    assert protocol.steps[0].arguments == (
+        "--path",
+        r"\Actor-Mixer Hierarchy\Default Work Unit\SemanticLab\Weapons\Impact_Library",
+        "--return-field",
+        "id",
+        "--return-field",
+        "name",
+        "--return-field",
+        "type",
+        "--return-field",
+        "path",
+    )
+
+
 @pytest.mark.parametrize(
     "case_id",
     (

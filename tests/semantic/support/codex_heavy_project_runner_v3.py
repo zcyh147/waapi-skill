@@ -4740,6 +4740,16 @@ def _prepare_case(
             version=runtime.version,
             profile_unit_id=metadata_profile_unit_id,
         )
+        if (
+            protocol is not None
+            and unit_id == "TYP23-DEDICATED-OBJECT-CREATE"
+        ):
+            protocol = build_object_merge_query_protocol(
+                scenario,
+                recipe,
+                base_protocol=protocol,
+                profile_unit_id=unit_id,
+            )
         if protocol is None:
             protocol = build_object_merge_query_protocol(
                 scenario,
