@@ -1279,6 +1279,22 @@ def test_broker_projects_draft_action_and_completion_prefixes_to_task_install(
         "--expected-revision",
         "2",
     ]
+    disclosure_argv = [
+        "request-array-item",
+        "object.create",
+        "--array-handle",
+        "trh1-0123456789abcdef01234567",
+        "--index",
+        "1",
+        "--shape",
+        "object",
+    ]
+    disclosure_full_argv = [
+        "python",
+        str(candidate_runner.resolve(strict=True)),
+        "gateway.py",
+        *disclosure_argv,
+    ]
     payload = {
         "contract": "waapi-skill.operation-draft-next-action/v1",
         "shell_tool_timeout_ms": 30_000,
@@ -1288,6 +1304,20 @@ def test_broker_projects_draft_action_and_completion_prefixes_to_task_install(
             if platform_name == "nt"
             else shlex.join(action_prefix)
         ),
+        "root_dynamic_disclosure_commands": {
+            "rows": [
+                {
+                    "argv_by_shape": {"object": disclosure_argv},
+                    "copy_command_by_shape": {
+                        "object": (
+                            encode_windows_model_argv(disclosure_full_argv)
+                            if platform_name == "nt"
+                            else shlex.join(disclosure_full_argv)
+                        )
+                    },
+                }
+            ]
+        },
         "completion_candidate": {
             "fixed_argv_prefix": completion_prefix,
             "copy_command": (
@@ -1311,6 +1341,18 @@ def test_broker_projects_draft_action_and_completion_prefixes_to_task_install(
         if platform_name == "nt"
         else shlex.join(projected["fixed_argv_prefix"])
     )
+    disclosure = projected["root_dynamic_disclosure_commands"]["rows"][0]
+    projected_disclosure_argv = [
+        "python",
+        str(invocation_runner),
+        "gateway.py",
+        *disclosure["argv_by_shape"]["object"],
+    ]
+    assert disclosure["copy_command_by_shape"]["object"] == (
+        encode_windows_model_argv(projected_disclosure_argv)
+        if platform_name == "nt"
+        else shlex.join(projected_disclosure_argv)
+    )
     completion = projected["completion_candidate"]
     assert completion["fixed_argv_prefix"][1] == str(invocation_runner)
     assert completion["copy_command"] == (
@@ -1318,6 +1360,21 @@ def test_broker_projects_draft_action_and_completion_prefixes_to_task_install(
         if platform_name == "nt"
         else shlex.join(completion["fixed_argv_prefix"])
     )
+
+    tampered = json.loads(json.dumps(payload))
+    del tampered["root_dynamic_disclosure_commands"]["rows"][0][
+        "copy_command_by_shape"
+    ]
+    with pytest.raises(
+        GatewayInvocationError,
+        match="Draft disclosure copy commands are incomplete",
+    ):
+        broker_module._project_model_visible_runner(  # noqa: SLF001
+            tampered,
+            candidate_runner=candidate_runner,
+            invocation_runner=invocation_runner,
+            platform_name=platform_name,
+        )
 
 
 FAKE_RUNNER = r'''from __future__ import annotations

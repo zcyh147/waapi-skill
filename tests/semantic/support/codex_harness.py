@@ -50,18 +50,18 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "replace only explicit placeholders and never reconstruct a runner path. "
     "Repeat each typed fact template in full with one business value as one shell "
     "argv literal. Account for every prompt-present field, array item, and map "
-    "entry; copy booleans exactly and never infer optional/default values. If "
-    "batch_size is 6, submit exactly six complete action groups unless fewer such "
+    "entry; copy booleans exactly and never infer optional/default values. For "
+    "draft-apply batch_size 6, submit exactly six complete action groups unless fewer "
     "facts remain. Finish prompt-present top-level facts before "
-    "root_dynamic_disclosure. Use only the operation-schema metadata query and limit. "
-    "Append every prompt-required terminal scalar before completion_candidate.copy_command; "
-    "apply shell_tool_timeout_ms to that shell call. A successful "
+    "root_dynamic_disclosure. Execute copy_command_by_shape verbatim. Use only "
+    "operation-schema metadata query/limit. Append every prompt-required terminal "
+    "scalar before completion_candidate.copy_command; use its shell_tool_timeout_ms. "
+    "A successful "
     "draft-check is not a Preview: execute its next_command before answering or "
     "asking confirmation unless it declares requires_later_user_message. On "
     "native Windows the exact first command is Get-Content -Raw -Encoding UTF8 "
     "'.agents\\skills\\waapi-skill\\SKILL.md'; use this short task-local spelling. "
-    "Never set or override a shell-tool working directory; use the preconfigured "
-    "task workspace."
+    "Never override shell-tool cwd; use the task workspace."
 )
 
 
@@ -78,8 +78,7 @@ def semantic_skill_bootstrap_developer_instructions(
             ("python", raw_runner, "gateway.py")
         )
     elif posix_path.is_absolute():
-        quoted_runner = "'" + raw_runner.replace("'", "'\"'\"'") + "'"
-        command_prefix = f"python {quoted_runner} gateway.py"
+        command_prefix = shlex.join(("python", raw_runner, "gateway.py"))
     else:
         raise CodexHarnessError(
             "semantic Skill runner path must be absolute in its owning path flavor"

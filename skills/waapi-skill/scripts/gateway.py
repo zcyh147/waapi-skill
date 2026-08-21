@@ -5546,7 +5546,7 @@ def _root_dynamic_disclosure_commands(
                 "argv_by_shape": argv_by_shape,
             }
         )
-    return {
+    return _dynamic_disclosure_copy_commands({
         "selection": "first unsubmitted business-present root in schema order",
         "activation_gate": {
             "source": "/draft/next_action_binding/next_phase_decision",
@@ -5557,8 +5557,52 @@ def _root_dynamic_disclosure_commands(
         },
         "rows": rows,
         "copy_selected_argv_exactly": True,
+        "copy_selected_command_exactly": True,
         "reconstruct_schema_digest_or_handle": "invalid",
+    })
+
+
+def _dynamic_disclosure_copy_commands(value: Any) -> Any:
+    """Add host-native copy commands only to concrete container disclosures."""
+
+    if isinstance(value, list):
+        return [_dynamic_disclosure_copy_commands(item) for item in value]
+    if not isinstance(value, Mapping):
+        return value
+    projected = {
+        key: _dynamic_disclosure_copy_commands(item)
+        for key, item in value.items()
     }
+
+    def concrete_disclosure_argv(candidate: Any) -> list[str] | None:
+        if (
+            not isinstance(candidate, list)
+            or not candidate
+            or candidate[0] not in {"request-map-container", "request-array-item"}
+            or any(not isinstance(token, str) or "<" in token for token in candidate)
+        ):
+            return None
+        return candidate
+
+    argv_by_shape = value.get("argv_by_shape")
+    if isinstance(argv_by_shape, Mapping):
+        copy_by_shape: dict[str, str] = {}
+        for shape, candidate in argv_by_shape.items():
+            argv = concrete_disclosure_argv(candidate)
+            if not isinstance(shape, str) or argv is None:
+                continue
+            copy_by_shape[shape] = operation_draft_copy_command(
+                ["python", str(GATEWAY_RUNNER_PATH), "gateway.py", *argv]
+            )
+        if copy_by_shape:
+            projected["copy_command_by_shape"] = copy_by_shape
+
+    argv = concrete_disclosure_argv(value.get("argv"))
+    if argv is not None:
+        projected["copy_command"] = operation_draft_copy_command(
+            ["python", str(GATEWAY_RUNNER_PATH), "gateway.py", *argv]
+        )
+    return projected
 
 
 def _next_nested_disclosure_selector(
@@ -6514,6 +6558,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     )
                 ),
             }
+        response["continuation"] = _dynamic_disclosure_copy_commands(
+            response["continuation"]
+        )
         return response
     if args.command == "draft-start":
         request_version = resolve_operation_schema_version(args, env=env)

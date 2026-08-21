@@ -310,7 +310,17 @@ def test_generic_draft_start_requires_first_fact_batch_before_disclosure(
         "--shape",
         "object",
     ]
+    expected_disclosure_argv = [
+        "python",
+        str(waapi_gateway.GATEWAY_RUNNER_PATH),
+        "gateway.py",
+        *children["argv_by_shape"]["object"],
+    ]
+    assert children["copy_command_by_shape"]["object"] == (
+        waapi_gateway.operation_draft_copy_command(expected_disclosure_argv)
+    )
     assert disclosures["copy_selected_argv_exactly"] is True
+    assert disclosures["copy_selected_command_exactly"] is True
 
     type_handle = next(
         field.handle

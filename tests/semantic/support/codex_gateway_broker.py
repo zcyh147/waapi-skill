@@ -6291,6 +6291,129 @@ def _project_operation_draft_runner(
 
     expected_candidate = str(candidate_runner.resolve(strict=True))
 
+    def project_disclosure_commands(nested: Any) -> Any:
+        if isinstance(nested, list):
+            return [project_disclosure_commands(item) for item in nested]
+        if not isinstance(nested, Mapping):
+            return nested
+        projected = {
+            key: project_disclosure_commands(item)
+            for key, item in nested.items()
+        }
+        argv_by_shape = nested.get("argv_by_shape")
+        copy_by_shape = nested.get("copy_command_by_shape")
+        concrete_shapes = (
+            {
+                shape
+                for shape, gateway_argv in argv_by_shape.items()
+                if isinstance(shape, str)
+                and isinstance(gateway_argv, list)
+                and gateway_argv
+                and gateway_argv[0]
+                in {"request-map-container", "request-array-item"}
+                and all(
+                    isinstance(token, str) and "<" not in token
+                    for token in gateway_argv
+                )
+            }
+            if isinstance(argv_by_shape, Mapping)
+            else set()
+        )
+        if concrete_shapes:
+            if (
+                not isinstance(argv_by_shape, Mapping)
+                or not isinstance(copy_by_shape, Mapping)
+                or set(copy_by_shape) != concrete_shapes
+            ):
+                raise GatewayInvocationError(
+                    "Gateway Draft disclosure copy commands are incomplete"
+                )
+            projected_copies: dict[str, str] = {}
+            for shape, copy_command in copy_by_shape.items():
+                gateway_argv = argv_by_shape.get(shape)
+                if (
+                    not isinstance(shape, str)
+                    or not isinstance(gateway_argv, list)
+                    or not gateway_argv
+                    or gateway_argv[0]
+                    not in {"request-map-container", "request-array-item"}
+                    or any(not isinstance(token, str) for token in gateway_argv)
+                ):
+                    raise GatewayInvocationError(
+                        "Gateway Draft disclosure argv is invalid"
+                    )
+                candidate_argv = [
+                    "python",
+                    expected_candidate,
+                    "gateway.py",
+                    *gateway_argv,
+                ]
+                if copy_command != _draft_copy_command(
+                    candidate_argv,
+                    platform_name=platform_name,
+                ):
+                    raise GatewayInvocationError(
+                        "Gateway Draft disclosure command representation is not exact"
+                    )
+                projected_copies[shape] = _draft_copy_command(
+                    [
+                        "python",
+                        str(invocation_runner),
+                        "gateway.py",
+                        *gateway_argv,
+                    ],
+                    platform_name=platform_name,
+                )
+            projected["copy_command_by_shape"] = projected_copies
+        gateway_argv = nested.get("argv")
+        concrete_argv = (
+            isinstance(gateway_argv, list)
+            and bool(gateway_argv)
+            and gateway_argv[0]
+            in {"request-map-container", "request-array-item"}
+            and all(
+                isinstance(token, str) and "<" not in token
+                for token in gateway_argv
+            )
+        )
+        if concrete_argv and "copy_command" not in nested:
+            raise GatewayInvocationError(
+                "Gateway Draft disclosure copy commands are incomplete"
+            )
+        if concrete_argv:
+            if (
+                not gateway_argv
+                or gateway_argv[0]
+                not in {"request-map-container", "request-array-item"}
+                or any(not isinstance(token, str) for token in gateway_argv)
+            ):
+                raise GatewayInvocationError(
+                    "Gateway Draft disclosure argv is invalid"
+                )
+            candidate_argv = [
+                "python",
+                expected_candidate,
+                "gateway.py",
+                *gateway_argv,
+            ]
+            if nested.get("copy_command") != _draft_copy_command(
+                candidate_argv,
+                platform_name=platform_name,
+            ):
+                raise GatewayInvocationError(
+                    "Gateway Draft disclosure command representation is not exact"
+                )
+            projected["copy_command"] = _draft_copy_command(
+                [
+                    "python",
+                    str(invocation_runner),
+                    "gateway.py",
+                    *gateway_argv,
+                ],
+                platform_name=platform_name,
+            )
+        return projected
+
     def project_prefix(
         mapping: Mapping[str, Any],
         prefix_key: str,
@@ -6329,7 +6452,7 @@ def _project_operation_draft_runner(
         return projected
 
     def project_binding(binding: Mapping[str, Any]) -> dict[str, Any]:
-        projected = dict(binding)
+        projected = project_disclosure_commands(binding)
         if "fixed_argv_prefix" in binding:
             projected = project_prefix(
                 projected,
@@ -6353,8 +6476,10 @@ def _project_operation_draft_runner(
 
     if value.get("contract") == "waapi-skill.operation-draft-next-action/v1":
         return project_binding(value)
+    if value.get("contract") == "waapi-skill.typed-container-handle/v1":
+        return project_disclosure_commands(value)
 
-    projected_draft = dict(value)
+    projected_draft = project_disclosure_commands(value)
     binding = value.get("next_action_binding")
     if isinstance(binding, Mapping):
         projected_draft["next_action_binding"] = project_binding(binding)
@@ -6393,6 +6518,7 @@ def _project_model_visible_runner(
         if value.get("contract") in {
             "waapi-skill.operation-draft/v1",
             "waapi-skill.operation-draft-next-action/v1",
+            "waapi-skill.typed-container-handle/v1",
         }:
             return _project_operation_draft_runner(
                 value,

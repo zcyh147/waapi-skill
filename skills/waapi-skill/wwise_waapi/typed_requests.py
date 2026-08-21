@@ -805,6 +805,13 @@ class TypedRequestContract:
                     "schema_digest": self.schema_digest,
                     "gateway_argv_prefix": gateway_argv_prefix,
                     "fact_flags": fact_flags,
+                    "prompt_fact_completion_guard": {
+                        "account_for_every_prompt_present_scalar_array_item_and_map_entry": True,
+                        "copy_boolean_values_exactly": True,
+                        "infer_or_replace_prompt_values": "invalid",
+                        "submission_scope": "one_complete_typed_call",
+                        "draft_batch_size_applies": False,
+                    },
                     **({"apply": True} if self.effect != "read" else {}),
                 }
                 if not flat_inline:

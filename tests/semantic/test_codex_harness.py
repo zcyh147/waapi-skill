@@ -1432,7 +1432,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "fixed_argv_prefix" in instructions
     assert "opaque handle" in instructions
     assert "never reconstruct" in instructions
-    assert "Never set or override a shell-tool working directory" in instructions
+    assert "Never override shell-tool cwd" in instructions
     assert "Repeat each typed fact template in full" in instructions
     assert "one shell argv literal" in instructions
     assert "submit exactly six complete action groups" in instructions
@@ -1443,7 +1443,8 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
         "Finish prompt-present top-level facts before root_dynamic_disclosure"
         in instructions
     )
-    assert "metadata query and limit" in instructions
+    assert "copy_command_by_shape verbatim" in instructions
+    assert "metadata query/limit" in instructions
     assert "shell_tool_timeout_ms" in instructions
     assert "A successful draft-check is not a Preview" in instructions
     assert "requires_later_user_message" in instructions
@@ -1482,10 +1483,9 @@ def test_formal_task_instructions_bind_exact_posix_skill_read_schedule() -> None
 
     assert "cat '.agents/skills/waapi-skill/SKILL.md'" in instructions
     assert (
-        "python "
-        f"'{task_skill / 'scripts' / 'run.py'}' "
-        "gateway.py"
-    ) in instructions
+        f"python {task_skill / 'scripts' / 'run.py'} gateway.py"
+        in instructions
+    )
     assert "/repo/skills/waapi-skill/scripts/run.py" not in instructions
     assert (
         "cat '.agents/skills/waapi-skill/references/waapi-query.md'"

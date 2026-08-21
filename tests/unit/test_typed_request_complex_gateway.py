@@ -785,6 +785,13 @@ def test_isolated_typed_call_prefix_places_io_authority_before_every_fact(
     ]
     assert continuation["apply"] is True
     assert "io_root_flag" not in continuation
+    assert continuation["prompt_fact_completion_guard"] == {
+        "account_for_every_prompt_present_scalar_array_item_and_map_entry": True,
+        "copy_boolean_values_exactly": True,
+        "infer_or_replace_prompt_values": "invalid",
+        "submission_scope": "one_complete_typed_call",
+        "draft_batch_size_applies": False,
+    }
 
 
 def test_nested_container_handles_can_be_issued_before_one_atomic_typed_call(
@@ -1582,6 +1589,18 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     ]
     assert "--no-dynamic-descendants" not in encoded
 
+    sibling = leaf["continuation"]["business_sibling_transition"]
+    sibling_argv = sibling["argv_by_shape"]["object"]
+    assert sibling["copy_command_by_shape"]["object"] == (
+        gateway.operation_draft_copy_command(
+            [
+                "python",
+                str(gateway.GATEWAY_RUNNER_PATH),
+                "gateway.py",
+                *sibling_argv,
+            ]
+        )
+    )
     last_leaf_argv = [
         "1" if token == "<zero_based_business_present_index>" else token
         for token in child_array["continuation"]["next_item_disclosure"][
