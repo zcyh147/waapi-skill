@@ -154,6 +154,7 @@ from tests.semantic.support.codex_object_business_plan_v3 import (  # noqa: E402
     ObjectBusinessPlanError,
     ObjectBusinessPlanSections,
     TYPED_PROFILE_OBJECT_METADATA_UNITS,
+    TYPED_PROFILE_RENAME_UNIT_ID,
     TYPED_PROFILE_SET03_UNIT_ID,
     parse_object_business_plan_sections,
     validate_archived_object_business_plan,
@@ -200,6 +201,7 @@ from tests.semantic.support.codex_object_heavy_v3 import (  # noqa: E402
     ObjectHeavyRecipeError,
     build_object_heavy_v3_recipe,
     typed_input_merge_recipe,
+    typed_input_rename_recipe,
 )
 from tests.semantic.support.codex_object_runtime_v3 import (  # noqa: E402
     bounded_result_disclosure,
@@ -6268,6 +6270,13 @@ def _validate_heavy_v3_typed_business_plan(
                 recipe,
                 unit_id="TYP21-DEDICATED-OBJECT-CREATE",
             )
+        elif getattr(expected_unit, "unit_id", None) == (
+            TYPED_PROFILE_RENAME_UNIT_ID
+        ):
+            recipe = typed_input_rename_recipe(
+                recipe,
+                unit_id=TYPED_PROFILE_RENAME_UNIT_ID,
+            )
         sections = validate_archived_object_business_plan(
             plan_value,
             scenario=scenario,
@@ -6277,7 +6286,10 @@ def _validate_heavy_v3_typed_business_plan(
             profile_unit_id=(
                 str(getattr(expected_unit, "unit_id", ""))
                 if getattr(expected_unit, "unit_id", None)
-                in TYPED_PROFILE_OBJECT_METADATA_UNITS
+                in {
+                    *TYPED_PROFILE_OBJECT_METADATA_UNITS,
+                    TYPED_PROFILE_RENAME_UNIT_ID,
+                }
                 else None
             ),
         )

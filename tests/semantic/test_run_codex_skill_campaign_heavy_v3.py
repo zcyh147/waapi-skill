@@ -117,6 +117,7 @@ from tests.semantic.support.codex_object_heavy_v3 import (
     QueryObjectRequestSpec,
     build_object_heavy_v3_recipe,
     typed_input_merge_recipe,
+    typed_input_rename_recipe,
 )
 from wwise_waapi.platform_commands import (
     PlatformCommandError,
@@ -7964,6 +7965,65 @@ def test_campaign_typed_input_merge_replays_the_narrow_reviewed_recipe() -> None
             "children"
         ]
     ] == ["Alert"]
+
+
+def test_campaign_typed_input_rename_replays_the_narrow_reviewed_recipe() -> None:
+    from tests.semantic.support.codex_object_business_plan_v3 import (
+        build_object_merge_query_protocol,
+    )
+    from tests.semantic.support.codex_typed_input_profile import (
+        load_typed_input_profile,
+    )
+
+    profile = load_typed_input_profile(
+        Path(__file__).resolve().parent
+        / "data"
+        / "typed-input-v1"
+        / "profile.json"
+    )
+    unit = next(
+        row
+        for row in profile.units
+        if row.unit_id == "TYP23-DEDICATED-OBJECT-CREATE"
+    )
+    recipe = typed_input_rename_recipe(
+        build_object_heavy_v3_recipe(
+            unit.base_scenario_id,
+            version=unit.version,
+        ),
+        unit_id=unit.unit_id,
+    )
+    base = build_transaction_protocol(
+        (recipe.request.as_dict(version=recipe.version),)
+    )
+    protocol = build_object_merge_query_protocol(
+        unit.scenario,
+        recipe,
+        base_protocol=base,
+        profile_unit_id=unit.unit_id,
+    )
+    assert protocol is not None
+    sections = compile_object_business_plan(
+        unit.scenario,
+        recipe,
+        protocol,
+        _synthetic_object_before(recipe),
+        (),
+        profile_unit_id=unit.unit_id,
+    )
+
+    parsed = campaign._validate_heavy_v3_typed_business_plan(
+        sections.writer_kwargs(),
+        expected_unit=unit,
+        provenance=SimpleNamespace(protocol=protocol),
+    )
+
+    assert parsed is not None
+    arguments = parsed.static_expectation["request"]["value"]["arguments"]
+    assert "properties" not in arguments
+    assert "children" not in arguments
+
+
 def test_campaign_object_recipe_fixture_fallback_binds_2025_lane() -> None:
     from tests.semantic.support.codex_compound_heavy_v1 import (
         load_compound_heavy_profile,
