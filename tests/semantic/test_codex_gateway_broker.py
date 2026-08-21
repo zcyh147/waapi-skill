@@ -104,6 +104,17 @@ def _typed_draft_argv(action: dict[str, object]) -> tuple[str, ...]:
 def _compact_next_action_binding(
     *, shell_tool_timeout_ms: object = 30_000
 ) -> dict[str, object]:
+    completion_argv = [
+        "python",
+        "/owned/run.py",
+        "gateway.py",
+        "draft-check",
+        "od1-0123456789abcdef0123456789abcdef",
+        "--task-authority",
+        "da1-0123456789abcdef0123456789abcdef01234567",
+        "--expected-revision",
+        "2",
+    ]
     return {
         "shell_tool_timeout_ms": shell_tool_timeout_ms,
         "completion_candidate": {
@@ -111,17 +122,23 @@ def _compact_next_action_binding(
                 "all_current_business_request_facts_and_disclosures_submitted"
             ),
             "is_next_command_when_condition_true": True,
-            "fixed_argv_prefix": [
-                "python",
-                "/owned/run.py",
-                "gateway.py",
-                "draft-check",
-                "od1-0123456789abcdef0123456789abcdef",
-                "--task-authority",
-                "da1-0123456789abcdef0123456789abcdef01234567",
-                "--expected-revision",
-                "2",
-            ],
+            "fixed_argv_prefix": completion_argv,
+            "copy_exactly": True,
+            "copy_instruction": {
+                "contract": (
+                    "waapi-skill.operation-draft-command-copy-instruction/v1"
+                ),
+                "source_field": "copy_command",
+                "action": "execute_verbatim_as_one_shell_tool_call",
+                "forbidden_transformations": [
+                    "reconstruct",
+                    "shorten",
+                    "normalize",
+                    "substitute_path_segments",
+                    "select_another_field",
+                ],
+            },
+            "copy_command": shlex.join(completion_argv),
             "allowed_suffix_source": "request_schema_terminal_arguments_only",
             "draft_apply_action_check": "invalid",
             "when_condition_false": (
@@ -555,6 +572,10 @@ def test_compact_receipt_rejects_missing_or_tampered_shell_tool_timeout(
             **_compact_next_action_binding()["completion_candidate"],
             "draft_apply_action_check": "allowed",
         },
+        {
+            **_compact_next_action_binding()["completion_candidate"],
+            "copy_command": "python reconstructed-draft-check.py",
+        },
     ),
 )
 def test_compact_receipt_rejects_missing_or_tampered_completion_candidate(
@@ -583,6 +604,21 @@ def test_compact_receipt_rejects_missing_or_tampered_completion_candidate(
         match="compact Draft action response has an invalid bounded projection",
     ):
         broker_module._draft_compact_action_result(payload)
+
+
+def test_compact_completion_candidate_binds_copy_command_to_runner_path_flavor() -> None:
+    candidate = dict(_compact_next_action_binding()["completion_candidate"])
+    windows_prefix = list(candidate["fixed_argv_prefix"])
+    windows_prefix[1] = (
+        r"C:\Agent Workspace\.agents\skills\waapi-skill\scripts\run.py"
+    )
+    candidate["fixed_argv_prefix"] = windows_prefix
+    candidate["copy_command"] = shlex.join(windows_prefix)
+
+    assert broker_module._valid_draft_completion_candidate(candidate) is False
+
+    candidate["copy_command"] = encode_windows_model_argv(windows_prefix)
+    assert broker_module._valid_draft_completion_candidate(candidate) is True
 
 
 def test_current_evidence_accepts_and_binds_closed_required_followups() -> None:

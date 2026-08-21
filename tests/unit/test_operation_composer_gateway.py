@@ -1540,9 +1540,9 @@ def test_compact_weather_shaped_action_responses_remain_constant_size(
             response_sizes.append(len(json.dumps(changed).encode("utf-8")))
 
     assert len(response_sizes) == 15
-    # The exact draft-check completion candidate adds a bounded terminal
-    # continuation while keeping every action receipt comfortably small.
-    assert max(response_sizes) < 2_500
+    # The exact draft-check completion candidate includes its copy-ready shell
+    # command while keeping every action receipt comfortably below 3.2 KiB.
+    assert max(response_sizes) < 3_200
     assert max(response_sizes) - min(response_sizes) < 256
     inspect_code, inspected = execute(
         tmp_path,

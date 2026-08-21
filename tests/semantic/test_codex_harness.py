@@ -1421,6 +1421,11 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
 
     assert "Before any other action" in instructions
     assert "one standalone complete file-read shell command" in instructions
+    assert (
+        "Get-Content -Raw -Encoding UTF8 "
+        "'.agents\\skills\\waapi-skill\\SKILL.md'"
+    ) in instructions
+    assert "use this short task-local spelling" in instructions
     assert "next_command.copy_instruction.source_field" in instructions
     assert "preserve every quote" in instructions
     assert "fixed_argv_prefix" in instructions

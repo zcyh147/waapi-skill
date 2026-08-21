@@ -29,7 +29,7 @@ import tempfile
 import threading
 import time
 from dataclasses import asdict, dataclass, replace
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from types import MappingProxyType
 from typing import Any, Callable, Mapping, Sequence
 
@@ -2110,6 +2110,9 @@ def _valid_draft_completion_candidate(value: Any) -> bool:
             "condition",
             "is_next_command_when_condition_true",
             "fixed_argv_prefix",
+            "copy_exactly",
+            "copy_instruction",
+            "copy_command",
             "allowed_suffix_source",
             "draft_apply_action_check",
             "when_condition_false",
@@ -2117,16 +2120,38 @@ def _valid_draft_completion_candidate(value: Any) -> bool:
         or value.get("condition")
         != "all_current_business_request_facts_and_disclosures_submitted"
         or value.get("is_next_command_when_condition_true") is not True
+        or value.get("copy_exactly") is not True
         or value.get("allowed_suffix_source")
         != "request_schema_terminal_arguments_only"
         or value.get("draft_apply_action_check") != "invalid"
         or value.get("when_condition_false")
         != "continue_with_one_atomic_typed_action_batch_or_dynamic_disclosure"
         or not isinstance(value.get("fixed_argv_prefix"), list)
+        or not isinstance(value.get("copy_command"), str)
     ):
         return False
     prefix = value["fixed_argv_prefix"]
-    return (
+    instruction = value.get("copy_instruction")
+    if (
+        not isinstance(instruction, Mapping)
+        or instruction
+        != {
+            "contract": (
+                "waapi-skill.operation-draft-command-copy-instruction/v1"
+            ),
+            "source_field": "copy_command",
+            "action": "execute_verbatim_as_one_shell_tool_call",
+            "forbidden_transformations": [
+                "reconstruct",
+                "shorten",
+                "normalize",
+                "substitute_path_segments",
+                "select_another_field",
+            ],
+        }
+    ):
+        return False
+    prefix_valid = (
         len(prefix) == 9
         and all(isinstance(token, str) and token for token in prefix)
         and prefix[0] == "python"
@@ -2138,6 +2163,20 @@ def _valid_draft_completion_candidate(value: Any) -> bool:
         and prefix[8].isdigit()
         and int(prefix[8]) > 0
     )
+    if not prefix_valid:
+        return False
+    runner_path = prefix[1]
+    if PureWindowsPath(runner_path).is_absolute():
+        exact_commands = {encode_windows_powershell_argv(prefix)}
+        try:
+            exact_commands.add(encode_windows_model_argv(prefix))
+        except PlatformCommandError:
+            pass
+    elif PurePosixPath(runner_path).is_absolute():
+        exact_commands = {shlex.join(prefix)}
+    else:
+        return False
+    return value["copy_command"] in exact_commands
 
 
 def _valid_draft_construction_continuation(

@@ -379,6 +379,9 @@ TRANSACTION_NEXT_COMMAND_CONTRACT = "waapi-skill.gateway-next-command/v2"
 TRANSACTION_COMMAND_COPY_INSTRUCTION_CONTRACT = (
     "waapi-skill.gateway-command-copy-instruction/v2"
 )
+OPERATION_DRAFT_COMMAND_COPY_INSTRUCTION_CONTRACT = (
+    "waapi-skill.operation-draft-command-copy-instruction/v1"
+)
 TRANSACTION_CONFIRMATION_BINDING_CONTRACT = (
     "waapi-skill.confirmation-binding/v1"
 )
@@ -13799,6 +13802,23 @@ def transaction_next_command(
     return payload
 
 
+def operation_draft_copy_command(
+    full_argv: Sequence[str],
+    *,
+    platform_name: str | None = None,
+) -> str:
+    """Render one exact compact Draft continuation for the active shell host."""
+
+    active_platform = os.name if platform_name is None else platform_name
+    normalized = [str(value) for value in full_argv]
+    if active_platform == "nt":
+        try:
+            return encode_windows_model_argv(normalized)
+        except PlatformCommandError:
+            return encode_windows_powershell_argv(normalized)
+    return shlex.join(normalized)
+
+
 def transaction_state_payload(command: str, record: Any, *, offline: bool) -> dict[str, Any]:
     payload = {
         "contract": GATEWAY_RESULT_CONTRACT,
@@ -14445,22 +14465,41 @@ def operation_draft_payload(
             if compact_actions is not None and not isinstance(
                 construction_continuation, Mapping
             ):
+                completion_argv = [
+                    "python",
+                    str(GATEWAY_RUNNER_PATH),
+                    "gateway.py",
+                    "draft-check",
+                    record.draft_id,
+                    "--task-authority",
+                    task_authority or "<task-authority-from-draft-start>",
+                    "--expected-revision",
+                    str(record.revision),
+                ]
                 next_action_binding["completion_candidate"] = {
                     "condition": (
                         "all_current_business_request_facts_and_disclosures_submitted"
                     ),
                     "is_next_command_when_condition_true": True,
-                    "fixed_argv_prefix": [
-                        "python",
-                        str(GATEWAY_RUNNER_PATH),
-                        "gateway.py",
-                        "draft-check",
-                        record.draft_id,
-                        "--task-authority",
-                        task_authority or "<task-authority-from-draft-start>",
-                        "--expected-revision",
-                        str(record.revision),
-                    ],
+                    "fixed_argv_prefix": completion_argv,
+                    "copy_exactly": True,
+                    "copy_instruction": {
+                        "contract": (
+                            OPERATION_DRAFT_COMMAND_COPY_INSTRUCTION_CONTRACT
+                        ),
+                        "source_field": "copy_command",
+                        "action": "execute_verbatim_as_one_shell_tool_call",
+                        "forbidden_transformations": [
+                            "reconstruct",
+                            "shorten",
+                            "normalize",
+                            "substitute_path_segments",
+                            "select_another_field",
+                        ],
+                    },
+                    "copy_command": operation_draft_copy_command(
+                        completion_argv
+                    ),
                     "allowed_suffix_source": (
                         "request_schema_terminal_arguments_only"
                     ),

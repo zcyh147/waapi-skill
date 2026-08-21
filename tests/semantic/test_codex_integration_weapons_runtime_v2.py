@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import shlex
 import uuid
 from pathlib import Path
 from types import SimpleNamespace
@@ -1079,6 +1080,17 @@ def test_compact_draft_replay_accepts_only_the_exact_queried_bus_guid(
             composition,
         )["current_facts"]
         revision += 1
+        completion_argv = [
+            "python",
+            "/owned/run.py",
+            "gateway.py",
+            "draft-check",
+            "od1-" + "2" * 32,
+            "--task-authority",
+            "da1-" + "1" * 40,
+            "--expected-revision",
+            str(revision),
+        ]
         broker._payloads_by_step[action_step.name] = {  # noqa: SLF001
             "draft": {
                 "draft_id": "od1-" + "2" * 32,
@@ -1113,17 +1125,25 @@ def test_compact_draft_replay_accepts_only_the_exact_queried_bus_guid(
                                 "disclosures_submitted"
                             ),
                             "is_next_command_when_condition_true": True,
-                            "fixed_argv_prefix": [
-                                "python",
-                                "/owned/run.py",
-                                "gateway.py",
-                                "draft-check",
-                                "od1-" + "2" * 32,
-                                "--task-authority",
-                                "da1-" + "1" * 40,
-                                "--expected-revision",
-                                str(revision),
-                            ],
+                            "fixed_argv_prefix": completion_argv,
+                            "copy_exactly": True,
+                            "copy_instruction": {
+                                "contract": (
+                                    "waapi-skill.operation-draft-command-copy-instruction/v1"
+                                ),
+                                "source_field": "copy_command",
+                                "action": (
+                                    "execute_verbatim_as_one_shell_tool_call"
+                                ),
+                                "forbidden_transformations": [
+                                    "reconstruct",
+                                    "shorten",
+                                    "normalize",
+                                    "substitute_path_segments",
+                                    "select_another_field",
+                                ],
+                            },
+                            "copy_command": shlex.join(completion_argv),
                             "allowed_suffix_source": (
                                 "request_schema_terminal_arguments_only"
                             ),

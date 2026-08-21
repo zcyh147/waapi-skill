@@ -48,7 +48,10 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "reconstruct it from gateway_argv or full_argv. During typed Draft construction, "
     "copy fixed_argv_prefix, every opaque handle, every schema digest, and every "
     "response-bound token exactly from the latest authoritative response; replace only "
-    "explicit placeholders and never reconstruct a runner path."
+    "explicit placeholders and never reconstruct a runner path. On native Windows, "
+    "the exact standalone first command is Get-Content -Raw -Encoding UTF8 "
+    "'.agents\\skills\\waapi-skill\\SKILL.md'; use this short task-local spelling "
+    "even when the injected inventory also displays a long absolute locator."
 )
 WINDOWS_SEMANTIC_SANDBOX_MODE = "unelevated"
 WINDOWS_HARD_REAP_SECONDS = 5.0

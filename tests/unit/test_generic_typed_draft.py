@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import shlex
 import sys
 from pathlib import Path
 from typing import Any, Mapping
@@ -17,6 +18,7 @@ from wwise_waapi.operation_composer import (
     operation_composer_contract,
     parse_typed_action_cli_argument_sequence,
 )
+from wwise_waapi.platform_commands import encode_windows_model_argv
 from wwise_waapi.transactions import TransactionStore
 from wwise_waapi.typed_requests import request_contract
 
@@ -39,6 +41,29 @@ SPEC.loader.exec_module(gateway)
 
 
 URI = "ak.soundengine.setPosition"
+
+
+def test_draft_completion_copy_command_uses_exact_native_shell_spelling() -> None:
+    full_argv = [
+        "python",
+        r"C:\Agent Workspace\.agents\skills\waapi-skill\scripts\run.py",
+        "gateway.py",
+        "draft-check",
+        "od1-0123456789abcdef0123456789abcdef",
+        "--task-authority",
+        "da1-0123456789abcdef0123456789abcdef01234567",
+        "--expected-revision",
+        "5",
+    ]
+
+    assert gateway.operation_draft_copy_command(
+        full_argv,
+        platform_name="posix",
+    ) == shlex.join(full_argv)
+    assert gateway.operation_draft_copy_command(
+        full_argv,
+        platform_name="nt",
+    ) == encode_windows_model_argv(full_argv)
 
 
 def _env(tmp_path: Path, version: str = "2022.1") -> dict[str, str]:
@@ -310,9 +335,24 @@ def test_draft_apply_batches_ordered_typed_actions_in_one_atomic_write(
         ],
         "first_true_candidate_is_the_only_next_phase": True,
     }
-    assert payload["draft"]["next_action_binding"]["completion_candidate"][
-        "fixed_argv_prefix"
-    ][-1] == "3"
+    completion = payload["draft"]["next_action_binding"]["completion_candidate"]
+    assert completion["fixed_argv_prefix"][-1] == "3"
+    assert completion["copy_exactly"] is True
+    assert completion["copy_instruction"] == {
+        "contract": "waapi-skill.operation-draft-command-copy-instruction/v1",
+        "source_field": "copy_command",
+        "action": "execute_verbatim_as_one_shell_tool_call",
+        "forbidden_transformations": [
+            "reconstruct",
+            "shorten",
+            "normalize",
+            "substitute_path_segments",
+            "select_another_field",
+        ],
+    }
+    assert completion["copy_command"] == shlex.join(
+        completion["fixed_argv_prefix"]
+    )
     assert "current_facts" not in payload["draft"]
     inspect_code, inspected = gateway.execute_gateway(
         [

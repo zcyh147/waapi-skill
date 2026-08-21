@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import shlex
 import sys
 from pathlib import Path
 from typing import Any, Mapping
@@ -374,22 +375,40 @@ def test_media_pool_compact_draft_action_requires_read_result_not_preview(
     assert applied["draft"]["next_action_binding"]["fixed_argv_prefix"][6] == (
         started["task_authority"]
     )
-    assert applied["draft"]["next_action_binding"]["completion_candidate"] == {
+    completion = applied["draft"]["next_action_binding"]["completion_candidate"]
+    completion_argv = [
+        "python",
+        str(gateway.GATEWAY_RUNNER_PATH),
+        "gateway.py",
+        "draft-check",
+        started["draft"]["draft_id"],
+        "--task-authority",
+        started["task_authority"],
+        "--expected-revision",
+        "2",
+    ]
+    assert completion == {
         "condition": (
             "all_current_business_request_facts_and_disclosures_submitted"
         ),
         "is_next_command_when_condition_true": True,
-        "fixed_argv_prefix": [
-            "python",
-            str(gateway.GATEWAY_RUNNER_PATH),
-            "gateway.py",
-            "draft-check",
-            started["draft"]["draft_id"],
-            "--task-authority",
-            started["task_authority"],
-            "--expected-revision",
-            "2",
-        ],
+        "fixed_argv_prefix": completion_argv,
+        "copy_exactly": True,
+        "copy_instruction": {
+            "contract": (
+                "waapi-skill.operation-draft-command-copy-instruction/v1"
+            ),
+            "source_field": "copy_command",
+            "action": "execute_verbatim_as_one_shell_tool_call",
+            "forbidden_transformations": [
+                "reconstruct",
+                "shorten",
+                "normalize",
+                "substitute_path_segments",
+                "select_another_field",
+            ],
+        },
+        "copy_command": shlex.join(completion_argv),
         "allowed_suffix_source": "request_schema_terminal_arguments_only",
         "draft_apply_action_check": "invalid",
         "when_condition_false": (
