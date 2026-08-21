@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import shlex
 import sys
 from pathlib import Path
 from typing import Any, Mapping
@@ -408,7 +407,7 @@ def test_media_pool_compact_draft_action_requires_read_result_not_preview(
                 "select_another_field",
             ],
         },
-        "copy_command": shlex.join(completion_argv),
+        "copy_command": gateway.operation_draft_copy_command(completion_argv),
         "allowed_suffix_source": "request_schema_terminal_arguments_only",
         "request_schema_terminal_arguments": {
             "source_pointer": "/request-schema/result_filter",
