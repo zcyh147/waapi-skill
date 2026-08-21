@@ -2279,6 +2279,7 @@ def gateway_stdout_payload(value: Any) -> Any:
     }
     raw_child_contract = value.get("child_contract")
     projected_child_contract: dict[str, Any] | None = None
+    compact_recursive_object = value.get("uri") == "object.create"
     if isinstance(raw_child_contract, Mapping):
         projected_child_contract = {
             key: item
@@ -2286,6 +2287,15 @@ def gateway_stdout_payload(value: Any) -> Any:
             if key not in {"fact_literal_policy", "fixed_container_members"}
             and item not in (None, False, [], {})
         }
+        scalar_table = projected_child_contract.get(
+            "fixed_scalar_member_fact_table"
+        )
+        if compact_recursive_object and isinstance(scalar_table, Mapping):
+            projected_child_contract["fixed_scalar_member_fact_table"] = {
+                key: scalar_table[key]
+                for key in ("columns", "rows")
+                if key in scalar_table
+            }
     raw_continuation = value.get("continuation")
     if not isinstance(raw_continuation, Mapping):
         return projected
@@ -2302,19 +2312,65 @@ def gateway_stdout_payload(value: Any) -> Any:
     if include_root_anchor:
         candidate_keys.append("root_fact_queue_anchor")
     if isinstance(raw_decision, Mapping):
-        decision = {
-            key: raw_decision[key]
-            for key in (
-                "preview_construction_boundary",
-                "evaluate_in_order",
-                "first_true_candidate_is_the_only_next_action",
-                "draft_check_or_cancel_with_remaining_candidate_or_deferred_fact",
-            )
-            if key in raw_decision
-        }
+        if compact_recursive_object:
+            boundary = raw_decision.get("preview_construction_boundary")
+            decision = {
+                **(
+                    {
+                        "construction_boundary": {
+                            key: boundary[key]
+                            for key in (
+                                "complete",
+                                "required_terminal",
+                                "same_turn_requirement",
+                            )
+                            if key in boundary
+                        }
+                    }
+                    if isinstance(boundary, Mapping)
+                    else {}
+                ),
+                **{
+                    key: raw_decision[key]
+                    for key in (
+                        "evaluate_in_order",
+                        "first_true_candidate_is_the_only_next_action",
+                        "draft_check_or_cancel_with_remaining_candidate_or_deferred_fact",
+                    )
+                    if key in raw_decision
+                },
+            }
+        else:
+            decision = {
+                key: raw_decision[key]
+                for key in (
+                    "preview_construction_boundary",
+                    "evaluate_in_order",
+                    "first_true_candidate_is_the_only_next_action",
+                    "draft_check_or_cancel_with_remaining_candidate_or_deferred_fact",
+                )
+                if key in raw_decision
+            }
         evaluate = decision.get("evaluate_in_order")
         if isinstance(evaluate, list):
-            decision["evaluate_in_order"] = list(evaluate)
+            decision["evaluate_in_order"] = (
+                [
+                    {
+                        key: row[key]
+                        for key in (
+                            "candidate",
+                            "first_command_pointer",
+                            "command_pointer",
+                            "after_success",
+                        )
+                        if key in row
+                    }
+                    for row in evaluate
+                    if isinstance(row, Mapping)
+                ]
+                if compact_recursive_object
+                else list(evaluate)
+            )
             candidate_key_by_name = {
                 "branch_disclosure": "branch_disclosure",
                 "nested_container_disclosures": "nested_container_disclosures",
@@ -2352,6 +2408,35 @@ def gateway_stdout_payload(value: Any) -> Any:
                         ),
                         "append_this_fact_argv_exactly": True,
                     },
+                }
+            if compact_recursive_object and key == "deferred_fact" and isinstance(
+                item, Mapping
+            ):
+                item = {
+                    candidate: item[candidate]
+                    for candidate in (
+                        "argv",
+                        "complete_command_assembly",
+                        "must_precede",
+                        "consume_once",
+                    )
+                    if candidate in item
+                }
+            if (
+                compact_recursive_object
+                and key == "business_sibling_transition"
+                and isinstance(item, Mapping)
+            ):
+                item = {
+                    candidate: item[candidate]
+                    for candidate in (
+                        "condition",
+                        "business_value_pointer",
+                        "index",
+                        "is_next_command",
+                        "argv_by_shape",
+                    )
+                    if candidate in item
                 }
             continuation[key] = item
     for key, item in raw_continuation.items():

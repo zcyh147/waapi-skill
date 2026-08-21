@@ -1386,16 +1386,23 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
 
     projected = gateway.gateway_stdout_payload(leaf)
     encoded = gateway.gateway_stdout_json_encoder(projected).encode(projected)
-    assert len((encoded + "\n").encode("utf-8")) < 10 * 1024
+    assert len((encoded + "\n").encode("utf-8")) < 6 * 1024
     assert projected["handle"] == leaf["handle"]
     assert projected["schema_lineage_token"] == leaf["schema_lineage_token"]
     assert projected["response_integrity"] == root_projected["response_integrity"]
     assert encoded.index('"response_integrity":{') < encoded.index(
         '"continuation":{'
     ) < encoded.index('"child_contract":{')
-    assert projected["child_contract"]["fixed_scalar_member_fact_table"] == (
-        leaf["child_contract"]["fixed_scalar_member_fact_table"]
-    )
+    projected_scalar_table = projected["child_contract"][
+        "fixed_scalar_member_fact_table"
+    ]
+    assert projected_scalar_table["columns"] == leaf["child_contract"][
+        "fixed_scalar_member_fact_table"
+    ]["columns"]
+    assert projected_scalar_table["rows"] == leaf["child_contract"][
+        "fixed_scalar_member_fact_table"
+    ]["rows"]
+    assert "shared_policy" not in projected_scalar_table
     assert projected["continuation"]["next_command_decision"][
         "evaluate_in_order"
     ][0]["first_command_pointer"] == (
