@@ -2151,7 +2151,7 @@ def _valid_draft_construction_continuation(
 
     if value is None:
         return True
-    if not isinstance(value, Mapping) or action != "add_typed_fact":
+    if not isinstance(value, Mapping) or action not in {"add_typed_fact", "batch"}:
         return False
     required = {
         "source",
@@ -2169,6 +2169,9 @@ def _valid_draft_construction_continuation(
     completed_fact_action = value.get("completed_fact_action")
     expected_rules = {
         "append": "continue_with_child_contract_facts_for_the_appended_value",
+        "batch": (
+            "resume_previous_container_response_after_current_node_fact_batch"
+        ),
         "set": (
             "continue_with_the_next_business_present_child_contract_"
             "fact_in_queue_index_order"
@@ -2183,7 +2186,7 @@ def _valid_draft_construction_continuation(
     key_required = completed_fact_action in {"map-put", "choose-dynamic"}
     resume = value.get("resume_previous_container_response")
     resume_valid = resume is None or (
-        completed_fact_action == "map-put"
+        completed_fact_action in {"map-put", "batch"}
         and isinstance(resume, Mapping)
         and set(resume)
         == {
@@ -2198,7 +2201,12 @@ def _valid_draft_construction_continuation(
         and isinstance(resume.get("response_handle"), str)
         and str(resume["response_handle"]).startswith("trm1-")
         and _DRAFT_HANDLE_RE.fullmatch(str(resume["response_handle"])) is not None
-        and resume.get("completed_candidate") == "deferred_fact_queue"
+        and resume.get("completed_candidate")
+        == (
+            "current_node_fact_batch"
+            if completed_fact_action == "batch"
+            else "deferred_fact_queue"
+        )
         and resume.get("decision_pointer")
         == "/continuation/next_command_decision/evaluate_in_order"
         and resume.get("selection")
@@ -2221,9 +2229,17 @@ def _valid_draft_construction_continuation(
         and _DRAFT_HANDLE_RE.fullmatch(current_handle) is not None
         and current_handle in {*created_handles, *affected_handles}
         and completed_fact_action in expected_rules
+        and (
+            (action == "batch" and completed_fact_action == "batch")
+            or (action == "add_typed_fact" and completed_fact_action != "batch")
+        )
         and value.get("next_rule")
         == (
-            "resume_previous_container_response_after_deferred_fact_queue"
+            (
+                "resume_previous_container_response_after_current_node_fact_batch"
+                if completed_fact_action == "batch"
+                else "resume_previous_container_response_after_deferred_fact_queue"
+            )
             if resume is not None
             else expected_rules.get(completed_fact_action)
         )
@@ -2322,7 +2338,6 @@ def _draft_compact_action_result(
                 or not 2 <= result["action_count"] <= MAX_TYPED_ACTIONS_PER_APPLY
                 or result.get("applied_atomically") is not True
                 or "required_followup_facts" in result
-                or "construction_continuation" in result
             )
         )
         or (
@@ -9625,16 +9640,45 @@ class CodexGatewayBroker:
                     if expected_replay_actions
                     else {}
                 )
-                resume_matches = resume_previous is None or (
-                    isinstance(resume_previous, Mapping)
-                    and expected_last_action.get("fact_action") == "map-put"
-                    and resume_previous.get("response_handle")
-                    == expected_last_action.get("value")
-                    and construction_continuation.get("current_handle")
-                    == expected_last_action.get("field_handle")
-                    and construction_continuation.get("current_key")
-                    == expected_last_action.get("key")
+                expected_first_action = (
+                    expected_replay_actions[0]
+                    if expected_replay_actions
+                    else {}
                 )
+                if resume_previous is None:
+                    resume_matches = True
+                elif result_action == "batch":
+                    response_handle = expected_first_action.get("value")
+                    resume_matches = (
+                        isinstance(resume_previous, Mapping)
+                        and expected_first_action.get("fact_action")
+                        in {"append", "map-put", "set"}
+                        and isinstance(response_handle, str)
+                        and response_handle.startswith("trm1-")
+                        and resume_previous.get("response_handle")
+                        == response_handle
+                        and resume_previous.get("completed_candidate")
+                        == "current_node_fact_batch"
+                        and construction_continuation.get("current_handle")
+                        == response_handle
+                        and "current_key" not in construction_continuation
+                        and all(
+                            action.get("action") == "add_typed_fact"
+                            and action.get("field_handle") == response_handle
+                            for action in expected_replay_actions[1:]
+                        )
+                    )
+                else:
+                    resume_matches = (
+                        isinstance(resume_previous, Mapping)
+                        and expected_last_action.get("fact_action") == "map-put"
+                        and resume_previous.get("response_handle")
+                        == expected_last_action.get("value")
+                        and construction_continuation.get("current_handle")
+                        == expected_last_action.get("field_handle")
+                        and construction_continuation.get("current_key")
+                        == expected_last_action.get("key")
+                    )
                 expected_affected = {
                     value
                     for action in expected_replay_actions

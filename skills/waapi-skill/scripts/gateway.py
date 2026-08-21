@@ -13388,6 +13388,51 @@ def _operation_draft_facts_summary(current_facts: list[Any]) -> dict[str, Any]:
     }
 
 
+def _operation_draft_node_batch_continuation(
+    actions: Sequence[Mapping[str, Any]],
+) -> dict[str, Any] | None:
+    """Resume the disclosed child after one atomic parent-plus-node batch."""
+
+    if len(actions) < 2:
+        return None
+    parent_fact = actions[0]
+    response_handle = parent_fact.get("value")
+    if (
+        parent_fact.get("action") != "add_typed_fact"
+        or parent_fact.get("fact_action") not in {"append", "map-put", "set"}
+        or not isinstance(response_handle, str)
+        or not response_handle.startswith("trm1-")
+        or any(
+            row.get("action") != "add_typed_fact"
+            or row.get("field_handle") != response_handle
+            for row in actions[1:]
+        )
+    ):
+        return None
+    return {
+        "source": "most_recent_typed_container_handle_response",
+        "response_was_complete_not_truncated": True,
+        "current_handle": response_handle,
+        "completed_fact_action": "batch",
+        "next_rule": (
+            "resume_previous_container_response_after_current_node_fact_batch"
+        ),
+        "stop_cancel_or_claim_truncation_before_current_root_is_complete": (
+            "invalid"
+        ),
+        "resume_previous_container_response": {
+            "contract": "waapi-skill.typed-container-handle/v1",
+            "response_handle": response_handle,
+            "completed_candidate": "current_node_fact_batch",
+            "decision_pointer": (
+                "/continuation/next_command_decision/evaluate_in_order"
+            ),
+            "selection": "first_remaining_business_present_candidate_in_order",
+            "continue_in_same_turn": True,
+        },
+    }
+
+
 def _operation_draft_compact_action_projection(
     *,
     actions: Sequence[Mapping[str, Any]],
@@ -13679,7 +13724,13 @@ def operation_draft_payload(
                 action_result["action"] = "batch"
                 action_result["action_count"] = len(compact_actions)
                 action_result["applied_atomically"] = True
-                action_result.pop("construction_continuation", None)
+                batch_continuation = _operation_draft_node_batch_continuation(
+                    compact_actions
+                )
+                if batch_continuation is None:
+                    action_result.pop("construction_continuation", None)
+                else:
+                    action_result["construction_continuation"] = batch_continuation
             projection["schema_required_fields_status"] = projection.pop(
                 "missing_fields_status"
             )

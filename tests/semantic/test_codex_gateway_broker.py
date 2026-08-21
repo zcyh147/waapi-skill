@@ -335,6 +335,73 @@ def test_compact_generic_typed_fact_receipt_accepts_exact_container_resume() -> 
     assert summary["canonical_sha256"] == "1" * 64
 
 
+def test_compact_generic_typed_fact_batch_accepts_exact_node_resume() -> None:
+    response_handle = "trm1-4dedc2c7c0aea1301b0d773f"
+    resume = {
+        "contract": "waapi-skill.typed-container-handle/v1",
+        "response_handle": response_handle,
+        "completed_candidate": "current_node_fact_batch",
+        "decision_pointer": "/continuation/next_command_decision/evaluate_in_order",
+        "selection": "first_remaining_business_present_candidate_in_order",
+        "continue_in_same_turn": True,
+    }
+    payload = {
+        "action_result": {
+            "contract": "waapi-skill.operation-draft-action-result/v1",
+            "action": "batch",
+            "last_action": "add_typed_fact",
+            "action_count": 3,
+            "applied_atomically": True,
+            "created_handles": ["tdh1-c12aa1ea49a4d727357b105b"],
+            "affected_handles": [response_handle],
+            "construction_continuation": {
+                "source": "most_recent_typed_container_handle_response",
+                "response_was_complete_not_truncated": True,
+                "current_handle": response_handle,
+                "completed_fact_action": "batch",
+                "next_rule": (
+                    "resume_previous_container_response_after_current_node_fact_batch"
+                ),
+                "stop_cancel_or_claim_truncation_before_current_root_is_complete": (
+                    "invalid"
+                ),
+                "resume_previous_container_response": resume,
+            },
+        },
+        "current_facts_summary": {
+            "contract": "waapi-skill.operation-draft-facts-summary/v1",
+            "target_count": 3,
+            "handle_count": 1,
+            "canonical_sha256": "1" * 64,
+        },
+        "next_action_binding": {
+            "contract": "waapi-skill.operation-draft-next-action/v1",
+            "shell_tool_timeout_ms": 30_000,
+            "fixed_argv_prefix": [
+                "python", "/owned/run.py", "gateway.py", "draft-apply",
+                "od1-0123456789abcdef0123456789abcdef",
+                "--task-authority",
+                "da1-0123456789abcdef0123456789abcdef01234567",
+                "--expected-revision", "4", "--compact", "--facts",
+            ],
+            "append_one_or_more_complete_typed_actions": [
+                "--action", "<action-name>", "<typed-fact-arguments>",
+            ],
+            "replace_only": ["<action-name>", "<typed-fact-arguments>"],
+            "resume_previous_container_response": resume,
+        },
+    }
+
+    action, created, affected, summary = broker_module._draft_compact_action_result(
+        payload
+    )
+
+    assert action == "batch"
+    assert created == {"tdh1-c12aa1ea49a4d727357b105b"}
+    assert affected == {response_handle}
+    assert summary["target_count"] == 3
+
+
 def test_compact_generic_typed_fact_receipt_rejects_misbound_container_resume() -> None:
     resume = {
         "contract": "waapi-skill.typed-container-handle/v1",

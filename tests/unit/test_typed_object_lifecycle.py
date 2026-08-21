@@ -587,6 +587,65 @@ def test_object_create_parent_fact_resumes_the_exact_container_response(
     assert "root_dynamic_disclosure_commands" not in binding
     assert "next_phase_decision" not in binding
 
+    item_code, child_item = waapi_gateway.execute_gateway(
+        [
+            "--version", "2021.1", "request-array-item", "object.create",
+            "--array-handle", child_array["handle"], "--index", "0",
+            "--shape", "object", "--parent-schema-token",
+            child_array["schema_lineage_token"],
+        ],
+        env=env,
+        client_factory=lambda url: pytest.fail(f"child item connected to {url}"),
+    )
+    assert item_code == 0, child_item
+    leaf_code, leaf = waapi_gateway.execute_gateway(
+        [
+            "--version", "2021.1", "draft-apply", started["draft"]["draft_id"],
+            "--task-authority", started["task_authority"],
+            "--expected-revision", str(put["draft"]["revision"]),
+            "--compact", "--facts",
+            *child_item["continuation"]["deferred_fact"]["argv"],
+            "--action", "add_typed_fact", "--fact-action", "map-put",
+            "--field-handle", child_item["handle"], "--key", "type",
+            "--value-type", "string", "--fact-value", "Sound",
+            "--action", "add_typed_fact", "--fact-action", "map-put",
+            "--field-handle", child_item["handle"], "--key", "name",
+            "--value-type", "string", "--fact-value", "Alert_A",
+        ],
+        env=env,
+        client_factory=lambda url: pytest.fail(f"leaf facts connected to {url}"),
+    )
+    assert leaf_code == 0, leaf
+    leaf_continuation = leaf["draft"]["action_result"][
+        "construction_continuation"
+    ]
+    assert leaf_continuation == {
+        "source": "most_recent_typed_container_handle_response",
+        "response_was_complete_not_truncated": True,
+        "current_handle": child_item["handle"],
+        "completed_fact_action": "batch",
+        "next_rule": (
+            "resume_previous_container_response_after_current_node_fact_batch"
+        ),
+        "stop_cancel_or_claim_truncation_before_current_root_is_complete": (
+            "invalid"
+        ),
+        "resume_previous_container_response": {
+            "contract": "waapi-skill.typed-container-handle/v1",
+            "response_handle": child_item["handle"],
+            "completed_candidate": "current_node_fact_batch",
+            "decision_pointer": (
+                "/continuation/next_command_decision/evaluate_in_order"
+            ),
+            "selection": "first_remaining_business_present_candidate_in_order",
+            "continue_in_same_turn": True,
+        },
+    }
+    assert leaf["draft"]["next_action_binding"][
+        "resume_previous_container_response"
+    ] == leaf_continuation["resume_previous_container_response"]
+    assert "completion_candidate" not in leaf["draft"]["next_action_binding"]
+
 
 def test_public_object_create_draft_start_uses_the_dedicated_typed_contract(
     tmp_path: Path,
