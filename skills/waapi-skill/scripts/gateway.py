@@ -2329,6 +2329,16 @@ def gateway_stdout_payload(value: Any) -> Any:
                             compact_scalar_table["type_value_guidance"] = (
                                 type_rows[0][description_index]
                             )
+                    compact_scalar_table["business_present_row_policy"] = {
+                        "selection": (
+                            "every_row_with_present_business_value_pointer"
+                        ),
+                        "required_false_with_present_business_value": (
+                            "must_include"
+                        ),
+                        "absent_optional_row": "skip",
+                        "order": "table_order",
+                    }
                     compact_scalar_table.update(
                         {
                             "rows": [

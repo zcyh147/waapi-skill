@@ -1416,6 +1416,12 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     assert "never RandomContainer" in projected_scalar_table[
         "type_value_guidance"
     ]
+    assert projected_scalar_table["business_present_row_policy"] == {
+        "selection": "every_row_with_present_business_value_pointer",
+        "required_false_with_present_business_value": "must_include",
+        "absent_optional_row": "skip",
+        "order": "table_order",
+    }
     assert projected_scalar_table["fact_command_assembly"] == {
         "fixed_argv_prefix": [
             "--action",
