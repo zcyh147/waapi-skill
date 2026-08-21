@@ -1435,6 +1435,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "Repeat each typed fact template in full" in instructions
     assert "one shell argv literal" in instructions
     assert "submit exactly six complete action groups" in instructions
+    assert "append every prompt-required terminal scalar" in instructions
     assert "A successful draft-check is not a Preview" in instructions
     assert "requires_later_user_message" in instructions
 
@@ -4892,6 +4893,54 @@ def test_validated_skill_read_accepts_complete_coverage_reference(tmp_path: Path
         content,
         skill_source=skill,
     ) == ("references/waapi-coverage.md", content)
+
+
+def test_posix_task_classifier_accepts_only_exact_task_local_skill_reads(
+    tmp_path: Path,
+) -> None:
+    candidate = tmp_path / "candidate"
+    workspace = tmp_path / "agent-workspace"
+    installed = workspace / ".agents" / "skills" / "waapi-skill"
+    for root in (candidate, installed):
+        (root / "references").mkdir(parents=True)
+        (root / "SKILL.md").write_text("# skill\n", encoding="utf-8")
+        (root / "references" / "waapi-query.md").write_text(
+            "# query\n",
+            encoding="utf-8",
+        )
+
+    commands = (
+        completed_record(
+            "cat '.agents/skills/waapi-skill/SKILL.md'",
+            "# skill\n",
+        ),
+        completed_record(
+            "cat '.agents/skills/waapi-skill/references/waapi-query.md'",
+            "# query\n",
+        ),
+    )
+
+    facts = classify_task_commands(
+        commands,
+        workspace=workspace,
+        skill_source=candidate,
+    )
+
+    assert facts.skill_read_files == ("SKILL.md", "references/waapi-query.md")
+    assert facts.allowed_read_commands == tuple(row.command for row in commands)
+    assert facts.unexpected_commands == ()
+
+    near = completed_record(
+        "cat '.agents/skills/waapi-skill/./SKILL.md'",
+        "# skill\n",
+    )
+    near_facts = classify_task_commands(
+        (near,),
+        workspace=workspace,
+        skill_source=candidate,
+    )
+    assert near_facts.allowed_read_commands == ()
+    assert near_facts.unexpected_commands == (near.command,)
 
 
 def test_validated_skill_read_normalizes_only_line_endings(tmp_path: Path) -> None:

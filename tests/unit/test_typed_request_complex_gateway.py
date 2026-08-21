@@ -410,6 +410,11 @@ def test_media_pool_compact_draft_action_requires_read_result_not_preview(
         },
         "copy_command": shlex.join(completion_argv),
         "allowed_suffix_source": "request_schema_terminal_arguments_only",
+        "request_schema_terminal_arguments": {
+            "source_pointer": "/request-schema/result_filter",
+            "append_before_execute": True,
+            "contract": contract.as_gateway_payload()["result_filter"],
+        },
         "draft_apply_action_check": "invalid",
         "when_condition_false": (
             "continue_with_one_atomic_typed_action_batch_or_dynamic_disclosure"

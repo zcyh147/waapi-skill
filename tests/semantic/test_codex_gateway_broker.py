@@ -621,6 +621,28 @@ def test_compact_completion_candidate_binds_copy_command_to_runner_path_flavor()
     assert broker_module._valid_draft_completion_candidate(candidate) is True
 
 
+def test_compact_completion_candidate_binds_exact_request_schema_terminal_arguments() -> None:
+    candidate = dict(_compact_next_action_binding()["completion_candidate"])
+    result_filter = request_contract(
+        "2025.1",
+        "ak.wwise.core.mediaPool.get",
+    ).as_gateway_payload()["result_filter"]
+    candidate["request_schema_terminal_arguments"] = {
+        "source_pointer": "/request-schema/result_filter",
+        "append_before_execute": True,
+        "contract": result_filter,
+    }
+
+    assert broker_module._valid_draft_completion_candidate(candidate) is True
+
+    tampered = dict(candidate)
+    tampered["request_schema_terminal_arguments"] = {
+        **candidate["request_schema_terminal_arguments"],
+        "source_pointer": "/invented",
+    }
+    assert broker_module._valid_draft_completion_candidate(tampered) is False
+
+
 def test_current_evidence_accepts_and_binds_closed_required_followups() -> None:
     payload = {
         "action_result": {

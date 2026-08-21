@@ -50,7 +50,9 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "Repeat each typed fact template in full; replace one business value with one "
     "shell argv literal, preserving whitespace inside that item. If batch_size "
     "is 6, submit exactly six complete action groups unless fewer "
-    "business-present facts remain. A successful "
+    "business-present facts remain. When completion_candidate discloses "
+    "request_schema_terminal_arguments, append every prompt-required terminal "
+    "scalar before executing its copy_command. A successful "
     "draft-check is not a Preview: execute its next_command before answering or "
     "asking confirmation unless it declares requires_later_user_message. On "
     "native Windows the exact first command is Get-Content -Raw -Encoding UTF8 "
@@ -316,6 +318,25 @@ _ALLOWED_SKILL_READS = frozenset(
         "references/waapi-coverage.md",
     }
 )
+_POSIX_WORKSPACE_SKILL_READS = {
+    ".agents/skills/waapi-skill/SKILL.md": ("SKILL.md",),
+    ".agents/skills/waapi-skill/references/waapi-setup.md": (
+        "references",
+        "waapi-setup.md",
+    ),
+    ".agents/skills/waapi-skill/references/waapi-query.md": (
+        "references",
+        "waapi-query.md",
+    ),
+    ".agents/skills/waapi-skill/references/waapi-operate.md": (
+        "references",
+        "waapi-operate.md",
+    ),
+    ".agents/skills/waapi-skill/references/waapi-coverage.md": (
+        "references",
+        "waapi-coverage.md",
+    ),
+}
 _WINDOWS_WORKSPACE_SKILL_READS = {
     r".agents\skills\waapi-skill\SKILL.md": ("SKILL.md",),
     r".agents\skills\waapi-skill\references\waapi-setup.md": (
@@ -334,6 +355,10 @@ _WINDOWS_WORKSPACE_SKILL_READS = {
         "references",
         "waapi-coverage.md",
     ),
+}
+_WORKSPACE_SKILL_READS_BY_SYNTAX = {
+    "posix": _POSIX_WORKSPACE_SKILL_READS,
+    "windows": _WINDOWS_WORKSPACE_SKILL_READS,
 }
 _SKILL_LINE_RE = re.compile(
     r"(?m)^\s*-\s+(?P<name>[A-Za-z0-9_.:-]+)\s*:\s*.*?"
@@ -4247,8 +4272,10 @@ def allowed_skill_read(
         record.aggregated_output,
         skill_source=skill_source,
         skill_read_content_source=skill_read_content_source,
-        allow_exact_windows_workspace_relative=(
-            executable == "get-content"
+        exact_workspace_relative_syntax=(
+            "posix"
+            if executable == "cat"
+            else "windows" if executable == "get-content" else None
         ),
         allow_one_terminal_newline=(executable == "get-content"),
     )
@@ -4318,7 +4345,7 @@ def validated_skill_read(
     *,
     skill_source: Path,
     skill_read_content_source: Path | None = None,
-    allow_exact_windows_workspace_relative: bool = False,
+    exact_workspace_relative_syntax: str | None = None,
     allow_one_terminal_newline: bool = False,
 ) -> tuple[str, str] | None:
     """Prove a complete approved Skill read from one closed locator."""
@@ -4333,9 +4360,12 @@ def validated_skill_read(
         else locator
     )
     if not candidate.is_absolute():
+        workspace_reads = _WORKSPACE_SKILL_READS_BY_SYNTAX.get(
+            exact_workspace_relative_syntax or ""
+        )
         relative_parts = (
-            _WINDOWS_WORKSPACE_SKILL_READS.get(path_text)
-            if allow_exact_windows_workspace_relative
+            workspace_reads.get(path_text)
+            if workspace_reads is not None
             else None
         )
         source_parts = tuple(part.casefold() for part in locator.parts[-3:])

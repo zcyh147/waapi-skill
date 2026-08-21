@@ -14480,7 +14480,7 @@ def operation_draft_payload(
                     "--expected-revision",
                     str(record.revision),
                 ]
-                next_action_binding["completion_candidate"] = {
+                completion_candidate = {
                     "condition": (
                         "all_current_business_request_facts_and_disclosures_submitted"
                     ),
@@ -14512,6 +14512,19 @@ def operation_draft_payload(
                         "continue_with_one_atomic_typed_action_batch_or_dynamic_disclosure"
                     ),
                 }
+                if generic_typed_draft:
+                    terminal_arguments = typed_draft_contract.as_gateway_payload().get(
+                        "result_filter"
+                    )
+                    if isinstance(terminal_arguments, Mapping):
+                        completion_candidate[
+                            "request_schema_terminal_arguments"
+                        ] = {
+                            "source_pointer": "/request-schema/result_filter",
+                            "append_before_execute": True,
+                            "contract": dict(terminal_arguments),
+                        }
+                next_action_binding["completion_candidate"] = completion_candidate
             followups = (
                 action_result.get("required_followup_facts")
                 if isinstance(action_result, Mapping)

@@ -2102,21 +2102,37 @@ def _valid_required_followup_facts(value: Any) -> bool:
     return len(handles) == len(set(handles))
 
 
+def _valid_request_schema_terminal_arguments(value: Any) -> bool:
+    result_filter = request_contract(
+        "2025.1",
+        "ak.wwise.core.mediaPool.get",
+    ).as_gateway_payload().get("result_filter")
+    return value == {
+        "source_pointer": "/request-schema/result_filter",
+        "append_before_execute": True,
+        "contract": result_filter,
+    }
+
+
 def _valid_draft_completion_candidate(value: Any) -> bool:
+    required_keys = {
+        "condition",
+        "is_next_command_when_condition_true",
+        "fixed_argv_prefix",
+        "copy_exactly",
+        "copy_instruction",
+        "copy_command",
+        "allowed_suffix_source",
+        "draft_apply_action_check",
+        "when_condition_false",
+    }
     if (
         not isinstance(value, Mapping)
         or set(value)
-        != {
-            "condition",
-            "is_next_command_when_condition_true",
-            "fixed_argv_prefix",
-            "copy_exactly",
-            "copy_instruction",
-            "copy_command",
-            "allowed_suffix_source",
-            "draft_apply_action_check",
-            "when_condition_false",
-        }
+        not in (
+            required_keys,
+            required_keys | {"request_schema_terminal_arguments"},
+        )
         or value.get("condition")
         != "all_current_business_request_facts_and_disclosures_submitted"
         or value.get("is_next_command_when_condition_true") is not True
@@ -2128,6 +2144,12 @@ def _valid_draft_completion_candidate(value: Any) -> bool:
         != "continue_with_one_atomic_typed_action_batch_or_dynamic_disclosure"
         or not isinstance(value.get("fixed_argv_prefix"), list)
         or not isinstance(value.get("copy_command"), str)
+        or (
+            "request_schema_terminal_arguments" in value
+            and not _valid_request_schema_terminal_arguments(
+                value.get("request_schema_terminal_arguments")
+            )
+        )
     ):
         return False
     prefix = value["fixed_argv_prefix"]
