@@ -1386,7 +1386,7 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
 
     projected = gateway.gateway_stdout_payload(leaf)
     encoded = gateway.gateway_stdout_json_encoder(projected).encode(projected)
-    assert len((encoded + "\n").encode("utf-8")) < 6 * 1024
+    assert len((encoded + "\n").encode("utf-8")) < 5 * 1024
     assert projected["handle"] == leaf["handle"]
     assert projected["schema_lineage_token"] == leaf["schema_lineage_token"]
     assert projected["response_integrity"] == root_projected["response_integrity"]
@@ -1463,6 +1463,51 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
             key,
         ] == raw_row[4][accepted_types[0]]
     assert "shared_policy" not in projected_scalar_table
+    raw_nested_rows = leaf["continuation"]["nested_container_disclosures"]
+    nested_table = projected["continuation"]["nested_container_disclosures"]
+    assert nested_table["columns"] == [
+        "key",
+        "shape",
+        "required",
+        "business_value_pointer",
+        "queue_index",
+        "argv_middle",
+    ]
+    assert nested_table["selection"] == (
+        "first_row_with_present_business_value_pointer_in_queue_order"
+    )
+    assert nested_table["absent_business_values"] == (
+        "skip_without_gateway_command"
+    )
+    assert nested_table["command_assembly"] == {
+        "fixed_argv_prefix": raw_nested_rows[0]["argv"][:4],
+        "append_selected_row": "argv_middle",
+        "fixed_argv_suffix": raw_nested_rows[0]["argv"][-2:],
+        "assembly_order": [
+            "fixed_argv_prefix",
+            "selected_row.argv_middle",
+            "fixed_argv_suffix",
+        ],
+    }
+    assert nested_table["rows"] == [
+        [
+            row["key"],
+            row["shape"],
+            row["required"],
+            row["business_value_pointer"],
+            row["queue_index"],
+            ["--key", row["key"], "--shape", row["shape"]],
+        ]
+        for row in raw_nested_rows
+    ]
+    for projected_row, raw_row in zip(
+        nested_table["rows"], raw_nested_rows, strict=True
+    ):
+        assert [
+            *nested_table["command_assembly"]["fixed_argv_prefix"],
+            *projected_row[-1],
+            *nested_table["command_assembly"]["fixed_argv_suffix"],
+        ] == raw_row["argv"]
     assert projected["continuation"]["next_command_decision"][
         "evaluate_in_order"
     ][0]["first_command_pointer"] == (
@@ -1472,6 +1517,16 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     assert projected["continuation"]["next_command_decision"][
         "evaluate_in_order"
     ][0]["candidate"] == "deferred_fact_queue"
+    nested_candidate = next(
+        row
+        for row in projected["continuation"]["next_command_decision"][
+            "evaluate_in_order"
+        ]
+        if row["candidate"] == "nested_container_disclosures"
+    )
+    assert nested_candidate["command_pointer"] == (
+        "/continuation/nested_container_disclosures/command_assembly"
+    )
     assert list(projected["continuation"])[:5] == [
         "next_command_decision",
         "deferred_fact",

@@ -2449,6 +2449,13 @@ def gateway_stdout_payload(value: Any) -> Any:
                 if compact_recursive_object
                 else list(evaluate)
             )
+            if compact_recursive_object:
+                for row in decision["evaluate_in_order"]:
+                    if row.get("candidate") == "nested_container_disclosures":
+                        row["command_pointer"] = (
+                            "/continuation/nested_container_disclosures/"
+                            "command_assembly"
+                        )
             candidate_key_by_name = {
                 "branch_disclosure": "branch_disclosure",
                 "nested_container_disclosures": "nested_container_disclosures",
@@ -2517,6 +2524,72 @@ def gateway_stdout_payload(value: Any) -> Any:
                     )
                     if candidate in item
                 }
+            if (
+                compact_recursive_object
+                and key == "nested_container_disclosures"
+                and isinstance(item, list)
+                and item
+                and all(isinstance(row, Mapping) for row in item)
+            ):
+                argv_rows = [row.get("argv") for row in item]
+                if (
+                    all(
+                        isinstance(argv, list)
+                        and len(argv) >= 10
+                        and all(isinstance(token, str) for token in argv)
+                        for argv in argv_rows
+                    )
+                    and all(argv[:4] == argv_rows[0][:4] for argv in argv_rows)
+                    and all(argv[-2:] == argv_rows[0][-2:] for argv in argv_rows)
+                    and all(
+                        argv[4:-2]
+                        == [
+                            "--key",
+                            row.get("key"),
+                            "--shape",
+                            row.get("shape"),
+                        ]
+                        for row, argv in zip(item, argv_rows, strict=True)
+                    )
+                ):
+                    item = {
+                        "columns": [
+                            "key",
+                            "shape",
+                            "required",
+                            "business_value_pointer",
+                            "queue_index",
+                            "argv_middle",
+                        ],
+                        "rows": [
+                            [
+                                row.get("key"),
+                                row.get("shape"),
+                                row.get("required"),
+                                row.get("business_value_pointer"),
+                                row.get("queue_index"),
+                                argv[4:-2],
+                            ]
+                            for row, argv in zip(item, argv_rows, strict=True)
+                        ],
+                        "selection": (
+                            "first_row_with_present_business_value_pointer_"
+                            "in_queue_order"
+                        ),
+                        "absent_business_values": (
+                            "skip_without_gateway_command"
+                        ),
+                        "command_assembly": {
+                            "fixed_argv_prefix": argv_rows[0][:4],
+                            "append_selected_row": "argv_middle",
+                            "fixed_argv_suffix": argv_rows[0][-2:],
+                            "assembly_order": [
+                                "fixed_argv_prefix",
+                                "selected_row.argv_middle",
+                                "fixed_argv_suffix",
+                            ],
+                        },
+                    }
             continuation[key] = item
     for key, item in raw_continuation.items():
         if key in {
