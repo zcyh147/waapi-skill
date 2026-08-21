@@ -937,6 +937,16 @@ class TypedRequestContract:
                     "value": "--post-filter-value <exact case-sensitive text>",
                     "limit": "--post-filter-limit <1..1000>",
                 },
+                "business_value_sources": {
+                    "value": (
+                        "current user requested exact-case substring; do not "
+                        "substitute the server candidate filter spelling"
+                    ),
+                    "limit": (
+                        "current user requested final return limit; never copy "
+                        "the typed request maxResults candidate ceiling"
+                    ),
+                },
                 "requirements": [
                     "typed request filters includes Filename contains with the same value",
                     "typed request options return includes Filename",
