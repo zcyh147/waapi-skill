@@ -488,6 +488,10 @@ class TypedRequestContract:
                 "rows": branch_choice_rows,
             },
             "business_pointer_source": "this table's business_pointer column",
+            "string_argv_rule": (
+                "one exact string argv; PowerShell single-quotes it, doubles "
+                "embedded single quotes, and never leaves whitespace unquoted"
+            ),
             "open_map_fact_rule": (
                 "for every prompt-present member under a map business pointer, "
                 "submit one map-put on that row handle using the exact member key, "

@@ -779,6 +779,10 @@ def test_media_pool_request_schema_discloses_typed_result_filter(
         "fact",
         "disclosure",
     ]
+    assert table["string_argv_rule"] == (
+        "one exact string argv; PowerShell single-quotes it, doubles embedded "
+        "single quotes, and never leaves whitespace unquoted"
+    )
     assert payload["result_filter"] == {
         "contract": "waapi-skill.media-pool-post-filter/v1",
         "availability": "optional_after_complete_typed_candidate_request",

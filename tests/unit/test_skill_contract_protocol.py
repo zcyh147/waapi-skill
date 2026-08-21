@@ -171,10 +171,7 @@ def test_media_pool_reference_classification_documents_terminal_result_and_bound
 def test_initial_skill_bootstrap_is_the_only_combined_read_exception() -> None:
     frontmatter = SKILL.split("---", 2)[1]
 
-    assert (
-        "make that host-native injected `SKILL.md` read the sole first shell action"
-        in SKILL
-    )
+    assert "Read the injected `SKILL.md` exactly once as the sole first shell action" in SKILL
     assert "Never combine it with `pwd`, `git`, `rg`, `ls`, `find`, `printf`" in SKILL
     assert "Choose by command host, not Wwise/Codex version or path spelling" in frontmatter
     assert "POSIX uses `cat '<literal-locator>'` or exact `sed -n '1,$p'" in frontmatter
@@ -1212,7 +1209,8 @@ def test_one_time_onboarding_is_global_natural_and_does_not_add_a_gateway_call()
         "The first time this Skill is used in a conversation",
         "do not announce that it is loaded before the first gateway result",
         "A Skill or lane-reference file read is not a Gateway result",
-        "After it succeeds, never read `SKILL.md` again",
+        "Read the injected `SKILL.md` exactly once",
+        "A successful read is complete; a second `SKILL.md` read is forbidden",
         "do not emit a placeholder introduction",
         "the very next Agent message",
         "state every actual returned fact together, even if an earlier message mentioned part",
