@@ -106,6 +106,7 @@ def test_typed_input_merge_recipe_keeps_one_representative_recursive_group() -> 
     assert [row["name"] for row in recipe.request.arguments["children"]] == [
         "Alert"
     ]
+    assert "notes" not in recipe.request.arguments["children"][0]
     assert recipe.oracle.new_keys == ("alert", "alert_a", "alert_b")
     robot = next(row for row in recipe.oracle.expected_objects if row.key == "robot")
     assert robot.children == ("idle", "alert")
@@ -119,6 +120,9 @@ def test_typed_input_merge_recipe_keeps_one_representative_recursive_group() -> 
     }
     assert "Combat" not in recipe.prompt_literals
     assert "Damage" not in recipe.prompt_literals
+    assert "警戒对白" not in recipe.prompt_literals
+    alert = next(row for row in recipe.oracle.expected_objects if row.key == "alert")
+    assert all(field.name != "notes" for field in alert.fields)
     assert base.oracle.new_keys == (
         "alert",
         "alert_a",

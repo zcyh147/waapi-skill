@@ -186,6 +186,7 @@ def test_create_merge_prompt_keeps_the_existing_node_out_of_the_parent_role() ->
         unit.scenario.prompt
     )
     assert "`Combat`、`Damage` 不属于本单元范围" in unit.scenario.prompt
+    assert "警戒对白" not in unit.scenario.prompt
     assert unit.scenario.confirmation_prompt == (
         "可以，只在现有 Robot_VO 下合并新增 Alert 这一组并核对结果。"
     )

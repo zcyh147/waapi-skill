@@ -2474,6 +2474,7 @@ def typed_input_merge_recipe(
         raise ObjectHeavyRecipeError(
             "typed-input merge must select one exact Alert group"
         )
+    selected_children[0].pop("notes", None)
     arguments["children"] = selected_children
     retained_keys = {
         "robot",
@@ -2486,6 +2487,11 @@ def typed_input_merge_recipe(
     expected_objects = tuple(
         replace(row, children=("idle", "alert"))
         if row.key == "robot"
+        else replace(
+            row,
+            fields=tuple(field for field in row.fields if field.name != "notes"),
+        )
+        if row.key == "alert"
         else row
         for row in recipe.oracle.expected_objects
         if row.key in retained_keys
@@ -2504,7 +2510,8 @@ def typed_input_merge_recipe(
         prompt_literals=tuple(
             value
             for value in recipe.prompt_literals
-            if value not in {"Combat", "Damage", "战斗对白", "受击对白"}
+            if value
+            not in {"Combat", "Damage", "警戒对白", "战斗对白", "受击对白"}
         ),
         request=OperationRequestSpec(
             operation="object.create",
