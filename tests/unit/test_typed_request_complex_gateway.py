@@ -205,6 +205,16 @@ def test_media_pool_dynamic_child_applies_parent_before_descendant_disclosure(
         "group_size": 2,
         "split_across_apply_batches": "forbidden",
         "insufficient_remaining_slots": "start_group_in_next_batch",
+        "greedy_batching": {
+            "parent_fact_action_count": 1,
+            "maximum_groups_with_parent_fact": 2,
+            "maximum_groups_without_parent_fact": 3,
+            "rule": (
+                "start with the deferred parent fact, append at most two complete "
+                "branch groups, execute, read the new revision, then pack at most "
+                "three complete remaining groups per later batch"
+            ),
+        },
     }
     assert gateway.gateway_stdout_payload(item)["child_contract"][
         "branch_fact_group_policy"

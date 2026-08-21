@@ -43,6 +43,7 @@ from tests.semantic.support.codex_harness import (
     gateway_continuation_binding_errors,
     normalized_gateway_command_argv,
     prepare_workspace_skill_install,
+    recoverable_failed_skill_read_attempt_indexes,
 )
 from tests.semantic.support.codex_prompt_provenance_v3 import (
     PROMPT_MATERIALIZATION_RECEIPT_CONTRACT,
@@ -687,6 +688,17 @@ def _grade_common_turn(
         )
     )
     records = facts.command_records
+    recoverable_read_indexes = frozenset(
+        recoverable_failed_skill_read_attempt_indexes(
+            records,
+            allowed_read_commands=allowed_reads,
+        )
+    )
+    effective_records = tuple(
+        record
+        for index, record in enumerate(records)
+        if index not in recoverable_read_indexes
+    )
     gateway_count = len(facts.gateway_attempt_commands)
     try:
         prompt_asset_reads = validated_prompt_asset_cat_commands(
@@ -722,10 +734,13 @@ def _grade_common_turn(
         "one_target_skill": result.prompt_audit.passed,
         "no_collaboration": result.collab_call_count == 0,
         "skill_reads_exact": read_files == expected_reads and len(allowed_reads) == len(read_files),
-        "read_prefix_exact": tuple(record.command for record in records[: len(allowed_reads)]) == allowed_reads,
+        "read_prefix_exact": tuple(
+            record.command for record in effective_records[: len(allowed_reads)]
+        )
+        == allowed_reads,
         "gateway_count_exact": gateway_count == expected_gateway_count,
         "no_other_commands": (
-            len(records)
+            len(effective_records)
             == len(allowed_reads)
             + len(prompt_asset_reads)
             + expected_gateway_count

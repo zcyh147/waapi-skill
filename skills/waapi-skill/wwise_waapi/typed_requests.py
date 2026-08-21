@@ -658,6 +658,18 @@ class TypedRequestContract:
             and isinstance(field.get("path"), list)
             and len(field["path"]) > 1
         ]
+        duplicate_name_fact_routes = [
+            [
+                path,
+                rows[index][5],
+                str(fields[index]["handle"]),
+                list(fields[index]["accepted_types"]),
+            ]
+            for index, path in duplicate_name_paths
+            if direct_actions
+            and isinstance(rows[index][5], str)
+            and rows[index][5].endswith("-set")
+        ]
         return {
             "contract": "waapi-skill.compact-typed-field-table/v1",
             "section": section,
@@ -690,6 +702,20 @@ class TypedRequestContract:
                 "omitted; duplicate names use path row; no parent map"
             ),
             "duplicate_name_paths": duplicate_name_paths,
+            "duplicate_name_fact_routes": {
+                "columns": [
+                    "business_pointer",
+                    "fact_action",
+                    "field_handle",
+                    "accepted_types",
+                ],
+                "rows": duplicate_name_fact_routes,
+                "selection": (
+                    "for a duplicate name, match the exact business pointer and "
+                    "copy this scalar fact route; never use an ancestor open-map "
+                    "row for a fixed child key"
+                ),
+            },
             "rows": rows,
         }
 

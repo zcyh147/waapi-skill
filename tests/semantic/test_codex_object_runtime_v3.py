@@ -706,6 +706,26 @@ def test_get02_query_oracle_accepts_exact_active_sources_and_paired_paths() -> N
     ]
 
 
+def test_get02_query_oracle_scopes_decoys_to_the_candidate_inventory() -> None:
+    runtime, payload, answer = _get02_query_runtime()
+    before = runtime.before.by_key()
+    candidate_inventory = "\n".join(
+        (
+            "候选盘点（供筛选审计，不是最终结果）：",
+            f"| `{before['hero_nested'].path}` | candidate |",
+            f"| `{before['music_child'].path}` | candidate |",
+            "符合条件的直接子级 Sound：",
+        )
+    )
+
+    verification = runtime.verify_query_result(
+        payload,
+        final_response=f"{candidate_inventory}\n{answer}",
+    )
+
+    assert verification.passed, verification.failures
+
+
 @pytest.mark.parametrize(
     ("mutation", "failure"),
     (

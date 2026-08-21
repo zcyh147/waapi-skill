@@ -4326,6 +4326,15 @@ def operation_composer_input_contract(
                 "minimum": 1,
                 "maximum": MAX_TYPED_ACTIONS_PER_APPLY,
             },
+            "batch_fill": {
+                "mode": "greedy_schema_order",
+                "rule": (
+                    "append the next complete handle-independent action while it "
+                    "fits; execute a shorter batch only when the next action "
+                    "depends on a returned handle or no action remains"
+                ),
+                "split_one_complete_action": "forbidden",
+            },
             "repeat_complete_action_group": [
                 "--action",
                 "<action-name>",
@@ -4838,6 +4847,16 @@ def _bind_dynamic_branch_facts(
         "group_size": 2,
         "split_across_apply_batches": "forbidden",
         "insufficient_remaining_slots": "start_group_in_next_batch",
+        "greedy_batching": {
+            "parent_fact_action_count": 1,
+            "maximum_groups_with_parent_fact": 2,
+            "maximum_groups_without_parent_fact": 3,
+            "rule": (
+                "start with the deferred parent fact, append at most two complete "
+                "branch groups, execute, read the new revision, then pack at most "
+                "three complete remaining groups per later batch"
+            ),
+        },
     }
     for queue_index, row in enumerate(rows, start=1):
         if not isinstance(row, dict) or not isinstance(row.get("key"), str):
@@ -5738,6 +5757,14 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         (version,) = resolve_catalog_versions(args, env=env)
         options = topic_options_contract(version, args.api)
         match = topic_match_contract(version, args.api)
+        options_payload = typed_topic_contract_payload(options)
+        match_payload = typed_topic_contract_payload(match)
+        match_fields = match_payload.get("fields")
+        duplicate_name_fact_routes = (
+            match_fields.get("duplicate_name_fact_routes")
+            if isinstance(match_fields, Mapping)
+            else None
+        )
         payload = {
             "contract": "waapi-skill.typed-topic-input/v1",
             "ok": True,
@@ -5773,6 +5800,12 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 },
                 "fact_argv": {
                     "prefixes": ["option", "match"],
+                    **(
+                        {"qualified_duplicate_fact_routes": duplicate_name_fact_routes}
+                        if isinstance(duplicate_name_fact_routes, Mapping)
+                        and duplicate_name_fact_routes.get("rows")
+                        else {}
+                    ),
                     "top_level_fact_tables": {
                         "options": _topic_top_level_fact_table(
                             options,
@@ -5801,8 +5834,8 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     "stream-topic": "cancel/timeout; unsubscribe",
                 },
             },
-            "options": typed_topic_contract_payload(options),
-            "event_match": typed_topic_contract_payload(match),
+            "options": options_payload,
+            "event_match": match_payload,
         }
         final_payload = attach_gateway_session_context(
             payload,
@@ -5822,6 +5855,15 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 fields = section.get("fields") if isinstance(section, Mapping) else None
                 if isinstance(fields, dict):
                     fields.pop("duplicate_name_paths", None)
+                    fields.pop("duplicate_name_fact_routes", None)
+            continuation = payload.get("continuation")
+            fact_argv = (
+                continuation.get("fact_argv")
+                if isinstance(continuation, Mapping)
+                else None
+            )
+            if isinstance(fact_argv, dict):
+                fact_argv.pop("qualified_duplicate_fact_routes", None)
             final_payload = attach_gateway_session_context(
                 payload,
                 args=args,

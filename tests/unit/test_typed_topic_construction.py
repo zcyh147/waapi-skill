@@ -574,6 +574,26 @@ def test_wait_topic_digests_bind_to_the_real_topic_schema_envelope(
         and compact_rows[row[1]][2] == "soundbank"
     )
     assert duplicate_paths[top_level_name_row] == "soundbank.name"
+    duplicate_routes = {
+        row[0]: row[1:]
+        for row in payload["event_match"]["fields"][
+            "duplicate_name_fact_routes"
+        ]["rows"]
+    }
+    if version == "2023.1":
+        assert duplicate_routes["soundbank.name"] == [
+            "--match-set",
+            compact_rows[top_level_name_row][0],
+            ["string"],
+        ]
+        assert payload["event_match"]["fields"][
+            "duplicate_name_fact_routes"
+        ]["selection"].endswith(
+            "never use an ancestor open-map row for a fixed child key"
+        )
+        assert payload["continuation"]["fact_argv"][
+            "qualified_duplicate_fact_routes"
+        ] == payload["event_match"]["fields"]["duplicate_name_fact_routes"]
     nested_name_rows = [
         index
         for index, row in enumerate(compact_rows)

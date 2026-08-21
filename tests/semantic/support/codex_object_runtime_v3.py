@@ -1310,11 +1310,33 @@ def _paired_path_answer_proof(
     lines = final_response.splitlines()
     required: list[dict[str, Any]] = []
     excluded: list[dict[str, Any]] = []
+    id_to_key = {item.id: key for key, item in before.items()}
+    exact = set(request.exact_expected_keys)
+    expected_children = [
+        key
+        for key in expected_order_keys
+        if before[key].type == "Sound"
+        and before[key].parent_id is not None
+        and id_to_key.get(before[key].parent_id) in exact
+    ]
+    paired_line_indexes = [
+        index
+        for child_key in expected_children
+        for index, line in enumerate(lines)
+        if (
+            (parent_key := id_to_key.get(before[child_key].parent_id or ""))
+            is not None
+            and _path_token_offsets(line, before[child_key].path)
+            and _path_token_offsets(line, before[parent_key].path)
+        )
+    ]
+    result_start = min(paired_line_indexes) if paired_line_indexes else 0
+    result_lines = lines[result_start:]
     for key in request.exact_expected_keys:
         item = before[key]
         matches = [
-            (index, offset)
-            for index, line in enumerate(lines)
+            (result_start + index, offset)
+            for index, line in enumerate(result_lines)
             for offset in _path_token_offsets(line, item.path)
         ]
         required.append(
@@ -1330,8 +1352,8 @@ def _paired_path_answer_proof(
     for key in excluded_keys:
         item = before[key]
         matches = [
-            (index, offset)
-            for index, line in enumerate(lines)
+            (result_start + index, offset)
+            for index, line in enumerate(result_lines)
             for offset in _path_token_offsets(line, item.path)
         ]
         excluded.append(
@@ -1344,15 +1366,6 @@ def _paired_path_answer_proof(
         if matches:
             failures.append(f"final answer includes excluded standalone path {key}")
 
-    id_to_key = {item.id: key for key, item in before.items()}
-    exact = set(request.exact_expected_keys)
-    expected_children = [
-        key
-        for key in expected_order_keys
-        if before[key].type == "Sound"
-        and before[key].parent_id is not None
-        and id_to_key.get(before[key].parent_id) in exact
-    ]
     all_languages = {
         item.source_language
         for item in before.values()
@@ -1377,6 +1390,7 @@ def _paired_path_answer_proof(
             (index, offset)
             for index, line in enumerate(lines)
             for offset in _path_token_offsets(line, child.path)
+            if _path_token_offsets(line, parent.path)
         ]
         line_index = child_matches[0][0] if child_matches else None
         line = lines[line_index] if line_index is not None else ""

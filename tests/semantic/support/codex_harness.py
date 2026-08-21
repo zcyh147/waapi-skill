@@ -1320,6 +1320,42 @@ class CodexCommandFacts:
     non_gateway_unexpected_commands: tuple[str, ...] = ()
 
 
+def recoverable_failed_skill_read_attempt_indexes(
+    records: Sequence[CodexCommandRecord],
+    *,
+    allowed_read_commands: Sequence[str],
+) -> tuple[int, ...]:
+    """Return exact Windows SKILL reads that failed before process creation.
+
+    The following identical command must be one already validated successful
+    SKILL read.  This does not authorize a second spelling, a partial read, or
+    any command that reached PowerShell.
+    """
+
+    allowed = frozenset(allowed_read_commands)
+    return tuple(
+        index
+        for index, record in enumerate(records[:-1])
+        if (
+            getattr(record, "status", "") == "failed"
+            and getattr(record, "exit_code", None) == -1
+            and not getattr(record, "parse_error", "")
+            and not getattr(record, "has_shell_operators", False)
+            and getattr(record, "parser_kind", "")
+            == _WINDOWS_POWERSHELL_CORE_PARSER_KIND
+            and getattr(record, "command", "") in allowed
+            and getattr(record, "command", "")
+            == getattr(records[index + 1], "command", "")
+            and getattr(record, "argv", ()) == getattr(records[index + 1], "argv", ())
+            and getattr(record, "aggregated_output", "").startswith(
+                "execution error: Io("
+            )
+            and "windows sandbox: CreateProcessAsUserW failed: 267"
+            in getattr(record, "aggregated_output", "")
+        )
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class CodexRunResult:
     command: tuple[str, ...]
@@ -3540,7 +3576,33 @@ def classify_commands(
             raise ValueError("expected_gateway_errors commands must be unique")
         error_expectations[expectation.command] = expectation.error_code
 
-    for record in records:
+    validated_reads_by_index: dict[int, str] = {}
+    for index, record in enumerate(records):
+        candidates = tuple(
+            value
+            for source in skill_read_sources
+            if (
+                value := allowed_skill_read(
+                    record,
+                    skill_source=source,
+                    skill_read_content_source=skill_read_content_source,
+                )
+            )
+        )
+        if candidates and len(set(candidates)) == 1:
+            validated_reads_by_index[index] = candidates[0]
+    recoverable_failed_read_indexes = frozenset(
+        recoverable_failed_skill_read_attempt_indexes(
+            records,
+            allowed_read_commands=tuple(
+                records[index].command
+                for index, relative in validated_reads_by_index.items()
+                if relative == "SKILL.md"
+            ),
+        )
+    )
+
+    for record_index, record in enumerate(records):
         command = record.command
         lowered = command.lower()
         executable = Path(record.argv[0]).name.lower() if record.argv else ""
@@ -3600,23 +3662,7 @@ def classify_commands(
         )
         if is_python and not is_gateway and not is_packaged_runner_attempt:
             inline_python.append(command)
-        allowed_read_candidates = tuple(
-            value
-            for source in skill_read_sources
-            if (
-                value := allowed_skill_read(
-                    record,
-                    skill_source=source,
-                    skill_read_content_source=skill_read_content_source,
-                )
-            )
-        )
-        allowed_read = (
-            allowed_read_candidates[0]
-            if allowed_read_candidates
-            and len(set(allowed_read_candidates)) == 1
-            else None
-        )
+        allowed_read = validated_reads_by_index.get(record_index)
         if direct_waapi_command(record):
             direct_client.append(command)
         if write_like_command(record) and not allowed_read:
@@ -3629,7 +3675,11 @@ def classify_commands(
             read_files.append(allowed_read)
             if allowed_read == "SKILL.md":
                 skill_read = True
-        if not is_gateway and not allowed_read:
+        if (
+            not is_gateway
+            and not allowed_read
+            and record_index not in recoverable_failed_read_indexes
+        ):
             unexpected.append(command)
             if gateway_shape is None:
                 non_gateway_unexpected.append(command)

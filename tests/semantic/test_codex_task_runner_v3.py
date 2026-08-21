@@ -97,6 +97,45 @@ def test_common_grade_accepts_first_and_resumed_turn_shapes() -> None:
         assert all(gates.values())
 
 
+def test_common_grade_ignores_one_preprocess_windows_skill_read_failure() -> None:
+    result = _result(turn=1, gateway_count=2)
+    successful = result.command_facts.command_records[0]
+    successful.status = "completed"
+    successful.exit_code = 0
+    successful.parse_error = ""
+    successful.has_shell_operators = False
+    successful.parser_kind = "windows-pwsh-command"
+    successful.argv = ("Get-Content", "-Raw", "-Encoding", "UTF8", "SKILL.md")
+    successful.aggregated_output = "skill"
+    failed = SimpleNamespace(
+        command=successful.command,
+        status="failed",
+        exit_code=-1,
+        parse_error="",
+        has_shell_operators=False,
+        parser_kind="windows-pwsh-command",
+        argv=successful.argv,
+        aggregated_output=(
+            "execution error: Io(windows sandbox: "
+            "CreateProcessAsUserW failed: 267)"
+        ),
+    )
+    result.command_facts.command_records = (
+        failed,
+        *result.command_facts.command_records,
+    )
+
+    errors, gates = _grade_common_turn(
+        result,
+        turn_index=1,
+        required_reference="references/waapi-operate.md",
+        expected_gateway_count=2,
+    )
+
+    assert errors == ()
+    assert all(gates.values())
+
+
 def test_task_reconciliation_rejects_equivalent_requoted_continuation() -> None:
     full_argv = (
         "python",

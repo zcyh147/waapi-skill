@@ -662,6 +662,15 @@ def test_normal_object_set_schema_and_detail_expose_only_composer_input(
     assert schema["composer"]["apply"]["revision_discipline"] == {
         "mode": "one_ordered_atomic_batch_then_read",
         "action_count": {"minimum": 1, "maximum": 6},
+        "batch_fill": {
+            "mode": "greedy_schema_order",
+            "rule": (
+                "append the next complete handle-independent action while it "
+                "fits; execute a shorter batch only when the next action "
+                "depends on a returned handle or no action remains"
+            ),
+            "split_one_complete_action": "forbidden",
+        },
         "repeat_complete_action_group": [
             "--action",
             "<action-name>",
