@@ -2297,7 +2297,6 @@ def gateway_stdout_payload(value: Any) -> Any:
                 "key",
                 "required",
                 "accepted_types",
-                "business_value_pointer",
             )
             if (
                 isinstance(columns, list)
@@ -2311,24 +2310,37 @@ def gateway_stdout_payload(value: Any) -> Any:
                     all(index < len(row) for index in kept_indexes)
                     for row in rows
                 ):
+                    business_pointer_index = columns.index(
+                        "business_value_pointer"
+                    )
+                    business_pointers = [
+                        row[business_pointer_index] for row in rows
+                    ]
+                    business_object_pointers = {
+                        pointer.rsplit("/", 1)[0]
+                        for pointer in business_pointers
+                        if isinstance(pointer, str) and "/" in pointer
+                    }
+                    if len(business_object_pointers) != 1:
+                        raise GatewayInputError(
+                            "Recursive object scalar rows do not share one "
+                            "business object pointer."
+                        )
                     compact_scalar_table: dict[str, Any] = {
                         "columns": list(kept_columns),
+                        "business_object_pointer": next(
+                            iter(business_object_pointers)
+                        ),
+                        "exact_type_tokens": {
+                            "Actor Mixer": "ActorMixer",
+                            "Random Container": "RandomSequenceContainer",
+                            "随机容器": "RandomSequenceContainer",
+                            "Blend Container": "BlendContainer",
+                            "混合容器": "BlendContainer",
+                            "Sound": "Sound",
+                            "forbidden": ["RandomContainer"],
+                        },
                     }
-                    if "description" in columns:
-                        description_index = columns.index("description")
-                        key_index = columns.index("key")
-                        type_rows = [
-                            row
-                            for row in rows
-                            if row[key_index] == "type"
-                            and description_index < len(row)
-                            and isinstance(row[description_index], str)
-                            and row[description_index]
-                        ]
-                        if len(type_rows) == 1:
-                            compact_scalar_table["type_value_guidance"] = (
-                                type_rows[0][description_index]
-                            )
                     compact_scalar_table["business_present_row_policy"] = {
                         "selection": (
                             "every_row_with_present_business_value_pointer"
@@ -2359,15 +2371,9 @@ def gateway_stdout_payload(value: Any) -> Any:
                                     "<selected-accepted-type>",
                                     "--fact-value",
                                     "<business-value>",
-                                    "--key",
-                                    "<row-key>",
-                                ],
-                                "row_order": "table_order",
-                                "batch_limit": MAX_TYPED_ACTIONS_PER_APPLY,
-                                "type_value_authority": (
-                                    "operation-schema/composer/"
-                                    "typed-request-type-description"
-                                ),
+                                "--key",
+                                "<row-key>",
+                            ],
                             },
                         }
                     )
@@ -2552,21 +2558,33 @@ def gateway_stdout_payload(value: Any) -> Any:
                         for row, argv in zip(item, argv_rows, strict=True)
                     )
                 ):
+                    nested_object_pointers = {
+                        str(row.get("business_value_pointer")).rsplit("/", 1)[0]
+                        for row in item
+                        if isinstance(row.get("business_value_pointer"), str)
+                        and "/" in str(row.get("business_value_pointer"))
+                    }
+                    if len(nested_object_pointers) != 1:
+                        raise GatewayInputError(
+                            "Recursive object container rows do not share one "
+                            "business object pointer."
+                        )
                     item = {
                         "columns": [
                             "key",
                             "shape",
                             "required",
-                            "business_value_pointer",
                             "queue_index",
                             "argv_middle",
                         ],
+                        "business_object_pointer": next(
+                            iter(nested_object_pointers)
+                        ),
                         "rows": [
                             [
                                 row.get("key"),
                                 row.get("shape"),
                                 row.get("required"),
-                                row.get("business_value_pointer"),
                                 row.get("queue_index"),
                                 argv[4:-2],
                             ]

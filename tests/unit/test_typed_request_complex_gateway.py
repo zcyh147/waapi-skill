@@ -1386,7 +1386,7 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
 
     projected = gateway.gateway_stdout_payload(leaf)
     encoded = gateway.gateway_stdout_json_encoder(projected).encode(projected)
-    assert len((encoded + "\n").encode("utf-8")) < 5 * 1024
+    assert len((encoded + "\n").encode("utf-8")) < 19 * 256
     assert projected["handle"] == leaf["handle"]
     assert projected["schema_lineage_token"] == leaf["schema_lineage_token"]
     assert projected["response_integrity"] == root_projected["response_integrity"]
@@ -1400,22 +1400,27 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
         "key",
         "required",
         "accepted_types",
-        "business_value_pointer",
     ]
     raw_scalar_table = leaf["child_contract"][
         "fixed_scalar_member_fact_table"
     ]
+    business_pointers = [row[3] for row in raw_scalar_table["rows"]]
+    assert len({pointer.rsplit("/", 1)[0] for pointer in business_pointers}) == 1
+    assert projected_scalar_table["business_object_pointer"] == (
+        business_pointers[0].rsplit("/", 1)[0]
+    )
     assert projected_scalar_table["rows"] == [
-        row[:4] for row in raw_scalar_table["rows"]
+        row[:3] for row in raw_scalar_table["rows"]
     ]
-    type_row = next(row for row in raw_scalar_table["rows"] if row[0] == "type")
-    assert projected_scalar_table["type_value_guidance"] == type_row[5]
-    assert "RandomSequenceContainer" in projected_scalar_table[
-        "type_value_guidance"
-    ]
-    assert "never RandomContainer" in projected_scalar_table[
-        "type_value_guidance"
-    ]
+    assert projected_scalar_table["exact_type_tokens"] == {
+        "Actor Mixer": "ActorMixer",
+        "Random Container": "RandomSequenceContainer",
+        "随机容器": "RandomSequenceContainer",
+        "Blend Container": "BlendContainer",
+        "混合容器": "BlendContainer",
+        "Sound": "Sound",
+        "forbidden": ["RandomContainer"],
+    }
     assert projected_scalar_table["business_present_row_policy"] == {
         "selection": "every_row_with_present_business_value_pointer",
         "required_false_with_present_business_value": "must_include",
@@ -1439,11 +1444,6 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
             "--key",
             "<row-key>",
         ],
-        "row_order": "table_order",
-        "batch_limit": 6,
-        "type_value_authority": (
-            "operation-schema/composer/typed-request-type-description"
-        ),
     }
     fact_prefix = projected_scalar_table["fact_command_assembly"][
         "fixed_argv_prefix"
@@ -1451,7 +1451,7 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     for projected_row, raw_row in zip(
         projected_scalar_table["rows"], raw_scalar_table["rows"], strict=True
     ):
-        key, _required, accepted_types, _business_pointer = projected_row
+        key, _required, accepted_types = projected_row
         assert len(accepted_types) == 1
         assert [
             *fact_prefix,
@@ -1469,10 +1469,18 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
         "key",
         "shape",
         "required",
-        "business_value_pointer",
         "queue_index",
         "argv_middle",
     ]
+    nested_business_pointers = [
+        row["business_value_pointer"] for row in raw_nested_rows
+    ]
+    assert len(
+        {pointer.rsplit("/", 1)[0] for pointer in nested_business_pointers}
+    ) == 1
+    assert nested_table["business_object_pointer"] == (
+        nested_business_pointers[0].rsplit("/", 1)[0]
+    )
     assert nested_table["selection"] == (
         "first_row_with_present_business_value_pointer_in_queue_order"
     )
@@ -1494,7 +1502,6 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
             row["key"],
             row["shape"],
             row["required"],
-            row["business_value_pointer"],
             row["queue_index"],
             ["--key", row["key"], "--shape", row["shape"]],
         ]
