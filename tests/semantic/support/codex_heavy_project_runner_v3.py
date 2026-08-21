@@ -164,10 +164,12 @@ from tests.semantic.support.codex_object_heavy_v3 import (
     OperationRequestSpec,
     build_object_heavy_v3_recipe,
     typed_input_merge_recipe,
+    typed_input_rename_recipe,
 )
 from tests.semantic.support.codex_object_business_plan_v3 import (
     ObjectBusinessPlanSections,
     TYPED_PROFILE_OBJECT_METADATA_UNITS,
+    TYPED_PROFILE_RENAME_UNIT_ID,
     TYPED_PROFILE_SET03_UNIT_ID,
     build_object_merge_query_protocol,
     compile_object_business_plan,
@@ -4718,6 +4720,8 @@ def _prepare_case(
         )
         if unit_id == "TYP21-DEDICATED-OBJECT-CREATE":
             recipe = typed_input_merge_recipe(recipe, unit_id=unit_id)
+        elif unit_id == TYPED_PROFILE_RENAME_UNIT_ID:
+            recipe = typed_input_rename_recipe(recipe, unit_id=unit_id)
         if recipe.version != runtime.version:
             raise HeavyProjectRunnerError(
                 "object recipe version differs from the active lifecycle"
@@ -4733,30 +4737,29 @@ def _prepare_case(
             raise HeavyProjectRunnerError(
                 "object runtime did not retain its sealed before snapshot"
             )
-        protocol = _build_compound_object_metadata_protocol(
-            scenario,
-            recipe=recipe,
-            direct=direct,
-            version=runtime.version,
-            profile_unit_id=metadata_profile_unit_id,
-        )
-        if (
-            protocol is not None
-            and unit_id == "TYP23-DEDICATED-OBJECT-CREATE"
-        ):
+        if unit_id == TYPED_PROFILE_RENAME_UNIT_ID:
+            protocol = object_runtime.gateway_protocol()
             protocol = build_object_merge_query_protocol(
                 scenario,
                 recipe,
                 base_protocol=protocol,
                 profile_unit_id=unit_id,
             )
-        if protocol is None:
-            protocol = build_object_merge_query_protocol(
+        else:
+            protocol = _build_compound_object_metadata_protocol(
                 scenario,
-                recipe,
+                recipe=recipe,
+                direct=direct,
+                version=runtime.version,
+                profile_unit_id=metadata_profile_unit_id,
             )
-        if protocol is None:
-            protocol = object_runtime.gateway_protocol()
+            if protocol is None:
+                protocol = build_object_merge_query_protocol(
+                    scenario,
+                    recipe,
+                )
+            if protocol is None:
+                protocol = object_runtime.gateway_protocol()
         if project_modification_policy is not None:
             if _compound_object_metadata_binding(
                 scenario,
@@ -4778,13 +4781,18 @@ def _prepare_case(
             if item.object_type == "Sound" and item.source_language is not None
         }
         input_file_manifest = seal_object_input_file_manifest(object_input_files)
+        business_plan_profile_unit_id = (
+            unit_id
+            if unit_id == TYPED_PROFILE_RENAME_UNIT_ID
+            else metadata_profile_unit_id
+        )
         typed_sections = compile_object_business_plan(
             scenario,
             recipe,
             protocol,
             before,
             input_file_manifest,
-            profile_unit_id=metadata_profile_unit_id,
+            profile_unit_id=business_plan_profile_unit_id,
         )
         validate_object_business_plan(
             typed_sections,
@@ -4794,7 +4802,7 @@ def _prepare_case(
             before=before,
             input_file_manifest=input_file_manifest,
             verify_files=True,
-            profile_unit_id=metadata_profile_unit_id,
+            profile_unit_id=business_plan_profile_unit_id,
         )
 
         def verify(payload: Mapping[str, Any] | None, result: CodexRunResult) -> Any:

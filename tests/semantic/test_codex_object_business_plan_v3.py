@@ -44,6 +44,7 @@ from tests.semantic.support.codex_object_heavy_v3 import (
     QueryObjectRequestSpec,
     build_object_heavy_v3_recipe,
     typed_input_merge_recipe,
+    typed_input_rename_recipe,
 )
 from tests.semantic.support.codex_object_runtime_v3 import (
     MaterializedObject,
@@ -351,7 +352,7 @@ def test_compound_object_2025_business_plan_compiles_and_archive_validates(
     )
 
 
-def test_typed_profile_collision_metadata_protocol_queries_before_schema(
+def test_typed_profile_collision_protocol_queries_before_schema(
     tmp_path: Path,
 ) -> None:
     scenario, recipe, _base, _before, _manifest = _case(
@@ -359,22 +360,18 @@ def test_typed_profile_collision_metadata_protocol_queries_before_schema(
         tmp_path,
         "2023.1",
     )
-    metadata = build_metadata_transaction_protocol(
-        (recipe.request.as_dict(version=recipe.version),),
-        object_type="ActorMixer",
-        metadata_queries=("volume",),
-        required_tokens=("Volume",),
-        expected_required_token_projection=(
-            MetadataTokenProjection("Volume", "property", "Real64"),
-        ),
-        equivalence="wire_exact",
-        schema_first=True,
+    recipe = typed_input_rename_recipe(
+        recipe,
+        unit_id="TYP23-DEDICATED-OBJECT-CREATE",
+    )
+    base = build_transaction_protocol(
+        (recipe.request.as_dict(version=recipe.version),)
     )
 
     protocol = build_object_merge_query_protocol(
         scenario,
         recipe,
-        base_protocol=metadata,
+        base_protocol=base,
         profile_unit_id="TYP23-DEDICATED-OBJECT-CREATE",
     )
 
@@ -382,7 +379,7 @@ def test_typed_profile_collision_metadata_protocol_queries_before_schema(
     assert [step.subcommand for step in protocol.steps[:3]] == [
         "query-object",
         "operation-schema",
-        "metadata",
+        "draft-start",
     ]
     assert protocol.steps[0].arguments == (
         "--path",

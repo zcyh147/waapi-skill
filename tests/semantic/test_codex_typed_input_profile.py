@@ -217,34 +217,22 @@ def test_metadata_set_prompt_names_each_exact_target_path() -> None:
     )
 
 
-def test_object_create_prompts_declare_the_requested_sound_leaves() -> None:
+def test_recursive_object_create_prompt_declares_the_requested_sound_leaves() -> None:
     profile = load_typed_input_profile(PROFILE_PATH)
-    units = [
+    unit = next(
         unit
         for unit in profile.units
-        if unit.unit_id
-        in {
-            "TYP21-DEDICATED-OBJECT-CREATE",
-            "TYP23-DEDICATED-OBJECT-CREATE",
-        }
-    ]
-
-    assert len(units) == 2
-    assert all("都是叶节点" in unit.scenario.prompt for unit in units)
-    assert all(
-        "不再添加子对象、属性或引用" in unit.scenario.prompt for unit in units
+        if unit.unit_id == "TYP21-DEDICATED-OBJECT-CREATE"
     )
-    assert all("严格按这棵业务树" in unit.scenario.prompt for unit in units)
-    assert all(
-        "处理完一个叶节点后直接处理同组的下一个叶节点" in unit.scenario.prompt
-        for unit in units
+    assert "都是叶节点" in unit.scenario.prompt
+    assert "不再添加子对象、属性或引用" in unit.scenario.prompt
+    assert "严格按这棵业务树" in unit.scenario.prompt
+    assert "处理完一个叶节点后直接处理同组的下一个叶节点" in (
+        unit.scenario.prompt
     )
-    assert all(
-        "预览返回后再请我确认执行" in unit.scenario.prompt for unit in units
-    )
+    assert "预览返回后再请我确认执行" in unit.scenario.prompt
     assert all(
         command not in unit.scenario.prompt
-        for unit in units
         for command in ("request-map-container", "--parent-schema-token")
     )
 
@@ -369,6 +357,11 @@ def test_rename_object_create_prompt_seals_the_existing_collision_identity() -> 
     ) in unit.scenario.prompt
     assert "应当是 Actor Mixer" in unit.scenario.prompt
     assert "创建前先核对该完整路径和类型" in unit.scenario.prompt
+    assert "不添加属性、引用或子对象" in unit.scenario.prompt
+    assert all(
+        omitted not in unit.scenario.prompt
+        for omitted in ("Volume", "Metal", "Wood", "Light", "Heavy")
+    )
     assert all(
         command not in unit.scenario.prompt
         for command in ("query-object", "operation-schema", "draft-start")

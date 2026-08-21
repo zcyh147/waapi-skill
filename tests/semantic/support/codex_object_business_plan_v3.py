@@ -64,6 +64,7 @@ OBJECT_APIS = frozenset(
     }
 )
 TYPED_PROFILE_SET03_UNIT_ID = "TYP22-METADATA-OBJECT-SET"
+TYPED_PROFILE_RENAME_UNIT_ID = "TYP23-DEDICATED-OBJECT-CREATE"
 TYPED_PROFILE_OBJECT_METADATA_UNITS = MappingProxyType(
     {
         TYPED_PROFILE_SET03_UNIT_ID: (
@@ -72,13 +73,6 @@ TYPED_PROFILE_OBJECT_METADATA_UNITS = MappingProxyType(
             "2022.1",
             ("volume", "pitch", "notes", "output bus"),
             ("Volume", "Pitch", "OutputBus"),
-        ),
-        "TYP23-DEDICATED-OBJECT-CREATE": (
-            "OBJ22-F-CREATE-03",
-            "ak.wwise.core.object.create",
-            "2023.1",
-            ("volume",),
-            ("Volume",),
         ),
         "TYP24-METADATA-OBJECT-SET": (
             "OBJ22-F-SET-01",
@@ -1601,6 +1595,8 @@ def _compound_metadata_protocol(
     *,
     profile_unit_id: str | None,
 ) -> V3GatewayProtocol | None:
+    if profile_unit_id == TYPED_PROFILE_RENAME_UNIT_ID:
+        return None
     if profile_unit_id is not None:
         reviewed = TYPED_PROFILE_OBJECT_METADATA_UNITS.get(profile_unit_id)
         if reviewed is None or (
@@ -1683,13 +1679,6 @@ def _compound_metadata_protocol(
         ),
         schema_first=True,
     )
-    if profile_unit_id == "TYP23-DEDICATED-OBJECT-CREATE":
-        return build_object_merge_query_protocol(
-            scenario,
-            recipe,
-            base_protocol=metadata_protocol,
-            profile_unit_id=profile_unit_id,
-        )
     return metadata_protocol
 
 
@@ -1709,7 +1698,7 @@ def build_object_merge_query_protocol(
         if isinstance(asset_spec, Mapping)
         else None
     )
-    typed_collision = profile_unit_id == "TYP23-DEDICATED-OBJECT-CREATE"
+    typed_collision = profile_unit_id == TYPED_PROFILE_RENAME_UNIT_ID
     if typed_collision:
         if (
             recipe.scenario_id != "OBJ22-F-CREATE-03"
@@ -1858,9 +1847,18 @@ def _validate_protocol(
             base = build_transaction_protocol(
                 [request.as_dict(version=recipe.version)]
             )
-            merge_protocol = build_object_merge_query_protocol(
-                scenario,
-                recipe,
+            merge_protocol = (
+                build_object_merge_query_protocol(
+                    scenario,
+                    recipe,
+                    base_protocol=base,
+                    profile_unit_id=profile_unit_id,
+                )
+                if profile_unit_id == TYPED_PROFILE_RENAME_UNIT_ID
+                else build_object_merge_query_protocol(
+                    scenario,
+                    recipe,
+                )
             )
             expected_protocols = (
                 (merge_protocol,)

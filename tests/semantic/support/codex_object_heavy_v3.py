@@ -2526,6 +2526,70 @@ def typed_input_merge_recipe(
     )
 
 
+def typed_input_rename_recipe(
+    recipe: ObjectHeavyRecipe,
+    *,
+    unit_id: str,
+) -> ObjectHeavyRecipe:
+    """Focus the typed-input rename lane on one collision-root creation."""
+
+    if (
+        unit_id != "TYP23-DEDICATED-OBJECT-CREATE"
+        or recipe.scenario_id != "OBJ22-F-CREATE-03"
+        or recipe.version != "2023.1"
+        or recipe.api != OBJECT_CREATE_URI
+        or not isinstance(recipe.request, OperationRequestSpec)
+        or recipe.request.operation != "object.create"
+    ):
+        raise ObjectHeavyRecipeError(
+            "typed-input rename recipe is outside its reviewed unit/version lane"
+        )
+    arguments = _plain(recipe.request.arguments)
+    arguments.pop("properties", None)
+    arguments.pop("children", None)
+    created = tuple(
+        replace(
+            row,
+            fields=tuple(field for field in row.fields if field.name == "notes"),
+            children=(),
+        )
+        for row in recipe.oracle.expected_objects
+        if row.key == "new_impact"
+    )
+    if len(created) != 1:
+        raise ObjectHeavyRecipeError(
+            "typed-input rename must select one exact collision root"
+        )
+    rule_keys = {"new_impact", *recipe.oracle.preserved_keys}
+    rules = tuple(
+        replace(
+            rule,
+            subject_keys=tuple(
+                key for key in rule.subject_keys if key in rule_keys
+            ),
+        )
+        for rule in recipe.oracle.rules
+    )
+    return replace(
+        recipe,
+        prompt_literals=tuple(
+            value
+            for value in recipe.prompt_literals
+            if value not in {"-1.5 dB", "Metal", "Wood", "Light", "Heavy"}
+        ),
+        request=OperationRequestSpec(
+            operation="object.create",
+            arguments=_freeze(arguments),
+        ),
+        oracle=replace(
+            recipe.oracle,
+            expected_objects=created,
+            new_keys=("new_impact",),
+            rules=rules,
+        ),
+    )
+
+
 def all_object_heavy_v3_recipes() -> tuple[ObjectHeavyRecipe, ...]:
     """Return all fifteen recipes in create/get/set review order."""
 
@@ -2564,4 +2628,5 @@ __all__ = [
     "all_object_heavy_v3_recipes",
     "build_object_heavy_v3_recipe",
     "typed_input_merge_recipe",
+    "typed_input_rename_recipe",
 ]

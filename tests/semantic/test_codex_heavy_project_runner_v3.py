@@ -1261,12 +1261,6 @@ def test_typed_profile_set03_requires_exact_live_property_metadata() -> None:
     ("unit_id", "scenario_id", "api", "version"),
     (
         (
-            "TYP23-DEDICATED-OBJECT-CREATE",
-            "OBJ22-F-CREATE-03",
-            "ak.wwise.core.object.create",
-            "2023.1",
-        ),
-        (
             "TYP24-METADATA-OBJECT-SET",
             "OBJ22-F-SET-01",
             "ak.wwise.core.object.set",

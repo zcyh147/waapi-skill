@@ -9,6 +9,8 @@ from typing import Any
 
 import pytest  # pyright: ignore[reportMissingImports]
 
+from tests.semantic.support import codex_object_heavy_v3 as object_heavy
+
 from tests.semantic.support.codex_object_heavy_v3 import (
     OBJECT_CREATE_CASE_IDS,
     OBJECT_COMPOUND_CROSS_VERSION_CASE_IDS,
@@ -133,6 +135,36 @@ def test_typed_input_merge_recipe_keeps_one_representative_recursive_group() -> 
         "damage",
         "damage_a",
         "damage_b",
+    )
+
+
+def test_typed_input_rename_recipe_focuses_on_the_collision_root() -> None:
+    base = build_object_heavy_v3_recipe("OBJ22-F-CREATE-03", "2023.1")
+
+    recipe = object_heavy.typed_input_rename_recipe(
+        base,
+        unit_id="TYP23-DEDICATED-OBJECT-CREATE",
+    )
+
+    assert isinstance(recipe.request, OperationRequestSpec)
+    assert "properties" not in recipe.request.arguments
+    assert "children" not in recipe.request.arguments
+    assert recipe.request.arguments["notes"] == "新版材质碰撞库"
+    assert recipe.oracle.new_keys == ("new_impact",)
+    assert tuple(row.key for row in recipe.oracle.expected_objects) == (
+        "new_impact",
+    )
+    created = recipe.oracle.expected_objects[0]
+    assert created.children == ()
+    assert [field.name for field in created.fields] == ["notes"]
+    assert base.oracle.new_keys == (
+        "new_impact",
+        "new_metal",
+        "new_metal_light",
+        "new_metal_heavy",
+        "new_wood",
+        "new_wood_light",
+        "new_wood_heavy",
     )
 
 
