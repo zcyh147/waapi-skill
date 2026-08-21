@@ -79,10 +79,9 @@ def semantic_skill_bootstrap_developer_instructions(
         )
     return (
         SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
-        + " For Gateway commands without complete next_command use this exact "
-        "fixed prefix: "
+        + " Without complete next_command use exact prefix: "
         + command_prefix
-        + ". Append only response-disclosed argv; never rebuild its runner path."
+        + ". Append only disclosed argv; do not rebuild it."
     )
 
 
@@ -123,7 +122,7 @@ def semantic_task_developer_instructions(
     turn_rows: list[str] = []
     for turn_index, reads in enumerate(schedule, start=1):
         if not reads:
-            turn_rows.append(f"turn {turn_index} none")
+            turn_rows.append(f"{turn_index} none")
             continue
         commands: list[str] = []
         for relative in reads:
@@ -138,7 +137,7 @@ def semantic_task_developer_instructions(
                 quoted = "'" + str(path).replace("'", "'\"'\"'") + "'"
                 commands.append(f"cat {quoted}")
         turn_rows.append(
-            f"turn {turn_index} exact reads: "
+            f"{turn_index} "
             + " then ".join(f"[{command}]" for command in commands)
         )
 
@@ -159,9 +158,9 @@ def semantic_task_developer_instructions(
         base = semantic_skill_bootstrap_developer_instructions(str(task_runner))
     instructions = (
         base
-        + " Exact Skill reads: "
+        + " Reads: "
         + "; ".join(turn_rows)
-        + ". No substitutes or extras."
+        + ". No substitutes/extras."
     )
     if len(instructions.encode("utf-8")) > 2048:
         raise CodexHarnessError(

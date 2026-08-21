@@ -1450,7 +1450,7 @@ def test_formal_bootstrap_instructions_bind_one_exact_windows_runner_prefix() ->
         r"'C:\Git_Repos\waapi-skills\skills\waapi-skill\scripts\run.py' "
         "'gateway.py'"
     ) in instructions
-    assert "use this exact fixed prefix" in instructions
+    assert "use exact prefix" in instructions
     assert len(instructions.encode("utf-8")) <= 2048
 
 
@@ -1480,8 +1480,8 @@ def test_formal_task_instructions_bind_exact_posix_skill_read_schedule() -> None
         f"cat '{task_skill / 'references' / 'waapi-query.md'}'"
         in instructions
     )
-    assert "turn 1 exact reads" in instructions
-    assert "turn 2 none" in instructions
+    assert "Reads: 1" in instructions
+    assert "2 none" in instructions
     assert len(instructions.encode("utf-8")) <= 2048
 
 
