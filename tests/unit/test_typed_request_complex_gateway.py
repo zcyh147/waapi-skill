@@ -1408,6 +1408,14 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     assert projected_scalar_table["rows"] == [
         row[:4] for row in raw_scalar_table["rows"]
     ]
+    type_row = next(row for row in raw_scalar_table["rows"] if row[0] == "type")
+    assert projected_scalar_table["type_value_guidance"] == type_row[5]
+    assert "RandomSequenceContainer" in projected_scalar_table[
+        "type_value_guidance"
+    ]
+    assert "never RandomContainer" in projected_scalar_table[
+        "type_value_guidance"
+    ]
     assert projected_scalar_table["fact_command_assembly"] == {
         "fixed_argv_prefix": [
             "--action",

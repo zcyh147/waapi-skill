@@ -2311,39 +2311,59 @@ def gateway_stdout_payload(value: Any) -> Any:
                     all(index < len(row) for index in kept_indexes)
                     for row in rows
                 ):
+                    compact_scalar_table: dict[str, Any] = {
+                        "columns": list(kept_columns),
+                    }
+                    if "description" in columns:
+                        description_index = columns.index("description")
+                        key_index = columns.index("key")
+                        type_rows = [
+                            row
+                            for row in rows
+                            if row[key_index] == "type"
+                            and description_index < len(row)
+                            and isinstance(row[description_index], str)
+                            and row[description_index]
+                        ]
+                        if len(type_rows) == 1:
+                            compact_scalar_table["type_value_guidance"] = (
+                                type_rows[0][description_index]
+                            )
+                    compact_scalar_table.update(
+                        {
+                            "rows": [
+                                [row[index] for index in kept_indexes]
+                                for row in rows
+                            ],
+                            "fact_command_assembly": {
+                                "fixed_argv_prefix": [
+                                    "--action",
+                                    "add_typed_fact",
+                                    "--fact-action",
+                                    "map-put",
+                                    "--field-handle",
+                                    value["handle"],
+                                ],
+                                "append_for_each_business_present_row": [
+                                    "--value-type",
+                                    "<selected-accepted-type>",
+                                    "--fact-value",
+                                    "<business-value>",
+                                    "--key",
+                                    "<row-key>",
+                                ],
+                                "row_order": "table_order",
+                                "batch_limit": MAX_TYPED_ACTIONS_PER_APPLY,
+                                "type_value_authority": (
+                                    "operation-schema/composer/"
+                                    "typed-request-type-description"
+                                ),
+                            },
+                        }
+                    )
                     projected_child_contract[
                         "fixed_scalar_member_fact_table"
-                    ] = {
-                        "columns": list(kept_columns),
-                        "rows": [
-                            [row[index] for index in kept_indexes]
-                            for row in rows
-                        ],
-                        "fact_command_assembly": {
-                            "fixed_argv_prefix": [
-                                "--action",
-                                "add_typed_fact",
-                                "--fact-action",
-                                "map-put",
-                                "--field-handle",
-                                value["handle"],
-                            ],
-                            "append_for_each_business_present_row": [
-                                "--value-type",
-                                "<selected-accepted-type>",
-                                "--fact-value",
-                                "<business-value>",
-                                "--key",
-                                "<row-key>",
-                            ],
-                            "row_order": "table_order",
-                            "batch_limit": MAX_TYPED_ACTIONS_PER_APPLY,
-                            "type_value_authority": (
-                                "operation-schema/composer/"
-                                "typed-request-type-description"
-                            ),
-                        },
-                    }
+                    ] = compact_scalar_table
     raw_continuation = value.get("continuation")
     if not isinstance(raw_continuation, Mapping):
         return projected
