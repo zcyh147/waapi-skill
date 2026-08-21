@@ -562,6 +562,10 @@ def test_wait_topic_digests_bind_to_the_real_topic_schema_envelope(
             "duplicate_name_paths"
         ]
     }
+    assert payload["event_match"]["fields"]["path"] == (
+        "omitted; use duplicate_name_paths exact row; "
+        "parent map substitution forbidden"
+    )
     compact_rows = payload["event_match"]["fields"]["rows"]
     top_level_name_row = next(
         index

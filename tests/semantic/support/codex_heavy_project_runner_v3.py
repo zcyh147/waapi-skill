@@ -4628,6 +4628,11 @@ def _prepare_case(
                         and "返回" in folded
                         and "结构" in folded
                     )
+                    or (
+                        ("仅验证" in folded or "只验证" in folded)
+                        and "返回结果" in folded
+                        and "结构" in folded
+                    )
                 )
                 and (
                     "未验证" in folded

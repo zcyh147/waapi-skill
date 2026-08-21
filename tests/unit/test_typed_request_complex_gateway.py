@@ -200,6 +200,19 @@ def test_media_pool_dynamic_child_applies_parent_before_descendant_disclosure(
         "operator",
     ]
     assert [branch["queue_index"] for branch in branch_choices] == [1, 2, 3, 4]
+    assert [
+        (
+            branch["key"],
+            branch["business_value_pointer"],
+            branch["condition"],
+        )
+        for branch in branch_choices
+    ] == [
+        ("type", "/args/filters/0/type", "current_business_request_contains_member"),
+        ("value", "/args/filters/0/value", "current_business_request_contains_member"),
+        ("field", "/args/filters/0/field", "current_business_request_contains_member"),
+        ("operator", "/args/filters/0/operator", "current_business_request_contains_member"),
+    ]
     assert all(
         branch["fact_sequence"]
         == "choose_one_then_map_put_same_key_before_next_branch"

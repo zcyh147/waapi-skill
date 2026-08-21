@@ -679,7 +679,10 @@ class TypedRequestContract:
                     "one_key_per_fact": True,
                 },
             },
-            "path": "omitted; construct with handles and parent_row lineage",
+            "path": (
+                "omitted; use duplicate_name_paths exact row; "
+                "parent map substitution forbidden"
+            ),
             "duplicate_name_paths": duplicate_name_paths,
             "rows": rows,
         }

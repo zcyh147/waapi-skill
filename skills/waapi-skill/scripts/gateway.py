@@ -6147,6 +6147,21 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     row["condition"] = (
                         "current_business_request_contains_member"
                     )
+            branch_choices = child_contract.get("branch_choices")
+            if isinstance(branch_choices, list):
+                for row in branch_choices:
+                    if not isinstance(row, dict):
+                        continue
+                    member_key = row.get("key")
+                    if not isinstance(member_key, str):
+                        continue
+                    escaped_key = member_key.replace("~", "~0").replace("/", "~1")
+                    row["business_value_pointer"] = (
+                        f"{current_business_value_pointer}/{escaped_key}"
+                    )
+                    row["condition"] = (
+                        "current_business_request_contains_member"
+                    )
             for row in nested_container_disclosures:
                 key_value = str(row["key"]).replace("~", "~0").replace("/", "~1")
                 row["business_value_pointer"] = (

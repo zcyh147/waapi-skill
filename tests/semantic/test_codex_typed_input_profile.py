@@ -257,7 +257,11 @@ def test_2025_metadata_prompt_uses_the_exact_version_owned_container_path() -> N
         if unit.unit_id == "TYP25-METADATA-OBJECT-SET"
     )
 
-    assert r"\Containers\Default Work Unit\SemanticLab\UI" in unit.scenario.prompt
+    assert all(
+        rf"\Containers\Default Work Unit\SemanticLab\UI\{name}"
+        in unit.scenario.prompt
+        for name in ("Confirm", "Cancel", "Error")
+    )
     assert r"\Actor-Mixer Hierarchy\Default Work Unit\SemanticLab\UI" not in (
         unit.scenario.prompt
     )
@@ -274,7 +278,6 @@ def test_media_pool_prompt_separates_the_bounded_candidate_inventory_from_the_fi
         for unit in profile.units
         if unit.unit_id == "TYP25-GENERIC-MEDIA-POOL"
     )
-
     assert "最多 200 条候选" in unit.scenario.prompt
     assert "从这份候选清单" in unit.scenario.prompt
     assert "最终最多返回 20 条" in unit.scenario.prompt
@@ -289,6 +292,57 @@ def test_media_pool_prompt_separates_the_bounded_candidate_inventory_from_the_fi
     )
 
 
+def test_topic_prompts_separate_subscription_scope_from_returned_event_checks() -> None:
+    profile = load_typed_input_profile(PROFILE_PATH)
+    prompts = {
+        unit.unit_id: unit.scenario.prompt
+        for unit in profile.units
+        if "TOPIC-SOUNDBANK-GENERATED" in unit.unit_id
+    }
+
+    assert "订阅时只按平台名称 `Windows` 限定" in prompts[
+        "TYP21-TOPIC-SOUNDBANK-GENERATED"
+    ]
+    assert "三个 SoundBank 名称在通知返回后核对" in prompts[
+        "TYP21-TOPIC-SOUNDBANK-GENERATED"
+    ]
+    assert "SoundBank 对象本身的名称 `Dialogue_Chapter14`" in prompts[
+        "TYP23-TOPIC-SOUNDBANK-GENERATED"
+    ]
+    assert "平台记录的名称 `Windows`" in prompts[
+        "TYP23-TOPIC-SOUNDBANK-GENERATED"
+    ]
+    assert "只按 SoundBank 对象本身的名称 `Weapons_Core` 限定" in prompts[
+        "TYP24-TOPIC-SOUNDBANK-GENERATED"
+    ]
+    assert "平台不限定为单值" in prompts[
+        "TYP24-TOPIC-SOUNDBANK-GENERATED"
+    ]
+    assert all(
+        command not in prompt
+        for prompt in prompts.values()
+        for command in ("topic-schema", "wait-topic", "--match-set")
+    )
+
+
+def test_query_prompt_treats_the_exact_object_path_as_business_input() -> None:
+    profile = load_typed_input_profile(PROFILE_PATH)
+    unit = next(
+        unit
+        for unit in profile.units
+        if unit.unit_id == "TYP23-QUERY-OBJECT-GET"
+    )
+
+    assert r"\Actor-Mixer Hierarchy\Default Work Unit\SemanticLab" in (
+        unit.scenario.prompt
+    )
+    assert "无需查找任何本地文件或目录" in unit.scenario.prompt
+    assert all(
+        command not in unit.scenario.prompt
+        for command in ("query-object", "Get-ChildItem", "SKILL.md")
+    )
+
+
 def test_object_create_prompt_does_not_invite_a_redundant_parent_query() -> None:
     profile = load_typed_input_profile(PROFILE_PATH)
     unit = next(
@@ -299,6 +353,25 @@ def test_object_create_prompt_does_not_invite_a_redundant_parent_query() -> None
 
     assert "父级路径已经明确" in unit.scenario.prompt
     assert "无需另行核对父级" in unit.scenario.prompt
+
+
+def test_rename_object_create_prompt_seals_the_existing_collision_identity() -> None:
+    profile = load_typed_input_profile(PROFILE_PATH)
+    unit = next(
+        unit
+        for unit in profile.units
+        if unit.unit_id == "TYP23-DEDICATED-OBJECT-CREATE"
+    )
+
+    assert (
+        r"\Actor-Mixer Hierarchy\Default Work Unit\SemanticLab\Weapons"
+        r"\Impact_Library"
+    ) in unit.scenario.prompt
+    assert "已证明是 Actor Mixer" in unit.scenario.prompt
+    assert all(
+        command not in unit.scenario.prompt
+        for command in ("query-object", "operation-schema", "draft-start")
+    )
 
 
 def test_typed_input_profile_rejects_definition_drift_before_filtering(
