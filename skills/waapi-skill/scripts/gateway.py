@@ -6515,7 +6515,11 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             schema_digest=schema_digest,
             composer_digest=composer_digest,
         )
-        payload = operation_draft_payload(args.command, started.record)
+        payload = operation_draft_payload(
+            args.command,
+            started.record,
+            task_authority=started.task_authority,
+        )
         payload["task_authority"] = started.task_authority
         return payload
     if args.command == "draft-apply":

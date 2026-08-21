@@ -1432,6 +1432,10 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "opaque handle" in instructions
     assert "never reconstruct" in instructions
     assert "Never set or override a shell-tool working directory" in instructions
+    assert "Repeat each typed fact template in full" in instructions
+    assert "one shell argv literal" in instructions
+    assert "A successful draft-check is not a Preview" in instructions
+    assert "requires_later_user_message" in instructions
 
 
 def test_formal_bootstrap_instructions_bind_one_exact_windows_runner_prefix() -> None:
@@ -1446,7 +1450,67 @@ def test_formal_bootstrap_instructions_bind_one_exact_windows_runner_prefix() ->
         r"'C:\Git_Repos\waapi-skills\skills\waapi-skill\scripts\run.py' "
         "'gateway.py'"
     ) in instructions
-    assert "copy this exact fixed command prefix byte-for-byte" in instructions
+    assert "use this exact fixed prefix" in instructions
+    assert len(instructions.encode("utf-8")) <= 2048
+
+
+def test_formal_task_instructions_bind_exact_posix_skill_read_schedule() -> None:
+    task_skill = Path(
+        "/tmp/campaign/scenarios/001-TYP22/evidence/codex-task/agent-workspace/"
+        ".agents/skills/waapi-skill"
+    )
+
+    instructions = codex_harness_module.semantic_task_developer_instructions(
+        "/repo/skills/waapi-skill/scripts/run.py",
+        task_skill_source=task_skill,
+        expected_skill_reads=(
+            ("SKILL.md", "references/waapi-query.md"),
+            (),
+        ),
+    )
+
+    assert f"cat '{task_skill / 'SKILL.md'}'" in instructions
+    assert (
+        "python "
+        f"'{task_skill / 'scripts' / 'run.py'}' "
+        "gateway.py"
+    ) in instructions
+    assert "/repo/skills/waapi-skill/scripts/run.py" not in instructions
+    assert (
+        f"cat '{task_skill / 'references' / 'waapi-query.md'}'"
+        in instructions
+    )
+    assert "turn 1 exact reads" in instructions
+    assert "turn 2 none" in instructions
+    assert len(instructions.encode("utf-8")) <= 2048
+
+
+def test_formal_task_instructions_bind_exact_windows_skill_read_schedule() -> None:
+    instructions = codex_harness_module.semantic_task_developer_instructions(
+        r"C:\Git_Repos\waapi-skills\skills\waapi-skill\scripts\run.py",
+        task_skill_source=(
+            r"C:\Git_Repos\waapi-skills\skills\waapi-skill-workspace\root"
+            r"\agent-workspace\.agents\skills\waapi-skill"
+        ),
+        expected_skill_reads=(
+            ("SKILL.md", "references/waapi-operate.md"),
+        ),
+    )
+
+    assert (
+        "Get-Content -Raw -Encoding UTF8 "
+        r"'.agents\skills\waapi-skill\SKILL.md'"
+    ) in instructions
+    assert (
+        "python "
+        r"'C:\Git_Repos\waapi-skills\skills\waapi-skill-workspace\root"
+        r"\agent-workspace\.agents\skills\waapi-skill\scripts\run.py' "
+        "'gateway.py'"
+    ) in instructions
+    assert (
+        "Get-Content -Raw -Encoding UTF8 "
+        r"'.agents\skills\waapi-skill\references\waapi-operate.md'"
+    ) in instructions
     assert len(instructions.encode("utf-8")) <= 2048
 
 

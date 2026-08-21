@@ -44,6 +44,7 @@ from tests.semantic.support.codex_harness import (
     normalized_gateway_command_argv,
     prepare_workspace_skill_install,
     recoverable_preprocess_attempt_indexes,
+    semantic_task_developer_instructions,
 )
 from tests.semantic.support.codex_prompt_provenance_v3 import (
     PROMPT_MATERIALIZATION_RECEIPT_CONTRACT,
@@ -285,6 +286,16 @@ def run_v3_codex_task(
     )
     workspace = root / "agent-workspace"
     skill_install = _prepare_agent_workspace(workspace, skill_source)
+    sealed_developer_instructions = (
+        semantic_task_developer_instructions(
+            skill_source / "scripts" / "run.py",
+            task_skill_source=skill_install,
+            expected_skill_reads=expected_skill_reads,
+            base_developer_instructions=developer_instructions,
+        )
+        if developer_instructions
+        else ""
+    )
     broker_root = root / "broker"
     results: list[CodexRunResult] = []
     grades: list[V3TurnGrade] = []
@@ -319,7 +330,7 @@ def run_v3_codex_task(
         allow_output_write=False,
         network_access=True,
         expected_gateway_errors=gateway_errors,
-        developer_instructions=developer_instructions,
+        developer_instructions=sealed_developer_instructions,
     )
     broker = CodexGatewayBroker(
         skill_source=skill_source,

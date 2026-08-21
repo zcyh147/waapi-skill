@@ -270,6 +270,7 @@ from tests.semantic.support.codex_harness import (  # noqa: E402
     probe_windows_powershell_core,
     recoverable_preprocess_attempt_indexes,
     semantic_skill_bootstrap_developer_instructions,
+    semantic_task_developer_instructions,
     turn_usage,
     validate_codex_version_output,
     workspace_skill_install_path,
@@ -3344,6 +3345,7 @@ def _validate_heavy_v3_retryable_task_failure(
         task_root=task_root,
         turn_root=failed_turn_root,
         options=options,
+        expected_skill_read_schedule=expected_skill_reads,
     )
 
     turns_root = task_root / "turns"
@@ -3388,6 +3390,7 @@ def _validate_heavy_v3_retryable_task_failure(
             expected_steps=protocol.steps[previous_validated_prefix:expected_prefix],
             version=str(getattr(expected_unit, "version", "")),
             expected_skill_reads=expected_skill_reads[index - 1],
+            expected_skill_read_schedule=expected_skill_reads,
             prompt_provenance=prompt_evidence.provenance,
         )
         prior_gateway_records.extend(turn_gateway_records)
@@ -3455,6 +3458,7 @@ def _validate_heavy_v3_retryable_failed_facts(
     task_root: Path,
     turn_root: Path,
     options: CampaignOptions,
+    expected_skill_read_schedule: Sequence[Sequence[str]],
 ) -> None:
     required_keys = {
         "command",
@@ -3574,8 +3578,21 @@ def _validate_heavy_v3_retryable_failed_facts(
         allow_output_write=False,
         network_access=True,
         developer_instructions=(
-            semantic_skill_bootstrap_developer_instructions(
-                options.skill_source / "scripts" / "run.py"
+            semantic_task_developer_instructions(
+                options.skill_source / "scripts" / "run.py",
+                task_skill_source=(
+                    task_root
+                    / "agent-workspace"
+                    / ".agents"
+                    / "skills"
+                    / "waapi-skill"
+                ),
+                expected_skill_reads=expected_skill_read_schedule,
+                base_developer_instructions=(
+                    semantic_skill_bootstrap_developer_instructions(
+                        options.skill_source / "scripts" / "run.py"
+                    )
+                ),
             )
             if options.profile == TYPED_INPUT_PROFILE_ID
             else ""
@@ -4891,6 +4908,7 @@ def _validate_heavy_v3_task_result(
             expected_steps=protocol.steps[previous_prefix:expected_prefix],
             version=str(getattr(expected_unit, "version", "")),
             expected_skill_reads=expected_skill_reads[index - 1],
+            expected_skill_read_schedule=expected_skill_reads,
             prompt_provenance=prompt_evidence.provenance,
         )
         gateway_records.extend(turn_gateway_records)
@@ -5648,6 +5666,7 @@ def _validate_heavy_v3_turn_grade(
     expected_steps: Sequence[Any],
     version: str,
     expected_skill_reads: Sequence[str],
+    expected_skill_read_schedule: Sequence[Sequence[str]],
     prompt_provenance: PromptProvenanceEvidence,
 ) -> tuple[Mapping[str, Any], ...]:
     if not isinstance(value, Mapping) or set(value) != {
@@ -5723,6 +5742,7 @@ def _validate_heavy_v3_turn_grade(
         expected_steps=expected_steps,
         version=version,
         expected_skill_reads=expected_skill_reads,
+        expected_skill_read_schedule=expected_skill_read_schedule,
         archived_common_gates=common_gates,
         prompt_provenance=prompt_provenance,
     )
@@ -5746,6 +5766,7 @@ def _validate_heavy_v3_codex_facts(
     expected_steps: Sequence[Any],
     version: str,
     expected_skill_reads: Sequence[str],
+    expected_skill_read_schedule: Sequence[Sequence[str]],
     archived_common_gates: Mapping[str, Any],
     prompt_provenance: PromptProvenanceEvidence,
 ) -> tuple[Mapping[str, Any], ...]:
@@ -5827,8 +5848,21 @@ def _validate_heavy_v3_codex_facts(
         allow_output_write=False,
         network_access=True,
         developer_instructions=(
-            semantic_skill_bootstrap_developer_instructions(
-                options.skill_source / "scripts" / "run.py"
+            semantic_task_developer_instructions(
+                options.skill_source / "scripts" / "run.py",
+                task_skill_source=(
+                    task_root
+                    / "agent-workspace"
+                    / ".agents"
+                    / "skills"
+                    / "waapi-skill"
+                ),
+                expected_skill_reads=expected_skill_read_schedule,
+                base_developer_instructions=(
+                    semantic_skill_bootstrap_developer_instructions(
+                        options.skill_source / "scripts" / "run.py"
+                    )
+                ),
             )
             if options.profile == TYPED_INPUT_PROFILE_ID
             else ""

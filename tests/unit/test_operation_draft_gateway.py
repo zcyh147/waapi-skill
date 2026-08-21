@@ -104,7 +104,7 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
                 "draft-apply",
                 draft_id,
                 "--task-authority",
-                "<task-authority-from-draft-start>",
+                task_authority,
                 "--expected-revision",
                 "1",
                 "--compact",
@@ -116,7 +116,6 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
                 "<typed-fact-arguments>",
             ],
             "replace_only": [
-                "<task-authority-from-draft-start>",
                 "<action-name>",
                 "<typed-fact-arguments>",
             ],
@@ -159,7 +158,19 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
     )
 
     assert inspect_code == 0
-    assert inspected["draft"] == started["draft"]
+    inspected_draft = dict(inspected["draft"])
+    inspected_binding = inspected_draft.pop("next_action_binding")
+    started_draft = dict(started["draft"])
+    started_draft.pop("next_action_binding")
+    assert inspected_draft == started_draft
+    assert inspected_binding["fixed_argv_prefix"][6] == (
+        "<task-authority-from-draft-start>"
+    )
+    assert inspected_binding["replace_only"] == [
+        "<task-authority-from-draft-start>",
+        "<action-name>",
+        "<typed-fact-arguments>",
+    ]
     assert "task_authority" not in inspected
     assert task_authority not in json.dumps(inspected)
 

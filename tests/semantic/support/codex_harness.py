@@ -41,20 +41,20 @@ DEFAULT_SERVICE_TIER = "priority"
 DEFAULT_TIMEOUT_SECONDS = 180.0
 SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "Before any other action, read the injected waapi-skill SKILL.md exactly once "
-    "with one standalone complete file-read shell command. Do not stat or probe the "
-    "file, combine that read with another command, or read SKILL.md again after the "
-    "successful complete read. Whenever a Gateway result supplies next_command, "
-    "execute exactly the complete string named by "
+    "with one standalone complete file-read shell command; do not probe, combine, "
+    "or reread it. For next_command, execute exactly "
     "next_command.copy_instruction.source_field and preserve every quote; never "
-    "reconstruct it from gateway_argv or full_argv. During typed Draft construction, "
-    "copy fixed_argv_prefix, every opaque handle, every schema digest, and every "
-    "response-bound token exactly from the latest authoritative response; replace only "
-    "explicit placeholders and never reconstruct a runner path. On native Windows, "
-    "the exact standalone first command is Get-Content -Raw -Encoding UTF8 "
-    "'.agents\\skills\\waapi-skill\\SKILL.md'; use this short task-local spelling "
-    "even when the injected inventory also displays a long absolute locator. "
-    "Never set or override a shell-tool working directory; use the "
-    "harness-preconfigured task workspace exactly."
+    "reconstruct it from gateway_argv or full_argv. For typed Drafts, copy "
+    "fixed_argv_prefix, every opaque handle, schema digest, and response-bound token; "
+    "replace only explicit placeholders and never reconstruct a runner path. "
+    "Repeat each typed fact template in full; replace one business value with one "
+    "shell argv literal, preserving whitespace inside that item. A successful "
+    "draft-check is not a Preview: execute its next_command before answering or "
+    "asking confirmation unless it declares requires_later_user_message. On "
+    "native Windows the exact first command is Get-Content -Raw -Encoding UTF8 "
+    "'.agents\\skills\\waapi-skill\\SKILL.md'; use this short task-local spelling. "
+    "Never set or override a shell-tool working directory; use the preconfigured "
+    "task workspace."
 )
 
 
@@ -79,13 +79,95 @@ def semantic_skill_bootstrap_developer_instructions(
         )
     return (
         SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
-        + " For every Gateway command that is not supplied as a complete "
-        "next_command, copy this exact fixed command prefix byte-for-byte: "
+        + " For Gateway commands without complete next_command use this exact "
+        "fixed prefix: "
         + command_prefix
-        + ". Append only the Gateway arguments disclosed by the authoritative "
-        "response; never rebuild the runner path from a scenario, workspace, or "
-        "Skill locator."
+        + ". Append only response-disclosed argv; never rebuild its runner path."
     )
+
+
+def semantic_task_developer_instructions(
+    runner_path: str | Path,
+    *,
+    task_skill_source: str | Path,
+    expected_skill_reads: Sequence[Sequence[str]],
+    base_developer_instructions: str | None = None,
+) -> str:
+    """Seal exact host-native Skill reads into one formal task instruction."""
+
+    try:
+        schedule = tuple(tuple(row) for row in expected_skill_reads)
+    except TypeError as exc:
+        raise CodexHarnessError("semantic Skill read schedule is invalid") from exc
+    if not schedule or schedule[0][:1] != ("SKILL.md",):
+        raise CodexHarnessError(
+            "semantic Skill read schedule must begin with exactly one SKILL.md read"
+        )
+    flattened = tuple(value for row in schedule for value in row)
+    if (
+        any(value not in _ALLOWED_SKILL_READS for value in flattened)
+        or flattened.count("SKILL.md") != 1
+        or len(flattened) != len(set(flattened))
+    ):
+        raise CodexHarnessError("semantic Skill read schedule is not closed")
+
+    raw_skill_source = str(task_skill_source)
+    windows_source = PureWindowsPath(raw_skill_source)
+    posix_source = PurePosixPath(raw_skill_source)
+    is_windows = windows_source.is_absolute()
+    if not is_windows and not posix_source.is_absolute():
+        raise CodexHarnessError(
+            "semantic task Skill source must be absolute in its owning path flavor"
+        )
+
+    turn_rows: list[str] = []
+    for turn_index, reads in enumerate(schedule, start=1):
+        if not reads:
+            turn_rows.append(f"turn {turn_index} none")
+            continue
+        commands: list[str] = []
+        for relative in reads:
+            if is_windows:
+                relative_windows = relative.replace("/", "\\")
+                commands.append(
+                    "Get-Content -Raw -Encoding UTF8 "
+                    f"'.agents\\skills\\waapi-skill\\{relative_windows}'"
+                )
+            else:
+                path = posix_source.joinpath(*PurePosixPath(relative).parts)
+                quoted = "'" + str(path).replace("'", "'\"'\"'") + "'"
+                commands.append(f"cat {quoted}")
+        turn_rows.append(
+            f"turn {turn_index} exact reads: "
+            + " then ".join(f"[{command}]" for command in commands)
+        )
+
+    candidate_base = semantic_skill_bootstrap_developer_instructions(runner_path)
+    base = (
+        candidate_base
+        if base_developer_instructions is None
+        else base_developer_instructions
+    )
+    if not isinstance(base, str) or not base or base != base.strip():
+        raise CodexHarnessError("semantic base developer instructions are invalid")
+    if base == candidate_base:
+        task_runner = (
+            windows_source / "scripts" / "run.py"
+            if is_windows
+            else posix_source / "scripts" / "run.py"
+        )
+        base = semantic_skill_bootstrap_developer_instructions(str(task_runner))
+    instructions = (
+        base
+        + " Exact Skill reads: "
+        + "; ".join(turn_rows)
+        + ". No substitutes or extras."
+    )
+    if len(instructions.encode("utf-8")) > 2048:
+        raise CodexHarnessError(
+            "semantic task developer instructions exceed the 2048-byte limit"
+        )
+    return instructions
 
 
 WINDOWS_SEMANTIC_SANDBOX_MODE = "unelevated"

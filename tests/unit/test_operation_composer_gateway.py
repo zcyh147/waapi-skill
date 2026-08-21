@@ -59,6 +59,20 @@ PROJECT_ID = "{22222222-2222-2222-2222-222222222222}"
 ACTION_CONTRACT = "waapi-skill.operation-draft-action/v1"
 
 
+def _assert_pristine_inspected_draft(
+    started: Mapping[str, Any],
+    inspected: Mapping[str, Any],
+) -> None:
+    started_draft = dict(started["draft"])
+    started_draft.pop("next_action_binding")
+    inspected_draft = dict(inspected["draft"])
+    inspected_binding = inspected_draft.pop("next_action_binding")
+    assert inspected_draft == started_draft
+    assert inspected_binding["fixed_argv_prefix"][6] == (
+        "<task-authority-from-draft-start>"
+    )
+
+
 def _composer_fields(composer: Mapping[str, Any]) -> list[dict[str, Any]]:
     fields = composer.get("typed_request_fields")
     if isinstance(fields, list):
@@ -1691,7 +1705,7 @@ def test_invalid_action_is_byte_atomic_and_rejects_complete_request_injection(
         "--task-authority",
         authority,
     )
-    assert inspected["draft"] == started["draft"]
+    _assert_pristine_inspected_draft(started, inspected)
 
 
 def test_invalid_target_selectors_are_registry_rejected_without_any_revision(
@@ -1736,7 +1750,7 @@ def test_invalid_target_selectors_are_registry_rejected_without_any_revision(
         "--task-authority",
         authority,
     )
-    assert inspected["draft"] == started["draft"]
+    _assert_pristine_inspected_draft(started, inspected)
 
 
 def test_public_facts_result_budget_rejects_before_durable_revision(

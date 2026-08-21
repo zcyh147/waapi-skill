@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 
 from tests.support.platform_filesystem import create_symlink_or_skip
+from tests.semantic.support import codex_harness as codex_harness_module
 from tests.semantic.support.codex_business_oracle_plan_v3 import (
     write_business_oracle_plan,
 )
@@ -749,6 +750,7 @@ def _install_task_fakes(
     broker_action_on_failure: bool = False,
     broker_close_failure: bool = False,
     reconciliation_errors: tuple[str, ...] = (),
+    captured_developer_instructions: list[str] | None = None,
 ) -> tuple[CodexInfrastructureError, list[object]]:
     instances: list[object] = []
     expected_names = ("first", "second")
@@ -813,6 +815,10 @@ def _install_task_fakes(
 
     class FakeTask:
         def __init__(self, config: object, *_: object, **__: object) -> None:
+            if captured_developer_instructions is not None:
+                captured_developer_instructions.append(
+                    str(getattr(config, "developer_instructions"))
+                )
             self.broker = instances[-1]
             workspace = Path(getattr(config, "workspace"))
             receipt_path = workspace.parent / task_runner.PROMPT_MATERIALIZATION_FILE
@@ -947,6 +953,7 @@ def _run_infrastructure_task(
     prompts: tuple[str, ...],
     plan_tamper: str | None = None,
     protocol: V3GatewayProtocol | None = None,
+    developer_instructions: str = "",
 ) -> Path:
     skill_source = tmp_path / "skill"
     skill_source.mkdir()
@@ -1053,6 +1060,7 @@ def _run_infrastructure_task(
         runner_environment={},
         required_reference="references/waapi-operate.md",
         business_oracle_plan=business_oracle_plan,
+        developer_instructions=developer_instructions,
     )
     return task_root
 
@@ -1257,6 +1265,46 @@ def test_codex_infrastructure_failure_archives_closed_fixed_path_evidence(
     assert (failed_turn_root / "prompt.txt").read_text(encoding="utf-8") == (
         prompts[failure_turn - 1] + "\n"
     )
+
+
+def test_v3_task_seals_exact_task_local_skill_reads_and_runner(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: list[str] = []
+    _install_task_fakes(
+        monkeypatch,
+        failure_turn=1,
+        captured_developer_instructions=captured,
+    )
+    candidate_runner = tmp_path / "skill" / "scripts" / "run.py"
+    base = codex_harness_module.semantic_skill_bootstrap_developer_instructions(
+        candidate_runner
+    )
+
+    with pytest.raises(CodexInfrastructureError):
+        _run_infrastructure_task(
+            tmp_path,
+            prompts=("first natural prompt", "second natural prompt"),
+            developer_instructions=base,
+        )
+
+    assert len(captured) == 1
+    task_skill = (
+        tmp_path
+        / "scenario"
+        / "evidence"
+        / "codex-task"
+        / "agent-workspace"
+        / ".agents"
+        / "skills"
+        / "waapi-skill"
+    )
+    instructions = captured[0]
+    assert f"cat '{task_skill / 'SKILL.md'}'" in instructions
+    assert f"cat '{task_skill / 'references' / 'waapi-operate.md'}'" in instructions
+    assert f"python '{task_skill / 'scripts' / 'run.py'}' gateway.py" in instructions
+    assert str(candidate_runner) not in instructions
 
 
 def test_codex_infrastructure_archive_failure_masks_retryable_error(

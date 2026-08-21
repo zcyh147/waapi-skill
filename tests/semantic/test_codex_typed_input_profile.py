@@ -224,6 +224,21 @@ def test_metadata_set_prompt_names_each_exact_target_path() -> None:
     )
 
 
+def test_2025_metadata_set_prompt_names_the_exact_actor_mixer_type() -> None:
+    profile = load_typed_input_profile(PROFILE_PATH)
+    unit = next(
+        unit
+        for unit in profile.units
+        if unit.unit_id == "TYP25-METADATA-OBJECT-SET"
+    )
+
+    assert "三个 Actor Mixer 的完整路径" in unit.scenario.prompt
+    assert all(
+        command not in unit.scenario.prompt
+        for command in ("metadata discover", "--object-type", "operation-schema")
+    )
+
+
 def test_recursive_object_create_prompt_declares_the_requested_sound_leaves() -> None:
     profile = load_typed_input_profile(PROFILE_PATH)
     unit = next(

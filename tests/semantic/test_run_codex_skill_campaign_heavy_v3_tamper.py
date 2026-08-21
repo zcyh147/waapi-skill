@@ -283,6 +283,10 @@ def _validate_campaign_prompt_asset_read(
         turn_root,
         provenance,
     ) = fixture_value
+    expected_skill_reads = (
+        "SKILL.md",
+        fixture._synthetic_required_reference(unit),
+    )
     return campaign._validate_heavy_v3_codex_facts(
         facts,
         turn_index=1,
@@ -293,10 +297,8 @@ def _validate_campaign_prompt_asset_read(
         options=options,
         expected_steps=provenance.protocol.steps,
         version=unit.version,
-        expected_skill_reads=(
-            "SKILL.md",
-            fixture._synthetic_required_reference(unit),
-        ),
+        expected_skill_reads=expected_skill_reads,
+        expected_skill_read_schedule=(expected_skill_reads,),
         archived_common_gates=archived_gates,
         prompt_provenance=provenance,
     )
