@@ -1361,13 +1361,12 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     assert "root_fact_queue_anchor" not in child_array_projected["continuation"]
     assert child_array_projected["continuation"]["next_command_decision"][
         "evaluate_in_order"
-    ][0]["first_command_pointer"] == "/continuation/deferred_fact/argv"
+    ][0]["command_key"] == "deferred_fact"
     assert child_array_projected["continuation"]["deferred_fact"][
         "complete_command_assembly"
     ] == {
         "fixed_argv_prefix_source": (
-            "most_recent_successful_draft_action_response/"
-            "draft/next_action_binding/fixed_argv_prefix"
+            "latest_draft_response.next_action_binding.fixed_argv_prefix"
         ),
         "append_this_fact_argv_exactly": True,
     }
@@ -1386,7 +1385,7 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
 
     projected = gateway.gateway_stdout_payload(leaf)
     encoded = gateway.gateway_stdout_json_encoder(projected).encode(projected)
-    assert len((encoded + "\n").encode("utf-8")) < 19 * 256
+    assert len((encoded + "\n").encode("utf-8")) < 4 * 1024
     assert projected["handle"] == leaf["handle"]
     assert projected["schema_lineage_token"] == leaf["schema_lineage_token"]
     assert projected["response_integrity"] == root_projected["response_integrity"]
@@ -1465,13 +1464,6 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     assert "shared_policy" not in projected_scalar_table
     raw_nested_rows = leaf["continuation"]["nested_container_disclosures"]
     nested_table = projected["continuation"]["nested_container_disclosures"]
-    assert nested_table["columns"] == [
-        "key",
-        "shape",
-        "required",
-        "queue_index",
-        "argv_middle",
-    ]
     nested_business_pointers = [
         row["business_value_pointer"] for row in raw_nested_rows
     ]
@@ -1487,39 +1479,21 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     assert nested_table["absent_business_values"] == (
         "skip_without_gateway_command"
     )
-    assert nested_table["command_assembly"] == {
-        "fixed_argv_prefix": raw_nested_rows[0]["argv"][:4],
-        "append_selected_row": "argv_middle",
-        "fixed_argv_suffix": raw_nested_rows[0]["argv"][-2:],
-        "assembly_order": [
-            "fixed_argv_prefix",
-            "selected_row.argv_middle",
-            "fixed_argv_suffix",
-        ],
-    }
-    assert nested_table["rows"] == [
-        [
-            row["key"],
-            row["shape"],
-            row["required"],
-            row["queue_index"],
-            ["--key", row["key"], "--shape", row["shape"]],
-        ]
-        for row in raw_nested_rows
+    assert nested_table["allowed_members"] == [
+        row["key"] for row in raw_nested_rows
     ]
-    for projected_row, raw_row in zip(
-        nested_table["rows"], raw_nested_rows, strict=True
-    ):
+    assert nested_table["shape"] == "array"
+    assert nested_table["replace_only"] == ["<selected-business-member>"]
+    for raw_row in raw_nested_rows:
         assert [
-            *nested_table["command_assembly"]["fixed_argv_prefix"],
-            *projected_row[-1],
-            *nested_table["command_assembly"]["fixed_argv_suffix"],
+            raw_row["key"]
+            if token == "<selected-business-member>"
+            else token
+            for token in nested_table["argv_template"]
         ] == raw_row["argv"]
     assert projected["continuation"]["next_command_decision"][
         "evaluate_in_order"
-    ][0]["first_command_pointer"] == (
-        "/continuation/deferred_fact/argv"
-    )
+    ][0]["command_key"] == "deferred_fact"
     assert "root_fact_queue_anchor" not in projected["continuation"]
     assert projected["continuation"]["next_command_decision"][
         "evaluate_in_order"
@@ -1531,9 +1505,7 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
         ]
         if row["candidate"] == "nested_container_disclosures"
     )
-    assert nested_candidate["command_pointer"] == (
-        "/continuation/nested_container_disclosures/command_assembly"
-    )
+    assert nested_candidate["command_key"] == "nested_container_disclosures"
     assert list(projected["continuation"])[:5] == [
         "next_command_decision",
         "deferred_fact",
@@ -1557,8 +1529,8 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     assert code == 0, last_leaf
     last_projected = gateway.gateway_stdout_payload(last_leaf)
     last_decision = last_projected["continuation"]["next_command_decision"]
-    assert last_decision["evaluate_in_order"][0]["first_command_pointer"] == (
-        "/continuation/deferred_fact/argv"
+    assert last_decision["evaluate_in_order"][0]["command_key"] == (
+        "deferred_fact"
     )
     assert "root_fact_queue_anchor" not in last_projected["continuation"]
     assert last_projected["continuation"]["business_sibling_transition"][

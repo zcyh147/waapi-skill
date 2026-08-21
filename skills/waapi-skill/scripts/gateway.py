@@ -2259,19 +2259,28 @@ def gateway_stdout_payload(value: Any) -> Any:
         or value.get("contract") != "waapi-skill.typed-container-handle/v1"
     ):
         return value
+    compact_recursive_object = value.get("uri") == "object.create"
+    compact_recursive_audit_fields = (
+        {"schema_digest", "parent_handle", "key", "shape"}
+        if compact_recursive_object
+        else set()
+    )
     projected = {
         key: item
         for key, item in value.items()
         if key
-        not in {
-            "business_value_scope",
-            "schema_lineage_authority",
-            "construction_state",
-            "session_context",
-            "child_contract",
-            "continuation",
-            "response_integrity",
-        }
+        not in (
+            {
+                "business_value_scope",
+                "schema_lineage_authority",
+                "construction_state",
+                "session_context",
+                "child_contract",
+                "continuation",
+                "response_integrity",
+            }
+            | compact_recursive_audit_fields
+        )
     }
     projected["response_integrity"] = {
         "complete": True,
@@ -2279,7 +2288,6 @@ def gateway_stdout_payload(value: Any) -> Any:
     }
     raw_child_contract = value.get("child_contract")
     projected_child_contract: dict[str, Any] | None = None
-    compact_recursive_object = value.get("uri") == "object.create"
     if isinstance(raw_child_contract, Mapping):
         projected_child_contract = {
             key: item
@@ -2437,31 +2445,39 @@ def gateway_stdout_payload(value: Any) -> Any:
             }
         evaluate = decision.get("evaluate_in_order")
         if isinstance(evaluate, list):
-            decision["evaluate_in_order"] = (
-                [
-                    {
-                        key: row[key]
-                        for key in (
-                            "candidate",
-                            "first_command_pointer",
-                            "command_pointer",
-                            "after_success",
-                        )
-                        if key in row
-                    }
-                    for row in evaluate
-                    if isinstance(row, Mapping)
-                ]
-                if compact_recursive_object
-                else list(evaluate)
-            )
             if compact_recursive_object:
-                for row in decision["evaluate_in_order"]:
-                    if row.get("candidate") == "nested_container_disclosures":
-                        row["command_pointer"] = (
-                            "/continuation/nested_container_disclosures/"
-                            "command_assembly"
+                command_key_by_candidate = {
+                    "branch_disclosure": "branch_disclosure",
+                    "deferred_fact_queue": "deferred_fact",
+                    "nested_container_disclosures": (
+                        "nested_container_disclosures"
+                    ),
+                    "next_item_disclosure": "next_item_disclosure",
+                    "business_sibling_transition": (
+                        "business_sibling_transition"
+                    ),
+                }
+                compact_evaluate: list[dict[str, Any]] = []
+                for row in evaluate:
+                    if not isinstance(row, Mapping):
+                        continue
+                    candidate = row.get("candidate")
+                    if not isinstance(candidate, str) or candidate not in (
+                        command_key_by_candidate
+                    ):
+                        continue
+                    compact_row: dict[str, Any] = {
+                        "candidate": candidate,
+                        "command_key": command_key_by_candidate[candidate],
+                    }
+                    if "after_success" in row:
+                        compact_row["after_success"] = (
+                            "re_evaluate_same_response"
                         )
+                    compact_evaluate.append(compact_row)
+                decision["evaluate_in_order"] = compact_evaluate
+            else:
+                decision["evaluate_in_order"] = list(evaluate)
             candidate_key_by_name = {
                 "branch_disclosure": "branch_disclosure",
                 "nested_container_disclosures": "nested_container_disclosures",
@@ -2494,8 +2510,8 @@ def gateway_stdout_payload(value: Any) -> Any:
                     **item,
                     "complete_command_assembly": {
                         "fixed_argv_prefix_source": (
-                            "most_recent_successful_draft_action_response/"
-                            "draft/next_action_binding/fixed_argv_prefix"
+                            "latest_draft_response.next_action_binding."
+                            "fixed_argv_prefix"
                         ),
                         "append_this_fact_argv_exactly": True,
                     },
@@ -2570,26 +2586,9 @@ def gateway_stdout_payload(value: Any) -> Any:
                             "business object pointer."
                         )
                     item = {
-                        "columns": [
-                            "key",
-                            "shape",
-                            "required",
-                            "queue_index",
-                            "argv_middle",
-                        ],
                         "business_object_pointer": next(
                             iter(nested_object_pointers)
                         ),
-                        "rows": [
-                            [
-                                row.get("key"),
-                                row.get("shape"),
-                                row.get("required"),
-                                row.get("queue_index"),
-                                argv[4:-2],
-                            ]
-                            for row, argv in zip(item, argv_rows, strict=True)
-                        ],
                         "selection": (
                             "first_row_with_present_business_value_pointer_"
                             "in_queue_order"
@@ -2597,16 +2596,17 @@ def gateway_stdout_payload(value: Any) -> Any:
                         "absent_business_values": (
                             "skip_without_gateway_command"
                         ),
-                        "command_assembly": {
-                            "fixed_argv_prefix": argv_rows[0][:4],
-                            "append_selected_row": "argv_middle",
-                            "fixed_argv_suffix": argv_rows[0][-2:],
-                            "assembly_order": [
-                                "fixed_argv_prefix",
-                                "selected_row.argv_middle",
-                                "fixed_argv_suffix",
-                            ],
-                        },
+                        "allowed_members": [row.get("key") for row in item],
+                        "shape": "array",
+                        "argv_template": [
+                            *argv_rows[0][:4],
+                            "--key",
+                            "<selected-business-member>",
+                            "--shape",
+                            "array",
+                            *argv_rows[0][-2:],
+                        ],
+                        "replace_only": ["<selected-business-member>"],
                     }
             continuation[key] = item
     for key, item in raw_continuation.items():

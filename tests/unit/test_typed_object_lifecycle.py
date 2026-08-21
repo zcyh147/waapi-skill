@@ -186,7 +186,10 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
     ).encode(public_container)
     decision_offset = encoded_container.index('"next_command_decision":{')
     nested_offset = encoded_container.index('"nested_container_disclosures":{')
-    children_offset = encoded_container.index('["children","array"', nested_offset)
+    children_offset = encoded_container.index(
+        '"allowed_members":["properties","references","children"]',
+        nested_offset,
+    )
     assert decision_offset < nested_offset
     assert '"request_wide_order"' not in encoded_container
     assert children_offset < 4096
