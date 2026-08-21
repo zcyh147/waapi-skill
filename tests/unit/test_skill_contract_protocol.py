@@ -1211,6 +1211,10 @@ def test_one_time_onboarding_is_global_natural_and_does_not_add_a_gateway_call()
     for phrase in (
         "The first time this Skill is used in a conversation",
         "do not announce that it is loaded before the first gateway result",
+        "A Skill or lane-reference file read is not a Gateway result",
+        "do not emit a placeholder introduction",
+        "the very next Agent message",
+        "state every actual returned fact together, even if an earlier message mentioned part",
         "`session_context.one_time_introduction.facts`",
         "the first Agent message after that result",
         "one short, atomic introduction",

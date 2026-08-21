@@ -458,7 +458,7 @@ class TypedRequestContract:
                 if shape == "scalar"
                 else "choose"
                 if shape == "branch"
-                else "array"
+                else "append"
                 if shape == "array"
                 else "map-put"
                 if shape == "map"

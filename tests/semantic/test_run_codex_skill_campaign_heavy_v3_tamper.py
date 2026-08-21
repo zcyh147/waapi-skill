@@ -2085,6 +2085,40 @@ def test_get02_campaign_rechecks_paired_path_boundaries_from_final_text(
         _validate(options, unit, root)
 
 
+def test_paired_path_archive_scopes_proof_after_candidate_inventory(
+    tmp_path: Path,
+) -> None:
+    unit = fixture._unit(2)
+    _options, _unit, _root, scenario_root, task_root = _passing_case(
+        tmp_path,
+        unit=unit,
+    )
+    turn_root = task_root / "turns" / "turn-01"
+    response = (turn_root / "final.txt").read_text(encoding="utf-8").rstrip("\n")
+    outcome = json.loads((scenario_root / "outcome.json").read_text(encoding="utf-8"))
+    proof = copy.deepcopy(
+        outcome["checks"]["business_verification"]["verification"]["evidence"]
+    )
+    inventory = "candidate inventory: " + " | ".join(
+        str(row["path"])
+        for row in (
+            *proof["required_identity_tokens"],
+            *proof["excluded_identity_tokens"],
+        )
+    )
+    response = inventory + "\n" + response
+    for row in proof["required_identity_tokens"]:
+        row["first_line"] += 1
+    for row in proof["paired_rows"]:
+        row["line_index"] += 1
+
+    campaign._validate_archived_paired_path_answer(
+        proof,
+        final_response=response,
+        label="project business oracle",
+    )
+
+
 def test_get02_campaign_recomputes_unexpected_language_from_final_text(
     tmp_path: Path,
 ) -> None:

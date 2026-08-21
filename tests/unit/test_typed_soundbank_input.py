@@ -1159,6 +1159,30 @@ def test_generate_public_schema_explains_the_skip_languages_boolean(
     )
 
 
+def test_generate_top_level_scalar_arrays_disclose_append_actions(
+    tmp_path: Path,
+) -> None:
+    code, payload = gateway.execute_gateway(
+        ["--version", "2024.1", "operation-schema", "soundbank.generate"],
+        env=_env(tmp_path, "2024.1"),
+        client_factory=lambda url: pytest.fail(
+            f"operation-schema connected to {url}"
+        ),
+    )
+
+    assert code == 0, payload
+    table = payload["composer"]["top_level_fact_plan"]
+    rows = [
+        dict(zip(table["columns"], row, strict=True)) for row in table["rows"]
+    ]
+    assert next(row for row in rows if row["name"] == "platforms")["action"] == (
+        "append"
+    )
+    assert next(row for row in rows if row["name"] == "languages")["action"] == (
+        "append"
+    )
+
+
 def test_generate_identity_collection_limit_is_registry_owned() -> None:
     contract = draft_operation_request_contract("soundbank.generate", "2025.1")
     banks = _field(contract, ("soundbanks",), shape="array")

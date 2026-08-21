@@ -4525,7 +4525,7 @@ def _topic_top_level_fact_table(
                 f"--{prefix}-set", handle, value_type, "<business-value>",
             ]
             empty = None
-        elif action == "array":
+        elif action == "append":
             nonempty = [
                 f"--{prefix}-append", handle, value_type, "<business-value>",
             ]
@@ -4851,10 +4851,16 @@ def _bind_dynamic_branch_facts(
             "parent_fact_action_count": 1,
             "maximum_groups_with_parent_fact": 2,
             "maximum_groups_without_parent_fact": 3,
+            "exact_group_count": (
+                "with the parent fact use min(2,business-present queued groups); "
+                "without it use min(3,remaining business-present queued groups)"
+            ),
+            "early_execute_with_a_business_present_group_unpacked": "invalid",
             "rule": (
-                "start with the deferred parent fact, append at most two complete "
-                "branch groups, execute, read the new revision, then pack at most "
-                "three complete remaining groups per later batch"
+                "start with the deferred parent fact, append exactly the next up "
+                "to two business-present complete branch groups, execute, read the "
+                "new revision, then pack exactly the next up to three remaining "
+                "business-present complete groups per later batch"
             ),
         },
     }

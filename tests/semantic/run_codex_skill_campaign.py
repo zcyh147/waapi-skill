@@ -10392,18 +10392,43 @@ def _validate_archived_paired_path_answer(
     order = proof.get("observed_answer_order")
     if not all(isinstance(value, list) for value in (required, excluded, paired, order)):
         raise CampaignEvidenceError(f"{label} paired answer arrays are invalid")
-    for item in required:
-        token = _closed_oracle_mapping(
+    required_tokens = [
+        _closed_oracle_mapping(
             item,
             {"key", "path", "occurrence_count", "first_line"},
             label=f"{label} required path token",
         )
+        for item in required
+    ]
+    first_lines = [token.get("first_line") for token in required_tokens]
+    paired_line_hashes = [
+        row.get("line_sha256") if isinstance(row, Mapping) else None
+        for row in paired
+    ]
+    if (
+        not first_lines
+        or any(type(index) is not int or index < 0 for index in first_lines)
+        or not paired_line_hashes
+        or any(not _sha256_text_value(value) for value in paired_line_hashes)
+    ):
+        raise CampaignEvidenceError(f"{label} required answer scope is invalid")
+    paired_line_indexes = [
+        index
+        for line_hash in paired_line_hashes
+        for index, line in enumerate(lines)
+        if hashlib.sha256(line.encode("utf-8")).hexdigest() == line_hash
+    ]
+    if len(paired_line_indexes) != len(paired_line_hashes):
+        raise CampaignEvidenceError(f"{label} paired path proof scope is invalid")
+    answer_start = min(paired_line_indexes)
+    answer_lines = tuple(enumerate(lines[answer_start:], start=answer_start))
+    for token in required_tokens:
         path = token.get("path")
         if not _nonempty_text(path):
             raise CampaignEvidenceError(f"{label} required path is invalid")
         matches = [
             (index, offset)
-            for index, line in enumerate(lines)
+            for index, line in answer_lines
             for offset in _campaign_path_token_offsets(line, str(path))
         ]
         if (
@@ -10425,7 +10450,7 @@ def _validate_archived_paired_path_answer(
             raise CampaignEvidenceError(f"{label} excluded path is invalid")
         matches = [
             offset
-            for line in lines
+            for _, line in answer_lines
             for offset in _campaign_path_token_offsets(line, str(path))
         ]
         if token.get("occurrence_count") != len(matches) or matches:
@@ -10473,7 +10498,7 @@ def _validate_archived_paired_path_answer(
             raise CampaignEvidenceError(f"{label} paired path row values are invalid")
         child_matches = [
             (index, offset)
-            for index, line in enumerate(lines)
+            for index, line in answer_lines
             for offset in _campaign_path_token_offsets(line, str(row["child_path"]))
         ]
         line_index = child_matches[0][0] if child_matches else None
