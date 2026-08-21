@@ -432,9 +432,15 @@ def test_typed_input_project_dispatch_seals_pre_action_developer_instructions(
     )
 
     assert outcome.passed
-    assert observed["options"].developer_instructions == (
+    developer_instructions = observed["options"].developer_instructions
+    assert developer_instructions.startswith(
         matrix.SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
     )
+    assert (
+        "python "
+        f"'{options.skill_source / 'scripts' / 'run.py'}' "
+        "gateway.py"
+    ) in developer_instructions
 
 
 def test_audio_convert_hidden_io_root_is_blocked_before_runner_execution(

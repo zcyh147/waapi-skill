@@ -87,6 +87,7 @@ from tests.semantic.support.codex_harness import (  # noqa: E402  # pyright: ign
     normalized_gateway_command_argv,
     prepare_workspace_skill_install,
     resolve_codex_binary,
+    semantic_skill_bootstrap_developer_instructions,
 )
 from tests.semantic.support.codex_transaction_seal import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     PreviewSealEvidence,
@@ -769,7 +770,9 @@ def run_heavy_v3_unit(
             live_environment=live_environment,
             windows_powershell_core_host=options.windows_powershell_core_host,
             developer_instructions=(
-                SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
+                semantic_skill_bootstrap_developer_instructions(
+                    options.skill_source / "scripts" / "run.py"
+                )
                 if options.profile == TYPED_INPUT_PROFILE_ID
                 else ""
             ),

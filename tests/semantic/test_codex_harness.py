@@ -1433,6 +1433,22 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "never reconstruct" in instructions
 
 
+def test_formal_bootstrap_instructions_bind_one_exact_windows_runner_prefix() -> None:
+    runner = r"C:\Git_Repos\waapi-skills\skills\waapi-skill\scripts\run.py"
+
+    instructions = (
+        codex_harness_module.semantic_skill_bootstrap_developer_instructions(runner)
+    )
+
+    assert (
+        "python "
+        r"'C:\Git_Repos\waapi-skills\skills\waapi-skill\scripts\run.py' "
+        "'gateway.py'"
+    ) in instructions
+    assert "copy this exact fixed command prefix byte-for-byte" in instructions
+    assert len(instructions.encode("utf-8")) <= 2048
+
+
 def test_prompt_audit_requires_exact_bootstrap_developer_instruction_once(
     tmp_path: Path,
 ) -> None:

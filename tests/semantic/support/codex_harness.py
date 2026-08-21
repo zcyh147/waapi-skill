@@ -25,6 +25,7 @@ from wwise_waapi.platform_commands import (
     WINDOWS_POWERSHELL_ENCODED_FAMILY,
     decode_windows_model_argv,
     decode_windows_powershell_argv,
+    encode_windows_model_argv,
 )
 from tests.semantic.support.codex_gateway_contracts import (
     GATEWAY_RESULT_CONTRACT,
@@ -53,6 +54,38 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "'.agents\\skills\\waapi-skill\\SKILL.md'; use this short task-local spelling "
     "even when the injected inventory also displays a long absolute locator."
 )
+
+
+def semantic_skill_bootstrap_developer_instructions(
+    runner_path: str | Path,
+) -> str:
+    """Bind typed-profile model guidance to one exact packaged runner prefix."""
+
+    raw_runner = str(runner_path)
+    windows_path = PureWindowsPath(raw_runner)
+    posix_path = PurePosixPath(raw_runner)
+    if windows_path.is_absolute():
+        command_prefix = encode_windows_model_argv(
+            ("python", raw_runner, "gateway.py")
+        )
+    elif posix_path.is_absolute():
+        quoted_runner = "'" + raw_runner.replace("'", "'\"'\"'") + "'"
+        command_prefix = f"python {quoted_runner} gateway.py"
+    else:
+        raise CodexHarnessError(
+            "semantic Skill runner path must be absolute in its owning path flavor"
+        )
+    return (
+        SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
+        + " For every Gateway command that is not supplied as a complete "
+        "next_command, copy this exact fixed command prefix byte-for-byte: "
+        + command_prefix
+        + ". Append only the Gateway arguments disclosed by the authoritative "
+        "response; never rebuild the runner path from a scenario, workspace, or "
+        "Skill locator."
+    )
+
+
 WINDOWS_SEMANTIC_SANDBOX_MODE = "unelevated"
 WINDOWS_HARD_REAP_SECONDS = 5.0
 PROMPT_AUDIT_TIMEOUT_SECONDS = 30.0

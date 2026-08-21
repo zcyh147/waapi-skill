@@ -251,7 +251,6 @@ from tests.semantic.support.codex_harness import (  # noqa: E402
     CodexGatewayErrorExpectation,
     CodexHarnessConfig,
     CodexHarnessError,
-    SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS,
     WindowsPowerShellCoreHost,
     audit_session_events,
     build_task_exec_command,
@@ -270,6 +269,7 @@ from tests.semantic.support.codex_harness import (  # noqa: E402
     powershell_core_host_fingerprint,
     probe_windows_powershell_core,
     recoverable_preprocess_attempt_indexes,
+    semantic_skill_bootstrap_developer_instructions,
     turn_usage,
     validate_codex_version_output,
     workspace_skill_install_path,
@@ -3574,7 +3574,9 @@ def _validate_heavy_v3_retryable_failed_facts(
         allow_output_write=False,
         network_access=True,
         developer_instructions=(
-            SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
+            semantic_skill_bootstrap_developer_instructions(
+                options.skill_source / "scripts" / "run.py"
+            )
             if options.profile == TYPED_INPUT_PROFILE_ID
             else ""
         ),
@@ -5825,7 +5827,9 @@ def _validate_heavy_v3_codex_facts(
         allow_output_write=False,
         network_access=True,
         developer_instructions=(
-            SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
+            semantic_skill_bootstrap_developer_instructions(
+                options.skill_source / "scripts" / "run.py"
+            )
             if options.profile == TYPED_INPUT_PROFILE_ID
             else ""
         ),
