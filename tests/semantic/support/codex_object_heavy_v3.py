@@ -2443,6 +2443,82 @@ def build_object_heavy_v3_recipe(
         ) from exc
 
 
+def typed_input_merge_recipe(
+    recipe: ObjectHeavyRecipe,
+    *,
+    unit_id: str,
+) -> ObjectHeavyRecipe:
+    """Narrow the reviewed typed-input merge to one recursive Alert group."""
+
+    if (
+        unit_id != "TYP21-DEDICATED-OBJECT-CREATE"
+        or recipe.scenario_id != "OBJ22-F-CREATE-02"
+        or recipe.version != "2021.1"
+        or recipe.api != OBJECT_CREATE_URI
+        or not isinstance(recipe.request, OperationRequestSpec)
+        or recipe.request.operation != "object.create"
+    ):
+        raise ObjectHeavyRecipeError(
+            "typed-input merge recipe is outside its reviewed unit/version lane"
+        )
+    arguments = _plain(recipe.request.arguments)
+    children = arguments.get("children")
+    if not isinstance(children, list):
+        raise ObjectHeavyRecipeError("typed-input merge children are malformed")
+    selected_children = [
+        row
+        for row in children
+        if isinstance(row, dict) and row.get("name") == "Alert"
+    ]
+    if len(selected_children) != 1:
+        raise ObjectHeavyRecipeError(
+            "typed-input merge must select one exact Alert group"
+        )
+    arguments["children"] = selected_children
+    retained_keys = {
+        "robot",
+        "idle",
+        "idle_a",
+        "alert",
+        "alert_a",
+        "alert_b",
+    }
+    expected_objects = tuple(
+        replace(row, children=("idle", "alert"))
+        if row.key == "robot"
+        else row
+        for row in recipe.oracle.expected_objects
+        if row.key in retained_keys
+    )
+    rules = tuple(
+        replace(
+            rule,
+            subject_keys=tuple(
+                key for key in rule.subject_keys if key in retained_keys
+            ),
+        )
+        for rule in recipe.oracle.rules
+    )
+    return replace(
+        recipe,
+        prompt_literals=tuple(
+            value
+            for value in recipe.prompt_literals
+            if value not in {"Combat", "Damage", "战斗对白", "受击对白"}
+        ),
+        request=OperationRequestSpec(
+            operation="object.create",
+            arguments=_freeze(arguments),
+        ),
+        oracle=replace(
+            recipe.oracle,
+            expected_objects=expected_objects,
+            new_keys=("alert", "alert_a", "alert_b"),
+            rules=rules,
+        ),
+    )
+
+
 def all_object_heavy_v3_recipes() -> tuple[ObjectHeavyRecipe, ...]:
     """Return all fifteen recipes in create/get/set review order."""
 
@@ -2480,4 +2556,5 @@ __all__ = [
     "QueryObjectRequestSpec",
     "all_object_heavy_v3_recipes",
     "build_object_heavy_v3_recipe",
+    "typed_input_merge_recipe",
 ]

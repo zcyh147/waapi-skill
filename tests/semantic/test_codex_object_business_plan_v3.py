@@ -43,6 +43,7 @@ from tests.semantic.support.codex_object_heavy_v3 import (
     OperationRequestSpec,
     QueryObjectRequestSpec,
     build_object_heavy_v3_recipe,
+    typed_input_merge_recipe,
 )
 from tests.semantic.support.codex_object_runtime_v3 import (
     MaterializedObject,
@@ -599,7 +600,10 @@ def test_typed_profile_merge_reads_the_exact_root_before_schema_continuation() -
         for row in load_typed_input_profile(profile_path).units
         if row.unit_id == "TYP21-DEDICATED-OBJECT-CREATE"
     )
-    recipe = build_object_heavy_v3_recipe(unit.base_scenario_id, unit.version)
+    recipe = typed_input_merge_recipe(
+        build_object_heavy_v3_recipe(unit.base_scenario_id, unit.version),
+        unit_id=unit.unit_id,
+    )
 
     protocol = build_object_merge_query_protocol(unit.scenario, recipe)
 

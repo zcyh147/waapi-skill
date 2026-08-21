@@ -22,6 +22,7 @@ from tests.semantic.support.codex_object_heavy_v3 import (
     QueryObjectRequestSpec,
     all_object_heavy_v3_recipes,
     build_object_heavy_v3_recipe,
+    typed_input_merge_recipe,
 )
 from wwise_waapi.operation_registry import parse_operation_request
 
@@ -91,6 +92,44 @@ def test_all_fifteen_object_heavy_ids_build_deterministically() -> None:
 
     with pytest.raises(ObjectHeavyRecipeError, match="unknown object-heavy V3 scenario"):
         build_object_heavy_v3_recipe("OBJ22-F-GET-99")
+
+
+def test_typed_input_merge_recipe_keeps_one_representative_recursive_group() -> None:
+    base = build_object_heavy_v3_recipe("OBJ22-F-CREATE-02", "2021.1")
+
+    recipe = typed_input_merge_recipe(
+        base,
+        unit_id="TYP21-DEDICATED-OBJECT-CREATE",
+    )
+
+    assert isinstance(recipe.request, OperationRequestSpec)
+    assert [row["name"] for row in recipe.request.arguments["children"]] == [
+        "Alert"
+    ]
+    assert recipe.oracle.new_keys == ("alert", "alert_a", "alert_b")
+    robot = next(row for row in recipe.oracle.expected_objects if row.key == "robot")
+    assert robot.children == ("idle", "alert")
+    assert {row.key for row in recipe.oracle.expected_objects} == {
+        "robot",
+        "idle",
+        "idle_a",
+        "alert",
+        "alert_a",
+        "alert_b",
+    }
+    assert "Combat" not in recipe.prompt_literals
+    assert "Damage" not in recipe.prompt_literals
+    assert base.oracle.new_keys == (
+        "alert",
+        "alert_a",
+        "alert_b",
+        "combat",
+        "combat_a",
+        "combat_b",
+        "damage",
+        "damage_a",
+        "damage_b",
+    )
 
 
 def test_every_agent_visible_literal_is_grounded_in_the_approved_prompt() -> None:

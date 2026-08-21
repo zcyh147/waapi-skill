@@ -116,6 +116,7 @@ from tests.semantic.support.codex_object_heavy_v3 import (
     OperationRequestSpec,
     QueryObjectRequestSpec,
     build_object_heavy_v3_recipe,
+    typed_input_merge_recipe,
 )
 from wwise_waapi.platform_commands import (
     PlatformCommandError,
@@ -7914,6 +7915,55 @@ def test_campaign_typed_profile_set03_plan_binds_exact_unit_metadata_lane(
         )
 
 
+def test_campaign_typed_input_merge_replays_the_narrow_reviewed_recipe() -> None:
+    from tests.semantic.support.codex_object_business_plan_v3 import (
+        build_object_merge_query_protocol,
+    )
+    from tests.semantic.support.codex_typed_input_profile import (
+        load_typed_input_profile,
+    )
+
+    profile = load_typed_input_profile(
+        Path(__file__).resolve().parent
+        / "data"
+        / "typed-input-v1"
+        / "profile.json"
+    )
+    unit = next(
+        row
+        for row in profile.units
+        if row.unit_id == "TYP21-DEDICATED-OBJECT-CREATE"
+    )
+    recipe = typed_input_merge_recipe(
+        build_object_heavy_v3_recipe(
+            unit.base_scenario_id,
+            version=unit.version,
+        ),
+        unit_id=unit.unit_id,
+    )
+    protocol = build_object_merge_query_protocol(unit.scenario, recipe)
+    assert protocol is not None
+    sections = compile_object_business_plan(
+        unit.scenario,
+        recipe,
+        protocol,
+        _synthetic_object_before(recipe),
+        (),
+    )
+
+    parsed = campaign._validate_heavy_v3_typed_business_plan(
+        sections.writer_kwargs(),
+        expected_unit=unit,
+        provenance=SimpleNamespace(protocol=protocol),
+    )
+
+    assert parsed is not None
+    assert [
+        row["name"]
+        for row in parsed.static_expectation["request"]["value"]["arguments"][
+            "children"
+        ]
+    ] == ["Alert"]
 def test_campaign_object_recipe_fixture_fallback_binds_2025_lane() -> None:
     from tests.semantic.support.codex_compound_heavy_v1 import (
         load_compound_heavy_profile,

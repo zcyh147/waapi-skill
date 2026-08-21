@@ -163,6 +163,7 @@ from tests.semantic.support.codex_object_heavy_v3 import (
     ObjectHeavyRecipe,
     OperationRequestSpec,
     build_object_heavy_v3_recipe,
+    typed_input_merge_recipe,
 )
 from tests.semantic.support.codex_object_business_plan_v3 import (
     ObjectBusinessPlanSections,
@@ -4710,6 +4711,8 @@ def _prepare_case(
             scenario.id,
             version=runtime.version,
         )
+        if unit_id == "TYP21-DEDICATED-OBJECT-CREATE":
+            recipe = typed_input_merge_recipe(recipe, unit_id=unit_id)
         if recipe.version != runtime.version:
             raise HeavyProjectRunnerError(
                 "object recipe version differs from the active lifecycle"

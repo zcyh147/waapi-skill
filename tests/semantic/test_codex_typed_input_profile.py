@@ -182,10 +182,14 @@ def test_create_merge_prompt_keeps_the_existing_node_out_of_the_parent_role() ->
     assert "不要为 `Idle` 或 `Idle_A` 生成任何新增事实" in (
         unit.scenario.prompt
     )
-    assert "本次新增 children 只有 `Alert`、`Combat`、`Damage`" in (
+    assert "本次新增 children 只有 `Alert`" in (
         unit.scenario.prompt
     )
-    assert "A/B Sound 都是叶节点" in unit.scenario.prompt
+    assert "`Combat`、`Damage` 不属于本单元范围" in unit.scenario.prompt
+    assert unit.scenario.confirmation_prompt == (
+        "可以，只在现有 Robot_VO 下合并新增 Alert 这一组并核对结果。"
+    )
+    assert "`Alert_A`、`Alert_B` 都是叶节点" in unit.scenario.prompt
     assert "不再添加子对象、属性或引用" in unit.scenario.prompt
     assert all(
         command not in unit.scenario.prompt
@@ -206,7 +210,7 @@ def test_object_create_prompts_declare_the_requested_sound_leaves() -> None:
     ]
 
     assert len(units) == 2
-    assert all("Sound 都是叶节点" in unit.scenario.prompt for unit in units)
+    assert all("都是叶节点" in unit.scenario.prompt for unit in units)
     assert all(
         "不再添加子对象、属性或引用" in unit.scenario.prompt for unit in units
     )

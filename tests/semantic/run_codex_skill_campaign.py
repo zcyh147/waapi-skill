@@ -199,6 +199,7 @@ from tests.semantic.support.codex_integration_workflows_v2 import (  # noqa: E40
 from tests.semantic.support.codex_object_heavy_v3 import (  # noqa: E402
     ObjectHeavyRecipeError,
     build_object_heavy_v3_recipe,
+    typed_input_merge_recipe,
 )
 from tests.semantic.support.codex_object_runtime_v3 import (  # noqa: E402
     bounded_result_disclosure,
@@ -6260,6 +6261,13 @@ def _validate_heavy_v3_typed_business_plan(
             _heavy_v3_base_scenario_id(expected_unit),
             version=str(getattr(expected_unit, "version", "")),
         )
+        if getattr(expected_unit, "unit_id", None) == (
+            "TYP21-DEDICATED-OBJECT-CREATE"
+        ):
+            recipe = typed_input_merge_recipe(
+                recipe,
+                unit_id="TYP21-DEDICATED-OBJECT-CREATE",
+            )
         sections = validate_archived_object_business_plan(
             plan_value,
             scenario=scenario,
