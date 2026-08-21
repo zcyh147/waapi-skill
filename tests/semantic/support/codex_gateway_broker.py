@@ -65,6 +65,8 @@ from wwise_waapi.platform_commands import (
     PlatformCommandError,
     WINDOWS_MODEL_COMMAND_FAMILY,
     WINDOWS_POWERSHELL_ENCODED_FAMILY,
+    decode_windows_model_argv,
+    decode_windows_powershell_argv,
     encode_windows_model_argv,
     encode_windows_powershell_argv,
 )
@@ -6319,38 +6321,67 @@ def _project_operation_draft_runner(
             if isinstance(argv_by_shape, Mapping)
             else set()
         )
-        if concrete_shapes:
+        if concrete_shapes or copy_by_shape is not None:
             if (
-                not isinstance(argv_by_shape, Mapping)
-                or not isinstance(copy_by_shape, Mapping)
-                or set(copy_by_shape) != concrete_shapes
+                not isinstance(copy_by_shape, Mapping)
+                or (
+                    concrete_shapes
+                    and set(copy_by_shape) != concrete_shapes
+                )
             ):
                 raise GatewayInvocationError(
                     "Gateway Draft disclosure copy commands are incomplete"
                 )
             projected_copies: dict[str, str] = {}
             for shape, copy_command in copy_by_shape.items():
-                gateway_argv = argv_by_shape.get(shape)
+                gateway_argv = (
+                    argv_by_shape.get(shape)
+                    if isinstance(argv_by_shape, Mapping)
+                    else None
+                )
                 if (
                     not isinstance(shape, str)
-                    or not isinstance(gateway_argv, list)
-                    or not gateway_argv
-                    or gateway_argv[0]
-                    not in {"request-map-container", "request-array-item"}
-                    or any(not isinstance(token, str) for token in gateway_argv)
+                    or not isinstance(copy_command, str)
+                    or not copy_command
                 ):
                     raise GatewayInvocationError(
-                        "Gateway Draft disclosure argv is invalid"
+                        "Gateway Draft disclosure copy command is invalid"
                     )
-                candidate_argv = [
-                    "python",
-                    expected_candidate,
-                    "gateway.py",
-                    *gateway_argv,
-                ]
-                if copy_command != _draft_copy_command(
-                    candidate_argv,
-                    platform_name=platform_name,
+                try:
+                    if platform_name == "nt":
+                        try:
+                            candidate_argv = list(
+                                decode_windows_model_argv(copy_command)
+                            )
+                        except PlatformCommandError:
+                            candidate_argv = list(
+                                decode_windows_powershell_argv(copy_command)
+                            )
+                    elif platform_name == "posix":
+                        candidate_argv = shlex.split(copy_command)
+                    else:
+                        raise GatewayInvocationError(
+                            f"unsupported Gateway continuation platform {platform_name!r}"
+                        )
+                except (PlatformCommandError, ValueError) as exc:
+                    raise GatewayInvocationError(
+                        "Gateway Draft disclosure copy command cannot be decoded"
+                    ) from exc
+                if (
+                    len(candidate_argv) < 4
+                    or candidate_argv[:3]
+                    != ["python", expected_candidate, "gateway.py"]
+                    or candidate_argv[3]
+                    not in {"request-map-container", "request-array-item"}
+                    or _draft_copy_command(
+                        candidate_argv,
+                        platform_name=platform_name,
+                    )
+                    != copy_command
+                    or (
+                        isinstance(gateway_argv, list)
+                        and candidate_argv[3:] != gateway_argv
+                    )
                 ):
                     raise GatewayInvocationError(
                         "Gateway Draft disclosure command representation is not exact"
@@ -6360,7 +6391,7 @@ def _project_operation_draft_runner(
                         "python",
                         str(invocation_runner),
                         "gateway.py",
-                        *gateway_argv,
+                        *candidate_argv[3:],
                     ],
                     platform_name=platform_name,
                 )

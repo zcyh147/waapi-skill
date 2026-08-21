@@ -1494,12 +1494,9 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
         "Sound": "Sound",
         "forbidden": ["RandomContainer"],
     }
-    assert projected_scalar_table["business_present_row_policy"] == {
-        "selection": "every_row_with_present_business_value_pointer",
-        "required_false_with_present_business_value": "must_include",
-        "absent_optional_row": "skip",
-        "order": "table_order",
-    }
+    assert projected_scalar_table["row_policy"] == (
+        "all_present_rows_in_order_skip_absent_optional"
+    )
     assert projected_scalar_table["fact_command_assembly"] == {
         "fixed_argv_prefix": [
             "--action",
@@ -1621,12 +1618,7 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     assert "root_fact_queue_anchor" not in last_projected["continuation"]
     assert last_projected["continuation"]["business_sibling_transition"][
         "when_absent"
-    ] == {
-        "next_action": (
-            "finish_current_node_then_use_nearest_ancestor_business_"
-            "sibling_exact_argv"
-        )
-    }
+    ] == "nearest_ancestor_business_sibling"
     last_encoded = gateway.gateway_stdout_json_encoder(last_projected).encode(
         last_projected
     )

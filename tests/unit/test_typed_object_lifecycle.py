@@ -507,6 +507,11 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         assert argv[argv.index("--field-handle") + 1] == grandchild["handle"]
         assert argv[argv.index("--key") + 1] == row["key"]
     public_grandchild = waapi_gateway.gateway_stdout_payload(grandchild)
+    assert public_grandchild["continuation"]["business_sibling_transition"][
+        "copy_command_by_shape"
+    ] == grandchild["continuation"]["business_sibling_transition"][
+        "copy_command_by_shape"
+    ]
     encoded = waapi_gateway.gateway_stdout_json_encoder(public_grandchild).encode(
         public_grandchild
     )

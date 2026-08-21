@@ -1315,7 +1315,16 @@ def test_broker_projects_draft_action_and_completion_prefixes_to_task_install(
                             else shlex.join(disclosure_full_argv)
                         )
                     },
-                }
+                },
+                {
+                    "copy_command_by_shape": {
+                        "object": (
+                            encode_windows_model_argv(disclosure_full_argv)
+                            if platform_name == "nt"
+                            else shlex.join(disclosure_full_argv)
+                        )
+                    }
+                },
             ]
         },
         "completion_candidate": {
@@ -1353,6 +1362,10 @@ def test_broker_projects_draft_action_and_completion_prefixes_to_task_install(
         if platform_name == "nt"
         else shlex.join(projected_disclosure_argv)
     )
+    copy_only_disclosure = projected["root_dynamic_disclosure_commands"]["rows"][1]
+    assert copy_only_disclosure["copy_command_by_shape"] == disclosure[
+        "copy_command_by_shape"
+    ]
     completion = projected["completion_candidate"]
     assert completion["fixed_argv_prefix"][1] == str(invocation_runner)
     assert completion["copy_command"] == (

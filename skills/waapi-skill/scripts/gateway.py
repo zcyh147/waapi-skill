@@ -2352,16 +2352,9 @@ def gateway_stdout_payload(value: Any) -> Any:
                             "forbidden": ["RandomContainer"],
                         },
                     }
-                    compact_scalar_table["business_present_row_policy"] = {
-                        "selection": (
-                            "every_row_with_present_business_value_pointer"
-                        ),
-                        "required_false_with_present_business_value": (
-                            "must_include"
-                        ),
-                        "absent_optional_row": "skip",
-                        "order": "table_order",
-                    }
+                    compact_scalar_table["row_policy"] = (
+                        "all_present_rows_in_order_skip_absent_optional"
+                    )
                     compact_scalar_table.update(
                         {
                             "rows": [
@@ -2537,18 +2530,20 @@ def gateway_stdout_payload(value: Any) -> Any:
                 and key == "business_sibling_transition"
                 and isinstance(item, Mapping)
             ):
+                compact_candidates = (
+                    ("copy_command_by_shape",)
+                    if "copy_command_by_shape" in item
+                    else ("argv_by_shape",)
+                )
                 item = {
                     candidate: item[candidate]
-                    for candidate in (
-                        "condition",
-                        "business_value_pointer",
-                        "index",
-                        "when_absent",
-                        "is_next_command",
-                        "argv_by_shape",
-                    )
+                    for candidate in compact_candidates
                     if candidate in item
                 }
+                if isinstance(
+                    raw_continuation[key].get("when_absent"), Mapping
+                ):
+                    item["when_absent"] = "nearest_ancestor_business_sibling"
             if (
                 compact_recursive_object
                 and key == "nested_container_disclosures"
@@ -2624,7 +2619,10 @@ def gateway_stdout_payload(value: Any) -> Any:
         ):
             continue
         continuation[key] = item
-    projected["continuation"] = continuation
+    # Recursive-object compaction intentionally rewrites several verbose
+    # continuation rows.  Re-derive the exact model-facing command only after
+    # that rewrite so a concrete public argv can never lose its copy authority.
+    projected["continuation"] = _dynamic_disclosure_copy_commands(continuation)
     if projected_child_contract is not None:
         projected["child_contract"] = projected_child_contract
     return projected
