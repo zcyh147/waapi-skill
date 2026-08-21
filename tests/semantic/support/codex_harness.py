@@ -1320,19 +1320,16 @@ class CodexCommandFacts:
     non_gateway_unexpected_commands: tuple[str, ...] = ()
 
 
-def recoverable_failed_skill_read_attempt_indexes(
+def recoverable_preprocess_attempt_indexes(
     records: Sequence[CodexCommandRecord],
-    *,
-    allowed_read_commands: Sequence[str],
 ) -> tuple[int, ...]:
-    """Return exact Windows SKILL reads that failed before process creation.
+    """Return exact Windows commands retried after process creation failed.
 
-    The following identical command must be one already validated successful
-    SKILL read.  This does not authorize a second spelling, a partial read, or
-    any command that reached PowerShell.
+    The next record must preserve the complete command and argv.  The failed
+    record never entered PowerShell; the later record still receives all normal
+    Skill-read, Gateway, Broker, and lifecycle validation.
     """
 
-    allowed = frozenset(allowed_read_commands)
     return tuple(
         index
         for index, record in enumerate(records[:-1])
@@ -1343,10 +1340,13 @@ def recoverable_failed_skill_read_attempt_indexes(
             and not getattr(record, "has_shell_operators", False)
             and getattr(record, "parser_kind", "")
             == _WINDOWS_POWERSHELL_CORE_PARSER_KIND
-            and getattr(record, "command", "") in allowed
             and getattr(record, "command", "")
             == getattr(records[index + 1], "command", "")
             and getattr(record, "argv", ()) == getattr(records[index + 1], "argv", ())
+            and getattr(records[index + 1], "exit_code", None) in {0, 2}
+            and not getattr(records[index + 1], "aggregated_output", "").startswith(
+                "execution error: Io("
+            )
             and getattr(record, "aggregated_output", "").startswith(
                 "execution error: Io("
             )
@@ -3591,18 +3591,13 @@ def classify_commands(
         )
         if candidates and len(set(candidates)) == 1:
             validated_reads_by_index[index] = candidates[0]
-    recoverable_failed_read_indexes = frozenset(
-        recoverable_failed_skill_read_attempt_indexes(
-            records,
-            allowed_read_commands=tuple(
-                records[index].command
-                for index, relative in validated_reads_by_index.items()
-                if relative == "SKILL.md"
-            ),
-        )
+    recoverable_preprocess_indexes = frozenset(
+        recoverable_preprocess_attempt_indexes(records)
     )
 
     for record_index, record in enumerate(records):
+        if record_index in recoverable_preprocess_indexes:
+            continue
         command = record.command
         lowered = command.lower()
         executable = Path(record.argv[0]).name.lower() if record.argv else ""
@@ -3678,7 +3673,6 @@ def classify_commands(
         if (
             not is_gateway
             and not allowed_read
-            and record_index not in recoverable_failed_read_indexes
         ):
             unexpected.append(command)
             if gateway_shape is None:

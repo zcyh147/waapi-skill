@@ -97,7 +97,7 @@ def test_common_grade_accepts_first_and_resumed_turn_shapes() -> None:
         assert all(gates.values())
 
 
-def test_common_grade_ignores_one_preprocess_windows_skill_read_failure() -> None:
+def test_common_grade_ignores_one_identical_windows_preprocess_failure() -> None:
     result = _result(turn=1, gateway_count=2)
     successful = result.command_facts.command_records[0]
     successful.status = "completed"

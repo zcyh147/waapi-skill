@@ -54,7 +54,7 @@ from .support.codex_harness import (  # pyright: ignore[reportMissingImports]
     run_process,
     subprocess_process_group_options,
     prepare_workspace_skill_install,
-    recoverable_failed_skill_read_attempt_indexes,
+    recoverable_preprocess_attempt_indexes,
     snapshot_tree_hash,
     snapshot_workspace,
     turn_usage,
@@ -3565,10 +3565,7 @@ def test_windows_failed_exact_skill_read_can_recover_once_before_success(
     assert facts.skill_read is True
     assert facts.allowed_read_commands == (command,)
     assert facts.unexpected_commands == ()
-    assert recoverable_failed_skill_read_attempt_indexes(
-        facts.command_records,
-        allowed_read_commands=facts.allowed_read_commands,
-    ) == (0,)
+    assert recoverable_preprocess_attempt_indexes(facts.command_records) == (0,)
 
 
 @pytest.mark.parametrize(
@@ -4240,6 +4237,52 @@ def test_command_classifier_distinguishes_gateway_from_inline_code_and_discovery
     assert facts.inline_python_commands == (commands[-1].command,)
     assert facts.direct_waapi_client_commands == (commands[-1].command,)
     assert facts.unexpected_commands == (commands[2].command, commands[3].command)
+
+
+def test_command_classifier_counts_one_identical_gateway_after_preprocess_failure(
+    tmp_path: Path,
+) -> None:
+    skill = tmp_path / "waapi-skill"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    payload = {
+        "contract": "waapi-skill.gateway-result/v1",
+        "command": "buses",
+        "ok": True,
+    }
+    base = completed_record(gateway_command(skill, "buses"), payload)
+    successful = CodexCommandRecord(
+        command=base.command,
+        exit_code=base.exit_code,
+        status=base.status,
+        aggregated_output=base.aggregated_output,
+        argv=base.argv,
+        has_shell_operators=False,
+        parser_kind="windows-pwsh-command",
+    )
+    failed = CodexCommandRecord(
+        command=successful.command,
+        exit_code=-1,
+        status="failed",
+        aggregated_output=(
+            "execution error: Io(Custom { kind: Other, error: \"windows sandbox: "
+            "CreateProcessAsUserW failed: 267 (invalid directory)\" })"
+        ),
+        argv=successful.argv,
+        has_shell_operators=False,
+        parser_kind=successful.parser_kind,
+    )
+
+    facts = classify_commands(
+        (failed, successful),
+        skill_source=skill,
+        expected_gateway_subcommands=("buses",),
+    )
+
+    assert recoverable_preprocess_attempt_indexes(facts.command_records) == (0,)
+    assert facts.gateway_attempt_commands == (successful.command,)
+    assert facts.gateway_commands == (successful.command,)
+    assert facts.unexpected_commands == ()
 
 
 def test_command_classifier_accepts_only_explicit_exact_gateway_exit_2_error(

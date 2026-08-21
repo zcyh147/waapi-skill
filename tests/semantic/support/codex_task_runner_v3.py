@@ -43,7 +43,7 @@ from tests.semantic.support.codex_harness import (
     gateway_continuation_binding_errors,
     normalized_gateway_command_argv,
     prepare_workspace_skill_install,
-    recoverable_failed_skill_read_attempt_indexes,
+    recoverable_preprocess_attempt_indexes,
 )
 from tests.semantic.support.codex_prompt_provenance_v3 import (
     PROMPT_MATERIALIZATION_RECEIPT_CONTRACT,
@@ -689,10 +689,7 @@ def _grade_common_turn(
     )
     records = facts.command_records
     recoverable_read_indexes = frozenset(
-        recoverable_failed_skill_read_attempt_indexes(
-            records,
-            allowed_read_commands=allowed_reads,
-        )
+        recoverable_preprocess_attempt_indexes(records)
     )
     effective_records = tuple(
         record

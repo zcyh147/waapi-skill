@@ -268,7 +268,7 @@ from tests.semantic.support.codex_harness import (  # noqa: E402
     parse_jsonl_events,
     powershell_core_host_fingerprint,
     probe_windows_powershell_core,
-    recoverable_failed_skill_read_attempt_indexes,
+    recoverable_preprocess_attempt_indexes,
     turn_usage,
     validate_codex_version_output,
     workspace_skill_install_path,
@@ -5957,10 +5957,7 @@ def _validate_heavy_v3_codex_facts(
                 record.command
                 for index, record in enumerate(records)
                 if index
-                not in recoverable_failed_skill_read_attempt_indexes(
-                    records,
-                    allowed_read_commands=allowed_reads,
-                )
+                not in recoverable_preprocess_attempt_indexes(records)
             )[: len(allowed_reads)]
             == allowed_reads
         ),
@@ -5970,10 +5967,7 @@ def _validate_heavy_v3_codex_facts(
         "no_other_commands": (
             len(records)
             - len(
-                recoverable_failed_skill_read_attempt_indexes(
-                    records,
-                    allowed_read_commands=allowed_reads,
-                )
+                recoverable_preprocess_attempt_indexes(records)
             )
             == len(allowed_reads)
             + len(prompt_asset_reads)
