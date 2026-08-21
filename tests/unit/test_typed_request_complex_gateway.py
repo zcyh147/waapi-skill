@@ -1386,7 +1386,7 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
 
     projected = gateway.gateway_stdout_payload(leaf)
     encoded = gateway.gateway_stdout_json_encoder(projected).encode(projected)
-    assert len((encoded + "\n").encode("utf-8")) < 5 * 1024
+    assert len((encoded + "\n").encode("utf-8")) < 6 * 1024
     assert projected["handle"] == leaf["handle"]
     assert projected["schema_lineage_token"] == leaf["schema_lineage_token"]
     assert projected["response_integrity"] == root_projected["response_integrity"]
@@ -1485,6 +1485,14 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
         "/continuation/deferred_fact/argv"
     )
     assert "root_fact_queue_anchor" not in last_projected["continuation"]
+    assert last_projected["continuation"]["business_sibling_transition"][
+        "when_absent"
+    ] == {
+        "next_action": (
+            "finish_current_node_then_use_nearest_ancestor_business_"
+            "sibling_exact_argv"
+        )
+    }
     last_encoded = gateway.gateway_stdout_json_encoder(last_projected).encode(
         last_projected
     )

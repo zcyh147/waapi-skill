@@ -2481,6 +2481,7 @@ def gateway_stdout_payload(value: Any) -> Any:
                         "condition",
                         "business_value_pointer",
                         "index",
+                        "when_absent",
                         "is_next_command",
                         "argv_by_shape",
                     )
