@@ -393,6 +393,11 @@ def test_small_complete_audit_uses_simple_inventory_before_report_rules() -> Non
     assert "every object in one explicit small subtree" in query_flat
     assert "apply the user's `OR`, `NOT`, comparison, or naming rules directly to those rows, without code" in query_flat
     assert "Do not call `query-schema` merely because a report has several rules" in query_flat
+    assert (
+        "A complete simple `query-object` command is the first and only Gateway "
+        "command for that read; never preface it with `query-schema`"
+        in query_flat
+    )
     assert "Boolean rules applied after a complete small inventory do not trigger that switch" in query_flat
 
 

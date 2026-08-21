@@ -129,6 +129,13 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
                     "substitute_path_segments",
                     "select_another_field",
                 ],
+                "opaque_token_guard": {
+                    "task_authority": {
+                        "prefix": "da1-",
+                        "hex_characters_after_prefix": 40,
+                        "truncate_to_32_hex_characters": "invalid",
+                    }
+                },
             },
             "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency": [
                 "--action",

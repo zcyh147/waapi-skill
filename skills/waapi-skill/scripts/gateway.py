@@ -13911,6 +13911,13 @@ def operation_draft_prefix_copy_binding(
                 "substitute_path_segments",
                 "select_another_field",
             ],
+            "opaque_token_guard": {
+                "task_authority": {
+                    "prefix": "da1-",
+                    "hex_characters_after_prefix": 40,
+                    "truncate_to_32_hex_characters": "invalid",
+                }
+            },
         },
     }
 

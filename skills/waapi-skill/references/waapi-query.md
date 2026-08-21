@@ -1,16 +1,13 @@
 # WAAPI query lane
 
-Use this reference for read-only project facts, hierarchy inspection, metadata
-discovery, bounded Topic waits, and persistent streams.
+Use this reference for read-only Wwise queries and bounded Topic waits or streams.
 
 Require the unique terminal sentinel required by `SKILL.md` and no truncation or omission marker; do not reread a range or invoke the Gateway.
 
 ## Boundaries and routing
 
 - Use only the Skill-local Gateway; return its structured evidence or blocker.
-- Use fixed `status`, `buses`, `selected`, `query-schema`, `query-object`,
-  `object-types`, `metadata`, `request-schema`, `topic-schema`, `wait-topic`,
-  and `stream-topic` directly. Simple queries use concise typed flags;
+- Invoke the fixed routes named below directly. Simple queries use concise typed flags;
   structured and advanced queries use the sole continuation returned by
   `query-schema`; reflected functions use `request-schema`; Topic facts use
   `topic-schema`. Topic observation never authorizes its publishing change.
@@ -148,6 +145,8 @@ simple inventory, then apply the user's `OR`, `NOT`, comparison, or naming rules
 directly to those rows, without code. Do not call `query-schema` merely because
 a report has several rules. Use structured only when live row selection itself
 requires it.
+A complete simple `query-object` command is the first and only Gateway command
+for that read; never preface it with `query-schema`.
 
 For a complex query, first run the offline, version-aware schema command:
 
