@@ -9,10 +9,14 @@ from typing import Any, Mapping
 import pytest
 
 from tests.semantic.support.codex_eval_protocol_v3 import build_transaction_protocol
-from tests.semantic.support.codex_gateway_broker import ResponseBinding
+from tests.semantic.support.codex_gateway_broker import (
+    DraftTypedActionBatchArgument,
+    ResponseBinding,
+)
 from wwise_waapi.operation_composer import (
     OPERATION_COMPOSITION_CONTRACT,
     materialize_operation_request,
+    parse_typed_action_cli_arguments,
 )
 from wwise_waapi.operation_registry import parse_operation_request
 from wwise_waapi.typed_operations import (
@@ -567,6 +571,28 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
     assert identity["handle"] != item["handle"]
     assert identity["child_contract"]["required_keys"] == ["kind", "value"]
     assert identity["child_contract"]["constant_fields"] == {"kind": "id"}
+    assert identity["continuation"]["selected_parent_branch_fact"] == {
+        "argv": [
+            "--action", "add_typed_fact", "--fact-action", "choose-dynamic",
+            "--field-handle", item["handle"], "--fact-value", id_choice,
+            "--key", "object",
+        ],
+        "execute_after": "all_pending_ancestor_facts_in_response_tree_preorder",
+        "must_precede": "deferred_fact",
+        "queue_phase": "selected_parent_branch",
+        "queue_order_ref": "/continuation/request_wide_order/deferred_fact_queue",
+        "is_next_command": False,
+        "consume_once": True,
+        "replay_allowed": False,
+    }
+    assert identity["continuation"]["request_wide_order"][
+        "deferred_fact_queue"
+    ]["node_steps"] == [
+        "deferred_parent_fact",
+        "selected_parent_branch_fact",
+        "child_contract_facts",
+        "then_descendant_response_nodes",
+    ]
     assert identity["child_contract"]["constant_field_facts"] == [
         {
             "typed_fact": {
@@ -601,6 +627,17 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
             "evaluate_in_order"
         ]
     ] == ["deferred_fact_queue", "business_sibling_transition"]
+    assert identity["continuation"]["next_command_decision"][
+        "evaluate_in_order"
+    ][0]["action"] == (
+        "apply_current_node_parent_fact_then_selected_parent_branch_fact_then_"
+        "business_present_child_contract_facts_in_schema_order"
+    )
+    assert identity["continuation"]["next_command_decision"][
+        "evaluate_in_order"
+    ][0]["first_command_pointer"] == (
+        "/continuation/selected_parent_branch_fact/argv"
+    )
     sibling = identity["continuation"]["business_sibling_transition"]
     assert sibling["business_value_pointer"] == "/args/inclusions/0/filters"
     assert sibling["is_next_command"] is False
@@ -634,6 +671,144 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
         "all_facts_with_field_handle": identity["handle"],
         "reason": "attach_returned_handle_to_its_parent_first",
     }
+    action_step = next(
+        step for step in protocol.steps if step.name == "tx01.action.002"
+    )
+    expected_batch = action_step.arguments[-1]
+    assert isinstance(expected_batch, DraftTypedActionBatchArgument)
+    payload_by_step = {
+        "tx01.disclose.001": item,
+        "tx01.disclose.002": identity,
+    }
+
+    def expected_action(action: object) -> dict[str, object]:
+        assert hasattr(action, "expected") and hasattr(action, "response_bindings")
+        bound = dict(action.expected)
+        for binding in action.response_bindings:
+            current: object = payload_by_step[binding.step]
+            for token in binding.response_pointer.removeprefix("/").split("/"):
+                assert isinstance(current, (dict, list))
+                current = (
+                    current[int(token)]
+                    if isinstance(current, list)
+                    else current[token]
+                )
+            bound[binding.pointer.removeprefix("/")] = current
+        return bound
+
+    value_row = next(
+        row
+        for row in identity["child_contract"]["branch_choices"]
+        if row["key"] == "value"
+    )
+    value_choice = next(
+        choice
+        for choice in value_row["choices"]
+        if choice["accepted_types"] == ["string"]
+    )["handle"]
+    value_choice_fact = [
+        value_choice if token == "<selected-choice-handle>" else token
+        for token in value_row["fact_construction"]["choose_dynamic_argv"]
+    ]
+    value_fact = value_row["fact_construction"]["map_put_argv"]
+    public_batch = [
+        item["continuation"]["root_fact_queue_anchor"]["first_fact_argv"],
+        identity["continuation"]["selected_parent_branch_fact"]["argv"],
+        identity["continuation"]["deferred_fact"]["argv"],
+        identity["child_contract"]["constant_field_facts"][0]["deferred_fact"][
+            "argv"
+        ],
+        value_choice_fact,
+        [
+            "string"
+            if token == "<selected-accepted-type>"
+            else EVENT_ID
+            if token == "<selected-choice-enum-or-business-value>"
+            else token
+            for token in value_fact
+        ],
+    ]
+    assert [parse_typed_action_cli_arguments(argv) for argv in public_batch] == [
+        expected_action(action) for action in expected_batch.actions
+    ]
+
+    event_path = r"\Events\Default Work Unit\Play_Combat_Start"
+    path_choice = item_choices[1]["handle"]
+    path_choice_argv = [
+        path_choice if token == id_choice else token for token in choice_argv
+    ]
+    path_code, path_identity = gateway.execute_gateway(
+        ["--version", "2025.1", *path_choice_argv],
+        env=_env(tmp_path, "2025.1"),
+        client_factory=lambda url: pytest.fail(
+            f"path identity disclosure connected to {url}"
+        ),
+    )
+    assert path_code == 0, path_identity
+    path_protocol = build_transaction_protocol(
+        (
+            {
+                "contract": "waapi-skill.operation-request/v1",
+                "version": "2025.1",
+                "operation": "soundbank.setInclusions",
+                "arguments": {
+                    "soundbank": {"kind": "id", "value": BANK_ID},
+                    "mode": "add",
+                    "inclusions": [
+                        {
+                            "object": {"kind": "path", "value": event_path},
+                            "filters": ["events"],
+                        }
+                    ],
+                },
+            },
+        )
+    )
+    path_batch = next(
+        step for step in path_protocol.steps if step.name == "tx01.action.002"
+    ).arguments[-1]
+    assert isinstance(path_batch, DraftTypedActionBatchArgument)
+    path_payloads = {
+        "tx01.disclose.001": item,
+        "tx01.disclose.002": path_identity,
+    }
+
+    def expected_path_action(action: object) -> dict[str, object]:
+        assert hasattr(action, "expected") and hasattr(action, "response_bindings")
+        bound = dict(action.expected)
+        for binding in action.response_bindings:
+            current: object = path_payloads[binding.step]
+            for token in binding.response_pointer.removeprefix("/").split("/"):
+                assert isinstance(current, (dict, list))
+                current = (
+                    current[int(token)]
+                    if isinstance(current, list)
+                    else current[token]
+                )
+            bound[binding.pointer.removeprefix("/")] = current
+        return bound
+
+    path_value_fact = next(
+        row
+        for row in path_identity["child_contract"]["fixed_scalar_member_facts"]
+        if row["key"] == "value"
+    )["fact_argv_by_type"]["string"]
+    path_public_batch = [
+        item["continuation"]["root_fact_queue_anchor"]["first_fact_argv"],
+        path_identity["continuation"]["selected_parent_branch_fact"]["argv"],
+        path_identity["continuation"]["deferred_fact"]["argv"],
+        path_identity["child_contract"]["constant_field_facts"][0][
+            "deferred_fact"
+        ]["argv"],
+        [
+            event_path if token == "<business-value>" else token
+            for token in path_value_fact
+        ],
+    ]
+    assert len(path_public_batch) == 5
+    assert [
+        parse_typed_action_cli_arguments(argv) for argv in path_public_batch
+    ] == [expected_path_action(action) for action in path_batch.actions]
 
     for contradiction in (
         ["--shape", "array"],

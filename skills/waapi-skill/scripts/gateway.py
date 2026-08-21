@@ -5061,6 +5061,71 @@ def _deferred_dynamic_fact_payload(
     }
 
 
+def _selected_parent_branch_fact_payload(
+    args: argparse.Namespace,
+    *,
+    parent_handle: str,
+    draft_shape: bool,
+    undo_child_shape: bool,
+    query_shape: bool,
+    topic_prefix: str | None,
+) -> dict[str, Any]:
+    """Preserve the exact selected branch fact on its disclosed child response."""
+
+    choice_handle = getattr(args, "choice_handle", None)
+    if (
+        args.command != "request-map-container"
+        or not isinstance(choice_handle, str)
+    ):
+        return {}
+    if undo_child_shape:
+        argv = [
+            "--action", "add_child_typed_fact",
+            "--child-handle", "<child_handle>",
+            "--fact-action", "choose-dynamic",
+            "--field-handle", parent_handle,
+            "--fact-value", choice_handle,
+            "--key", args.key,
+        ]
+    elif draft_shape and not query_shape and topic_prefix is None:
+        argv = [
+            "--action", "add_typed_fact",
+            "--fact-action", "choose-dynamic",
+            "--field-handle", parent_handle,
+            "--fact-value", choice_handle,
+            "--key", args.key,
+        ]
+    elif query_shape:
+        argv = [
+            "--typed-choose-dynamic", parent_handle, args.key, choice_handle,
+        ]
+    elif topic_prefix is not None:
+        argv = [
+            f"--{topic_prefix}-choose-dynamic",
+            parent_handle,
+            args.key,
+            choice_handle,
+        ]
+    else:
+        argv = ["--choose-dynamic", parent_handle, args.key, choice_handle]
+    return {
+        "selected_parent_branch_fact": {
+            "argv": argv,
+            "execute_after": (
+                "all_pending_ancestor_facts_in_response_tree_preorder"
+            ),
+            "must_precede": "deferred_fact",
+            "queue_phase": "selected_parent_branch",
+            "queue_order_ref": (
+                "/continuation/request_wide_order/deferred_fact_queue"
+            ),
+            "is_next_command": False,
+            "consume_once": True,
+            "replay_allowed": False,
+        }
+    }
+
+
 def _root_fact_queue_anchor(
     *,
     contract: TypedRequestContract,
@@ -5434,6 +5499,7 @@ def _dynamic_next_command_decision(
     next_item_disclosure: Mapping[str, Any],
     next_sibling_disclosure: Mapping[str, Any],
     deferred_fact: Mapping[str, Any],
+    selected_parent_branch_fact: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Return one ordered, machine-readable decision for the next action."""
 
@@ -5487,7 +5553,10 @@ def _dynamic_next_command_decision(
             "candidate": "deferred_fact_queue",
             "condition": "current_disclosed_node_has_unapplied_business_facts",
             "action": (
-                "apply_current_node_parent_fact_then_business_present_"
+                "apply_current_node_parent_fact_then_selected_parent_branch_"
+                "fact_then_business_present_child_contract_facts_in_schema_order"
+                if selected_parent_branch_fact
+                else "apply_current_node_parent_fact_then_business_present_"
                 "child_contract_facts_in_schema_order"
             ),
             "start_at": "current_disclosed_node_response",
@@ -5501,7 +5570,11 @@ def _dynamic_next_command_decision(
             # The deferred fact is the exact parent fact for this response's
             # current node. The repeated root anchor is a cross-response audit
             # aid and may already have been consumed by an ancestor response.
-            "first_command_pointer": "/continuation/deferred_fact/argv",
+            "first_command_pointer": (
+                "/continuation/selected_parent_branch_fact/argv"
+                if selected_parent_branch_fact
+                else "/continuation/deferred_fact/argv"
+            ),
         }
         if deferred_fact
         else None
@@ -6059,6 +6132,14 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             query_shape=query_shape,
             topic_prefix=topic_prefix,
         )
+        selected_parent_branch_fact = _selected_parent_branch_fact_payload(
+            args,
+            parent_handle=parent_handle,
+            draft_shape=draft_shape,
+            undo_child_shape=undo_child_shape,
+            query_shape=query_shape,
+            topic_prefix=topic_prefix,
+        )
         if "deferred_fact" in deferred_fact:
             blocked_by: list[str] = []
             if branch_continuation:
@@ -6159,6 +6240,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     query_shape=query_shape,
                     topic_prefix=topic_prefix,
                 ),
+                **selected_parent_branch_fact,
                 **_dynamic_next_command_decision(
                     draft_shape=(
                         (draft_shape or undo_child_shape)
@@ -6173,6 +6255,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     next_item_disclosure=next_item_disclosure,
                     next_sibling_disclosure=next_sibling_disclosure,
                     deferred_fact=deferred_fact,
+                    selected_parent_branch_fact=selected_parent_branch_fact,
                 ),
                 "request_wide_order": {
                     "phase": "node_local_disclosure_then_facts",
@@ -6186,6 +6269,11 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                         "traversal": "response_tree_preorder",
                         "node_steps": [
                             "deferred_parent_fact",
+                            *(
+                                ["selected_parent_branch_fact"]
+                                if selected_parent_branch_fact
+                                else []
+                            ),
                             "child_contract_facts",
                             "then_descendant_response_nodes",
                         ],
