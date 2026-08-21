@@ -368,6 +368,7 @@ def test_rename_object_create_prompt_seals_the_existing_collision_identity() -> 
         r"\Impact_Library"
     ) in unit.scenario.prompt
     assert "已证明是 Actor Mixer" in unit.scenario.prompt
+    assert "创建前无需重复读取" in unit.scenario.prompt
     assert all(
         command not in unit.scenario.prompt
         for command in ("query-object", "operation-schema", "draft-start")

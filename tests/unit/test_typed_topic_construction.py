@@ -551,6 +551,7 @@ def test_wait_topic_digests_bind_to_the_real_topic_schema_envelope(
         for field in _expand_compact_field_table(payload["event_match"]["fields"])
         if field["name"] == "soundbank:map"
     )
+    assert soundbank_map["map"]["fixed_key_route"] == "explicit_child_row"
     assert any(
         field["name"] == "name"
         and field.get("parent_handle") == soundbank_map["parent_handle"]
@@ -563,8 +564,7 @@ def test_wait_topic_digests_bind_to_the_real_topic_schema_envelope(
         ]
     }
     assert payload["event_match"]["fields"]["path"] == (
-        "omitted; use duplicate_name_paths exact row; "
-        "parent map substitution forbidden"
+        "omitted; duplicate names use path row; no parent map"
     )
     compact_rows = payload["event_match"]["fields"]["rows"]
     top_level_name_row = next(

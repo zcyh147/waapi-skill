@@ -4831,8 +4831,14 @@ def _bind_dynamic_branch_facts(
             row.update(deferred)
 
     rows = child_contract.get("branch_choices")
-    if not isinstance(rows, list):
+    if not isinstance(rows, list) or not rows:
         return
+    child_contract["branch_fact_group_policy"] = {
+        "actions": ["choose_dynamic_argv", "map_put_argv"],
+        "group_size": 2,
+        "split_across_apply_batches": "forbidden",
+        "insufficient_remaining_slots": "start_group_in_next_batch",
+    }
     for queue_index, row in enumerate(rows, start=1):
         if not isinstance(row, dict) or not isinstance(row.get("key"), str):
             continue

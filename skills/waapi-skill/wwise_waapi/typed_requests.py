@@ -302,6 +302,13 @@ class TypedFieldContract:
                 "key_patterns": [pattern for pattern, _variants in self.map_patterns],
                 "schema_authorized_additional_keys": bool(self.additional_variants),
                 "one_key_per_fact": True,
+                **(
+                    {
+                        "fixed_key_route": "explicit_child_row"
+                    }
+                    if self.fixed_map_keys
+                    else {}
+                ),
             }
             payload["maximum_properties"] = self.maximum_properties
             payload["maximum_bytes"] = self.maximum_bytes
@@ -680,8 +687,7 @@ class TypedRequestContract:
                 },
             },
             "path": (
-                "omitted; use duplicate_name_paths exact row; "
-                "parent map substitution forbidden"
+                "omitted; duplicate names use path row; no parent map"
             ),
             "duplicate_name_paths": duplicate_name_paths,
             "rows": rows,

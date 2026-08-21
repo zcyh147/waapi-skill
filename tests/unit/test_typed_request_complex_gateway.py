@@ -200,6 +200,15 @@ def test_media_pool_dynamic_child_applies_parent_before_descendant_disclosure(
         "operator",
     ]
     assert [branch["queue_index"] for branch in branch_choices] == [1, 2, 3, 4]
+    assert item["child_contract"]["branch_fact_group_policy"] == {
+        "actions": ["choose_dynamic_argv", "map_put_argv"],
+        "group_size": 2,
+        "split_across_apply_batches": "forbidden",
+        "insufficient_remaining_slots": "start_group_in_next_batch",
+    }
+    assert gateway.gateway_stdout_payload(item)["child_contract"][
+        "branch_fact_group_policy"
+    ] == item["child_contract"]["branch_fact_group_policy"]
     assert [
         (
             branch["key"],
