@@ -2341,6 +2341,7 @@ def _valid_draft_resume_action_binding(
             "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency",
             "replace_only",
             "resume_previous_container_response",
+            "prompt_fact_completion_guard",
         }
         or value.get("contract")
         != "waapi-skill.operation-draft-next-action/v1"
@@ -2352,6 +2353,13 @@ def _valid_draft_resume_action_binding(
         != ["--action", "<action-name>", "<typed-fact-arguments>"]
         or value.get("replace_only")
         != ["<action-name>", "<typed-fact-arguments>"]
+        or value.get("prompt_fact_completion_guard")
+        != {
+            "schema_optional_is_not_evidence_of_prompt_absence": True,
+            "account_for_every_prompt_present_scalar_array_item_and_map_entry": True,
+            "copy_boolean_values_exactly": True,
+            "infer_or_replace_prompt_values": "invalid",
+        }
         or not isinstance(value.get("fixed_argv_prefix"), list)
     ):
         return False

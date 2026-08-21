@@ -289,6 +289,11 @@ def test_generic_draft_start_requires_first_fact_batch_before_disclosure(
     assert disclosures["selection"] == (
         "first unsubmitted business-present root in schema order"
     )
+    assert disclosures["activation_gate"] == {
+        "source": "/draft/next_action_binding/next_phase_decision",
+        "required_selected_candidate": "dynamic_disclosure",
+        "while_remaining_top_level_fact_batch_is_selected": "do_not_execute_any_row",
+    }
     children = next(
         row for row in disclosures["rows"] if row["name"] == "children"
     )
@@ -342,6 +347,14 @@ def test_generic_draft_start_requires_first_fact_batch_before_disclosure(
     assert applied["draft"]["next_action_binding"][
         "root_dynamic_disclosure_commands"
     ] == disclosures
+    assert applied["draft"]["next_action_binding"][
+        "prompt_fact_completion_guard"
+    ] == {
+        "schema_optional_is_not_evidence_of_prompt_absence": True,
+        "account_for_every_prompt_present_scalar_array_item_and_map_entry": True,
+        "copy_boolean_values_exactly": True,
+        "infer_or_replace_prompt_values": "invalid",
+    }
     public_payload = waapi_gateway.gateway_stdout_payload(applied)
     encoded = waapi_gateway.gateway_stdout_json_encoder(public_payload).encode(
         public_payload

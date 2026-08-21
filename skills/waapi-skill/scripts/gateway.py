@@ -5548,6 +5548,13 @@ def _root_dynamic_disclosure_commands(
         )
     return {
         "selection": "first unsubmitted business-present root in schema order",
+        "activation_gate": {
+            "source": "/draft/next_action_binding/next_phase_decision",
+            "required_selected_candidate": "dynamic_disclosure",
+            "while_remaining_top_level_fact_batch_is_selected": (
+                "do_not_execute_any_row"
+            ),
+        },
         "rows": rows,
         "copy_selected_argv_exactly": True,
         "reconstruct_schema_digest_or_handle": "invalid",
@@ -14384,7 +14391,7 @@ def operation_draft_payload(
                 ],
                 "first_true_candidate_is_the_only_next_phase": True,
             }
-        if generic_typed_draft and compact_actions is None:
+        if generic_typed_draft:
             next_action_binding["prompt_fact_completion_guard"] = {
                 "schema_optional_is_not_evidence_of_prompt_absence": True,
                 "account_for_every_prompt_present_scalar_array_item_and_map_entry": True,

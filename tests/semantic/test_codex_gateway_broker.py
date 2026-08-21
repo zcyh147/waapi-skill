@@ -345,6 +345,12 @@ def test_compact_generic_typed_fact_receipt_accepts_exact_container_resume() -> 
             ],
             "replace_only": ["<action-name>", "<typed-fact-arguments>"],
             "resume_previous_container_response": resume,
+            "prompt_fact_completion_guard": {
+                "schema_optional_is_not_evidence_of_prompt_absence": True,
+                "account_for_every_prompt_present_scalar_array_item_and_map_entry": True,
+                "copy_boolean_values_exactly": True,
+                "infer_or_replace_prompt_values": "invalid",
+            },
         },
     }
 
@@ -412,6 +418,12 @@ def test_compact_generic_typed_fact_batch_accepts_exact_node_resume() -> None:
             ],
             "replace_only": ["<action-name>", "<typed-fact-arguments>"],
             "resume_previous_container_response": resume,
+            "prompt_fact_completion_guard": {
+                "schema_optional_is_not_evidence_of_prompt_absence": True,
+                "account_for_every_prompt_present_scalar_array_item_and_map_entry": True,
+                "copy_boolean_values_exactly": True,
+                "infer_or_replace_prompt_values": "invalid",
+            },
         },
     }
 
@@ -7443,15 +7455,16 @@ def test_runner_timeout_kills_reaps_and_records_terminal_failure(tmp_path: Path)
         expected_steps=(ExpectedGatewayStep("status", "status"),),
         runner_environment={**os.environ, "FAKE_GATEWAY_MODE": "hang-ignore-term"},
         transport="tcp",
-        # Leave enough time for a cold Python interpreter to write its PID;
-        # the assertion below still proves the bounded timeout and hard reap.
-        runner_timeout_seconds=0.25,
+        # Leave enough time for a cold Python interpreter to import this large
+        # fake runner and write its PID; the assertions below still prove the
+        # configured timeout and hard reap.
+        runner_timeout_seconds=1.0,
     ) as broker:
         started = time.monotonic()
         failed = run_model_command(broker, ["status"])
         elapsed = time.monotonic() - started
 
-        assert elapsed < 2.0
+        assert elapsed < 3.0
         assert failed.returncode == 125
         record = broker.evidence().records[0]
         assert record.accepted is True

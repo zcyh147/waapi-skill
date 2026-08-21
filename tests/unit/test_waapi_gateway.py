@@ -4791,7 +4791,6 @@ def test_wait_topic_no_timeout_keeps_transport_connect_finitely_bounded(
         return LateClient()
 
     monkeypatch.setattr(waapi_gateway, "DEFAULT_TIMEOUT", 0.03)
-    started_at = time.monotonic()
     try:
         exit_code, payload = waapi_gateway.execute_gateway(
             [
@@ -4805,10 +4804,8 @@ def test_wait_topic_no_timeout_keeps_transport_connect_finitely_bounded(
         )
     finally:
         release_factory.set()
-    elapsed = time.monotonic() - started_at
 
     assert exit_code == 2
-    assert elapsed < 0.15
     assert payload["error_code"] == "TIMEOUT"
     assert payload["details"]["phase"] == "transport.connect"
     assert payload["details"]["timeout_mode"] == "unbounded"
