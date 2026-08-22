@@ -878,16 +878,15 @@ def test_historical_prompt_protocol_uses_only_the_offline_archive_codec(
             ).encode("utf-8")
         ).hexdigest(),
     }
-    current.path.write_text(
+    current.path.write_bytes(
         json.dumps(
             payload,
             ensure_ascii=False,
             allow_nan=False,
             sort_keys=True,
             separators=(",", ":"),
-        )
-        + "\n",
-        encoding="utf-8",
+        ).encode("utf-8")
+        + b"\n"
     )
 
     with pytest.raises(PromptProvenanceError, match="protocol step schema"):
