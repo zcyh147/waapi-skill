@@ -4,12 +4,12 @@ Read this file once with one complete standalone `cat`. It is complete only when
 
 ## Core boundaries
 
-- The normal change path is the packaged transaction CLI through the absolute `scripts/run.py` from the injected `SKILL.md` locator.
+- The only normal change path is the packaged transaction CLI through absolute `scripts/run.py` from the injected `SKILL.md` locator.
 - Do not import builders or planners from inline Python, write a helper, call `WaapiClient`, construct raw WAAPI mutations, edit Wwise XML, or bypass a dedicated operation with generic `call`. Do not write code to bypass an unsupported boundary. That boundary does not authorize code generation.
 - Each reference read and Gateway invocation is one shell tool call. Never join commands with `&&`, `;`, a pipe, command substitution, or a multi-command shell string.
 - Read each Gateway JSON before continuing; exit `0` proves nothing. Stop on empty, non-JSON, or host-truncated output. A typed-container response is complete only when final `WAAPI_TYPED_CONTAINER_RESPONSE_END` says `complete:true` and `truncated:false`; then continue from that response.
 - A rejected or nonzero Gateway invocation is also a hard stop for that turn. Do not advance to the next schema, preview, or transaction phase and do not repair or retry the command. The sole metadata-discovery retry below starts only from a successful complete JSON result whose `fallback_detail_scan.status` is `partial`.
-- Except for the migration below, one complete terminal `verify` ends the transaction; append no query, filesystem inspection, or other proof.
+- Except for the migration below, one complete terminal `verify` result ends the transaction; append no query, filesystem inspection, or other proof.
 
 ## Choose the phase and first Gateway command
 
