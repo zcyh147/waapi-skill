@@ -5708,7 +5708,12 @@ def _dynamic_next_command_decision(
             "candidate": "deferred_fact_queue",
             "condition": "current_disclosed_node_has_unapplied_business_facts",
             "action": (
-                "apply_current_node_parent_fact_then_selected_parent_branch_"
+                "apply_pending_ancestor_facts_then_current_node_parent_fact_"
+                "then_selected_parent_branch_fact_then_business_present_child_"
+                "contract_facts_in_schema_order"
+                if selected_parent_branch_fact
+                and outermost_disclosed_root_pointer is not None
+                else "apply_current_node_parent_fact_then_selected_parent_branch_"
                 "fact_then_business_present_child_contract_facts_in_schema_order"
                 if selected_parent_branch_fact
                 else "apply_current_node_parent_fact_then_business_present_"
@@ -5722,11 +5727,11 @@ def _dynamic_next_command_decision(
             "stop_before": "first_descendant_or_sibling_parent_fact",
             "after_success": "re_evaluate_remaining_candidates_from_this_response",
             "first_fact_only": "valid_only_when_current_node_has_no_other_business_facts",
-            # The deferred fact is the exact parent fact for this response's
-            # current node. The repeated root anchor is a cross-response audit
-            # aid and may already have been consumed by an ancestor response.
             "first_command_pointer": (
-                "/continuation/selected_parent_branch_fact/argv"
+                "/continuation/root_fact_queue_anchor/first_fact_argv"
+                if selected_parent_branch_fact
+                and outermost_disclosed_root_pointer is not None
+                else "/continuation/selected_parent_branch_fact/argv"
                 if selected_parent_branch_fact
                 else "/continuation/deferred_fact/argv"
             ),

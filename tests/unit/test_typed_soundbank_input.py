@@ -630,13 +630,14 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
     assert identity["continuation"]["next_command_decision"][
         "evaluate_in_order"
     ][0]["action"] == (
-        "apply_current_node_parent_fact_then_selected_parent_branch_fact_then_"
-        "business_present_child_contract_facts_in_schema_order"
+        "apply_pending_ancestor_facts_then_current_node_parent_fact_then_"
+        "selected_parent_branch_fact_then_business_present_child_contract_"
+        "facts_in_schema_order"
     )
     assert identity["continuation"]["next_command_decision"][
         "evaluate_in_order"
     ][0]["first_command_pointer"] == (
-        "/continuation/selected_parent_branch_fact/argv"
+        "/continuation/root_fact_queue_anchor/first_fact_argv"
     )
     sibling = identity["continuation"]["business_sibling_transition"]
     assert sibling["business_value_pointer"] == "/args/inclusions/0/filters"
@@ -712,7 +713,7 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
     ]
     value_fact = value_row["fact_construction"]["map_put_argv"]
     public_batch = [
-        item["continuation"]["root_fact_queue_anchor"]["first_fact_argv"],
+        identity["continuation"]["root_fact_queue_anchor"]["first_fact_argv"],
         identity["continuation"]["selected_parent_branch_fact"]["argv"],
         identity["continuation"]["deferred_fact"]["argv"],
         identity["child_contract"]["constant_field_facts"][0]["deferred_fact"][
@@ -794,7 +795,7 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
         if row["key"] == "value"
     )["fact_argv_by_type"]["string"]
     path_public_batch = [
-        item["continuation"]["root_fact_queue_anchor"]["first_fact_argv"],
+        path_identity["continuation"]["root_fact_queue_anchor"]["first_fact_argv"],
         path_identity["continuation"]["selected_parent_branch_fact"]["argv"],
         path_identity["continuation"]["deferred_fact"]["argv"],
         path_identity["child_contract"]["constant_field_facts"][0][
