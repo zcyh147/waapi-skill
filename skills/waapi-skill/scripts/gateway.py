@@ -4323,6 +4323,17 @@ def operation_composer_input_contract(
         ),
         "scalar_types": ["string", "number", "integer", "boolean"],
         **(
+            {
+                "scalar_type_discipline": {
+                    "cli_type_source": "scalar_types",
+                    "metadata_type_tokens_as_cli_types": "invalid",
+                    "metadata_examples": {"Real64": "number", "int16": "integer"},
+                }
+            }
+            if operation in {"audio.import", "object.set"}
+            else {}
+        ),
+        **(
             {"selector_kinds": selector_kinds}
             if any(
                 "SELECTOR" in token
@@ -14401,6 +14412,9 @@ def operation_draft_payload(
             )
             next_action_binding["typed_fact_batch_discipline"] = {
                 "batch_size": "6 until fewer than 6 facts remain",
+                "final_batch": (
+                    "include every remaining complete action; never split"
+                ),
                 "top_level_facts_before_dynamic_disclosure": True,
                 "branch_choice_requires_selected_branch_facts": True,
                 "schema_candidates_without_business_values": "skip",
@@ -14578,8 +14592,10 @@ def operation_draft_payload(
                 next_action_binding["resume_previous_container_response"] = dict(
                     resume_previous
                 )
-            if compact_actions is not None and not isinstance(
-                construction_continuation, Mapping
+            if (
+                compact_actions is not None
+                and not isinstance(construction_continuation, Mapping)
+                and draft.get("schema_required_fields_status") == "complete"
             ):
                 completion_argv = [
                     "python",

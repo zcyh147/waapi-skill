@@ -1450,22 +1450,9 @@ def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
         "shell_tool_timeout_ms",
         "fixed_argv_prefix",
         "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency",
-        "completion_candidate",
         "replace_only",
     }
-    assert draft["next_action_binding"]["completion_candidate"][
-        "fixed_argv_prefix"
-    ] == [
-        "python",
-        str(waapi_gateway.GATEWAY_RUNNER_PATH),
-        "gateway.py",
-        "draft-check",
-        draft_id,
-        "--task-authority",
-        authority,
-        "--expected-revision",
-        "2",
-    ]
+    assert "completion_candidate" not in draft["next_action_binding"]
     assert draft["next_action_binding"]["replace_only"] == [
         "<action-name>",
         "<typed-fact-arguments>",
@@ -1592,10 +1579,16 @@ def test_compact_weather_shaped_action_responses_remain_constant_size(
             response_sizes.append(len(json.dumps(changed).encode("utf-8")))
 
     assert len(response_sizes) == 15
-    # The exact draft-check completion candidate includes its copy-ready shell
-    # command while keeping every action receipt comfortably below 3.5 KiB.
+    # Required-incomplete target-only receipts omit draft-check.  Once a
+    # property makes the schema complete, the exact completion candidate adds
+    # its copy-ready shell command.  Both projections remain bounded.
     assert max(response_sizes) < 3_500
-    assert max(response_sizes) - min(response_sizes) < 256
+    incomplete_sizes = [size for size in response_sizes if size < 2_000]
+    complete_sizes = [size for size in response_sizes if size > 3_000]
+    assert len(incomplete_sizes) == 5
+    assert len(complete_sizes) == 10
+    assert max(incomplete_sizes) - min(incomplete_sizes) < 16
+    assert max(complete_sizes) - min(complete_sizes) < 16
     inspect_code, inspected = execute(
         tmp_path,
         "draft-inspect",

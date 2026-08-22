@@ -29,11 +29,9 @@ from tests.semantic.support.codex_integration_workflows_v1 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     DraftActionMetadataBinding,
-    ExactArgumentAlternatives,
     InlineTypedOperationArgument,
     MetadataTokenProjection,
     ResponseBinding,
-    ResponseBindingOrExactArgument,
 )
 
 
@@ -440,15 +438,14 @@ def test_prepare_builds_exact_alarm_chain_and_frozen_runner_seam(
     assert "backend" not in {field.name for field in dataclasses.fields(prepared)}
 
 
-def test_protocol_exposes_six_exact_chain_reads_then_one_standard_transaction(
+def test_protocol_exposes_five_exact_chain_reads_then_one_standard_transaction(
     tmp_path: Path,
 ) -> None:
     prepared, _fake = _prepared(tmp_path)
     protocol = prepared.protocol
 
-    assert protocol.turn_prefix_counts == (6, 9, 13)
-    assert tuple(step.name for step in protocol.steps[:6]) == (
-        "diag.event",
+    assert protocol.turn_prefix_counts == (5, 8, 12)
+    assert tuple(step.name for step in protocol.steps[:5]) == (
         "diag.action",
         "diag.sound",
         "diag.source",
@@ -458,35 +455,34 @@ def test_protocol_exposes_six_exact_chain_reads_then_one_standard_transaction(
     assert protocol.commutative_read_only_step_groups == (
         ("diag.source", "diag.dead_bus", "diag.target_bus"),
     )
-    assert {step.subcommand for step in protocol.steps[:6]} == {"query-object"}
-    assert "--take" not in protocol.steps[0].arguments
-    assert "--take" in protocol.steps[1].arguments
+    assert {step.subcommand for step in protocol.steps[:5]} == {"query-object"}
+    assert protocol.steps[0].arguments[:6] == (
+        "--path",
+        alarm_fixture_paths("2022.1").event,
+        "--select",
+        "children",
+        "--take",
+        "100",
+    )
     assert all(
         "--take" not in step.arguments
-        for step in protocol.steps[2:6]
+        for step in protocol.steps[1:5]
     )
-    assert protocol.steps[1].arguments[1] == ResponseBindingOrExactArgument(
-        binding=ResponseBinding("diag.event", "/objects/0/id"),
-        exact_values=(alarm_fixture_paths("2022.1").event,),
-    )
-    assert protocol.steps[1].arguments[0] == ExactArgumentAlternatives(
-        ("--object-id", "--path")
-    )
-    assert protocol.steps[2].arguments[1] == ResponseBinding(
+    assert protocol.steps[1].arguments[1] == ResponseBinding(
         "diag.action",
         "/objects/0/Target/id",
     )
-    assert protocol.steps[3].arguments[1] == ResponseBinding(
+    assert protocol.steps[2].arguments[1] == ResponseBinding(
         "diag.sound",
         "/objects/0/activeSource/id",
     )
-    assert protocol.steps[4].arguments[1] == ResponseBinding(
+    assert protocol.steps[3].arguments[1] == ResponseBinding(
         "diag.sound",
         "/objects/0/OutputBus/id",
     )
-    sound_fields = protocol.steps[2].arguments[3::2]
-    dead_bus_fields = protocol.steps[4].arguments[3::2]
-    target_bus_fields = protocol.steps[5].arguments[3::2]
+    sound_fields = protocol.steps[1].arguments[3::2]
+    dead_bus_fields = protocol.steps[3].arguments[3::2]
+    target_bus_fields = protocol.steps[4].arguments[3::2]
     assert sound_fields == (
         "id",
         "name",
@@ -504,7 +500,7 @@ def test_protocol_exposes_six_exact_chain_reads_then_one_standard_transaction(
         "path",
         "@Volume",
     )
-    assert tuple(step.subcommand for step in protocol.steps[6:]) == (
+    assert tuple(step.subcommand for step in protocol.steps[5:]) == (
         "operation-schema",
         "metadata",
         "typed-operation",
@@ -513,7 +509,7 @@ def test_protocol_exposes_six_exact_chain_reads_then_one_standard_transaction(
         "execute",
         "verify",
     )
-    metadata = protocol.steps[7]
+    metadata = protocol.steps[6]
     sound_id = prepared.before_snapshot.by_key()["sound"].object_id
     assert metadata.arguments == (
         "discover",
@@ -525,7 +521,7 @@ def test_protocol_exposes_six_exact_chain_reads_then_one_standard_transaction(
         "8",
     )
     assert metadata.arguments[4].label == "output bus"
-    preview = protocol.steps[8]
+    preview = protocol.steps[7]
     assert preview.metadata_binding == DraftActionMetadataBinding(
         step="metadata.discover",
         object_type="Sound",
@@ -575,14 +571,13 @@ def test_diagnostic_payload_observer_seals_exact_chain_evidence(
     prepared, _fake = _prepared(tmp_path)
     rows = prepared.before_snapshot.by_key()
     key_by_step = {
-        "diag.event": "event",
         "diag.action": "action",
         "diag.sound": "sound",
         "diag.source": "source",
         "diag.dead_bus": "dead_bus",
         "diag.target_bus": "target_bus",
     }
-    for step in prepared.protocol.steps[:6]:
+    for step in prepared.protocol.steps[:5]:
         row = _payload_row(rows[key_by_step[step.name]])
         prepared.observe_payload(
             step,
@@ -607,7 +602,7 @@ def test_diagnostic_payload_observer_rejects_wrong_chain_identity(
         match="sealed sound evidence",
     ):
         prepared.observe_payload(
-            prepared.protocol.steps[2],
+            prepared.protocol.steps[1],
             {
                 "ok": True,
                 "command": "query-object",

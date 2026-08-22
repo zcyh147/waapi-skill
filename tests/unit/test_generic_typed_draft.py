@@ -314,6 +314,7 @@ def test_draft_apply_batches_ordered_typed_actions_in_one_atomic_write(
         "typed_fact_batch_discipline"
     ] == {
         "batch_size": "6 until fewer than 6 facts remain",
+        "final_batch": "include every remaining complete action; never split",
         "top_level_facts_before_dynamic_disclosure": True,
         "branch_choice_requires_selected_branch_facts": True,
         "schema_candidates_without_business_values": "skip",
@@ -335,23 +336,10 @@ def test_draft_apply_batches_ordered_typed_actions_in_one_atomic_write(
         ],
         "first_true_candidate_is_the_only_next_phase": True,
     }
-    completion = payload["draft"]["next_action_binding"]["completion_candidate"]
-    assert completion["fixed_argv_prefix"][-1] == "3"
-    assert completion["copy_exactly"] is True
-    assert completion["copy_instruction"] == {
-        "contract": "waapi-skill.operation-draft-command-copy-instruction/v1",
-        "source_field": "copy_command",
-        "action": "execute_verbatim_as_one_shell_tool_call",
-        "forbidden_transformations": [
-            "reconstruct",
-            "shorten",
-            "normalize",
-            "substitute_path_segments",
-            "select_another_field",
-        ],
-    }
-    assert completion["copy_command"] == shlex.join(
-        completion["fixed_argv_prefix"]
+    assert payload["draft"]["schema_required_fields_status"] == "incomplete"
+    assert (
+        "completion_candidate"
+        not in payload["draft"]["next_action_binding"]
     )
     assert "current_facts" not in payload["draft"]
     inspect_code, inspected = gateway.execute_gateway(

@@ -521,7 +521,7 @@
         {
           "index": 1,
           "kind": "request",
-          "prompt": "请在 {harbor_bank_name} 这个 SoundBank 中，为下面三个 Event 分别增加 Event、Structure 和 Media 三类包含内容：{harbor_event_paths}。同时移除已有的 Debug 包含项；不要修改 Harbor_Control。本次工程、缓存和全部生成输出都在可信目录 {soundbank_io_root} 内，实际发布输出目录是 {soundbank_output_directory}。随后为 Windows 和 Mac 两个平台生成 SFX 发布产物；发布语言只选择 SFX，不要省略这个语言范围。这两步都先给我看预览，不要跨过确认直接执行。",
+          "prompt": "请在 {harbor_bank_name} 这个 SoundBank 中，为下面三个 Event 分别增加 Event、Structure 和 Media 三类包含内容：{harbor_event_paths}。同时移除已有的 Debug 包含项；不要修改 Harbor_Control。本次工程、缓存和全部生成输出都在可信目录 {soundbank_io_root} 内，实际发布输出目录是 {soundbank_output_directory}。随后为 Windows 和 Mac 两个平台生成这个非本地化 SFX Bank，并写入磁盘；跳过语言变体，不要重建全部 SoundBank，不要清空音频缓存，也不要重建 Init Bank。这两步都先给我看预览，不要跨过确认直接执行。",
           "confirms_transaction": null,
           "expects_preview_transaction": 1
         },

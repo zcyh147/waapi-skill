@@ -369,10 +369,9 @@ def test_generic_draft_start_requires_first_fact_batch_before_disclosure(
     encoded = waapi_gateway.gateway_stdout_json_encoder(public_payload).encode(
         public_payload
     )
-    assert encoded.index('"completion_candidate"') < encoded.index(
-        '"root_dynamic_disclosure_commands"'
-    )
-    assert '"draft-check"' in encoded[:4096]
+    assert '"completion_candidate"' not in encoded
+    assert '"root_dynamic_disclosure_commands"' in encoded
+    assert '"draft-apply"' in encoded[:4096]
 
 
 def test_object_create_prioritizes_collision_policy_before_optional_containers(
@@ -840,6 +839,13 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
     assert schema["composer"]["planning_discipline"]["dynamic_metadata"][
         "validation_owner"
     ] == "gateway_draft_check"
+    assert schema["composer"]["planning_discipline"]["dynamic_metadata"][
+        "property_value_type"
+    ] == {
+        "source": "metadata.candidates[].metadata.typed_value_type",
+        "copy_to": "--property NAME <typed_value_type> VALUE",
+        "native_metadata_type_is_not_action_type": True,
+    }
     assert schema["composer"]["planning_discipline"]["import_operation"] == {
         "source": "registry_fragments.request_options.import_operation",
         "action": "set_import_operation",
@@ -949,6 +955,11 @@ def test_structurally_distinct_adapters_share_one_public_lifecycle(
             "integer",
             "boolean",
         ]
+        assert composer["apply"]["scalar_type_discipline"] == {
+            "cli_type_source": "scalar_types",
+            "metadata_type_tokens_as_cli_types": "invalid",
+            "metadata_examples": {"Real64": "number", "int16": "integer"},
+        }
         assert composer["apply"]["selector_kinds"] == [
             "id-string VALUE",
             "id-integer VALUE",

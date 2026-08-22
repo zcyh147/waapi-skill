@@ -1685,6 +1685,13 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "action_fields_source": (
                     "explicit_user_intent_plus_exact_live_tokens"
                 ),
+                "property_value_type": {
+                    "source": (
+                        "metadata.candidates[].metadata.typed_value_type"
+                    ),
+                    "copy_to": "--property NAME <typed_value_type> VALUE",
+                    "native_metadata_type_is_not_action_type": True,
+                },
                 "unrequested_dependency_candidates": (
                     "validation_only_do_not_copy_into_action"
                 ),

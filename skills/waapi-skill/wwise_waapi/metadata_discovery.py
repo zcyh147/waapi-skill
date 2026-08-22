@@ -66,6 +66,38 @@ _WORD = re.compile(r"[^\W_]+", re.UNICODE)
 _MAX_METADATA_SEARCH_STRINGS = 96
 _MAX_METADATA_SEARCH_STRING_CHARS = 512
 
+_BOOLEAN_METADATA_TYPES = frozenset({"bool", "boolean"})
+_INTEGER_METADATA_TYPES = frozenset(
+    {
+        "int8",
+        "int16",
+        "int32",
+        "int64",
+        "uint8",
+        "uint16",
+        "uint32",
+        "uint64",
+    }
+)
+_NUMBER_METADATA_TYPES = frozenset({"real32", "real64", "float", "double"})
+
+
+def metadata_typed_value_type(metadata_type: str) -> str | None:
+    """Map one reflected Wwise scalar type to the public typed-action token."""
+
+    if not isinstance(metadata_type, str):
+        return None
+    normalized = metadata_type.casefold()
+    if normalized in _BOOLEAN_METADATA_TYPES:
+        return "boolean"
+    if normalized in _INTEGER_METADATA_TYPES:
+        return "integer"
+    if normalized in _NUMBER_METADATA_TYPES:
+        return "number"
+    if normalized == "string":
+        return "string"
+    return None
+
 ReadCall = Callable[
     [str, Mapping[str, Any], Mapping[str, Any]],
     Mapping[str, Any],
@@ -995,6 +1027,9 @@ def _compact_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:
         "display": compact_display,
         "restriction": compact_restriction,
     }
+    typed_value_type = metadata_typed_value_type(str(metadata["type"]))
+    if typed_value_type is not None:
+        payload["typed_value_type"] = typed_value_type
     if (
         str(compact_restriction.get("type", "")).casefold() == "range"
         and (

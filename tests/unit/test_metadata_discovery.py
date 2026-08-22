@@ -138,7 +138,9 @@ def test_object_type_discovery_resolves_live_name_and_returns_compact_candidates
         "default",
         "display",
         "restriction",
+        "typed_value_type",
     }
+    assert looping["metadata"]["typed_value_type"] == "boolean"
     detailed = discovery.as_dict(detail=True)
     assert detailed["contract"] == "waapi-skill.metadata-discovery/v1"
     assert "result_detail" not in detailed

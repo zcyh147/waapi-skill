@@ -386,6 +386,11 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
                 "when_token_is_not_already_exact_live_evidence"
             ),
             "action_fields_source": "explicit_user_intent_plus_exact_live_tokens",
+            "property_value_type": {
+                "source": "metadata.candidates[].metadata.typed_value_type",
+                "copy_to": "--property NAME <typed_value_type> VALUE",
+                "native_metadata_type_is_not_action_type": True,
+            },
             "unrequested_dependency_candidates": (
                 "validation_only_do_not_copy_into_action"
             ),

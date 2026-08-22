@@ -9,6 +9,8 @@ from typing import Any, Callable, Mapping
 
 import pytest  # pyright: ignore[reportMissingImports]
 
+from wwise_waapi.metadata_discovery import metadata_typed_value_type
+
 
 SCRIPT_PATH = (
     Path(__file__).resolve().parents[2]
@@ -433,6 +435,9 @@ def test_metadata_discover_dispatches_only_closed_reads_for_all_versions(
     assert payload["agent_result"]["result_detail"] == "compact"
     assert payload["agent_result"]["candidates"][0]["name"] == "Volume"
     assert payload["agent_result"]["candidates"][0]["metadata"]["name"] == "Volume"
+    assert payload["agent_result"]["candidates"][0]["metadata"][
+        "typed_value_type"
+    ] == "number"
     assert "supports" not in payload["agent_result"]["candidates"][0]["metadata"]
     assert "match_evidence" not in payload["agent_result"]["candidates"][0]
 
@@ -459,6 +464,26 @@ def test_metadata_discover_dispatches_only_closed_reads_for_all_versions(
     assert names_call[1] == expected_scope_args
     assert info_call[1] == {**expected_scope_args, "property": "Volume"}
     assert client.disconnected is True
+
+
+@pytest.mark.parametrize(
+    ("metadata_type", "typed_value_type"),
+    (
+        ("bool", "boolean"),
+        ("Boolean", "boolean"),
+        ("int16", "integer"),
+        ("UInt64", "integer"),
+        ("Real32", "number"),
+        ("real64", "number"),
+        ("String", "string"),
+        ("Object", None),
+    ),
+)
+def test_live_metadata_type_discloses_canonical_typed_action_scalar(
+    metadata_type: str,
+    typed_value_type: str | None,
+) -> None:
+    assert metadata_typed_value_type(metadata_type) == typed_value_type
 
 
 def test_metadata_discover_detail_is_an_explicit_full_audit_opt_in(

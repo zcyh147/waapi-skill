@@ -1436,6 +1436,9 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "Repeat each typed fact template in full" in instructions
     assert "one shell argv literal" in instructions
     assert "submit exactly six complete action groups" in instructions
+    assert "include every remaining action in one final batch" in instructions
+    assert "only string/number/integer/boolean" in instructions
+    assert "never Wwise metadata types such as Real64/int16" in instructions
     assert "every prompt-required terminal scalar" in instructions
     assert "every prompt-present field" in instructions
     assert "copy booleans exactly" in instructions
@@ -1546,6 +1549,7 @@ def test_public_integration_alarm_instructions_fit_the_sealed_byte_limit() -> No
     assert "Reads: 1" in instructions
     assert "2 [Get-Content" in instructions
     assert "3 none" in instructions
+    assert "never Wwise metadata types such as Real64/int16" in instructions
     assert len(instructions.encode("utf-8")) <= 2048
 
 
