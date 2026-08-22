@@ -152,6 +152,7 @@ def test_task_reconciliation_rejects_equivalent_requoted_continuation() -> None:
         "gateway_argv": list(full_argv[3:]),
         "full_argv": list(full_argv),
         "copy_exactly": True,
+        "shell_tool_timeout_ms": 30_000,
         "shell_family": "posix-sh",
         "copy_instruction": {
             "contract": "waapi-skill.gateway-command-copy-instruction/v2",
@@ -1318,7 +1319,7 @@ def test_v3_task_seals_exact_task_local_skill_reads_and_runner(
         assert "cat '.agents/skills/waapi-skill/references/waapi-operate.md'" in (
             instructions
         )
-        assert f"python '{task_skill / 'scripts' / 'run.py'}' gateway.py" in (
+        assert f"python {task_skill / 'scripts' / 'run.py'} gateway.py" in (
             instructions
         )
     assert str(candidate_runner) not in instructions

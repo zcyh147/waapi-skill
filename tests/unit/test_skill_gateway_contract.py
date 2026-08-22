@@ -63,7 +63,12 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
     assert "run `request-schema` and follow its sole typed continuation" in skill
     assert "The configured exact Wwise version selects every schema" in (SKILL_ROOT / "references" / "waapi-query.md").read_text(encoding="utf-8")
     assert "Read each later named lane reference exactly once in its own shell call" in skill
-    assert "native Windows uses `Get-Content -Raw -Encoding UTF8 '<reference>'`" in skill
+    assert (
+        "Native Windows always copies the short task-local form "
+        "`Get-Content -Raw -Encoding UTF8 "
+        "'.agents\\skills\\waapi-skill\\references\\<file>.md'` exactly"
+        in skill
+    )
     assert ".agents\\skills\\waapi-skill\\references\\<file>.md" in skill
     assert "Do not probe with `wc -l`, `ls`, `rg`, `find`, `stat`, or `test`" in skill
     assert "never split a reference" in skill
@@ -320,7 +325,7 @@ def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
         assert "**656**" in readme
         assert "**152**" in readme
         assert "**6**" in readme
-        assert "3382" in readme
+        assert "3392" in readme
         assert "./skills/waapi-skill/references/waapi-coverage.md" in readme
 
     assert "198 unique routed WAAPI URIs" in english
@@ -329,4 +334,4 @@ def test_public_readmes_publish_exact_five_version_api_coverage() -> None:
     assert "仍要求实时宿主为 Authoring" in " ".join(chinese.split())
     assert "not a claim that all 808 rows have been exercised against a real Wwise process" in english
     assert "不等于已经在真实 Wwise 进程中逐一运行了全部 808 行" in chinese
-    assert "currently contains 3382 passing tests" in coverage_contract
+    assert "currently contains 3392 passing tests" in coverage_contract

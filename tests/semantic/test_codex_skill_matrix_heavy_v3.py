@@ -441,7 +441,7 @@ def test_typed_input_project_dispatch_seals_pre_action_developer_instructions(
     expected_prefix = (
         f"python '{runner}' 'gateway.py'"
         if os.name == "nt"
-        else f"python '{runner}' gateway.py"
+        else f"python {runner} gateway.py"
     )
     assert expected_prefix in developer_instructions
 

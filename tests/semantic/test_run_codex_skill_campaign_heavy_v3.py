@@ -2305,6 +2305,7 @@ def _synthetic_gateway_records(
                 "gateway_argv": gateway_argv,
                 "full_argv": full_argv,
                 "copy_exactly": True,
+                "shell_tool_timeout_ms": 30_000,
                 "requires_explicit_user_confirmation": True,
             }
             model_command: str | None = None
