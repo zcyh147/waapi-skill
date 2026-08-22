@@ -40,6 +40,7 @@ from .support.codex_harness import (  # pyright: ignore[reportMissingImports]
     completed_command_records,
     count_invalid_jsonl_lines,
     discover_windows_powershell_core,
+    discover_windows_user_skill_paths,
     final_agent_message,
     gateway_continuation_binding_errors,
     gateway_runtime_apis,
@@ -1616,6 +1617,77 @@ def test_prompt_audit_command_uses_supported_global_flags_with_pristine_codex_ho
     assert command[:3] == [str(config.codex_binary), "--disable", "memories"]
     assert "--ignore-user-config" not in command
     assert command[-3:] == ["debug", "prompt-input", "List buses."]
+
+
+def test_native_windows_commands_disable_each_ambient_user_skill_by_exact_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        codex_harness_module,
+        "_is_windows",
+        lambda platform_name=None: True,
+    )
+    first = (tmp_path / "profile" / ".agents" / "skills" / "first" / "SKILL.md")
+    second = (tmp_path / "profile" / ".agents" / "skills" / "second" / "SKILL.md")
+    for path in (first, second):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("---\nname: example\n---\n", encoding="utf-8")
+    config = CodexHarnessConfig(
+        workspace=tmp_path,
+        skill_source=tmp_path / "skill",
+        codex_binary=tmp_path / "codex.exe",
+        disabled_user_skill_paths=(first, second),
+    )
+    expected = (
+        "skills.config=["
+        f"{{path={json.dumps(str(first.resolve()))},enabled=false}},"
+        f"{{path={json.dumps(str(second.resolve()))},enabled=false}}]"
+    )
+
+    commands = (
+        build_prompt_audit_command(config, prompt="Inspect it."),
+        build_task_exec_command(
+            config,
+            prompt="Inspect it.",
+            writable_dir=tmp_path / "output",
+        ),
+        build_task_resume_command(
+            config,
+            thread_id="thread-exact-123",
+            prompt="Continue.",
+            writable_dir=tmp_path / "output",
+        ),
+    )
+
+    for command in commands:
+        assert command.count(expected) == 1
+        assert command[command.index(expected) - 1] == "-c"
+
+
+def test_native_windows_user_skill_discovery_tracks_new_exact_skill_files(
+    tmp_path: Path,
+) -> None:
+    profile = tmp_path / "profile"
+    skills = profile / ".agents" / "skills"
+    first = skills / "first" / "SKILL.md"
+    first.parent.mkdir(parents=True)
+    first.write_text("---\nname: first\n---\n", encoding="utf-8")
+    (skills / "not-a-skill").mkdir()
+    environment = {"USERPROFILE": str(profile)}
+
+    assert discover_windows_user_skill_paths(
+        environment=environment,
+        platform_name="nt",
+    ) == (first.resolve(),)
+
+    second = skills / "second" / "SKILL.md"
+    second.parent.mkdir()
+    second.write_text("---\nname: second\n---\n", encoding="utf-8")
+    assert discover_windows_user_skill_paths(
+        environment=environment,
+        platform_name="nt",
+    ) == (first.resolve(), second.resolve())
 
 
 def test_prompt_audit_retries_one_pre_action_timeout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

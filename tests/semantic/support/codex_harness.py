@@ -333,6 +333,65 @@ _ALLOWED_SKILL_READS = frozenset(
         "references/waapi-coverage.md",
     }
 )
+
+
+def discover_windows_user_skill_paths(
+    *,
+    environment: Mapping[str, str] | None = None,
+    platform_name: str | None = None,
+) -> tuple[Path, ...]:
+    r"""Return exact user-global Skill files Codex may discover on Windows.
+
+    Native Codex resolves ``%USERPROFILE%\.agents\skills`` through the Windows
+    user profile Known Folder even when the child process receives disposable
+    HOME, USERPROFILE, and CODEX_HOME values.  Formal campaign commands disable
+    every pre-existing file by exact path while retaining the task-local
+    ``waapi-skill`` installed below the isolated workspace.
+    """
+
+    if not _is_windows(platform_name):
+        return ()
+    source = os.environ if environment is None else environment
+    user_profile = _environment_value_case_insensitive(source, "USERPROFILE")
+    if not user_profile:
+        raise CodexHarnessError(
+            "native Windows user Skill isolation requires USERPROFILE"
+        )
+    root = Path(user_profile).expanduser() / ".agents" / "skills"
+    if not root.exists():
+        return ()
+    if not root.is_dir() or is_link_or_junction(root):
+        raise CodexHarnessError(
+            f"native Windows user Skill root is not a regular directory: {root}"
+        )
+    paths: list[Path] = []
+    for entry in sorted(root.iterdir(), key=lambda value: value.name.casefold()):
+        skill_file = entry / "SKILL.md"
+        if not entry.is_dir() or is_link_or_junction(entry) or not skill_file.exists():
+            continue
+        if not skill_file.is_file() or is_link_or_junction(skill_file):
+            raise CodexHarnessError(
+                f"native Windows user Skill file is not regular: {skill_file}"
+            )
+        paths.append(skill_file.resolve(strict=True))
+    if len(paths) != len(set(paths)):
+        raise CodexHarnessError("native Windows user Skill paths are duplicated")
+    return tuple(paths)
+
+
+def _disabled_user_skill_config_argv(paths: Sequence[Path]) -> tuple[str, ...]:
+    if not paths:
+        return ()
+    normalized = tuple(Path(path).expanduser().resolve(strict=False) for path in paths)
+    if len(normalized) != len(set(normalized)) or any(
+        not path.is_absolute() or path.name != "SKILL.md" for path in normalized
+    ):
+        raise CodexHarnessError("disabled user Skill paths are invalid")
+    rows = ",".join(
+        "{path=" + json.dumps(str(path)) + ",enabled=false}"
+        for path in normalized
+    )
+    return ("-c", f"skills.config=[{rows}]")
 _POSIX_WORKSPACE_SKILL_READS = {
     ".agents/skills/waapi-skill/SKILL.md": ("SKILL.md",),
     ".agents/skills/waapi-skill/references/waapi-setup.md": (
@@ -1596,6 +1655,13 @@ class CodexHarnessConfig:
     workspace: Path
     skill_source: Path
     codex_binary: Path = field(default_factory=discover_codex_binary)
+    disabled_user_skill_paths: tuple[Path, ...] = field(
+        default_factory=lambda: (
+            discover_windows_user_skill_paths(platform_name="nt")
+            if os.name == "nt"
+            else ()
+        )
+    )
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None
     auth_json: Path = DEFAULT_AUTH_JSON
     model: str = DEFAULT_MODEL
@@ -1611,6 +1677,23 @@ class CodexHarnessConfig:
     developer_instructions: str = ""
 
     def __post_init__(self) -> None:
+        normalized_skill_paths = tuple(
+            Path(path).expanduser().resolve(strict=False)
+            for path in self.disabled_user_skill_paths
+        )
+        if len(normalized_skill_paths) != len(set(normalized_skill_paths)) or any(
+            not path.is_absolute() or path.name != "SKILL.md"
+            for path in normalized_skill_paths
+        ):
+            raise ValueError(
+                "CodexHarnessConfig.disabled_user_skill_paths must contain "
+                "unique absolute SKILL.md paths"
+            )
+        object.__setattr__(
+            self,
+            "disabled_user_skill_paths",
+            normalized_skill_paths,
+        )
         if self.developer_instructions and (
             self.developer_instructions != self.developer_instructions.strip()
             or "\x00" in self.developer_instructions
@@ -2653,6 +2736,7 @@ def build_prompt_audit_command(config: CodexHarnessConfig, *, prompt: str) -> li
         "--disable",
         "memories",
     ]
+    command.extend(_disabled_user_skill_config_argv(config.disabled_user_skill_paths))
     command.extend(_developer_instructions_config_argv(config.developer_instructions))
     command.extend(
         (
@@ -2728,6 +2812,7 @@ def _build_exec_prefix(
                 f'windows.sandbox="{WINDOWS_SEMANTIC_SANDBOX_MODE}"',
             )
         )
+    command.extend(_disabled_user_skill_config_argv(config.disabled_user_skill_paths))
     command.extend(_developer_instructions_config_argv(config.developer_instructions))
     command.extend(
         [
@@ -4635,6 +4720,7 @@ __all__ = [
     "count_invalid_jsonl_lines",
     "discover_codex_binary",
     "discover_windows_powershell_core",
+    "discover_windows_user_skill_paths",
     "final_agent_message",
     "first_gateway_backed_agent_message",
     "gateway_continuation_binding_errors",

@@ -5736,12 +5736,12 @@ def _dynamic_next_command_decision(
             "candidate": "deferred_fact_queue",
             "condition": "current_disclosed_node_has_unapplied_business_facts",
             "action": (
-                "apply_pending_ancestor_facts_then_current_node_parent_fact_"
-                "then_selected_parent_branch_fact_then_business_present_child_"
+                "apply_pending_ancestor_facts_then_selected_parent_branch_fact_"
+                "then_current_node_parent_fact_then_business_present_child_"
                 "contract_facts_in_schema_order"
                 if selected_parent_branch_fact
                 and outermost_disclosed_root_pointer is not None
-                else "apply_current_node_parent_fact_then_selected_parent_branch_"
+                else "apply_selected_parent_branch_fact_then_current_node_parent_"
                 "fact_then_business_present_child_contract_facts_in_schema_order"
                 if selected_parent_branch_fact
                 else "apply_current_node_parent_fact_then_business_present_"
@@ -6509,12 +6509,12 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     "deferred_fact_queue": {
                         "traversal": "response_tree_preorder",
                         "node_steps": [
-                            "deferred_parent_fact",
                             *(
                                 ["selected_parent_branch_fact"]
                                 if selected_parent_branch_fact
                                 else []
                             ),
+                            "deferred_parent_fact",
                             "child_contract_facts",
                             "then_descendant_response_nodes",
                         ],

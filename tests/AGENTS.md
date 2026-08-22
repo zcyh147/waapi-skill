@@ -163,6 +163,27 @@ suite. A partial, quota-blocked, prerequisite-blocked, or interrupted campaign
 is incomplete even if its selected profile is named `formal_98` or
 `full_cross_version_168`.
 
+### Native-Windows Fresh Agent isolation
+
+Native Codex resolves the current user's `%USERPROFILE%\.agents\skills` through
+the Windows user profile Known Folder. Disposable `HOME`, `USERPROFILE`, and
+`CODEX_HOME` values do not by themselves hide that tree. Before each formal
+Windows campaign, enumerate its direct regular `SKILL.md` files and seal exact
+path-based `skills.config=[{path=...,enabled=false}]` session overrides into
+both `codex debug prompt-input` and every `codex exec`/resume argv. The
+task-local `.agents\skills\waapi-skill\SKILL.md` remains enabled and the prompt
+audit must still prove that it is the only non-system Skill visible. Recompute
+the sealed list for a new campaign root so a newly installed user Skill cannot
+appear silently; never rename, delete, or modify the user's Skill tree.
+
+Pass these TOML overrides as an argv list through the attested PowerShell Core
+host with native argument mode `Standard` or `Windows`. Windows PowerShell 5
+legacy native argument passing strips the embedded TOML quotes and is not a
+valid isolation probe. Formal Fresh Agent work runs from the active desktop
+user's Scheduled Task with `InteractiveToken` and `Limited`; SSH only creates,
+starts, waits for, reads, and removes that task. Ordinary `ci\test.bat` and
+pytest runs continue directly over SSH.
+
 ### Failure-first campaign scheduling
 
 After a frozen full-profile root exposes ordinary semantic failures, repair the

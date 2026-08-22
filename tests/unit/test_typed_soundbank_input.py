@@ -588,8 +588,8 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
     assert identity["continuation"]["request_wide_order"][
         "deferred_fact_queue"
     ]["node_steps"] == [
-        "deferred_parent_fact",
         "selected_parent_branch_fact",
+        "deferred_parent_fact",
         "child_contract_facts",
         "then_descendant_response_nodes",
     ]
@@ -630,8 +630,8 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
     assert identity["continuation"]["next_command_decision"][
         "evaluate_in_order"
     ][0]["action"] == (
-        "apply_pending_ancestor_facts_then_current_node_parent_fact_then_"
-        "selected_parent_branch_fact_then_business_present_child_contract_"
+        "apply_pending_ancestor_facts_then_selected_parent_branch_fact_then_"
+        "current_node_parent_fact_then_business_present_child_contract_"
         "facts_in_schema_order"
     )
     assert identity["continuation"]["next_command_decision"][
