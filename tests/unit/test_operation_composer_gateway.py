@@ -1518,6 +1518,8 @@ def test_compact_weather_shaped_action_responses_remain_constant_size(
     authority = started["task_authority"]
     revision = 1
     response_sizes: list[int] = []
+    incomplete_sizes: list[int] = []
+    complete_sizes: list[int] = []
 
     for index in range(5):
         code, targeted = execute(
@@ -1554,7 +1556,10 @@ def test_compact_weather_shaped_action_responses_remain_constant_size(
         }
         handle = targeted["draft"]["action_result"]["created_handles"][0]
         revision += 1
-        response_sizes.append(len(json.dumps(targeted).encode("utf-8")))
+        targeted_size = len(json.dumps(targeted).encode("utf-8"))
+        response_sizes.append(targeted_size)
+        assert targeted["draft"]["schema_required_fields_status"] == "incomplete"
+        incomplete_sizes.append(targeted_size)
         for name, value in (("FadeTime", 0.25 + index / 10), ("Delay", index / 10)):
             code, changed = execute(
                 tmp_path,
@@ -1591,15 +1596,16 @@ def test_compact_weather_shaped_action_responses_remain_constant_size(
                 "construction_boundary"
             ]["before"] == "continue_no_confirm_no_end"
             revision += 1
-            response_sizes.append(len(json.dumps(changed).encode("utf-8")))
+            changed_size = len(json.dumps(changed).encode("utf-8"))
+            response_sizes.append(changed_size)
+            assert changed["draft"]["schema_required_fields_status"] == "complete"
+            complete_sizes.append(changed_size)
 
     assert len(response_sizes) == 15
     # Required-incomplete target-only receipts omit draft-check.  Once a
     # property makes the schema complete, the exact completion candidate adds
     # its copy-ready shell command.  Both projections remain bounded.
     assert max(response_sizes) < 3_500
-    incomplete_sizes = [size for size in response_sizes if size < 2_000]
-    complete_sizes = [size for size in response_sizes if size > 3_000]
     assert len(incomplete_sizes) == 5
     assert len(complete_sizes) == 10
     assert max(incomplete_sizes) - min(incomplete_sizes) < 16
