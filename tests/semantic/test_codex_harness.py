@@ -1482,6 +1482,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "typed_operation.continuation.gateway_argv_prefix verbatim" in instructions
     assert "incl --apply" in instructions
     assert "selector kind/value are separate argv" in instructions
+    assert "IDs and opaque handles/tokens/digests are exact-copy values" in instructions
     assert "SFX => exact object_type Sound SFX, never Sound" in instructions
     assert "requested Event belongs in initial add_import_row" in instructions
     assert "never defer/omit" in instructions
@@ -2520,6 +2521,26 @@ def test_native_windows_taskkill_command_is_tree_scoped_and_fail_closed(
     )
     with pytest.raises(CodexHarnessError, match="could not terminate"):
         codex_harness_module.taskkill_process_tree(fake, force=False)
+
+    exited_during_taskkill = InterruptingFakeProcess()
+
+    def partial_exit_race(
+        command: Sequence[str],
+        **_kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        exited_during_taskkill.returncode = 1
+        return subprocess.CompletedProcess(
+            command,
+            255,
+            "SUCCESS: terminated the tracked parent",
+            "ERROR: one console helper operation is not supported",
+        )
+
+    monkeypatch.setattr(subprocess, "run", partial_exit_race)
+    codex_harness_module.taskkill_process_tree(
+        exited_during_taskkill,  # type: ignore[arg-type]
+        force=True,
+    )
 
 
 def test_windows_system_executable_uses_fixed_system32_path() -> None:

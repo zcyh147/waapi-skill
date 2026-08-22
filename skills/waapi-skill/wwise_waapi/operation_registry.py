@@ -2453,6 +2453,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         constraints=(
             "target=null is an explicit closed clear operation and is rejected when live metadata contains a notNull restriction",
             "a non-null target is live-resolved and checked against live reference type restrictions",
+            "when a prior successful Gateway read returned an exact id for object or target, copy that id exactly; do not retype its path or name",
         ),
         selection_guidance=_selection_guidance(
             use_when=("Exactly one existing object receives one reference set or clear.",),
@@ -3478,6 +3479,8 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "child must be a direct child of switch_container",
             "state_or_switch must be a direct child of the group referenced by SwitchGroupOrStateGroup",
             "the exact child and state_or_switch pair must already exist",
+            "an exact child name plus a closed parent requires scoped-name; direct-child is only for one unnamed exactly-one child by type",
+            "an exact Switch or State value name plus its closed group parent requires scoped-name",
         ),
         selection_guidance=_selection_guidance(
             use_when=("The user asks to remove one existing Switch Container child assignment.",),

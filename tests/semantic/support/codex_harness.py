@@ -46,8 +46,8 @@ DEFAULT_TIMEOUT_SECONDS = 180.0
 SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "First read SKILL.md once, standalone. Execute exact "
     "next_command.copy_instruction.source_field; preserve "
-    "quotes; never reconstruct. Copy fixed_argv_prefix, opaque handles/tokens/"
-    "digests. Each fact one argv value; cover every prompt field/item/map/bool; "
+    "quotes; never reconstruct. Copy fixed_argv_prefix; IDs and opaque handles/"
+    "tokens/digests are exact-copy values. Each fact one argv value; cover every prompt field/item/map/bool; "
     "no defaults. batch_size 6; final batch holds all remaining and may be shorter. CLI "
     "TYPE: string/number/integer/boolean, not Real64/int16. Prepend unapplied "
     "ancestor deferred_fact at execute_after=all_pending_ancestor_facts_in_response_"
@@ -2353,6 +2353,16 @@ def taskkill_process_tree(
         ) from exc
     if completed.returncode == 0:
         return
+    # ``taskkill /T`` can report a partial error for a console helper that is
+    # already disappearing after it successfully terminates the tracked Codex
+    # parent.  Reap that exit race here; the caller still requires
+    # ``communicate()`` to close every inherited pipe and fails if a descendant
+    # keeps the tree alive.
+    for _attempt in range(5):
+        process.poll()
+        if process.returncode is not None:
+            return
+        time.sleep(0.05)
     output = f"{completed.stdout or ''}\n{completed.stderr or ''}".casefold()
     not_found = completed.returncode == 128 or any(
         marker in output

@@ -1427,6 +1427,14 @@ def test_switch_remove_schema_prefers_scoped_names_from_parent_evidence() -> Non
     assert "does not add a Group display-name path segment" in properties[
         "state_or_switch"
     ]["description"]
+    assert any(
+        "exact child name plus a closed parent requires scoped-name" in constraint
+        for constraint in remove["constraints"]
+    )
+    assert any(
+        "exact Switch or State value name" in constraint
+        for constraint in remove["constraints"]
+    )
     assert "description" not in describe_operation(
         "switchContainer.addAssignment"
     ).as_dict()["argument_contract"]["properties"]["child"]

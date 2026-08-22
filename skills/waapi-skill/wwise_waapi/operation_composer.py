@@ -1925,6 +1925,10 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             "include_only_selected_optional_fields": True,
             "additional_fields": False,
         },
+        "identity_value_authority": {
+            "prior_gateway_result_id_is_opaque_exact_copy": True,
+            "replace_prior_result_id_with_path_or_name": "invalid",
+        },
         "flat_target_row_discipline": {
             "initial_action": "add_target",
             "include_every_known_field": [

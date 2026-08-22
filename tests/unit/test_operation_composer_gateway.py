@@ -199,6 +199,10 @@ def test_object_set_composer_discloses_every_exact_typed_action_shape(
         "include_only_selected_optional_fields": True,
         "additional_fields": False,
     }
+    assert contract["identity_value_authority"] == {
+        "prior_gateway_result_id_is_opaque_exact_copy": True,
+        "replace_prior_result_id_with_path_or_name": "invalid",
+    }
     assert contract["flat_target_row_discipline"] == {
         "initial_action": "add_target",
         "include_every_known_field": [
@@ -286,7 +290,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
 
     assert len(non_object_set_digests) == 149
     assert canonical_sha256(non_object_set_digests) == (
-        "6d969ba6b7e02a25258c7cd0b9b2f8938df559af9051017fd4f0bebce55519bd"
+        "e584250074e0c237cd2c13e3bc81e0a4b31007884ff0af3bbc23994570debf24"
     )
     assert {
         version: operation_input_mode("object.set", version)
