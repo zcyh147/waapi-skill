@@ -569,6 +569,7 @@ def test_object_set_typed_actions_build_one_target_scalar_fact_offline(
     ]
     assert target["draft"]["next_action_binding"] == {
         "contract": "waapi-skill.operation-draft-next-action/v1",
+        "shell_tool_timeout_ms": 30_000,
         "draft_id": draft_id,
         "expected_revision": 2,
         "one_atomic_action_batch_only": True,

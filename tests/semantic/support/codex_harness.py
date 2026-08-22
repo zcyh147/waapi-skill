@@ -47,28 +47,26 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "First read SKILL.md once, standalone. Execute exact "
     "next_command.copy_instruction.source_field; preserve "
     "quotes; never reconstruct. Copy fixed_argv_prefix, opaque handles/tokens/"
-    "digests. Each fact: one value/argv literal; every "
-    "prompt field/item/map/boolean; no defaults. "
-    "Fill batch_size 6; only final batch may be shorter and holds all remaining. CLI "
+    "digests. Each fact one argv value; cover every prompt field/item/map/bool; "
+    "no defaults. batch_size 6; final batch holds all remaining and may be shorter. CLI "
     "TYPE: string/number/integer/boolean, not Real64/int16. Prepend unapplied "
     "ancestor deferred_fact at execute_after=all_pending_ancestor_facts_in_response_"
     "tree_preorder. After choose add required selected-branch constant/value facts. "
-    "Top-level facts precede root_dynamic_disclosure; copy_command_by_shape "
-    "verbatim. Metadata: reuse exact visible live tokens; otherwise one distinct "
-    "query/requested token; first command batches "
-    "every same-scope shared/per-row dynamic field; "
-    "never split 1..8; no same-scope "
-    "repeat after success. "
+    "Top facts precede root_dynamic_disclosure; copy_command_by_shape "
+    "verbatim. Metadata: reuse only prior successful live-result tokens; otherwise "
+    "query each requested property/reference token distinctly; batch all same-scope "
+    "shared/per-row fields first; never split 1..8 or repeat after success. "
     "enum/const exactly. typed_operation.continuation.gateway_argv_prefix "
     "verbatim incl --apply; selector kind/value are separate argv. SFX => "
     "exact object_type Sound SFX, never Sound. audio.import: every requested "
-    "Event belongs in initial add_import_row; never defer/omit. Prompt "
-    "absolute paths: copy verbatim; never shorten/normalize. Append prompt terminal "
-    "scalars before completion_candidate.copy_command; use "
-    "shell_tool_timeout_ms. Editable draft-apply continues same turn via "
+    "Event belongs in initial add_import_row; never defer/omit. Prompt absolute "
+    "paths verbatim; no shorten/normalize. Every Skill/Gateway shell call uses "
+    "timeout_ms>=30000; higher shell_tool_timeout_ms wins. Append prompt terminal "
+    "scalars before completion_candidate.copy_command. Editable draft-apply "
+    "continues same turn via "
     "next_phase_decision; no progress reply while editable. "
     "draft-check is not Preview; run next_command before reply unless "
-    "requires_later_user_message. No shell cwd override."
+    "requires_later_user_message. No cwd override."
 )
 
 
@@ -98,9 +96,9 @@ def semantic_skill_bootstrap_developer_instructions(
         )
     return (
         SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
-        + " No next_command: use only "
+        + " No next_command: only "
         + command_prefix
-        + "; never rebuild/shorten it; append disclosed argv only."
+        + "; append disclosed argv verbatim."
     )
 
 
@@ -181,7 +179,7 @@ def semantic_task_developer_instructions(
         base
         + " Reads: "
         + "; ".join(turn_rows)
-        + ". No substitutes/extras."
+        + ". Exact turn; no early/late/extra reads."
     )
     if len(instructions.encode("utf-8")) > 2048:
         raise CodexHarnessError(

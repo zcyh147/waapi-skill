@@ -1432,24 +1432,23 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "fixed_argv_prefix" in instructions
     assert "opaque handle" in instructions
     assert "never reconstruct" in instructions
-    assert "No shell cwd override" in instructions
-    assert "Each fact" in instructions
-    assert "one value/argv literal" in instructions
-    assert "Fill batch_size 6" in instructions
-    assert "only final batch may be shorter" in instructions
-    assert "holds all remaining" in instructions
+    assert "No cwd override" in instructions
+    assert "Each fact one argv value" in instructions
+    assert "every prompt field/item/map/bool" in instructions
+    assert "batch_size 6" in instructions
+    assert "final batch holds all remaining" in instructions
+    assert "may be shorter" in instructions
     assert "CLI TYPE: string/number/integer/boolean" in instructions
     assert "not Real64/int16" in instructions
     assert "unapplied ancestor deferred_fact" in instructions
     assert "execute_after=all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "selected-branch constant" in instructions
-    assert "one distinct query/requested token" in instructions
-    assert "reuse exact visible live tokens" in instructions
-    assert "first command batches every same-scope" in instructions
-    assert "shared/per-row dynamic field" in instructions
+    assert "prior successful live-result tokens" in instructions
+    assert "each requested property/reference token distinctly" in instructions
+    assert "batch all same-scope shared/per-row fields first" in instructions
     assert "never split 1..8" in instructions
-    assert "no same-scope repeat after success" in instructions
+    assert "repeat after success" in instructions
     assert "enum/const exactly" in instructions
     assert "typed_operation.continuation.gateway_argv_prefix verbatim" in instructions
     assert "incl --apply" in instructions
@@ -1457,16 +1456,17 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "SFX => exact object_type Sound SFX, never Sound" in instructions
     assert "requested Event belongs in initial add_import_row" in instructions
     assert "never defer/omit" in instructions
-    assert "Prompt absolute paths: copy verbatim" in instructions
-    assert "never shorten/normalize" in instructions
+    assert "Prompt absolute paths verbatim" in instructions
+    assert "no shorten/normalize" in instructions
     assert "prompt terminal scalars" in instructions
-    assert "every prompt field/item/map/boolean" in instructions
+    assert "every prompt field/item/map/bool" in instructions
     assert (
-        "Top-level facts precede root_dynamic_disclosure"
+        "Top facts precede root_dynamic_disclosure"
         in instructions
     )
     assert "copy_command_by_shape verbatim" in instructions
     assert "shell_tool_timeout_ms" in instructions
+    assert "timeout_ms>=30000" in instructions
     assert "draft-check is not Preview" in instructions
     assert "Editable draft-apply continues same turn" in instructions
     assert "no progress reply while editable" in instructions
@@ -1485,7 +1485,8 @@ def test_formal_bootstrap_instructions_bind_one_exact_windows_runner_prefix() ->
         r"'C:\Git_Repos\waapi-skills\skills\waapi-skill\scripts\run.py' "
         "'gateway.py'"
     ) in instructions
-    assert "No next_command: use only" in instructions
+    assert "No next_command: only" in instructions
+    assert "append disclosed argv verbatim" in instructions
     assert len(instructions.encode("utf-8")) <= 2048
 
 
@@ -1514,6 +1515,7 @@ def test_formal_task_instructions_bind_exact_posix_skill_read_schedule() -> None
     )
     assert "Reads: 1" in instructions
     assert "2 none" in instructions
+    assert "Exact turn; no early/late/extra reads" in instructions
     assert len(instructions.encode("utf-8")) <= 2048
 
 
@@ -1537,13 +1539,14 @@ def test_formal_task_instructions_bind_exact_windows_skill_read_schedule() -> No
         "python '.agents\\skills\\waapi-skill\\scripts\\run.py' "
         "'gateway.py'"
     ) in instructions
-    assert "use only" in instructions
-    assert "never rebuild/shorten it" in instructions
+    assert "No next_command: only" in instructions
+    assert "append disclosed argv verbatim" in instructions
     assert "waapi-skill-workspace\\root" not in instructions
     assert (
         "Get-Content -Raw -Encoding UTF8 "
         r"'.agents\skills\waapi-skill\references\waapi-operate.md'"
     ) in instructions
+    assert "Exact turn; no early/late/extra reads" in instructions
     assert len(instructions.encode("utf-8")) <= 2048
 
 

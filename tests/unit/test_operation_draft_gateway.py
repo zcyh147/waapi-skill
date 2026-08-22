@@ -103,6 +103,7 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
         "revision": 1,
         "next_action_binding": {
             "contract": "waapi-skill.operation-draft-next-action/v1",
+            "shell_tool_timeout_ms": 30_000,
             "draft_id": draft_id,
             "expected_revision": 1,
             "one_atomic_action_batch_only": True,

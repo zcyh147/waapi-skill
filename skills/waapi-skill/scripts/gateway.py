@@ -14466,6 +14466,7 @@ def operation_draft_payload(
         )
         next_action_binding: dict[str, Any] = {
             "contract": "waapi-skill.operation-draft-next-action/v1",
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
         }
         if generic_typed_draft:
             typed_draft_contract = (
@@ -14530,10 +14531,6 @@ def operation_draft_payload(
                 "copy_boolean_values_exactly": True,
                 "infer_or_replace_prompt_values": "invalid",
             }
-        if compact_actions is not None:
-            next_action_binding["shell_tool_timeout_ms"] = (
-                GATEWAY_SHELL_TOOL_TIMEOUT_MS
-            )
         if compact_actions is None:
             next_action_binding.update(
                 {
