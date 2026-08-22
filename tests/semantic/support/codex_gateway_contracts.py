@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import PurePosixPath, PureWindowsPath
+
 
 GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
 TYPED_REQUEST_SCHEMA_CONTRACT = "waapi-skill.typed-request-schema/v1"
@@ -15,6 +17,35 @@ TYPED_ARRAY_ITEM_CHOICES_CONTRACT = (
 )
 TASK_LOCAL_RUNNER_POSIX = ".agents/skills/waapi-skill/scripts/run.py"
 TASK_LOCAL_RUNNER_WINDOWS = r".agents\skills\waapi-skill\scripts\run.py"
+
+
+def metadata_candidate_limit_for_query_count(query_count: int) -> int:
+    """Return the one public candidate budget for 1..8 metadata queries."""
+
+    if (
+        isinstance(query_count, bool)
+        or not isinstance(query_count, int)
+        or not 1 <= query_count <= 8
+    ):
+        raise ValueError("metadata query count must be an integer from 1 through 8")
+    return 8 if query_count <= 2 else 3 if query_count <= 4 else 2
+
+
+def task_local_runner_matches_normalized(
+    raw_runner: str,
+    normalized_runner: str,
+) -> bool:
+    """Bind one exact task-local spelling to its absolute installed runner."""
+
+    if raw_runner == TASK_LOCAL_RUNNER_POSIX:
+        path = PurePosixPath(normalized_runner)
+        expected_tail = PurePosixPath(TASK_LOCAL_RUNNER_POSIX).parts
+    elif raw_runner == TASK_LOCAL_RUNNER_WINDOWS:
+        path = PureWindowsPath(normalized_runner)
+        expected_tail = PureWindowsPath(TASK_LOCAL_RUNNER_WINDOWS).parts
+    else:
+        return False
+    return path.is_absolute() and path.parts[-len(expected_tail) :] == expected_tail
 
 
 def gateway_payload_contracts(subcommand: str) -> frozenset[str]:
@@ -45,4 +76,6 @@ __all__ = [
     "TYPED_REQUEST_SCHEMA_CONTRACT",
     "TYPED_TOPIC_INPUT_CONTRACT",
     "gateway_payload_contracts",
+    "metadata_candidate_limit_for_query_count",
+    "task_local_runner_matches_normalized",
 ]

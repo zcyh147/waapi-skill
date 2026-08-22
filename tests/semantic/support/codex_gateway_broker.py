@@ -76,14 +76,14 @@ from wwise_waapi.platform_commands import (
 )
 from tests.semantic.support.codex_gateway_contracts import (
     GATEWAY_RESULT_CONTRACT,
-    TASK_LOCAL_RUNNER_POSIX,
-    TASK_LOCAL_RUNNER_WINDOWS,
     TYPED_ARRAY_ITEM_CHOICES_CONTRACT,
     TYPED_CONTAINER_HANDLE_CONTRACT,
     TYPED_MAP_CONTAINER_CHOICES_CONTRACT,
     TYPED_REQUEST_SCHEMA_CONTRACT,
     TYPED_TOPIC_INPUT_CONTRACT,
     gateway_payload_contracts,
+    metadata_candidate_limit_for_query_count,
+    task_local_runner_matches_normalized,
 )
 
 
@@ -4876,21 +4876,29 @@ def _validate_metadata_discover_query_arguments(
             "metadata discover --limit must be one canonical decimal integer"
         )
     supplied_limit_value = int(supplied_limit)
-    limit_matches = (
-        supplied_limit == configured_limit
-        if isinstance(configured_limit, str)
-        else configured_limit.minimum
-        <= supplied_limit_value
-        <= configured_limit.maximum
-    )
     if (
         supplied_scopes != [(scope_flag, scope_value)]
-        or not limit_matches
         or not 1 <= len(queries) <= 8
     ):
         raise GatewayInvocationError(
             "metadata discover scope must be exactly one configured "
-            "--object-type, 1..8 --query values, and one matching --limit"
+            "--object-type and 1..8 --query values"
+        )
+    actual_limit = metadata_candidate_limit_for_query_count(len(queries))
+    configured_limit_allows_actual = (
+        isinstance(configured_limit, str)
+        and int(configured_limit)
+        == metadata_candidate_limit_for_query_count(len(query_specs))
+        or isinstance(configured_limit, BoundedIntegerArgument)
+        and configured_limit.minimum <= actual_limit <= configured_limit.maximum
+    )
+    if not configured_limit_allows_actual:
+        raise GatewayInvocationError(
+            "metadata discover configured limit does not match its query slots"
+        )
+    if supplied_limit_value != actual_limit:
+        raise GatewayInvocationError(
+            "metadata discover --limit must match the actual query count"
         )
     query_values = tuple(queries)
     maximum_chars = min(item.maximum_chars for item in query_specs)
@@ -5783,17 +5791,20 @@ def resolve_gateway_invocation(
     )
     allowed_runners = tuple(dict.fromkeys((invocation_runner, candidate_runner)))
     raw_runner = values[1]
-    task_local_runner = (
-        TASK_LOCAL_RUNNER_WINDOWS if os.name == "nt" else TASK_LOCAL_RUNNER_POSIX
-    )
-    if raw_runner == task_local_runner and invocation_skill_source is not None:
+    if (
+        invocation_skill_source is not None
+        and task_local_runner_matches_normalized(
+            raw_runner,
+            str(invocation_runner),
+        )
+    ):
         supplied_runner = invocation_runner
     else:
         supplied_runner = Path(raw_runner)
     if not supplied_runner.is_absolute() or supplied_runner not in allowed_runners:
         expected = " or ".join(str(path) for path in allowed_runners)
         if invocation_skill_source is not None:
-            expected += f" or {task_local_runner}"
+            expected += " or the exact task-local runner"
         raise GatewayInvocationError(f"runner path must be exactly {expected}")
     if values[2] == "gateway.py":
         gateway_arguments = values[3:]

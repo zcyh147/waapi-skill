@@ -75,7 +75,11 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
     SemanticJsonArgument,
     SHIM_TRUSTED_PYTHON_ENV,
 )
-from .support.codex_gateway_contracts import TYPED_REQUEST_SCHEMA_CONTRACT
+from .support.codex_gateway_contracts import (
+    TASK_LOCAL_RUNNER_POSIX,
+    TASK_LOCAL_RUNNER_WINDOWS,
+    TYPED_REQUEST_SCHEMA_CONTRACT,
+)
 
 
 _FAKE_KILL_RETURN_CODE = -9
@@ -1426,34 +1430,38 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
         "Get-Content -Raw -Encoding UTF8 "
         "'.agents\\skills\\waapi-skill\\SKILL.md'"
     ) in instructions
-    assert "use this short task-local spelling" in instructions
+    assert "short task-local only" in instructions
     assert "next_command.copy_instruction.source_field" in instructions
     assert "preserve every quote" in instructions
     assert "fixed_argv_prefix" in instructions
     assert "opaque handle" in instructions
     assert "never reconstruct" in instructions
-    assert "Never override shell-tool cwd" in instructions
-    assert "Repeat each typed fact template in full" in instructions
-    assert "one shell argv literal" in instructions
-    assert "submit exactly six complete action groups" in instructions
-    assert "include every remaining action in one final batch" in instructions
-    assert "only string/number/integer/boolean" in instructions
-    assert "never Wwise metadata types such as Real64/int16" in instructions
-    assert "every still-unapplied ancestor deferred_fact" in instructions
+    assert "No shell cwd override" in instructions
+    assert "Each full fact template" in instructions
+    assert "one business value/argv literal" in instructions
+    assert "Greedily fill batch_size 6" in instructions
+    assert "only final batch is shorter" in instructions
+    assert "with all remaining" in instructions
+    assert "CLI TYPE is string/number/integer/boolean" in instructions
+    assert "never Real64/int16" in instructions
+    assert "unapplied ancestor deferred_fact" in instructions
     assert "execute_after=all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "selected-branch constant" in instructions
-    assert "metadata query/limit exactly" in instructions
-    assert "enum/const spelling exactly" in instructions
-    assert "every prompt-required terminal scalar" in instructions
-    assert "every prompt-present field" in instructions
-    assert "copy booleans exactly" in instructions
+    assert "distinct query per requested token" in instructions
+    assert "no repeat of successful same-scope/token discovery" in instructions
+    assert "enum/const exactly" in instructions
+    assert "typed_operation.continuation.gateway_argv_prefix verbatim" in instructions
+    assert "incl --apply" in instructions
+    assert "selector kind/value as separate argv tokens" in instructions
+    assert "SFX => exact object_type Sound SFX, never Sound" in instructions
+    assert "prompt terminal scalars" in instructions
+    assert "every prompt field/item/map/boolean" in instructions
     assert (
-        "Finish prompt-present top-level facts before root_dynamic_disclosure"
+        "Finish prompt top-level facts before root_dynamic_disclosure"
         in instructions
     )
     assert "copy_command_by_shape verbatim" in instructions
-    assert "metadata query/limit" in instructions
     assert "shell_tool_timeout_ms" in instructions
     assert "A successful draft-check is not a Preview" in instructions
     assert "requires_later_user_message" in instructions
@@ -1552,7 +1560,7 @@ def test_public_integration_alarm_instructions_fit_the_sealed_byte_limit() -> No
     assert "Reads: 1" in instructions
     assert "2 [Get-Content" in instructions
     assert "3 none" in instructions
-    assert "never Wwise metadata types such as Real64/int16" in instructions
+    assert "never Real64/int16" in instructions
     assert len(instructions.encode("utf-8")) <= 2048
 
 
@@ -4981,6 +4989,50 @@ def test_posix_task_classifier_accepts_only_exact_task_local_skill_reads(
     )
     assert near_facts.allowed_read_commands == ()
     assert near_facts.unexpected_commands == (near.command,)
+
+
+def test_task_classifier_accepts_exact_task_local_gateway_runner(
+    tmp_path: Path,
+) -> None:
+    candidate = tmp_path / "candidate" / "waapi-skill"
+    installed = (
+        tmp_path
+        / "agent-workspace"
+        / ".agents"
+        / "skills"
+        / "waapi-skill"
+    )
+    for root in (candidate, installed):
+        (root / "scripts").mkdir(parents=True)
+        (root / "scripts" / "run.py").write_text("# runner\n", encoding="utf-8")
+    payload = {
+        "contract": "waapi-skill.gateway-result/v1",
+        "command": "status",
+        "ok": True,
+    }
+    relative_runner = (
+        TASK_LOCAL_RUNNER_WINDOWS if os.name == "nt" else TASK_LOCAL_RUNNER_POSIX
+    )
+    record = CodexCommandRecord(
+        command=f"python {relative_runner} gateway.py status",
+        exit_code=0,
+        status="completed",
+        aggregated_output=json.dumps(payload),
+        argv=("python", relative_runner, "gateway.py", "status"),
+        has_shell_operators=False,
+        parser_kind="windows-pwsh-command" if os.name == "nt" else "posix-native",
+    )
+
+    facts = classify_commands(
+        (record,),
+        skill_source=candidate,
+        alternate_gateway_skill_sources=(installed,),
+        expected_gateway_subcommands=("status",),
+    )
+
+    assert facts.gateway_commands == (record.command,)
+    assert facts.gateway_subcommands == ("status",)
+    assert facts.unexpected_commands == ()
 
 
 def test_validated_skill_read_normalizes_only_line_endings(tmp_path: Path) -> None:

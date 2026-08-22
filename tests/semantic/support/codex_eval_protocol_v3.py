@@ -32,6 +32,9 @@ from tests.semantic.support.codex_gateway_broker import (
     validate_commutative_read_only_step_groups,
     validate_operation_draft_protocol_steps,
 )
+from tests.semantic.support.codex_gateway_contracts import (
+    metadata_candidate_limit_for_query_count,
+)
 from wwise_waapi.operation_composer import (
     MAX_TYPED_ACTIONS_PER_APPLY,
     OperationComposerError,
@@ -1693,7 +1696,7 @@ def metadata_candidate_limit(queries: Sequence[str]) -> int:
         raise V3ProtocolError(
             "metadata candidate budget requires 1..8 query phrases"
         )
-    return 8 if count <= 2 else 3 if count <= 4 else 2
+    return metadata_candidate_limit_for_query_count(count)
 
 
 def operation_request_equivalence(operation: str) -> str:

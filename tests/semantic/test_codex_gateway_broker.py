@@ -66,6 +66,11 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
     project_required_metadata_tokens,
     resolve_gateway_invocation,
 )
+from .support.codex_gateway_contracts import (
+    TASK_LOCAL_RUNNER_POSIX,
+    TASK_LOCAL_RUNNER_WINDOWS,
+    task_local_runner_matches_normalized,
+)
 from .support.codex_eval_protocol_v3 import (  # pyright: ignore[reportMissingImports]
     build_audio_import_composer_transaction_steps,
     build_object_set_composer_transaction_steps,
@@ -8413,7 +8418,9 @@ def test_resolver_accepts_only_the_exact_task_local_relative_runner(
     invocation = make_fake_skill(
         tmp_path / "task" / ".agents" / "skills"
     )
-    relative_runner = ".agents/skills/waapi-skill/scripts/run.py"
+    relative_runner = (
+        TASK_LOCAL_RUNNER_WINDOWS if os.name == "nt" else TASK_LOCAL_RUNNER_POSIX
+    )
 
     resolved = resolve_gateway_invocation(
         ["python", relative_runner, "gateway.py", "status"],
@@ -8428,13 +8435,41 @@ def test_resolver_accepts_only_the_exact_task_local_relative_runner(
         resolve_gateway_invocation(
             [
                 "python",
-                ".agents/skills/waapi-skill/scripts/rn.py",
+                relative_runner.replace("run.py", "rn.py"),
                 "gateway.py",
                 "status",
             ],
             skill_source=candidate,
             invocation_skill_source=invocation,
         )
+
+
+@pytest.mark.parametrize(
+    ("raw_runner", "normalized_runner"),
+    (
+        (
+            TASK_LOCAL_RUNNER_POSIX,
+            "/tmp/task/.agents/skills/waapi-skill/scripts/run.py",
+        ),
+        (
+            TASK_LOCAL_RUNNER_WINDOWS,
+            r"C:\task\.agents\skills\waapi-skill\scripts\run.py",
+        ),
+    ),
+)
+def test_task_local_runner_binding_uses_owning_path_flavor(
+    raw_runner: str,
+    normalized_runner: str,
+) -> None:
+    assert task_local_runner_matches_normalized(raw_runner, normalized_runner)
+    assert not task_local_runner_matches_normalized(
+        raw_runner.replace("run.py", "rn.py"),
+        normalized_runner,
+    )
+    assert not task_local_runner_matches_normalized(
+        raw_runner,
+        normalized_runner.replace("waapi-skill", "other-skill"),
+    )
 
 
 def test_windows_codex_shlex_audio_import_event_reconciles_exact_broker_argv_and_hashes(
@@ -8646,6 +8681,52 @@ def test_metadata_query_slots_accept_the_configured_candidate_limit(
     assert execution_arguments == actual
 
 
+def test_metadata_query_slots_derive_limit_from_actual_rephrased_query_count(
+    tmp_path: Path,
+) -> None:
+    metadata_step = _metadata_step_with_limit(
+        "2",
+        object_type="Sound",
+        query_labels=(
+            "looping enabled",
+            "looping infinite",
+            "ignore parent playback limit",
+            "sound instance limit enabled",
+            "maximum sound instances per object",
+            "volume",
+            "output bus routing",
+        ),
+    )
+    broker = CodexGatewayBroker(
+        skill_source=tmp_path / "waapi-skill",
+        expected_steps=(metadata_step,),
+    )
+    actual = (
+        "metadata",
+        "discover",
+        "--object-type",
+        "Sound",
+        "--query",
+        "looping",
+        "--query",
+        "playback instance limit",
+        "--query",
+        "volume",
+        "--query",
+        "output bus",
+        "--limit",
+        "3",
+    )
+
+    semantic_hash, execution_arguments = broker._validate_step(  # noqa: SLF001
+        metadata_step,
+        actual,
+    )
+
+    assert len(semantic_hash) == 64
+    assert execution_arguments == actual
+
+
 def test_metadata_query_slots_accept_only_canonical_bounded_limits(
     tmp_path: Path,
 ) -> None:
@@ -8657,14 +8738,18 @@ def test_metadata_query_slots_accept_only_canonical_bounded_limits(
         expected_steps=(metadata_step,),
     )
     hashes: dict[str, str] = {}
-    for supplied_limit in ("1", "3", "8"):
+    for query_count, supplied_limit in ((1, "8"), (3, "3"), (8, "2")):
+        queries = tuple(
+            item
+            for index in range(query_count)
+            for item in ("--query", f"bounded query {index}")
+        )
         actual = (
             "metadata",
             "discover",
             "--object-type",
             "ActorMixer",
-            "--query",
-            "volume",
+            *queries,
             "--limit",
             supplied_limit,
         )
@@ -8721,7 +8806,7 @@ def test_broker_accepts_only_declared_read_only_pair_linearizations(
             "--query",
             "volume",
             "--limit",
-            "3",
+            "8",
         ],
     }
     with CodexGatewayBroker(
@@ -8779,7 +8864,7 @@ def test_broker_accepts_only_dependency_safe_composer_setup_orders(
             "--query",
             "volume",
             "--limit",
-            "3",
+            "8",
         ],
         "draft.start": ["draft-start", "audio.import"],
     }
@@ -9080,7 +9165,7 @@ def test_broker_commutative_pair_still_rejects_duplicates_and_preview_races(
                 "--query",
                 "volume",
                 "--limit",
-                "3",
+                "8",
             ],
         )
         duplicate = run_model_command(
@@ -9093,7 +9178,7 @@ def test_broker_commutative_pair_still_rejects_duplicates_and_preview_races(
                 "--query",
                 "volume",
                 "--limit",
-                "3",
+                "8",
             ],
         )
         assert first.returncode == 0
@@ -9128,7 +9213,7 @@ def test_broker_commutative_pair_still_rejects_duplicates_and_preview_races(
             "--query",
             "volume",
             "--limit",
-            "3",
+            "8",
         ],
     ),
 )
@@ -9158,22 +9243,18 @@ def test_broker_commutative_pair_rejects_wrong_operation_or_object_scope(
         assert len(evidence.rejected_records) == 1
 
 
-@pytest.mark.parametrize(
-    ("configured_limit", "supplied_limit"),
-    (("2", "8"), ("8", "2")),
-)
-def test_metadata_query_slots_reject_a_limit_mismatched_with_the_expected_step(
+@pytest.mark.parametrize("supplied_limit", ("1", "2", "3", "4", "7"))
+def test_metadata_query_slots_reject_a_limit_mismatched_with_actual_query_count(
     tmp_path: Path,
-    configured_limit: str,
     supplied_limit: str,
 ) -> None:
-    metadata_step = _metadata_step_with_limit(configured_limit)
+    metadata_step = _metadata_step_with_limit("8")
     broker = CodexGatewayBroker(
         skill_source=tmp_path / "waapi-skill",
         expected_steps=(metadata_step,),
     )
 
-    with pytest.raises(GatewayInvocationError, match="matching --limit"):
+    with pytest.raises(GatewayInvocationError, match="actual query count"):
         broker._validate_step(  # noqa: SLF001
             metadata_step,
             (
@@ -9326,14 +9407,39 @@ def test_weather_agent_metadata_step_crosses_broker_validation(
     assert [
         step.name for step in protocol.steps if step.subcommand == "metadata"
     ] == ["tx01.metadata", "tx02.metadata"]
-    metadata_step = next(
-        step for step in protocol.steps if step.name == "tx02.metadata"
-    )
-    assert metadata_step.arguments[-2:] == ("--limit", "8")
     broker = CodexGatewayBroker(
         skill_source=tmp_path / "waapi-skill",
         expected_steps=protocol.steps,
     )
+    sound_metadata_step = next(
+        step for step in protocol.steps if step.name == "tx01.metadata"
+    )
+    collapsed_sound_queries = (
+        "metadata",
+        "discover",
+        "--object-type",
+        "Sound",
+        "--query",
+        "looping",
+        "--query",
+        "playback instance limit",
+        "--query",
+        "volume",
+        "--query",
+        "output bus",
+        "--limit",
+        "3",
+    )
+    collapsed_hash, collapsed_execution = broker._validate_step(  # noqa: SLF001
+        sound_metadata_step,
+        collapsed_sound_queries,
+    )
+    assert len(collapsed_hash) == 64
+    assert collapsed_execution == collapsed_sound_queries
+    metadata_step = next(
+        step for step in protocol.steps if step.name == "tx02.metadata"
+    )
+    assert metadata_step.arguments[-2:] == ("--limit", "8")
     actual = (
         "metadata",
         "discover",
@@ -9428,7 +9534,7 @@ def test_metadata_query_slots_accept_rephrasing_but_keep_a_closed_scope(
             "ActorMixer",
             *queries,
             "--limit",
-            "8",
+            "8" if query_count <= 2 else "3" if query_count <= 4 else "2",
         )
         variable_hash, variable_execution = broker._validate_step(  # noqa: SLF001
             metadata_step,

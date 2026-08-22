@@ -22,6 +22,7 @@ from .codex_eval_suite import (
     EvalSession,
 )
 from .codex_gateway_broker import GatewayBrokerEvidence, GatewayBrokerReconciliation
+from .codex_gateway_contracts import task_local_runner_matches_normalized
 from .codex_harness import CodexCommandRecord, CodexRunResult, normalized_gateway_command_argv
 
 
@@ -505,8 +506,19 @@ def _normalized_gateway_record(
         if source is not None
     }
     supplied_runner = Path(argv[1]).expanduser()
-    normalized_runner = _absolute_lexical(supplied_runner)
-    if not supplied_runner.is_absolute() or normalized_runner not in allowed_runners:
+    normalized_runner = (
+        _absolute_lexical(supplied_runner)
+        if supplied_runner.is_absolute()
+        else next(
+            (
+                runner
+                for runner in allowed_runners
+                if task_local_runner_matches_normalized(argv[1], str(runner))
+            ),
+            None,
+        )
+    )
+    if normalized_runner is None or normalized_runner not in allowed_runners:
         return None
     if argv[2] != "gateway.py":
         return None

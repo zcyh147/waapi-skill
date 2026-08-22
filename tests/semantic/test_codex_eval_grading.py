@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from dataclasses import FrozenInstanceError, replace
 from pathlib import Path
@@ -9,6 +10,7 @@ import pytest
 
 from tests.semantic.support.codex_eval_grading import (
     _allowed_read_sequences,
+    _normalized_gateway_record,
     grade_eval_session,
 )
 from tests.semantic.support.codex_eval_suite import (
@@ -21,6 +23,10 @@ from tests.semantic.support.codex_gateway_broker import (
     GatewayBrokerEvidence,
     GatewayBrokerRecord,
     GatewayBrokerReconciliation,
+)
+from tests.semantic.support.codex_gateway_contracts import (
+    TASK_LOCAL_RUNNER_POSIX,
+    TASK_LOCAL_RUNNER_WINDOWS,
 )
 from tests.semantic.support.codex_harness import (
     CodexCommandRecord,
@@ -35,6 +41,49 @@ from tests.semantic.support.codex_harness import (
 
 ROOT = Path(__file__).resolve().parents[2]
 SUITE = load_eval_suite(ROOT / "skills" / "waapi-skill" / "evals" / "evals-v2.json")
+
+
+def test_grading_normalizes_exact_task_local_runner_to_installed_copy(
+    tmp_path: Path,
+) -> None:
+    installed = (
+        tmp_path
+        / "agent-workspace"
+        / ".agents"
+        / "skills"
+        / "waapi-skill"
+    )
+    candidate = tmp_path / "candidate" / "waapi-skill"
+    relative_runner = (
+        TASK_LOCAL_RUNNER_WINDOWS if os.name == "nt" else TASK_LOCAL_RUNNER_POSIX
+    )
+    record = CodexCommandRecord(
+        command=f"python {relative_runner} gateway.py status",
+        exit_code=0,
+        status="completed",
+        aggregated_output="{}",
+        argv=(
+            "python",
+            relative_runner,
+            "gateway.py",
+            "status",
+        ),
+        has_shell_operators=False,
+        parse_error="",
+        parser_kind="posix-native",
+    )
+
+    assert _normalized_gateway_record(
+        record,
+        skill_source=candidate,
+        invocation_skill_source=installed,
+        expected_wwise_version="2022.1",
+    ) == (
+        "python",
+        str(installed / "scripts" / "run.py"),
+        "gateway.py",
+        "status",
+    )
 
 
 def _session(case_id: str, phase: str) -> EvalSession:

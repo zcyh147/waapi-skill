@@ -29,6 +29,9 @@ from tests.semantic.support.codex_gateway_broker import (
     TrustedStepPreObserver,
     gateway_step_sequence_matches,
 )
+from tests.semantic.support.codex_gateway_contracts import (
+    task_local_runner_matches_normalized,
+)
 from tests.semantic.support.codex_filesystem_security import write_utf8_text_bytes
 from tests.semantic.support.codex_harness import (
     CodexCliTask,
@@ -899,22 +902,19 @@ def _gateway_candidate_argvs(
     alternate_skill_sources: Sequence[Path] = (),
     expected_wwise_version: str,
 ) -> tuple[tuple[str, ...], ...]:
-    expected_runners = {
+    expected_runners = tuple(dict.fromkeys(
         os.path.abspath(os.fspath(source / "scripts" / "run.py"))
         for source in (skill_source, *alternate_skill_sources)
-    }
+    ))
     candidates: list[tuple[str, ...]] = []
     for record in result.command_facts.command_records:
         argv = normalized_gateway_command_argv(
             record.argv,
             expected_wwise_version=expected_wwise_version,
         )
-        if (
-            len(argv) >= 4
-            and os.path.abspath(os.path.expanduser(argv[1])) in expected_runners
-            and argv[2] == "gateway.py"
-        ):
-            candidates.append(argv)
+        runner = _candidate_runner_path(argv, expected_runners=expected_runners)
+        if runner is not None:
+            candidates.append((argv[0], runner, *argv[2:]))
     return tuple(candidates)
 
 
@@ -927,23 +927,40 @@ def _gateway_candidate_records(
 ) -> tuple[CodexCommandRecord, ...]:
     """Keep raw Codex records for response-derived continuation binding."""
 
-    expected_runners = {
+    expected_runners = tuple(dict.fromkeys(
         os.path.abspath(os.fspath(source / "scripts" / "run.py"))
         for source in (skill_source, *alternate_skill_sources)
-    }
+    ))
     candidates: list[CodexCommandRecord] = []
     for record in result.command_facts.command_records:
         argv = normalized_gateway_command_argv(
             record.argv,
             expected_wwise_version=expected_wwise_version,
         )
-        if (
-            len(argv) >= 4
-            and os.path.abspath(os.path.expanduser(argv[1])) in expected_runners
-            and argv[2] == "gateway.py"
-        ):
+        if _candidate_runner_path(argv, expected_runners=expected_runners) is not None:
             candidates.append(record)
     return tuple(candidates)
+
+
+def _candidate_runner_path(
+    argv: Sequence[str],
+    *,
+    expected_runners: Sequence[str],
+) -> str | None:
+    if len(argv) < 4 or argv[2] != "gateway.py":
+        return None
+    supplied = Path(argv[1]).expanduser()
+    if supplied.is_absolute():
+        normalized = os.path.abspath(os.fspath(supplied))
+        return normalized if normalized in expected_runners else None
+    return next(
+        (
+            expected
+            for expected in expected_runners
+            if task_local_runner_matches_normalized(argv[1], expected)
+        ),
+        None,
+    )
 
 
 def _bind_gateway_prefix_reconciliation(

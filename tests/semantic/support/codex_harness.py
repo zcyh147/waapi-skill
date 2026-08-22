@@ -33,6 +33,7 @@ from tests.semantic.support.codex_gateway_contracts import (
     TASK_LOCAL_RUNNER_POSIX,
     TASK_LOCAL_RUNNER_WINDOWS,
     gateway_payload_contracts,
+    task_local_runner_matches_normalized,
 )
 
 
@@ -45,28 +46,29 @@ DEFAULT_TIMEOUT_SECONDS = 180.0
 SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "Before any other action, read SKILL.md once with one standalone complete "
     "file-read shell command. "
-    "Execute next_command.copy_instruction.source_field exactly; preserve every "
-    "quote; never reconstruct. Typed Drafts: copy fixed_argv_prefix, every opaque "
-    "handle/token/digest; replace only placeholders. "
-    "Repeat each typed fact template in full with one business value as one shell "
-    "argv literal. Include every prompt-present field/item/map entry; copy booleans "
-    "exactly; infer no defaults. For batch_size 6 submit exactly six complete action "
-    "groups; if fewer remain, include every remaining "
-    "action in one final batch. Draft CLI scalar TYPE is only "
-    "string/number/integer/boolean; never Wwise metadata types such as Real64/int16. "
-    "Prepend every still-unapplied ancestor deferred_fact when "
+    "Execute exact next_command.copy_instruction.source_field; preserve every quote; "
+    "never reconstruct. Typed Drafts: copy fixed_argv_prefix and opaque "
+    "handles/tokens/digests; only placeholders change. Each full fact template has "
+    "one business value/argv literal; include every prompt field/item/map/boolean; "
+    "no defaults. Greedily fill batch_size 6 with independent complete actions; only "
+    "final batch is shorter, with all remaining. CLI TYPE is "
+    "string/number/integer/boolean, never Real64/int16. "
+    "Prepend unapplied ancestor deferred_fact at "
     "execute_after=all_pending_ancestor_facts_in_response_tree_preorder. "
-    "After choose, include every required selected-branch constant and value fact. "
-    "Finish prompt-present top-level facts before root_dynamic_disclosure; copy_command_by_shape "
-    "verbatim. Copy operation-schema metadata query/limit exactly and every "
-    "enum/const spelling exactly. "
-    "Append every prompt-required terminal scalar before "
+    "After choose add required selected-branch constant/value facts. "
+    "Finish prompt top-level facts before root_dynamic_disclosure; copy_command_by_shape "
+    "verbatim. Metadata: distinct query per requested token; actual-count limit; no "
+    "repeat of successful same-scope/token discovery. Copy enum/const exactly. Copy "
+    "typed_operation.continuation.gateway_argv_prefix verbatim incl --apply; keep "
+    "selector kind/value as separate argv tokens. For audio.import, SFX "
+    "=> exact object_type Sound SFX, never Sound. "
+    "Append prompt terminal scalars before "
     "completion_candidate.copy_command; use shell_tool_timeout_ms. A successful "
-    "draft-check is not a Preview: execute next_command before replying/confirmation "
+    "draft-check is not a Preview: run next_command before reply "
     "unless requires_later_user_message. Windows first: "
     "Get-Content -Raw -Encoding UTF8 "
-    "'.agents\\skills\\waapi-skill\\SKILL.md'; use this short task-local spelling. "
-    "Never override shell-tool cwd; use task workspace."
+    "'.agents\\skills\\waapi-skill\\SKILL.md'; short task-local only. "
+    "No shell cwd override; use task workspace."
 )
 
 
@@ -4087,9 +4089,10 @@ def gateway_invocation(
     runner = argv[1]
     expected_runner = _absolute_lexical_path(skill_source) / "scripts" / "run.py"
     candidate = _supplied_absolute_lexical_path(runner)
-    if candidate is None:
-        return None
-    if candidate != expected_runner:
+    if candidate != expected_runner and not task_local_runner_matches_normalized(
+        runner,
+        str(expected_runner),
+    ):
         return None
     if argv[2] != "gateway.py":
         return None

@@ -27,9 +27,14 @@ from tests.semantic.support.codex_campaign_runner import (
     replace_expected_skill_symlinks,
     validate_child_run,
 )
+from tests.semantic.support import codex_campaign_runner as campaign_runner_module
 from tests.semantic.support.codex_harness import (
     prepare_workspace_skill_install,
     workspace_skill_tree_sha256,
+)
+from tests.semantic.support.codex_gateway_contracts import (
+    TASK_LOCAL_RUNNER_POSIX,
+    TASK_LOCAL_RUNNER_WINDOWS,
 )
 from tests.semantic.support.codex_eval_suite import SUPPORTED_VERSIONS, EvalSession, load_eval_suite
 
@@ -51,6 +56,45 @@ _WWISE_GET_INFO_DISPLAY_NAME_BY_VERSION = {
 }
 _SCREENING = load_eval_suite(matrix.DEFAULT_SUITE).expand_profile("screening")
 _FULL = load_eval_suite(matrix.DEFAULT_SUITE).expand_profile("full_cross_version_168")
+
+
+def test_campaign_raw_argv_join_accepts_only_exact_task_local_runner(
+    tmp_path: Path,
+) -> None:
+    installed_runner = (
+        tmp_path
+        / "agent-workspace"
+        / ".agents"
+        / "skills"
+        / "waapi-skill"
+        / "scripts"
+        / "run.py"
+    )
+    relative_runner = (
+        TASK_LOCAL_RUNNER_WINDOWS if os.name == "nt" else TASK_LOCAL_RUNNER_POSIX
+    )
+    command_record = {
+        "argv": ["python", relative_runner, "gateway.py", "status"],
+    }
+    broker_record = {
+        "model_argv": ["python", relative_runner, "gateway.py", "status"],
+        "normalized_model_argv": [
+            "python",
+            str(installed_runner),
+            "gateway.py",
+            "status",
+        ],
+    }
+
+    assert campaign_runner_module._command_record_matches_broker_raw_argv(  # noqa: SLF001
+        command_record,
+        broker_record,
+    )
+    broker_record["model_argv"][1] = ".agents/skills/waapi-skill/scripts/rn.py"
+    assert not campaign_runner_module._command_record_matches_broker_raw_argv(  # noqa: SLF001
+        command_record,
+        broker_record,
+    )
 
 
 def _session(case_id: str, phase: str = "single") -> EvalSession:

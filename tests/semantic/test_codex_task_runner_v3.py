@@ -25,6 +25,10 @@ from tests.semantic.support.codex_gateway_broker import (
     ExpectedGatewayStep,
     GatewayBrokerReconciliation,
 )
+from tests.semantic.support.codex_gateway_contracts import (
+    TASK_LOCAL_RUNNER_POSIX,
+    TASK_LOCAL_RUNNER_WINDOWS,
+)
 from tests.semantic.support.codex_filesystem_security import write_utf8_text_bytes
 from tests.semantic.support.codex_harness import (
     CodexCommandRecord,
@@ -1111,6 +1115,53 @@ def test_v3_gateway_accounting_accepts_copy_then_candidate_runner(tmp_path: Path
         alternate_skill_sources=(candidate,),
         expected_wwise_version="2022.1",
     ) == tuple(record.argv for record in records)
+
+
+def test_v3_gateway_accounting_canonicalizes_exact_task_local_runner(
+    tmp_path: Path,
+) -> None:
+    installed = (
+        tmp_path
+        / "workspace"
+        / ".agents"
+        / "skills"
+        / "waapi-skill"
+    )
+    candidate = tmp_path / "candidate" / "waapi-skill"
+    relative_runner = (
+        TASK_LOCAL_RUNNER_WINDOWS if os.name == "nt" else TASK_LOCAL_RUNNER_POSIX
+    )
+    record = SimpleNamespace(
+        argv=(
+            "python",
+            relative_runner,
+            "gateway.py",
+            "status",
+        )
+    )
+    result = SimpleNamespace(
+        command_facts=SimpleNamespace(command_records=(record,))
+    )
+
+    assert task_runner._gateway_candidate_argvs(
+        result,
+        skill_source=installed,
+        alternate_skill_sources=(candidate,),
+        expected_wwise_version="2022.1",
+    ) == (
+        (
+            "python",
+            str(installed / "scripts" / "run.py"),
+            "gateway.py",
+            "status",
+        ),
+    )
+    assert task_runner._gateway_candidate_records(
+        result,
+        skill_source=installed,
+        alternate_skill_sources=(candidate,),
+        expected_wwise_version="2022.1",
+    ) == (record,)
 
 
 def test_task_runner_stops_at_exact_indeterminate_execute_without_verify(
