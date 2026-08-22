@@ -682,6 +682,12 @@ def test_prepares_exact_gateway_checked_use_existing_batch(
     assert prepared.visible_values["rifle_source_directory"].startswith(
         str(runtime.asset_root)
     )
+    source_files = json.loads(prepared.visible_values["rifle_source_files"])
+    assert source_files == [
+        str(prepared.operation_request["arguments"]["imports"][index]["audio_file"])
+        for index in range(4)
+    ]
+    assert all(Path(path).is_absolute() for path in source_files)
     assert prepared.visible_values["rifle_bus_path"] == (
         r"\Master-Mixer Hierarchy\Default Work Unit\WAAPI_V2_Weapons"
         if version == "2022.1"

@@ -8406,6 +8406,37 @@ def test_resolver_and_reconciliation_fail_closed(tmp_path: Path) -> None:
         assert any("differs" in error for error in mismatch.errors)
 
 
+def test_resolver_accepts_only_the_exact_task_local_relative_runner(
+    tmp_path: Path,
+) -> None:
+    candidate = make_fake_skill(tmp_path / "candidate")
+    invocation = make_fake_skill(
+        tmp_path / "task" / ".agents" / "skills"
+    )
+    relative_runner = ".agents/skills/waapi-skill/scripts/run.py"
+
+    resolved = resolve_gateway_invocation(
+        ["python", relative_runner, "gateway.py", "status"],
+        skill_source=candidate,
+        invocation_skill_source=invocation,
+    )
+
+    assert resolved.raw_model_argv[1] == relative_runner
+    assert resolved.runner_path == str(invocation / "scripts" / "run.py")
+    assert resolved.normalized_model_argv[1] == resolved.runner_path
+    with pytest.raises(GatewayInvocationError, match="runner path"):
+        resolve_gateway_invocation(
+            [
+                "python",
+                ".agents/skills/waapi-skill/scripts/rn.py",
+                "gateway.py",
+                "status",
+            ],
+            skill_source=candidate,
+            invocation_skill_source=invocation,
+        )
+
+
 def test_windows_codex_shlex_audio_import_event_reconciles_exact_broker_argv_and_hashes(
     tmp_path: Path,
 ) -> None:

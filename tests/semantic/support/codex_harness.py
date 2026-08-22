@@ -30,6 +30,8 @@ from wwise_waapi.platform_commands import (
 )
 from tests.semantic.support.codex_gateway_contracts import (
     GATEWAY_RESULT_CONTRACT,
+    TASK_LOCAL_RUNNER_POSIX,
+    TASK_LOCAL_RUNNER_WINDOWS,
     gateway_payload_contracts,
 )
 
@@ -53,9 +55,11 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "action in one final batch. Draft CLI scalar TYPE is only "
     "string/number/integer/boolean; never Wwise metadata types such as Real64/int16. "
     "Prepend every still-unapplied ancestor deferred_fact when "
-    "all_pending_ancestor_facts_in_response_tree_preorder. "
+    "execute_after=all_pending_ancestor_facts_in_response_tree_preorder. "
+    "After choose, include every required selected-branch constant and value fact. "
     "Finish prompt-present top-level facts before root_dynamic_disclosure; copy_command_by_shape "
-    "verbatim. Use only operation-schema metadata query/limit. "
+    "verbatim. Copy operation-schema metadata query/limit exactly and every "
+    "enum/const spelling exactly. "
     "Append every prompt-required terminal scalar before "
     "completion_candidate.copy_command; use shell_tool_timeout_ms. A successful "
     "draft-check is not a Preview: execute next_command before replying/confirmation "
@@ -74,7 +78,13 @@ def semantic_skill_bootstrap_developer_instructions(
     raw_runner = str(runner_path)
     windows_path = PureWindowsPath(raw_runner)
     posix_path = PurePosixPath(raw_runner)
-    if windows_path.is_absolute():
+    if raw_runner == TASK_LOCAL_RUNNER_WINDOWS:
+        command_prefix = encode_windows_model_argv(
+            ("python", raw_runner, "gateway.py")
+        )
+    elif raw_runner == TASK_LOCAL_RUNNER_POSIX:
+        command_prefix = shlex.join(("python", raw_runner, "gateway.py"))
+    elif windows_path.is_absolute():
         command_prefix = encode_windows_model_argv(
             ("python", raw_runner, "gateway.py")
         )
@@ -160,11 +170,11 @@ def semantic_task_developer_instructions(
         raise CodexHarnessError("semantic base developer instructions are invalid")
     if base == candidate_base:
         task_runner = (
-            windows_source / "scripts" / "run.py"
+            TASK_LOCAL_RUNNER_WINDOWS
             if is_windows
-            else posix_source / "scripts" / "run.py"
+            else TASK_LOCAL_RUNNER_POSIX
         )
-        base = semantic_skill_bootstrap_developer_instructions(str(task_runner))
+        base = semantic_skill_bootstrap_developer_instructions(task_runner)
     instructions = (
         base
         + " Reads: "

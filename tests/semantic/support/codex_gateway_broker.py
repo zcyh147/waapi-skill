@@ -76,6 +76,8 @@ from wwise_waapi.platform_commands import (
 )
 from tests.semantic.support.codex_gateway_contracts import (
     GATEWAY_RESULT_CONTRACT,
+    TASK_LOCAL_RUNNER_POSIX,
+    TASK_LOCAL_RUNNER_WINDOWS,
     TYPED_ARRAY_ITEM_CHOICES_CONTRACT,
     TYPED_CONTAINER_HANDLE_CONTRACT,
     TYPED_MAP_CONTAINER_CHOICES_CONTRACT,
@@ -5780,9 +5782,18 @@ def resolve_gateway_invocation(
         else candidate_runner
     )
     allowed_runners = tuple(dict.fromkeys((invocation_runner, candidate_runner)))
-    supplied_runner = Path(values[1])
+    raw_runner = values[1]
+    task_local_runner = (
+        TASK_LOCAL_RUNNER_WINDOWS if os.name == "nt" else TASK_LOCAL_RUNNER_POSIX
+    )
+    if raw_runner == task_local_runner and invocation_skill_source is not None:
+        supplied_runner = invocation_runner
+    else:
+        supplied_runner = Path(raw_runner)
     if not supplied_runner.is_absolute() or supplied_runner not in allowed_runners:
         expected = " or ".join(str(path) for path in allowed_runners)
+        if invocation_skill_source is not None:
+            expected += f" or {task_local_runner}"
         raise GatewayInvocationError(f"runner path must be exactly {expected}")
     if values[2] == "gateway.py":
         gateway_arguments = values[3:]

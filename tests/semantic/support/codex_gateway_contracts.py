@@ -13,6 +13,8 @@ TYPED_MAP_CONTAINER_CHOICES_CONTRACT = (
 TYPED_ARRAY_ITEM_CHOICES_CONTRACT = (
     "waapi-skill.typed-array-item-choices/v1"
 )
+TASK_LOCAL_RUNNER_POSIX = ".agents/skills/waapi-skill/scripts/run.py"
+TASK_LOCAL_RUNNER_WINDOWS = r".agents\skills\waapi-skill\scripts\run.py"
 
 
 def gateway_payload_contracts(subcommand: str) -> frozenset[str]:
@@ -35,6 +37,8 @@ def gateway_payload_contracts(subcommand: str) -> frozenset[str]:
 
 __all__ = [
     "GATEWAY_RESULT_CONTRACT",
+    "TASK_LOCAL_RUNNER_POSIX",
+    "TASK_LOCAL_RUNNER_WINDOWS",
     "TYPED_ARRAY_ITEM_CHOICES_CONTRACT",
     "TYPED_CONTAINER_HANDLE_CONTRACT",
     "TYPED_MAP_CONTAINER_CHOICES_CONTRACT",

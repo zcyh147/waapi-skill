@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 from pathlib import Path
 from types import MappingProxyType, SimpleNamespace
@@ -258,6 +259,19 @@ def _visible_values(unit: WorkflowUnit, tmp_path: Path) -> dict[str, str]:
             directory = (tmp_path / item.name).resolve()
             directory.mkdir(parents=True, exist_ok=True)
             values[item.name] = str(directory)
+        elif item.kind == "structured_array":
+            directory = (tmp_path / item.name).resolve()
+            directory.mkdir(parents=True, exist_ok=True)
+            files = []
+            for spec in unit.workflow.fixture.source_files:
+                path = directory / spec.file_name
+                path.write_bytes(b"integration-source\n")
+                files.append(str(path))
+            values[item.name] = json.dumps(
+                files,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
         else:
             values[item.name] = rf"\Test\{item.name}"
     return values

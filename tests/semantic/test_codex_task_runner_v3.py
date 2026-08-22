@@ -1311,18 +1311,21 @@ def test_v3_task_seals_exact_task_local_skill_reads_and_runner(
             "Get-Content -Raw -Encoding UTF8 "
             r"'.agents\skills\waapi-skill\references\waapi-operate.md'"
         ) in instructions
-        assert f"python '{task_skill / 'scripts' / 'run.py'}' 'gateway.py'" in (
-            instructions
-        )
+        assert (
+            "python '.agents\\skills\\waapi-skill\\scripts\\run.py' "
+            "'gateway.py'"
+        ) in instructions
     else:
         assert "cat '.agents/skills/waapi-skill/SKILL.md'" in instructions
         assert "cat '.agents/skills/waapi-skill/references/waapi-operate.md'" in (
             instructions
         )
-        assert f"python {task_skill / 'scripts' / 'run.py'} gateway.py" in (
-            instructions
+        assert (
+            "python .agents/skills/waapi-skill/scripts/run.py gateway.py"
+            in instructions
         )
     assert str(candidate_runner) not in instructions
+    assert str(task_skill) not in instructions
 
 
 def test_codex_infrastructure_archive_failure_masks_retryable_error(

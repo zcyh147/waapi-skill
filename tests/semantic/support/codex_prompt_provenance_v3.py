@@ -3238,6 +3238,9 @@ def _expected_leaf_path_kind(
         ("ak.wwise.core.audio.import", "import_rows"): (
             ("/audio_file", "file"),
         ),
+        ("ak.wwise.core.audio.import", "rifle_source_files"): (
+            ("", "file"),
+        ),
         (
             "ak.wwise.core.audio.importTabDelimited",
             "language_import_files",

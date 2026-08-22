@@ -138,6 +138,17 @@ def test_workflows_keep_the_reviewed_turn_and_transaction_topology() -> None:
     assert "不要修改" in alarm.turns[0].prompt
 
 
+def test_weather_and_harbor_prompts_express_only_the_exact_business_facts() -> None:
+    weather, _alarm, harbor = load_integration_workflows_profile(
+        COMMITTED_PROFILE_PATH
+    ).workflows
+
+    assert "都启用循环，并把循环模式设为无限循环" in weather.turns[0].prompt
+    assert "Harbor_Release 这一行的 rebuild 明确设为 false" in harbor.turns[0].prompt
+    assert "Event 或 Aux Bus" not in harbor.turns[0].prompt
+    assert "清单明确为空" not in harbor.turns[0].prompt
+
+
 def test_units_expose_the_existing_runner_scenario_read_seam() -> None:
     profile = load_integration_workflows_profile(COMMITTED_PROFILE_PATH)
 

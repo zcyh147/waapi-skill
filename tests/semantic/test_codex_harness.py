@@ -1440,7 +1440,11 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "only string/number/integer/boolean" in instructions
     assert "never Wwise metadata types such as Real64/int16" in instructions
     assert "every still-unapplied ancestor deferred_fact" in instructions
+    assert "execute_after=all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "all_pending_ancestor_facts_in_response_tree_preorder" in instructions
+    assert "selected-branch constant" in instructions
+    assert "metadata query/limit exactly" in instructions
+    assert "enum/const spelling exactly" in instructions
     assert "every prompt-required terminal scalar" in instructions
     assert "every prompt-present field" in instructions
     assert "copy booleans exactly" in instructions
@@ -1487,10 +1491,8 @@ def test_formal_task_instructions_bind_exact_posix_skill_read_schedule() -> None
     )
 
     assert "cat '.agents/skills/waapi-skill/SKILL.md'" in instructions
-    assert (
-        f"python {task_skill / 'scripts' / 'run.py'} gateway.py"
-        in instructions
-    )
+    assert "python .agents/skills/waapi-skill/scripts/run.py gateway.py" in instructions
+    assert str(task_skill / "scripts" / "run.py") not in instructions
     assert "/repo/skills/waapi-skill/scripts/run.py" not in instructions
     assert (
         "cat '.agents/skills/waapi-skill/references/waapi-query.md'"
@@ -1518,11 +1520,10 @@ def test_formal_task_instructions_bind_exact_windows_skill_read_schedule() -> No
         r"'.agents\skills\waapi-skill\SKILL.md'"
     ) in instructions
     assert (
-        "python "
-        r"'C:\Git_Repos\waapi-skills\skills\waapi-skill-workspace\root"
-        r"\agent-workspace\.agents\skills\waapi-skill\scripts\run.py' "
+        "python '.agents\\skills\\waapi-skill\\scripts\\run.py' "
         "'gateway.py'"
     ) in instructions
+    assert "waapi-skill-workspace\\root" not in instructions
     assert (
         "Get-Content -Raw -Encoding UTF8 "
         r"'.agents\skills\waapi-skill\references\waapi-operate.md'"

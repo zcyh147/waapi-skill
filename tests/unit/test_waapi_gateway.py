@@ -4235,6 +4235,26 @@ def test_stream_topic_emits_matching_events_immediately_from_one_subscription(
     assert client.disconnected is True
 
 
+def test_short_topic_wait_reserves_half_deadline_for_cleanup() -> None:
+    started_at = time.monotonic()
+    connection = waapi_gateway.GatewayConnection(
+        host="127.0.0.1",
+        port=31337,
+        version_hint="2022.1",
+        evidence_dir=None,
+        timeout=0.5,
+        deadline=waapi_gateway.GatewayDeadline(
+            timeout=0.5,
+            started_at=started_at,
+            expires_at=started_at + 0.5,
+        ),
+    )
+
+    reserved = waapi_gateway.reserved_topic_wait_timeout(connection)
+
+    assert 0.20 <= reserved <= 0.25
+
+
 def test_stream_topic_defaults_to_continuous_until_cancelled(
     tmp_path: Path,
 ) -> None:
@@ -4643,7 +4663,7 @@ def test_wait_topic_rejects_malformed_dispatcher_event_envelope(result: Mapping[
 @pytest.mark.parametrize(
     ("remaining", "expected"),
     (
-        (1.0, 0.8),
+        (1.0, 0.75),
         (2.0, 1.75),
     ),
 )

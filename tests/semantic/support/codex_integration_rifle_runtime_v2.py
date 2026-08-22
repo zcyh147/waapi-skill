@@ -15,6 +15,7 @@ project proofs, and direct WAAPI access remain runner-owned.
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import os
 import re
@@ -1058,6 +1059,11 @@ class _RifleSession:
         bindings = self.workflow.fixture.visible_bindings
         values = {
             "rifle_source_directory": str(input_root),
+            "rifle_source_files": json.dumps(
+                [str(path) for path in self.input_paths.values()],
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
             "rifle_container_path": _binding_object_path(
                 bindings["rifle_container_path"], self.version
             ),
@@ -1070,6 +1076,7 @@ class _RifleSession:
         }
         if tuple(values) != (
             "rifle_source_directory",
+            "rifle_source_files",
             "rifle_container_path",
             "rifle_event_path",
             "rifle_bus_path",
@@ -1799,6 +1806,7 @@ def _validate_reviewed_inputs(
         raise RifleIntegrationRuntimeError("Rifle turn topology drifted")
     if tuple(item.name for item in workflow.visible_inputs) != (
         "rifle_source_directory",
+        "rifle_source_files",
         "rifle_container_path",
         "rifle_event_path",
         "rifle_bus_path",
