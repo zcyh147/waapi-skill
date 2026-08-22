@@ -228,6 +228,7 @@ from wwise_waapi.operation_composer import (  # noqa: E402  # pyright: ignore[re
     OBJECT_SET_COMPOSER_OPERATION,
     OperationComposerError,
     composition_projection,
+    operation_draft_public_projection,
     operation_draft_construction_boundary,
     operation_composer_contract,
     operation_composer_digest,
@@ -14423,24 +14424,7 @@ def operation_draft_payload(
                 else []
             ),
         }
-    raw_allowed_actions = projection.get("allowed_actions")
-    if isinstance(raw_allowed_actions, list):
-        lifecycle_commands = {
-            "check": "draft-check",
-            "inspect": "draft-inspect",
-            "cancel": "draft-cancel",
-            "preview-from-draft": "preview-from-draft",
-        }
-        projection["allowed_actions"] = [
-            action
-            for action in raw_allowed_actions
-            if action not in lifecycle_commands
-        ]
-        projection["allowed_lifecycle_commands"] = [
-            lifecycle_commands[action]
-            for action in raw_allowed_actions
-            if action in lifecycle_commands
-        ]
+    projection = operation_draft_public_projection(projection)
     draft = {
         "contract": OPERATION_DRAFT_CONTRACT,
         "draft_id": record.draft_id,

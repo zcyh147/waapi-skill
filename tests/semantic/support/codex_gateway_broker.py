@@ -46,6 +46,7 @@ from wwise_waapi.operation_composer import (
     composition_projection,
     materialize_operation_request,
     new_composition,
+    operation_draft_public_projection,
     parse_typed_action_cli_arguments,
     parse_typed_action_cli_argument_sequence,
     typed_action_cli_arguments,
@@ -10457,10 +10458,12 @@ class CodexGatewayBroker:
                 raise GatewayInvocationError(
                     "Draft canonical replay produced inconsistent action facts"
                 )
-            actual_projection = composition_projection(
-                operation,
-                version,
-                actual_composition,
+            actual_projection = operation_draft_public_projection(
+                composition_projection(
+                    operation,
+                    version,
+                    actual_composition,
+                )
             )
             if compact_result is not None:
                 result_action, _created, affected, summary = compact_result

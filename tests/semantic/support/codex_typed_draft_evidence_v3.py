@@ -24,6 +24,7 @@ from wwise_waapi.operation_composer import (
     new_composition,
     operation_composer_contract,
     operation_draft_construction_boundary,
+    operation_draft_public_projection,
     parse_typed_action_cli_arguments,
     parse_typed_action_cli_argument_sequence,
 )
@@ -479,11 +480,19 @@ def _require_projection(
         }
     ):
         _fail("Composer Draft response does not match its immutable binding")
-    if not all(draft.get(key) == value for key, value in projection.items()):
+    expected_projection = dict(projection)
+    if lifecycle_state != "editable" and isinstance(
+        expected_projection.get("allowed_actions"), list
+    ):
+        expected_projection["allowed_actions"] = []
+    expected_projection = operation_draft_public_projection(expected_projection)
+    if not all(
+        draft.get(key) == value for key, value in expected_projection.items()
+    ):
         mismatched = next(
             (
                 key
-                for key, value in projection.items()
+                for key, value in expected_projection.items()
                 if draft.get(key) != value
             ),
             "projection",

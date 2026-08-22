@@ -130,6 +130,7 @@ from wwise_waapi.platform_commands import (
 from wwise_waapi.operation_composer import (
     composition_projection,
     operation_composer_digest,
+    operation_draft_public_projection,
     typed_action_cli_arguments,
 )
 from wwise_waapi.operation_drafts import OperationDraftStore
@@ -2169,10 +2170,12 @@ def _synthetic_gateway_records(
                             "version": version,
                             "schema_digest": schema_digest,
                         },
-                        **composition_projection(
-                            operation,
-                            version,
-                            started.record.composition,
+                        **operation_draft_public_projection(
+                            composition_projection(
+                                operation,
+                                version,
+                                started.record.composition,
+                            )
                         ),
                     },
                     "task_authority": started.task_authority,
@@ -2233,10 +2236,12 @@ def _synthetic_gateway_records(
                         and pointer.endswith("/created_handles/0")
                     ),
                 },
-                **composition_projection(
-                    operation,
-                    version,
-                    updated.composition,
+                **operation_draft_public_projection(
+                    composition_projection(
+                        operation,
+                        version,
+                        updated.composition,
+                    )
                 ),
             }
         elif step.subcommand == "draft-check":
@@ -2275,10 +2280,12 @@ def _synthetic_gateway_records(
                     "version": version,
                     "schema_digest": schema_digest,
                 },
-                **composition_projection(
-                    operation,
-                    version,
-                    checked.composition,
+                **operation_draft_public_projection(
+                    composition_projection(
+                        operation,
+                        version,
+                        checked.composition,
+                    )
                 ),
             }
         elif step.subcommand == "draft-inspect":

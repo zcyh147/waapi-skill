@@ -3633,6 +3633,34 @@ def composition_projection(
     }
 
 
+def operation_draft_public_projection(
+    projection: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Separate appendable Composer actions from Draft lifecycle commands."""
+
+    projected = dict(projection)
+    raw_allowed_actions = projected.get("allowed_actions")
+    if not isinstance(raw_allowed_actions, list):
+        return projected
+    lifecycle_commands = {
+        "check": "draft-check",
+        "inspect": "draft-inspect",
+        "cancel": "draft-cancel",
+        "preview-from-draft": "preview-from-draft",
+    }
+    projected["allowed_actions"] = [
+        action
+        for action in raw_allowed_actions
+        if action not in lifecycle_commands
+    ]
+    projected["allowed_lifecycle_commands"] = [
+        lifecycle_commands[action]
+        for action in raw_allowed_actions
+        if action in lifecycle_commands
+    ]
+    return projected
+
+
 def _normalize_composition(
     composition: Mapping[str, Any],
     *,

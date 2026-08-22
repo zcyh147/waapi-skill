@@ -83,6 +83,7 @@ from wwise_waapi.operation_composer import (
     materialize_operation_request,
     new_composition,
     operation_composer_digest,
+    operation_draft_public_projection,
     typed_action_cli_arguments,
 )
 from wwise_waapi.canonical import canonical_sha256
@@ -1841,7 +1842,21 @@ elif command == "draft-apply":
         "current_facts": draft_marker["current_facts"],
         "missing_fields": draft_marker["missing_fields"],
         "missing_fields_status": draft_marker["missing_fields_status"],
-        "allowed_actions": draft_marker["allowed_actions"],
+        "allowed_actions": [
+            action
+            for action in draft_marker["allowed_actions"]
+            if action not in {"check", "inspect", "cancel", "preview-from-draft"}
+        ],
+        "allowed_lifecycle_commands": [
+            {
+                "check": "draft-check",
+                "inspect": "draft-inspect",
+                "cancel": "draft-cancel",
+                "preview-from-draft": "preview-from-draft",
+            }[action]
+            for action in draft_marker["allowed_actions"]
+            if action in {"check", "inspect", "cancel", "preview-from-draft"}
+        ],
     }
 elif command == "draft-inspect":
     draft_marker = json.loads(
@@ -4193,10 +4208,12 @@ def test_audio_import_preview_replay_treats_named_field_order_as_semantic(
         broker._payloads_by_step[action_step.name] = {  # noqa: SLF001
             "draft": {
                 "revision": revision,
-                **composition_projection(
-                    "audio.import",
-                    "2025.1",
-                    composition,
+                **operation_draft_public_projection(
+                    composition_projection(
+                        "audio.import",
+                        "2025.1",
+                        composition,
+                    )
                 ),
             }
         }
@@ -4321,7 +4338,9 @@ def _read_only_draft_evidence_fixture(
                 "version": version,
                 "schema_digest": schema_digest,
             },
-            **composition_projection(operation, version, composition),
+            **operation_draft_public_projection(
+                composition_projection(operation, version, composition)
+            ),
         },
     }
     records: list[dict[str, object]] = [
@@ -4379,7 +4398,9 @@ def _read_only_draft_evidence_fixture(
                     "version": version,
                     "schema_digest": schema_digest,
                 },
-                **composition_projection(operation, version, composition),
+                **operation_draft_public_projection(
+                    composition_projection(operation, version, composition)
+                ),
             },
         }
         action_payloads[step.name] = payload
@@ -4728,10 +4749,12 @@ def test_draft_replay_is_scoped_to_the_preview_flow_in_multi_transaction_protoco
         broker._payloads_by_step[action_step.name] = {  # noqa: SLF001
             "draft": {
                 "revision": revision,
-                **composition_projection(
-                    "audio.import",
-                    "2022.1",
-                    composition,
+                **operation_draft_public_projection(
+                    composition_projection(
+                        "audio.import",
+                        "2022.1",
+                        composition,
+                    )
                 ),
             }
         }
