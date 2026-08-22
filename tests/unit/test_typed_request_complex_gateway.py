@@ -1404,6 +1404,18 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
         "complete": True,
         "truncated": False,
     }
+    assert root_projected["response_end"] == {
+        "contract": "waapi-skill.gateway-response-end/v1",
+        "marker": "WAAPI_TYPED_CONTAINER_RESPONSE_END",
+        "complete": True,
+        "truncated": False,
+    }
+    assert list(root_projected)[-1] == "response_end"
+    assert root_encoded.endswith(
+        '"response_end":{"contract":"waapi-skill.gateway-response-end/v1",'
+        '"marker":"WAAPI_TYPED_CONTAINER_RESPONSE_END","complete":true,'
+        '"truncated":false}}'
+    )
     assert root_encoded.index('"response_integrity":{') < root_encoded.index(
         '"continuation":{'
     ) < root_encoded.index('"child_contract":{')
@@ -1463,6 +1475,8 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     assert projected["handle"] == leaf["handle"]
     assert projected["schema_lineage_token"] == leaf["schema_lineage_token"]
     assert projected["response_integrity"] == root_projected["response_integrity"]
+    assert projected["response_end"] == root_projected["response_end"]
+    assert list(projected)[-1] == "response_end"
     assert encoded.index('"response_integrity":{') < encoded.index(
         '"continuation":{'
     ) < encoded.index('"child_contract":{')

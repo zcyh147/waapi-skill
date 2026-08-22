@@ -2289,6 +2289,13 @@ def test_broker_executes_exact_order_with_semantic_json_and_response_bindings(
         assert [result.returncode for result in results] == [0, 0, 0, 0]
         preview = json.loads(results[1].stdout[results[1].stdout.index("{") :])
         shown = json.loads(results[2].stdout[results[2].stdout.index("{") :])
+        shown_document = results[2].stdout[results[2].stdout.index("{") :].strip()
+        assert shown_document == json.dumps(
+            shown,
+            ensure_ascii=False,
+            allow_nan=False,
+            separators=(",", ":"),
+        )
         confirm_output = results[3].stdout
         assert confirm_output
         confirm = json.loads(confirm_output[confirm_output.index("{") :])

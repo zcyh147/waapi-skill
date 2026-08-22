@@ -1,15 +1,15 @@
 # WAAPI operate lane
 
-Read this file once with one complete standalone `cat`. The read is complete only when the unique terminal sentinel required by `SKILL.md` is the final visible line and the tool output contains no truncation or omission marker. Otherwise stop and report an incomplete host read; do not reread a range or invoke the Gateway.
+Read this file once with one complete standalone `cat`. It is complete only when the unique terminal sentinel required by `SKILL.md` is the final visible line and no truncation or omission marker appears. Otherwise report an incomplete host read; do not reread a range or invoke the Gateway.
 
 ## Core boundaries
 
-- The only normal change path is the packaged transaction CLI through the absolute `scripts/run.py` derived from the injected `SKILL.md` locator.
+- The normal change path is the packaged transaction CLI through the absolute `scripts/run.py` from the injected `SKILL.md` locator.
 - Do not import builders or planners from inline Python, write a helper, call `WaapiClient`, construct raw WAAPI mutations, edit Wwise XML, or bypass a dedicated operation with generic `call`. Do not write code to bypass an unsupported boundary. That boundary does not authorize code generation.
 - Each reference read and Gateway invocation is one shell tool call. Never join commands with `&&`, `;`, a pipe, command substitution, or a multi-command shell string.
-- Read every Gateway JSON completely before the next command. Never suppress or redirect it, choose a short output budget, or infer success from exit code `0`. Empty, truncated, non-JSON, or otherwise incomplete visible output is a hard stop for that turn.
+- Read each Gateway JSON before continuing; exit `0` proves nothing. Stop on empty, non-JSON, or host-truncated output. A typed-container response is complete only when final `WAAPI_TYPED_CONTAINER_RESPONSE_END` says `complete:true` and `truncated:false`; then continue from that response.
 - A rejected or nonzero Gateway invocation is also a hard stop for that turn. Do not advance to the next schema, preview, or transaction phase and do not repair or retry the command. The sole metadata-discovery retry below starts only from a successful complete JSON result whose `fallback_detail_scan.status` is `partial`.
-- Except for the migration exception below, one complete terminal `verify` result ends the transaction. Do not append a query, filesystem inspection, or another proof.
+- Except for the migration below, one complete terminal `verify` ends the transaction; append no query, filesystem inspection, or other proof.
 
 ## Choose the phase and first Gateway command
 
@@ -121,7 +121,7 @@ Users speak naturally; never ask them for internal property/reference names. Whe
 
 For `object.create`, `object.set`, and direct `audio.import`, read the named schema first, then discover only naturally requested dynamic property/reference tokens that are not already exact live evidence. Composer operations subsequently revalidate those exact tokens and dependency closure during `draft-check`; they do not infer names from user prose. Other metadata-bound operations keep their stated order.
 
-1. Run `metadata discover` with one repeated `--query '<ordinary phrase>'` per requested setting. Use the deterministic candidate budget: one or two flags require `--limit 8`, three or four require `--limit 3`, and five through eight require `--limit 2`. Translate localized wording into short English Wwise UI or technical phrases; do not copy CJK wording into the live lexical matcher. Search independent switches and numeric values separately. Split oversized compound searches into related groups; never repeat an already resolved phrase.
+1. Run `metadata discover` with one repeated `--query '<ordinary phrase>'` per requested setting. Use the deterministic candidate budget: one or two flags require `--limit 8`; three or four use `--limit 3`; five through eight use `--limit 2`. Translate localized wording into short English Wwise UI or technical phrases; do not copy CJK wording into the live lexical matcher. Search independent switches and numeric values separately. For `maximum playback instances`, one query covers both that enable switch and its numeric value. Split oversized compound searches into related groups; never repeat an already resolved phrase.
 2. Use exactly one scope: `--object-type` for a known new/imported type or several existing targets of one proven type, `--class-id` for a proven class id, or `--object` for one existing object. Keep a schema-proven shared `--object-type`; do not substitute `--object`.
 3. For Sound SFX imports use `--object-type Sound`. For Actor Mixer roots use `ActorMixer` in `2021.1`–`2024.1` and reflected `PropertyContainer` in `2025.1`; the operation request token remains `ActorMixer`.
 4. Copy only exact returned names requested by the user. Gateway validates and activates proven dependencies; do not add unrequested action fields or use candidates/defaults as a preset.
@@ -129,7 +129,7 @@ For `object.create`, `object.set`, and direct `audio.import`, read the named sch
 
 The operation preview performs final live typed validation and remains authoritative. Do not add a separate property-info check for a token already proved in the visible conversation, and never inspect metadata-cache files.
 
-For direct imports, discover only requested dynamic `properties[]`/`references[]`; for table imports, only dynamic `Property[...]`, `Reference[...]`, or `@...` columns. Fixed fields and side effects never trigger discovery: `Notes` and `Audio Source Notes` are fixed import columns, not Sound metadata queries; Event, Dialogue Event, and Switch Assignation are schema-owned too. Search each looping, playback-limit, volume, and output-bus concept separately; phrases never authorize guessed tokens.
+For direct imports, discover only requested dynamic `properties[]`/`references[]`; for table imports, only dynamic `Property[...]`, `Reference[...]`, or `@...` columns. Fixed fields and side effects never trigger discovery: `Notes` and `Audio Source Notes` are fixed import columns, not Sound metadata queries; Event, Dialogue Event, and Switch Assignation are schema-owned.
 
 For a user-supplied Lua file, use `lua.executeCoreFile` in Authoring or `lua.executeCliFile` only for explicit Console/CLI; there is no `lua.executeFile` operation. Follow the named schema unchanged.
 

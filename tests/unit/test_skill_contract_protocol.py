@@ -797,6 +797,10 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "including both import operations" not in OPERATE
     assert "schema owns fixed fields and Event/Switch Assignation" in OPERATE
     assert "metadata selects dynamic tokens and `draft-check` revalidates them" in OPERATE
+    assert "`maximum playback instances`" in OPERATE
+    assert "one query covers both that enable switch and its numeric value" in OPERATE
+    assert "`WAAPI_TYPED_CONTAINER_RESPONSE_END`" in OPERATE
+    assert "then continue from that response" in OPERATE
     assert "Table imports start `operation-schema audio.importTabDelimited`" in OPERATE
     assert "dynamic columns stay metadata-first" in OPERATE
     skill_compact = " ".join(SKILL.split())
@@ -987,8 +991,8 @@ def test_operate_metadata_and_import_prose_only_rules_are_preserved() -> None:
         "one repeated `--query '<ordinary phrase>'` per requested setting",
             "Use the deterministic candidate budget",
         "one or two flags require `--limit 8`",
-        "three or four require `--limit 3`",
-        "five through eight require `--limit 2`",
+        "three or four use `--limit 3`",
+        "five through eight use `--limit 2`",
         "A rejected or nonzero Gateway invocation is also a hard stop",
         "Do not advance to the next schema, preview, or transaction phase",
         "several existing targets of one proven type",
@@ -1002,7 +1006,7 @@ def test_operate_metadata_and_import_prose_only_rules_are_preserved() -> None:
         "A `complete` scan with no match is terminal",
         "for table imports, only dynamic `Property[...]`, `Reference[...]`, or `@...` columns",
         "Fixed fields and side effects never trigger discovery",
-        "Event, Dialogue Event, and Switch Assignation are schema-owned too",
+        "Event, Dialogue Event, and Switch Assignation are schema-owned",
         "`Notes` and `Audio Source Notes` are fixed import columns",
         "not Sound metadata queries",
         "ordinary `audio.importTabDelimited` import",

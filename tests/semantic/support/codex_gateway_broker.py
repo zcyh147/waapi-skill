@@ -9711,7 +9711,7 @@ class CodexGatewayBroker:
                         projected_payload,
                         ensure_ascii=False,
                         allow_nan=False,
-                        indent=2,
+                        separators=(",", ":"),
                     )
                     stdout = (
                         stdout[:payload_start]

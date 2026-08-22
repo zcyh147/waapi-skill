@@ -2254,6 +2254,17 @@ def gateway_json_document_size(
     return observed + 1  # print() appends one newline
 
 
+def _typed_container_response_end() -> dict[str, Any]:
+    """Return the final visible completeness sentinel for typed containers."""
+
+    return {
+        "contract": "waapi-skill.gateway-response-end/v1",
+        "marker": "WAAPI_TYPED_CONTAINER_RESPONSE_END",
+        "complete": True,
+        "truncated": False,
+    }
+
+
 def gateway_stdout_payload(value: Any) -> Any:
     """Return the compact public projection for one terminal stdout document."""
 
@@ -2386,6 +2397,7 @@ def gateway_stdout_payload(value: Any) -> Any:
                     ] = compact_scalar_table
     raw_continuation = value.get("continuation")
     if not isinstance(raw_continuation, Mapping):
+        projected["response_end"] = _typed_container_response_end()
         return projected
     raw_decision = raw_continuation.get("next_command_decision")
     raw_root_anchor = raw_continuation.get("root_fact_queue_anchor")
@@ -2625,6 +2637,7 @@ def gateway_stdout_payload(value: Any) -> Any:
     projected["continuation"] = _dynamic_disclosure_copy_commands(continuation)
     if projected_child_contract is not None:
         projected["child_contract"] = projected_child_contract
+    projected["response_end"] = _typed_container_response_end()
     return projected
 
 
