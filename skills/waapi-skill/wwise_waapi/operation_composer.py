@@ -1705,11 +1705,13 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "when_requested": "include_in_initial_add_import_row",
                 "defer_or_omit": "invalid",
             },
-            "typed_object_path_hierarchy": {
-                "ancestor_containers_encoded_in_descendant_row_path": True,
-                "container_only_row_when_descendant_row_encodes_it": "invalid",
-                "structure_only_row_allowed_when": (
-                    "no requested descendant import row encodes that object"
+            "hierarchy_row_order": {
+                "requested_structure_rows_are_separate": True,
+                "structure_rows": "tree_preorder_before_every_media_row",
+                "media_rows": "prompt_order_after_all_structure_rows",
+                "typed_descendant_path_does_not_replace_requested_structure_row": True,
+                "batching": (
+                    "concatenate_structure_then_media_and_split_only_at_batch_limit"
                 ),
             },
             "metadata_dependency_activation": (
