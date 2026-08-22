@@ -1674,7 +1674,17 @@ def test_prompt_audit_stops_after_two_pre_action_timeouts(
     assert calls == [30.0, 30.0]
 
 
-@pytest.mark.parametrize("key", ["HOME", "CODEX_HOME", "XDG_CACHE_HOME", "XDG_CONFIG_HOME", "CODEX_FOO"])
+@pytest.mark.parametrize(
+    "key",
+    [
+        "HOME",
+        "USERPROFILE",
+        "CODEX_HOME",
+        "XDG_CACHE_HOME",
+        "XDG_CONFIG_HOME",
+        "CODEX_FOO",
+    ],
+)
 def test_isolated_environment_rejects_protected_extra_env(tmp_path: Path, key: str) -> None:
     auth = tmp_path / "auth.json"
     auth.write_text("{}\n", encoding="utf-8")
@@ -1758,9 +1768,17 @@ def test_prompt_audit_and_exec_environments_scrub_ambient_waapi_state(
     assert first.codex_home != second.codex_home
 
 
-def test_native_windows_isolated_environment_uses_detached_auth_copy(tmp_path: Path) -> None:
+def test_native_windows_isolated_environment_uses_detached_auth_copy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     auth = tmp_path / "auth.json"
     auth.write_text('{"token":"runner-owned"}\n', encoding="utf-8")
+    ambient_profile = tmp_path / "ambient-profile"
+    ambient_skill = ambient_profile / ".agents" / "skills" / "user-global-skill"
+    ambient_skill.mkdir(parents=True)
+    (ambient_skill / "SKILL.md").write_text("user-global\n", encoding="utf-8")
+    monkeypatch.setenv("USERPROFILE", str(ambient_profile))
 
     with isolated_codex_environment(auth, platform_name="nt") as environment:
         audit = inspect_isolated_environment(
@@ -1771,6 +1789,9 @@ def test_native_windows_isolated_environment_uses_detached_auth_copy(tmp_path: P
         installed_auth = Path(environment["CODEX_HOME"]) / "auth.json"
 
         assert audit.passed is True
+        assert environment["USERPROFILE"] == environment["HOME"]
+        assert environment["USERPROFILE"] != str(ambient_profile)
+        assert not (Path(environment["USERPROFILE"]) / ".agents").exists()
         assert audit.auth_install_mode == "copy"
         assert audit.auth_is_symlink is False
         assert audit.auth_same_file_as_source is False

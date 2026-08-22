@@ -5307,10 +5307,25 @@ def _validate_heavy_v3_broker_records(
                 invocation_skill_source=invocation_skill_source,
                 shim_directory=task_root / "broker" / "bin",
             )
-            semantic_sha, execution_arguments = replay._validate_step(  # noqa: SLF001
-                step,
-                resolved.gateway_arguments,
-            )
+            replay._next_step = index - 1  # noqa: SLF001
+            replay_step = replay._execution_steps[index - 1]  # noqa: SLF001
+            if replay_step.name != step.name:
+                raise CampaignEvidenceError(
+                    f"{label} replay step order differs at {step.name}"
+                )
+            try:
+                semantic_sha, execution_arguments = replay._validate_step(  # noqa: SLF001
+                    replay_step,
+                    resolved.gateway_arguments,
+                )
+            except GatewayInvocationError:
+                rebound = replay._match_dependency_ready_draft_batch(  # noqa: SLF001
+                    resolved.gateway_arguments,
+                )
+                if rebound is None:
+                    raise
+                replay_step, semantic_sha, execution_arguments = rebound
+            step = replay_step
         except Exception as exc:
             raise CampaignEvidenceError(
                 f"{label} broker argv cannot replay protocol step {step.name}: {exc}"
@@ -5478,6 +5493,7 @@ def _validate_heavy_v3_broker_records(
                 submitted_draft_actions
             )
         replay._payloads_by_step[step.name] = payload  # noqa: SLF001
+        replay._next_step = index  # noqa: SLF001
 
 
 def _validate_heavy_v3_broker_subscription_ack_record(

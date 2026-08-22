@@ -2719,6 +2719,248 @@ def test_broker_executes_one_atomic_generic_typed_draft_batch(
     }
 
 
+@pytest.mark.parametrize(
+    "first_indexes,second_indexes",
+    (
+        ((0, 1, 2, 3), (4, 5, 6)),
+        ((0, 1, 2, 3, 5, 6), (4,)),
+    ),
+)
+def test_broker_accepts_dependency_free_draft_facts_rebatched_across_adjacent_steps(
+    tmp_path: Path,
+    first_indexes: tuple[int, ...],
+    second_indexes: tuple[int, ...],
+) -> None:
+    skill = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
+    protocol = build_transaction_protocol((_soundbank_generate_request(),))
+    action_steps = tuple(
+        step for step in protocol.steps if step.subcommand == "draft-apply"
+    )
+    assert len(action_steps) >= 2
+    first, second = action_steps[:2]
+    assert protocol.steps.index(second) == protocol.steps.index(first) + 1
+    original_actions = tuple(
+        action
+        for step in (first, second)
+        for action in (
+            step.arguments[-1].actions
+            if isinstance(step.arguments[-1], DraftTypedActionBatchArgument)
+            else (step.arguments[-1],)
+        )
+    )
+    assert len(original_actions) == 7
+    assert not any(action.response_bindings for action in original_actions)
+
+    payloads: dict[str, Mapping[str, object]] = {}
+
+    def pointer(payload: object, value: str) -> object:
+        current = payload
+        for token in value.removeprefix("/").split("/"):
+            assert isinstance(current, (dict, list))
+            current = current[int(token)] if isinstance(current, list) else current[token]
+        return current
+
+    def fixed_argv(step: ExpectedGatewayStep) -> list[str]:
+        argv = [step.subcommand]
+        for argument in step.arguments[:-1]:
+            if isinstance(argument, ResponseBinding):
+                argv.append(str(pointer(payloads[argument.step], argument.pointer)))
+            else:
+                assert isinstance(argument, str)
+                argv.append(argument)
+        return argv
+
+    first_index = protocol.steps.index(first)
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=protocol.steps,
+        expected_wwise_version="2025.1",
+        transport="tcp",
+        working_root=tmp_path / "broker-root",
+    ) as broker:
+        for step in protocol.steps[:first_index]:
+            argv = [step.subcommand]
+            for argument in step.arguments:
+                if isinstance(argument, ResponseBinding):
+                    argv.append(str(pointer(payloads[argument.step], argument.pointer)))
+                else:
+                    assert isinstance(argument, str)
+                    argv.append(argument)
+            result = run_model_command(broker, argv)
+            assert result.returncode == 0, result.stderr
+            payloads[step.name] = json.loads(result.stdout[result.stdout.index("{") :])
+
+        for step, indexes in ((first, first_indexes), (second, second_indexes)):
+            argv = fixed_argv(step)
+            for index in indexes:
+                argv.extend(typed_action_cli_arguments(original_actions[index].expected))
+            result = run_model_command(broker, argv)
+            assert result.returncode == 0, result.stderr
+            payloads[step.name] = json.loads(result.stdout[result.stdout.index("{") :])
+
+        assert broker.evidence().consumed_step_names[-2:] == (
+            first.name,
+            second.name,
+        )
+
+
+@pytest.mark.parametrize(
+    "submitted_indexes",
+    (
+        (0, 1, 2, 3, 4, 4),
+        (1, 0, 2, 3, 4, 5),
+    ),
+)
+def test_broker_rejects_unsafe_fact_order_while_rebatching_adjacent_steps(
+    tmp_path: Path,
+    submitted_indexes: tuple[int, ...],
+) -> None:
+    skill = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
+    protocol = build_transaction_protocol((_soundbank_generate_request(),))
+    action_steps = tuple(
+        step for step in protocol.steps if step.subcommand == "draft-apply"
+    )
+    first, second = action_steps[:2]
+    assert protocol.steps.index(second) == protocol.steps.index(first) + 1
+    original_actions = tuple(
+        action
+        for step in (first, second)
+        for action in (
+            step.arguments[-1].actions
+            if isinstance(step.arguments[-1], DraftTypedActionBatchArgument)
+            else (step.arguments[-1],)
+        )
+    )
+    assert original_actions[0].expected.get("fact_action") == "append"
+    payloads: dict[str, Mapping[str, object]] = {}
+
+    def pointer(payload: object, value: str) -> object:
+        current = payload
+        for token in value.removeprefix("/").split("/"):
+            assert isinstance(current, (dict, list))
+            current = current[int(token)] if isinstance(current, list) else current[token]
+        return current
+
+    first_index = protocol.steps.index(first)
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=protocol.steps,
+        expected_wwise_version="2025.1",
+        transport="tcp",
+        working_root=tmp_path / "broker-root",
+    ) as broker:
+        for step in protocol.steps[:first_index]:
+            argv = [step.subcommand]
+            for argument in step.arguments:
+                if isinstance(argument, ResponseBinding):
+                    argv.append(str(pointer(payloads[argument.step], argument.pointer)))
+                else:
+                    assert isinstance(argument, str)
+                    argv.append(argument)
+            result = run_model_command(broker, argv)
+            assert result.returncode == 0, result.stderr
+            payloads[step.name] = json.loads(result.stdout[result.stdout.index("{") :])
+
+        argv = [first.subcommand]
+        for argument in first.arguments[:-1]:
+            if isinstance(argument, ResponseBinding):
+                argv.append(str(pointer(payloads[argument.step], argument.pointer)))
+            else:
+                assert isinstance(argument, str)
+                argv.append(argument)
+        for index in submitted_indexes:
+            argv.extend(typed_action_cli_arguments(original_actions[index].expected))
+        result = run_model_command(broker, argv)
+
+        assert result.returncode == 126
+        assert "typed Draft" in result.stderr
+        assert broker.evidence().terminal_state == "FAILED"
+
+
+def test_rebatched_dependency_free_draft_replays_the_exact_canonical_request(
+    tmp_path: Path,
+) -> None:
+    skill = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.create",
+        "arguments": {
+            "parent": {"kind": "path", "value": r"\Root"},
+            "name": "RebatchedChild",
+            "type": "Sound",
+            "on_name_conflict": "fail",
+            "notes": "sealed-note",
+        },
+    }
+    protocol = build_transaction_protocol((request,))
+    action_steps = tuple(
+        step for step in protocol.steps if step.subcommand == "draft-apply"
+    )
+    assert len(action_steps) == 2
+    first, second = action_steps
+    assert protocol.steps.index(second) == protocol.steps.index(first) + 1
+    original_actions = tuple(
+        action
+        for step in action_steps
+        for action in (
+            step.arguments[-1].actions
+            if isinstance(step.arguments[-1], DraftTypedActionBatchArgument)
+            else (step.arguments[-1],)
+        )
+    )
+    assert len(original_actions) == 7
+    payloads: dict[str, Mapping[str, object]] = {}
+
+    def pointer(payload: object, value: str) -> object:
+        current = payload
+        for token in value.removeprefix("/").split("/"):
+            assert isinstance(current, (dict, list))
+            current = current[int(token)] if isinstance(current, list) else current[token]
+        return current
+
+    first_index = protocol.steps.index(first)
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=protocol.steps,
+        expected_wwise_version="2022.1",
+        transport="tcp",
+        working_root=tmp_path / "broker-root",
+    ) as broker:
+        for step in protocol.steps[:first_index]:
+            argv = [step.subcommand]
+            for argument in step.arguments:
+                if isinstance(argument, ResponseBinding):
+                    argv.append(str(pointer(payloads[argument.step], argument.pointer)))
+                else:
+                    assert isinstance(argument, str)
+                    argv.append(argument)
+            result = run_model_command(broker, argv)
+            assert result.returncode == 0, result.stderr
+            payloads[step.name] = json.loads(result.stdout[result.stdout.index("{") :])
+
+        for step, indexes in ((first, (0, 1, 2, 3)), (second, (4, 5, 6))):
+            argv = [step.subcommand]
+            for argument in step.arguments[:-1]:
+                if isinstance(argument, ResponseBinding):
+                    argv.append(str(pointer(payloads[argument.step], argument.pointer)))
+                else:
+                    assert isinstance(argument, str)
+                    argv.append(argument)
+            for index in indexes:
+                argv.extend(typed_action_cli_arguments(original_actions[index].expected))
+            result = run_model_command(broker, argv)
+            assert result.returncode == 0, result.stderr
+            payloads[step.name] = json.loads(result.stdout[result.stdout.index("{") :])
+
+        preview = next(
+            step for step in protocol.steps if step.subcommand == "preview-from-draft"
+        )
+        assert broker._replay_expected_operation_draft_request(  # noqa: SLF001
+            preview
+        ) == request
+
+
 def test_object_set_protocol_batches_independent_targets_through_public_gateway(
     tmp_path: Path,
 ) -> None:
@@ -2749,6 +2991,10 @@ def test_object_set_protocol_batches_independent_targets_through_public_gateway(
         "add_target",
         "add_target",
     ]
+    assert broker_module.dependency_free_draft_action_block(
+        protocol.steps,
+        protocol.steps.index(action_steps[0]),
+    ) is None
 
     payloads: dict[str, Mapping[str, object]] = {}
 

@@ -48,6 +48,7 @@ from wwise_waapi.operation_composer import (
     new_composition,
     parse_typed_action_cli_arguments,
     parse_typed_action_cli_argument_sequence,
+    typed_action_cli_arguments,
 )
 from wwise_waapi.operation_registry import (
     OperationContractError,
@@ -250,6 +251,7 @@ _AUDIO_IMPORT_SCALAR_ROW_FIELD_LIMITS = MappingProxyType(
 _AUDIO_IMPORT_EVENT_ACTIONS = frozenset(
     {"Play", "Stop", "Pause", "Resume", "Break", "Seek"}
 )
+_COMPOSER_HANDLE_PRODUCING_ACTIONS = frozenset({"add_target", "add_child"})
 _AUDIO_IMPORT_IDENTITY_MAX_NAME_LENGTH = 255
 _AUDIO_IMPORT_IDENTITY_MAX_TYPE_LENGTH = 128
 _AUDIO_IMPORT_IDENTITY_MAX_PARENT_LENGTH = 4096
@@ -2961,6 +2963,80 @@ def gateway_step_sequence_matches(
         actual,
         groups,
         composer_setup_groups,
+    )
+
+
+def dependency_free_draft_action_block(
+    steps: Sequence[ExpectedGatewayStep],
+    start_index: int,
+) -> tuple[tuple[int, ...], tuple[DraftTypedActionArgument, ...]] | None:
+    """Return one adjacent Composer fact block whose transport order may vary."""
+
+    if not 0 <= start_index < len(steps):
+        return None
+    first = steps[start_index]
+    first_match = _NUMBERED_DRAFT_ACTION_STEP_RE.fullmatch(first.name)
+    first_actions = (
+        _draft_typed_actions(first.arguments[-1])
+        if first.subcommand == "draft-apply" and first.arguments
+        else None
+    )
+    if (
+        first_match is None
+        or not first_actions
+        or first_actions[0].operation == "audio.import"
+    ):
+        return None
+    prefix = first_match.group("prefix")
+    indexes: list[int] = []
+    actions: list[DraftTypedActionArgument] = []
+    for index in range(start_index, len(steps)):
+        candidate = steps[index]
+        candidate_match = _NUMBERED_DRAFT_ACTION_STEP_RE.fullmatch(
+            candidate.name
+        )
+        candidate_actions = (
+            _draft_typed_actions(candidate.arguments[-1])
+            if candidate.subcommand == "draft-apply" and candidate.arguments
+            else None
+        )
+        if (
+            candidate_match is None
+            or candidate_match.group("prefix") != prefix
+            or not candidate_actions
+        ):
+            break
+        indexes.append(index)
+        actions.extend(candidate_actions)
+    if (
+        not actions
+        or any(action.operation != first_actions[0].operation for action in actions)
+        or any(action.response_bindings for action in actions)
+        or any(
+            action.expected.get("action") in _COMPOSER_HANDLE_PRODUCING_ACTIONS
+            for action in actions
+        )
+    ):
+        return None
+    return tuple(indexes), tuple(actions)
+
+
+def _commutative_typed_draft_fact(
+    first: DraftTypedActionArgument,
+    second: DraftTypedActionArgument,
+) -> bool:
+    """Return whether two sealed scalar facts may cross transport batches."""
+
+    first_value = first.expected
+    second_value = second.expected
+    return (
+        first_value.get("action") == "add_typed_fact"
+        and second_value.get("action") == "add_typed_fact"
+        and first_value.get("fact_action") == "set"
+        and second_value.get("fact_action") == "set"
+        and isinstance(first_value.get("field_handle"), str)
+        and isinstance(second_value.get("field_handle"), str)
+        and first_value["field_handle"] != second_value["field_handle"]
     )
 
 
@@ -8111,7 +8187,9 @@ class CodexGatewayBroker:
                 )
             except GatewayInvocationError as first_error:
                 try:
-                    reordered = self._match_dependency_ready_draft_action(
+                    reordered = self._match_dependency_ready_draft_batch(
+                        resolved.gateway_arguments,
+                    ) or self._match_dependency_ready_draft_action(
                         resolved.gateway_arguments,
                     )
                 except GatewayInvocationError as reorder_error:
@@ -8194,6 +8272,143 @@ class CodexGatewayBroker:
             execution_arguments=execution_arguments,
             submitted_draft_actions=submitted_draft_actions,
         )
+
+    def _match_dependency_ready_draft_batch(
+        self,
+        actual: Sequence[str],
+    ) -> tuple[ExpectedGatewayStep, str, tuple[str, ...]] | None:
+        """Repack one adjacent dependency-free fact block without changing meaning.
+
+        Composer construction facts are business semantics; the arbitrary
+        grouping of at most six independent facts into one ``draft-apply`` is
+        transport.  Accept a different dependency-free grouping only when
+        every submitted action uniquely matches one still-sealed action and
+        the remaining facts still fit the already-sealed number of adjacent
+        action steps.  Dynamic parent/child facts retain their exact response
+        binding and are therefore excluded from this commutative block.
+        """
+
+        current = self._execution_steps[self._next_step]
+        block_contract = dependency_free_draft_action_block(
+            self._execution_steps,
+            self._next_step,
+        )
+        if block_contract is None:
+            return None
+        block_indexes, pool = block_contract
+        block = tuple(
+            (index, self._execution_steps[index]) for index in block_indexes
+        )
+
+        try:
+            action_start = tuple(actual).index("--facts") + 1
+        except ValueError:
+            return None
+        if len(actual) <= action_start:
+            return None
+        try:
+            submitted = parse_typed_action_cli_argument_sequence(
+                actual[action_start:]
+            )
+        except OperationComposerError:
+            return None
+        if not 1 <= len(submitted) <= MAX_TYPED_ACTIONS_PER_APPLY:
+            return None
+
+        unmatched = list(enumerate(pool))
+        matched: list[DraftTypedActionArgument] = []
+        matched_indexes: list[int] = []
+        for submitted_action in submitted:
+            candidate_actual = (
+                *actual[:action_start],
+                *typed_action_cli_arguments(submitted_action),
+            )
+            matches: list[tuple[int, DraftTypedActionArgument]] = []
+            for remaining_index, (pool_index, expected_action) in enumerate(unmatched):
+                candidate_step = replace(
+                    current,
+                    arguments=(*current.arguments[:-1], expected_action),
+                )
+                try:
+                    self._validate_step(candidate_step, candidate_actual)
+                except GatewayInvocationError:
+                    continue
+                matches.append((remaining_index, expected_action))
+            if len(matches) != 1:
+                return None
+            remaining_index, expected_action = matches[0]
+            pool_index = unmatched[remaining_index][0]
+            matched.append(expected_action)
+            matched_indexes.append(pool_index)
+            unmatched.pop(remaining_index)
+
+        scheduled = (*matched_indexes, *(index for index, _action in unmatched))
+        for left_position, left_index in enumerate(scheduled):
+            for right_index in scheduled[left_position + 1 :]:
+                if left_index <= right_index:
+                    continue
+                if not _commutative_typed_draft_fact(
+                    pool[left_index],
+                    pool[right_index],
+                ):
+                    return None
+
+        unmatched_actions = [action for _index, action in unmatched]
+
+        remaining_steps = len(block) - 1
+        if (
+            (remaining_steps == 0 and unmatched_actions)
+            or (
+                remaining_steps > 0
+                and not (
+                    remaining_steps
+                    <= len(unmatched_actions)
+                    <= remaining_steps * MAX_TYPED_ACTIONS_PER_APPLY
+                )
+            )
+        ):
+            return None
+
+        matched_argument: DraftTypedActionArgument | DraftTypedActionBatchArgument
+        matched_argument = (
+            matched[0]
+            if len(matched) == 1
+            else DraftTypedActionBatchArgument(tuple(matched))
+        )
+        matched_step = replace(
+            current,
+            arguments=(*current.arguments[:-1], matched_argument),
+        )
+        semantic_hash, execution_arguments = self._validate_step(
+            matched_step,
+            actual,
+        )
+
+        cursor = 0
+        for position, (index, candidate) in enumerate(block[1:], start=1):
+            slots_after = remaining_steps - position
+            width = min(
+                MAX_TYPED_ACTIONS_PER_APPLY,
+                len(unmatched_actions) - cursor - slots_after,
+            )
+            actions = tuple(unmatched_actions[cursor : cursor + width])
+            cursor += width
+            argument: DraftTypedActionArgument | DraftTypedActionBatchArgument
+            argument = (
+                actions[0]
+                if len(actions) == 1
+                else DraftTypedActionBatchArgument(actions)
+            )
+            self._execution_steps[index] = replace(
+                candidate,
+                arguments=(*candidate.arguments[:-1], argument),
+            )
+        if cursor != len(unmatched_actions):
+            raise GatewayInvocationError(
+                "dependency-free typed Draft facts could not be repartitioned"
+            )
+        self._execution_steps[self._next_step] = matched_step
+        return matched_step, semantic_hash, execution_arguments
 
     def _match_dependency_ready_draft_action(
         self,
@@ -10473,6 +10688,7 @@ __all__ = [
     "TrustedStepPreObserver",
     "TypedRequestFactsArgument",
     "InlineTypedOperationArgument",
+    "dependency_free_draft_action_block",
     "reconcile_gateway_commands",
     "project_required_metadata_tokens",
     "resolve_gateway_invocation",

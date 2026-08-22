@@ -831,6 +831,17 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
                 "--fact-value", "<business-value>",
             ]
         },
+        "fact_argv_by_enum_value": {
+            value: [
+                "--action", "add_typed_fact", "--fact-action", "append",
+                "--field-handle", filters_handle, "--value-type", "string",
+                "--fact-value", value,
+            ]
+            for value in ("events", "structures", "media")
+        },
+        "enum_fact_selection": (
+            "copy_exact_argv_for_each_business_item_in_order"
+        ),
         "repeat_for_each_business_item_in_order": True,
         "execute_after": "deferred_parent_fact",
         "queue_phase": "child_contract",
@@ -862,15 +873,12 @@ def test_set_inclusions_discloses_selector_branch_constants(tmp_path: Path) -> N
             bound[binding.pointer.removeprefix("/")] = current
         return bound
 
-    append_template = filters_payload["child_contract"][
+    exact_enum_facts = filters_payload["child_contract"][
         "scalar_array_item_facts"
-    ]["fact_argv_by_type"]["string"]
+    ]["fact_argv_by_enum_value"]
     filters_public_batch = [
         filters_payload["continuation"]["deferred_fact"]["argv"],
-        *(
-            [value if token == "<business-value>" else token for token in append_template]
-            for value in ("events", "structures", "media")
-        ),
+        *(exact_enum_facts[value] for value in ("events", "structures", "media")),
     ]
     assert [
         parse_typed_action_cli_arguments(argv) for argv in filters_public_batch

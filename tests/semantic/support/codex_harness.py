@@ -283,7 +283,7 @@ GATEWAY_SUBCOMMANDS = frozenset(
         "call",
     }
 )
-_PROTECTED_ENV_EXACT = frozenset({"HOME", "CODEX_HOME"})
+_PROTECTED_ENV_EXACT = frozenset({"HOME", "USERPROFILE", "CODEX_HOME"})
 _BROKER_COMMON_MODEL_ENV_NAMES = frozenset(
     {
         "WAAPI_CODEX_GATEWAY_BROKER_ENDPOINT",
@@ -2399,6 +2399,12 @@ def isolated_codex_environment(
                     "PYTHONDONTWRITEBYTECODE": "1",
                 }
             )
+            if _is_windows(platform_name):
+                # Native Codex resolves the user-level .agents tree through
+                # USERPROFILE even when HOME and CODEX_HOME are disposable.
+                # Bind all three identity roots to the same one-shot home so
+                # user skills cannot appear between campaign scenarios.
+                env["USERPROFILE"] = home_text
             yield env
 
 
@@ -2418,7 +2424,8 @@ def validate_extra_environment(
     protected = sorted(key for key in extra_env if is_protected_environment_key(key))
     if protected:
         raise CodexHarnessError(
-            "extra_env may not override isolated HOME/CODEX/XDG state: " + ", ".join(protected)
+            "extra_env may not override isolated HOME/USERPROFILE/CODEX/XDG state: "
+            + ", ".join(protected)
         )
 
     forbidden_sensitive = sorted(

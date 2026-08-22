@@ -5045,18 +5045,46 @@ def _bind_dynamic_scalar_array_facts(
             argv_by_type[value_type] = list(deferred["argv"])
     if not argv_by_type:
         return
-    child_contract["scalar_array_item_facts"] = {
+    scalar_array_item_facts = {
         **dict(item_contract),
         "fact_argv_by_type": argv_by_type,
-        "repeat_for_each_business_item_in_order": True,
-        "execute_after": "deferred_parent_fact",
-        "queue_phase": "child_contract",
-        "queue_order_ref": (
-            "/continuation/request_wide_order/deferred_fact_queue"
-        ),
-        "consume_each_item_once": True,
-        "replay_allowed": False,
     }
+    enum_values = item_contract.get("enum")
+    if (
+        len(accepted_types) == 1
+        and isinstance(enum_values, list)
+        and 0 < len(enum_values) <= MAX_TYPED_ACTIONS_PER_APPLY
+        and all(isinstance(value, str) for value in enum_values)
+        and len(set(enum_values)) == len(enum_values)
+    ):
+        template = argv_by_type[accepted_types[0]]
+        scalar_array_item_facts.update(
+            {
+                "fact_argv_by_enum_value": {
+                    value: [
+                        value if token == "<business-value>" else token
+                        for token in template
+                    ]
+                    for value in enum_values
+                },
+                "enum_fact_selection": (
+                    "copy_exact_argv_for_each_business_item_in_order"
+                ),
+            }
+        )
+    scalar_array_item_facts.update(
+        {
+            "repeat_for_each_business_item_in_order": True,
+            "execute_after": "deferred_parent_fact",
+            "queue_phase": "child_contract",
+            "queue_order_ref": (
+                "/continuation/request_wide_order/deferred_fact_queue"
+            ),
+            "consume_each_item_once": True,
+            "replay_allowed": False,
+        }
+    )
+    child_contract["scalar_array_item_facts"] = scalar_array_item_facts
 
 
 def _compact_fixed_scalar_member_facts(child_contract: dict[str, Any]) -> None:

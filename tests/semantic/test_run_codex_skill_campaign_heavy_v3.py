@@ -225,6 +225,101 @@ def test_consumed_composer_order_rebinds_each_revision_to_its_actual_predecessor
     )
 
 
+def test_archived_typed_draft_accepts_dependency_free_rebatching(
+    tmp_path: Path,
+) -> None:
+    options = _options(tmp_path)
+    task_root = tmp_path / "task"
+    task_root.mkdir()
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.create",
+        "arguments": {
+            "parent": {"kind": "path", "value": r"\Root"},
+            "name": "ArchivedRebatch",
+            "type": "Sound",
+            "on_name_conflict": "fail",
+            "notes": "sealed-note",
+        },
+    }
+    canonical = build_transaction_protocol((request,))
+    action_indexes = tuple(
+        index
+        for index, step in enumerate(canonical.steps)
+        if step.subcommand == "draft-apply"
+    )
+    assert len(action_indexes) == 2
+    expected_actions = tuple(
+        action
+        for index in action_indexes
+        for action in (
+            canonical.steps[index].arguments[-1].actions
+            if isinstance(
+                canonical.steps[index].arguments[-1],
+                DraftTypedActionBatchArgument,
+            )
+            else (canonical.steps[index].arguments[-1],)
+        )
+    )
+    assert len(expected_actions) == 7
+    observed_steps = list(canonical.steps)
+    for step_index, actions in zip(
+        action_indexes,
+        (expected_actions[:4], expected_actions[4:]),
+        strict=True,
+    ):
+        observed_steps[step_index] = replace(
+            observed_steps[step_index],
+            arguments=(
+                *observed_steps[step_index].arguments[:-1],
+                DraftTypedActionBatchArgument(tuple(actions)),
+            ),
+        )
+    observed = replace(canonical, steps=tuple(observed_steps))
+    records = _synthetic_gateway_records(
+        options=options,
+        task_root=task_root,
+        protocol=observed,
+        version="2022.1",
+    )
+    command_records = completed_command_records(
+        parse_jsonl_events(
+            _synthetic_events(
+                thread_id="thread-rebatched-archive",
+                records=records,
+                final_response="操作完成。",
+                windows_powershell_core_host=options.windows_powershell_core_host,
+            )
+        ),
+        windows_powershell_core_host=options.windows_powershell_core_host,
+    )
+    serialized_commands = [
+        campaign._json_canonical_value(asdict(record))
+        for record in command_records
+    ]
+
+    campaign._validate_heavy_v3_broker_records(
+        records,
+        task_root=task_root,
+        steps=canonical.steps,
+        command_records=serialized_commands,
+        options=options,
+        version="2022.1",
+        label="passing rebatched archive",
+    )
+    from tests.semantic.support.codex_typed_draft_evidence_v3 import (
+        validate_typed_draft_evidence,
+    )
+
+    replayed = validate_typed_draft_evidence(
+        state_directory=task_root / "broker" / "state",
+        steps=canonical.steps,
+        broker_records=records,
+    )
+    assert replayed["canonical_request"] == request
+
+
 def test_archived_broker_replay_preserves_declared_composer_setup_order() -> None:
     schema = ExpectedGatewayStep(
         "tx01.operation-schema",

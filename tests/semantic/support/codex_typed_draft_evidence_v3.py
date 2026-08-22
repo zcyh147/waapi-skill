@@ -9,6 +9,7 @@ from tests.semantic.support.codex_gateway_broker import (
     DraftTypedActionArgument,
     DraftTypedActionBatchArgument,
     GatewayInvocationError,
+    dependency_free_draft_action_block,
     draft_compact_action_result,
     project_required_metadata_tokens,
 )
@@ -697,6 +698,31 @@ def _validate_typed_draft_evidence(
         and request_contract(version, operation).effect == "read"
     )
 
+    rebatchable_action_indexes: set[int] = set()
+    action_index = 0
+    while action_index < len(steps):
+        block = dependency_free_draft_action_block(steps, action_index)
+        if block is None:
+            action_index += 1
+            continue
+        block_indexes, block_expected_actions = block
+        actual_count = sum(
+            len(
+                _strict_actions(
+                    arguments_by_step[index],
+                    operation=operation,
+                    version=version,
+                )
+            )
+            for index in block_indexes
+        )
+        if actual_count != len(block_expected_actions):
+            _fail(
+                "Composer archive dependency-free action block count drifted"
+            )
+        rebatchable_action_indexes.update(block_indexes)
+        action_index = block_indexes[-1] + 1
+
     def project(value: Mapping[str, Any]) -> dict[str, Any]:
         return composition_projection(
             operation,
@@ -723,7 +749,9 @@ def _validate_typed_draft_evidence(
     preview_payload: Mapping[str, Any] | None = None
     direct_read_binding: Mapping[str, Any] | None = None
 
-    for step, payload, arguments in zip(steps, payloads, arguments_by_step):
+    for step_index, (step, payload, arguments) in enumerate(
+        zip(steps, payloads, arguments_by_step)
+    ):
         if step.subcommand == "draft-start":
             continue
         if step.subcommand == "draft-apply":
@@ -744,7 +772,10 @@ def _validate_typed_draft_evidence(
                     else ()
                 )
             )
-            if not expected_actions or len(expected_actions) != len(actions):
+            if not expected_actions or (
+                len(expected_actions) != len(actions)
+                and step_index not in rebatchable_action_indexes
+            ):
                 _fail("Composer archive action lacks its typed protocol argument")
             for metadata_binding in (
                 expected.metadata_binding
