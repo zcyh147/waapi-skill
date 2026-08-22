@@ -171,6 +171,12 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
         ],
         "check": None,
         "seal": None,
+        "agent_control": {
+            "terminal": False,
+            "required_outcome_before_reply": "preview_or_structured_refusal",
+            "next": "follow_next_action_binding",
+            "reply_or_claim_preview_now": "invalid",
+        },
     }
     assert started["draft"]["created_at"] == started["draft"]["updated_at"]
     assert started["draft"]["expires_at"] > started["draft"]["created_at"]
@@ -189,6 +195,8 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
     inspected_binding = inspected_draft.pop("next_action_binding")
     started_draft = dict(started["draft"])
     started_draft.pop("next_action_binding")
+    started_draft.pop("agent_control")
+    assert "agent_control" not in inspected_draft
     assert inspected_draft == started_draft
     assert inspected_binding["fixed_argv_prefix"][6] == (
         "<task-authority-from-draft-start>"

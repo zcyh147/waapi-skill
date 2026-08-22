@@ -365,6 +365,12 @@ def test_generic_draft_start_requires_first_fact_batch_before_disclosure(
         "copy_boolean_values_exactly": True,
         "infer_or_replace_prompt_values": "invalid",
     }
+    assert applied["draft"]["agent_control"] == {
+        "terminal": False,
+        "required_outcome_before_reply": "preview_or_structured_refusal",
+        "next": "follow_next_action_binding",
+        "reply_or_claim_preview_now": "invalid",
+    }
     public_payload = waapi_gateway.gateway_stdout_payload(applied)
     encoded = waapi_gateway.gateway_stdout_json_encoder(public_payload).encode(
         public_payload
@@ -811,6 +817,19 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         "agent_metadata_command_required": (
             "when_dynamic_token_is_not_already_exact_live_evidence"
         ),
+        "metadata_query_batch": {
+            "scope": "one exact object, class, or object-type scope",
+            "first_request": (
+                "include every distinct prompt-present dynamic property/reference "
+                "token for this operation and scope"
+            ),
+            "one_to_eight_queries": "one metadata discover command",
+            "split_within_limit": "invalid",
+            "successful_complete_scope_result": "do_not_query_that_scope_again",
+            "partial_fallback": (
+                "one broader retry only when explicitly reported partial"
+            ),
+        },
         "submit_only_explicit_user_facts": True,
         "draft_check_revalidates_dynamic_metadata": True,
     }

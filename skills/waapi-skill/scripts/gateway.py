@@ -14747,6 +14747,15 @@ def operation_draft_payload(
             }
         if not (command == "draft-check" and record.check is not None):
             draft["next_action_binding"] = next_action_binding
+        if command in {"draft-start", "draft-apply"}:
+            draft["agent_control"] = {
+                "terminal": False,
+                "required_outcome_before_reply": (
+                    "preview_or_structured_refusal"
+                ),
+                "next": "follow_next_action_binding",
+                "reply_or_claim_preview_now": "invalid",
+            }
     return {
         "contract": GATEWAY_RESULT_CONTRACT,
         "ok": True,

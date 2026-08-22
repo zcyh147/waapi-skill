@@ -262,9 +262,9 @@ def test_operate_identity_preflight_stays_in_the_operate_reference_lane() -> Non
     assert "preserved sibling" in operate_compact
     assert "post-execution verification does not" in operate_compact
     assert (
-        "After that preflight, `object.create` runs `operation-schema`, then "
-        "`metadata discover` for every prompt-present dynamic property/reference "
-        "token, and only then `draft-start`"
+        "After that preflight, `object.create` runs `operation-schema`, then one "
+        "`metadata discover` containing every same-scope prompt-present dynamic "
+        "property/reference token (1–8; never split), then `draft-start`"
     ) in operate_compact
     assert operate_compact.index(
         "Finish any user-requested exact path/type preflight"
@@ -779,7 +779,8 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "transaction-show <transaction-id> --summary-only" in OPERATE
     assert "Do not call `operations`, `operation-schema`, or `request-schema` first" in OPERATE
     assert "`object.set` or `audio.import`" in OPERATE
-    assert "run one metadata discovery next, then Composer actions" in OPERATE
+    assert "One command carries one repeated `--query" in OPERATE
+    assert "1–8 never split" in OPERATE
     assert "Then `operation-schema`; metadata" in OPERATE
     assert "pre-Preview same-name-root type/path only" in OPERATE
     assert "not parent/sibling or later verification" in compact
@@ -798,13 +799,13 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "schema owns fixed fields and Event/Switch Assignation" in OPERATE
     assert "metadata selects dynamic tokens and `draft-check` revalidates them" in OPERATE
     assert "`maximum playback instances`" in OPERATE
-    assert "one query covers both that enable switch and its numeric value" in OPERATE
+    assert "one query covers both that enable switch and numeric value" in OPERATE
     assert "`WAAPI_TYPED_CONTAINER_RESPONSE_END`" in OPERATE
     assert "then continue from that response" in OPERATE
     assert "Table imports start `operation-schema audio.importTabDelimited`" in OPERATE
     assert "dynamic columns stay metadata-first" in OPERATE
     skill_compact = " ".join(SKILL.split())
-    assert "Composer `draft-check` revalidates them and dependencies" in skill_compact
+    assert "Composer `draft-check` revalidates tokens and dependencies" in skill_compact
     assert "only an explicit unknown dynamic property/reference token needs" in skill_compact
     assert "A known native URI without a named route" in OPERATE
     assert "`request-schema <uri>`" in OPERATE
@@ -815,15 +816,15 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "then only the selected `action_argv`" in OPERATE
     assert "Start `object.set` rows with `add_target --target ...`" in OPERATE
     assert "Start every `audio.import` row with one `add_import_row`" in OPERATE
-    assert "include `--assignment none`" in OPERATE
+    assert "use `--assignment none`" in OPERATE
     assert "`--assignment switch VALUE` only when requested" in OPERATE
-    assert "run its `preview-from-draft` unchanged" in OPERATE
+    assert "Corrections reuse the draft" in OPERATE
     assert "preserving `--expected-revision` and `--apply`" in OPERATE
     assert "there is no `lua.executeFile` operation" in OPERATE
     assert "keep it as one `path` selector" in OPERATE
-    assert "`--apply` marks a preview, not execution" in OPERATE
+    assert "`--apply` marks Preview, not execution" in OPERATE
     assert "Exact reflected URIs use `request-schema`" in OPERATE
-    assert "follow its sole typed continuation" in OPERATE
+    assert "Follow the schema's sole `input_mode`" in OPERATE
     assert "Unknown fields fail" in OPERATE
     assert "there is no caller-authored request document" in OPERATE
     assert "Public mutation identities are closed" in OPERATE
@@ -856,7 +857,7 @@ def test_operate_business_selection_and_execution_domains_remain_explicit() -> N
         "`ui.commands.execute`",
     ):
         assert phrase in OPERATE
-    assert "Batch size alone never establishes file-workflow intent" in compact
+    assert "Batch size never establishes file-workflow intent" in compact
     assert "When media import is primary" in compact
     assert "replace media on existing Sounds" in compact
     assert "create a Sound in the same batch" in compact

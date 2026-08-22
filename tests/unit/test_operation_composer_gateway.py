@@ -65,6 +65,7 @@ def _assert_pristine_inspected_draft(
 ) -> None:
     started_draft = dict(started["draft"])
     started_draft.pop("next_action_binding")
+    started_draft.pop("agent_control")
     inspected_draft = dict(inspected["draft"])
     inspected_binding = inspected_draft.pop("next_action_binding")
     assert inspected_draft == started_draft
@@ -1416,6 +1417,12 @@ def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
             "before": "continue_no_confirm_no_end",
         },
     }
+    assert draft["agent_control"] == {
+        "terminal": False,
+        "required_outcome_before_reply": "preview_or_structured_refusal",
+        "next": "follow_next_action_binding",
+        "reply_or_claim_preview_now": "invalid",
+    }
     assert "draft-inspect" not in json.dumps(targeted)
     handle = draft["action_result"]["created_handles"][0]
     assert TARGET_HANDLE_RE.fullmatch(handle)
@@ -1536,6 +1543,7 @@ def test_compact_weather_shaped_action_responses_remain_constant_size(
             "action_result",
             "response_integrity",
             "next_action_binding",
+            "agent_control",
         }
         handle = targeted["draft"]["action_result"]["created_handles"][0]
         revision += 1
@@ -1929,6 +1937,33 @@ def test_rtpc_public_composer_discloses_exact_business_mode_mapping(
         "present and add it if absent; use add only when an existing exact "
         "property and ControlInput match must fail."
     )
+
+
+def test_audio_import_schema_requires_one_complete_metadata_query_batch(
+    tmp_path: Path,
+) -> None:
+    exit_code, payload = execute(
+        tmp_path,
+        "--version",
+        "2025.1",
+        "operation-schema",
+        "audio.import",
+    )
+
+    assert exit_code == 0, payload
+    assert payload["composer"]["start_preconditions"][
+        "metadata_query_batch"
+    ] == {
+        "scope": "one exact object, class, or object-type scope",
+        "first_request": (
+            "include every distinct prompt-present dynamic property/reference "
+            "token for this operation and scope"
+        ),
+        "one_to_eight_queries": "one metadata discover command",
+        "split_within_limit": "invalid",
+        "successful_complete_scope_result": "do_not_query_that_scope_again",
+        "partial_fallback": "one broader retry only when explicitly reported partial",
+    }
 
 
 def test_registry_composer_lanes_and_real_adapters_are_one_to_one() -> None:

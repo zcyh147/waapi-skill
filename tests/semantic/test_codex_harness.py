@@ -1450,7 +1450,9 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "selected-branch constant" in instructions
     assert "distinct query per requested token" in instructions
-    assert "no repeat of successful same-scope/token discovery" in instructions
+    assert "one first-command batch for every same-scope token" in instructions
+    assert "never split 1..8" in instructions
+    assert "no same-scope repeat after success" in instructions
     assert "enum/const exactly" in instructions
     assert "typed_operation.continuation.gateway_argv_prefix verbatim" in instructions
     assert "incl --apply" in instructions
@@ -1465,6 +1467,8 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "copy_command_by_shape verbatim" in instructions
     assert "shell_tool_timeout_ms" in instructions
     assert "A successful draft-check is not a Preview" in instructions
+    assert "Editable draft-apply continues same turn" in instructions
+    assert "no progress reply while editable" in instructions
     assert "requires_later_user_message" in instructions
 
 

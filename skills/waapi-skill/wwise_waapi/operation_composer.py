@@ -1421,6 +1421,24 @@ def _selector_cli_tokens(selector: Mapping[str, Any], *, depth: int = 0) -> tupl
     raise OperationComposerError("Typed selector is invalid.")
 
 
+def _metadata_query_batch_contract() -> dict[str, str]:
+    """Describe the one scoped discovery batch used before one Draft."""
+
+    return {
+        "scope": "one exact object, class, or object-type scope",
+        "first_request": (
+            "include every distinct prompt-present dynamic property/reference "
+            "token for this operation and scope"
+        ),
+        "one_to_eight_queries": "one metadata discover command",
+        "split_within_limit": "invalid",
+        "successful_complete_scope_result": "do_not_query_that_scope_again",
+        "partial_fallback": (
+            "one broader retry only when explicitly reported partial"
+        ),
+    }
+
+
 def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
     """Return one reviewed Adapter contract, derived from the Registry."""
 
@@ -1818,6 +1836,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "agent_metadata_command_required": (
                     "when_dynamic_token_is_not_already_exact_live_evidence"
                 ),
+                "metadata_query_batch": _metadata_query_batch_contract(),
                 "submit_only_explicit_user_facts": True,
                 "draft_check_revalidates_dynamic_metadata": True,
             },
@@ -1917,6 +1936,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "--limit",
                 "<1..8>",
             ],
+            "metadata_query_batch": _metadata_query_batch_contract(),
             "forbidden_scope_flags": ["--object"],
         },
         "action_shapes": {
