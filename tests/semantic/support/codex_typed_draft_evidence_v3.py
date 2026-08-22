@@ -554,6 +554,45 @@ def validate_typed_draft_evidence(
         raise TypedDraftEvidenceError(f"Composer archive replay failed: {exc}") from exc
 
 
+def _composer_flow_step_indexes(
+    steps: Sequence[Any],
+    prefix: str,
+) -> tuple[int, ...]:
+    """Keep one Composer flow together with its exact external metadata proofs."""
+
+    owned_indexes = tuple(
+        index
+        for index, step in enumerate(steps)
+        if step.name == prefix or step.name.startswith(f"{prefix}.")
+    )
+    dependency_names: set[str] = set()
+    for index in owned_indexes:
+        step = steps[index]
+        step_binding = getattr(step, "metadata_binding", None)
+        if step_binding is not None:
+            dependency_names.add(step_binding.step)
+        for argument in step.arguments:
+            expected_actions = (
+                (argument,)
+                if isinstance(argument, DraftTypedActionArgument)
+                else (
+                    argument.actions
+                    if isinstance(argument, DraftTypedActionBatchArgument)
+                    else ()
+                )
+            )
+            dependency_names.update(
+                action.metadata_binding.step
+                for action in expected_actions
+                if action.metadata_binding is not None
+            )
+    return tuple(
+        index
+        for index, step in enumerate(steps)
+        if index in owned_indexes or step.name in dependency_names
+    )
+
+
 def _validate_typed_draft_evidence(
     *,
     state_directory: Path,
@@ -577,11 +616,7 @@ def _validate_typed_draft_evidence(
             prefixes.append(prefix)
         flows: list[Mapping[str, Any]] = []
         for prefix in prefixes:
-            indexes = tuple(
-                index
-                for index, step in enumerate(steps)
-                if step.name == prefix or step.name.startswith(f"{prefix}.")
-            )
+            indexes = _composer_flow_step_indexes(steps, prefix)
             if not indexes:
                 _fail("Multi-Composer flow has no archived steps")
             flows.append(
@@ -590,6 +625,7 @@ def _validate_typed_draft_evidence(
                     steps=tuple(steps[index] for index in indexes),
                     broker_records=tuple(broker_records[index] for index in indexes),
                     durable_records=durable_records,
+                    allow_cleaned_file_evidence=allow_cleaned_file_evidence,
                 )
             )
         evidence = {
@@ -723,11 +759,20 @@ def _validate_typed_draft_evidence(
                 )
                 if len(source_indexes) != 1:
                     _fail("Composer archive metadata source is unavailable")
+                source_step = steps[source_indexes[0]]
+                if (
+                    len(source_step.arguments) < 3
+                    or source_step.arguments[1] not in {"--object-type", "--object"}
+                    or not isinstance(source_step.arguments[2], str)
+                ):
+                    _fail("Composer archive metadata scope is invalid")
                 try:
                     source_projection = project_required_metadata_tokens(
                         payloads[source_indexes[0]],
                         object_type=metadata_binding.object_type,
                         required_tokens=metadata_binding.required_tokens,
+                        scope_flag=source_step.arguments[1],
+                        scope_value=source_step.arguments[2],
                     )
                 except GatewayInvocationError as exc:
                     raise TypedDraftEvidenceError(

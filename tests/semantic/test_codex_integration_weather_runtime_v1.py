@@ -411,6 +411,16 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         "tx01.metadata",
         "tx02.metadata",
     ]
+    from tests.semantic.support.codex_typed_draft_evidence_v3 import (
+        _composer_flow_step_indexes,
+    )
+
+    tx03_archive_names = tuple(
+        protocol.steps[index].name
+        for index in _composer_flow_step_indexes(protocol.steps, "tx03")
+    )
+    assert "tx01.metadata" in tx03_archive_names
+    assert "tx01.draft-start" not in tx03_archive_names
     assert [step.arguments[-2:] for step in metadata_steps] == [
         ("--limit", "2"),
         ("--limit", "8"),

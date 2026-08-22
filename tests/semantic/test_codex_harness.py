@@ -1525,6 +1525,30 @@ def test_formal_task_instructions_bind_exact_windows_skill_read_schedule() -> No
     assert len(instructions.encode("utf-8")) <= 2048
 
 
+def test_public_integration_alarm_instructions_fit_the_sealed_byte_limit() -> None:
+    task_skill = (
+        r"C:\Git_Repos\waapi-skills\skills\waapi-skill-workspace"
+        r"\w1a68649-int-fail10-r1\attempts\attempt-000001\runs\heavy-v3"
+        r"\matrix\scenarios\002-INT22-ALARM\evidence\codex-task"
+        r"\agent-workspace\.agents\skills\waapi-skill"
+    )
+
+    instructions = codex_harness_module.semantic_task_developer_instructions(
+        r"C:\Git_Repos\waapi-skills\skills\waapi-skill\scripts\run.py",
+        task_skill_source=task_skill,
+        expected_skill_reads=(
+            ("SKILL.md", "references/waapi-query.md"),
+            ("references/waapi-operate.md",),
+            (),
+        ),
+    )
+
+    assert "Reads: 1" in instructions
+    assert "2 [Get-Content" in instructions
+    assert "3 none" in instructions
+    assert len(instructions.encode("utf-8")) <= 2048
+
+
 def test_prompt_audit_requires_exact_bootstrap_developer_instruction_once(
     tmp_path: Path,
 ) -> None:
