@@ -405,11 +405,58 @@ def test_same_object_dependency_closure_is_live_bounded_and_cycle_safe() -> None
             "required_values": [True],
         }
     ]
+    assert override["matched_queries"] == ["OutputBus"]
     assert {
         call[1]["property"]
         for call in reader.calls
         if call[0] == GET_PROPERTY_INFO_URI
     } == {"EnableRouting", "OutputBus", "OverrideOutput"}
+
+
+def test_dependency_candidate_preserves_overlap_with_an_explicit_enable_query() -> None:
+    reader = MetadataReader(
+        names=["MaxSoundPerInstance", "UseMaxSoundPerInstance"],
+        info={
+            "MaxSoundPerInstance": _property_info(
+                "MaxSoundPerInstance",
+                property_type="int16",
+                display_name="Maximum playback instances",
+                dependencies=[_self_dependency("UseMaxSoundPerInstance")],
+            ),
+            "UseMaxSoundPerInstance": _property_info(
+                "UseMaxSoundPerInstance",
+                display_name="Limit Sound Instances",
+            ),
+        },
+    )
+
+    result = discover_metadata(
+        read_call=reader,
+        object_type="Sound",
+        queries=["maximum playback instances enabled"],
+        limit=1,
+    ).as_dict()
+
+    assert [row["name"] for row in result["candidates"]] == [
+        "MaxSoundPerInstance"
+    ]
+    assert result["dependency_candidates"] == [
+        {
+            "name": "UseMaxSoundPerInstance",
+            "kind": "property",
+            "matched_queries": ["maximum playback instances enabled"],
+            "required_by": ["MaxSoundPerInstance"],
+            "dependency_requirements": [],
+            "metadata": {
+                "name": "UseMaxSoundPerInstance",
+                "type": "Boolean",
+                "default": False,
+                "display": {"name": "Limit Sound Instances"},
+                "restriction": {},
+                "typed_value_type": "boolean",
+            },
+        }
+    ]
 
 
 def test_dependency_cycle_below_root_does_not_repeat_reads_or_exhaust_depth() -> None:

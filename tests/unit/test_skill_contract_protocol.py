@@ -798,8 +798,10 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "including both import operations" not in OPERATE
     assert "schema owns fixed fields and Event/Switch Assignation" in OPERATE
     assert "metadata selects dynamic tokens and `draft-check` revalidates them" in OPERATE
+    assert "`limit sound instances`" in OPERATE
     assert "`maximum playback instances`" in OPERATE
-    assert "one query covers both that enable switch and numeric value" in OPERATE
+    assert "both selected tokens are facts" in OPERATE
+    assert "one is also a dependency" in OPERATE
     assert "`WAAPI_TYPED_CONTAINER_RESPONSE_END`" in OPERATE
     assert "then continue from that response" in OPERATE
     assert "Table imports start `operation-schema audio.importTabDelimited`" in OPERATE
@@ -1000,9 +1002,9 @@ def test_operate_metadata_and_import_prose_only_rules_are_preserved() -> None:
         "`--object` for one existing object",
         "`--object-type Sound`",
         "`PropertyContainer` in `2025.1`",
-            "Translate localized wording into short English Wwise UI",
-        "do not copy CJK wording into the live lexical matcher",
-            "independent switches and numeric values separately",
+        "Translate localized wording to short English Wwise UI/technical phrases",
+        "never pass CJK to the lexical matcher",
+        "Search separately: `limit sound instances`",
         "`fallback_detail_scan.status` is `partial`",
         "A `complete` scan with no match is terminal",
         "for table imports, only dynamic `Property[...]`, `Reference[...]`, or `@...` columns",

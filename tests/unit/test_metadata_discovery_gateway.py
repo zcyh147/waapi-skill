@@ -625,6 +625,9 @@ def test_compact_five_query_complete_gateway_stdout_stays_below_32_kib(
         "action_field_selection": "explicit_user_settings_only",
         "dependency_candidates": {
             "required_by_only": "omit_from_action",
+            "matched_queries_nonempty": (
+                "still_requires_explicit_user_selection_but_may_copy_name_and_type"
+            ),
             "independently_requested_exact_token": "may_copy_name_and_type",
             "activation_owner": "gateway_draft_check_and_preview",
         },

@@ -1698,6 +1698,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "switch_assignment",
             ],
             "distinct_metadata_tokens_are_independent_facts": True,
+            "requested_enable_toggle_and_requested_value_are_distinct_facts": True,
             "switch_assignment_value_only_when_explicit": True,
         }
         planning_discipline = {

@@ -168,6 +168,9 @@ class MetadataDiscoveryResult:
                 "action_field_selection": "explicit_user_settings_only",
                 "dependency_candidates": {
                     "required_by_only": "omit_from_action",
+                    "matched_queries_nonempty": (
+                        "still_requires_explicit_user_selection_but_may_copy_name_and_type"
+                    ),
                     "independently_requested_exact_token": (
                         "may_copy_name_and_type"
                     ),
@@ -321,6 +324,7 @@ def discover_metadata(
         live_scope_args,
         available_names=names,
         candidates=selected,
+        query_order=normalized_queries,
     )
 
     candidate_payloads = tuple(
@@ -792,6 +796,7 @@ def _resolve_dependency_closure(
     *,
     available_names: Sequence[str],
     candidates: Sequence[_Candidate],
+    query_order: Sequence[str],
 ) -> tuple[
     tuple[Mapping[str, Any], ...],
     Mapping[str, tuple[str, ...]],
@@ -906,6 +911,16 @@ def _resolve_dependency_closure(
         {
             "name": name,
             "kind": _metadata_kind(info_by_name[name]),
+            "matched_queries": [
+                query
+                for query in query_order
+                if _candidate_score(
+                    query,
+                    name=name,
+                    info=info_by_name[name],
+                )
+                > 0
+            ],
             "required_by": sorted(
                 required_by[name],
                 key=lambda value: (value.casefold(), value),
@@ -1004,6 +1019,7 @@ def _compact_dependency_candidate_payload(
     return {
         "name": name,
         "kind": candidate["kind"],
+        "matched_queries": list(candidate["matched_queries"]),
         "required_by": list(candidate["required_by"]),
         "dependency_requirements": _compact_dependency_requirements(
             metadata,

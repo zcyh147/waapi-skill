@@ -44,10 +44,10 @@ DEFAULT_REASONING_EFFORT = "medium"
 DEFAULT_SERVICE_TIER = "priority"
 DEFAULT_TIMEOUT_SECONDS = 180.0
 SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
-    "Before any other action, one standalone complete file-read shell command: "
-    "SKILL.md. Execute exact next_command.copy_instruction.source_field; preserve "
+    "First: read SKILL.md once in one standalone command. Execute exact "
+    "next_command.copy_instruction.source_field; preserve "
     "every quote; never reconstruct. Copy fixed_argv_prefix, opaque handles/tokens/"
-    "digests. Each full fact template: one business value/argv literal; every "
+    "digests. Each fact: one business value/argv literal; every "
     "prompt field/item/map/boolean; no defaults. "
     "Greedily fill batch_size 6; only final batch is shorter, with all remaining. CLI "
     "TYPE is string/number/integer/boolean, never Real64/int16. Prepend unapplied "
@@ -56,7 +56,7 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "Finish prompt top-level facts before root_dynamic_disclosure; copy_command_by_shape "
     "verbatim. Metadata: distinct query per requested token; one first-command batch "
     "for every same-scope token, including shared and per-row dynamic fields; "
-    "never split 1..8; exact limit; no same-scope "
+    "never split 1..8; no same-scope "
     "repeat after success. "
     "enum/const exactly. typed_operation.continuation.gateway_argv_prefix "
     "verbatim incl --apply; selector kind/value as separate argv tokens. SFX => "
@@ -98,9 +98,9 @@ def semantic_skill_bootstrap_developer_instructions(
         )
     return (
         SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
-        + " Without complete next_command use exact prefix: "
+        + " No next_command: prefix "
         + command_prefix
-        + ". Append only disclosed argv; do not rebuild it."
+        + "; append disclosed argv only."
     )
 
 

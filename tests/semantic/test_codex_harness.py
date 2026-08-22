@@ -1425,8 +1425,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
         codex_harness_module.SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
     )
 
-    assert "Before any other action" in instructions
-    assert "one standalone complete file-read shell command" in instructions
+    assert "First: read SKILL.md once in one standalone command" in instructions
     assert (
         "Get-Content -Raw -Encoding UTF8 "
         "'.agents\\skills\\waapi-skill\\SKILL.md'"
@@ -1438,7 +1437,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "opaque handle" in instructions
     assert "never reconstruct" in instructions
     assert "No shell cwd override" in instructions
-    assert "Each full fact template" in instructions
+    assert "Each fact" in instructions
     assert "one business value/argv literal" in instructions
     assert "Greedily fill batch_size 6" in instructions
     assert "only final batch is shorter" in instructions
@@ -1487,7 +1486,7 @@ def test_formal_bootstrap_instructions_bind_one_exact_windows_runner_prefix() ->
         r"'C:\Git_Repos\waapi-skills\skills\waapi-skill\scripts\run.py' "
         "'gateway.py'"
     ) in instructions
-    assert "use exact prefix" in instructions
+    assert "No next_command: prefix" in instructions
     assert len(instructions.encode("utf-8")) <= 2048
 
 
@@ -1562,6 +1561,11 @@ def test_public_integration_alarm_instructions_fit_the_sealed_byte_limit() -> No
             ("SKILL.md", "references/waapi-query.md"),
             ("references/waapi-operate.md",),
             (),
+        ),
+        base_developer_instructions=(
+            codex_harness_module.semantic_skill_bootstrap_developer_instructions(
+                r"c:\git_repos\waapi-skills\skills\waapi-skill\scripts\run.py"
+            )
         ),
     )
 
