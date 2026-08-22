@@ -28,9 +28,11 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_metadata_transaction_protocol,
 )
 from tests.semantic.support.codex_gateway_broker import (
+    ExactArgumentAlternatives,
     ExpectedGatewayStep,
     MetadataTokenProjection,
     ResponseBinding,
+    ResponseBindingOrExactArgument,
 )
 from tests.semantic.support.codex_version_layout_v3 import (
     get_codex_version_layout_v3,
@@ -95,6 +97,7 @@ _SOURCE_FIELDS = (
 _BUS_FIELDS = (*_BASE_FIELDS, "@Volume")
 _FIXED_FIELDS = _BASE_FIELDS
 _MAX_RESULT_ROWS = 32
+_DIAGNOSTIC_EVENT_FIELDS = ("id", "name", "type", "path")
 _DIAGNOSTIC_ACTION_FIELDS = (
     "id",
     "name",
@@ -947,6 +950,7 @@ class _AlarmFixtureSession:
 
         rows = before.by_key()
         expected = {
+            "diag.event": ("event", "event"),
             "diag.action": ("action", "action"),
             "diag.sound": ("sound", "sound"),
             "diag.source": ("source", "source"),
@@ -1093,8 +1097,20 @@ def _alarm_protocol(
 ) -> V3GatewayProtocol:
     diagnostic_steps = (
         _query_step(
-            "diag.action",
+            "diag.event",
             source=("--path", fixture_paths.event),
+            take=None,
+            fields=_DIAGNOSTIC_EVENT_FIELDS,
+        ),
+        _query_step(
+            "diag.action",
+            source=(
+                ExactArgumentAlternatives(("--object-id", "--path")),
+                ResponseBindingOrExactArgument(
+                    binding=ResponseBinding("diag.event", "/objects/0/id"),
+                    exact_values=(fixture_paths.event,),
+                ),
+            ),
             selects=("children",),
             take=100,
             fields=_DIAGNOSTIC_ACTION_FIELDS,

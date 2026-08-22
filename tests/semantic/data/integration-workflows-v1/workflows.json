@@ -360,7 +360,7 @@
         {
           "index": 1,
           "kind": "diagnosis_request",
-          "prompt": "请先只读诊断 {alarm_event_path} 的完整播放链路：从这个精确 Event 找到直接 Play Action 及其目标 Sound，确认 Sound 是否覆写输出、使用的 AudioSource 对应哪个原始文件和语言，再核对它当前实际指向的 Bus 与 {alarm_target_bus_path} 各自的音量，判断问题是路由错误还是总线静音。这一轮只报告 Event→Action→Sound→AudioSource→Bus 的逐层证据和结论，不要修改工程。",
+          "prompt": "请先只读诊断 {alarm_event_path} 的完整播放链路：先单独核对这个精确 Event 的身份，再另一步读取它的直接 Play Action 及其目标 Sound；确认 Sound 是否覆写输出、使用的 AudioSource 对应哪个原始文件和语言，再核对它当前实际指向的 Bus 与 {alarm_target_bus_path} 各自的音量，判断问题是路由错误还是总线静音。这一轮只报告 Event→Action→Sound→AudioSource→Bus 的逐层证据和结论，不要修改工程。",
           "confirms_transaction": null,
           "expects_preview_transaction": null
         },

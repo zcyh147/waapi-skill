@@ -8,6 +8,7 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     OPERATION_REQUEST_CONTRACT,
+    OPERATION_SPECS,
     OperationContractError,
     _is_rtpc_control_input,
     _read_rtpc_rows_with_evidence,
@@ -680,6 +681,18 @@ def test_rtpc_update_targets_existing_rtpc_without_replace_all() -> None:
         ),
     )
     assert verified.ok
+
+
+def test_rtpc_mode_schema_maps_replace_or_add_business_wording() -> None:
+    spec = OPERATION_SPECS["object.setRTPC"]
+    mode = spec.argument_contract["properties"]["mode"]
+
+    assert mode["x-discloseDescription"] is True
+    assert mode["description"] == (
+        "Use add_or_replace when the user asks to replace the matching RTPC if "
+        "present and add it if absent; use add only when an existing exact "
+        "property and ControlInput match must fail."
+    )
 
 
 def test_rtpc_add_fails_before_dispatch_when_complete_list_is_at_capacity() -> None:

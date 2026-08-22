@@ -181,6 +181,61 @@ def test_compact_generic_typed_fact_receipt_accepts_its_real_fact_handle_family(
     assert summary["target_count"] == 1
 
 
+def test_compact_required_incomplete_receipt_omits_completion_candidate() -> None:
+    payload = {
+        "schema_required_fields_status": "incomplete",
+        "action_result": {
+            "contract": "waapi-skill.operation-draft-action-result/v1",
+            "action": "add_typed_fact",
+            "created_handles": ["tdh1-c12aa1ea49a4d727357b105b"],
+            "affected_handles": ["trh1-4dedc2c7c0aea1301b0d773f"],
+        },
+        "current_facts_summary": {
+            "contract": "waapi-skill.operation-draft-facts-summary/v1",
+            "target_count": 1,
+            "handle_count": 1,
+            "canonical_sha256": "1" * 64,
+        },
+        "next_action_binding": {
+            "shell_tool_timeout_ms": 30_000,
+        },
+    }
+
+    action, created, affected, summary = broker_module._draft_compact_action_result(
+        payload
+    )
+
+    assert action == "add_typed_fact"
+    assert created == {"tdh1-c12aa1ea49a4d727357b105b"}
+    assert affected == {"trh1-4dedc2c7c0aea1301b0d773f"}
+    assert summary["canonical_sha256"] == "1" * 64
+
+
+def test_compact_required_incomplete_receipt_rejects_completion_candidate() -> None:
+    payload = {
+        "schema_required_fields_status": "incomplete",
+        "action_result": {
+            "contract": "waapi-skill.operation-draft-action-result/v1",
+            "action": "add_typed_fact",
+            "created_handles": ["tdh1-c12aa1ea49a4d727357b105b"],
+            "affected_handles": ["trh1-4dedc2c7c0aea1301b0d773f"],
+        },
+        "current_facts_summary": {
+            "contract": "waapi-skill.operation-draft-facts-summary/v1",
+            "target_count": 1,
+            "handle_count": 1,
+            "canonical_sha256": "1" * 64,
+        },
+        "next_action_binding": _compact_next_action_binding(),
+    }
+
+    with pytest.raises(
+        GatewayInvocationError,
+        match="compact Draft action response has an invalid bounded projection",
+    ):
+        broker_module._draft_compact_action_result(payload)
+
+
 def test_compact_generic_typed_fact_receipt_accepts_closed_required_followups() -> None:
     payload = {
         "action_result": {

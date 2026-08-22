@@ -271,7 +271,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
 
     assert len(non_object_set_digests) == 149
     assert canonical_sha256(non_object_set_digests) == (
-        "3845e10de1c7d20ccb82d5d9478f90d077395b641f4d51820f9704f6a10ffab2"
+        "6d969ba6b7e02a25258c7cd0b9b2f8938df559af9051017fd4f0bebce55519bd"
     )
     assert {
         version: operation_input_mode("object.set", version)
@@ -1904,6 +1904,31 @@ def test_shared_uri_composers_are_isolated_by_exact_operation_name(
 
     assert exit_code == 0
     assert started["draft"]["binding"]["operation"] == "object.setRTPC"
+
+
+def test_rtpc_public_composer_discloses_exact_business_mode_mapping(
+    tmp_path: Path,
+) -> None:
+    exit_code, payload = execute(
+        tmp_path,
+        "--version",
+        "2025.1",
+        "operation-schema",
+        "object.setRTPC",
+    )
+
+    assert exit_code == 0
+    mode = next(
+        field
+        for field in payload["composer"]["typed_request_fields"]
+        if field["name"] == "mode"
+    )
+    assert mode["enum"] == ["add", "add_or_replace"]
+    assert mode["description"] == (
+        "Use add_or_replace when the user asks to replace the matching RTPC if "
+        "present and add it if absent; use add only when an existing exact "
+        "property and ControlInput match must fail."
+    )
 
 
 def test_registry_composer_lanes_and_real_adapters_are_one_to_one() -> None:

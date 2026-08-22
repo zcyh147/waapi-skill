@@ -2567,6 +2567,13 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     "type": "string",
                     "enum": ["add", "add_or_replace"],
                     "default": "add_or_replace",
+                    "x-discloseDescription": True,
+                    "description": (
+                        "Use add_or_replace when the user asks to replace the "
+                        "matching RTPC if present and add it if absent; use add "
+                        "only when an existing exact property and ControlInput "
+                        "match must fail."
+                    ),
                 },
             },
             optional=("notes", "mode"),

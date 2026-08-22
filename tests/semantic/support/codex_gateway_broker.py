@@ -2435,6 +2435,12 @@ def _draft_compact_action_result(
     result = draft.get("action_result")
     summary = draft.get("current_facts_summary")
     next_action_binding = draft.get("next_action_binding")
+    required_fields_status = draft.get("schema_required_fields_status")
+    completion_candidate = (
+        next_action_binding.get("completion_candidate")
+        if isinstance(next_action_binding, Mapping)
+        else None
+    )
     if (
         not isinstance(result, Mapping)
         or not set(result).issubset(
@@ -2514,15 +2520,20 @@ def _draft_compact_action_result(
         or not isinstance(next_action_binding, Mapping)
         or next_action_binding.get("shell_tool_timeout_ms")
         != GATEWAY_SHELL_TOOL_TIMEOUT_MS
+        or required_fields_status not in {None, "complete", "incomplete"}
         or (
             "construction_continuation" in result
-            and "completion_candidate" in next_action_binding
+            and completion_candidate is not None
         )
         or (
             "construction_continuation" not in result
-            and not _valid_draft_completion_candidate(
-                next_action_binding.get("completion_candidate")
-            )
+            and required_fields_status == "incomplete"
+            and completion_candidate is not None
+        )
+        or (
+            "construction_continuation" not in result
+            and required_fields_status != "incomplete"
+            and not _valid_draft_completion_candidate(completion_candidate)
         )
         or not _valid_draft_resume_action_binding(
             next_action_binding,
