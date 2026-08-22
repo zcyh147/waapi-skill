@@ -231,17 +231,11 @@ def test_object_set_composer_discloses_every_exact_typed_action_shape(
             "embedded_import",
         ],
     }
-    assert contract["start_preconditions"]["required_sequence_by_evidence"] == {
-        "exact_live_tokens_already_proven": [
-            "operation-schema",
-            "draft-start",
-        ],
-        "one_or_more_dynamic_tokens_unproven": [
-            "operation-schema",
-            "metadata discover",
-            "draft-start",
-        ],
-    }
+    assert contract["start_preconditions"]["required_sequence"] == [
+        "operation-schema",
+        "metadata discover",
+        "draft-start",
+    ]
     assert contract["start_preconditions"]["metadata_gateway_argv_template"] == [
         "metadata",
         "discover",
