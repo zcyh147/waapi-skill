@@ -1978,6 +1978,15 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "when the exact shared target type is known, keep --object-type "
                 "and do not substitute --object <target-path>"
             ),
+            "metadata_scope_decision": {
+                "first_source": "exact_shared_target_type_from_every_selector",
+                "direct_child_selector_type_is_exact_scope": True,
+                "reviewed_property_container_fallback": (
+                    "only_registry_default_actor_mixer_container_scope"
+                ),
+                "action_target_scope": "Action",
+                "property_container_for_action_target": "invalid",
+            },
             "metadata_gateway_argv_template": [
                 "metadata",
                 "discover",

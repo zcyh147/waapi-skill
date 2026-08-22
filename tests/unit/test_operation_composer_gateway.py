@@ -264,6 +264,15 @@ def test_object_set_composer_discloses_every_exact_typed_action_shape(
         "--limit",
         "<1..8>",
     ]
+    assert contract["start_preconditions"]["metadata_scope_decision"] == {
+        "first_source": "exact_shared_target_type_from_every_selector",
+        "direct_child_selector_type_is_exact_scope": True,
+        "reviewed_property_container_fallback": (
+            "only_registry_default_actor_mixer_container_scope"
+        ),
+        "action_target_scope": "Action",
+        "property_container_for_action_target": "invalid",
+    }
     assert contract["start_preconditions"]["forbidden_scope_flags"] == [
         "--object"
     ]
