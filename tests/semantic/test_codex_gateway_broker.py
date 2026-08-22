@@ -7746,13 +7746,22 @@ def test_native_windows_powershell_shim_preserves_public_typed_container_facts(
                 if isinstance(argument, ResponseBinding):
                     argv.append(str(pointer(payloads[argument.step], argument.pointer)))
                     continue
-                if isinstance(argument, DraftTypedActionArgument):
-                    action = dict(argument.expected)
-                    for binding in argument.response_bindings:
-                        action[binding.pointer.removeprefix("/")] = pointer(
-                            payloads[binding.step], binding.response_pointer
-                        )
-                    argv.extend(typed_action_cli_arguments(action))
+                if isinstance(
+                    argument,
+                    (DraftTypedActionArgument, DraftTypedActionBatchArgument),
+                ):
+                    actions = (
+                        argument.actions
+                        if isinstance(argument, DraftTypedActionBatchArgument)
+                        else (argument,)
+                    )
+                    for typed_action in actions:
+                        action = dict(typed_action.expected)
+                        for binding in typed_action.response_bindings:
+                            action[binding.pointer.removeprefix("/")] = pointer(
+                                payloads[binding.step], binding.response_pointer
+                            )
+                        argv.extend(typed_action_cli_arguments(action))
                     continue
                 assert isinstance(argument, str)
                 argv.append(argument)
