@@ -38,7 +38,7 @@
         {
           "index": 1,
           "kind": "request",
-          "prompt": "素材目录是 {rifle_source_directory}，四条素材的有序完整绝对路径是 {rifle_source_files}，依次对应 rifle_close_v2.wav、rifle_tail_v2.wav、rifle_mechanical_v2.wav 和 rifle_distant.wav。请在现有 {rifle_container_path} 中，用前三条新版素材更新 Rifle_Close、Rifle_Tail 和 Rifle_Mechanical；沿用这三个 Sound，不要替换或重建对象，并保持它们的 GUID、父级、音量、Notes、输出总线以及已有 RTPC 不变。{rifle_event_path} 及其 Action 也不要修改。在同一个 Random Container 中新增 Rifle_Distant，只明确设置音量 -12 dB 和输出总线 {rifle_bus_path}，不要为新 Sound 另外设置其他属性或引用。请把三条更新和一条新增合成一次变更，先给我看预览再执行；不要影响名称相近的其他对象。",
+          "prompt": "素材目录是 {rifle_source_directory}，四条素材的有序完整绝对路径是 {rifle_source_files}，依次对应 rifle_close_v2.wav、rifle_tail_v2.wav、rifle_mechanical_v2.wav 和 rifle_distant.wav。请在现有 `{rifle_container_path}` 中，用前三条新版素材更新 Rifle_Close、Rifle_Tail 和 Rifle_Mechanical；沿用这三个 Sound，不要替换或重建对象，并保持它们的 GUID、父级、音量、Notes、输出总线以及已有 RTPC 不变。`{rifle_event_path}` 及其 Action 也不要修改。在同一个 Random Container 中新增 Rifle_Distant，只明确设置音量 -12 dB 和输出总线 `{rifle_bus_path}`，不要为新 Sound 另外设置其他属性或引用。这三个 Wwise 路径都是不透明的完整业务值，请逐字保留其中每个反斜杠分隔符。请把三条更新和一条新增合成一次变更，先给我看预览再执行；不要影响名称相近的其他对象。",
           "confirms_transaction": null,
           "expects_preview_transaction": 1
         },

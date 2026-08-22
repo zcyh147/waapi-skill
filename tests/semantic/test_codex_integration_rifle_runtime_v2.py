@@ -693,6 +693,14 @@ def test_prepares_exact_gateway_checked_use_existing_batch(
         if version == "2022.1"
         else r"\Busses\Default Work Unit\WAAPI_V2_Weapons"
     )
+    prompt = _unit(version).scenario.render_prompt(prepared.visible_values)
+    for name in (
+        "rifle_container_path",
+        "rifle_event_path",
+        "rifle_bus_path",
+    ):
+        assert f"`{prepared.visible_values[name]}`" in prompt
+    assert "逐字保留其中每个反斜杠分隔符" in prompt
     request = _plain(prepared.operation_request)
     assert request["contract"] == "waapi-skill.operation-request/v1"
     assert request["version"] == version
