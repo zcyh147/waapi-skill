@@ -621,6 +621,14 @@ def test_compact_five_query_complete_gateway_stdout_stays_below_32_kib(
     payload = _compact_five_query_gateway_payload(tmp_path)
 
     assert payload["agent_result"]["candidate_count"] == 20
+    assert payload["agent_result"]["mutation_authoring_policy"] == {
+        "action_field_selection": "explicit_user_settings_only",
+        "dependency_candidates": {
+            "required_by_only": "omit_from_action",
+            "independently_requested_exact_token": "may_copy_name_and_type",
+            "activation_owner": "gateway_draft_check_and_preview",
+        },
+    }
     assert len(payload["agent_result"]["dependency_candidates"]) == 5
     assert (
         waapi_gateway.gateway_json_document_size(payload["agent_result"])

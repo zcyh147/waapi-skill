@@ -164,6 +164,16 @@ class MetadataDiscoveryResult:
                 )
                 for item in self.candidates
             ],
+            "mutation_authoring_policy": {
+                "action_field_selection": "explicit_user_settings_only",
+                "dependency_candidates": {
+                    "required_by_only": "omit_from_action",
+                    "independently_requested_exact_token": (
+                        "may_copy_name_and_type"
+                    ),
+                    "activation_owner": "gateway_draft_check_and_preview",
+                },
+            },
             "dependency_candidates": [
                 (
                     dict(item)

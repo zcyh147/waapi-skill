@@ -153,6 +153,7 @@ def test_object_type_discovery_resolves_live_name_and_returns_compact_candidates
         "candidate_count",
         "query_results",
         "candidates",
+        "mutation_authoring_policy",
         "dependency_candidates",
         "dependency_closure_complete",
         "unresolved_dependencies",
