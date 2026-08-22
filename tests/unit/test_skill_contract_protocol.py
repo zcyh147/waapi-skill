@@ -989,7 +989,7 @@ def test_operate_uses_one_bank_scoped_replace_for_a_complete_inclusion_post_stat
 def test_operate_metadata_and_import_prose_only_rules_are_preserved() -> None:
     compact = " ".join(OPERATE.split())
     for phrase in (
-        "one repeated `--query '<ordinary phrase>'` per requested setting",
+        "one repeated `--query '<ordinary phrase>'` per setting",
             "Use the deterministic candidate budget",
         "one or two flags require `--limit 8`",
         "three or four use `--limit 3`",

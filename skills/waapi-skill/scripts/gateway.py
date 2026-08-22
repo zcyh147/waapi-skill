@@ -4389,8 +4389,13 @@ def operation_composer_input_contract(
             "precompute_or_increment_revision": False,
         },
     }
+    public_contract = {
+        key: value
+        for key, value in contract.items()
+        if key != "start_preconditions"
+    }
     return {
-        **contract,
+        **public_contract,
         "start": {
             "subcommand": "draft-start",
             "gateway_argv": ["draft-start", operation],

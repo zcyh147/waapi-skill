@@ -148,7 +148,7 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
         "draft-start",
         "object.create",
     ]
-    metadata_decision = payload["composer"]["start_preconditions"][
+    metadata_decision = payload["composer"]["start"]["preconditions"][
         "next_step_decision"
     ]
     assert metadata_decision == (

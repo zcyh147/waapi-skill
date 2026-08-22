@@ -823,6 +823,10 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
                 "include every distinct prompt-present dynamic property/reference "
                 "token for this operation and scope"
             ),
+            "row_field_inventory": (
+                "include shared and every row-local dynamic property/reference, "
+                "including scalar fields whose values differ by row"
+            ),
             "one_to_eight_queries": "one metadata discover command",
             "split_within_limit": "invalid",
             "successful_complete_scope_result": "do_not_query_that_scope_again",

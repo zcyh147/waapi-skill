@@ -961,7 +961,7 @@ def test_public_object_set_schema_discloses_the_exact_default_container_metadata
     )
 
     assert code == 0, payload
-    exact = payload["composer"]["start_preconditions"][
+    exact = payload["composer"]["start"]["preconditions"][
         "reviewed_default_container_metadata_argv"
     ]
     assert exact["gateway_argv_template"] == [
@@ -1951,13 +1951,18 @@ def test_audio_import_schema_requires_one_complete_metadata_query_batch(
     )
 
     assert exit_code == 0, payload
-    assert payload["composer"]["start_preconditions"][
+    assert "start_preconditions" not in payload["composer"]
+    assert payload["composer"]["start"]["preconditions"][
         "metadata_query_batch"
     ] == {
         "scope": "one exact object, class, or object-type scope",
         "first_request": (
             "include every distinct prompt-present dynamic property/reference "
             "token for this operation and scope"
+        ),
+        "row_field_inventory": (
+            "include shared and every row-local dynamic property/reference, "
+            "including scalar fields whose values differ by row"
         ),
         "one_to_eight_queries": "one metadata discover command",
         "split_within_limit": "invalid",

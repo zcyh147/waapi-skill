@@ -1451,6 +1451,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "selected-branch constant" in instructions
     assert "distinct query per requested token" in instructions
     assert "one first-command batch for every same-scope token" in instructions
+    assert "shared and per-row dynamic fields" in instructions
     assert "never split 1..8" in instructions
     assert "no same-scope repeat after success" in instructions
     assert "enum/const exactly" in instructions
