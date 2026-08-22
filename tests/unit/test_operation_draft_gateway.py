@@ -166,9 +166,8 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
             "set_request_option",
             "clear_request_option",
             "add_target",
-            "inspect",
-            "cancel",
         ],
+        "allowed_lifecycle_commands": ["draft-inspect", "draft-cancel"],
         "check": None,
         "seal": None,
         "agent_control": {

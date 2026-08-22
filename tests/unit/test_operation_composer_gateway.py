@@ -647,7 +647,8 @@ def test_object_set_typed_actions_build_one_target_scalar_fact_offline(
     ]
     assert property_result["draft"]["missing_fields"] == []
     assert property_result["draft"]["missing_fields_status"] == "complete"
-    assert "check" in property_result["draft"]["allowed_actions"]
+    assert "check" not in property_result["draft"]["allowed_actions"]
+    assert "draft-check" in property_result["draft"]["allowed_lifecycle_commands"]
     assert not (tmp_path / "state" / "transactions").exists()
 
 
@@ -2036,7 +2037,8 @@ def test_live_check_is_bounded_durable_and_any_edit_invalidates_it(
     assert checked["draft"]["check"]["status"] == "passed"
     assert checked["draft"]["check"]["source_revision"] == 3
     assert checked["draft"]["check"]["request_digest"]
-    assert "preview-from-draft" in checked["draft"]["allowed_actions"]
+    assert "preview-from-draft" not in checked["draft"]["allowed_actions"]
+    assert "preview-from-draft" in checked["draft"]["allowed_lifecycle_commands"]
     assert "current_facts" not in checked["draft"]
     facts_summary = checked["draft"]["current_facts_summary"]
     assert facts_summary == {
@@ -2112,8 +2114,8 @@ def test_live_check_is_bounded_durable_and_any_edit_invalidates_it(
     assert edit_code == 0
     assert edited["draft"]["revision"] == 5
     assert edited["draft"]["check"] is None
-    assert "preview-from-draft" not in edited["draft"]["allowed_actions"]
-    assert "check" in edited["draft"]["allowed_actions"]
+    assert "preview-from-draft" not in edited["draft"]["allowed_lifecycle_commands"]
+    assert "draft-check" in edited["draft"]["allowed_lifecycle_commands"]
 
 
 def test_live_check_reports_all_invalid_target_rows_without_writing(

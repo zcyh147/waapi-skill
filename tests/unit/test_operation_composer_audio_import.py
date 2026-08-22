@@ -511,6 +511,12 @@ def test_audio_import_draft_start_places_assignment_rule_on_the_row_action(
         "other_rows": "use none unless the user assigns that row",
         "guessing_allowed": False,
     }
+    assert "cancel" not in started["draft"]["allowed_actions"]
+    assert "inspect" not in started["draft"]["allowed_actions"]
+    assert started["draft"]["allowed_lifecycle_commands"] == [
+        "draft-inspect",
+        "draft-cancel",
+    ]
 
 
 def test_base_audio_import_media_row_materializes_existing_canonical_request(
