@@ -455,6 +455,12 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         for step in protocol.steps
         if step.name.startswith("tx01.action.")
     ]
+    assert [
+        len(container.actions)
+        if isinstance(container, DraftTypedActionBatchArgument)
+        else 1
+        for container in import_action_containers
+    ] == [6, 3]
     import_actions = [
         action
         for container in import_action_containers

@@ -779,6 +779,35 @@ def test_powershell_core_probe_rejects_original_reparse_before_launch(
     assert launched == []
 
 
+def test_powershell_core_probe_allows_a_cold_interactive_windows_start(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    executable = tmp_path / "pwsh.exe"
+    executable.write_bytes(b"reviewed-powershell-core")
+    calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    def runner(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append((args, kwargs))
+        return subprocess.CompletedProcess(
+            args=args[0],
+            returncode=0,
+            stdout="Core|7.6.4|Windows",
+            stderr="",
+        )
+
+    monkeypatch.setattr(
+        codex_harness_module,
+        "validate_powershell_core_probe_output",
+        lambda *_args, **_kwargs: _WINDOWS_POWERSHELL_CORE_HOST,
+    )
+    host = probe_windows_powershell_core(executable, runner=runner)
+
+    assert host is _WINDOWS_POWERSHELL_CORE_HOST
+    assert len(calls) == 1
+    assert calls[0][1]["timeout"] == 30.0
+
+
 def test_windows_codex_runtime_path_keeps_broker_shim_first(
     tmp_path: Path,
 ) -> None:
