@@ -1426,11 +1426,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     )
 
     assert "First read SKILL.md once, standalone" in instructions
-    assert (
-        "Get-Content -Raw -Encoding UTF8 "
-        "'.agents\\skills\\waapi-skill\\SKILL.md'"
-    ) in instructions
-    assert "short task-local only" in instructions
+    assert "Get-Content -Raw -Encoding UTF8" not in instructions
     assert "next_command.copy_instruction.source_field" in instructions
     assert "preserve quotes" in instructions
     assert "fixed_argv_prefix" in instructions
@@ -1449,6 +1445,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "selected-branch constant" in instructions
     assert "one distinct query/requested token" in instructions
+    assert "reuse exact visible live tokens" in instructions
     assert "first command batches every same-scope" in instructions
     assert "shared/per-row dynamic field" in instructions
     assert "never split 1..8" in instructions
@@ -1488,7 +1485,7 @@ def test_formal_bootstrap_instructions_bind_one_exact_windows_runner_prefix() ->
         r"'C:\Git_Repos\waapi-skills\skills\waapi-skill\scripts\run.py' "
         "'gateway.py'"
     ) in instructions
-    assert "No next_command: prefix" in instructions
+    assert "No next_command: use only" in instructions
     assert len(instructions.encode("utf-8")) <= 2048
 
 
@@ -1540,6 +1537,8 @@ def test_formal_task_instructions_bind_exact_windows_skill_read_schedule() -> No
         "python '.agents\\skills\\waapi-skill\\scripts\\run.py' "
         "'gateway.py'"
     ) in instructions
+    assert "use only" in instructions
+    assert "never rebuild/shorten it" in instructions
     assert "waapi-skill-workspace\\root" not in instructions
     assert (
         "Get-Content -Raw -Encoding UTF8 "

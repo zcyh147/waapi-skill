@@ -54,7 +54,8 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "ancestor deferred_fact at execute_after=all_pending_ancestor_facts_in_response_"
     "tree_preorder. After choose add required selected-branch constant/value facts. "
     "Top-level facts precede root_dynamic_disclosure; copy_command_by_shape "
-    "verbatim. Metadata: one distinct query/requested token; first command batches "
+    "verbatim. Metadata: reuse exact visible live tokens; otherwise one distinct "
+    "query/requested token; first command batches "
     "every same-scope shared/per-row dynamic field; "
     "never split 1..8; no same-scope "
     "repeat after success. "
@@ -67,9 +68,7 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "shell_tool_timeout_ms. Editable draft-apply continues same turn via "
     "next_phase_decision; no progress reply while editable. "
     "draft-check is not Preview; run next_command before reply unless "
-    "requires_later_user_message. Get-Content -Raw -Encoding UTF8 "
-    "'.agents\\skills\\waapi-skill\\SKILL.md'; short task-local only. No shell cwd "
-    "override."
+    "requires_later_user_message. No shell cwd override."
 )
 
 
@@ -99,9 +98,9 @@ def semantic_skill_bootstrap_developer_instructions(
         )
     return (
         SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
-        + " No next_command: prefix "
+        + " No next_command: use only "
         + command_prefix
-        + "; append disclosed argv only."
+        + "; never rebuild/shorten it; append disclosed argv only."
     )
 
 
