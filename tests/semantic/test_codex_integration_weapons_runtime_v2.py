@@ -27,6 +27,7 @@ from tests.semantic.support.codex_integration_workflows_v2 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     CodexGatewayBroker,
+    DraftTypedActionBatchArgument,
     DraftTypedActionArgument,
     DraftActionQueryIdentityBinding,
     GatewayInvocationError,
@@ -566,12 +567,7 @@ def _typed_action_broker(
     action: str,
     occurrence: int = 0,
 ) -> tuple[CodexGatewayBroker, Any, dict[str, Any]]:
-    def matches_requested_action(step: Any) -> bool:
-        if step.subcommand != "draft-apply" or not isinstance(
-            step.arguments[-1], DraftTypedActionArgument
-        ):
-            return False
-        expected = step.arguments[-1].expected
+    def matches_requested_action(expected: Mapping[str, Any]) -> bool:
         if action == "set_property":
             return bool(expected.get("properties"))
         if action == "set_reference":
@@ -579,29 +575,13 @@ def _typed_action_broker(
         return expected.get("action") == action
 
     matches = [
-        step
+        (step, argument)
         for step in prepared.protocol.steps
-        if matches_requested_action(step)
+        if step.subcommand == "draft-apply"
+        for argument in _draft_action_members(step)
+        if matches_requested_action(argument.expected)
     ]
-    step = matches[occurrence]
-    argument = step.arguments[-1]
-    assert isinstance(argument, DraftTypedActionArgument)
-    handles = [f"odh1-{index:024x}" for index in range(1, 4)]
-    current_facts = [
-        {"handle": handle, "selector": {"kind": "id", "value": _guid(str(index))}}
-        for index, handle in enumerate(handles, start=1)
-    ]
-    add_target_steps = [
-        candidate
-        for candidate in prepared.protocol.steps
-        if candidate.subcommand == "draft-apply"
-        and isinstance(candidate.arguments[-1], DraftTypedActionArgument)
-        and candidate.arguments[-1].expected.get("action") == "add_target"
-    ]
-    handle_by_step = {
-        candidate.name: handle
-        for candidate, handle in zip(add_target_steps, handles, strict=True)
-    }
+    step, argument = matches[occurrence]
     start = next(
         candidate
         for candidate in prepared.protocol.steps
@@ -624,52 +604,50 @@ def _typed_action_broker(
             "current_facts": [],
         },
     }
-    for expected in step.arguments:
-        if not isinstance(expected, ResponseBinding) or expected.step == start.name:
-            continue
-        broker._payloads_by_step[expected.step] = {  # noqa: SLF001
-            "draft": {"revision": 99, "current_facts": current_facts}
-        }
-    for binding in argument.response_bindings:
-        broker._payloads_by_step[binding.step] = {  # noqa: SLF001
-            "draft": {
-                "revision": 99,
-                "action_result": {
-                    "created_handles": [handle_by_step[binding.step]],
-                },
+    for member in _draft_action_members(step):
+        for binding in member.query_identity_bindings:
+            source_step = next(
+                candidate
+                for candidate in prepared.protocol.steps
+                if candidate.name == binding.step
+            )
+            target = member.expected["references"][0]["target"]
+            broker._payloads_by_step[binding.step] = {  # noqa: SLF001
+                "ok": True,
+                "command": "query-object",
+                "count": 1,
+                "objects": [
+                    {
+                        "id": source_step.arguments[1],
+                        "name": "Weapons_Bus",
+                        "type": "Bus",
+                        "path": target["value"],
+                    }
+                ],
             }
-        }
     supplied_action = copy.deepcopy(dict(argument.expected))
-    for binding in argument.response_bindings:
-        supplied_action[binding.pointer.removeprefix("/")] = handle_by_step[
-            binding.step
-        ]
-    for binding in argument.query_identity_bindings:
-        source_step = next(
-            candidate
-            for candidate in prepared.protocol.steps
-            if candidate.name == binding.step
-        )
-        broker._payloads_by_step[binding.step] = {  # noqa: SLF001
-            "ok": True,
-            "command": "query-object",
-            "count": 1,
-            "objects": [
-                {
-                    "id": source_step.arguments[1],
-                    "name": "Weapons_Bus",
-                    "type": "Bus",
-                    "path": supplied_action["references"][0]["target"]["value"],
-                }
-            ],
-        }
     return broker, step, supplied_action
+
+
+def _draft_action_members(step: Any) -> tuple[DraftTypedActionArgument, ...]:
+    argument = step.arguments[-1]
+    if isinstance(argument, DraftTypedActionArgument):
+        return (argument,)
+    if isinstance(argument, DraftTypedActionBatchArgument):
+        return argument.actions
+    return ()
 
 
 def _typed_action_argv(step: Any, action: Mapping[str, Any]) -> tuple[str, ...]:
     revision_binding = step.arguments[4]
     assert isinstance(revision_binding, ResponseBinding)
     revision = "1" if revision_binding.step.endswith(".draft-start") else "99"
+    actual_actions = []
+    for member in _draft_action_members(step):
+        actual = copy.deepcopy(dict(member.expected))
+        if actual.get("selector") == action.get("selector"):
+            actual = copy.deepcopy(dict(action))
+        actual_actions.append(actual)
     return (
         step.subcommand,
         "od1-" + "2" * 32,
@@ -679,7 +657,11 @@ def _typed_action_argv(step: Any, action: Mapping[str, Any]) -> tuple[str, ...]:
         revision,
         "--compact",
         "--facts",
-        *typed_action_cli_arguments(action),
+        *tuple(
+            token
+            for actual in actual_actions
+            for token in typed_action_cli_arguments(actual)
+        ),
     )
 
 
@@ -706,26 +688,12 @@ def _observe(
     if reverse_output_bus_pair:
         steps[1:3] = reversed(steps[1:3])
     if add_all_targets_before_fields:
-        action_indexes = [
-            index
-            for index, step in enumerate(steps)
+        assert all(
+            member.expected.get("action") == "add_target"
+            for step in steps
             if step.subcommand == "draft-apply"
-        ]
-        action_steps = [steps[index] for index in action_indexes]
-        reordered = [
-            *(
-                step
-                for step in action_steps
-                if step.arguments[-1].expected.get("action") == "add_target"
-            ),
-            *(
-                step
-                for step in action_steps
-                if step.arguments[-1].expected.get("action") != "add_target"
-            ),
-        ]
-        for index, step in zip(action_indexes, reordered, strict=True):
-            steps[index] = step
+            for member in _draft_action_members(step)
+        )
     for step in steps:
         if step.name == "tx01.execute" and apply:
             fake.apply_set(prepared.operation_request)
@@ -764,7 +732,7 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
         "tx01.operation-schema",
         "tx01.draft-start",
     )
-    assert prepared.protocol.turn_prefix_counts == (3, 13, 17)
+    assert prepared.protocol.turn_prefix_counts == (3, 11, 15)
     assert prepared.protocol.commutative_read_only_step_groups == (
         (
             "relationship.output_bus.01",
@@ -775,11 +743,12 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
     assert deserialize_protocol(serialized) == prepared.protocol
     tampered = copy.deepcopy(serialized)
     identity_bound_argument = next(
-        argument
+        action
         for step in tampered["steps"]
         for argument in step["arguments"]
-        if argument.get("kind") == "draft_typed_action"
-        and argument.get("query_identity_bindings")
+        if argument.get("kind") == "draft_typed_action_batch"
+        for action in argument["actions"]
+        if action.get("query_identity_bindings")
     )
     identity_bound_argument["query_identity_bindings"][0]["step"] = (
         "missing.output.bus.query"
@@ -789,7 +758,7 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
         match="pre-Draft query-object response",
     ):
         deserialize_protocol(tampered)
-    composer_steps = prepared.protocol.steps[7:13]
+    composer_steps = prepared.protocol.steps[7:11]
     assert composer_steps[0].subcommand == "draft-start"
     assert [step.subcommand for step in composer_steps[-2:]] == [
         "draft-check",
@@ -798,15 +767,13 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
     action_steps = [
         step for step in composer_steps if step.subcommand == "draft-apply"
     ]
-    assert len(action_steps) == 3
-    assert all(
-        isinstance(step.arguments[-1], DraftTypedActionArgument)
-        for step in action_steps
-    )
+    assert len(action_steps) == 1
+    assert isinstance(action_steps[0].arguments[-1], DraftTypedActionBatchArgument)
     reference_actions = [
-        step.arguments[-1]
+        argument
         for step in action_steps
-        if step.arguments[-1].expected.get("references")
+        for argument in _draft_action_members(step)
+        if argument.expected.get("references")
     ]
     assert len(reference_actions) == 2
     assert all(
@@ -926,7 +893,7 @@ def test_weapons_fast_path_keeps_canonical_volume_and_rejects_query_accessor(
     broker._validate_step(step, _typed_action_argv(step, action))  # noqa: SLF001
 
     action["properties"][0]["name"] = "@Volume"
-    with pytest.raises(GatewayInvocationError, match="typed Draft action"):
+    with pytest.raises(GatewayInvocationError, match="typed Draft (?:action|batch)"):
         broker._validate_step(  # noqa: SLF001
             step,
             _typed_action_argv(step, action),
@@ -940,11 +907,11 @@ def test_composer_repeats_the_exact_reviewed_output_bus_path(
 ) -> None:
     prepared, _fake, _runtime = _prepared(tmp_path, version=version)
     references = [
-        step.arguments[-1].expected["references"][0]
+        argument.expected["references"][0]
         for step in prepared.protocol.steps
         if step.subcommand == "draft-apply"
-        and isinstance(step.arguments[-1], DraftTypedActionArgument)
-        and step.arguments[-1].expected.get("references")
+        for argument in _draft_action_members(step)
+        if argument.expected.get("references")
     ]
 
     assert len(references) == 2
@@ -966,7 +933,11 @@ def test_composer_repeats_the_exact_reviewed_output_bus_path(
             occurrence=occurrence,
         )
         broker._validate_step(step, _typed_action_argv(step, action))  # noqa: SLF001
-        binding = step.arguments[-1].query_identity_bindings[0]
+        binding = next(
+            argument.query_identity_bindings[0]
+            for argument in _draft_action_members(step)
+            if argument.expected.get("selector") == action.get("selector")
+        )
         source_step = next(
             candidate
             for candidate in prepared.protocol.steps
@@ -1010,38 +981,16 @@ def test_compact_draft_replay_accepts_only_the_exact_queried_bus_guid(
     }
 
     composition = new_composition("object.set", version)
-    handle_by_step: dict[str, str] = {}
-    handle_index = 0
-    revision = 1
     canonical_action_steps = [
         step for step in prepared.protocol.steps if step.subcommand == "draft-apply"
     ]
-    action_steps = [
-        *(
-            step
-            for step in canonical_action_steps
-            if step.arguments[-1].expected.get("action") == "add_target"
-        ),
-        *(
-            step
-            for step in canonical_action_steps
-            if step.arguments[-1].expected.get("action") != "add_target"
-        ),
-    ]
-    first_action_index = broker._execution_steps.index(  # noqa: SLF001
-        canonical_action_steps[0]
-    )
-    broker._execution_steps[  # noqa: SLF001
-        first_action_index : first_action_index + len(action_steps)
-    ] = action_steps
-    for action_step in action_steps:
-        argument = action_step.arguments[-1]
-        assert isinstance(argument, DraftTypedActionArgument)
+    assert len(canonical_action_steps) == 1
+    action_step = canonical_action_steps[0]
+    action_members = _draft_action_members(action_step)
+    assert len(action_members) == 3
+    created_handles: list[str] = []
+    for index, argument in enumerate(action_members, start=1):
         actual_action = copy.deepcopy(dict(argument.expected))
-        for binding in argument.response_bindings:
-            actual_action[binding.pointer.removeprefix("/")] = handle_by_step[
-                binding.step
-            ]
         for binding in argument.query_identity_bindings:
             source_step = next(
                 step for step in prepared.protocol.steps if step.name == binding.step
@@ -1049,118 +998,98 @@ def test_compact_draft_replay_accepts_only_the_exact_queried_bus_guid(
             _set_action_pointer(
                 actual_action,
                 binding.pointer,
-                {
-                    "kind": "id",
-                    "value": str(source_step.arguments[1]),
-                },
+                {"kind": "id", "value": str(source_step.arguments[1])},
             )
-
-        created_handle: str | None = None
-        if actual_action["action"] == "add_target":
-            handle_index += 1
-            created_handle = f"odh1-{handle_index:024x}"
-
-        def create_handle() -> str:
-            assert created_handle is not None
-            return created_handle
-
-        composition, action_name = apply_composer_action(
+        created_handle = f"odh1-{index:024x}"
+        composition, _action_name = apply_composer_action(
             "object.set",
             version,
             composition,
             actual_action,
-            handle_factory=create_handle,
+            handle_factory=lambda value=created_handle: value,
         )
-        created_handles = [created_handle] if created_handle is not None else []
-        if created_handle is not None:
-            handle_by_step[action_step.name] = created_handle
-        facts = composition_projection(
-            "object.set",
-            version,
-            composition,
-        )["current_facts"]
-        revision += 1
-        completion_argv = [
-            "python",
-            "/owned/run.py",
-            "gateway.py",
-            "draft-check",
-            "od1-" + "2" * 32,
-            "--task-authority",
-            "da1-" + "1" * 40,
-            "--expected-revision",
-            str(revision),
-        ]
-        broker._payloads_by_step[action_step.name] = {  # noqa: SLF001
-            "draft": {
-                "draft_id": "od1-" + "2" * 32,
-                "revision": revision,
-                "action_result": {
-                    "contract": "waapi-skill.operation-draft-action-result/v1",
-                    "action": action_name,
-                    "created_handles": created_handles,
-                    "affected_handles": sorted(
-                        value
-                        for key, value in actual_action.items()
-                        if key.endswith("_handle") and isinstance(value, str)
+        created_handles.append(created_handle)
+    facts = composition_projection(
+        "object.set",
+        version,
+        composition,
+    )["current_facts"]
+    completion_argv = [
+        "python",
+        "/owned/run.py",
+        "gateway.py",
+        "draft-check",
+        "od1-" + "2" * 32,
+        "--task-authority",
+        "da1-" + "1" * 40,
+        "--expected-revision",
+        "4",
+    ]
+    broker._payloads_by_step[action_step.name] = {  # noqa: SLF001
+        "draft": {
+            "draft_id": "od1-" + "2" * 32,
+            "revision": 4,
+            "action_result": {
+                "contract": "waapi-skill.operation-draft-action-result/v1",
+                "action": "batch",
+                "last_action": "add_target",
+                "action_count": 3,
+                "applied_atomically": True,
+                "created_handles": created_handles,
+                "affected_handles": [],
+            },
+            "current_facts_summary": {
+                "contract": "waapi-skill.operation-draft-facts-summary/v1",
+                "target_count": len(facts),
+                "handle_count": len(
+                    {
+                        row["handle"]
+                        for row in facts
+                        if isinstance(row, Mapping) and "handle" in row
+                    }
+                ),
+                "canonical_sha256": canonical_sha256(facts),
+            },
+            "next_action_binding": {
+                "shell_tool_timeout_ms": 30_000,
+                "completion_candidate": {
+                    "condition": (
+                        "all_current_business_request_facts_and_"
+                        "disclosures_submitted"
+                    ),
+                    "business_completion_check": {
+                        "source": "current_user_business_request",
+                        "schema_required_fields_complete_is_insufficient": True,
+                        "all_user_present_optional_map_and_constant_facts_required": True,
+                        "exact_values_and_object_types_required": True,
+                    },
+                    "is_next_command_when_condition_true": True,
+                    "fixed_argv_prefix": completion_argv,
+                    "copy_exactly": True,
+                    "copy_instruction": {
+                        "contract": (
+                            "waapi-skill.operation-draft-command-copy-instruction/v1"
+                        ),
+                        "source_field": "copy_command",
+                        "action": "execute_verbatim_as_one_shell_tool_call",
+                        "forbidden_transformations": [
+                            "reconstruct",
+                            "shorten",
+                            "normalize",
+                            "substitute_path_segments",
+                            "select_another_field",
+                        ],
+                    },
+                    "copy_command": shlex.join(completion_argv),
+                    "allowed_suffix_source": "request_schema_terminal_arguments_only",
+                    "draft_apply_action_check": "invalid",
+                    "when_condition_false": (
+                        "continue_with_one_atomic_typed_action_batch_or_dynamic_disclosure"
                     ),
                 },
-                    "current_facts_summary": {
-                    "contract": "waapi-skill.operation-draft-facts-summary/v1",
-                    "target_count": len(facts),
-                    "handle_count": len(
-                        {
-                            row["handle"]
-                            for row in facts
-                            if isinstance(row, Mapping) and "handle" in row
-                        }
-                    ),
-                        "canonical_sha256": canonical_sha256(facts),
-                    },
-                    "next_action_binding": {
-                        "shell_tool_timeout_ms": 30_000,
-                        "completion_candidate": {
-                            "condition": (
-                                "all_current_business_request_facts_and_"
-                                "disclosures_submitted"
-                            ),
-                            "business_completion_check": {
-                                "source": "current_user_business_request",
-                                "schema_required_fields_complete_is_insufficient": True,
-                                "all_user_present_optional_map_and_constant_facts_required": True,
-                                "exact_values_and_object_types_required": True,
-                            },
-                            "is_next_command_when_condition_true": True,
-                            "fixed_argv_prefix": completion_argv,
-                            "copy_exactly": True,
-                            "copy_instruction": {
-                                "contract": (
-                                    "waapi-skill.operation-draft-command-copy-instruction/v1"
-                                ),
-                                "source_field": "copy_command",
-                                "action": (
-                                    "execute_verbatim_as_one_shell_tool_call"
-                                ),
-                                "forbidden_transformations": [
-                                    "reconstruct",
-                                    "shorten",
-                                    "normalize",
-                                    "substitute_path_segments",
-                                    "select_another_field",
-                                ],
-                            },
-                            "copy_command": shlex.join(completion_argv),
-                            "allowed_suffix_source": (
-                                "request_schema_terminal_arguments_only"
-                            ),
-                            "draft_apply_action_check": "invalid",
-                            "when_condition_false": (
-                                "continue_with_one_atomic_typed_action_batch_or_dynamic_disclosure"
-                            ),
-                        },
-                    },
-                }
-            }
+            },
+        }
+    }
 
     preview = next(
         step
@@ -1223,7 +1152,11 @@ def test_composer_rejects_wrong_output_bus_guid_or_path(
         action="set_reference",
         occurrence=reference_index,
     )
-    binding = step.arguments[-1].query_identity_bindings[0]
+    binding = next(
+        argument.query_identity_bindings[0]
+        for argument in _draft_action_members(step)
+        if argument.expected.get("selector") == action.get("selector")
+    )
     target = action["references"][0]["target"]
     if wrong_identity == "guid":
         _set_action_pointer(
@@ -1234,7 +1167,7 @@ def test_composer_rejects_wrong_output_bus_guid_or_path(
     else:
         target["value"] += "_Wrong"
 
-    with pytest.raises(GatewayInvocationError, match="typed Draft action"):
+    with pytest.raises(GatewayInvocationError, match="typed Draft (?:action|batch)"):
         broker._validate_step(  # noqa: SLF001
             step,
             _typed_action_argv(step, action),

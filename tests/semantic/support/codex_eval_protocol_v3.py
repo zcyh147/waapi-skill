@@ -311,11 +311,7 @@ def build_object_set_composer_transaction_steps(
             )
             if parent_index is not None and parent_index not in available_parent_actions:
                 break
-            if identity_bindings and batch_rows:
-                break
             batch_rows.append((offset + 1, action, identity_bindings))
-            if identity_bindings:
-                break
         if not batch_rows:
             raise V3ProtocolError("object.set Composer child parent is unavailable")
 
@@ -2162,6 +2158,7 @@ def build_metadata_transaction_protocol(
     requests: Sequence[Mapping[str, Any]],
     *,
     object_type: str,
+    object_identity: str | None = None,
     metadata_queries: Sequence[str],
     required_tokens: Sequence[str],
     expected_required_token_projection: (
@@ -2241,6 +2238,16 @@ def build_metadata_transaction_protocol(
         raise V3ProtocolError(
             "metadata-bound transaction protocol requires one bounded exact object type"
         )
+    if object_identity is not None and (
+        not isinstance(object_identity, str)
+        or not object_identity
+        or object_identity != object_identity.strip()
+        or len(object_identity) > 4096
+        or any(ord(character) < 32 or ord(character) == 127 for character in object_identity)
+    ):
+        raise V3ProtocolError(
+            "metadata-bound transaction object identity must be bounded"
+        )
     if isinstance(metadata_queries, (str, bytes)):
         queries: tuple[Any, ...] = ()
     else:
@@ -2307,8 +2314,8 @@ def build_metadata_transaction_protocol(
     metadata_step_name = "metadata.discover"
     metadata_arguments: list[Any] = [
         "discover",
-        "--object-type",
-        object_type,
+        "--object" if object_identity is not None else "--object-type",
+        object_identity if object_identity is not None else object_type,
     ]
     for query in queries:
         metadata_arguments.extend(

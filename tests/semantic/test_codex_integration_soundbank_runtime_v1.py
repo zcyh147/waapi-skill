@@ -259,6 +259,7 @@ def test_harbor_runtime_materializes_closed_dual_platform_workflow_and_cleans(
     )
     assert prepared.visible_values["soundbank_io_root"] in prepared.prompt
     assert prepared.visible_values["soundbank_output_directory"] in prepared.prompt
+    assert "发布语言只选择 SFX，不要省略这个语言范围" in prepared.prompt
     assert tuple(row.api for row in prepared.expected_dispatches) == (
         SET_INCLUSIONS_API,
         GENERATE_API,

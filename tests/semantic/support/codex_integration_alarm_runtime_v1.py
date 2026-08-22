@@ -25,11 +25,12 @@ from typing import Any, Protocol
 from tests.semantic.support.codex_eval_protocol_v3 import (
     OPERATION_REQUEST_CONTRACT,
     V3GatewayProtocol,
-    build_transaction_protocol,
+    build_metadata_transaction_protocol,
 )
 from tests.semantic.support.codex_gateway_broker import (
     ExactArgumentAlternatives,
     ExpectedGatewayStep,
+    MetadataTokenProjection,
     ResponseBinding,
     ResponseBindingOrExactArgument,
 )
@@ -1148,7 +1149,33 @@ def _alarm_protocol(
             fields=_DIAGNOSTIC_BUS_FIELDS,
         ),
     )
-    transaction = build_transaction_protocol((operation_request,))
+    request_arguments = operation_request.get("arguments")
+    object_selector = (
+        request_arguments.get("object")
+        if isinstance(request_arguments, Mapping)
+        else None
+    )
+    object_identity = (
+        object_selector.get("value")
+        if isinstance(object_selector, Mapping)
+        and object_selector.get("kind") == "id"
+        else None
+    )
+    if not isinstance(object_identity, str) or not object_identity:
+        raise AlarmIntegrationRuntimeError(
+            "Alarm transaction metadata lacks its exact Sound identity"
+        )
+    transaction = build_metadata_transaction_protocol(
+        (operation_request,),
+        object_type="Sound",
+        object_identity=object_identity,
+        metadata_queries=("output bus",),
+        required_tokens=("OutputBus",),
+        expected_required_token_projection=(
+            MetadataTokenProjection("OutputBus", "reference", ""),
+        ),
+        schema_first=True,
+    )
     steps = (*diagnostic_steps, *transaction.steps)
     diagnostic_count = len(diagnostic_steps)
     return V3GatewayProtocol(

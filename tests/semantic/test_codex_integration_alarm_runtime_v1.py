@@ -28,8 +28,10 @@ from tests.semantic.support.codex_integration_workflows_v1 import (
     load_integration_workflows_profile,
 )
 from tests.semantic.support.codex_gateway_broker import (
+    DraftActionMetadataBinding,
     ExactArgumentAlternatives,
     InlineTypedOperationArgument,
+    MetadataTokenProjection,
     ResponseBinding,
     ResponseBindingOrExactArgument,
 )
@@ -444,7 +446,7 @@ def test_protocol_exposes_six_exact_chain_reads_then_one_standard_transaction(
     prepared, _fake = _prepared(tmp_path)
     protocol = prepared.protocol
 
-    assert protocol.turn_prefix_counts == (6, 8, 12)
+    assert protocol.turn_prefix_counts == (6, 9, 13)
     assert tuple(step.name for step in protocol.steps[:6]) == (
         "diag.event",
         "diag.action",
@@ -504,11 +506,33 @@ def test_protocol_exposes_six_exact_chain_reads_then_one_standard_transaction(
     )
     assert tuple(step.subcommand for step in protocol.steps[6:]) == (
         "operation-schema",
+        "metadata",
         "typed-operation",
         "transaction-show",
         "confirm",
         "execute",
         "verify",
+    )
+    metadata = protocol.steps[7]
+    sound_id = prepared.before_snapshot.by_key()["sound"].object_id
+    assert metadata.arguments == (
+        "discover",
+        "--object",
+        sound_id,
+        "--query",
+        metadata.arguments[4],
+        "--limit",
+        "8",
+    )
+    assert metadata.arguments[4].label == "output bus"
+    preview = protocol.steps[8]
+    assert preview.metadata_binding == DraftActionMetadataBinding(
+        step="metadata.discover",
+        object_type="Sound",
+        required_tokens=("OutputBus",),
+        expected_projection=(
+            MetadataTokenProjection("OutputBus", "reference", ""),
+        ),
     )
     assert [row.api for row in prepared.expected_dispatches] == [
         "ak.wwise.core.object.setReference",

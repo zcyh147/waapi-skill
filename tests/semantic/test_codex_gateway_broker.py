@@ -42,6 +42,7 @@ from .support.codex_gateway_broker import (  # pyright: ignore[reportMissingImpo
     GatewayDerivedReferenceActivationAllowance,
     GatewayBrokerError,
     GatewayInvocationError,
+    InlineTypedOperationArgument,
     MetadataBoundJsonArgument,
     MetadataQueryArgument,
     MetadataTokenProjection,
@@ -90,6 +91,7 @@ from wwise_waapi.platform_commands import (
     encode_windows_powershell_argv,
 )
 from wwise_waapi.typed_requests import request_contract
+from wwise_waapi.typed_operations import inline_operation_cli_arguments
 
 
 FAKE_ARTIFACT_HASH = "a" * 64
@@ -963,6 +965,89 @@ def test_broker_projection_accepts_compact_default_metadata_rows() -> None:
     )
     with pytest.raises(ValueError, match="only live references"):
         MetadataTokenProjection("Volume", "property", "")
+
+
+def test_inline_operation_metadata_binding_accepts_exact_object_scope(
+    tmp_path: Path,
+) -> None:
+    object_id = "{11111111-1111-1111-1111-111111111111}"
+    metadata = ExpectedGatewayStep(
+        "metadata.discover",
+        "metadata",
+        (
+            "discover",
+            "--object",
+            object_id,
+            "--query",
+            MetadataQueryArgument("output bus"),
+            "--limit",
+            "8",
+        ),
+    )
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.setReference",
+        "arguments": {
+            "object": {"kind": "id", "value": object_id},
+            "reference": "OutputBus",
+            "target": {
+                "kind": "id",
+                "value": "{22222222-2222-2222-2222-222222222222}",
+            },
+        },
+    }
+    inline_argv = inline_operation_cli_arguments(request)
+    preview = ExpectedGatewayStep(
+        "tx01.preview",
+        "typed-operation",
+        (
+            inline_argv[0],
+            InlineTypedOperationArgument(
+                request,
+                operation="object.setReference",
+            ),
+        ),
+        metadata_binding=DraftActionMetadataBinding(
+            step=metadata.name,
+            object_type="Sound",
+            required_tokens=("OutputBus",),
+            expected_projection=(
+                MetadataTokenProjection("OutputBus", "reference", ""),
+            ),
+        ),
+    )
+    broker = CodexGatewayBroker(
+        skill_source=make_fake_skill(tmp_path),
+        expected_steps=(metadata, preview),
+        expected_wwise_version="2022.1",
+    )
+    payload = _metadata_discovery_payload(
+        object_type="Sound",
+        candidate_names=("OutputBus",),
+        dependency_names=(),
+    )
+    agent_result = payload["agent_result"]
+    assert isinstance(agent_result, dict)
+    agent_result["scope"] = {"kind": "object", "object": object_id}
+    broker._payloads_by_step[metadata.name] = payload  # noqa: SLF001
+
+    broker._validate_step(  # noqa: SLF001
+        preview,
+        ("typed-operation", *inline_argv),
+    )
+
+    agent_result["scope"]["object"] = (
+        "{33333333-3333-3333-3333-333333333333}"
+    )
+    with pytest.raises(
+        GatewayInvocationError,
+        match="exact configured live object scope",
+    ):
+        broker._validate_step(  # noqa: SLF001
+            preview,
+            ("typed-operation", *inline_argv),
+        )
 
 
 def test_broker_projection_rejects_legacy_full_contract_as_compact() -> None:
@@ -2616,6 +2701,219 @@ def test_object_set_protocol_batches_independent_targets_through_public_gateway(
     draft = payloads[action_steps[0].name]["draft"]
     assert isinstance(draft, Mapping)
     assert draft["revision"] == 4
+
+
+def test_object_set_protocol_batches_query_bound_targets_as_one_revision(
+    tmp_path: Path,
+) -> None:
+    bus_id = "{11111111-1111-1111-1111-111111111111}"
+    bus_path = r"\Master-Mixer Hierarchy\Default Work Unit\Weapons"
+    query = ExpectedGatewayStep(
+        "relationship.output_bus",
+        "query-object",
+        (
+            "--object-id",
+            bus_id,
+            "--return-field",
+            "id",
+            "--return-field",
+            "name",
+            "--return-field",
+            "type",
+            "--return-field",
+            "path",
+        ),
+    )
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.set",
+        "arguments": {
+            "objects": [
+                {
+                    "object": {
+                        "kind": "path",
+                        "value": rf"\Root\Target{index}",
+                    },
+                    "references": [
+                        {
+                            "name": "OutputBus",
+                            "target": {"kind": "path", "value": bus_path},
+                        }
+                    ],
+                }
+                for index in range(3)
+            ]
+        },
+    }
+    transaction_steps = build_object_set_composer_transaction_steps(
+        request,
+        label="tx01",
+        reference_identity_sources={bus_path: query.name},
+    )
+    start = next(
+        step for step in transaction_steps if step.subcommand == "draft-start"
+    )
+    action = next(
+        step for step in transaction_steps if step.subcommand == "draft-apply"
+    )
+    batch = action.arguments[-1]
+    assert isinstance(batch, DraftTypedActionBatchArgument)
+    broker = CodexGatewayBroker(
+        skill_source=make_fake_skill(tmp_path),
+        expected_steps=(query, *transaction_steps),
+        expected_wwise_version="2022.1",
+    )
+    draft_id = "od1-" + "1" * 32
+    authority = "da1-" + "2" * 40
+    broker._payloads_by_step[query.name] = {  # noqa: SLF001
+        "ok": True,
+        "command": "query-object",
+        "count": 1,
+        "objects": [
+            {
+                "id": bus_id,
+                "name": "Weapons",
+                "type": "Bus",
+                "path": bus_path,
+            }
+        ],
+    }
+    broker._payloads_by_step[start.name] = {  # noqa: SLF001
+        "task_authority": authority,
+        "draft": {"draft_id": draft_id, "revision": 1},
+    }
+    actual_actions = []
+    for expected in batch.actions:
+        actual = json.loads(json.dumps(expected.expected))
+        actual["references"][0]["target"] = {"kind": "id", "value": bus_id}
+        actual_actions.append(actual)
+    argv = (
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--compact",
+        "--facts",
+        *tuple(
+            token
+            for actual in actual_actions
+            for token in typed_action_cli_arguments(actual)
+        ),
+    )
+
+    broker._validate_step(action, argv)  # noqa: SLF001
+
+    broker._payloads_by_step[start.name] = {  # noqa: SLF001
+        "task_authority": authority,
+        "draft": {"draft_id": draft_id, "revision": 1},
+    }
+    broker._validate_operation_draft_payload(  # noqa: SLF001
+        action,
+        {
+            "draft": {
+                "draft_id": draft_id,
+                "revision": 4,
+                "lifecycle_state": "editable",
+                "binding": {"operation": "object.set", "version": "2022.1"},
+            },
+        },
+    )
+
+
+def test_generic_typed_draft_batch_compares_number_values_semantically(
+    tmp_path: Path,
+) -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.setRTPC",
+        "arguments": {
+            "object": {"kind": "path", "value": r"\Root\Rain"},
+            "property": "Volume",
+            "control_input": {
+                "kind": "path",
+                "value": r"\Game Parameters\Rain",
+            },
+            "points": [{"x": 0.0, "y": -48.0, "shape": "Linear"}],
+            "mode": "add_or_replace",
+        },
+    }
+    protocol = build_transaction_protocol((request,))
+    start = next(step for step in protocol.steps if step.subcommand == "draft-start")
+    disclosure = next(
+        step for step in protocol.steps if step.subcommand == "request-array-item"
+    )
+    action = next(
+        step for step in protocol.steps if step.name == "tx01.action.003"
+    )
+    batch = action.arguments[-1]
+    assert isinstance(batch, DraftTypedActionBatchArgument)
+    broker = CodexGatewayBroker(
+        skill_source=make_fake_skill(tmp_path),
+        expected_steps=protocol.steps,
+        expected_wwise_version="2022.1",
+    )
+    draft_id = "od1-" + "1" * 32
+    authority = "da1-" + "2" * 40
+    child_handle = "trm1-" + "3" * 24
+    broker._payloads_by_step[start.name] = {  # noqa: SLF001
+        "task_authority": authority,
+        "draft": {"draft_id": draft_id, "revision": 1},
+    }
+    broker._payloads_by_step["tx01.action.002"] = {  # noqa: SLF001
+        "draft": {"draft_id": draft_id, "revision": 9},
+    }
+    broker._payloads_by_step[disclosure.name] = {  # noqa: SLF001
+        "handle": child_handle,
+    }
+
+    actual_actions = []
+    for expected in batch.actions:
+        actual = json.loads(json.dumps(expected.expected))
+        for binding in expected.response_bindings:
+            actual[binding.pointer.removeprefix("/")] = child_handle
+        if actual.get("value_type") == "number":
+            actual["value"] = str(int(float(actual["value"])))
+        actual_actions.append(actual)
+    argv = (
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "9",
+        "--compact",
+        "--facts",
+        *tuple(
+            token
+            for actual in actual_actions
+            for token in typed_action_cli_arguments(actual)
+        ),
+    )
+
+    broker._validate_step(action, argv)  # noqa: SLF001
+
+    wrong_actions = json.loads(json.dumps(actual_actions))
+    next(
+        item
+        for item in wrong_actions
+        if item.get("value_type") == "number" and item.get("key") == "y"
+    )["value"] = "-47"
+    wrong_argv = (
+        *argv[:8],
+        *tuple(
+            token
+            for actual in wrong_actions
+            for token in typed_action_cli_arguments(actual)
+        ),
+    )
+    with pytest.raises(GatewayInvocationError, match="typed Draft batch"):
+        broker._validate_step(action, wrong_argv)  # noqa: SLF001
+
+
 def test_numbered_draft_actions_follow_handle_dependencies_not_fixture_order(
     tmp_path: Path,
 ) -> None:
@@ -3183,6 +3481,100 @@ def test_audio_import_typed_action_treats_named_field_order_as_semantic(
     wrong_value[wrong_value.index("-4")] = "-5"
     with pytest.raises(GatewayInvocationError, match="typed Draft action"):
         broker._validate_step(action, tuple(wrong_value))  # noqa: SLF001
+
+    expected = action.arguments[-1]
+    assert isinstance(expected, DraftTypedActionArgument)
+    extra_action = (
+        *reordered_named_fields,
+        *typed_action_cli_arguments(expected.expected),
+    )
+    with pytest.raises(GatewayInvocationError, match="typed Draft action count"):
+        broker._validate_step(action, extra_action)  # noqa: SLF001
+
+
+def test_audio_import_typed_action_batch_treats_named_field_order_as_semantic(
+    tmp_path: Path,
+) -> None:
+    imports = []
+    for name in ("Rain", "Wind"):
+        imports.append(
+            {
+                "object_path": (
+                    rf"\Actor-Mixer Hierarchy\Default Work Unit\Weather\{name}"
+                ),
+                "object_type": "Sound SFX",
+                "audio_file": native_absolute_test_path(
+                    "inputs",
+                    f"{name.casefold()}.wav",
+                ),
+                "import_language": "SFX",
+                "properties": [
+                    {"name": "IsLoopingEnabled", "value": True},
+                    {"name": "Volume", "value": -4.0},
+                ],
+                "references": [
+                    {
+                        "name": "OutputBus",
+                        "target": {
+                            "kind": "path",
+                            "value": (
+                                r"\Master-Mixer Hierarchy\Default Work Unit"
+                                r"\Weather"
+                            ),
+                        },
+                    }
+                ],
+            }
+        )
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "imports": imports,
+            "import_operation": "createNew",
+        },
+    }
+    steps = build_audio_import_composer_transaction_steps(request, label="tx01")
+    start = next(step for step in steps if step.name == "tx01.draft-start")
+    action = next(step for step in steps if step.name == "tx01.action.001")
+    batch = action.arguments[-1]
+    assert isinstance(batch, DraftTypedActionBatchArgument)
+    broker = CodexGatewayBroker(
+        skill_source=make_fake_skill(tmp_path),
+        expected_steps=steps,
+        expected_wwise_version="2022.1",
+    )
+    draft_id = "od1-" + "1" * 32
+    authority = "da1-" + "2" * 40
+    broker._payloads_by_step[start.name] = {  # noqa: SLF001
+        "task_authority": authority,
+        "draft": {"draft_id": draft_id, "revision": 1},
+    }
+
+    actual_actions = []
+    for expected in batch.actions:
+        actual = json.loads(json.dumps(expected.expected))
+        actual["properties"].reverse()
+        actual["references"].reverse()
+        actual_actions.append(actual)
+    argv = (
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--compact",
+        "--facts",
+        *tuple(
+            token
+            for actual in actual_actions
+            for token in typed_action_cli_arguments(actual)
+        ),
+    )
+
+    broker._validate_step(action, argv)  # noqa: SLF001
 
 
 def test_audio_import_draft_action_accepts_explicit_gateway_owned_activation(

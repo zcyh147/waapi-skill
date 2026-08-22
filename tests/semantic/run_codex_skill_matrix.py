@@ -210,6 +210,9 @@ TYPED_INPUT_PROFILE_ID = "typed_input_cross_version_25"
 INTEGRATION_WORKFLOWS_V1_PROFILE_ID = "integration_workflows_cross_version_6"
 INTEGRATION_WORKFLOWS_V2_PROFILE_ID = "integration_workflows_v2_cross_version_6"
 INTEGRATION_PROFILE_ID = "integration"
+SEMANTIC_BOOTSTRAP_PROFILE_IDS = frozenset(
+    {TYPED_INPUT_PROFILE_ID, INTEGRATION_PROFILE_ID}
+)
 DEFAULT_CODEX_TIMEOUT_SECONDS = 240.0
 TYPED_INPUT_CODEX_TIMEOUT_SECONDS = 360.0
 INTEGRATION_CODEX_TIMEOUT_SECONDS = 360.0
@@ -773,7 +776,7 @@ def run_heavy_v3_unit(
                 semantic_skill_bootstrap_developer_instructions(
                     options.skill_source / "scripts" / "run.py"
                 )
-                if options.profile == TYPED_INPUT_PROFILE_ID
+                if options.profile in SEMANTIC_BOOTSTRAP_PROFILE_IDS
                 else ""
             ),
         )

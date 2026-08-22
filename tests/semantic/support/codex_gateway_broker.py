@@ -29,6 +29,7 @@ import tempfile
 import threading
 import time
 from dataclasses import asdict, dataclass, replace
+from decimal import Decimal, InvalidOperation
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from types import MappingProxyType
 from typing import Any, Callable, Mapping, Sequence
@@ -1251,7 +1252,6 @@ class DraftTypedActionBatchArgument:
             or not 2 <= len(self.actions) <= MAX_TYPED_ACTIONS_PER_APPLY
             or any(
                 not isinstance(action, DraftTypedActionArgument)
-                or action.query_identity_bindings
                 for action in self.actions
             )
             or len({action.operation for action in self.actions}) != 1
@@ -1318,8 +1318,8 @@ class InlineTypedOperationArgument:
 
     The canonical request is evidence, not a model-facing argument.  The
     evaluated Agent still submits only the public typed-operation flags; the
-    Broker derives the only accepted spelling from this request and binds that
-    spelling to its canonical digest.
+    Broker derives the accepted public spelling from this request and binds
+    exact reviewed selector equivalents to the same canonical digest.
     """
 
     expected: Mapping[str, Any]
@@ -1366,6 +1366,54 @@ ExpectedArgument = (
     | TypedRequestFactsArgument
     | InlineTypedOperationArgument
 )
+
+
+def _inline_operation_cli_argument_variants(
+    expected: Mapping[str, Any],
+) -> tuple[tuple[str, ...], ...]:
+    variants = [
+        json.loads(_canonical_json_bytes(dict(expected)).decode("utf-8"))
+    ]
+    if expected.get("operation") == "switchContainer.removeAssignment":
+        arguments = variants[0].get("arguments")
+        if isinstance(arguments, Mapping):
+            for field in ("child", "state_or_switch"):
+                current_variants = list(variants)
+                for request in current_variants:
+                    request_arguments = request.get("arguments")
+                    selector = (
+                        request_arguments.get(field)
+                        if isinstance(request_arguments, Mapping)
+                        else None
+                    )
+                    parent = (
+                        selector.get("parent")
+                        if isinstance(selector, Mapping)
+                        else None
+                    )
+                    if (
+                        not isinstance(selector, Mapping)
+                        or selector.get("kind") != "scoped-name"
+                        or not isinstance(selector.get("name"), str)
+                        or not isinstance(parent, Mapping)
+                        or parent.get("kind") != "path"
+                        or not isinstance(parent.get("value"), str)
+                    ):
+                        continue
+                    equivalent = json.loads(
+                        _canonical_json_bytes(request).decode("utf-8")
+                    )
+                    equivalent["arguments"][field] = {
+                        "kind": "path",
+                        "value": parent["value"] + "\\" + selector["name"],
+                    }
+                    variants.append(equivalent)
+    return tuple(
+        dict.fromkeys(
+            inline_operation_cli_arguments(request)
+            for request in variants
+        )
+    )
 
 
 def _parse_typed_request_fact_argv(
@@ -4734,20 +4782,17 @@ def _validate_metadata_discover_query_arguments(
         raise GatewayInvocationError(
             "metadata discover allow-list must contain 1..8 bounded queries"
         )
-    object_type = (
-        step.arguments[2]
-        if len(step.arguments) >= 3
-        and step.arguments[:2] == ("discover", "--object-type")
-        else None
-    )
+    scope_flag = step.arguments[1] if len(step.arguments) >= 3 else None
+    scope_value = step.arguments[2] if len(step.arguments) >= 3 else None
     if (
-        not isinstance(object_type, str)
-        or not object_type
-        or object_type != object_type.strip()
-        or len(object_type) > 256
+        scope_flag not in {"--object-type", "--object"}
+        or not isinstance(scope_value, str)
+        or not scope_value
+        or scope_value != scope_value.strip()
+        or len(scope_value) > (256 if scope_flag == "--object-type" else 4096)
     ):
         raise GatewayInvocationError(
-            "metadata discover allow-list must use one bounded object-type scope"
+            "metadata discover allow-list must use one bounded object or object-type scope"
         )
     configured_limit = (
         step.arguments[-1]
@@ -4766,8 +4811,8 @@ def _validate_metadata_discover_query_arguments(
         )
     configured_shape: list[Any] = [
         "discover",
-        "--object-type",
-        object_type,
+        scope_flag,
+        scope_value,
     ]
     for query_spec in query_specs:
         configured_shape.extend(("--query", query_spec))
@@ -4775,7 +4820,7 @@ def _validate_metadata_discover_query_arguments(
     if list(step.arguments) != configured_shape:
         raise GatewayInvocationError(
             "metadata discover allow-list must contain only its exact "
-            "object-type, 1..8 query slots, and configured --limit"
+            "object or object-type, 1..8 query slots, and configured --limit"
         )
 
     if (
@@ -4789,21 +4834,21 @@ def _validate_metadata_discover_query_arguments(
             "object-type, 1..8 bounded --query pairs, and configured --limit"
         )
 
-    supplied_object_types: list[str] = []
+    supplied_scopes: list[tuple[str, str]] = []
     supplied_limits: list[str] = []
     queries: list[str] = []
     for index in range(1, len(supplied_arguments), 2):
         flag = supplied_arguments[index]
         value = supplied_arguments[index + 1]
-        if flag == "--object-type":
-            supplied_object_types.append(value)
+        if flag in {"--object-type", "--object"}:
+            supplied_scopes.append((flag, value))
         elif flag == "--query":
             queries.append(value)
         elif flag == "--limit":
             supplied_limits.append(value)
         else:
             raise GatewayInvocationError(
-                "metadata discover accepts only its configured --object-type, "
+                "metadata discover accepts only its configured object scope, "
                 "--query, and --limit options"
             )
     supplied_limit = supplied_limits[0] if len(supplied_limits) == 1 else ""
@@ -4820,7 +4865,7 @@ def _validate_metadata_discover_query_arguments(
         <= configured_limit.maximum
     )
     if (
-        supplied_object_types != [object_type]
+        supplied_scopes != [(scope_flag, scope_value)]
         or not limit_matches
         or not 1 <= len(queries) <= 8
     ):
@@ -4864,6 +4909,8 @@ def _metadata_discovery_live_projection(
     payload: Mapping[str, Any],
     *,
     object_type: str,
+    scope_flag: str = "--object-type",
+    scope_value: str | None = None,
 ) -> Mapping[str, MetadataTokenProjection]:
     """Return stable exact-token fields from one brokered discovery result."""
 
@@ -4883,15 +4930,26 @@ def _metadata_discovery_live_projection(
         )
     scope = agent_result.get("scope")
     resolved = scope.get("resolved") if isinstance(scope, Mapping) else None
-    if (
-        not isinstance(scope, Mapping)
-        or scope.get("kind") != "object_type"
-        or scope.get("requested") != object_type
-        or not isinstance(resolved, Mapping)
-        or resolved.get("name") != object_type
-    ):
+    object_type_scope = (
+        scope_flag == "--object-type"
+        and isinstance(scope, Mapping)
+        and scope.get("kind") == "object_type"
+        and scope.get("requested") == object_type
+        and isinstance(resolved, Mapping)
+        and resolved.get("name") == object_type
+    )
+    object_scope = (
+        scope_flag == "--object"
+        and isinstance(scope_value, str)
+        and isinstance(scope, Mapping)
+        and scope.get("kind") == "object"
+        and scope.get("object") == scope_value
+    )
+    if not object_type_scope and not object_scope:
+        scope_name = "object-type" if scope_flag == "--object-type" else "object"
         raise GatewayInvocationError(
-            "metadata-bound mutation requires the exact configured live object-type scope"
+            "metadata-bound mutation requires the exact configured live "
+            f"{scope_name} scope"
         )
     projections: list[MetadataTokenProjection] = []
     for key in ("candidates", "dependency_candidates"):
@@ -4949,6 +5007,8 @@ def project_required_metadata_tokens(
     *,
     object_type: str,
     required_tokens: Sequence[str],
+    scope_flag: str = "--object-type",
+    scope_value: str | None = None,
 ) -> tuple[MetadataTokenProjection, ...]:
     """Project only mutation-relevant stable fields from live discovery.
 
@@ -4974,6 +5034,8 @@ def project_required_metadata_tokens(
     available = _metadata_discovery_live_projection(
         payload,
         object_type=object_type,
+        scope_flag=scope_flag,
+        scope_value=scope_value,
     )
     missing = [token for token in tokens if token not in available]
     if missing:
@@ -4981,6 +5043,31 @@ def project_required_metadata_tokens(
             f"required metadata tokens are absent from live discovery: {missing!r}"
         )
     return tuple(available[token] for token in tokens)
+
+
+def _metadata_binding_scope(
+    step: ExpectedGatewayStep,
+    *,
+    object_type: str,
+) -> tuple[str, str]:
+    if (
+        step.subcommand != "metadata"
+        or len(step.arguments) < 3
+        or step.arguments[0] != "discover"
+        or step.arguments[1] not in {"--object-type", "--object"}
+        or not isinstance(step.arguments[2], str)
+        or not step.arguments[2]
+    ):
+        raise GatewayInvocationError(
+            "metadata source does not use one exact reviewed scope"
+        )
+    scope_flag = step.arguments[1]
+    scope_value = step.arguments[2]
+    if scope_flag == "--object-type" and scope_value != object_type:
+        raise GatewayInvocationError(
+            "metadata source does not bind the reviewed object type"
+        )
+    return scope_flag, scope_value
 
 
 def _metadata_reference_activation_rules(
@@ -5163,6 +5250,37 @@ def _normalize_audio_import_draft_action_named_fields(value: Any) -> Any:
         except (TypeError, ValueError):
             return value
         normalized[field] = [named[name] for name in sorted(named)]
+    return normalized
+
+
+def _normalize_typed_draft_number_value(
+    actual: Any,
+    expected: Any,
+) -> Any:
+    """Treat finite typed ``number`` spellings as their numeric value."""
+
+    if not isinstance(actual, Mapping) or not isinstance(expected, Mapping):
+        return actual
+    if (
+        actual.get("value_type") != "number"
+        or expected.get("value_type") != "number"
+        or not isinstance(actual.get("value"), str)
+        or not isinstance(expected.get("value"), str)
+    ):
+        return actual
+    try:
+        actual_number = Decimal(actual["value"])
+        expected_number = Decimal(expected["value"])
+    except InvalidOperation:
+        return actual
+    if (
+        not actual_number.is_finite()
+        or not expected_number.is_finite()
+        or actual_number != expected_number
+    ):
+        return actual
+    normalized = dict(actual)
+    normalized["value"] = expected["value"]
     return normalized
 
 
@@ -8267,6 +8385,10 @@ class CodexGatewayBroker:
                 raise GatewayInvocationError(
                     f"step {step.name!r} typed Draft action argv is invalid: {exc}"
                 ) from exc
+            if len(typed_actions) != len(expected_typed_actions):
+                raise GatewayInvocationError(
+                    f"step {step.name!r} typed Draft action count drifted"
+                )
             validation_arguments = (
                 *validation_arguments[:fixed_count],
                 _canonical_json_bytes(
@@ -8344,13 +8466,15 @@ class CodexGatewayBroker:
                 raise GatewayInvocationError(
                     "inline typed operation binding must be the final protocol argument"
                 )
-            expected_argv = inline_operation_cli_arguments(
-                inline_operation_argument.expected
-            )
             fixed_count = len(step.arguments) - 1
-            expected_tail = expected_argv[fixed_count:]
             supplied_tail = validation_arguments[fixed_count:]
-            if tuple(supplied_tail) != tuple(expected_tail):
+            accepted_tails = tuple(
+                argv[fixed_count:]
+                for argv in _inline_operation_cli_argument_variants(
+                    inline_operation_argument.expected
+                )
+            )
+            if tuple(supplied_tail) not in accepted_tails:
                 raise GatewayInvocationError(
                     f"step {step.name!r} inline typed argv differs from its sealed request"
                 )
@@ -8516,22 +8640,21 @@ class CodexGatewayBroker:
                         for candidate in self.expected_steps
                         if candidate.name == expected.metadata_step
                     )
-                    if (
-                        len(source_steps) != 1
-                        or source_steps[0].subcommand != "metadata"
-                        or len(source_steps[0].arguments) < 3
-                        or source_steps[0].arguments[:2]
-                        != ("discover", "--object-type")
-                        or source_steps[0].arguments[2] != expected.object_type
-                    ):
+                    if len(source_steps) != 1:
                         raise GatewayInvocationError(
                             f"step {step.name!r} metadata source does not bind "
                             f"object type {expected.object_type!r}"
                         )
+                    scope_flag, scope_value = _metadata_binding_scope(
+                        source_steps[0],
+                        object_type=expected.object_type,
+                    )
                     actual_projection = project_required_metadata_tokens(
                         source,
                         object_type=expected.object_type,
                         required_tokens=expected.required_tokens,
+                        scope_flag=scope_flag,
+                        scope_value=scope_value,
                     )
                     expected_projection = (
                         expected.expected_required_token_projection
@@ -8620,18 +8743,107 @@ class CodexGatewayBroker:
                         normalized_actual = json.loads(
                             _canonical_json_bytes(actual_action).decode("utf-8")
                         )
+                        identity_evidence: list[dict[str, Any]] = []
+                        for binding in expected_action.query_identity_bindings:
+                            source = self._payloads_by_step.get(binding.step)
+                            if source is None:
+                                raise GatewayInvocationError(
+                                    f"step {step.name!r} query identity source "
+                                    f"{binding.step!r} is unavailable"
+                                )
+                            source_steps = tuple(
+                                candidate
+                                for candidate in self.expected_steps
+                                if candidate.name == binding.step
+                            )
+                            if len(source_steps) != 1:
+                                raise GatewayInvocationError(
+                                    f"step {step.name!r} query identity source "
+                                    "is not unique"
+                                )
+                            identity = _exact_query_bus_identity(
+                                source_payload=source,
+                                source_step=source_steps[0],
+                                expected_step_name=binding.step,
+                            )
+                            expected_target = _json_pointer(
+                                bound_expected,
+                                binding.pointer,
+                            )
+                            actual_target = _json_pointer(
+                                actual_action,
+                                binding.pointer,
+                            )
+                            normalized_target = _json_pointer(
+                                normalized_actual,
+                                binding.pointer,
+                            )
+                            path_identity = {
+                                "kind": "path",
+                                "value": identity["path"],
+                            }
+                            id_identity = {
+                                "kind": "id",
+                                "value": identity["id"],
+                            }
+                            if (
+                                expected_target != path_identity
+                                or actual_target not in (path_identity, id_identity)
+                                or not isinstance(normalized_target, dict)
+                            ):
+                                raise GatewayInvocationError(
+                                    f"step {step.name!r} typed Draft batch "
+                                    "query-bound identity does not match the "
+                                    "exact Bus row"
+                                )
+                            normalized_target.clear()
+                            normalized_target.update(path_identity)
+                            identity_evidence.append(
+                                {
+                                    "pointer": binding.pointer,
+                                    "step": binding.step,
+                                    "id": identity["id"],
+                                    "path": identity["path"],
+                                }
+                            )
+                        if expected_action.operation == "audio.import":
+                            normalized_actual = (
+                                _normalize_audio_import_draft_action_named_fields(
+                                    normalized_actual
+                                )
+                            )
+                            bound_expected = (
+                                _normalize_audio_import_draft_action_named_fields(
+                                    bound_expected
+                                )
+                            )
+                        normalized_actual = _normalize_typed_draft_number_value(
+                            normalized_actual,
+                            bound_expected,
+                        )
                         metadata_evidence: dict[str, Any] | None = None
                         metadata_binding = expected_action.metadata_binding
                         if metadata_binding is not None:
                             source = self._payloads_by_step.get(metadata_binding.step)
-                            if source is None:
+                            source_steps = tuple(
+                                candidate
+                                for candidate in self.expected_steps
+                                if candidate.name == metadata_binding.step
+                            )
+                            if source is None or len(source_steps) != 1:
                                 raise GatewayInvocationError(
                                     f"step {step.name!r} Draft metadata source is unavailable"
                                 )
+                            scope_flag, scope_value = _metadata_binding_scope(
+                                source_steps[0],
+                                object_type=metadata_binding.object_type,
+                            )
                             projection = project_required_metadata_tokens(
                                 source,
                                 object_type=metadata_binding.object_type,
                                 required_tokens=metadata_binding.required_tokens,
+                                scope_flag=scope_flag,
+                                scope_value=scope_value,
                             )
                             if (
                                 metadata_binding.expected_projection is not None
@@ -8658,6 +8870,7 @@ class CodexGatewayBroker:
                             {
                                 "action": dict(expected_action.expected),
                                 "response_bindings": bindings,
+                                "query_identity_bindings": identity_evidence,
                                 "metadata": metadata_evidence,
                             }
                         )
@@ -8778,6 +8991,10 @@ class CodexGatewayBroker:
                                 bound_expected
                             )
                         )
+                    normalized_actual = _normalize_typed_draft_number_value(
+                        normalized_actual,
+                        bound_expected,
+                    )
                     if metadata_binding is not None:
                         source = self._payloads_by_step.get(metadata_binding.step)
                         source_steps = tuple(
@@ -8785,23 +9002,20 @@ class CodexGatewayBroker:
                             for candidate in self.expected_steps
                             if candidate.name == metadata_binding.step
                         )
-                        if (
-                            source is None
-                            or len(source_steps) != 1
-                            or source_steps[0].subcommand != "metadata"
-                            or len(source_steps[0].arguments) < 3
-                            or source_steps[0].arguments[:2]
-                            != ("discover", "--object-type")
-                            or source_steps[0].arguments[2]
-                            != metadata_binding.object_type
-                        ):
+                        if source is None or len(source_steps) != 1:
                             raise GatewayInvocationError(
                                 f"step {step.name!r} Draft metadata source is unavailable"
                             )
+                        scope_flag, scope_value = _metadata_binding_scope(
+                            source_steps[0],
+                            object_type=metadata_binding.object_type,
+                        )
                         actual_projection = project_required_metadata_tokens(
                             source,
                             object_type=metadata_binding.object_type,
                             required_tokens=metadata_binding.required_tokens,
+                            scope_flag=scope_flag,
+                            scope_value=scope_value,
                         )
                         if (
                             metadata_binding.expected_projection is not None
@@ -8876,14 +9090,25 @@ class CodexGatewayBroker:
                     metadata_binding = expected.metadata_binding
                     if metadata_binding is not None:
                         source = self._payloads_by_step.get(metadata_binding.step)
-                        if source is None:
+                        source_steps = tuple(
+                            candidate
+                            for candidate in self.expected_steps
+                            if candidate.name == metadata_binding.step
+                        )
+                        if source is None or len(source_steps) != 1:
                             raise GatewayInvocationError(
                                 f"step {step.name!r} typed metadata source is unavailable"
                             )
+                        scope_flag, scope_value = _metadata_binding_scope(
+                            source_steps[0],
+                            object_type=metadata_binding.object_type,
+                        )
                         projection = project_required_metadata_tokens(
                             source,
                             object_type=metadata_binding.object_type,
                             required_tokens=metadata_binding.required_tokens,
+                            scope_flag=scope_flag,
+                            scope_value=scope_value,
                         )
                         if (
                             metadata_binding.expected_projection is not None
@@ -9002,21 +9227,20 @@ class CodexGatewayBroker:
                 for candidate in self.expected_steps
                 if candidate.name == metadata_binding.step
             )
-            if (
-                source is None
-                or len(source_steps) != 1
-                or source_steps[0].subcommand != "metadata"
-                or len(source_steps[0].arguments) < 3
-                or source_steps[0].arguments[:2] != ("discover", "--object-type")
-                or source_steps[0].arguments[2] != metadata_binding.object_type
-            ):
+            if source is None or len(source_steps) != 1:
                 raise GatewayInvocationError(
                     f"step {step.name!r} metadata source is unavailable"
                 )
+            scope_flag, scope_value = _metadata_binding_scope(
+                source_steps[0],
+                object_type=metadata_binding.object_type,
+            )
             projection = project_required_metadata_tokens(
                 source,
                 object_type=metadata_binding.object_type,
                 required_tokens=metadata_binding.required_tokens,
+                scope_flag=scope_flag,
+                scope_value=scope_value,
             )
             if (
                 metadata_binding.expected_projection is not None
@@ -9658,37 +9882,40 @@ class CodexGatewayBroker:
         for action_step in self._execution_steps[:preview_index]:
             if action_step.subcommand != "draft-apply":
                 continue
-            argument = action_step.arguments[-1]
-            if not isinstance(argument, DraftTypedActionArgument):
-                continue
-            for binding in argument.query_identity_bindings:
-                source = self._payloads_by_step.get(binding.step)
-                source_step = next(
-                    (
-                        candidate
-                        for candidate in self.expected_steps
-                        if candidate.name == binding.step
-                    ),
-                    None,
-                )
-                if not isinstance(source, Mapping) or source_step is None:
-                    raise GatewayInvocationError(
-                        "Draft query identity normalization lacks its exact source"
+            arguments = _draft_typed_actions(action_step.arguments[-1]) or ()
+            for argument in arguments:
+                for binding in argument.query_identity_bindings:
+                    source = self._payloads_by_step.get(binding.step)
+                    source_step = next(
+                        (
+                            candidate
+                            for candidate in self.expected_steps
+                            if candidate.name == binding.step
+                        ),
+                        None,
                     )
-                identity = _exact_query_bus_identity(
-                    source_payload=source,
-                    source_step=source_step,
-                    expected_step_name=binding.step,
-                )
-                expected_target = _json_pointer(argument.expected, binding.pointer)
-                if expected_target != {
-                    "kind": "path",
-                    "value": identity["path"],
-                }:
-                    raise GatewayInvocationError(
-                        "Draft query identity normalization differs from the reviewed path"
+                    if not isinstance(source, Mapping) or source_step is None:
+                        raise GatewayInvocationError(
+                            "Draft query identity normalization lacks its exact source"
+                        )
+                    identity = _exact_query_bus_identity(
+                        source_payload=source,
+                        source_step=source_step,
+                        expected_step_name=binding.step,
                     )
-                identities[identity["id"]] = identity["path"]
+                    expected_target = _json_pointer(
+                        argument.expected,
+                        binding.pointer,
+                    )
+                    if expected_target != {
+                        "kind": "path",
+                        "value": identity["path"],
+                    }:
+                        raise GatewayInvocationError(
+                            "Draft query identity normalization differs from the "
+                            "reviewed path"
+                        )
+                    identities[identity["id"]] = identity["path"]
 
         def normalize(item: Any) -> Any:
             if isinstance(item, Mapping):
@@ -9724,31 +9951,31 @@ class CodexGatewayBroker:
         for action_step in self._execution_steps[:preview_index]:
             if action_step.subcommand != "draft-apply":
                 continue
-            argument = action_step.arguments[-1]
-            if (
-                not isinstance(argument, DraftTypedActionArgument)
-                or argument.operation != "audio.import"
-                or argument.metadata_binding is None
-            ):
-                continue
-            binding = argument.metadata_binding
-            source = self._payloads_by_step.get(binding.step)
-            if not isinstance(source, Mapping):
-                raise GatewayInvocationError(
-                    "Draft reference activation normalization lacks live metadata"
-                )
-            projected = _metadata_reference_activation_rules(
-                source,
-                object_type=binding.object_type,
-                required_tokens=binding.required_tokens,
-            )
-            for reference_name, activations in projected.items():
-                prior = rules.get(reference_name)
-                if prior is not None and prior != activations:
+            arguments = _draft_typed_actions(action_step.arguments[-1]) or ()
+            for argument in arguments:
+                if (
+                    argument.operation != "audio.import"
+                    or argument.metadata_binding is None
+                ):
+                    continue
+                binding = argument.metadata_binding
+                source = self._payloads_by_step.get(binding.step)
+                if not isinstance(source, Mapping):
                     raise GatewayInvocationError(
-                        "Draft reference activation metadata is inconsistent"
+                        "Draft reference activation normalization lacks live metadata"
                     )
-                rules[reference_name] = activations
+                projected = _metadata_reference_activation_rules(
+                    source,
+                    object_type=binding.object_type,
+                    required_tokens=binding.required_tokens,
+                )
+                for reference_name, activations in projected.items():
+                    prior = rules.get(reference_name)
+                    if prior is not None and prior != activations:
+                        raise GatewayInvocationError(
+                            "Draft reference activation metadata is inconsistent"
+                        )
+                    rules[reference_name] = activations
         return _normalize_audio_import_request_activation_properties(
             value,
             expected_request,

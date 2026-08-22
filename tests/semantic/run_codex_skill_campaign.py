@@ -318,6 +318,7 @@ INTEGRATION_WORKFLOWS_V2_PROFILE_ID = (
     matrix.INTEGRATION_WORKFLOWS_V2_PROFILE_ID
 )
 INTEGRATION_PROFILE_ID = matrix.INTEGRATION_PROFILE_ID
+SEMANTIC_BOOTSTRAP_PROFILE_IDS = matrix.SEMANTIC_BOOTSTRAP_PROFILE_IDS
 _INTEGRATION_V1_WORKFLOW_IDS = frozenset(
     {
         "interactive_weather_build",
@@ -3594,7 +3595,7 @@ def _validate_heavy_v3_retryable_failed_facts(
                     )
                 ),
             )
-            if options.profile == TYPED_INPUT_PROFILE_ID
+            if options.profile in SEMANTIC_BOOTSTRAP_PROFILE_IDS
             else ""
         ),
     )
@@ -5864,7 +5865,7 @@ def _validate_heavy_v3_codex_facts(
                     )
                 ),
             )
-            if options.profile == TYPED_INPUT_PROFILE_ID
+            if options.profile in SEMANTIC_BOOTSTRAP_PROFILE_IDS
             else ""
         ),
     )

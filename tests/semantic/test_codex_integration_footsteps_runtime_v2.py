@@ -745,14 +745,15 @@ def test_scoped_remove_request_accepts_only_its_exact_path_equivalents(
                 "kind": "path",
                 "value": case.fake._path("surface_mud"),
             }
-        with pytest.raises(GatewayInvocationError, match="sealed request"):
-            broker._validate_step(  # noqa: SLF001
-                preview_step,
-                (
-                    "typed-operation",
-                    *inline_operation_cli_arguments(equivalent),
-                ),
-            )
+        equivalent_hash, equivalent_arguments = broker._validate_step(  # noqa: SLF001
+            preview_step,
+            (
+                "typed-operation",
+                *inline_operation_cli_arguments(equivalent),
+            ),
+        )
+        assert equivalent_hash == semantic_hash
+        assert equivalent_arguments[0] == "typed-operation"
 
     exact_name_container = copy.deepcopy(_plain(remove_request))
     exact_name_container["arguments"]["switch_container"] = {

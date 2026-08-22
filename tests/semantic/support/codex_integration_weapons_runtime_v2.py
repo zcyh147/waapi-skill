@@ -634,7 +634,7 @@ class _WeaponsSession:
             or tuple(
                 step.subcommand for step in protocol.steps[6:]
             ).count("draft-apply")
-            != 3
+            != 1
             or transaction_names[-6:]
             != (
                 "tx01.check",
@@ -646,7 +646,7 @@ class _WeaponsSession:
             )
             or tuple(protocol.steps[1 : 1 + len(output_bus_steps)])
             != output_bus_steps
-            or protocol.turn_prefix_counts != (3, 13, 17)
+            or protocol.turn_prefix_counts != (3, 11, 15)
             or protocol.commutative_read_only_step_groups
             != (output_bus_names,)
         ):

@@ -389,11 +389,16 @@ def test_project_dispatch_passes_closed_runtime_options_without_starting_it(
     assert runtime_options.developer_instructions == ""
 
 
-def test_typed_input_project_dispatch_seals_pre_action_developer_instructions(
+@pytest.mark.parametrize(
+    "profile",
+    [matrix.TYPED_INPUT_PROFILE_ID, matrix.INTEGRATION_PROFILE_ID],
+)
+def test_agent_facing_project_dispatch_seals_pre_action_developer_instructions(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    profile: str,
 ) -> None:
-    options = replace(_options(tmp_path), profile=matrix.TYPED_INPUT_PROFILE_ID)
+    options = replace(_options(tmp_path), profile=profile)
     unit = _Unit(
         "TYP21-ZERO-GET-INFO",
         "2021.1",

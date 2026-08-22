@@ -23,6 +23,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     wait_topic_step,
 )
 from tests.semantic.support.codex_gateway_broker import (
+    DraftActionQueryIdentityBinding,
     DraftActionResponseBinding,
     DraftTypedActionArgument,
     DraftTypedActionBatchArgument,
@@ -492,6 +493,49 @@ def test_object_set_protocol_batches_sibling_children_after_parent_handle() -> N
             ),
         ),
     ]
+
+
+def test_object_set_protocol_batches_independent_query_bound_targets() -> None:
+    bus_path = r"\Master-Mixer Hierarchy\Default Work Unit\Weapons"
+    request = _object_set_request()
+    template = request["arguments"]["objects"][0]  # type: ignore[index]
+    request["arguments"]["objects"] = [  # type: ignore[index]
+        {
+            **template,
+            "object": {"kind": "path", "value": rf"\Root\Target{index}"},
+            "references": [
+                {
+                    "name": "OutputBus",
+                    "target": {"kind": "path", "value": bus_path},
+                }
+            ],
+        }
+        for index in range(3)
+    ]
+
+    steps = build_object_set_composer_transaction_steps(
+        request,
+        label="tx01",
+        reference_identity_sources={bus_path: "relationship.output_bus"},
+    )
+    action_steps = tuple(
+        step for step in steps if step.subcommand == "draft-apply"
+    )
+
+    assert len(action_steps) == 1
+    batch = action_steps[0].arguments[-1]
+    assert isinstance(batch, DraftTypedActionBatchArgument)
+    assert len(batch.actions) == 3
+    assert all(
+        action.query_identity_bindings
+        == (
+            DraftActionQueryIdentityBinding(
+                "/references/0/target",
+                "relationship.output_bus",
+            ),
+        )
+        for action in batch.actions
+    )
 
 
 def test_single_transaction_spans_two_turn_prefixes_with_response_bindings() -> None:

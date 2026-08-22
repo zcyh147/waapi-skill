@@ -80,6 +80,11 @@ def test_public_cli_defaults_are_locked_and_legacy_defaults_are_unchanged(
     campaign_options = campaign.parse_args(_campaign_args(tmp_path / "campaign"))
 
     assert matrix_options.profile == campaign_options.profile == "integration"
+    assert matrix.SEMANTIC_BOOTSTRAP_PROFILE_IDS == (
+        campaign.SEMANTIC_BOOTSTRAP_PROFILE_IDS
+    ) == frozenset(
+        {matrix.TYPED_INPUT_PROFILE_ID, matrix.INTEGRATION_PROFILE_ID}
+    )
     assert matrix_options.suite_path == matrix.DEFAULT_INTEGRATION_SUITE.resolve()
     assert campaign_options.suite_path == matrix.DEFAULT_INTEGRATION_SUITE.resolve()
     assert matrix_options.iteration_root == (
