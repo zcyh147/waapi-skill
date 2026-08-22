@@ -1425,52 +1425,52 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
         codex_harness_module.SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
     )
 
-    assert "First: read SKILL.md once in one standalone command" in instructions
+    assert "First read SKILL.md once, standalone" in instructions
     assert (
         "Get-Content -Raw -Encoding UTF8 "
         "'.agents\\skills\\waapi-skill\\SKILL.md'"
     ) in instructions
     assert "short task-local only" in instructions
     assert "next_command.copy_instruction.source_field" in instructions
-    assert "preserve every quote" in instructions
+    assert "preserve quotes" in instructions
     assert "fixed_argv_prefix" in instructions
     assert "opaque handle" in instructions
     assert "never reconstruct" in instructions
     assert "No shell cwd override" in instructions
     assert "Each fact" in instructions
-    assert "one business value/argv literal" in instructions
-    assert "Greedily fill batch_size 6" in instructions
-    assert "only final batch is shorter" in instructions
-    assert "with all remaining" in instructions
-    assert "CLI TYPE is string/number/integer/boolean" in instructions
-    assert "never Real64/int16" in instructions
+    assert "one value/argv literal" in instructions
+    assert "Fill batch_size 6" in instructions
+    assert "only final batch may be shorter" in instructions
+    assert "holds all remaining" in instructions
+    assert "CLI TYPE: string/number/integer/boolean" in instructions
+    assert "not Real64/int16" in instructions
     assert "unapplied ancestor deferred_fact" in instructions
     assert "execute_after=all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "selected-branch constant" in instructions
-    assert "distinct query per requested token" in instructions
-    assert "one first-command batch for every same-scope token" in instructions
-    assert "shared and per-row dynamic fields" in instructions
+    assert "one distinct query/requested token" in instructions
+    assert "first command batches every same-scope" in instructions
+    assert "shared/per-row dynamic field" in instructions
     assert "never split 1..8" in instructions
     assert "no same-scope repeat after success" in instructions
     assert "enum/const exactly" in instructions
     assert "typed_operation.continuation.gateway_argv_prefix verbatim" in instructions
     assert "incl --apply" in instructions
-    assert "selector kind/value as separate argv tokens" in instructions
+    assert "selector kind/value are separate argv" in instructions
     assert "SFX => exact object_type Sound SFX, never Sound" in instructions
-    assert "requested Event in its initial add_import_row" in instructions
-    assert "never defer or omit it" in instructions
+    assert "requested Event belongs in initial add_import_row" in instructions
+    assert "never defer/omit" in instructions
     assert "Prompt absolute paths: copy verbatim" in instructions
     assert "never shorten/normalize" in instructions
     assert "prompt terminal scalars" in instructions
     assert "every prompt field/item/map/boolean" in instructions
     assert (
-        "Finish prompt top-level facts before root_dynamic_disclosure"
+        "Top-level facts precede root_dynamic_disclosure"
         in instructions
     )
     assert "copy_command_by_shape verbatim" in instructions
     assert "shell_tool_timeout_ms" in instructions
-    assert "A successful draft-check is not a Preview" in instructions
+    assert "draft-check is not Preview" in instructions
     assert "Editable draft-apply continues same turn" in instructions
     assert "no progress reply while editable" in instructions
     assert "requires_later_user_message" in instructions
@@ -1574,7 +1574,7 @@ def test_public_integration_alarm_instructions_fit_the_sealed_byte_limit() -> No
     assert "Reads: 1" in instructions
     assert "2 [Get-Content" in instructions
     assert "3 none" in instructions
-    assert "never Real64/int16" in instructions
+    assert "not Real64/int16" in instructions
     assert len(instructions.encode("utf-8")) <= 2048
 
 
