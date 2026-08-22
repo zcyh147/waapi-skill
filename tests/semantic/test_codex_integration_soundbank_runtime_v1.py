@@ -259,8 +259,15 @@ def test_harbor_runtime_materializes_closed_dual_platform_workflow_and_cleans(
     )
     assert prepared.visible_values["soundbank_io_root"] in prepared.prompt
     assert prepared.visible_values["soundbank_output_directory"] in prepared.prompt
+    assert "逐项使用我给出的三个完整 Event 路径作为对象身份" in prepared.prompt
+    assert "不要改成按同名对象查找" in prepared.prompt
     assert (
-        "生成这个非本地化 SFX Bank，并写入磁盘；跳过语言变体，"
+        "生成步骤不额外指定任何 Event 或 Aux Bus，这两份清单明确为空"
+        in prepared.prompt
+    )
+    assert (
+        "Harbor_Release 这一行的 "
+        "rebuild 明确设为 false，跳过语言变体，"
         "不要重建全部 SoundBank，不要清空音频缓存，也不要重建 Init Bank"
         in prepared.prompt
     )

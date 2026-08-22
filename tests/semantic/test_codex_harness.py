@@ -1439,6 +1439,8 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "include every remaining action in one final batch" in instructions
     assert "only string/number/integer/boolean" in instructions
     assert "never Wwise metadata types such as Real64/int16" in instructions
+    assert "every still-unapplied ancestor deferred_fact" in instructions
+    assert "all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "every prompt-required terminal scalar" in instructions
     assert "every prompt-present field" in instructions
     assert "copy booleans exactly" in instructions

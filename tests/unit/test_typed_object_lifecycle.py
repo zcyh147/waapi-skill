@@ -763,7 +763,7 @@ def test_object_create_node_local_disclosures_and_fact_batches_are_executable(
                 argv.extend(["--key", fact.key])
         return argv
 
-    def apply(facts: tuple[Any, ...]) -> None:
+    def apply(facts: tuple[Any, ...]) -> Mapping[str, Any]:
         nonlocal revision
         argv = [
             "--version", "2025.1", "--state-dir", str(state_dir),
@@ -781,6 +781,7 @@ def test_object_create_node_local_disclosures_and_fact_batches_are_executable(
         )
         assert apply_code == 0, applied
         revision = applied["draft"]["revision"]
+        return applied
 
     first_disclosure = construction.disclosures[0]
     apply(construction.facts[: first_disclosure.fact_index])
@@ -825,7 +826,18 @@ def test_object_create_node_local_disclosures_and_fact_batches_are_executable(
             if index + 1 < len(construction.disclosures)
             else len(construction.facts)
         )
-        apply(construction.facts[disclosure.fact_index : next_fact_index])
+        applied = apply(
+            construction.facts[disclosure.fact_index : next_fact_index]
+        )
+
+    assert applied["draft"]["schema_required_fields_status"] == "complete"
+    assert "construction_continuation" in applied["draft"]["action_result"]
+    completion = applied["draft"]["next_action_binding"]["completion_candidate"]
+    assert completion["fixed_argv_prefix"][-2:] == [
+        "--expected-revision",
+        str(revision),
+    ]
+    assert completion["copy_exactly"] is True
 
     inspect_code, inspected = waapi_gateway.execute_gateway(
         [

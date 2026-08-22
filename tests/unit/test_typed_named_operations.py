@@ -9,6 +9,7 @@ from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImp
 from wwise_waapi.typed_operations import (  # pyright: ignore[reportMissingImports]
     MAX_INLINE_OPERATION_VALUE_BYTES,
     TypedOperationInputError,
+    inline_operation_cli_argument_variants,
     inline_operation_contract,
     materialize_inline_operation_request,
 )
@@ -116,6 +117,33 @@ def test_reference_clear_and_target_are_mutually_exclusive() -> None:
                 "clear": True,
             },
         )
+
+
+def test_reference_cli_variants_preserve_exact_groups_in_any_parser_order() -> None:
+    request = materialize_inline_operation_request(
+        "object.setReference",
+        "2022.1",
+        {"object": OBJECT, "reference": "OutputBus", "target": TARGET},
+    )
+
+    variants = inline_operation_cli_argument_variants(request)
+
+    assert len(variants) == 6
+    assert variants[0][4:9] == (
+        "--object",
+        *OBJECT,
+        "--reference",
+        "OutputBus",
+    )
+    assert (
+        *variants[0][:4],
+        "--target",
+        *TARGET,
+        "--object",
+        *OBJECT,
+        "--reference",
+        "OutputBus",
+    ) in variants
 
 
 def test_inline_contract_discloses_one_operation_specific_continuation() -> None:

@@ -14594,7 +14594,6 @@ def operation_draft_payload(
                 )
             if (
                 compact_actions is not None
-                and not isinstance(construction_continuation, Mapping)
                 and draft.get("schema_required_fields_status") == "complete"
             ):
                 completion_argv = [

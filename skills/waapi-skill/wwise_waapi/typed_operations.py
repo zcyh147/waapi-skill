@@ -7,10 +7,11 @@ preparer, Preview lifecycle, dispatcher, and verifier.
 
 from __future__ import annotations
 
+import itertools
 import json
-from copy import deepcopy
 import math
 import re
+from copy import deepcopy
 from typing import Any, Mapping, Sequence
 
 from .canonical import canonical_json_bytes
@@ -519,33 +520,6 @@ def inline_operation_cli_arguments(request: Mapping[str, Any]) -> tuple[str, ...
         "--apply",
     ]
 
-    def selector_tokens(value: Any) -> tuple[str, ...]:
-        if not isinstance(value, Mapping):
-            raise TypedOperationInputError("Inline selector is not an object")
-        kind = value.get("kind")
-        if kind in {"id", "path"}:
-            raw = value.get("value")
-            token = (
-                "id-integer"
-                if kind == "id" and isinstance(raw, int) and not isinstance(raw, bool)
-                else "id-string"
-                if kind == "id"
-                else "path"
-            )
-            return (token, str(raw))
-        if kind == "exact-type-name":
-            return (kind, str(value.get("type")), str(value.get("name")))
-        if kind == "direct-child":
-            return (kind, str(value.get("type")), *selector_tokens(value.get("parent")))
-        if kind == "scoped-name":
-            return (
-                kind,
-                str(value.get("type")),
-                str(value.get("name")),
-                *selector_tokens(value.get("parent")),
-            )
-        raise TypedOperationInputError("Inline selector kind is unsupported")
-
     def scalar_tokens(value: Any) -> tuple[str, str]:
         value_type = (
             "boolean"
@@ -566,7 +540,9 @@ def inline_operation_cli_arguments(request: Mapping[str, Any]) -> tuple[str, ...
         result.extend(("--enable", scalar_tokens(arguments["enable"])[1]))
     elif operation == "audio.importTabDelimited":
         result.extend(("--import-file", str(arguments["import_file"])))
-        result.extend(("--import-location", *selector_tokens(arguments["import_location"])))
+        result.extend(
+            ("--import-location", *_selector_cli_tokens(arguments["import_location"]))
+        )
         result.extend(("--import-language", str(arguments["import_language"])))
         for name, flag in (
             ("import_operation", "--import-operation"),
@@ -585,14 +561,14 @@ def inline_operation_cli_arguments(request: Mapping[str, Any]) -> tuple[str, ...
             ("child", "--child"),
             ("state_or_switch", "--state-or-switch"),
         ):
-            result.extend((flag, *selector_tokens(arguments[name])))
+            result.extend((flag, *_selector_cli_tokens(arguments[name])))
     elif operation in {"object.setName", "object.setNotes"}:
-        result.extend(("--object", *selector_tokens(arguments["object"])))
+        result.extend(("--object", *_selector_cli_tokens(arguments["object"])))
         result.extend(("--text", str(arguments["value"])))
     elif operation in {"object.delete", "object.copy", "object.move"}:
-        result.extend(("--object", *selector_tokens(arguments["object"])))
+        result.extend(("--object", *_selector_cli_tokens(arguments["object"])))
         if "parent" in arguments:
-            result.extend(("--parent", *selector_tokens(arguments["parent"])))
+            result.extend(("--parent", *_selector_cli_tokens(arguments["parent"])))
         for name, flag in (
             ("on_name_conflict", "--on-name-conflict"),
             ("auto_add_to_source_control", "--auto-add"),
@@ -601,23 +577,23 @@ def inline_operation_cli_arguments(request: Mapping[str, Any]) -> tuple[str, ...
             if name in arguments:
                 result.extend((flag, scalar_tokens(arguments[name])[1]))
     elif operation == "object.setProperty":
-        result.extend(("--object", *selector_tokens(arguments["object"])))
+        result.extend(("--object", *_selector_cli_tokens(arguments["object"])))
         result.extend(("--property", str(arguments["property"])))
         value_type, value = scalar_tokens(arguments["value"])
         result.extend(("--value", value_type, value))
         if "platform" in arguments:
             result.extend(("--platform", str(arguments["platform"])))
     elif operation == "object.setReference":
-        result.extend(("--object", *selector_tokens(arguments["object"])))
+        result.extend(("--object", *_selector_cli_tokens(arguments["object"])))
         result.extend(("--reference", str(arguments["reference"])))
         if arguments["target"] is None:
             result.append("--clear")
         else:
-            result.extend(("--target", *selector_tokens(arguments["target"])))
+            result.extend(("--target", *_selector_cli_tokens(arguments["target"])))
         if "platform" in arguments:
             result.extend(("--platform", str(arguments["platform"])))
     elif operation == "object.setLinked":
-        result.extend(("--object", *selector_tokens(arguments["object"])))
+        result.extend(("--object", *_selector_cli_tokens(arguments["object"])))
         result.extend(("--property", str(arguments["property"])))
         result.extend(("--platform", str(arguments["platform"])))
         result.extend(("--linked", scalar_tokens(arguments["linked"])[1]))
@@ -647,6 +623,74 @@ def inline_operation_cli_arguments(request: Mapping[str, Any]) -> tuple[str, ...
     except OperationContractError as exc:
         raise TypedOperationInputError(str(exc)) from exc
     return tuple(result)
+
+
+def _selector_cli_tokens(value: Any) -> tuple[str, ...]:
+    if not isinstance(value, Mapping):
+        raise TypedOperationInputError("Inline selector is not an object")
+    kind = value.get("kind")
+    if kind in {"id", "path"}:
+        raw = value.get("value")
+        token = (
+            "id-integer"
+            if kind == "id" and isinstance(raw, int) and not isinstance(raw, bool)
+            else "id-string"
+            if kind == "id"
+            else "path"
+        )
+        return (token, str(raw))
+    if kind == "exact-type-name":
+        return (kind, str(value.get("type")), str(value.get("name")))
+    if kind == "direct-child":
+        return (
+            kind,
+            str(value.get("type")),
+            *_selector_cli_tokens(value.get("parent")),
+        )
+    if kind == "scoped-name":
+        return (
+            kind,
+            str(value.get("type")),
+            str(value.get("name")),
+            *_selector_cli_tokens(value.get("parent")),
+        )
+    raise TypedOperationInputError("Inline selector kind is unsupported")
+
+
+def inline_operation_cli_argument_variants(
+    request: Mapping[str, Any],
+) -> tuple[tuple[str, ...], ...]:
+    """Return every reviewed argparse-equivalent argv for one exact request.
+
+    The first row is the canonical display form.  Additional rows vary only
+    independent option-group order; every value and selector spelling remains
+    sealed by the canonical request.
+    """
+
+    canonical = inline_operation_cli_arguments(request)
+    if request.get("operation") != "object.setReference":
+        return (canonical,)
+    arguments = request.get("arguments")
+    if not isinstance(arguments, Mapping):
+        raise TypedOperationInputError("Inline operation request is incomplete")
+    groups: list[tuple[str, ...]] = [
+        ("--object", *_selector_cli_tokens(arguments.get("object"))),
+        ("--reference", str(arguments.get("reference"))),
+        (
+            ("--clear",)
+            if arguments.get("target") is None
+            else ("--target", *_selector_cli_tokens(arguments.get("target")))
+        ),
+    ]
+    if "platform" in arguments:
+        groups.append(("--platform", str(arguments["platform"])))
+    prefix = canonical[:4]
+    return tuple(
+        dict.fromkeys(
+            (*prefix, *(token for group in ordering for token in group))
+            for ordering in itertools.permutations(groups)
+        )
+    )
 
 
 def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:

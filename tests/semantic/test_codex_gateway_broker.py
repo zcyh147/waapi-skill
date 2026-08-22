@@ -493,6 +493,25 @@ def test_compact_generic_typed_fact_batch_accepts_exact_node_resume() -> None:
     assert affected == {response_handle}
     assert summary["target_count"] == 3
 
+    payload["schema_required_fields_status"] = "complete"
+    payload["next_action_binding"]["completion_candidate"] = (
+        _compact_next_action_binding()["completion_candidate"]
+    )
+    action, created, affected, summary = (
+        broker_module._draft_compact_action_result(payload)
+    )
+    assert action == "batch"
+    assert created == {"tdh1-c12aa1ea49a4d727357b105b"}
+    assert affected == {response_handle}
+    assert summary["target_count"] == 3
+
+    payload["next_action_binding"].pop("completion_candidate")
+    with pytest.raises(
+        GatewayInvocationError,
+        match="compact Draft action response has an invalid bounded projection",
+    ):
+        broker_module._draft_compact_action_result(payload)
+
 
 def test_compact_generic_typed_fact_receipt_rejects_misbound_container_resume() -> None:
     resume = {
@@ -1090,6 +1109,11 @@ def test_inline_operation_metadata_binding_accepts_exact_object_scope(
     broker._validate_step(  # noqa: SLF001
         preview,
         ("typed-operation", *inline_argv),
+    )
+    target_first_argv = (*inline_argv[:4], *inline_argv[9:12], *inline_argv[4:9])
+    broker._validate_step(  # noqa: SLF001
+        preview,
+        ("typed-operation", *target_first_argv),
     )
 
     agent_result["scope"]["object"] = (

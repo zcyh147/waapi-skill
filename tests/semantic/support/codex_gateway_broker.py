@@ -53,7 +53,10 @@ from wwise_waapi.operation_registry import (
     OperationContractError,
     parse_operation_request,
 )
-from wwise_waapi.typed_operations import inline_operation_cli_arguments
+from wwise_waapi.typed_operations import (
+    inline_operation_cli_argument_variants,
+    inline_operation_cli_arguments,
+)
 from wwise_waapi.typed_requests import (
     TypedRequestContract,
     TypedRequestError,
@@ -1410,8 +1413,9 @@ def _inline_operation_cli_argument_variants(
                     variants.append(equivalent)
     return tuple(
         dict.fromkeys(
-            inline_operation_cli_arguments(request)
+            argv
             for request in variants
+            for argv in inline_operation_cli_argument_variants(request)
         )
     )
 
@@ -2381,18 +2385,21 @@ def _valid_draft_resume_action_binding(
     resume = construction_continuation.get("resume_previous_container_response")
     if resume is None:
         return True
+    if not isinstance(value, Mapping):
+        return False
+    expected_keys = {
+        "contract",
+        "shell_tool_timeout_ms",
+        "fixed_argv_prefix",
+        "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency",
+        "replace_only",
+        "resume_previous_container_response",
+        "prompt_fact_completion_guard",
+    }
+    if value.get("completion_candidate") is not None:
+        expected_keys.add("completion_candidate")
     if (
-        not isinstance(value, Mapping)
-        or set(value)
-        != {
-            "contract",
-            "shell_tool_timeout_ms",
-            "fixed_argv_prefix",
-            "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency",
-            "replace_only",
-            "resume_previous_container_response",
-            "prompt_fact_completion_guard",
-        }
+        set(value) != expected_keys
         or value.get("contract")
         != "waapi-skill.operation-draft-next-action/v1"
         or value.get("shell_tool_timeout_ms") != GATEWAY_SHELL_TOOL_TIMEOUT_MS
@@ -2522,17 +2529,16 @@ def _draft_compact_action_result(
         != GATEWAY_SHELL_TOOL_TIMEOUT_MS
         or required_fields_status not in {None, "complete", "incomplete"}
         or (
-            "construction_continuation" in result
+            required_fields_status == "incomplete"
             and completion_candidate is not None
         )
         or (
-            "construction_continuation" not in result
-            and required_fields_status == "incomplete"
-            and completion_candidate is not None
+            required_fields_status == "complete"
+            and not _valid_draft_completion_candidate(completion_candidate)
         )
         or (
-            "construction_continuation" not in result
-            and required_fields_status != "incomplete"
+            required_fields_status is None
+            and "construction_continuation" not in result
             and not _valid_draft_completion_candidate(completion_candidate)
         )
         or not _valid_draft_resume_action_binding(
