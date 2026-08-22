@@ -58,16 +58,17 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "for every same-scope token, including shared and per-row dynamic fields; "
     "never split 1..8; exact limit; no same-scope "
     "repeat after success. "
-    "Copy enum/const exactly. Copy typed_operation.continuation.gateway_argv_prefix "
-    "verbatim incl --apply; keep selector kind/value as separate argv tokens. SFX => "
-    "exact object_type Sound SFX, never Sound. Append prompt "
+    "enum/const exactly. typed_operation.continuation.gateway_argv_prefix "
+    "verbatim incl --apply; selector kind/value as separate argv tokens. SFX => "
+    "exact object_type Sound SFX, never Sound. For audio.import, put every "
+    "requested Event in its initial add_import_row; never defer or omit it. prompt "
     "terminal scalars before completion_candidate.copy_command; use "
     "shell_tool_timeout_ms. Editable draft-apply continues same turn via "
     "next_phase_decision; no progress reply while editable. "
     "A successful draft-check is not a Preview: run next_command before reply unless "
-    "requires_later_user_message. Windows first: Get-Content -Raw -Encoding UTF8 "
+    "requires_later_user_message. Get-Content -Raw -Encoding UTF8 "
     "'.agents\\skills\\waapi-skill\\SKILL.md'; short task-local only. No shell cwd "
-    "override; use task workspace."
+    "override."
 )
 
 

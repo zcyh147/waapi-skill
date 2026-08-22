@@ -352,6 +352,10 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
         },
         "never_guess_assignment_intent": True,
         "include_every_known_field_in_one_action": True,
+        "same_row_event": {
+            "when_requested": "include_in_initial_add_import_row",
+            "defer_or_omit": "invalid",
+        },
         "metadata_dependency_activation": (
             "agent_selects_exact_token_gateway_validates_dependencies"
         ),
@@ -479,6 +483,10 @@ def test_audio_import_exposes_one_row_action_with_explicit_assignment_intent(
         },
         "never_guess_assignment_intent": True,
         "include_every_known_field_in_one_action": True,
+        "same_row_event": {
+            "when_requested": "include_in_initial_add_import_row",
+            "defer_or_omit": "invalid",
+        },
         "metadata_dependency_activation": (
             "agent_selects_exact_token_gateway_validates_dependencies"
         ),
