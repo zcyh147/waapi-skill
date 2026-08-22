@@ -817,6 +817,20 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         "agent_metadata_command_required": (
             "when_dynamic_token_is_not_already_exact_live_evidence"
         ),
+        "workflow_control": {
+            "metadata_success_is_terminal": False,
+            "continue_same_turn_after_metadata": "draft-start",
+            "reply_before_draft_start": "invalid",
+        },
+        "activation_decision": {
+            "run_metadata_when": (
+                "one_or_more_required_tokens_lack_prior_successful_live_result"
+            ),
+            "skip_metadata_when": (
+                "every_required_token_has_prior_successful_live_result"
+            ),
+            "when_skipped_continue_same_turn_with": "draft-start",
+        },
         "metadata_query_batch": {
             "scope": "one exact object, class, or object-type scope",
             "first_request": (

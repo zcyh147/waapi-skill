@@ -4283,6 +4283,14 @@ def test_large_successful_execute_is_bounded_but_journal_and_verify_stay_exact(
     assert execute_payload["executed"] is True
     assert execute_payload["verified"] is False
     assert execute_payload["automatic_retry"] is False
+    assert execute_payload["agent_control"] == {
+        "terminal": False,
+        "required_outcome_before_reply": (
+            "verified_or_structured_verification_failure"
+        ),
+        "next": "execute next_command.copy_instruction.source_field in same turn",
+        "reply_before_next_command": "invalid",
+    }
     assert execute_payload["next_command"] == expected_transaction_next_command(
         "verify",
         ["verify", transaction["transaction_id"]],

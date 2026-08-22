@@ -356,9 +356,21 @@ def test_base_audio_import_adapter_is_registry_derived_and_normal_cutover(
             "when_requested": "include_in_initial_add_import_row",
             "defer_or_omit": "invalid",
         },
+        "typed_object_path_hierarchy": {
+            "ancestor_containers_encoded_in_descendant_row_path": True,
+            "container_only_row_when_descendant_row_encodes_it": "invalid",
+            "structure_only_row_allowed_when": (
+                "no requested descendant import row encodes that object"
+            ),
+        },
         "metadata_dependency_activation": (
             "agent_selects_exact_token_gateway_validates_dependencies"
         ),
+    }
+    assert contract["start_preconditions"]["workflow_control"] == {
+        "metadata_success_is_terminal": False,
+        "continue_same_turn_after_metadata": "draft-start",
+        "reply_before_draft_start": "invalid",
     }
     assert contract["registry_fragments"]["supported_row_fields"] == [
         "audio_file",
@@ -486,6 +498,13 @@ def test_audio_import_exposes_one_row_action_with_explicit_assignment_intent(
         "same_row_event": {
             "when_requested": "include_in_initial_add_import_row",
             "defer_or_omit": "invalid",
+        },
+        "typed_object_path_hierarchy": {
+            "ancestor_containers_encoded_in_descendant_row_path": True,
+            "container_only_row_when_descendant_row_encodes_it": "invalid",
+            "structure_only_row_allowed_when": (
+                "no requested descendant import row encodes that object"
+            ),
         },
         "metadata_dependency_activation": (
             "agent_selects_exact_token_gateway_validates_dependencies"

@@ -1443,6 +1443,30 @@ def _metadata_query_batch_contract() -> dict[str, str]:
     }
 
 
+def _metadata_workflow_control() -> dict[str, str | bool]:
+    """Keep operation-scoped discovery inside the same construction turn."""
+
+    return {
+        "metadata_success_is_terminal": False,
+        "continue_same_turn_after_metadata": "draft-start",
+        "reply_before_draft_start": "invalid",
+    }
+
+
+def _metadata_activation_decision() -> dict[str, str]:
+    """Distinguish live token reuse from required live discovery."""
+
+    return {
+        "run_metadata_when": (
+            "one_or_more_required_tokens_lack_prior_successful_live_result"
+        ),
+        "skip_metadata_when": (
+            "every_required_token_has_prior_successful_live_result"
+        ),
+        "when_skipped_continue_same_turn_with": "draft-start",
+    }
+
+
 def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
     """Return one reviewed Adapter contract, derived from the Registry."""
 
@@ -1594,6 +1618,8 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                             "metadata discover",
                             "draft-start",
                         ],
+                        "workflow_control": _metadata_workflow_control(),
+                        "activation_decision": _metadata_activation_decision(),
                         "metadata_scope": (
                             "use --object-type for the new type, never a target path"
                         ),
@@ -1678,6 +1704,13 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             "same_row_event": {
                 "when_requested": "include_in_initial_add_import_row",
                 "defer_or_omit": "invalid",
+            },
+            "typed_object_path_hierarchy": {
+                "ancestor_containers_encoded_in_descendant_row_path": True,
+                "container_only_row_when_descendant_row_encodes_it": "invalid",
+                "structure_only_row_allowed_when": (
+                    "no requested descendant import row encodes that object"
+                ),
             },
             "metadata_dependency_activation": (
                 "agent_selects_exact_token_gateway_validates_dependencies"
@@ -1845,6 +1878,8 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "agent_metadata_command_required": (
                     "when_dynamic_token_is_not_already_exact_live_evidence"
                 ),
+                "workflow_control": _metadata_workflow_control(),
+                "activation_decision": _metadata_activation_decision(),
                 "metadata_query_batch": _metadata_query_batch_contract(),
                 "submit_only_explicit_user_facts": True,
                 "draft_check_revalidates_dynamic_metadata": True,
@@ -1931,6 +1966,8 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "metadata discover",
                 "draft-start",
             ],
+            "workflow_control": _metadata_workflow_control(),
+            "activation_decision": _metadata_activation_decision(),
             "metadata_scope": (
                 "when the exact shared target type is known, keep --object-type "
                 "and do not substitute --object <target-path>"

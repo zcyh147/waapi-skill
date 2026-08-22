@@ -236,6 +236,20 @@ def test_object_set_composer_discloses_every_exact_typed_action_shape(
         "metadata discover",
         "draft-start",
     ]
+    assert contract["start_preconditions"]["workflow_control"] == {
+        "metadata_success_is_terminal": False,
+        "continue_same_turn_after_metadata": "draft-start",
+        "reply_before_draft_start": "invalid",
+    }
+    assert contract["start_preconditions"]["activation_decision"] == {
+        "run_metadata_when": (
+            "one_or_more_required_tokens_lack_prior_successful_live_result"
+        ),
+        "skip_metadata_when": (
+            "every_required_token_has_prior_successful_live_result"
+        ),
+        "when_skipped_continue_same_turn_with": "draft-start",
+    }
     assert contract["start_preconditions"]["metadata_gateway_argv_template"] == [
         "metadata",
         "discover",

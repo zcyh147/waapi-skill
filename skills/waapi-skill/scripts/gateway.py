@@ -11203,6 +11203,16 @@ def dispatch_transaction_command(
             "automatic_retry": False,
         }
         if call_uri != "ak.wwise.cli.migrate":
+            execute_payload["agent_control"] = {
+                "terminal": False,
+                "required_outcome_before_reply": (
+                    "verified_or_structured_verification_failure"
+                ),
+                "next": (
+                    "execute next_command.copy_instruction.source_field in same turn"
+                ),
+                "reply_before_next_command": "invalid",
+            }
             execute_payload["next_command"] = transaction_next_command(
                 "verify",
                 ["verify", transaction_id],
