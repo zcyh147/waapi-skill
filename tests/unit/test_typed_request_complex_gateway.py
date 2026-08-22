@@ -165,6 +165,13 @@ def test_media_pool_dynamic_child_applies_parent_before_descendant_disclosure(
         "prefix_source": (
             "latest_draft_response.next_action_binding.fixed_argv_prefix"
         ),
+        "complete_command_formula": [
+            "copy_every_prefix_argv_from_prefix_source",
+            "append_current_node_deferred_parent_fact_when_present",
+            "append_every_business_present_child_contract_fact_in_schema_order",
+            "execute_once_as_one_shell_tool_call",
+        ],
+        "runner_only_or_prefix_only_command": "invalid",
         "batch_scope": "current_disclosed_node_only",
         "complete_action_groups_in_queue_order": True,
         "maximum_actions": 6,

@@ -1443,6 +1443,22 @@ def _metadata_query_batch_contract() -> dict[str, str]:
     }
 
 
+def _metadata_required_sequence_by_evidence() -> dict[str, list[str]]:
+    """Keep already-proven live tokens out of redundant discovery."""
+
+    return {
+        "exact_live_tokens_already_proven": [
+            "operation-schema",
+            "draft-start",
+        ],
+        "one_or_more_dynamic_tokens_unproven": [
+            "operation-schema",
+            "metadata discover",
+            "draft-start",
+        ],
+    }
+
+
 def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
     """Return one reviewed Adapter contract, derived from the Registry."""
 
@@ -1589,11 +1605,9 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                         "applies_when": (
                             "unproven dynamic property/reference tokens are required"
                         ),
-                        "required_sequence": [
-                            "operation-schema",
-                            "metadata discover",
-                            "draft-start",
-                        ],
+                        "required_sequence_by_evidence": (
+                            _metadata_required_sequence_by_evidence()
+                        ),
                         "metadata_scope": (
                             "use --object-type for the new type, never a target path"
                         ),
@@ -1926,11 +1940,9 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "the request contains dynamic properties or references whose exact "
                 "live tokens are not already proven"
             ),
-            "required_sequence": [
-                "operation-schema",
-                "metadata discover",
-                "draft-start",
-            ],
+            "required_sequence_by_evidence": (
+                _metadata_required_sequence_by_evidence()
+            ),
             "metadata_scope": (
                 "when the exact shared target type is known, keep --object-type "
                 "and do not substitute --object <target-path>"

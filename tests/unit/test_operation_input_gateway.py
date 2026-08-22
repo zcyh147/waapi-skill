@@ -658,8 +658,18 @@ def test_normal_object_set_schema_and_detail_expose_only_composer_input(
         "object.set",
     ]
     assert schema["composer"]["start"]["preconditions"][
-        "required_sequence"
-    ] == ["operation-schema", "metadata discover", "draft-start"]
+        "required_sequence_by_evidence"
+    ] == {
+        "exact_live_tokens_already_proven": [
+            "operation-schema",
+            "draft-start",
+        ],
+        "one_or_more_dynamic_tokens_unproven": [
+            "operation-schema",
+            "metadata discover",
+            "draft-start",
+        ],
+    }
     assert schema["composer"]["start"]["preconditions"][
         "metadata_gateway_argv_template"
     ] == [
@@ -945,8 +955,18 @@ def test_structurally_distinct_adapters_share_one_public_lifecycle(
         "sequence"
     ]
     assert projections["object.create"]["start"]["preconditions"][
-        "required_sequence"
-    ] == ["operation-schema", "metadata discover", "draft-start"]
+        "required_sequence_by_evidence"
+    ] == {
+        "exact_live_tokens_already_proven": [
+            "operation-schema",
+            "draft-start",
+        ],
+        "one_or_more_dynamic_tokens_unproven": [
+            "operation-schema",
+            "metadata discover",
+            "draft-start",
+        ],
+    }
     assert "fact-action map-put" in create_dynamic["scalar_map_entry_action"]
 
     shared_keys = {
@@ -1063,11 +1083,17 @@ def test_structurally_distinct_adapters_share_one_public_lifecycle(
         "draft-start",
         "audio.import",
     ]
-    assert object_set["start"]["preconditions"]["required_sequence"] == [
-        "operation-schema",
-        "metadata discover",
-        "draft-start",
-    ]
+    assert object_set["start"]["preconditions"]["required_sequence_by_evidence"] == {
+        "exact_live_tokens_already_proven": [
+            "operation-schema",
+            "draft-start",
+        ],
+        "one_or_more_dynamic_tokens_unproven": [
+            "operation-schema",
+            "metadata discover",
+            "draft-start",
+        ],
+    }
     assert "preconditions" in audio_import["start"]
     assert set(object_set["actions"]) != set(audio_import["actions"])
 

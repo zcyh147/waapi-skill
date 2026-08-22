@@ -6559,6 +6559,19 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                                 "latest_draft_response.next_action_binding."
                                 "fixed_argv_prefix"
                             ),
+                            "complete_command_formula": [
+                                "copy_every_prefix_argv_from_prefix_source",
+                                (
+                                    "append_current_node_deferred_parent_fact_"
+                                    "when_present"
+                                ),
+                                (
+                                    "append_every_business_present_child_contract_"
+                                    "fact_in_schema_order"
+                                ),
+                                "execute_once_as_one_shell_tool_call",
+                            ],
+                            "runner_only_or_prefix_only_command": "invalid",
                             "batch_scope": "current_disclosed_node_only",
                             "complete_action_groups_in_queue_order": True,
                             "maximum_actions": MAX_TYPED_ACTIONS_PER_APPLY,
