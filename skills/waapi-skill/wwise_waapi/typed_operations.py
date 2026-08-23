@@ -786,6 +786,12 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
             ["--reference TOKEN", "--platform PLATFORM (optional)"]
         )
         continuation["target_choice"] = ["--target SELECTOR", "--clear"]
+        continuation["selector_argv"] = {
+            "object_id_string": ["--object", "id-string", "<guid>"],
+            "target_id_string": ["--target", "id-string", "<guid>"],
+            "one_array_element_per_argv": True,
+            "joined_kind_and_value_string": "invalid",
+        }
     else:
         fields.extend(["--property TOKEN", "--platform PLATFORM", "--linked true|false"])
     continuation["fields"] = fields

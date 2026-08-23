@@ -153,6 +153,12 @@ def test_inline_contract_discloses_one_operation_specific_continuation() -> None
     assert contract["input_shape"] == "inline"
     assert contract["continuation"]["subcommand"] == "typed-operation"
     assert contract["continuation"]["target_choice"] == ["--target SELECTOR", "--clear"]
+    assert contract["continuation"]["selector_argv"] == {
+        "object_id_string": ["--object", "id-string", "<guid>"],
+        "target_id_string": ["--target", "id-string", "<guid>"],
+        "one_array_element_per_argv": True,
+        "joined_kind_and_value_string": "invalid",
+    }
     assert "request-json" not in str(contract).lower()
 
 
