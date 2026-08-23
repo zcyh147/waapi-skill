@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 import os
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -1149,6 +1150,88 @@ def test_success_rejects_events_and_facts_drift(tmp_path: Path) -> None:
 
     with pytest.raises(CampaignEvidenceError, match="reconstructed from events"):
         _validate(options, unit, root)
+
+
+def test_success_accepts_unique_commands_that_complete_out_of_start_order(
+    tmp_path: Path,
+) -> None:
+    options, unit, _root, scenario_root, task_root = _passing_case(tmp_path)
+    turn_root = task_root / "turns" / "turn-01"
+    events_path = turn_root / "events.jsonl"
+    rows = [
+        json.loads(line)
+        for line in events_path.read_text(encoding="utf-8").splitlines()
+    ]
+    command_indexes = [
+        index
+        for index, row in enumerate(rows)
+        if row.get("type") in {"item.started", "item.completed"}
+        and row.get("item", {}).get("type") == "command_execution"
+    ]
+    first_start, first_complete, second_start, second_complete = command_indexes[:4]
+    assert [rows[index]["type"] for index in command_indexes[:4]] == [
+        "item.started",
+        "item.completed",
+        "item.started",
+        "item.completed",
+    ]
+    concurrent = [
+        rows[first_start],
+        rows[second_start],
+        rows[second_complete],
+        rows[first_complete],
+    ]
+    for index, row in zip(command_indexes[:4], concurrent):
+        rows[index] = row
+    events = "".join(
+        json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n"
+        for row in rows
+    )
+    matrix.write_text(events_path, events)
+    protocol = fixture._synthetic_protocol(
+        unit,
+        scenario_root=scenario_root,
+        visible_values={},
+    )
+    facts = fixture._synthetic_codex_facts(
+        options=options,
+        task_root=task_root,
+        turn_root=turn_root,
+        turn_index=1,
+        prompt=unit.turns[0].prompt,
+        thread_id="thread-1",
+        events_text=events,
+        protocol=protocol,
+        version=unit.version,
+    )
+    command_records = campaign.completed_command_records(
+        campaign.parse_jsonl_events(events),
+        windows_powershell_core_host=options.windows_powershell_core_host,
+    )
+    session = campaign.audit_session_events(
+        campaign.parse_jsonl_events(events),
+        invalid_json_line_count=0,
+    )
+    session_facts = asdict(session)
+    session_facts["passed"] = session.passed
+    facts = {
+        **facts,
+        "session_audit": campaign._json_canonical_value(session_facts),
+        "command_facts": {
+            **facts["command_facts"],
+            "command_records": campaign._json_canonical_value(
+                [asdict(record) for record in command_records]
+            ),
+            "commands": [record.command for record in command_records],
+        },
+    }
+
+    campaign._validate_heavy_v3_events_against_facts(
+        events_path,
+        facts,
+        label="passing heavy turn",
+        windows_powershell_core_host=options.windows_powershell_core_host,
+    )
 
 
 @pytest.mark.parametrize("tamper", ("duplicate", "mispaired"))

@@ -6095,6 +6095,8 @@ def _validate_heavy_v3_events_against_facts(
     events = parse_jsonl_events(text)
     started_command_ids: list[str] = []
     completed_command_ids: list[str] = []
+    started_commands: dict[str, str | None] = {}
+    completed_commands: dict[str, str | None] = {}
     for event in events:
         item = event.get("item")
         if not isinstance(item, Mapping) or item.get("type") != "command_execution":
@@ -6109,12 +6111,28 @@ def _validate_heavy_v3_events_against_facts(
             )
         if event_type == "item.started":
             started_command_ids.append(item_id)
+            started_commands[item_id] = (
+                item.get("command")
+                if isinstance(item.get("command"), str)
+                else None
+            )
         else:
             completed_command_ids.append(item_id)
+            completed_commands[item_id] = (
+                item.get("command")
+                if isinstance(item.get("command"), str)
+                else None
+            )
     if (
         len(started_command_ids) != len(set(started_command_ids))
         or len(completed_command_ids) != len(set(completed_command_ids))
-        or started_command_ids != completed_command_ids
+        or set(started_command_ids) != set(completed_command_ids)
+        or any(
+            started_commands[item_id] is not None
+            and completed_commands[item_id] is not None
+            and started_commands[item_id] != completed_commands[item_id]
+            for item_id in started_commands
+        )
     ):
         raise CampaignEvidenceError(
             f"{label} command event item ids are duplicated or mispaired"
