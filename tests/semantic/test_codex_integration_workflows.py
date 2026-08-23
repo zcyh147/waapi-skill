@@ -194,6 +194,19 @@ def test_public_units_retain_component_runtime_and_closed_legacy_ids(profile) ->
         profile.legacy_unit_ids["INT22-WEATHER"] = "not-a-legacy-id"
 
 
+def test_weather_prompt_distinguishes_the_boolean_instance_limit_from_its_value(
+    profile,
+) -> None:
+    prompt = next(
+        unit.turns[0].prompt
+        for unit in profile.units
+        if unit.unit_id == "INT25-WEATHER"
+    )
+
+    assert "自身播放实例限制这个开关设为启用" in prompt
+    assert "另行设置每个 Sound 的最大播放实例数数值" in prompt
+
+
 @pytest.mark.parametrize(
     ("case_id", "expected"),
     [

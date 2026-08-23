@@ -1182,6 +1182,7 @@ def _alarm_protocol(
         steps=steps,
         commutative_read_only_step_groups=(
             ("diag.source", "diag.dead_bus", "diag.target_bus"),
+            ("tx01.operation-schema", "metadata.discover"),
         ),
         turn_prefix_counts=(
             diagnostic_count,
