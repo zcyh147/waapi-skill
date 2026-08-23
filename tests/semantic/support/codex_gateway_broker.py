@@ -6648,7 +6648,7 @@ def _project_operation_draft_runner(
                 if len(concrete_shapes) == 1
                 else None
             )
-            if instruction != expected_instruction:
+            if instruction is not None and instruction != expected_instruction:
                 raise GatewayInvocationError(
                     "Gateway Draft disclosure copy instruction is invalid"
                 )
@@ -6740,6 +6740,30 @@ def _project_operation_draft_runner(
 
     def project_binding(binding: Mapping[str, Any]) -> dict[str, Any]:
         projected = project_disclosure_commands(binding)
+        root_disclosures = binding.get("root_dynamic_disclosure_commands")
+        if isinstance(root_disclosures, Mapping):
+            rows = root_disclosures.get("rows")
+            if not isinstance(rows, list):
+                raise GatewayInvocationError(
+                    "Gateway Draft root disclosure rows are invalid"
+                )
+            for row in rows:
+                if not isinstance(row, Mapping):
+                    raise GatewayInvocationError(
+                        "Gateway Draft root disclosure row is invalid"
+                    )
+                copies = row.get("copy_command_by_shape")
+                disclosure_argv = row.get("argv_by_shape")
+                if (
+                    isinstance(copies, Mapping)
+                    and len(copies) == 1
+                    and isinstance(disclosure_argv, Mapping)
+                    and len(disclosure_argv) == 1
+                    and row.get("copy_instruction") is None
+                ):
+                    raise GatewayInvocationError(
+                        "Gateway Draft root disclosure copy instruction is missing"
+                    )
         if "fixed_argv_prefix" in binding:
             projected = project_prefix(
                 projected,
