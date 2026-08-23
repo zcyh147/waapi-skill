@@ -66,3 +66,10 @@ def test_skill_contract_requires_confirmation_before_retargeting_invalid_parent(
     assert "not a valid direct writable parent" in text
     assert "do not silently retarget the mutation" in text
     assert "ask the user to confirm the intended writable child container" in text
+
+
+def test_operate_contract_preserves_posix_wwise_path_backslashes() -> None:
+    text = doc_text("references/waapi-operate.md")
+
+    assert "On POSIX, single-quote every Wwise path value" in text
+    assert "so backslashes survive" in text

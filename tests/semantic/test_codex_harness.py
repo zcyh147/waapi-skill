@@ -1476,7 +1476,8 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "absent means none" in instructions
     assert "Metadata gate: prompt/schema != live" in instructions
     assert "discover every dynamic token before draft-start" in instructions
-    assert "IDs: reread selected pre-schema" in instructions
+    assert "reread selected pre-schema" in instructions
+    assert "exact user Wwise path => path selector, never exact-type-name" in instructions
     assert "one query-object per hop; no merge" in instructions
     assert "enum/const exactly" in instructions
     assert "typed_operation.continuation.gateway_argv_prefix verbatim" in instructions
@@ -1486,7 +1487,9 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "SFX => exact object_type Sound SFX, never Sound" in instructions
     assert "all Events in initial rows" in instructions
     assert "parents before children" in instructions
-    assert "Paths: copy parent backslashes" in instructions
+    assert "Paths: on POSIX single-quote every Wwise path value" in instructions
+    assert "so backslashes survive" in instructions
+    assert "copy parent backslashes" in instructions
     assert "add one per child" in instructions
     assert "prompt terminal scalars" in instructions
     assert "every prompt field/item/map/bool" in instructions
