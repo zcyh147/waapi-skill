@@ -1472,16 +1472,17 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "execute_after=all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "selected-branch constant" in instructions
-    assert "object.set/audio.import dynamic fields only" in instructions
-    assert "metadata discover post-schema" in instructions
-    assert "post-schema" in instructions
-    assert "--object-type shared exact type" in instructions
+    assert "Metadata only if object.set/audio.import requires it" in instructions
+    assert "never object.setRTPC" in instructions
+    assert "Post-schema discover" in instructions
+    assert "shared exact --object-type" in instructions
     assert "--object-type from exact-ID target" not in instructions
     assert "pre-draft-start" in instructions
     assert "omit name+notes" in instructions
-    assert "exact queries" in instructions
-    assert "end --limit 1..8; once" in instructions
-    assert "exact-ID reread selected GUIDs before schema" in instructions
+    assert "exact query" in instructions
+    assert "--limit 1..8 once" in instructions
+    assert "Only selected query rows" in instructions
+    assert "exact-ID reread GUIDs before schema" in instructions
     assert "enum/const exactly" in instructions
     assert "typed_operation.continuation.gateway_argv_prefix verbatim" in instructions
     assert "incl --apply" in instructions
