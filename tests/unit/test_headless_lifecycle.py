@@ -701,6 +701,10 @@ def test_shutdown_timeout_raises_after_force_kill_timeout(tmp_path: Path) -> Non
         assert lifecycle.process is None
 
 
+def test_default_force_kill_timeout_allows_slow_native_process_reaping() -> None:
+    assert LifecycleTimeouts().kill == 10.0
+
+
 def test_close_alias_shuts_down_running_process(tmp_path: Path) -> None:
     executable = make_executable(tmp_path)
     fake_process = FakeProcess()
