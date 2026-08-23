@@ -939,6 +939,84 @@ def test_file_operations_materialize_exact_paths_without_rewriting_sources(tmp_p
     parse_operation_request(processed, expected_version="2025.1")
 
 
+def test_compact_inclusion_child_batch_carries_exact_next_root_item_command() -> None:
+    operation = "soundbank.setInclusions"
+    version = "2022.1"
+    contract = draft_operation_request_contract(operation, version)
+    inclusions = _field(contract, ("inclusions",), shape="array")
+    item_handle = dynamic_array_item_handle(
+        contract,
+        array_handle=inclusions.handle,
+        index=1,
+        shape="object",
+    )
+    item_disclosure = dynamic_container_disclosure(
+        contract,
+        parent_handle=inclusions.handle,
+        key="1",
+        shape="object",
+        child_handle=item_handle,
+    )
+    filters_handle = dynamic_map_entry_handle(
+        contract,
+        map_handle=item_handle,
+        key="filters",
+        shape="array",
+        parent_schema=item_disclosure["schema_lineage"],
+    )
+
+    continuation = gateway._operation_draft_node_batch_continuation(
+        [
+            {
+                "action": "add_typed_fact",
+                "fact_action": "map-put",
+                "field_handle": item_handle,
+                "key": "filters",
+                "value_type": "array",
+                "value": filters_handle,
+            },
+            {
+                "action": "add_typed_fact",
+                "fact_action": "append",
+                "field_handle": filters_handle,
+                "value_type": "string",
+                "value": "events",
+            },
+        ],
+        operation=operation,
+        version=version,
+    )
+
+    assert continuation is not None
+    resume = continuation["resume_previous_container_response"]
+    assert resume["ancestor_next_item_source"] == (
+        "ancestor_next_item_disclosure.copy_command_by_shape"
+    )
+    disclosure = resume["ancestor_next_item_disclosure"]
+    assert disclosure["condition"] == (
+        "current_business_request_contains_next_complex_item"
+    )
+    assert disclosure["index"] == 2
+    expected = gateway.operation_draft_copy_command(
+        [
+            "python",
+            str(gateway.GATEWAY_RUNNER_PATH),
+            "gateway.py",
+            "request-array-item",
+            operation,
+            "--schema-digest",
+            contract.schema_digest,
+            "--array-handle",
+            inclusions.handle,
+            "--index",
+            "2",
+            "--shape",
+            "object",
+        ]
+    )
+    assert disclosure["copy_command_by_shape"] == {"object": expected}
+
+
 def test_generate_and_replace_empty_inclusions_materialize_exact_operation_contracts(tmp_path: Path) -> None:
     generate = draft_operation_request_contract("soundbank.generate", "2025.1")
     banks = _field(generate, ("soundbanks",), shape="array")

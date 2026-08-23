@@ -369,7 +369,22 @@ def test_compact_generic_typed_fact_receipt_accepts_exact_container_resume() -> 
         "ancestor_resume_gate": (
             "current_response_and_all_descendant_business_candidates_exhausted"
         ),
-        "ancestor_next_item_source": "next_item_disclosure.copy_command_by_shape",
+        "ancestor_next_item_source": (
+            "ancestor_next_item_disclosure.copy_command_by_shape"
+        ),
+        "ancestor_next_item_disclosure": {
+            "condition": "current_business_request_contains_next_complex_item",
+            "business_cardinality_authority": "current_business_request",
+            "index": 2,
+            "copy_command_by_shape": {
+                "object": (
+                    "python /owned/run.py gateway.py request-array-item "
+                    "soundbank.setInclusions --schema-digest "
+                    f"{'1' * 64} --array-handle "
+                    "trh1-111111111111111111111111 --index 2 --shape object"
+                )
+            },
+        },
         "retype_schema_digest": "invalid",
     }
     payload = {
@@ -431,6 +446,24 @@ def test_compact_generic_typed_fact_receipt_accepts_exact_container_resume() -> 
     assert created == {"tdh1-c12aa1ea49a4d727357b105b"}
     assert affected == {"trm1-4dedc2c7c0aea1301b0d773f"}
     assert summary["canonical_sha256"] == "1" * 64
+
+    tampered = json.loads(json.dumps(payload))
+    disclosure = tampered["action_result"]["construction_continuation"][
+        "resume_previous_container_response"
+    ]["ancestor_next_item_disclosure"]
+    disclosure["copy_command_by_shape"]["object"] = disclosure[
+        "copy_command_by_shape"
+    ]["object"].replace("--index 2", "--index 3")
+    tampered["next_action_binding"]["resume_previous_container_response"] = (
+        tampered["action_result"]["construction_continuation"][
+            "resume_previous_container_response"
+        ]
+    )
+    with pytest.raises(
+        GatewayInvocationError,
+        match="invalid bounded projection",
+    ):
+        broker_module._draft_compact_action_result(tampered)
 
 
 def test_compact_generic_typed_fact_batch_accepts_exact_node_resume() -> None:

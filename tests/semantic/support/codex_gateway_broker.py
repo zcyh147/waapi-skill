@@ -60,6 +60,7 @@ from wwise_waapi.typed_operations import (
     inline_operation_cli_arguments,
 )
 from wwise_waapi.typed_requests import (
+    MAX_TYPED_ARRAY_ITEMS,
     TypedRequestContract,
     TypedRequestError,
     TypedRequestFact,
@@ -2316,22 +2317,29 @@ def _valid_draft_construction_continuation(
     current_key = value.get("current_key")
     key_required = completed_fact_action in {"map-put", "choose-dynamic"}
     resume = value.get("resume_previous_container_response")
+    resume_base_keys = {
+        "contract",
+        "response_handle",
+        "completed_candidate",
+        "decision_pointer",
+        "selection",
+        "continue_in_same_turn",
+        "after_exhausted",
+        "ancestor_resume_gate",
+        "ancestor_next_item_source",
+        "retype_schema_digest",
+    }
+    ancestor_disclosure = (
+        resume.get("ancestor_next_item_disclosure")
+        if isinstance(resume, Mapping)
+        else None
+    )
     resume_valid = resume is None or (
         completed_fact_action in {"map-put", "batch"}
         and isinstance(resume, Mapping)
         and set(resume)
-        == {
-            "contract",
-            "response_handle",
-            "completed_candidate",
-            "decision_pointer",
-            "selection",
-            "continue_in_same_turn",
-            "after_exhausted",
-            "ancestor_resume_gate",
-            "ancestor_next_item_source",
-            "retype_schema_digest",
-        }
+        == resume_base_keys
+        | ({"ancestor_next_item_disclosure"} if ancestor_disclosure is not None else set())
         and resume.get("contract") == "waapi-skill.typed-container-handle/v1"
         and isinstance(resume.get("response_handle"), str)
         and str(resume["response_handle"]).startswith("trm1-")
@@ -2351,7 +2359,16 @@ def _valid_draft_construction_continuation(
         and resume.get("ancestor_resume_gate")
         == "current_response_and_all_descendant_business_candidates_exhausted"
         and resume.get("ancestor_next_item_source")
-        == "next_item_disclosure.copy_command_by_shape"
+        == (
+            "ancestor_next_item_disclosure.copy_command_by_shape"
+            if ancestor_disclosure is not None
+            else "next_item_disclosure.copy_command_by_shape"
+        )
+        and (
+            _valid_ancestor_next_item_disclosure(ancestor_disclosure)
+            if ancestor_disclosure is not None
+            else True
+        )
         and resume.get("retype_schema_digest") == "invalid"
     )
     try:
@@ -2391,6 +2408,79 @@ def _valid_draft_construction_continuation(
         and (key_valid if key_required else "current_key" not in value)
         and resume_valid
     )
+
+
+def _valid_ancestor_next_item_disclosure(value: Any) -> bool:
+    if not isinstance(value, Mapping) or set(value) != {
+        "condition",
+        "business_cardinality_authority",
+        "index",
+        "copy_command_by_shape",
+    }:
+        return False
+    index = value.get("index")
+    copies = value.get("copy_command_by_shape")
+    if (
+        value.get("condition")
+        != "current_business_request_contains_next_complex_item"
+        or value.get("business_cardinality_authority")
+        != "current_business_request"
+        or type(index) is not int
+        or not 1 <= index < MAX_TYPED_ARRAY_ITEMS
+        or not isinstance(copies, Mapping)
+        or not copies
+        or not set(copies).issubset({"object", "array"})
+    ):
+        return False
+    sealed_identity: tuple[str, str, str] | None = None
+    for shape, command in copies.items():
+        if not isinstance(command, str) or not command:
+            return False
+        candidates: list[list[str]] = []
+        try:
+            candidates.append(shlex.split(command))
+        except ValueError:
+            pass
+        for decoder in (decode_windows_model_argv, decode_windows_powershell_argv):
+            try:
+                decoded = list(decoder(command))
+            except PlatformCommandError:
+                continue
+            if decoded not in candidates:
+                candidates.append(decoded)
+        valid = False
+        for argv in candidates:
+            if (
+                len(argv) != 13
+                or argv[0] != "python"
+                or argv[2] != "gateway.py"
+                or argv[3] != "request-array-item"
+                or not argv[4]
+            ):
+                continue
+            runner = argv[1]
+            if not (
+                PurePosixPath(runner).is_absolute()
+                or PureWindowsPath(runner).is_absolute()
+            ):
+                continue
+            if (
+                argv[5] == "--schema-digest"
+                and re.fullmatch(r"[0-9a-f]{64}", argv[6]) is not None
+                and argv[7] == "--array-handle"
+                and _DRAFT_HANDLE_RE.fullmatch(argv[8]) is not None
+                and argv[8].startswith("trh1-")
+                and argv[9:13] == ["--index", str(index), "--shape", shape]
+            ):
+                identity = (argv[4], argv[6], argv[8])
+                if sealed_identity is not None and identity != sealed_identity:
+                    continue
+                sealed_identity = identity
+                valid = True
+                break
+        if not valid:
+            return False
+    return True
 
 
 def _valid_draft_resume_action_binding(

@@ -601,8 +601,32 @@ def test_object_create_parent_fact_resumes_the_exact_container_response(
             "current_response_and_all_descendant_business_candidates_exhausted"
         ),
         "ancestor_next_item_source": (
-            "next_item_disclosure.copy_command_by_shape"
+            "ancestor_next_item_disclosure.copy_command_by_shape"
         ),
+        "ancestor_next_item_disclosure": {
+            "condition": "current_business_request_contains_next_complex_item",
+            "business_cardinality_authority": "current_business_request",
+            "index": 1,
+            "copy_command_by_shape": {
+                "object": waapi_gateway.operation_draft_copy_command(
+                    [
+                        "python",
+                        str(waapi_gateway.GATEWAY_RUNNER_PATH),
+                        "gateway.py",
+                        "request-array-item",
+                        "object.create",
+                        "--schema-digest",
+                        contract.schema_digest,
+                        "--array-handle",
+                        children.handle,
+                        "--index",
+                        "1",
+                        "--shape",
+                        "object",
+                    ]
+                )
+            },
+        },
         "retype_schema_digest": "invalid",
     }
     binding = put["draft"]["next_action_binding"]

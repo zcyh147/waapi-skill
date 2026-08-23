@@ -1482,7 +1482,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "typed_operation.continuation.gateway_argv_prefix verbatim" in instructions
     assert "incl --apply" in instructions
     assert "selector kind/value are separate argv" in instructions
-    assert "IDs/handles/tokens/digests are opaque exact-copy values" in instructions
+    assert "IDs/handles/tokens/digests opaque exact-copy" in instructions
     assert "SFX => exact object_type Sound SFX, never Sound" in instructions
     assert "requested Event belongs in initial add_import_row" in instructions
     assert "never defer/omit" in instructions
@@ -1490,9 +1490,9 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "no shorten/normalize" in instructions
     assert "prompt terminal scalars" in instructions
     assert "every prompt field/item/map/bool" in instructions
-    assert "Top facts first; exhaust response/descendants" in instructions
+    assert "Top facts first; exhaust tree" in instructions
     assert "then copy" in instructions
-    assert "ancestor_next_item_source verbatim" in instructions
+    assert "field named by ancestor_next_item_source verbatim" in instructions
     assert "never type digest" in instructions
     assert "shell_tool_timeout_ms" in instructions
     assert "timeout_ms>=30000" in instructions

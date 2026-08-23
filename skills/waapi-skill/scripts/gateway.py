@@ -116,6 +116,7 @@ from wwise_waapi.builders.stable_reads import (  # noqa: E402  # pyright: ignore
     normalize_project_default_work_units_result,
 )
 from wwise_waapi.typed_requests import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    MAX_TYPED_ARRAY_ITEMS,
     TYPED_REQUEST_COMPLEX_TRACER_URI,
     TYPED_REQUEST_TRACER_URI,
     TypedRequestContract,
@@ -14089,6 +14090,9 @@ def _operation_draft_facts_summary(current_facts: list[Any]) -> dict[str, Any]:
 
 def _operation_draft_node_batch_continuation(
     actions: Sequence[Mapping[str, Any]],
+    *,
+    operation: str,
+    version: str,
 ) -> dict[str, Any] | None:
     """Resume the disclosed child after one atomic parent-plus-node batch."""
 
@@ -14119,25 +14123,136 @@ def _operation_draft_node_batch_continuation(
         "stop_cancel_or_claim_truncation_before_current_root_is_complete": (
             "invalid"
         ),
-        "resume_previous_container_response": {
-            "contract": "waapi-skill.typed-container-handle/v1",
-            "response_handle": response_handle,
-            "completed_candidate": "current_node_fact_batch",
-            "decision_pointer": (
-                "/continuation/next_command_decision/evaluate_in_order"
-            ),
-            "selection": "first_remaining_business_present_candidate_in_order",
-            "continue_in_same_turn": True,
-            "after_exhausted": "resume_ancestor_response_stack",
-            "ancestor_resume_gate": (
-                "current_response_and_all_descendant_business_candidates_exhausted"
-            ),
-            "ancestor_next_item_source": (
-                "next_item_disclosure.copy_command_by_shape"
-            ),
-            "retype_schema_digest": "invalid",
-        },
+        "resume_previous_container_response": (
+            _operation_draft_resume_previous_container_payload(
+                response_handle=response_handle,
+                completed_candidate="current_node_fact_batch",
+                operation=operation,
+                version=version,
+                actions=actions,
+            )
+        ),
     }
+
+
+def _operation_draft_root_array_next_item_disclosure(
+    *,
+    operation: str,
+    version: str,
+    actions: Sequence[Mapping[str, Any]],
+) -> dict[str, Any] | None:
+    """Carry the exact next direct-root array command across child receipts."""
+
+    if not actions:
+        return None
+    parent_fact = actions[0]
+    candidate_handles = {
+        value
+        for value in (parent_fact.get("field_handle"), parent_fact.get("value"))
+        if isinstance(value, str) and value.startswith("trm1-")
+    }
+    if not candidate_handles:
+        return None
+    contract = draft_operation_request_contract(operation, version)
+    for field in contract.fields:
+        if field.parent_handle is not None or field.shape != "array":
+            continue
+        for index in range(MAX_TYPED_ARRAY_ITEMS):
+            matched = False
+            for shape in ("object", "array"):
+                choices = dynamic_array_item_choices(
+                    contract,
+                    array_handle=field.handle,
+                    index=index,
+                    shape=shape,
+                )
+                if len(choices) != 1:
+                    continue
+                current_handle = dynamic_array_item_handle(
+                    contract,
+                    array_handle=field.handle,
+                    index=index,
+                    shape=shape,
+                )
+                if current_handle in candidate_handles:
+                    matched = True
+                    break
+            if not matched:
+                continue
+            next_index = index + 1
+            if next_index >= MAX_TYPED_ARRAY_ITEMS:
+                return None
+            copy_command_by_shape: dict[str, str] = {}
+            for shape in ("object", "array"):
+                choices = dynamic_array_item_choices(
+                    contract,
+                    array_handle=field.handle,
+                    index=next_index,
+                    shape=shape,
+                )
+                if len(choices) != 1:
+                    continue
+                copy_command_by_shape[shape] = operation_draft_copy_command(
+                    [
+                        "python",
+                        str(GATEWAY_RUNNER_PATH),
+                        "gateway.py",
+                        "request-array-item",
+                        operation,
+                        "--schema-digest",
+                        contract.schema_digest,
+                        "--array-handle",
+                        field.handle,
+                        "--index",
+                        str(next_index),
+                        "--shape",
+                        shape,
+                    ]
+                )
+            if not copy_command_by_shape:
+                return None
+            return {
+                "condition": "current_business_request_contains_next_complex_item",
+                "business_cardinality_authority": "current_business_request",
+                "index": next_index,
+                "copy_command_by_shape": copy_command_by_shape,
+            }
+    return None
+
+
+def _operation_draft_resume_previous_container_payload(
+    *,
+    response_handle: str,
+    completed_candidate: str,
+    operation: str,
+    version: str,
+    actions: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "contract": "waapi-skill.typed-container-handle/v1",
+        "response_handle": response_handle,
+        "completed_candidate": completed_candidate,
+        "decision_pointer": "/continuation/next_command_decision/evaluate_in_order",
+        "selection": "first_remaining_business_present_candidate_in_order",
+        "continue_in_same_turn": True,
+        "after_exhausted": "resume_ancestor_response_stack",
+        "ancestor_resume_gate": (
+            "current_response_and_all_descendant_business_candidates_exhausted"
+        ),
+        "ancestor_next_item_source": "next_item_disclosure.copy_command_by_shape",
+        "retype_schema_digest": "invalid",
+    }
+    disclosure = _operation_draft_root_array_next_item_disclosure(
+        operation=operation,
+        version=version,
+        actions=actions,
+    )
+    if disclosure is not None:
+        payload["ancestor_next_item_source"] = (
+            "ancestor_next_item_disclosure.copy_command_by_shape"
+        )
+        payload["ancestor_next_item_disclosure"] = disclosure
+    return payload
 
 
 def _operation_draft_compact_action_projection(
@@ -14231,26 +14346,15 @@ def _operation_draft_compact_action_projection(
             continuation["next_rule"] = (
                 "resume_previous_container_response_after_deferred_fact_queue"
             )
-            continuation["resume_previous_container_response"] = {
-                "contract": "waapi-skill.typed-container-handle/v1",
-                "response_handle": dynamic_value,
-                "completed_candidate": "deferred_fact_queue",
-                "decision_pointer": (
-                    "/continuation/next_command_decision/evaluate_in_order"
-                ),
-                "selection": (
-                    "first_remaining_business_present_candidate_in_order"
-                ),
-                "continue_in_same_turn": True,
-                "after_exhausted": "resume_ancestor_response_stack",
-                "ancestor_resume_gate": (
-                    "current_response_and_all_descendant_business_candidates_exhausted"
-                ),
-                "ancestor_next_item_source": (
-                    "next_item_disclosure.copy_command_by_shape"
-                ),
-                "retype_schema_digest": "invalid",
-            }
+            continuation["resume_previous_container_response"] = (
+                _operation_draft_resume_previous_container_payload(
+                    response_handle=dynamic_value,
+                    completed_candidate="deferred_fact_queue",
+                    operation=record.operation,
+                    version=record.version,
+                    actions=actions,
+                )
+            )
         action_result["construction_continuation"] = continuation
     if action.get("fact_action") == "choose" and isinstance(
         action.get("value"), str
@@ -14440,7 +14544,9 @@ def operation_draft_payload(
                 action_result["action_count"] = len(compact_actions)
                 action_result["applied_atomically"] = True
                 batch_continuation = _operation_draft_node_batch_continuation(
-                    compact_actions
+                    compact_actions,
+                    operation=record.operation,
+                    version=record.version,
                 )
                 if batch_continuation is None:
                     action_result.pop("construction_continuation", None)
