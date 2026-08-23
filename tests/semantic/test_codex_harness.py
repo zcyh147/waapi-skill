@@ -1474,7 +1474,8 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "selected-branch constant" in instructions
     assert "Mutation post-schema" in instructions
     assert "metadata discover each property/reference" in instructions
-    assert "--object-type from exact-ID target" in instructions
+    assert "--object-type exact shared target type" in instructions
+    assert "--object-type from exact-ID target" not in instructions
     assert "before draft-start" in instructions
     assert "omit name+notes" in instructions
     assert "query no proof" in instructions

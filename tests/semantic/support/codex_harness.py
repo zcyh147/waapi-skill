@@ -54,7 +54,7 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "tree_preorder. After choose add required selected-branch constant/value facts. "
     "Top facts first; exhaust tree. More item: copy ancestor_next_item_source; "
     "none: completion_candidate.copy_command. Never type digest. Mutation post-schema: "
-    "metadata discover each property/reference; --object-type from exact-ID target; "
+    "metadata discover each property/reference; --object-type exact shared target type; "
     "before draft-start; omit name+notes; query no proof; end --limit 1..8; once. "
     "Multi-row mutation: exact-ID reread "
     "selected GUIDs before schema. "
