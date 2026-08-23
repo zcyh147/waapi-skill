@@ -198,10 +198,7 @@ def test_object_set_composer_discloses_every_exact_typed_action_shape(
         "include_every_required_field": True,
         "include_only_selected_optional_fields": True,
         "additional_fields": False,
-    }
-    assert contract["identity_value_authority"] == {
-        "prior_gateway_result_id_is_opaque_exact_copy": True,
-        "replace_prior_result_id_with_path_or_name": "invalid",
+        "prior_gateway_id": "opaque_exact_copy_only",
     }
     assert contract["flat_target_row_discipline"] == {
         "initial_action": "add_target",

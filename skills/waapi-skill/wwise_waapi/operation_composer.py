@@ -1919,10 +1919,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             "include_every_required_field": True,
             "include_only_selected_optional_fields": True,
             "additional_fields": False,
-        },
-        "identity_value_authority": {
-            "prior_gateway_result_id_is_opaque_exact_copy": True,
-            "replace_prior_result_id_with_path_or_name": "invalid",
+            "prior_gateway_id": "opaque_exact_copy_only",
         },
         "flat_target_row_discipline": {
             "initial_action": "add_target",
