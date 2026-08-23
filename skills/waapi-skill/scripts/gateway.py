@@ -2264,6 +2264,7 @@ def _typed_container_response_end() -> dict[str, Any]:
         "marker": "WAAPI_TYPED_CONTAINER_RESPONSE_END",
         "complete": True,
         "truncated": False,
+        "agent_action": "continue_same_turn",
     }
 
 

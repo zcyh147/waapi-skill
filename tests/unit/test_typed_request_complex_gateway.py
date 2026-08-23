@@ -1416,12 +1416,13 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
         "marker": "WAAPI_TYPED_CONTAINER_RESPONSE_END",
         "complete": True,
         "truncated": False,
+        "agent_action": "continue_same_turn",
     }
     assert list(root_projected)[-1] == "response_end"
     assert root_encoded.endswith(
         '"response_end":{"contract":"waapi-skill.gateway-response-end/v1",'
         '"marker":"WAAPI_TYPED_CONTAINER_RESPONSE_END","complete":true,'
-        '"truncated":false}}'
+        '"truncated":false,"agent_action":"continue_same_turn"}}'
     )
     assert root_encoded.index('"response_integrity":{') < root_encoded.index(
         '"continuation":{'
