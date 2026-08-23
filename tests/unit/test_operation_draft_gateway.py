@@ -104,6 +104,22 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
         "next_action_binding": {
             "contract": "waapi-skill.operation-draft-next-action/v1",
             "shell_tool_timeout_ms": 30_000,
+            "allowed_action_argv": {
+                "set_request_option": ["--option", "NAME", "TYPE", "VALUE"],
+                "clear_request_option": ["--option", "NAME"],
+                "add_target": [
+                    "--target", "SELECTOR_KIND", "SELECTOR_VALUES...",
+                    "[--name VALUE]", "[--notes VALUE]", "[--platform VALUE]",
+                    "[--list-mode VALUE]", "[--on-name-conflict VALUE]",
+                    "[--property NAME TYPE VALUE]...",
+                    "[--reference NAME SELECTOR_KIND SELECTOR_VALUES...]...",
+                ],
+            },
+            "action_argv_discipline": {
+                "source": "allowed_action_argv[action-name]",
+                "copy_placeholder_positions_exactly": True,
+                "insert_type_only_where_template_contains_TYPE": True,
+            },
             "draft_id": draft_id,
             "expected_revision": 1,
             "one_atomic_action_batch_only": True,

@@ -14618,6 +14618,41 @@ def operation_draft_payload(
             "contract": "waapi-skill.operation-draft-next-action/v1",
             "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
         }
+        if (
+            command == "draft-start"
+            and compact_actions is None
+            and record.check is None
+            and not generic_typed_draft
+        ):
+            composer_input = operation_composer_input_contract(
+                record.operation,
+                record.version,
+            )
+            apply_contract = require_mapping(
+                composer_input.get("apply"),
+                "operation Composer apply contract",
+            )
+            action_argv = require_mapping(
+                apply_contract.get("action_argv"),
+                "operation Composer action argv",
+            )
+            allowed_actions = draft.get("allowed_actions")
+            if not isinstance(allowed_actions, list):
+                raise GatewayInputError(
+                    "Editable operation Draft lacks its allowed actions."
+                )
+            allowed_action_argv = {
+                action: list(action_argv[action])
+                for action in allowed_actions
+                if isinstance(action, str) and action in action_argv
+            }
+            if allowed_action_argv:
+                next_action_binding["allowed_action_argv"] = allowed_action_argv
+                next_action_binding["action_argv_discipline"] = {
+                    "source": "allowed_action_argv[action-name]",
+                    "copy_placeholder_positions_exactly": True,
+                    "insert_type_only_where_template_contains_TYPE": True,
+                }
         if generic_typed_draft:
             typed_draft_contract = (
                 request_contract(record.version, record.operation)

@@ -1466,15 +1466,15 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "batch_size 6" in instructions
     assert "final batch has all remaining" in instructions
     assert "may be shorter" in instructions
-    assert "CLI TYPE: string/number/integer/boolean" in instructions
+    assert "allowed_action_argv governs TYPE position" in instructions
     assert "not Real64/int16" in instructions
     assert "unapplied ancestor deferred_fact" in instructions
     assert "execute_after=all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "selected-branch constant" in instructions
-    assert "Change only after schema" in instructions
-    assert "metadata discover --query Volume --query OutputBus before draft-start" in instructions
-    assert "omit name/notes" in instructions
+    assert "Change after schema" in instructions
+    assert "metadata discover exact --query Volume --query OutputBus" in instructions
+    assert "before draft-start" in instructions
     assert "object-query isn't proof" in instructions
     assert "end --limit 1..8" in instructions
     assert "no repeat" in instructions

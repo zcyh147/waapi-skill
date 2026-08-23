@@ -233,6 +233,8 @@ def test_existing_transaction_continuation_precedes_named_operation_schema() -> 
     assert "An existing transaction continuation always outranks operation selection" in operate
     assert "an artifact hash is not a lookup key" in operate
     assert "transaction-show <transaction-id> --summary-only" in operate
+    assert "The visible Preview's `next_command` is authoritative" in operate
+    assert "never authorizes reconstruction" in operate
     assert "Do not call `operations`, `operation-schema`, or `request-schema` first" in operate
     assert "execute only the field named by `next_command.copy_instruction.source_field`" in operate
     assert "copying the complete string verbatim once" in operate

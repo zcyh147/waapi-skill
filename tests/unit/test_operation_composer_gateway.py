@@ -801,6 +801,31 @@ def test_normal_composer_schema_discloses_typed_argv_not_action_json(
     assert "typed-action-json" not in encoded
 
 
+def test_object_set_draft_start_repeats_exact_allowed_action_argv(
+    tmp_path: Path,
+) -> None:
+    code, payload = execute(tmp_path, "draft-start", "object.set")
+
+    assert code == 0
+    binding = payload["draft"]["next_action_binding"]
+    assert binding["allowed_action_argv"] == {
+        "set_request_option": ["--option", "NAME", "TYPE", "VALUE"],
+        "clear_request_option": ["--option", "NAME"],
+        "add_target": [
+            "--target", "SELECTOR_KIND", "SELECTOR_VALUES...",
+            "[--name VALUE]", "[--notes VALUE]", "[--platform VALUE]",
+            "[--list-mode VALUE]", "[--on-name-conflict VALUE]",
+            "[--property NAME TYPE VALUE]...",
+            "[--reference NAME SELECTOR_KIND SELECTOR_VALUES...]...",
+        ],
+    }
+    assert binding["action_argv_discipline"] == {
+        "source": "allowed_action_argv[action-name]",
+        "copy_placeholder_positions_exactly": True,
+        "insert_type_only_where_template_contains_TYPE": True,
+    }
+
+
 @pytest.mark.parametrize(
     ("version", "operation", "path", "expected"),
     (
