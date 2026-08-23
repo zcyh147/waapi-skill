@@ -1484,8 +1484,8 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "selector kind/value are separate argv" in instructions
     assert "IDs/handles/tokens/digests opaque exact-copy" in instructions
     assert "SFX => exact object_type Sound SFX, never Sound" in instructions
-    assert "requested Event belongs in initial add_import_row" in instructions
-    assert "never defer/omit" in instructions
+    assert "all Events in initial rows" in instructions
+    assert "parents before children" in instructions
     assert "Paths: every backslash verbatim" in instructions
     assert "no shortening" in instructions
     assert "prompt terminal scalars" in instructions
