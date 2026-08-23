@@ -55,7 +55,7 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "Top facts first; exhaust tree. More item: copy ancestor_next_item_source; "
     "none: completion_candidate.copy_command. Never type digest. Metadata: reuse only successful live "
     "tokens; else one call: each property/reference gets --query; skip name/notes; "
-    "end --limit 1..8; no repeat. "
+    "query fields are not metadata tokens; end --limit 1..8; no repeat. "
     "Multi-row mutation: exact-ID reread "
     "selected GUIDs before schema. "
     "enum/const exactly. typed_operation.continuation.gateway_argv_prefix "

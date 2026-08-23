@@ -1463,6 +1463,8 @@ def _metadata_activation_decision() -> dict[str, str]:
         "skip_metadata_when": (
             "every_required_token_has_prior_successful_live_result"
         ),
+        "successful_live_result_source": "metadata_discover_only",
+        "query_object_fields_are_token_proof": "invalid",
         "when_skipped_continue_same_turn_with": "draft-start",
     }
 
