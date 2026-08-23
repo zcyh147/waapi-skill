@@ -1487,8 +1487,9 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "incl --apply" in instructions
     assert "selector kind/value separate argv" in instructions
     assert "opaque IDs/handles/tokens/digests" in instructions
-    assert "SFX => exact object_type Sound SFX, never Sound" in instructions
-    assert "Import: Events initial" in instructions
+    assert "Import object_type=Sound SFX" in instructions
+    assert "query type=Sound" in instructions
+    assert "Events initial" in instructions
     assert "parents first" in instructions
     assert "POSIX Wwise paths single-quoted" in instructions
     assert "keep backslashes" in instructions
