@@ -1802,6 +1802,10 @@ payload = {
     "shim_trusted_python_visible": "WAAPI_CODEX_GATEWAY_SHIM_TRUSTED_PYTHON" in os.environ,
     "gateway_required_visible": "WAAPI_CODEX_GATEWAY_REQUIRED" in os.environ,
 }
+if mode == "report-python-bytecode-policy":
+    payload["python_dont_write_bytecode"] = os.environ.get(
+        "PYTHONDONTWRITEBYTECODE"
+    )
 transaction_id = os.environ.get("FAKE_GATEWAY_TRANSACTION_ID", "tx-dynamic-123")
 artifact_hash = "a" * 64
 event_sequence = 2
@@ -7156,6 +7160,26 @@ def test_trusted_pre_observer_runs_after_argv_validation_before_gateway_process(
         assert run_model_command(broker, ["status"]).returncode == 0
         assert events == ["before", "after"]
         assert broker.evidence().passed is True
+
+
+def test_broker_runner_cannot_write_python_bytecode_into_the_skill_tree(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(ExpectedGatewayStep("status", "status"),),
+        runner_environment={
+            "PATH": os.environ.get("PATH", os.defpath),
+            "FAKE_GATEWAY_MODE": "report-python-bytecode-policy",
+        },
+        transport="tcp",
+    ) as broker:
+        result = run_model_command(broker, ["status"])
+        evidence = broker.evidence()
+
+    assert result.returncode == 0
+    assert evidence.records[0].payload["python_dont_write_bytecode"] == "1"
 
 
 def test_subscription_ack_is_secret_fresh_step_bound_and_broker_validated(

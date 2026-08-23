@@ -149,6 +149,7 @@ _BROKER_ENV_NAMES = frozenset(
     }
 )
 _PYTHON_IO_ENCODING_ENV = "PYTHONIOENCODING"
+_PYTHON_DONT_WRITE_BYTECODE_ENV = "PYTHONDONTWRITEBYTECODE"
 _PYTHON_NAMES = frozenset({"python", "python3"})
 WINDOWS_SHIM_SCRIPT_NAME = "broker_shim.py"
 WINDOWS_COMMAND_SHIM_NAMES = tuple(
@@ -9693,13 +9694,18 @@ class CodexGatewayBroker:
             runner_env = dict(self._runner_environment)
             _remove_environment_names(
                 runner_env,
-                (*_BROKER_ENV_NAMES, _PYTHON_IO_ENCODING_ENV),
+                (
+                    *_BROKER_ENV_NAMES,
+                    _PYTHON_IO_ENCODING_ENV,
+                    _PYTHON_DONT_WRITE_BYTECODE_ENV,
+                ),
                 platform_name=self.platform_name,
             )
             # The parent reads strict UTF-8.  Own the packaged Python runner's
             # stream encoding too, including case-insensitive Windows aliases,
             # so locale/ACP settings cannot corrupt structured gateway output.
             runner_env[_PYTHON_IO_ENCODING_ENV] = "utf-8:strict"
+            runner_env[_PYTHON_DONT_WRITE_BYTECODE_ENV] = "1"
             runner_env[STATE_DIRECTORY_ENV] = str(self.state_directory)
             runner_env[EVIDENCE_DIRECTORY_ENV] = str(self.evidence_directory)
             runner_env[CONFIG_PATH_ENV] = str(self.config_path)
