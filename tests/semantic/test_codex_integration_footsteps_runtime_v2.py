@@ -585,6 +585,14 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
         "surface_group_path": case.fake._path("surface_group"),
         "footsteps_event_path": case.fake._path("play_footsteps_event"),
     }
+    prompt = case.unit.scenario.render_prompt(prepared.visible_values)
+    for name in (
+        "footsteps_container_path",
+        "surface_group_path",
+        "footsteps_event_path",
+    ):
+        assert f"`{prepared.visible_values[name]}`" in prompt
+    assert "逐字保留其中每个反斜杠分隔符" in prompt
     assert prepared.protocol.turn_prefix_counts == (5, 11, 15)
     assert len(prepared.protocol.steps) == 15
     assert [

@@ -432,7 +432,7 @@
         {
           "index": 1,
           "kind": "request",
-          "prompt": "{snow_source_directory} 中有 snow_step_01.wav、snow_step_02.wav、snow_step_03.wav 和 snow_step_04.wav。请在现有 {footsteps_container_path} 下新建一个名为 Snow 的 Random Container，并把四条素材依次作为名为 Snow_Step_01、Snow_Step_02、Snow_Step_03、Snow_Step_04 的 Sound SFX 导入其中；文件编号和 Sound 名称编号一一对应。把这个 Snow 容器分配给 {surface_group_path} 下已有的 Snow Switch。随后解除 Mud 容器当前的 Surface/Mud 分配，但保留 Mud 容器、里面的声音、素材和 Mud Switch 值。Metal、Wood 的现有分配以及 {footsteps_event_path} 的播放链路都不要修改。请先给我看 Snow 层级、四条导入和 Snow 分配这一步的预览；完成后再单独预览解除 Mud 分配。",
+          "prompt": "{snow_source_directory} 中有 snow_step_01.wav、snow_step_02.wav、snow_step_03.wav 和 snow_step_04.wav。请在现有 `{footsteps_container_path}` 下新建一个名为 Snow 的 Random Container，并把四条素材依次作为名为 Snow_Step_01、Snow_Step_02、Snow_Step_03、Snow_Step_04 的 Sound SFX 导入其中；文件编号和 Sound 名称编号一一对应。把这个 Snow 容器分配给 `{surface_group_path}` 下已有的 Snow Switch。随后解除 Mud 容器当前的 Surface/Mud 分配，但保留 Mud 容器、里面的声音、素材和 Mud Switch 值。Metal、Wood 的现有分配以及 `{footsteps_event_path}` 的播放链路都不要修改。这三个 Wwise 路径都是不透明的完整业务值，请逐字保留其中每个反斜杠分隔符。请先给我看 Snow 层级、四条导入和 Snow 分配这一步的预览；完成后再单独预览解除 Mud 分配。",
           "confirms_transaction": null,
           "expects_preview_transaction": 1
         },

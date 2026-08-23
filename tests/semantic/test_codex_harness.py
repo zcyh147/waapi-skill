@@ -1478,6 +1478,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "paired modes/routing" in instructions
     assert "one 1..8-query call" in instructions
     assert "never query that scope again" in instructions
+    assert "exact-ID re-read each selected GUID before operation-schema" in instructions
     assert "enum/const exactly" in instructions
     assert "typed_operation.continuation.gateway_argv_prefix verbatim" in instructions
     assert "incl --apply" in instructions

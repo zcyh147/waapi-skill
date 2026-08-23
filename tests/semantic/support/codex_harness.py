@@ -56,6 +56,7 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "ancestor_next_item_source verbatim; never type digest. Metadata: reuse prior "
     "live tokens; else inventory every same-scope prompt property/reference (incl "
     "paired modes/routing) before one 1..8-query call; never query that scope again. "
+    "After a multi-row read, exact-ID re-read each selected GUID before operation-schema. "
     "enum/const exactly. typed_operation.continuation.gateway_argv_prefix "
     "verbatim incl --apply; selector kind/value are separate argv. SFX => "
     "exact object_type Sound SFX, never Sound. audio.import: every requested "
