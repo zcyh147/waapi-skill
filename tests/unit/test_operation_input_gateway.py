@@ -622,6 +622,7 @@ def test_normal_object_set_schema_and_detail_expose_only_composer_input(
     }
     assert schema["composer"]["flat_target_row_discipline"] == {
         "initial_action": "add_target",
+        "prior_gateway_id": "opaque_exact_copy_only",
         "include_every_known_field": [
             "name",
             "notes",
