@@ -6,7 +6,7 @@ Read this file once with one complete standalone `cat`. It is complete only when
 
 - The only normal change path is the packaged transaction CLI through absolute `scripts/run.py` from the injected `SKILL.md` locator.
 - Do not import builders or planners from inline Python, write a helper, call `WaapiClient`, construct raw WAAPI mutations, edit Wwise XML, or bypass a dedicated operation with generic `call`. Do not write code to bypass an unsupported boundary. That boundary does not authorize code generation.
-- One read/Gateway invocation per shell call; never join commands. On POSIX, single-quote every Wwise path value so backslashes survive.
+- POSIX: single-quote Wwise path values to preserve backslashes; one read/Gateway call per shell call, never joined.
 - Read each Gateway JSON before continuing; exit `0` proves nothing. Stop on empty, non-JSON, or host-truncated output. A typed-container response is complete only when final `WAAPI_TYPED_CONTAINER_RESPONSE_END` says `complete:true` and `truncated:false`; then continue from that response.
 - A rejected or nonzero Gateway invocation is also a hard stop for that turn. Do not advance to the next schema, preview, or transaction phase and do not repair or retry the command. The sole metadata-discovery retry below starts only from a successful complete JSON result whose `fallback_detail_scan.status` is `partial`.
 - Except for the migration below, one complete terminal `verify` result ends the transaction; append no query, filesystem inspection, or other proof.
@@ -106,7 +106,7 @@ For example, `object.setRTPC` authors a curve while `ak.soundengine.setRTPCValue
 - If exact type is unproven, first exact-query the unchanged root and require one type/name/path match. Then open `operation-schema object.create` and follow its sole continuation directly into the Draft; do not query the parent already determined by that verified path.
 - For the current-version default container Work Unit, use that preflight query for an `object.create` same-name-root merge; `object.set` instead uses its returned target base, live token discovery, and Composer validation. Do not insert `project-default-work-units`.
 - Existing `objects[]` never implies child-name merge; obey returned `fail`, `merge`, or guarded-replace guidance.
-- If it is not a valid direct writable parent, do not silently retarget the mutation; ask the user to confirm the intended writable child container.
+- If not a valid direct writable parent, do not silently retarget the mutation; ask the user to confirm the intended writable child container.
 
 ## Resolve properties and references from live metadata
 
@@ -136,6 +136,7 @@ For user Lua files use `lua.executeCoreFile` in Authoring, or `lua.executeCliFil
 - `import_location` is a wire-significant path-base selector, not a harmless common-parent hint. For an absolute `object_path`, omit it from both the row and `defaults` unless the user explicitly asks for that native field; never infer `defaults.import_location` from a shared absolute parent. A relative `object_path` requires one effective row/default `import_location`.
 - When one direct import request explicitly includes a new container hierarchy, represent each requested container once as a typed structure-only row, then use full logical `object_path` values for the media rows below it. A structure-only row contains its path/type and only fields the user actually assigned to that container; never inherit Sound-only language, properties, references, media, or Event fields onto it through `defaults`. Keep those Sound fields on the media rows when the batch mixes structures and Sounds. Do not also encode the same containers as typed path segments.
 - Use `originals_subfolder` only when the user explicitly supplies its exact relative destination; otherwise omit it—never infer one from a source directory, media category, object path, or example. It is relative to Wwise's normal destination for that language; preserve an explicit value and never silently add or remove an `SFX/` prefix.
+- `audio_file`: supplied absolute path only; no relative/traversal.
 - Every requested import Event belongs in the matching media row of that same `audio.import` preview, with the exact absolute path below `\Events` and the requested Action. It must be absent before preview and unique across rows. Do not omit it for a later transaction or append an Action to an existing Event.
 - Wwise `Pitch` values are cents. Convert requested semitones before preview (`1 semitone = 100 cents`); do not pass the semitone number as the property value.
 

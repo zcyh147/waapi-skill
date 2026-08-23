@@ -71,5 +71,7 @@ def test_skill_contract_requires_confirmation_before_retargeting_invalid_parent(
 def test_operate_contract_preserves_posix_wwise_path_backslashes() -> None:
     text = doc_text("references/waapi-operate.md")
 
-    assert "On POSIX, single-quote every Wwise path value" in text
-    assert "so backslashes survive" in text
+    assert "POSIX: single-quote Wwise path values" in text
+    assert "to preserve backslashes" in text
+    assert "`audio_file`: supplied absolute path only" in text
+    assert "no relative/traversal" in text

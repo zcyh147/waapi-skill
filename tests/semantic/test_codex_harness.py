@@ -1491,6 +1491,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "so backslashes survive" in instructions
     assert "copy parent backslashes" in instructions
     assert "add one per child" in instructions
+    assert "Files: supplied absolute path only; no relative/traversal" in instructions
     assert "prompt terminal scalars" in instructions
     assert "every prompt field/item/map/bool" in instructions
     assert "Top facts first; exhaust tree" in instructions
