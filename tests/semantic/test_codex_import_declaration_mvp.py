@@ -816,6 +816,12 @@ def test_fake_gateway_cli_shape_errors_are_structured_and_atomic(
     assert list(payload)[-1] == "agent_result"
     assert state_path.read_bytes() == before
 
+    assert fake_gateway_main(["gateway.py", "x" * 10_000]) == 2
+    unknown_raw = capsys.readouterr().out
+    unknown = json.loads(unknown_raw)
+    assert unknown["command"] == "mvp-request"
+    assert len(unknown_raw.encode("utf-8")) < 1024
+
 
 def test_mvp_agent_contract_uses_standard_skill_bootstrap_and_semantic_preview_grade(
     tmp_path: Path,

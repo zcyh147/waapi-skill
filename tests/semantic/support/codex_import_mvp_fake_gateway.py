@@ -24,6 +24,15 @@ SKILL_ROOT_ENV = "WAAPI_MVP_SKILL_ROOT"
 VERSION_ENV = "WAAPI_MVP_VERSION"
 STATE_DIR_ENV = "WAAPI_SKILL_STATE_DIR"
 PROJECT_ID = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
+MVP_COMMANDS = frozenset(
+    {
+        "mvp-context",
+        "mvp-structure",
+        "mvp-asset",
+        "mvp-existing-asset",
+        "mvp-preview",
+    }
+)
 ROOT_ID = "{11111111-1111-1111-1111-111111111111}"
 BUS_ID = "{22222222-2222-2222-2222-222222222222}"
 RIFLE_ID = "{33333333-3333-3333-3333-333333333333}"
@@ -618,7 +627,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         args = _parser().parse_args(argv)
     except MvpCliRepair:
-        command = raw_argv[1] if len(raw_argv) > 1 else "mvp-request"
+        supplied_command = raw_argv[1] if len(raw_argv) > 1 else ""
+        command = (
+            supplied_command if supplied_command in MVP_COMMANDS else "mvp-request"
+        )
         return _emit(
             command,
             ok=False,
