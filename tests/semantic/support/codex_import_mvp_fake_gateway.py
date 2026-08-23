@@ -554,6 +554,8 @@ def _business_preview_lines(request: Mapping[str, Any]) -> list[str]:
                 lines.append("循环方式：Infinite")
             elif label:
                 lines.append(f"{label}：{prop['value']:g}")
+        for reference in row.get("references", []):
+            lines.append(f"引用：{reference['name']}")
         if "switch_assignment" in row:
             lines.append(f"Switch 值：{row['switch_assignment']}")
     return lines

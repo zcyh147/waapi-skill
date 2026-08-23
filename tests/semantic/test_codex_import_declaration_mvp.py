@@ -717,6 +717,7 @@ def test_fixed_fake_gateway_cases_use_real_compiler_and_immutable_preview(
         row.get("@CustomAuxBus") == AUX_BUS_ID
         for row in weapons_dispatch["args"]["imports"]
     )
+    assert "引用：CustomAuxBus" in previews_by_family["weapons"][0]["preview"]
     footsteps_dispatch = previews_by_family["footsteps"][0]["compiler_evidence"][
         "dispatch"
     ]
