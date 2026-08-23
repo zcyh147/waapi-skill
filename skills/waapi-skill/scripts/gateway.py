@@ -14991,15 +14991,65 @@ def operation_draft_payload(
                 **next_action_binding,
             }
         if not (command == "draft-check" and record.check is not None):
+            priority_keys = (
+                "contract",
+                "required_next_phase",
+                "fixed_argv_prefix_copy",
+                "fixed_argv_prefix_copy_instruction",
+                "next_phase_decision",
+            )
+            next_action_binding = {
+                **{
+                    key: next_action_binding[key]
+                    for key in priority_keys
+                    if key in next_action_binding
+                },
+                **{
+                    key: value
+                    for key, value in next_action_binding.items()
+                    if key not in priority_keys
+                },
+            }
             draft["next_action_binding"] = next_action_binding
         if command in {"draft-start", "draft-apply"}:
-            draft["agent_control"] = {
+            agent_control = {
                 "terminal": False,
                 "required_outcome_before_reply": (
                     "preview_or_structured_refusal"
                 ),
                 "next": "follow_next_action_binding",
                 "reply_or_claim_preview_now": "invalid",
+            }
+            draft = {
+                **{
+                    key: draft[key]
+                    for key in (
+                        "contract",
+                        "draft_id",
+                        "lifecycle_state",
+                        "revision",
+                        "binding",
+                    )
+                },
+                "agent_control": agent_control,
+                **(
+                    {"next_action_binding": draft["next_action_binding"]}
+                    if "next_action_binding" in draft
+                    else {}
+                ),
+                **{
+                    key: value
+                    for key, value in draft.items()
+                    if key
+                    not in {
+                        "contract",
+                        "draft_id",
+                        "lifecycle_state",
+                        "revision",
+                        "binding",
+                        "next_action_binding",
+                    }
+                },
             }
     return {
         "contract": GATEWAY_RESULT_CONTRACT,

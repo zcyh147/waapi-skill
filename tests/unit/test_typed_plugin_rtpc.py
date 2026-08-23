@@ -562,6 +562,27 @@ def test_public_schema_and_draft_start_share_one_exact_operation(
     )
     assert start_code == 0, started
     assert started["draft"]["binding"]["operation"] == operation
+    draft_keys = list(started["draft"])
+    assert draft_keys.index("agent_control") < draft_keys.index("current_facts")
+    assert draft_keys.index("next_action_binding") < draft_keys.index(
+        "current_facts"
+    )
+    binding_keys = list(started["draft"]["next_action_binding"])
+    for later_key in (
+        "typed_fact_batch_discipline",
+        "root_dynamic_disclosure_commands",
+    ):
+        if later_key not in binding_keys:
+            continue
+        assert binding_keys.index("required_next_phase") < binding_keys.index(
+            later_key
+        )
+        assert binding_keys.index("fixed_argv_prefix_copy") < binding_keys.index(
+            later_key
+        )
+        assert binding_keys.index(
+            "fixed_argv_prefix_copy_instruction"
+        ) < binding_keys.index(later_key)
 
 
 def test_rtpc_point_shape_fails_before_any_preview() -> None:
