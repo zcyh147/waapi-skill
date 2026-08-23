@@ -21,6 +21,8 @@ from wwise_waapi.metadata_discovery import (  # pyright: ignore[reportMissingImp
     METADATA_DISCOVERY_CONTRACT,
     MetadataDiscoveryError,
     discover_metadata,
+    metadata_candidate_limit_contract,
+    metadata_candidate_limit_for_query_count,
 )
 
 
@@ -63,6 +65,21 @@ class MetadataReader:
         if uri == GET_PROPERTY_INFO_URI:
             return dict(self.info[str(args["property"])])
         raise AssertionError(f"unapproved metadata URI: {uri}")
+
+
+def test_metadata_candidate_limit_has_one_production_authority() -> None:
+    assert metadata_candidate_limit_contract() == {
+        "1..2": 8,
+        "3..4": 3,
+        "5..8": 2,
+    }
+    assert [
+        metadata_candidate_limit_for_query_count(count)
+        for count in range(1, 9)
+    ] == [8, 8, 3, 3, 2, 2, 2, 2]
+    for invalid in (True, 0, 9):
+        with pytest.raises(ValueError, match="integer from 1 through 8"):
+            metadata_candidate_limit_for_query_count(invalid)
 
 
 def _property_info(

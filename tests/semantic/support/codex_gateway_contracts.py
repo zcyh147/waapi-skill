@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from pathlib import PurePosixPath, PureWindowsPath
 
+from wwise_waapi.metadata_discovery import (
+    metadata_candidate_limit_for_query_count,
+)
+
 
 GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
 TYPED_REQUEST_SCHEMA_CONTRACT = "waapi-skill.typed-request-schema/v1"
@@ -17,18 +21,6 @@ TYPED_ARRAY_ITEM_CHOICES_CONTRACT = (
 )
 TASK_LOCAL_RUNNER_POSIX = ".agents/skills/waapi-skill/scripts/run.py"
 TASK_LOCAL_RUNNER_WINDOWS = r".agents\skills\waapi-skill\scripts\run.py"
-
-
-def metadata_candidate_limit_for_query_count(query_count: int) -> int:
-    """Return the one public candidate budget for 1..8 metadata queries."""
-
-    if (
-        isinstance(query_count, bool)
-        or not isinstance(query_count, int)
-        or not 1 <= query_count <= 8
-    ):
-        raise ValueError("metadata query count must be an integer from 1 through 8")
-    return 8 if query_count <= 2 else 3 if query_count <= 4 else 2
 
 
 def task_local_runner_matches_normalized(

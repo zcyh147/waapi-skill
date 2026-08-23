@@ -16,6 +16,7 @@ from typing import Any, Callable, Mapping, Sequence
 
 from .canonical import canonical_json_bytes, canonical_sha256
 from .builders.common import SemanticValidationError
+from .metadata_discovery import metadata_candidate_limit_contract
 from .operation_registry import (
     COMPOSER_INPUT_MODE,
     OperationContractError,
@@ -1444,11 +1445,7 @@ def _metadata_query_batch_contract(
         ),
     }
     if include_limit_discipline:
-        contract["limit_by_query_count"] = {
-            "1..2": 8,
-            "3..4": 3,
-            "5..8": 2,
-        }
+        contract["limit_by_query_count"] = metadata_candidate_limit_contract()
         contract["required_final_argv"] = [
             "--limit",
             "<derived-from-query-count>",

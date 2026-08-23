@@ -82,6 +82,31 @@ _INTEGER_METADATA_TYPES = frozenset(
 _NUMBER_METADATA_TYPES = frozenset({"real32", "real64", "float", "double"})
 
 
+def metadata_candidate_limit_for_query_count(query_count: int) -> int:
+    """Return the one public candidate budget for 1..8 metadata queries."""
+
+    if (
+        isinstance(query_count, bool)
+        or not isinstance(query_count, int)
+        or not 1 <= query_count <= MAX_METADATA_DISCOVERY_QUERIES
+    ):
+        raise ValueError(
+            "metadata query count must be an integer from 1 through "
+            f"{MAX_METADATA_DISCOVERY_QUERIES}"
+        )
+    return 8 if query_count <= 2 else 3 if query_count <= 4 else 2
+
+
+def metadata_candidate_limit_contract() -> dict[str, int]:
+    """Project the reviewed query-count mapping into Gateway contracts."""
+
+    return {
+        "1..2": metadata_candidate_limit_for_query_count(1),
+        "3..4": metadata_candidate_limit_for_query_count(3),
+        "5..8": metadata_candidate_limit_for_query_count(5),
+    }
+
+
 def metadata_typed_value_type(metadata_type: str) -> str | None:
     """Map one reflected Wwise scalar type to the public typed-action token."""
 

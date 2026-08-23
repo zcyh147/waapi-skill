@@ -80,6 +80,7 @@ from wwise_waapi.metadata_discovery import (  # noqa: E402  # pyright: ignore[re
     MAX_METADATA_DISCOVERY_QUERY_CHARS,
     MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS,
     discover_metadata,
+    metadata_candidate_limit_contract,
 )
 from wwise_waapi.host_paths import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     HostPathError,
@@ -4126,11 +4127,7 @@ def operation_composer_input_contract(
                         "on_name_conflict",
                     ],
                 },
-                "limit_by_query_count": {
-                    "1..2": 8,
-                    "3..4": 3,
-                    "5..8": 2,
-                },
+                "limit_by_query_count": metadata_candidate_limit_contract(),
             }
             contract = {**contract, "start_preconditions": exact_preconditions}
     audio_import_option_names = (
