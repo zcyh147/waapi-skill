@@ -29,6 +29,7 @@ from wwise_waapi.typed_requests import (
     dynamic_array_item_handle,
     dynamic_branch_choices,
     dynamic_container_disclosure,
+    dynamic_map_container_choices,
     dynamic_map_entry_handle,
     materialize_typed_request,
     typed_request_construction_for_values,
@@ -1017,7 +1018,9 @@ def test_compact_inclusion_child_batch_carries_exact_next_root_item_command() ->
     assert disclosure["copy_command_by_shape"] == {"object": expected}
 
 
-def test_inclusion_selector_subtree_batch_resumes_the_disclosed_sibling() -> None:
+def test_inclusion_selector_subtree_batch_resumes_the_disclosed_sibling(
+    tmp_path: Path,
+) -> None:
     operation = "soundbank.setInclusions"
     version = "2022.1"
     contract = draft_operation_request_contract(operation, version)
@@ -1028,7 +1031,32 @@ def test_inclusion_selector_subtree_batch_resumes_the_disclosed_sibling() -> Non
         index=0,
         shape="object",
     )
-    identity_handle = "trm1-0123456789abcdef01234567"
+    item_disclosure = dynamic_container_disclosure(
+        contract,
+        parent_handle=inclusions.handle,
+        key="0",
+        shape="object",
+        child_handle=item_handle,
+    )
+    path_choice = next(
+        handle
+        for handle, _index, variant in dynamic_map_container_choices(
+            contract,
+            map_handle=item_handle,
+            key="object",
+            shape="object",
+            parent_schema=item_disclosure["schema_lineage"],
+        )
+        if variant.get("properties", {}).get("kind", {}).get("const") == "path"
+    )
+    identity_handle = dynamic_map_entry_handle(
+        contract,
+        map_handle=item_handle,
+        key="object",
+        shape="object",
+        choice_handle=path_choice,
+        parent_schema=item_disclosure["schema_lineage"],
+    )
 
     actions = [
         {
@@ -1044,7 +1072,7 @@ def test_inclusion_selector_subtree_batch_resumes_the_disclosed_sibling() -> Non
             "field_handle": item_handle,
             "key": "object",
             "value_type": "choice",
-            "value": "trc1-0123456789abcdef01234567",
+            "value": path_choice,
         },
         {
             "action": "add_typed_fact",
@@ -1082,6 +1110,73 @@ def test_inclusion_selector_subtree_batch_resumes_the_disclosed_sibling() -> Non
     assert continuation["resume_previous_container_response"][
         "response_handle"
     ] == item_handle
+    sibling = continuation["resume_previous_container_response"][
+        "business_sibling_transition"
+    ]
+    assert continuation["resume_previous_container_response"]["selection"] == (
+        "business_present_sibling_before_ancestor_item"
+    )
+    assert sibling["key"] == "filters"
+    assert sibling["business_value_pointer"] == "/args/inclusions/0/filters"
+    assert "array" in sibling["copy_command_by_shape"]
+
+    state_dir = tmp_path / "state-inclusion-selector-resume"
+    start_code, started = gateway.execute_gateway(
+        [
+            "--version",
+            version,
+            "--state-dir",
+            str(state_dir),
+            "draft-start",
+            operation,
+        ],
+        env=_env(tmp_path, version),
+        client_factory=lambda url: pytest.fail(f"draft-start connected to {url}"),
+    )
+    assert start_code == 0, started
+    action_argv: list[str] = []
+    for action in actions:
+        action_argv.extend(
+            [
+                "--action",
+                str(action["action"]),
+                "--fact-action",
+                str(action["fact_action"]),
+                "--field-handle",
+                str(action["field_handle"]),
+                "--fact-value",
+                str(action["value"]),
+            ]
+        )
+        if action["fact_action"] != "choose-dynamic":
+            action_argv.extend(
+                ["--value-type", str(action["value_type"])]
+            )
+        if "key" in action:
+            action_argv.extend(["--key", str(action["key"])])
+    apply_code, applied = gateway.execute_gateway(
+        [
+            "--version",
+            version,
+            "--state-dir",
+            str(state_dir),
+            "draft-apply",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(started["draft"]["revision"]),
+            "--compact",
+            "--facts",
+            *action_argv,
+        ],
+        env=_env(tmp_path, version),
+        client_factory=lambda url: pytest.fail(f"draft-apply connected to {url}"),
+    )
+    assert apply_code == 0, applied
+    assert applied["draft"]["next_action_binding"][
+        "resume_previous_container_response"
+    ] == continuation["resume_previous_container_response"]
     disconnected = [dict(row) for row in actions]
     disconnected[-1]["field_handle"] = "trm1-fedcba9876543210fedcba98"
     assert gateway._operation_draft_node_batch_continuation(

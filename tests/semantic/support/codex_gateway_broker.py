@@ -2335,12 +2335,18 @@ def _valid_draft_construction_continuation(
         if isinstance(resume, Mapping)
         else None
     )
+    business_sibling = (
+        resume.get("business_sibling_transition")
+        if isinstance(resume, Mapping)
+        else None
+    )
     resume_valid = resume is None or (
         completed_fact_action in {"map-put", "batch"}
         and isinstance(resume, Mapping)
         and set(resume)
         == resume_base_keys
         | ({"ancestor_next_item_disclosure"} if ancestor_disclosure is not None else set())
+        | ({"business_sibling_transition"} if business_sibling is not None else set())
         and resume.get("contract") == "waapi-skill.typed-container-handle/v1"
         and isinstance(resume.get("response_handle"), str)
         and str(resume["response_handle"]).startswith("trm1-")
@@ -2352,9 +2358,17 @@ def _valid_draft_construction_continuation(
             else "deferred_fact_queue"
         )
         and resume.get("decision_pointer")
-        == "/continuation/next_command_decision/evaluate_in_order"
+        == (
+            "/business_sibling_transition"
+            if business_sibling is not None
+            else "/continuation/next_command_decision/evaluate_in_order"
+        )
         and resume.get("selection")
-        == "first_remaining_business_present_candidate_in_order"
+        == (
+            "business_present_sibling_before_ancestor_item"
+            if business_sibling is not None
+            else "first_remaining_business_present_candidate_in_order"
+        )
         and resume.get("continue_in_same_turn") is True
         and resume.get("after_exhausted") == "resume_ancestor_response_stack"
         and resume.get("ancestor_resume_gate")
@@ -2368,6 +2382,11 @@ def _valid_draft_construction_continuation(
         and (
             _valid_ancestor_next_item_disclosure(ancestor_disclosure)
             if ancestor_disclosure is not None
+            else True
+        )
+        and (
+            _valid_resume_business_sibling_transition(business_sibling)
+            if business_sibling is not None
             else True
         )
         and resume.get("retype_schema_digest") == "invalid"
@@ -2409,6 +2428,96 @@ def _valid_draft_construction_continuation(
         and (key_valid if key_required else "current_key" not in value)
         and resume_valid
     )
+
+
+def _valid_resume_business_sibling_transition(value: Any) -> bool:
+    if not isinstance(value, Mapping) or set(value) != {
+        "condition",
+        "business_value_pointer",
+        "key",
+        "after",
+        "after_current_node_facts",
+        "absent_member_forbidden",
+        "is_next_command",
+        "argv_by_shape",
+        "copy_command_by_shape",
+    }:
+        return False
+    pointer = value.get("business_value_pointer")
+    key = value.get("key")
+    argv_by_shape = value.get("argv_by_shape")
+    copy_by_shape = value.get("copy_command_by_shape")
+    escaped_key = (
+        key.replace("~", "~0").replace("/", "~1")
+        if isinstance(key, str)
+        else None
+    )
+    if (
+        value.get("condition")
+        != "current_business_request_contains_next_complex_member"
+        or not isinstance(pointer, str)
+        or not pointer.startswith("/args/")
+        or not isinstance(escaped_key, str)
+        or not escaped_key
+        or not pointer.endswith(f"/{escaped_key}")
+        or value.get("after") != "current_branch_descendant_disclosures"
+        or value.get("after_current_node_facts") is not True
+        or value.get("absent_member_forbidden") is not True
+        or value.get("is_next_command") is not False
+        or not isinstance(argv_by_shape, Mapping)
+        or not argv_by_shape
+        or not isinstance(copy_by_shape, Mapping)
+        or set(argv_by_shape) != set(copy_by_shape)
+        or not set(argv_by_shape).issubset({"object", "array"})
+    ):
+        return False
+    sealed_identity: tuple[str, str, str, str] | None = None
+    for shape, raw_argv in argv_by_shape.items():
+        copy_command = copy_by_shape.get(shape)
+        if (
+            not isinstance(raw_argv, list)
+            or len(raw_argv) != 10
+            or any(not isinstance(token, str) or not token for token in raw_argv)
+            or raw_argv[0] != "request-map-container"
+            or raw_argv[2:4] != ["--map-handle", raw_argv[3]]
+            or _DRAFT_HANDLE_RE.fullmatch(raw_argv[3]) is None
+            or not raw_argv[3].startswith("trm1-")
+            or raw_argv[4:8] != ["--key", key, "--shape", shape]
+            or raw_argv[8] != "--parent-schema-token"
+            or not raw_argv[9].startswith("trl2-")
+            or not isinstance(copy_command, str)
+            or not copy_command
+        ):
+            return False
+        identity = (raw_argv[1], raw_argv[3], key, raw_argv[9])
+        if sealed_identity is not None and identity != sealed_identity:
+            return False
+        sealed_identity = identity
+        candidates: list[list[str]] = []
+        try:
+            candidates.append(shlex.split(copy_command))
+        except ValueError:
+            pass
+        for decoder in (decode_windows_model_argv, decode_windows_powershell_argv):
+            try:
+                decoded = list(decoder(copy_command))
+            except PlatformCommandError:
+                continue
+            if decoded not in candidates:
+                candidates.append(decoded)
+        if not any(
+            len(argv) == 13
+            and argv[0] == "python"
+            and (
+                PurePosixPath(argv[1]).is_absolute()
+                or PureWindowsPath(argv[1]).is_absolute()
+            )
+            and argv[2] == "gateway.py"
+            and argv[3:] == raw_argv
+            for argv in candidates
+        ):
+            return False
+    return True
 
 
 def _valid_ancestor_next_item_disclosure(value: Any) -> bool:
@@ -5064,6 +5173,11 @@ def _validate_metadata_discover_query_arguments(
         raise GatewayInvocationError(
             "metadata discover scope must be exactly one configured "
             "--object-type and 1..8 --query values"
+        )
+    if isinstance(configured_limit, str) and len(queries) != len(query_specs):
+        raise GatewayInvocationError(
+            "metadata discover query slot count must match the fixed reviewed "
+            "property/reference checklist"
         )
     actual_limit = metadata_candidate_limit_for_query_count(len(queries))
     configured_limit_allows_actual = (
@@ -10646,6 +10760,27 @@ class CodexGatewayBroker:
                     resume_matches = True
                 elif result_action == "batch":
                     response_handle = expected_first_action.get("value")
+                    reachable_handles = (
+                        {response_handle}
+                        if isinstance(response_handle, str)
+                        else set()
+                    )
+                    connected_batch = True
+                    for action in expected_replay_actions[1:]:
+                        if (
+                            action.get("action") != "add_typed_fact"
+                            or action.get("field_handle") not in reachable_handles
+                        ):
+                            connected_batch = False
+                            break
+                        nested_handle = action.get("value")
+                        if (
+                            action.get("fact_action")
+                            in {"append", "map-put", "set"}
+                            and isinstance(nested_handle, str)
+                            and nested_handle.startswith("trm1-")
+                        ):
+                            reachable_handles.add(nested_handle)
                     resume_matches = (
                         isinstance(resume_previous, Mapping)
                         and expected_first_action.get("fact_action")
@@ -10659,11 +10794,7 @@ class CodexGatewayBroker:
                         and construction_continuation.get("current_handle")
                         == response_handle
                         and "current_key" not in construction_continuation
-                        and all(
-                            action.get("action") == "add_typed_fact"
-                            and action.get("field_handle") == response_handle
-                            for action in expected_replay_actions[1:]
-                        )
+                        and connected_batch
                     )
                 else:
                     resume_matches = (

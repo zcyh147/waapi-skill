@@ -823,7 +823,7 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "gateway.py operation-schema <operation-name>" not in OPERATE
     assert "Follow the schema's sole `input_mode`" in OPERATE
     assert "For `composer`, run `composer.start.gateway_argv`" in OPERATE
-    assert "then only the selected `action_argv`" in OPERATE
+    assert "after either start field, use only the selected `action_argv`" in OPERATE
     assert "Start `object.set` rows with `add_target --target ...`" in OPERATE
     assert "Start every `audio.import` row with one `add_import_row`" in OPERATE
     assert "use `--assignment none`" in OPERATE

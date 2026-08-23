@@ -1,6 +1,6 @@
 # WAAPI query lane
 
-Use this reference for read-only Wwise queries and bounded Topic waits or streams.
+Use this for read-only Wwise queries and bounded Topic waits/streams.
 
 Require the unique terminal sentinel required by `SKILL.md` and no truncation or omission marker; do not reread a range or invoke the Gateway.
 
@@ -190,10 +190,8 @@ Only `Target.id`, `activeSource.id`, `OutputBus.id`, or `parent.id` is the next-
 identity. Require a canonical braced GUID; stop if missing or
 malformed. Query that GUID directly; do not reread the current row or search by name
 or path. Gateway target/role revalidation still runs during preview/execute/verify.
-Preserve first-returned order,
-de-duplicate the GUIDs, and query each distinct GUID exactly once.
-Use one separate `query-object --object-id` invocation per distinct GUID; never
-merge repeated `--object-id` and `--return-field` groups into one command.
+Preserve first-returned order, de-duplicate the GUIDs, and query each distinct
+GUID exactly once in a separate `query-object --object-id`; never merge IDs in one command.
 
 A relationship display `name`, including `OutputBus.name`, never proves an
 absolute path. If a rule gives an absolute Bus path,

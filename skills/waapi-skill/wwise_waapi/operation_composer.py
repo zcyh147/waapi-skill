@@ -1429,6 +1429,17 @@ def _metadata_query_batch_contract(
 
     contract: dict[str, Any] = {
         "scope": "one exact object, class, or object-type scope",
+        **(
+            {
+                "reconcile_before_command": (
+                    "list every requested property/reference assignment across all "
+                    "rows, then require equal distinct checklist and --query counts; "
+                    "familiar one-row fields such as Volume and OutputBus still count"
+                )
+            }
+            if include_limit_discipline
+            else {}
+        ),
         "first_request": (
             "include every distinct prompt-present dynamic property/reference "
             "token for this operation and scope"
@@ -1436,16 +1447,6 @@ def _metadata_query_batch_contract(
         "row_field_inventory": (
             "include shared and every row-local dynamic property/reference, "
             "including scalar fields whose values differ by row"
-        ),
-        **(
-            {
-                "reconcile_before_command": (
-                    "name every requested property/reference assignment and require "
-                    "one query for each; familiar or one-row-only fields still count"
-                )
-            }
-            if include_limit_discipline
-            else {}
         ),
         "one_to_eight_queries": "one metadata discover command",
         "split_within_limit": "invalid",

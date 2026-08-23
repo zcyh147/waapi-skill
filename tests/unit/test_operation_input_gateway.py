@@ -871,6 +871,11 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         },
         "metadata_query_batch": {
             "scope": "one exact object, class, or object-type scope",
+            "reconcile_before_command": (
+                "list every requested property/reference assignment across all "
+                "rows, then require equal distinct checklist and --query counts; "
+                "familiar one-row fields such as Volume and OutputBus still count"
+            ),
             "first_request": (
                 "include every distinct prompt-present dynamic property/reference "
                 "token for this operation and scope"
@@ -878,10 +883,6 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             "row_field_inventory": (
                 "include shared and every row-local dynamic property/reference, "
                 "including scalar fields whose values differ by row"
-            ),
-            "reconcile_before_command": (
-                "name every requested property/reference assignment and require "
-                "one query for each; familiar or one-row-only fields still count"
             ),
             "one_to_eight_queries": "one metadata discover command",
             "split_within_limit": "invalid",

@@ -472,14 +472,46 @@ def test_compact_generic_typed_fact_batch_accepts_exact_node_resume() -> None:
         "contract": "waapi-skill.typed-container-handle/v1",
         "response_handle": response_handle,
         "completed_candidate": "current_node_fact_batch",
-        "decision_pointer": "/continuation/next_command_decision/evaluate_in_order",
-        "selection": "first_remaining_business_present_candidate_in_order",
+        "decision_pointer": "/business_sibling_transition",
+        "selection": "business_present_sibling_before_ancestor_item",
         "continue_in_same_turn": True,
         "after_exhausted": "resume_ancestor_response_stack",
         "ancestor_resume_gate": (
             "current_response_and_all_descendant_business_candidates_exhausted"
         ),
         "ancestor_next_item_source": "next_item_disclosure.copy_command_by_shape",
+        "business_sibling_transition": {
+            "condition": "current_business_request_contains_next_complex_member",
+            "business_value_pointer": "/args/inclusions/0/filters",
+            "key": "filters",
+            "after": "current_branch_descendant_disclosures",
+            "after_current_node_facts": True,
+            "absent_member_forbidden": True,
+            "is_next_command": False,
+            "argv_by_shape": {
+                "array": [
+                    "request-map-container",
+                    "soundbank.setInclusions",
+                    "--map-handle",
+                    response_handle,
+                    "--key",
+                    "filters",
+                    "--shape",
+                    "array",
+                    "--parent-schema-token",
+                    "trl2-WyJ0cmgxLTExMTExMTExMTExMTExMTExMTExMTExMSIsIjAiLCJvYmplY3QiLG51bGxd",
+                ]
+            },
+            "copy_command_by_shape": {
+                "array": (
+                    "python /owned/run.py gateway.py request-map-container "
+                    "soundbank.setInclusions --map-handle "
+                    f"{response_handle} --key filters --shape array "
+                    "--parent-schema-token "
+                    "trl2-WyJ0cmgxLTExMTExMTExMTExMTExMTExMTExMTExMSIsIjAiLCJvYmplY3QiLG51bGxd"
+                )
+            },
+        },
         "retype_schema_digest": "invalid",
     }
     payload = {
@@ -543,6 +575,24 @@ def test_compact_generic_typed_fact_batch_accepts_exact_node_resume() -> None:
     assert created == {"tdh1-c12aa1ea49a4d727357b105b"}
     assert affected == {response_handle}
     assert summary["target_count"] == 3
+
+    tampered = json.loads(json.dumps(payload))
+    tampered_resume = tampered["action_result"]["construction_continuation"][
+        "resume_previous_container_response"
+    ]
+    tampered_resume["business_sibling_transition"]["copy_command_by_shape"][
+        "array"
+    ] = tampered_resume["business_sibling_transition"]["copy_command_by_shape"][
+        "array"
+    ].replace("--key filters", "--key Debug")
+    tampered["next_action_binding"]["resume_previous_container_response"] = (
+        tampered_resume
+    )
+    with pytest.raises(
+        GatewayInvocationError,
+        match="compact Draft action response has an invalid bounded projection",
+    ):
+        broker_module._draft_compact_action_result(tampered)
 
     payload["schema_required_fields_status"] = "complete"
     payload["next_action_binding"]["completion_candidate"] = (
@@ -3072,6 +3122,89 @@ def test_rebatched_dependency_free_draft_replays_the_exact_canonical_request(
                     argv.append(argument)
             for index in indexes:
                 argv.extend(typed_action_cli_arguments(original_actions[index].expected))
+            result = run_model_command(broker, argv)
+            assert result.returncode == 0, result.stderr
+            payloads[step.name] = json.loads(result.stdout[result.stdout.index("{") :])
+
+        preview = next(
+            step for step in protocol.steps if step.subcommand == "preview-from-draft"
+        )
+        assert broker._replay_expected_operation_draft_request(  # noqa: SLF001
+            preview
+        ) == request
+
+
+def test_nested_soundbank_branch_batch_replays_the_exact_canonical_request(
+    tmp_path: Path,
+) -> None:
+    skill = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2025.1",
+        "operation": "soundbank.setInclusions",
+        "arguments": {
+            "soundbank": {"kind": "path", "value": r"\SoundBanks\Harbor"},
+            "mode": "replace",
+            "inclusions": [
+                {
+                    "object": {
+                        "kind": "path",
+                        "value": r"\Events\Harbor\Play_Waves",
+                    },
+                    "filters": ["events", "structures", "media"],
+                }
+            ],
+        },
+    }
+    protocol = build_transaction_protocol((request,))
+    final_action_index = max(
+        index
+        for index, step in enumerate(protocol.steps)
+        if step.subcommand == "draft-apply"
+    )
+    payloads: dict[str, Mapping[str, object]] = {}
+
+    def pointer(payload: object, value: str) -> object:
+        current = payload
+        for token in value.removeprefix("/").split("/"):
+            assert isinstance(current, (dict, list))
+            current = (
+                current[int(token)] if isinstance(current, list) else current[token]
+            )
+        return current
+
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=protocol.steps,
+        expected_wwise_version="2025.1",
+        transport="tcp",
+        working_root=tmp_path / "broker-root",
+    ) as broker:
+        for step in protocol.steps[: final_action_index + 1]:
+            argv = [step.subcommand]
+            for argument in step.arguments:
+                if isinstance(argument, ResponseBinding):
+                    argv.append(str(pointer(payloads[argument.step], argument.pointer)))
+                    continue
+                if isinstance(
+                    argument,
+                    (DraftTypedActionArgument, DraftTypedActionBatchArgument),
+                ):
+                    actions = (
+                        argument.actions
+                        if isinstance(argument, DraftTypedActionBatchArgument)
+                        else (argument,)
+                    )
+                    for typed_action in actions:
+                        action = dict(typed_action.expected)
+                        for binding in typed_action.response_bindings:
+                            action[binding.pointer.removeprefix("/")] = pointer(
+                                payloads[binding.step], binding.response_pointer
+                            )
+                        argv.extend(typed_action_cli_arguments(action))
+                    continue
+                assert isinstance(argument, str)
+                argv.append(argument)
             result = run_model_command(broker, argv)
             assert result.returncode == 0, result.stderr
             payloads[step.name] = json.loads(result.stdout[result.stdout.index("{") :])
@@ -9087,7 +9220,7 @@ def test_metadata_query_slots_accept_the_configured_candidate_limit(
     assert execution_arguments == actual
 
 
-def test_metadata_query_slots_derive_limit_from_actual_rephrased_query_count(
+def test_metadata_query_slots_reject_omitted_fixed_query_slots(
     tmp_path: Path,
 ) -> None:
     metadata_step = _metadata_step_with_limit(
@@ -9124,13 +9257,37 @@ def test_metadata_query_slots_derive_limit_from_actual_rephrased_query_count(
         "3",
     )
 
+    with pytest.raises(GatewayInvocationError, match="query slot count"):
+        broker._validate_step(metadata_step, actual)  # noqa: SLF001
+
+    complete = (
+        "metadata",
+        "discover",
+        "--object-type",
+        "Sound",
+        "--query",
+        "looping",
+        "--query",
+        "loop count",
+        "--query",
+        "ignore parent playback limit",
+        "--query",
+        "limit instances",
+        "--query",
+        "maximum instances",
+        "--query",
+        "volume",
+        "--query",
+        "output bus",
+        "--limit",
+        "2",
+    )
     semantic_hash, execution_arguments = broker._validate_step(  # noqa: SLF001
         metadata_step,
-        actual,
+        complete,
     )
-
     assert len(semantic_hash) == 64
-    assert execution_arguments == actual
+    assert execution_arguments == complete
 
 
 def test_metadata_query_slots_accept_only_canonical_bounded_limits(
@@ -9918,6 +10075,8 @@ def test_metadata_query_slots_accept_rephrasing_but_keep_a_closed_scope(
         "音量属性",
         "--object-type",
         "ActorMixer",
+        "--query",
+        "声音增益",
         "--limit",
         "8",
     )
@@ -9942,12 +10101,8 @@ def test_metadata_query_slots_accept_rephrasing_but_keep_a_closed_scope(
             "--limit",
             "8" if query_count <= 2 else "3" if query_count <= 4 else "2",
         )
-        variable_hash, variable_execution = broker._validate_step(  # noqa: SLF001
-            metadata_step,
-            variable_actual,
-        )
-        assert len(variable_hash) == 64
-        assert variable_execution == variable_actual
+        with pytest.raises(GatewayInvocationError, match="query slot count"):
+            broker._validate_step(metadata_step, variable_actual)  # noqa: SLF001
     with pytest.raises(GatewayInvocationError, match="must be distinct"):
         broker._validate_step(  # noqa: SLF001
             metadata_step,

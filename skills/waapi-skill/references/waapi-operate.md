@@ -43,20 +43,13 @@ After a selected-subset gate, choose one first transaction-contract branch:
 
 For direct `audio.import`, schema owns fixed fields and Event/Switch Assignation; metadata selects dynamic tokens and `draft-check` revalidates them. Table imports start `operation-schema audio.importTabDelimited`; dynamic columns stay metadata-first. Use `operations` only for inventory, `request-schema` for exact reflected routes, and `waapi.undoGroup` for Undo Group.
 
-Follow the schema's sole `input_mode`. No schema-to-preview shortcut. Reuse evidence-bound live property/reference accessors: remove one leading `@` (`@Foo` becomes `Foo`); `OutputBus` remains `OutputBus`; never infer a token. For `inline_typed`, run only the returned `typed-operation` continuation. For `composer`, run `composer.start.gateway_argv` only when present. When start instead returns `gateway_argv_after_preconditions`, it is locked: satisfy every returned precondition first, then copy that field exactly. Start `object.set` rows with `add_target --target ...`. Start every `audio.import` row with one `add_import_row`: use `--assignment none`, or `--assignment switch VALUE` only when requested. An editable `draft-apply` continues its first true next phase in the same turn until Preview/refusal. Corrections reuse the draft. `--apply` marks Preview, not execution. Exact reflected URIs use `request-schema`.
+Follow the schema's sole `input_mode`. No schema-to-preview shortcut. Reuse evidence-bound live property/reference accessors: remove one leading `@` (`@Foo` becomes `Foo`); `OutputBus` remains `OutputBus`; never infer a token. For `inline_typed`, run only the returned `typed-operation` continuation. For `composer`, run `composer.start.gateway_argv` only when present. When start instead returns `gateway_argv_after_preconditions`, it is locked: satisfy every returned precondition first, then copy that field exactly; after either start field, use only the selected `action_argv`. Start `object.set` rows with `add_target --target ...`. Start every `audio.import` row with one `add_import_row`: use `--assignment none`, or `--assignment switch VALUE` only when requested. An editable `draft-apply` continues its first true next phase in the same turn until Preview/refusal. Corrections reuse the draft. `--apply` marks Preview, not execution. Exact reflected URIs use `request-schema`.
 
 Copy argv, preserving `--expected-revision` and `--apply`. After `draft-start`, fill six-fact batches then a last partial batch. After `choose`, add required branch constant/value facts immediately. Disclosure first is invalid; disclose children before handles; Maps use `map-put`.
 
 `construction_state.complete:false` and compact action receipts are complete JSON. Follow `next_command_decision`; only an exact `business_value_pointer` authorizes it; schema alone never does; never reuse handles. After disclosures return to the outermost response; parent fact before children. Finish via `completion_candidate`, never `draft-apply --action check`.
 
-Public mutation identities are closed to `id`, `path`, `exact-type-name`,
-`direct-child`, and `scoped-name`. Use a schema-fitting selector directly in
-preview; do not query only to translate it or use raw WAQL. After exact
-relationship/path read returns canonical `id`/`name`/`type`/`path`, reuse its
-GUID as an `id` selector for later object/target; never switch to path/name or
-retype its Wwise path. Gateway revalidates it. When the user already supplied a
-complete Wwise path, keep it as one `path` selector; do not decompose it into
-`scoped-name` plus a parent path.
+Public mutation identities are closed to `id`, `path`, `exact-type-name`, `direct-child`, and `scoped-name`. Use a schema-fitting selector directly in preview; do not query only to translate it or use raw WAQL. After exact relationship/path read returns canonical `id`/`name`/`type`/`path`, reuse its GUID as an `id` selector for later object/target; never switch to path/name or retype its Wwise path. Gateway revalidates it. When the user already supplied a complete Wwise path, keep it as one `path` selector; do not decompose it into `scoped-name` plus a parent path.
 
 For an exact SoundBank name that is intended to be globally unique by type, use
 `{"kind":"exact-type-name","type":"SoundBank","name":"<exact name>"}`. For an
@@ -108,32 +101,32 @@ For example, `object.setRTPC` authors a curve while `ak.soundengine.setRTPCValue
 
 ### `object.create` versus `object.set`
 
-- `object.set` remains for several fields/properties/references on one root, an ordinary closed object-list change, multiple roots, a root edit plus descendants, or insertion into a named existing descendant. Single-edit, plug-in, RTPC, and platform-link operations take precedence. An insertion target is not the request root; give each one an `objects[]` row whose `children` contain only genuinely new direct descendants.
-- `object.create` owns a wholly new recursive root. It may also merge only descendants below exactly one unchanged same-name existing root when those `object.set` conditions are absent. Keep that existing object as the request root, repeat its exact type/name, use its parent as `parent`, and use `on_name_conflict:"merge"`.
-- When exact type is not stated or proven, first exact-query the unchanged root and require one complete type/name/path match. Then open `operation-schema object.create` and follow its sole continuation directly into the Draft; do not query the parent already determined by that verified path.
-- When the request is relative to the current-version default container Work Unit, use that preflight query for an `object.create` same-name-root merge; `object.set` instead uses its returned target base, live token discovery, and Composer validation. Do not insert `project-default-work-units`.
-- Existing `objects[]` targets never imply a child-name merge. Follow the returned schema/selection guidance for `fail`, `merge`, and guarded replace.
-- If a requested target is not a valid direct writable parent for that object type, do not silently retarget the mutation; report the structured suitability evidence and ask the user to confirm the intended writable child container before a new preview.
+- `object.set` covers several fields/properties/references on one root, an ordinary closed object-list change, multiple roots, a root plus descendants, or insertion into a named descendant. Single-edit, plug-in, RTPC, and platform-link operations take precedence. An insertion target is not the request root; give each one an `objects[]` row containing only genuinely new direct descendants.
+- `object.create` owns a wholly new recursive root, or—only when those `object.set` conditions are absent—descendants below one unchanged same-name root. Repeat that root's exact type/name, use its parent, and set `on_name_conflict:"merge"`.
+- If exact type is unproven, first exact-query the unchanged root and require one type/name/path match. Then open `operation-schema object.create` and follow its sole continuation directly into the Draft; do not query the parent already determined by that verified path.
+- For the current-version default container Work Unit, use that preflight query for an `object.create` same-name-root merge; `object.set` instead uses its returned target base, live token discovery, and Composer validation. Do not insert `project-default-work-units`.
+- Existing `objects[]` never implies child-name merge; obey returned `fail`, `merge`, or guarded-replace guidance.
+- Never silently retarget an unsuitable parent. Report suitability evidence and ask for the intended writable child container before a new preview.
 
 ## Resolve properties and references from live metadata
 
 Users speak naturally; never ask them for internal property/reference names. When an exact token is not already visible from live metadata:
 
-For `object.create`, `object.set`, and direct `audio.import`, read the named schema first, then discover only naturally requested dynamic property/reference tokens that are not already exact live evidence. Composer operations subsequently revalidate those exact tokens and dependency closure during `draft-check`; they do not infer names from user prose. Other metadata-bound operations keep their stated order.
+For `object.create`, `object.set`, and direct `audio.import`, read the named schema first, then discover only requested dynamic property/reference tokens lacking exact live evidence. Composer `draft-check` revalidates tokens and dependency closure; other metadata-bound operations keep their stated order.
 
-Prompt text, `operation-schema` names or constraints, a cached schema, and general Wwise knowledge are never exact live metadata evidence. When `composer.start.preconditions` contains `metadata_gate`, complete one successful `metadata discover` covering every requested dynamic token before `draft-start`; only a successful metadata result already visible in the same conversation may satisfy that gate. Starting a Draft first is invalid.
+Prompt/schema text, cached schemas, and Wwise knowledge are never exact live metadata evidence. When `composer.start.preconditions` contains `metadata_gate`, complete one successful `metadata discover` covering every requested dynamic token before `draft-start`; only a visible successful live result satisfies it. Starting a Draft first is invalid.
 
-1. Before `draft-start`, gather every shared or row-local same-scope setting, including scalars that vary by row. Before running the command, reconcile the union against every requested property/reference assignment: familiar or one-row-only fields still count, so an assigned `Volume` and `OutputBus` each require a query. One command carries one repeated `--query '<ordinary phrase>'` per setting; 1–8 never split, and querying only the first field/row is invalid. Use the deterministic candidate budget: one or two flags require `--limit 8`; three or four use `--limit 3`; five through eight use `--limit 2`. Translate localized wording to short English Wwise UI/technical phrases; never pass CJK to the lexical matcher. Search separately: `limit sound instances` and `maximum playback instances`. If both requested, both selected tokens are facts even if one is also a dependency. >8 may split; never repeat a resolved phrase or successful complete scope.
+1. Before `draft-start`, gather every same-scope setting, including varying scalars, and reconcile the union against every requested property/reference assignment; familiar or one-row-only fields count, so an assigned `Volume` and `OutputBus` each require a query. One command carries one repeated `--query '<ordinary phrase>'` per setting; 1–8 never split. Use the deterministic candidate budget: one or two flags require `--limit 8`; three or four use `--limit 3`; five through eight use `--limit 2`. Translate localized wording to short English Wwise UI/technical phrases; never pass CJK to the lexical matcher. Search separately: `limit sound instances` and `maximum playback instances`; both selected tokens are facts even if one is also a dependency. >8 may split; never repeat a resolved phrase or complete scope.
 2. Use exactly one scope: `--object-type` for a known new/imported type or several existing targets of one proven type, `--class-id` for a proven class id, or `--object` for one existing object. Keep a schema-proven shared `--object-type`; do not substitute `--object`.
 3. For Sound SFX imports use `--object-type Sound`. For Actor Mixer roots use `ActorMixer` in `2021.1`–`2024.1` and reflected `PropertyContainer` in `2025.1`; the operation request token remains `ActorMixer`.
 4. Copy only exact returned names requested by the user. Gateway validates and activates proven dependencies; do not add unrequested action fields or use candidates/defaults as a preset.
 5. Retry once only when `fallback_detail_scan.status` is `partial`, using broader related English technical phrases. A `complete` scan with no match is terminal for that phrase; do not run a second metadata discovery. If candidates remain ambiguous, ask one natural behavior question.
 
-The operation preview performs final live typed validation and remains authoritative. Do not add a separate property-info check for a token already proved in the visible conversation, and never inspect metadata-cache files.
+Preview remains authoritative; never inspect metadata-cache files.
 
 For direct imports, discover only requested dynamic `properties[]`/`references[]`; for table imports, only dynamic `Property[...]`, `Reference[...]`, or `@...` columns. Fixed fields and side effects never trigger discovery: `Notes` and `Audio Source Notes` are fixed import columns, not Sound metadata queries; Event, Dialogue Event, and Switch Assignation are schema-owned.
 
-For a user-supplied Lua file, use `lua.executeCoreFile` in Authoring or `lua.executeCliFile` only for explicit Console/CLI; there is no `lua.executeFile` operation. Follow the named schema unchanged.
+For user Lua files use `lua.executeCoreFile` in Authoring, or `lua.executeCliFile` only for explicit CLI; there is no `lua.executeFile` operation.
 
 ### Compact import and value rules
 

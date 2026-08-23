@@ -14255,6 +14255,153 @@ def _operation_draft_root_array_next_item_disclosure(
     return None
 
 
+def _operation_draft_current_item_business_sibling(
+    *,
+    operation: str,
+    version: str,
+    actions: Sequence[Mapping[str, Any]],
+) -> dict[str, Any] | None:
+    """Reissue the exact schema sibling after one connected branch subtree."""
+
+    if not actions:
+        return None
+    parent_fact = actions[0]
+    candidate_handles = {
+        value
+        for value in (parent_fact.get("field_handle"), parent_fact.get("value"))
+        if isinstance(value, str) and value.startswith("trm1-")
+    }
+    if not candidate_handles:
+        return None
+    contract = draft_operation_request_contract(operation, version)
+    for field in contract.fields:
+        if field.parent_handle is not None or field.shape != "array":
+            continue
+        for index in range(MAX_TYPED_ARRAY_ITEMS):
+            for item_shape in ("object", "array"):
+                choices = dynamic_array_item_choices(
+                    contract,
+                    array_handle=field.handle,
+                    index=index,
+                    shape=item_shape,
+                )
+                if len(choices) != 1:
+                    continue
+                item_handle = dynamic_array_item_handle(
+                    contract,
+                    array_handle=field.handle,
+                    index=index,
+                    shape=item_shape,
+                )
+                if item_handle not in candidate_handles:
+                    continue
+                item_disclosure = dynamic_container_disclosure(
+                    contract,
+                    parent_handle=field.handle,
+                    key=str(index),
+                    shape=item_shape,
+                    child_handle=item_handle,
+                )
+                item_schema = item_disclosure.get("schema_lineage")
+                if not isinstance(item_schema, Mapping):
+                    return None
+                item_lineage_token = typed_schema_lineage_token(
+                    contract,
+                    child_handle=item_handle,
+                    parent_token=None,
+                    parent_handle=field.handle,
+                    key=str(index),
+                    shape=item_shape,
+                    choice_handle=None,
+                )
+                for branch in actions[1:]:
+                    branch_key = branch.get("key")
+                    branch_choice = branch.get("value")
+                    if (
+                        branch.get("action") != "add_typed_fact"
+                        or branch.get("fact_action") != "choose-dynamic"
+                        or branch.get("field_handle") != item_handle
+                        or not isinstance(branch_key, str)
+                        or not isinstance(branch_choice, str)
+                    ):
+                        continue
+                    children = tuple(
+                        row
+                        for row in actions[1:]
+                        if row.get("action") == "add_typed_fact"
+                        and row.get("fact_action") == "map-put"
+                        and row.get("field_handle") == item_handle
+                        and row.get("key") == branch_key
+                        and row.get("value_type") in {"object", "array"}
+                        and isinstance(row.get("value"), str)
+                    )
+                    if len(children) != 1:
+                        return None
+                    child = children[0]
+                    child_shape = str(child["value_type"])
+                    child_handle = str(child["value"])
+                    choice_rows = dynamic_map_container_choices(
+                        contract,
+                        map_handle=item_handle,
+                        key=branch_key,
+                        shape=child_shape,
+                        parent_schema=item_schema,
+                        parent_section=field.section,
+                    )
+                    if not any(
+                        choice_handle == branch_choice
+                        for choice_handle, _choice_index, _variant in choice_rows
+                    ):
+                        return None
+                    expected_child_handle = dynamic_map_entry_handle(
+                        contract,
+                        map_handle=item_handle,
+                        key=branch_key,
+                        shape=child_shape,
+                        choice_handle=branch_choice,
+                        parent_schema=item_schema,
+                        parent_section=field.section,
+                    )
+                    if child_handle != expected_child_handle:
+                        return None
+                    child_lineage_token = typed_schema_lineage_token(
+                        contract,
+                        child_handle=child_handle,
+                        parent_token=item_lineage_token,
+                        parent_handle=item_handle,
+                        key=branch_key,
+                        shape=child_shape,
+                        choice_handle=branch_choice,
+                    )
+                    try:
+                        business_pointer = typed_schema_lineage_business_pointer(
+                            contract,
+                            child_handle=child_handle,
+                            token=child_lineage_token,
+                        )
+                    except TypedRequestError:
+                        return None
+                    sibling = _next_map_sibling_disclosure(
+                        argparse.Namespace(
+                            command="request-map-container",
+                            parent_schema_token=item_lineage_token,
+                            key=branch_key,
+                            shape=child_shape,
+                            map_handle=item_handle,
+                            api=operation,
+                        ),
+                        contract=contract,
+                        parent_schema=item_schema,
+                        parent_section=field.section,
+                        current_business_value_pointer=business_pointer,
+                    )
+                    projected = _dynamic_disclosure_copy_commands(sibling)
+                    transition = projected.get("business_sibling_transition")
+                    return dict(transition) if isinstance(transition, Mapping) else None
+                return None
+    return None
+
+
 def _operation_draft_resume_previous_container_payload(
     *,
     response_handle: str,
@@ -14277,6 +14424,15 @@ def _operation_draft_resume_previous_container_payload(
         "ancestor_next_item_source": "next_item_disclosure.copy_command_by_shape",
         "retype_schema_digest": "invalid",
     }
+    business_sibling = _operation_draft_current_item_business_sibling(
+        operation=operation,
+        version=version,
+        actions=actions,
+    )
+    if business_sibling is not None:
+        payload["decision_pointer"] = "/business_sibling_transition"
+        payload["selection"] = "business_present_sibling_before_ancestor_item"
+        payload["business_sibling_transition"] = business_sibling
     disclosure = _operation_draft_root_array_next_item_disclosure(
         operation=operation,
         version=version,

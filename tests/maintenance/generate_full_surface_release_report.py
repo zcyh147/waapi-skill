@@ -221,7 +221,26 @@ def _continuation_error(
                         operation,
                         version,
                     )
-                    if contract["start"]["subcommand"] != "draft-start":
+                    start = contract["start"]
+                    subcommands = tuple(
+                        start[key]
+                        for key in (
+                            "subcommand",
+                            "subcommand_after_preconditions",
+                        )
+                        if key in start
+                    )
+                    argv_values = tuple(
+                        start[key]
+                        for key in (
+                            "gateway_argv",
+                            "gateway_argv_after_preconditions",
+                        )
+                        if key in start
+                    )
+                    if subcommands != ("draft-start",) or argv_values != (
+                        ["draft-start", operation],
+                    ):
                         return "Composer continuation does not start one Draft"
                 elif mode == gateway.INLINE_TYPED_INPUT_MODE:
                     contract = gateway.inline_operation_contract(operation, version)
