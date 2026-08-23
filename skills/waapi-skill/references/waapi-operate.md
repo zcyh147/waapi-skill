@@ -17,9 +17,7 @@ An existing transaction continuation always outranks operation selection.
 
 ### Existing transaction
 
-A continuation requires the transaction id retained from the visible conversation or prior Gateway result; an artifact hash is not a lookup key. If the id is unavailable, say that the saved preview context is unavailable and offer a fresh preview. Do not ask a normal user for an internal id or inspect a state directory. Do not reread `SKILL.md` or this reference on a continuation turn when they are already visible.
-
-The visible Preview's `next_command` is authoritative: execute the field selected by its `copy_instruction.source_field` verbatim. The template below describes the required shape but never authorizes reconstruction with another runner path.
+Use the transaction id from conversation or a prior Gateway result; an artifact hash is not a lookup key. If absent, report unavailable preview context and offer a fresh preview; do not ask for an internal id, inspect state, or reread visible Skill files. The visible Preview's `next_command` is authoritative: execute its selected field verbatim. The template below never authorizes reconstruction with another runner path.
 
 The first Gateway command is:
 
