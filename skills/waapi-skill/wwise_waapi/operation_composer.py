@@ -1435,7 +1435,20 @@ def _metadata_query_batch_contract(
                     "list every requested property/reference assignment across all "
                     "rows, then require equal distinct checklist and --query counts; "
                     "familiar one-row fields such as Volume and OutputBus still count"
-                )
+                ),
+                "business_fact_inventory": (
+                    "count every requested toggle, mode, scalar, and reference as "
+                    "one distinct checklist item even when one query could return "
+                    "several candidates"
+                ),
+                "paired_setting_discipline": {
+                    "loop_enabled_and_infinite_mode": (
+                        "two distinct checklist items"
+                    ),
+                    "ignore_parent_enable_self_and_maximum_value": (
+                        "three distinct checklist items"
+                    ),
+                },
             }
             if include_limit_discipline
             else {}

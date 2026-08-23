@@ -876,6 +876,17 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
                 "rows, then require equal distinct checklist and --query counts; "
                 "familiar one-row fields such as Volume and OutputBus still count"
             ),
+            "business_fact_inventory": (
+                "count every requested toggle, mode, scalar, and reference as one "
+                "distinct checklist item even when one query could return several "
+                "candidates"
+            ),
+            "paired_setting_discipline": {
+                "loop_enabled_and_infinite_mode": "two distinct checklist items",
+                "ignore_parent_enable_self_and_maximum_value": (
+                    "three distinct checklist items"
+                ),
+            },
             "first_request": (
                 "include every distinct prompt-present dynamic property/reference "
                 "token for this operation and scope"
