@@ -156,7 +156,7 @@ def test_operation_draft_business_update_is_durable_atomic_and_cas_bound(
             composer_digest=composer_digest,
             context=context,
             update=reject,
-            event_type="declaration.rejected",
+            event_type="declaration.added",
         )
     assert record_path.read_bytes() == before
 
@@ -181,6 +181,43 @@ def test_operation_draft_business_update_is_durable_atomic_and_cas_bound(
     )
     assert session.declarations[0].declaration_id == "rain-bed"
 
+    previewed = store.apply_business_update(
+        started.draft_id,
+        task_authority=started.task_authority,
+        expected_revision=2,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+        context=context,
+        update=lambda current: current.with_preview(
+            BusinessPreview.create(
+                source_revision=current.revision,
+                readable_lines=("对象：Rain_Bed", "音量：-4 dB"),
+                detail={"plan_digest": "a" * 64},
+            )
+        ),
+        event_type="preview.recorded",
+    )
+    assert previewed.revision == 3
+
+    revised = store.apply_business_update(
+        started.draft_id,
+        task_authority=started.task_authority,
+        expected_revision=3,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+        context=context,
+        update=lambda current: current.revise_declaration(
+            declaration_id="rain-bed",
+            fields={"media_file": "/tmp/rain.wav", "volume_db": -6.0},
+        ),
+        event_type="declaration.revised",
+    )
+    durable_revised = BusinessDeclarationSession.from_dict(
+        revised.composition["business_session"]
+    )
+    assert durable_revised.active_preview is None
+    assert len(durable_revised.preview_audit) == 1
+
     with pytest.raises(OperationDraftRevisionConflict):
         store.apply_business_update(
             started.draft_id,
@@ -190,7 +227,7 @@ def test_operation_draft_business_update_is_durable_atomic_and_cas_bound(
             composer_digest=composer_digest,
             context=context,
             update=lambda current: current,
-            event_type="declaration.replayed",
+                event_type="declaration.revised",
         )
 
 

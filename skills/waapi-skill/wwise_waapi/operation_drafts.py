@@ -97,6 +97,13 @@ _TEMP_NAME_PATTERN = re.compile(
 _LOCK_REGION_BYTES = 1
 _WINDOWS_LOCK_RETRY_SECONDS = 0.05
 _WINDOWS_LOCK_VIOLATION = 33
+_BUSINESS_DRAFT_UPDATE_EVENTS = frozenset(
+    {
+        "declaration.added",
+        "declaration.revised",
+        "preview.recorded",
+    }
+)
 
 
 class OperationDraftError(RuntimeError):
@@ -772,9 +779,9 @@ class OperationDraftStore:
             raise TypeError("update must be callable")
         if (
             not isinstance(event_type, str)
-            or not _AUDIT_EVENT_TYPE_PATTERN.fullmatch(event_type)
+            or event_type not in _BUSINESS_DRAFT_UPDATE_EVENTS
         ):
-            raise ValueError("event_type must be one bounded audit token")
+            raise ValueError("event_type must be one closed business Draft update")
         if not isinstance(draft_id, str) or not _DRAFT_ID_PATTERN.fullmatch(draft_id):
             raise _not_available()
         with self._existing_draft_lock(draft_id):
@@ -829,6 +836,7 @@ class OperationDraftStore:
                 raise OperationDraftBindingDrift(
                     "Business context differs from the durable declaration binding."
                 )
+            before_session_payload = session.as_dict()
             # The Adapter callback, state round-trip, Composer normalization,
             # and projection budget all complete before atomic replacement.
             candidate_session = update(session)
@@ -839,6 +847,28 @@ class OperationDraftStore:
                     "Business update changed its task, project, or Wwise binding."
                 )
             session_payload = candidate_session.as_dict()
+            if event_type.startswith("declaration."):
+                if (
+                    candidate_session.revision != session.revision + 1
+                    or candidate_session.active_preview is not None
+                    or session_payload["declarations"]
+                    == before_session_payload["declarations"]
+                ):
+                    raise OperationDraftInvalidTransition(
+                        "A declaration update must publish exactly one changed business revision and invalidate Preview."
+                    )
+            elif (
+                candidate_session.revision != session.revision
+                or session_payload["declarations"]
+                != before_session_payload["declarations"]
+                or session_payload["handles"] != before_session_payload["handles"]
+                or candidate_session.active_preview is None
+                or candidate_session.active_preview.source_revision
+                != session.revision
+            ):
+                raise OperationDraftInvalidTransition(
+                    "A Preview update must preserve facts and bind the current business revision."
+                )
             composition = dict(record.composition)
             composition["business_session"] = session_payload
             _require_composition_projection_budget(
