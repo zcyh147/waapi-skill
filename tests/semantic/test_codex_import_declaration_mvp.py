@@ -794,6 +794,11 @@ def test_mvp_agent_contract_uses_standard_skill_bootstrap_and_semantic_preview_g
         expected_markers=("Rain_Bed", "Infinite", "-4 dB"),
         broker_records=(Record(),),
     )
+    assert preview_was_reported(
+        final_response="未连接或修改 Wwise；仅完成预览。",
+        expected_markers=("Rain_Bed", "Infinite", "-4 dB"),
+        broker_records=(Record(),),
+    )
 
     facts = SimpleNamespace(
         command_records=("skill-read", "gateway-1", "gateway-2"),

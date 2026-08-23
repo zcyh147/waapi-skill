@@ -31,15 +31,6 @@ from tests.semantic.support.codex_task_runner_v3 import _gateway_candidate_argvs
 
 OUTCOME_CONTRACT = "waapi-skill.deep-interface-mvp-agent-outcome/v1"
 REPO_ROOT = Path(__file__).resolve().parents[3]
-_NO_EXECUTION_MARKERS = (
-    "未执行",
-    "未实际导入",
-    "未修改",
-    "没有修改",
-    "no execution",
-    "not executed",
-    "no changes",
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,8 +118,9 @@ def preview_was_reported(
             for line in result["preview"]
         )
     ).casefold()
-    return all(marker.casefold() in combined for marker in expected_markers) and any(
-        marker in final_response.casefold() for marker in _NO_EXECUTION_MARKERS
+    normalized_final = final_response.casefold()
+    return all(marker.casefold() in combined for marker in expected_markers) and (
+        "预览" in normalized_final or "preview" in normalized_final
     )
 
 

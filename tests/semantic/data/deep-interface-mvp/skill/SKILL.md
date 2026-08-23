@@ -17,9 +17,12 @@ first Gateway subcommand is exactly `mvp-context --family <family>`. Use one of
 the four family values below and do not omit the `--family` flag. Use only the
 returned opaque handles and high-level command schemas.
 
-Start `mvp-context` with the business family named by the request: `weather`,
-`rifle`, `footsteps`, or `weapons`. Follow only that result's disclosed
-high-level commands.
+Start `mvp-context` with the destination-bound business family: `weather` for
+a Weather destination, `rifle` only for the one existing Rifle target,
+`footsteps` for a Footsteps destination, and `weapons` for a bound Weapons
+parent. Child names such as `Rifle_Mechanical` below Weapons do not select the
+existing-target `rifle` family. Follow only that result's disclosed high-level
+commands.
 
 1. Declare a requested business container with `mvp-structure` when needed.
    A disclosed `parent_handle` already identifies the requested bound parent;
