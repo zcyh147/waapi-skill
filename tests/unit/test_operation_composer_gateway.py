@@ -885,6 +885,10 @@ def test_metadata_preconditions_are_operation_local_in_composer_start(
         "--limit",
         "<derived-from-query-count>",
     ]
+    assert audio_batch["reconcile_before_command"] == (
+        "name every requested property/reference assignment and require one query "
+        "for each; familiar or one-row-only fields still count"
+    )
     assert "preconditions" not in rtpc["composer"]["start"]
 
 
@@ -2079,6 +2083,10 @@ def test_audio_import_schema_requires_one_complete_metadata_query_batch(
         "row_field_inventory": (
             "include shared and every row-local dynamic property/reference, "
             "including scalar fields whose values differ by row"
+        ),
+        "reconcile_before_command": (
+            "name every requested property/reference assignment and require one "
+            "query for each; familiar or one-row-only fields still count"
         ),
         "one_to_eight_queries": "one metadata discover command",
         "split_within_limit": "invalid",

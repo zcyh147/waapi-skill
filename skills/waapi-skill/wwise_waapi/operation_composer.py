@@ -1437,6 +1437,16 @@ def _metadata_query_batch_contract(
             "include shared and every row-local dynamic property/reference, "
             "including scalar fields whose values differ by row"
         ),
+        **(
+            {
+                "reconcile_before_command": (
+                    "name every requested property/reference assignment and require "
+                    "one query for each; familiar or one-row-only fields still count"
+                )
+            }
+            if include_limit_discipline
+            else {}
+        ),
         "one_to_eight_queries": "one metadata discover command",
         "split_within_limit": "invalid",
         "successful_complete_scope_result": "do_not_query_that_scope_again",
