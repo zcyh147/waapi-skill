@@ -1609,6 +1609,38 @@ def test_broker_projects_draft_action_and_completion_prefixes_to_task_install(
         else shlex.join(completion["fixed_argv_prefix"])
     )
 
+    resume = {
+        "copy_command_by_shape": {
+            "object": (
+                encode_windows_model_argv(disclosure_full_argv)
+                if platform_name == "nt"
+                else shlex.join(disclosure_full_argv)
+            )
+        }
+    }
+    projected_draft = broker_module._project_model_visible_runner(  # noqa: SLF001
+        {
+            "contract": "waapi-skill.operation-draft/v1",
+            "next_action_binding": {
+                "contract": "waapi-skill.operation-draft-next-action/v1",
+                "resume_previous_container_response": resume,
+            },
+            "action_result": {
+                "construction_continuation": {
+                    "resume_previous_container_response": resume,
+                }
+            },
+        },
+        candidate_runner=candidate_runner,
+        invocation_runner=invocation_runner,
+        platform_name=platform_name,
+    )
+    assert projected_draft["action_result"]["construction_continuation"][
+        "resume_previous_container_response"
+    ] == projected_draft["next_action_binding"][
+        "resume_previous_container_response"
+    ]
+
     tampered = json.loads(json.dumps(payload))
     del tampered["root_dynamic_disclosure_commands"]["rows"][0][
         "copy_command_by_shape"

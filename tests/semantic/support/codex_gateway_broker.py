@@ -6896,7 +6896,7 @@ def _project_operation_draft_runner(
         projected_draft["next_action_binding"] = project_binding(binding)
     action_result = value.get("action_result")
     if isinstance(action_result, Mapping):
-        projected_action = dict(action_result)
+        projected_action = project_disclosure_commands(action_result)
         followups = action_result.get("required_followup_facts")
         if isinstance(followups, list):
             projected_action["required_followup_facts"] = [
