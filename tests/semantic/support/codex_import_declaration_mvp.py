@@ -726,7 +726,15 @@ class ImportBusinessMvp:
                 )
             return value
         if binding.value_type in {"number", "integer"}:
-            normalized = _finite_number(value, field_name=binding.name)
+            try:
+                normalized = _finite_number(value, field_name=binding.name)
+            except ValueError as exc:
+                raise self._repair(
+                    "FIELD_VALUE_TYPE_MISMATCH",
+                    field="fields",
+                    rejected_handle=binding.handle,
+                    action=f"resubmit a finite {binding.value_type} value",
+                ) from exc
             assert normalized is not None
             if binding.value_type == "integer" and not normalized.is_integer():
                 raise self._repair(

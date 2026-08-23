@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -28,6 +29,7 @@ BUS_ID = "{22222222-2222-2222-2222-222222222222}"
 RIFLE_ID = "{33333333-3333-3333-3333-333333333333}"
 FOOTSTEPS_ID = "{44444444-4444-4444-4444-444444444444}"
 WEAPONS_ID = "{55555555-5555-5555-5555-555555555555}"
+AUX_BUS_ID = "{66666666-6666-6666-6666-666666666666}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,7 +47,19 @@ class FamilySpec:
     version: str
     objects: tuple[ObjectSpec, ...]
     media_keys: tuple[str, ...]
+    expected_asset_count: int
+    expected_structure_count: int = 0
     custom_wetness: bool = False
+    custom_aux_bus: bool = False
+
+
+class MvpCliRepair(ValueError):
+    """Closed CLI parsing failed before any Draft state was loaded."""
+
+
+class _ClosedArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        raise MvpCliRepair(message)
 
 
 def prepare_import_mvp_runtime(root: Path) -> Path:
@@ -112,6 +126,13 @@ def family_spec(family: str, version: str) -> FamilySpec:
                 "ActorMixer",
                 root + r"\Weapons",
             ),
+            ObjectSpec(
+                "aux_bus_target",
+                AUX_BUS_ID,
+                "Weapons_Aux",
+                "Bus",
+                r"\Master-Mixer Hierarchy\Default Work Unit\Weapons_Aux",
+            ),
         ),
     }
     media = {
@@ -127,7 +148,10 @@ def family_spec(family: str, version: str) -> FamilySpec:
         version=version,
         objects=(*common, *additions[family]),
         media_keys=media[family],
+        expected_asset_count=2 if family in {"weather", "weapons"} else 1,
+        expected_structure_count=1 if family == "weather" else 0,
         custom_wetness=family == "weapons",
+        custom_aux_bus=family == "weapons",
     )
 
 
@@ -159,6 +183,14 @@ def _new_mvp(
             maximum=1,
             metadata_digest="fresh-mvp-custom-wetness-v1",
         )
+    if spec.custom_aux_bus:
+        handles["custom_aux_bus"] = mvp.bind_field(
+            metadata_scope="Sound",
+            name="CustomAuxBus",
+            field_kind="reference",
+            value_type="reference",
+            metadata_digest="fresh-mvp-custom-aux-bus-v1",
+        )
     return mvp, handles
 
 
@@ -181,12 +213,13 @@ def _replay(
             )
             handles[str(item.get("role"))] = result.handle
         elif kind == "asset":
+            fields: dict[str, Any] = {}
             field_handle = item.get("field_handle")
-            fields = (
-                {str(field_handle): item.get("field_number")}
-                if field_handle is not None
-                else None
-            )
+            if field_handle is not None:
+                fields[str(field_handle)] = item.get("field_number")
+            reference_field = item.get("reference_field_handle")
+            if reference_field is not None:
+                fields[str(reference_field)] = item.get("reference_target_handle")
             mvp.declare_asset(
                 parent=str(item.get("parent")),
                 name=str(item.get("name")),
@@ -205,7 +238,7 @@ def _replay(
                     if item.get("switch_value") is not None
                     else None
                 ),
-                fields=fields,
+                fields=fields or None,
             )
         elif kind == "existing":
             mvp.declare_existing_asset(
@@ -220,7 +253,7 @@ def _replay(
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(add_help=False)
+    parser = _ClosedArgumentParser(add_help=False)
     parser.add_argument("script")
     sub = parser.add_subparsers(dest="command", required=True)
     context = sub.add_parser("mvp-context", add_help=False)
@@ -241,6 +274,8 @@ def _parser() -> argparse.ArgumentParser:
     asset.add_argument("--switch-value")
     asset.add_argument("--field-handle")
     asset.add_argument("--field-number", type=float)
+    asset.add_argument("--reference-field-handle")
+    asset.add_argument("--reference-target-handle")
     existing = sub.add_parser("mvp-existing-asset", add_help=False)
     existing.add_argument("--target", required=True)
     existing.add_argument("--media", required=True)
@@ -297,13 +332,13 @@ def _context_payload(spec: FamilySpec, handles: Mapping[str, str]) -> dict[str, 
                     "--output-bus",
                     "--switch-value",
                     "--field-handle with --field-number",
+                    "--reference-field-handle with --reference-target-handle",
                 ],
             },
             "mvp-existing-asset": {
                 "required": ["--target", "--media", "--language"],
                 "explicit_replacement": "append --replace only when requested",
             },
-            "mvp-preview": {"required": []},
         },
         "compiler_owns": [
             "wwise_path",
@@ -314,7 +349,13 @@ def _context_payload(spec: FamilySpec, handles: Mapping[str, str]) -> dict[str, 
             "continuation",
         ],
     }
-    for role in ("parent", "target", "custom_wetness"):
+    for role in (
+        "parent",
+        "target",
+        "custom_wetness",
+        "custom_aux_bus",
+        "aux_bus_target",
+    ):
         if role in handles:
             result[f"{role}_handle"] = handles[role]
     return result
@@ -397,7 +438,7 @@ def _property_info(name: str) -> dict[str, Any]:
             "type": "Real32",
             "restriction": {"type": "range", "min": 0.0, "max": 1.0},
         }
-    if name == "OutputBus":
+    if name in {"OutputBus", "CustomAuxBus"}:
         return {
             "name": name,
             "type": "Reference",
@@ -535,7 +576,23 @@ def _emit(command: str, *, ok: bool, agent_result: Mapping[str, Any]) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = _parser().parse_args(argv)
+    raw_argv = list(argv if argv is not None else sys.argv[1:])
+    try:
+        args = _parser().parse_args(argv)
+    except MvpCliRepair as exc:
+        command = raw_argv[1] if len(raw_argv) > 1 else "mvp-request"
+        return _emit(
+            command,
+            ok=False,
+            agent_result={
+                "contract": "waapi-skill.business-repair/v1",
+                "error_code": "INCOMPLETE_OR_MISTYPED_DECLARATION",
+                "field": "command_arguments",
+                "draft_changed": False,
+                "action": "resubmit the disclosed high-level command shape",
+                "detail": str(exc),
+            },
+        )
     if args.script != "gateway.py":
         return 2
     runtime_root = Path(os.environ[RUNTIME_ROOT_ENV]).resolve(strict=True)
@@ -563,8 +620,17 @@ def main(argv: list[str] | None = None) -> int:
                 }
             )
         elif args.command == "mvp-asset":
-            if args.media not in spec.media_keys or (
+            field_pair_invalid = (
                 (args.field_handle is None) != (args.field_number is None)
+            )
+            reference_pair_invalid = (
+                (args.reference_field_handle is None)
+                != (args.reference_target_handle is None)
+            )
+            if (
+                args.media not in spec.media_keys
+                or field_pair_invalid
+                or reference_pair_invalid
             ):
                 raise MvpRepairError(
                     {
@@ -589,6 +655,8 @@ def main(argv: list[str] | None = None) -> int:
                     "switch_value": args.switch_value,
                     "field_handle": args.field_handle,
                     "field_number": args.field_number,
+                    "reference_field_handle": args.reference_field_handle,
+                    "reference_target_handle": args.reference_target_handle,
                 }
             )
         elif args.command == "mvp-existing-asset":
@@ -628,32 +696,29 @@ def main(argv: list[str] | None = None) -> int:
         candidate = {**state, "declarations": declarations}
         mvp, handles = _replay(candidate, runtime_root=runtime_root)
         _save_state(candidate)
+        inspection = mvp.inspect()
+        preview_ready = (
+            inspection["asset_count"] == spec.expected_asset_count
+            and inspection["structure_count"] == spec.expected_structure_count
+        )
+        declaration_result: dict[str, Any] = {
+            "declared": True,
+            "draft_changed": True,
+            "draft": inspection,
+        }
+        if preview_ready:
+            declaration_result["next_command"] = dict(mvp.compile().next_command)
+            declaration_result["next_action"] = (
+                "execute next_command.copy_instruction.source_field verbatim now"
+            )
+        if args.command == "mvp-structure":
+            declaration_result["object_handle"] = handles["declared_structure"]
+        if args.command == "mvp-existing-asset":
+            declaration_result["mode"] = "replace" if args.replace else "re-import"
         return _emit(
             args.command,
             ok=True,
-            agent_result={
-                "declared": True,
-                "draft_changed": True,
-                "draft": mvp.inspect(),
-                **(
-                    {"object_handle": handles["declared_structure"]}
-                    if args.command == "mvp-structure"
-                    else {}
-                ),
-                **(
-                    {
-                        "mode": (
-                            "replace" if args.replace else "re-import"
-                        ),
-                        "next_action": (
-                            "run mvp-preview now; before another import mode, "
-                            "start a new mvp-context after that Preview"
-                        ),
-                    }
-                    if args.command == "mvp-existing-asset"
-                    else {}
-                ),
-            },
+            agent_result=declaration_result,
         )
     except MvpRepairError as exc:
         return _emit(args.command, ok=False, agent_result=exc.repair)

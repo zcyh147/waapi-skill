@@ -19,6 +19,7 @@ from tests.semantic.support.codex_import_mvp_profile import (
     load_import_mvp_profile,
 )
 from tests.semantic.support.codex_import_mvp_fake_gateway import (
+    AUX_BUS_ID,
     RUNTIME_ROOT_ENV,
     SKILL_ROOT_ENV,
     VERSION_ENV,
@@ -28,6 +29,7 @@ from tests.semantic.support.codex_import_mvp_fake_gateway import (
 from tests.semantic.support.codex_import_mvp_agent_runner import (
     import_mvp_developer_instructions,
     mvp_command_set_is_closed,
+    mvp_continuations_were_used,
     preview_was_reported,
 )
 from wwise_waapi.transactions import TransactionStore
@@ -427,6 +429,7 @@ def test_field_handle_scope_and_range_fail_closed_atomically(tmp_path: Path) -> 
     for handle, value, code in (
         (mixer_field, 1, "FIELD_HANDLE_SCOPE_MISMATCH"),
         (volume, 30, "FIELD_VALUE_OUT_OF_RANGE"),
+        (volume, "loud", "FIELD_VALUE_TYPE_MISMATCH"),
     ):
         before = mvp.inspect()
         with pytest.raises(MvpRepairError) as caught:
@@ -590,7 +593,7 @@ def test_business_declaration_enters_existing_immutable_preview_pipeline(
     }
 
 
-def test_fixed_mvp_profile_covers_four_paraphrased_integration_families() -> None:
+def test_fixed_mvp_profile_runs_each_family_paraphrase_independently() -> None:
     profile = load_import_mvp_profile(MVP_PROFILE)
 
     assert (MODEL, REASONING_EFFORT, SERVICE_TIER) == (
@@ -600,11 +603,16 @@ def test_fixed_mvp_profile_covers_four_paraphrased_integration_families() -> Non
     )
     assert [unit.family for unit in profile.units] == [
         "weather",
+        "weather",
+        "rifle",
         "rifle",
         "footsteps",
+        "footsteps",
+        "weapons",
         "weapons",
     ]
-    assert len({unit.prompt for unit in profile.units}) == 4
+    assert [unit.variant for unit in profile.units] == ["A", "B"] * 4
+    assert len({unit.prompt for unit in profile.units}) == 8
     forbidden_tokens = {
         "object_path",
         "objectType",
@@ -617,11 +625,18 @@ def test_fixed_mvp_profile_covers_four_paraphrased_integration_families() -> Non
     }
     for unit in profile.units:
         assert len(unit.paraphrases) == 2
-        assert all(paraphrase in unit.prompt for paraphrase in unit.paraphrases)
+        assert unit.prompt == unit.paraphrases[0 if unit.variant == "A" else 1]
         command_tokens = {token for command in unit.commands for token in command}
         assert forbidden_tokens.isdisjoint(command_tokens)
         assert unit.commands[0] == ("mvp-context", "--family", unit.family)
         assert unit.commands[-1] == ("mvp-preview",)
+        for command in unit.commands:
+            if command[0] != "mvp-asset":
+                continue
+            name = command[command.index("--name") + 1]
+            media = command[command.index("--media") + 1]
+            assert name in unit.prompt
+            assert media in unit.prompt
 
 
 def test_fixed_fake_gateway_cases_use_real_compiler_and_immutable_preview(
@@ -642,7 +657,7 @@ def test_fixed_fake_gateway_cases_use_real_compiler_and_immutable_preview(
         monkeypatch.setenv(VERSION_ENV, unit.version)
         monkeypatch.setenv("WAAPI_SKILL_STATE_DIR", str(state_dir))
         family_previews: list[dict[str, Any]] = []
-        for command in unit.commands:
+        for command_index, command in enumerate(unit.commands):
             assert fake_gateway_main(["gateway.py", *command]) == 0
             payload = json.loads(capsys.readouterr().out)
             assert payload["ok"] is True
@@ -652,8 +667,19 @@ def test_fixed_fake_gateway_cases_use_real_compiler_and_immutable_preview(
                 assert "root_handle" not in payload["agent_result"]
             if command[0] == "mvp-existing-asset":
                 assert payload["agent_result"]["next_action"].startswith(
-                    "run mvp-preview now"
+                    "execute next_command"
                 )
+            if command[0] in {"mvp-structure", "mvp-asset", "mvp-existing-asset"}:
+                next_is_preview = (
+                    command_index + 1 < len(unit.commands)
+                    and unit.commands[command_index + 1][0] == "mvp-preview"
+                )
+                assert ("next_command" in payload["agent_result"]) is next_is_preview
+                if next_is_preview:
+                    next_command = payload["agent_result"]["next_command"]
+                    source = next_command["copy_instruction"]["source_field"]
+                    assert next_command[source]
+                    assert next_command["full_argv"][-1] == "mvp-preview"
             if command[0] == "mvp-preview":
                 preview = payload["agent_result"]
                 family_previews.append(preview)
@@ -682,6 +708,10 @@ def test_fixed_fake_gateway_cases_use_real_compiler_and_immutable_preview(
         row.get("@CustomWetness") == 0.75
         for row in weapons_dispatch["args"]["imports"]
     )
+    assert any(
+        row.get("@CustomAuxBus") == AUX_BUS_ID
+        for row in weapons_dispatch["args"]["imports"]
+    )
     footsteps_dispatch = previews_by_family["footsteps"][0]["compiler_evidence"][
         "dispatch"
     ]
@@ -689,6 +719,39 @@ def test_fixed_fake_gateway_cases_use_real_compiler_and_immutable_preview(
         row.get("switchAssignation") == "Snow"
         for row in footsteps_dispatch["args"]["imports"]
     )
+
+
+def test_fake_gateway_cli_shape_errors_are_structured_and_atomic(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    runtime_root = prepare_import_mvp_runtime(tmp_path / "runtime")
+    state_dir = tmp_path / "state"
+    state_dir.mkdir()
+    monkeypatch.setenv(RUNTIME_ROOT_ENV, str(runtime_root))
+    monkeypatch.setenv(SKILL_ROOT_ENV, str(SKILL_ROOT))
+    monkeypatch.setenv(VERSION_ENV, "2022.1")
+    monkeypatch.setenv("WAAPI_SKILL_STATE_DIR", str(state_dir))
+    assert fake_gateway_main(
+        ["gateway.py", "mvp-context", "--family", "weather"]
+    ) == 0
+    capsys.readouterr()
+    state_path = state_dir / "deep-import-mvp.json"
+    before = state_path.read_bytes()
+
+    assert fake_gateway_main(
+        ["gateway.py", "mvp-asset", "--volume-db", "not-a-number"]
+    ) == 2
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["ok"] is False
+    assert payload["agent_result"]["contract"] == "waapi-skill.business-repair/v1"
+    assert payload["agent_result"]["error_code"] == (
+        "INCOMPLETE_OR_MISTYPED_DECLARATION"
+    )
+    assert payload["agent_result"]["draft_changed"] is False
+    assert state_path.read_bytes() == before
 
 
 def test_mvp_agent_contract_uses_standard_skill_bootstrap_and_semantic_preview_grade(
@@ -745,3 +808,34 @@ def test_mvp_agent_contract_uses_standard_skill_bootstrap_and_semantic_preview_g
         gateway_argvs=argvs,
         reconciliation_passed=True,
     )
+
+    declaration = SimpleNamespace(
+        step_name="step-02-mvp-asset",
+        payload={
+            "agent_result": {
+                "next_command": {
+                    "full_argv": [
+                        "python",
+                        ".agents/skills/waapi-skill/scripts/run.py",
+                        "gateway.py",
+                        "mvp-preview",
+                    ],
+                    "shell_command": (
+                        "python .agents/skills/waapi-skill/scripts/run.py "
+                        "gateway.py mvp-preview"
+                    ),
+                    "copy_instruction": {"source_field": "shell_command"},
+                }
+            }
+        },
+    )
+    preview = SimpleNamespace(
+        step_name="step-03-mvp-preview",
+        model_argv=(
+            "/broker/python",
+            ".agents/skills/waapi-skill/scripts/run.py",
+            "gateway.py",
+            "mvp-preview",
+        ),
+    )
+    assert mvp_continuations_were_used((declaration, preview))

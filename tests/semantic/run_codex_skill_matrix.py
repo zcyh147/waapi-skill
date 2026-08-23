@@ -213,7 +213,7 @@ HEAVY_V3_PROFILE_ID = "heavy_cross_version_80"
 MODIFICATION_POLICY_V3_PROFILE_ID = "modification_policy_9"
 COMPOUND_HEAVY_V1_PROFILE_ID = "compound_heavy_cross_version_24"
 TYPED_INPUT_PROFILE_ID = "typed_input_cross_version_25"
-DEEP_INTERFACE_MVP_PROFILE_ID = "deep_interface_mvp_4"
+DEEP_INTERFACE_MVP_PROFILE_ID = "deep_interface_mvp_8"
 INTEGRATION_WORKFLOWS_V1_PROFILE_ID = "integration_workflows_cross_version_6"
 INTEGRATION_WORKFLOWS_V2_PROFILE_ID = "integration_workflows_v2_cross_version_6"
 INTEGRATION_PROFILE_ID = "integration"
@@ -3661,7 +3661,7 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
             else (
                 SKILL_ROOT.parent
                 / "waapi-skill-workspace"
-                / "deep-interface-mvp-4"
+                / "deep-interface-mvp-8"
             )
             if is_deep_interface_mvp
             else DEFAULT_TYPED_INPUT_ITERATION_ROOT

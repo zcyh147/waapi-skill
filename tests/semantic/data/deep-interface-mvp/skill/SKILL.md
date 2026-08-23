@@ -30,10 +30,11 @@ high-level commands.
    explicitly requests replacement. For a disclosed long-tail field, pass its
    opaque `--field-handle` with the requested `--field-number`; never replace
    the handle with a Wwise token.
-   Different import modes cannot share one Preview: after every
-   `mvp-existing-asset`, run `mvp-preview` immediately; only then start a new
-   `mvp-context` for the next mode.
-3. Run `mvp-preview` once after every requested business fact is present.
+   Different import modes cannot share one Preview.
+3. Never construct `mvp-preview` yourself. When a declaration result contains
+   `next_command`, execute only the complete field named by
+   `next_command.copy_instruction.source_field`, verbatim and immediately.
+   After that Preview, start a new `mvp-context` before declaring another mode.
 4. Stop after the Preview and summarize it. Nothing is executed in this MVP.
 
 Never supply or discuss a complete Wwise mutation path, native `objectType`,

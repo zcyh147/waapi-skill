@@ -1,4 +1,4 @@
-"""Closed loader for the four-task #52 deep-interface MVP profile."""
+"""Closed loader for the four-family, eight-task #52 MVP profile."""
 
 from __future__ import annotations
 
@@ -10,17 +10,27 @@ from typing import Any, Mapping, Sequence
 
 
 PROFILE_CONTRACT = "waapi-skill.deep-interface-mvp-profile/v1"
-PROFILE_ID = "deep_interface_mvp_4"
+PROFILE_ID = "deep_interface_mvp_8"
 MODEL = "gpt-5.6-terra"
 REASONING_EFFORT = "medium"
 SERVICE_TIER = "default"
-UNIT_IDS = (
+CASE_IDS = (
     "MVP22-WEATHER",
     "MVP22-RIFLE",
     "MVP25-FOOTSTEPS",
     "MVP25-WEAPONS",
 )
-FAMILIES = ("weather", "rifle", "footsteps", "weapons")
+CASE_FAMILIES = ("weather", "rifle", "footsteps", "weapons")
+UNIT_IDS = tuple(
+    f"{case_id}-{variant}"
+    for case_id in CASE_IDS
+    for variant in ("A", "B")
+)
+FAMILIES = tuple(
+    family
+    for family in CASE_FAMILIES
+    for _variant in ("A", "B")
+)
 
 
 class ImportMvpProfileError(ValueError):
@@ -40,6 +50,7 @@ class ImportMvpUnit:
     version: str
     prompt: str
     paraphrases: tuple[str, str]
+    variant: str
     commands: tuple[tuple[str, ...], ...]
     final_markers: tuple[str, ...]
     scenario: ImportMvpScenario
@@ -77,15 +88,20 @@ def load_import_mvp_profile(
     }:
         raise ImportMvpProfileError("MVP profile model settings drifted")
     raw_units = raw.get("units")
-    if not isinstance(raw_units, list) or len(raw_units) != len(UNIT_IDS):
-        raise ImportMvpProfileError("MVP profile requires exactly four units")
+    if not isinstance(raw_units, list) or len(raw_units) != len(CASE_IDS):
+        raise ImportMvpProfileError("MVP profile requires exactly four business cases")
     units = tuple(
-        _parse_unit(value, expected_id=unit_id, expected_family=family)
-        for value, unit_id, family in zip(
+        unit
+        for value, case_id, family in zip(
             raw_units,
-            UNIT_IDS,
-            FAMILIES,
+            CASE_IDS,
+            CASE_FAMILIES,
             strict=True,
+        )
+        for unit in _parse_case(
+            value,
+            expected_id=case_id,
+            expected_family=family,
         )
     )
     selected_ids = tuple(dict.fromkeys(str(value) for value in unit_ids))
@@ -112,12 +128,12 @@ def load_import_mvp_profile(
     )
 
 
-def _parse_unit(
+def _parse_case(
     value: Any,
     *,
     expected_id: str,
     expected_family: str,
-) -> ImportMvpUnit:
+) -> tuple[ImportMvpUnit, ImportMvpUnit]:
     if not isinstance(value, Mapping) or set(value) != {
         "unit_id",
         "family",
@@ -140,10 +156,6 @@ def _parse_unit(
     ):
         raise ImportMvpProfileError("MVP unit version or paraphrases are invalid")
     paraphrases = (str(paraphrases_value[0]), str(paraphrases_value[1]))
-    prompt = (
-        "以下两种说法表达同一项业务要求；不要重复声明，只生成一次对应预览：\n"
-        f"说法 A：{paraphrases[0]}\n说法 B：{paraphrases[1]}"
-    )
     commands_value = value.get("commands")
     if (
         not isinstance(commands_value, list)
@@ -168,19 +180,25 @@ def _parse_unit(
         or any(not isinstance(marker, str) or not marker for marker in markers_value)
     ):
         raise ImportMvpProfileError("MVP final markers are invalid")
-    return ImportMvpUnit(
-        unit_id=expected_id,
-        family=expected_family,
-        version=str(version),
-        prompt=prompt,
-        paraphrases=paraphrases,
-        commands=commands,
-        final_markers=tuple(markers_value),
-        scenario=ImportMvpScenario(id=expected_id),
+    return tuple(
+        ImportMvpUnit(
+            unit_id=f"{expected_id}-{variant}",
+            family=expected_family,
+            version=str(version),
+            prompt=prompt,
+            paraphrases=paraphrases,
+            variant=variant,
+            commands=commands,
+            final_markers=tuple(markers_value),
+            scenario=ImportMvpScenario(id=f"{expected_id}-{variant}"),
+        )
+        for variant, prompt in zip(("A", "B"), paraphrases, strict=True)
     )
 
 
 __all__ = [
+    "CASE_FAMILIES",
+    "CASE_IDS",
     "FAMILIES",
     "ImportMvpProfile",
     "ImportMvpProfileError",

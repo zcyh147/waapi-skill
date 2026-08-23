@@ -1,6 +1,6 @@
 {
   "contract": "waapi-skill.deep-interface-mvp-profile/v1",
-  "profile_id": "deep_interface_mvp_4",
+  "profile_id": "deep_interface_mvp_8",
   "model": {
     "name": "gpt-5.6-terra",
     "reasoning_effort": "medium",
@@ -14,7 +14,7 @@
       "version": "2022.1",
       "paraphrases": [
         "新建 Weather Actor Mixer，把 rain 和 wind 分别做成 Rain_Bed、Wind_Bed 两个循环 SFX，音量 -4 dB/-6 dB，并接到绑定总线；只预览。",
-        "做一个天气层，雨床与风床都无限循环，分别压到负四和负六分贝，走任务给出的 Bus，不执行导入。"
+        "做一个 Weather 天气层：rain 命名为 Rain_Bed、wind 命名为 Wind_Bed，两条 SFX 都无限循环，分别压到负四和负六分贝，走任务给出的 Bus，不执行导入。"
       ],
       "commands": [
         ["mvp-context", "--family", "weather"],
@@ -49,7 +49,7 @@
       "version": "2025.1",
       "paraphrases": [
         "在绑定的 Footsteps 下做 Snow_Step：snow_step 素材、SFX、-2 dB、绑定总线、Switch 值 Snow，只预览。",
-        "准备雪地脚步声，音量降两分贝并分配到 Snow 这个切换值，输出走任务总线，不要真正导入。"
+        "用 snow_step 准备名为 Snow_Step 的雪地脚步 SFX，音量降两分贝并分配到 Snow 这个切换值，输出走任务总线，不要真正导入。"
       ],
       "commands": [
         ["mvp-context", "--family", "footsteps"],
@@ -63,16 +63,16 @@
       "family": "weapons",
       "version": "2025.1",
       "paraphrases": [
-        "批量准备 Rifle_Mechanical(-3 dB) 与 Rifle_Tail(-6 dB)，都放到绑定 Weapons、走绑定总线；Mechanical 的现场 CustomWetness 字段设 0.75，只预览。",
-        "把机械层和尾音层一次规划好，分别负三/负六分贝；机械层湿度四分之三，使用 Gateway 给的字段句柄，不执行。"
+        "批量准备 mechanical 对应的 Rifle_Mechanical(-3 dB) 与 tail 对应的 Rifle_Tail(-6 dB)，都放到绑定 Weapons、走绑定总线；Mechanical 的现场 CustomWetness 设 0.75，并把 CustomAuxBus 引用设为绑定的 Weapons_Aux，只预览。",
+        "把 mechanical 做成 Rifle_Mechanical、tail 做成 Rifle_Tail，一次放进绑定的 Weapons 并都走绑定输出总线，分别负三/负六分贝；Mechanical 的湿度四分之三，并把 CustomAuxBus 指向绑定的 Weapons_Aux，两个字段都使用 Gateway 给的句柄，不执行。"
       ],
       "commands": [
         ["mvp-context", "--family", "weapons"],
-        ["mvp-asset", "--parent", "mvp-obj-e2df174575b0a7be331e265a", "--name", "Rifle_Mechanical", "--kind", "sound-sfx", "--media", "mechanical", "--language", "SFX", "--volume-db", "-3", "--output-bus", "mvp-obj-59c0a1e4cbbedf3ec4890322", "--field-handle", "mvp-field-d12938ec276454624f879057", "--field-number", "0.75"],
+        ["mvp-asset", "--parent", "mvp-obj-e2df174575b0a7be331e265a", "--name", "Rifle_Mechanical", "--kind", "sound-sfx", "--media", "mechanical", "--language", "SFX", "--volume-db", "-3", "--output-bus", "mvp-obj-59c0a1e4cbbedf3ec4890322", "--field-handle", "mvp-field-d12938ec276454624f879057", "--field-number", "0.75", "--reference-field-handle", "mvp-field-017a4f1f3e24dc417f6e5cad", "--reference-target-handle", "mvp-obj-a177d7efa608e3a36c8f67da"],
         ["mvp-asset", "--parent", "mvp-obj-e2df174575b0a7be331e265a", "--name", "Rifle_Tail", "--kind", "sound-sfx", "--media", "tail", "--language", "SFX", "--volume-db", "-6", "--output-bus", "mvp-obj-59c0a1e4cbbedf3ec4890322"],
         ["mvp-preview"]
       ],
-      "final_markers": ["Rifle_Mechanical", "Rifle_Tail", "CustomWetness", "0.75", "-3 dB", "-6 dB"]
+      "final_markers": ["Rifle_Mechanical", "Rifle_Tail", "CustomWetness", "CustomAuxBus", "0.75", "-3 dB", "-6 dB"]
     }
   ]
 }

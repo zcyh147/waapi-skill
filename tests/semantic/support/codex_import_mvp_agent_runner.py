@@ -149,6 +149,51 @@ def mvp_command_set_is_closed(
     )
 
 
+def mvp_continuations_were_used(broker_records: tuple[Any, ...]) -> bool:
+    """Bind every Preview command to the immediately preceding continuation."""
+
+    preview_count = 0
+    for index, record in enumerate(broker_records):
+        if getattr(record, "step_name", "").split("-")[-2:] != ["mvp", "preview"]:
+            continue
+        preview_count += 1
+        if index == 0:
+            return False
+        previous_payload = getattr(broker_records[index - 1], "payload", None)
+        previous_result = (
+            previous_payload.get("agent_result")
+            if isinstance(previous_payload, Mapping)
+            else None
+        )
+        next_command = (
+            previous_result.get("next_command")
+            if isinstance(previous_result, Mapping)
+            else None
+        )
+        copy_instruction = (
+            next_command.get("copy_instruction")
+            if isinstance(next_command, Mapping)
+            else None
+        )
+        source_field = (
+            copy_instruction.get("source_field")
+            if isinstance(copy_instruction, Mapping)
+            else None
+        )
+        full_argv = next_command.get("full_argv") if isinstance(next_command, Mapping) else None
+        model_argv = getattr(record, "model_argv", None)
+        if (
+            source_field not in {"shell_command", "model_command"}
+            or not isinstance(next_command.get(source_field), str)
+            or not isinstance(full_argv, list)
+            or not isinstance(model_argv, tuple | list)
+            or list(model_argv[1:]) != full_argv[1:]
+            or Path(str(model_argv[0])).name.casefold() not in {"python", "python3", "python.exe"}
+        ):
+            return False
+    return preview_count > 0
+
+
 def run_import_mvp_agent_unit(
     unit: ImportMvpUnit,
     *,
@@ -252,6 +297,9 @@ def run_import_mvp_agent_unit(
             expected_markers=unit.final_markers,
             broker_records=broker_evidence.records,
         ),
+        "continuations_used": mvp_continuations_were_used(
+            broker_evidence.records
+        ),
     }
     errors = [name for name, passed in gates.items() if not passed]
     outcome = ImportMvpAgentOutcome(
@@ -303,6 +351,7 @@ __all__ = [
     "OUTCOME_CONTRACT",
     "import_mvp_developer_instructions",
     "mvp_command_set_is_closed",
+    "mvp_continuations_were_used",
     "preview_was_reported",
     "run_import_mvp_agent_unit",
 ]
