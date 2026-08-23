@@ -84,6 +84,15 @@ def test_debug_host_controls_disclose_one_zero_value_confirmation_entry(
                 "--apply",
             ],
             "required_flag": "--apply",
+            "assembly_order": [
+                "copy_every_gateway_argv_prefix_element_in_order",
+                "append_each_business_field_as_separate_argv",
+            ],
+            "gateway_argv_prefix_copy_policy": {
+                "verbatim": True,
+                "required_flag_included": "--apply",
+                "omission_or_reordering": "invalid",
+            },
             "fields": [],
         }
         assert typed["business_values_required"] is False
