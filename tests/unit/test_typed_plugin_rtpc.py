@@ -537,6 +537,9 @@ def test_public_schema_and_draft_start_share_one_exact_operation(
     )
     assert code == 0, schema
     assert schema["operation"]["input_mode"] == "composer"
+    schema_keys = list(schema)
+    assert schema_keys.index("composer") < schema_keys.index("operation")
+    assert next(iter(schema["composer"])) == "start"
     start = schema["composer"]["start"]
     assert start["gateway_argv"] == ["draft-start", operation]
     assert start["copy_instruction"]["source_field"] == "gateway_argv"

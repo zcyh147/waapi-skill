@@ -4397,46 +4397,45 @@ def operation_composer_input_contract(
         for key, value in contract.items()
         if key != "start_preconditions"
     }
+    start = {
+        "subcommand": "draft-start",
+        "gateway_argv": ["draft-start", operation],
+        **(
+            {
+                "copy_instruction": {
+                    "contract": OPERATION_DRAFT_COMMAND_COPY_INSTRUCTION_CONTRACT,
+                    "source_field": "gateway_argv",
+                    "action": (
+                        "append_to_packaged_gateway_prefix_and_execute_verbatim"
+                    ),
+                    "forbidden_transformations": [
+                        "reconstruct",
+                        "shorten",
+                        "normalize",
+                        "substitute_path_segments",
+                        "select_another_field",
+                    ],
+                },
+                "precondition_discipline": {
+                    "metadata_discover_allowed_only_when": (
+                        "preconditions is present and selects metadata"
+                    ),
+                    "when_preconditions_absent": "execute_gateway_argv_now",
+                    "infer_metadata_from_operation_constraints": False,
+                },
+            }
+            if "start_preconditions" not in contract
+            else {}
+        ),
+        **(
+            {"preconditions": dict(contract["start_preconditions"])}
+            if "start_preconditions" in contract
+            else {}
+        ),
+    }
     return {
+        "start": start,
         **public_contract,
-        "start": {
-            "subcommand": "draft-start",
-            "gateway_argv": ["draft-start", operation],
-            **(
-                {
-                    "copy_instruction": {
-                        "contract": (
-                            OPERATION_DRAFT_COMMAND_COPY_INSTRUCTION_CONTRACT
-                        ),
-                        "source_field": "gateway_argv",
-                        "action": (
-                            "append_to_packaged_gateway_prefix_and_execute_verbatim"
-                        ),
-                        "forbidden_transformations": [
-                            "reconstruct",
-                            "shorten",
-                            "normalize",
-                            "substitute_path_segments",
-                            "select_another_field",
-                        ],
-                    },
-                    "precondition_discipline": {
-                        "metadata_discover_allowed_only_when": (
-                            "preconditions is present and selects metadata"
-                        ),
-                        "when_preconditions_absent": "execute_gateway_argv_now",
-                        "infer_metadata_from_operation_constraints": False,
-                    },
-                }
-                if "start_preconditions" not in contract
-                else {}
-            ),
-            **(
-                {"preconditions": dict(contract["start_preconditions"])}
-                if "start_preconditions" in contract
-                else {}
-            ),
-        },
         "dynamic_container_commands": {
             "map_value": "request-map-container",
             "array_item": "request-array-item",
@@ -7150,13 +7149,13 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             "status": "ok" if spec.implemented else "unsupported_boundary",
             "command": args.command,
             "offline": True,
-            "operation": operation_projection,
         }
         if normal_composer and request_version is not None:
             payload["composer"] = operation_composer_input_contract(
                 spec.name,
                 request_version,
             )
+        payload["operation"] = operation_projection
         if normal_inline and request_version is not None:
             operation_projection["input_mode"] = INLINE_TYPED_INPUT_MODE
             payload["typed_operation"] = inline_operation_contract(
