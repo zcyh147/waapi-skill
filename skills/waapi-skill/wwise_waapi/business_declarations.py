@@ -730,21 +730,19 @@ class BusinessHandleRegistry:
                     valid_range={"minimum": minimum, "maximum": maximum},
                     action="provide a value inside the live metadata range",
                 )
-            return int(normalized) if field.value_type == "integer" else normalized
+            normalized_value: Any = (
+                int(normalized) if field.value_type == "integer" else normalized
+            )
+            _require_enum_choice(field, normalized_value)
+            return normalized_value
         if field.value_type == "boolean":
             if type(value) is not bool:
                 raise _field_type_error(field)
+            _require_enum_choice(field, value)
             return value
         if not isinstance(value, str) or len(value.encode("utf-8")) > MAX_FIELD_STRING_BYTES:
             raise _field_type_error(field)
-        choices = restrictions.get("enum_choices")
-        if choices is not None and value not in choices:
-            raise _error(
-                "FIELD_VALUE_UNAVAILABLE",
-                field=field.token,
-                choices=choices,
-                action="choose one exact live metadata value",
-            )
+        _require_enum_choice(field, value)
         return value
 
     def _new_handle(self, prefix: str, binding_digest: str) -> str:
@@ -871,6 +869,7 @@ def bind_live_field(
         restrictions = _restrictions_from_live_metadata(
             info.restriction,
             field_kind=field_kind,
+            value_type=value_type,
         )
     except MetadataRestrictionError as exc:
         raise _error(
@@ -926,15 +925,22 @@ def bind_live_field(
             "metadata": info.as_dict(),
         }
     )
-    return registry.bind_field(
-        scope_kind=scope_kind,
-        scope_value=normalized_scope,
-        token=token,
-        field_kind=field_kind,
-        value_type=value_type,
-        restrictions=restrictions,
-        metadata_digest=metadata_digest,
-    )
+    try:
+        return registry.bind_field(
+            scope_kind=scope_kind,
+            scope_value=normalized_scope,
+            token=token,
+            field_kind=field_kind,
+            value_type=value_type,
+            restrictions=restrictions,
+            metadata_digest=metadata_digest,
+        )
+    except ValueError as exc:
+        raise _error(
+            "INVALID_METADATA",
+            field=token,
+            action="refresh or repair the live Wwise metadata contract",
+        ) from exc
 
 
 def revalidate_live_field(
@@ -1161,6 +1167,7 @@ def _restrictions_from_live_metadata(
     restriction: Mapping[str, Any],
     *,
     field_kind: str,
+    value_type: str,
 ) -> dict[str, Any]:
     normalized: dict[str, Any] = {}
     if restriction.get("type") == "range":
@@ -1170,14 +1177,16 @@ def _restrictions_from_live_metadata(
             normalized["maximum"] = restriction["max"]
     if restriction.get("type") == "enum":
         raw_values = restriction.get("values")
-        if isinstance(raw_values, Sequence) and not isinstance(raw_values, (str, bytes)):
-            choices = [
-                row.get("value")
-                for row in raw_values
-                if isinstance(row, Mapping) and isinstance(row.get("value"), str)
-            ]
-            if choices:
-                normalized["enum_choices"] = choices
+        if (
+            not isinstance(raw_values, list)
+            or not raw_values
+            or any(not isinstance(row, Mapping) or "value" not in row for row in raw_values)
+        ):
+            raise MetadataRestrictionError(
+                "INVALID_METADATA",
+                "Enum restriction values must be a non-empty array of value rows.",
+            )
+        normalized["enum_choices"] = [row["value"] for row in raw_values]
     if field_kind == "reference":
         allowed = reference_allowed_types(restriction)
         if allowed:
@@ -1398,13 +1407,10 @@ def _normalize_restrictions(
     } & normalized.keys():
         raise ValueError("only numeric fields accept a range")
     if "enum_choices" in restrictions:
-        choices = _normalized_text_sequence(
+        choices = _normalized_enum_choices(
             restrictions["enum_choices"],
-            field="enum_choices",
-            maximum_items=MAX_FIELD_ENUM_CHOICES,
+            value_type=value_type,
         )
-        if value_type != "string":
-            raise ValueError("enum choices require a string property")
         normalized["enum_choices"] = list(choices)
     if "allowed_target_types" in restrictions:
         target_types = _normalized_text_sequence(
@@ -1440,6 +1446,59 @@ def _normalized_text_sequence(
     if len(set(rows)) != len(rows):
         raise ValueError(f"{field} must not contain duplicates")
     return rows
+
+
+def _normalized_enum_choices(
+    value: Any,
+    *,
+    value_type: str,
+) -> tuple[Any, ...]:
+    if (
+        not isinstance(value, Sequence)
+        or isinstance(value, (str, bytes, bytearray))
+        or not value
+        or len(value) > MAX_FIELD_ENUM_CHOICES
+    ):
+        raise ValueError("enum_choices must be a non-empty bounded array")
+    rows: list[Any] = []
+    for item in value:
+        if value_type == "string":
+            normalized = _bounded_required_text(
+                item,
+                field="enum_choices",
+                maximum_bytes=MAX_FIELD_TOKEN_BYTES,
+            )
+        elif value_type == "boolean":
+            if type(item) is not bool:
+                raise ValueError("boolean enum choices must be booleans")
+            normalized = item
+        elif value_type in {"number", "integer"}:
+            if isinstance(item, bool) or not isinstance(item, (int, float)):
+                raise ValueError("numeric enum choices must be numbers")
+            number = float(item)
+            if not math.isfinite(number) or (
+                value_type == "integer" and not number.is_integer()
+            ):
+                raise ValueError("numeric enum choices must match their field type")
+            normalized = int(number) if value_type == "integer" else number
+        else:
+            raise ValueError("reference fields cannot use enum choices")
+        rows.append(normalized)
+    digests = tuple(canonical_sha256(item) for item in rows)
+    if len(set(digests)) != len(digests):
+        raise ValueError("enum choices must not contain duplicates")
+    return tuple(rows)
+
+
+def _require_enum_choice(field: BoundFieldHandle, value: Any) -> None:
+    choices = field.restrictions.get("enum_choices")
+    if choices is not None and value not in choices:
+        raise _error(
+            "FIELD_VALUE_UNAVAILABLE",
+            field=field.token,
+            choices=choices,
+            action="choose one exact live metadata value",
+        )
 
 
 def _field_type_error(field: BoundFieldHandle) -> BusinessDeclarationError:

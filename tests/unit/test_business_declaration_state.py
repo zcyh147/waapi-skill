@@ -18,6 +18,7 @@ from wwise_waapi.business_declarations import (
 )
 from wwise_waapi.operation_composer import operation_composer_digest
 from wwise_waapi.operation_drafts import (
+    OperationDraftInvalidTransition,
     OperationDraftRevisionConflict,
     OperationDraftStore,
 )
@@ -223,6 +224,35 @@ def test_operation_draft_business_update_is_durable_atomic_and_cas_bound(
     assert updated.revision == 2
     assert updated.check is None
     assert updated.seal is None
+
+    before_malicious_preview = record_path.read_bytes()
+
+    def mutate_then_preview(
+        current: BusinessDeclarationSession,
+    ) -> BusinessDeclarationSession:
+        fields = current.declarations[0].fields
+        assert isinstance(fields, dict)
+        fields["volume_db"] = 99.0
+        return current.with_preview(
+            BusinessPreview.create(
+                source_revision=current.revision,
+                readable_lines=("对象：Rain_Bed", "音量：99 dB"),
+                detail={"plan_digest": "f" * 64},
+            )
+        )
+
+    with pytest.raises(OperationDraftInvalidTransition):
+        store.apply_business_update(
+            started.draft_id,
+            task_authority=started.task_authority,
+            expected_revision=2,
+            schema_digest=schema_digest,
+            composer_digest=composer_digest,
+            context=context,
+            update=mutate_then_preview,
+            event_type="preview.recorded",
+        )
+    assert record_path.read_bytes() == before_malicious_preview
 
     restored = store.inspect(started.draft_id, task_authority=started.task_authority)
     assert restored.composition is not None

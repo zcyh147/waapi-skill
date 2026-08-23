@@ -11,7 +11,9 @@ from __future__ import annotations
 import heapq
 import math
 import re
+import shlex
 import time
+from collections import Counter
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Sequence
 
@@ -22,6 +24,17 @@ from .business_declaration_state import (
 from .business_declarations import BusinessDeclarationError, business_repair
 from .canonical import canonical_json_bytes, canonical_sha256, strict_json_copy
 from .operation_registry import OperationContractError, parse_operation_request
+from .operation_import import (
+    ImportContractError,
+    regular_file_proof,
+    verify_regular_file_proof,
+)
+from .platform_commands import (
+    WINDOWS_MODEL_COMMAND_FAMILY,
+    WINDOWS_POWERSHELL_ENCODED_FAMILY,
+    decode_windows_model_argv,
+    decode_windows_powershell_argv,
+)
 
 
 BUSINESS_EFFECT_CONTRACT = "waapi-skill.business-effect/v1"
@@ -135,6 +148,9 @@ class BusinessFileEvidence:
     path: str
     size_bytes: int
     sha256: str
+    mtime_ns: int | None = None
+    device: int | None = None
+    inode: int | None = None
 
     @classmethod
     def create(
@@ -143,6 +159,9 @@ class BusinessFileEvidence:
         path: str,
         size_bytes: int,
         sha256: str,
+        mtime_ns: int | None = None,
+        device: int | None = None,
+        inode: int | None = None,
     ) -> "BusinessFileEvidence":
         if not isinstance(path, str) or not path or path != path.strip():
             raise ValueError("file evidence path must be non-empty text")
@@ -154,14 +173,104 @@ class BusinessFileEvidence:
             raise ValueError("file evidence size must be non-negative")
         if not isinstance(sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", sha256):
             raise ValueError("file evidence digest must be a lowercase SHA-256")
-        return cls(path=path, size_bytes=size_bytes, sha256=sha256)
+        for name, value in (
+            ("mtime_ns", mtime_ns),
+            ("device", device),
+            ("inode", inode),
+        ):
+            if value is not None and (
+                isinstance(value, bool) or not isinstance(value, int) or value < 0
+            ):
+                raise ValueError(f"file evidence {name} must be non-negative")
+        return cls(
+            path=path,
+            size_bytes=size_bytes,
+            sha256=sha256,
+            mtime_ns=mtime_ns,
+            device=device,
+            inode=inode,
+        )
+
+    @classmethod
+    def from_path(cls, path: str) -> "BusinessFileEvidence":
+        proof = regular_file_proof(path, field="business file evidence")
+        return cls.create(
+            path=str(proof["path"]),
+            size_bytes=int(proof["size"]),
+            sha256=str(proof["sha256"]),
+            mtime_ns=int(proof["mtime_ns"]),
+            device=int(proof["device"]),
+            inode=int(proof["inode"]),
+        )
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "path": self.path,
             "size_bytes": self.size_bytes,
             "sha256": self.sha256,
         }
+        if self.mtime_ns is not None:
+            payload.update(
+                {
+                    "mtime_ns": self.mtime_ns,
+                    "device": self.device,
+                    "inode": self.inode,
+                }
+            )
+        return payload
+
+    def as_import_proof(self) -> dict[str, Any]:
+        if self.mtime_ns is None or self.device is None or self.inode is None:
+            raise ValueError("matching request files require complete immutable evidence")
+        return {
+            "path": self.path,
+            "size": self.size_bytes,
+            "sha256": self.sha256,
+            "mtime_ns": self.mtime_ns,
+            "device": self.device,
+            "inode": self.inode,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class BusinessPlanningDeadline:
+    started_at: float
+    expires_at: float
+    draft_revision: int
+    clock: Callable[[], float]
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        draft_revision: int,
+        clock: Callable[[], float],
+    ) -> "BusinessPlanningDeadline":
+        started_at = clock()
+        if not isinstance(started_at, (int, float)) or not math.isfinite(started_at):
+            raise ValueError("planning clock must return a finite number")
+        return cls(
+            started_at=float(started_at),
+            expires_at=float(started_at) + MAX_BUSINESS_PLANNING_SECONDS,
+            draft_revision=draft_revision,
+            clock=clock,
+        )
+
+    def checkpoint(self) -> None:
+        observed = self.clock()
+        if (
+            not isinstance(observed, (int, float))
+            or not math.isfinite(observed)
+            or observed < self.started_at
+            or observed > self.expires_at
+        ):
+            raise business_repair(
+                "BUSINESS_PLANNING_TIMEOUT",
+                field="plan",
+                draft_revision=self.draft_revision,
+                timeout_seconds=MAX_BUSINESS_PLANNING_SECONDS,
+                action="stop the Adapter and retry from fresh live evidence",
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -206,8 +315,14 @@ class CompiledBusinessPlan:
         return payload
 
 
-MaterializePlan = Callable[[Sequence[BusinessBatch]], Mapping[str, Any]]
-BuildContinuation = Callable[[Mapping[str, Any], str], Mapping[str, Any]]
+MaterializePlan = Callable[
+    [Sequence[BusinessBatch], BusinessPlanningDeadline],
+    Mapping[str, Any],
+]
+BuildContinuation = Callable[
+    [Mapping[str, Any], str, BusinessPlanningDeadline],
+    Mapping[str, Any],
+]
 
 
 def compile_business_plan(
@@ -217,7 +332,7 @@ def compile_business_plan(
     effects: Sequence[BusinessEffect],
     materialize: MaterializePlan,
     build_continuation: BuildContinuation,
-    file_evidence: Sequence[BusinessFileEvidence] = (),
+    file_evidence: Sequence[BusinessFileEvidence],
     clock: Callable[[], float] = time.monotonic,
 ) -> CompiledBusinessPlan:
     """Compile one complete, exact-revision business plan without mutation."""
@@ -226,9 +341,11 @@ def compile_business_plan(
         raise TypeError("session must be BusinessDeclarationSession")
     if not callable(clock):
         raise TypeError("clock must be callable")
-    started_at = clock()
-    if not isinstance(started_at, (int, float)) or not math.isfinite(started_at):
-        raise ValueError("planning clock must return a finite number")
+    deadline = BusinessPlanningDeadline.create(
+        draft_revision=session.revision,
+        clock=clock,
+    )
+    deadline.checkpoint()
     normalized_operation = _token(operation, field="operation")
     if not session.declarations or session.revision < 1:
         raise business_repair(
@@ -298,8 +415,9 @@ def compile_business_plan(
         )
     ordered = _topological_order(effect_rows, draft_revision=session.revision)
     batches = _layout_batches(ordered, draft_revision=session.revision)
+    deadline.checkpoint()
     try:
-        raw_request = materialize(batches)
+        raw_request = materialize(batches, deadline)
     except BusinessDeclarationError:
         raise
     except Exception as exc:
@@ -340,8 +458,41 @@ def compile_business_plan(
             action="repair the closed Adapter's canonical request materializer",
         ) from exc
     request_digest = canonical_sha256(request)
+    deadline.checkpoint()
     try:
-        raw_continuation = build_continuation(request, request_digest)
+        request_files = _request_file_paths(normalized_operation, request)
+    except ValueError as exc:
+        raise business_repair(
+            "BUSINESS_FILE_EVIDENCE_INVALID",
+            field="files",
+            draft_revision=session.revision,
+            action="repair the closed Adapter's canonical request-file mapping",
+        ) from exc
+    evidence_paths = tuple(row.path for row in normalized_files)
+    if Counter(request_files) != Counter(evidence_paths):
+        raise business_repair(
+            "BUSINESS_FILE_EVIDENCE_MISMATCH",
+            field="files",
+            draft_revision=session.revision,
+            request_file_count=len(request_files),
+            evidence_file_count=len(evidence_paths),
+            action="bind every native request file to exact immutable evidence",
+        )
+    try:
+        for row in normalized_files:
+            verify_regular_file_proof(
+                row.as_import_proof(),
+                field="business file evidence",
+            )
+    except (ImportContractError, ValueError) as exc:
+        raise business_repair(
+            "BUSINESS_FILE_EVIDENCE_STALE",
+            field="files",
+            draft_revision=session.revision,
+            action="refresh immutable file evidence before Preview",
+        ) from exc
+    try:
+        raw_continuation = build_continuation(request, request_digest, deadline)
         continuation = _validate_continuation(raw_continuation)
     except BusinessDeclarationError:
         raise
@@ -387,20 +538,7 @@ def compile_business_plan(
             draft_revision=session.revision,
             action="split the task into bounded business declaration batches",
         ) from exc
-    finished_at = clock()
-    if (
-        not isinstance(finished_at, (int, float))
-        or not math.isfinite(finished_at)
-        or finished_at < started_at
-        or finished_at - started_at > MAX_BUSINESS_PLANNING_SECONDS
-    ):
-        raise business_repair(
-            "BUSINESS_PLANNING_TIMEOUT",
-            field="plan",
-            draft_revision=session.revision,
-            timeout_seconds=MAX_BUSINESS_PLANNING_SECONDS,
-            action="retry from fresh live evidence with a bounded Adapter",
-        )
+    deadline.checkpoint()
     return CompiledBusinessPlan(
         operation=normalized_operation,
         version=session.context.wwise_version,
@@ -451,6 +589,34 @@ def _validate_file_evidence(
     return normalized
 
 
+def _request_file_paths(
+    operation: str,
+    request: Mapping[str, Any],
+) -> tuple[str, ...]:
+    if operation != "audio.import":
+        return ()
+    arguments = request.get("arguments")
+    if not isinstance(arguments, Mapping):
+        raise ValueError("canonical audio.import request is missing arguments")
+    raw_rows = arguments.get("imports")
+    if not isinstance(raw_rows, list):
+        raise ValueError("canonical audio.import request is missing import rows")
+    defaults = arguments.get("defaults", {})
+    if not isinstance(defaults, Mapping):
+        raise ValueError("canonical audio.import defaults are invalid")
+    files: list[str] = []
+    for row in raw_rows:
+        if not isinstance(row, Mapping):
+            raise ValueError("canonical audio.import row is invalid")
+        value = row.get("audio_file", defaults.get("audio_file"))
+        if value is None:
+            continue
+        if not isinstance(value, str) or not value:
+            raise ValueError("canonical audio.import audio_file is invalid")
+        files.append(value)
+    return tuple(files)
+
+
 def _validate_continuation(value: Any) -> dict[str, Any]:
     continuation = _strict_json_object(value, label="continuation")
     if len(canonical_json_bytes(continuation)) > MAX_BUSINESS_CONTINUATION_BYTES:
@@ -460,6 +626,7 @@ def _validate_continuation(value: Any) -> dict[str, Any]:
         "gateway_argv",
         "full_argv",
         "shell_command",
+        "shell_family",
         "copy_exactly",
         "copy_instruction",
     }
@@ -475,6 +642,11 @@ def _validate_continuation(value: Any) -> dict[str, Any]:
             or not all(isinstance(item, str) and item for item in argv)
         ):
             raise ValueError(f"continuation {field} is invalid")
+    gateway_argv = continuation["gateway_argv"]
+    full_argv = continuation["full_argv"]
+    assert isinstance(gateway_argv, list) and isinstance(full_argv, list)
+    if len(full_argv) <= len(gateway_argv) or full_argv[-len(gateway_argv) :] != gateway_argv:
+        raise ValueError("continuation full_argv and gateway_argv disagree")
     if not isinstance(continuation.get("shell_command"), str) or not continuation[
         "shell_command"
     ]:
@@ -495,6 +667,23 @@ def _validate_continuation(value: Any) -> dict[str, Any]:
         or not continuation[source_field]
     ):
         raise ValueError("continuation source field does not name one complete command")
+    shell_family = continuation.get("shell_family")
+    shell_command = continuation["shell_command"]
+    if shell_family == "posix-sh":
+        if shlex.join(full_argv) != shell_command:
+            raise ValueError("POSIX continuation does not encode full_argv exactly")
+    elif shell_family == WINDOWS_POWERSHELL_ENCODED_FAMILY:
+        if decode_windows_powershell_argv(shell_command) != tuple(full_argv):
+            raise ValueError("Windows continuation does not encode full_argv exactly")
+    else:
+        raise ValueError("continuation shell family is unsupported")
+    if source_field == "model_command":
+        if continuation.get("model_shell_family") != WINDOWS_MODEL_COMMAND_FAMILY:
+            raise ValueError("Windows model continuation family is invalid")
+        if decode_windows_model_argv(continuation["model_command"]) != tuple(full_argv):
+            raise ValueError("Windows model continuation does not encode full_argv exactly")
+    elif source_field != "shell_command":
+        raise ValueError("continuation source field is unsupported")
     return continuation
 
 
@@ -607,6 +796,7 @@ __all__ = [
     "BusinessBatch",
     "BusinessEffect",
     "BusinessFileEvidence",
+    "BusinessPlanningDeadline",
     "CompiledBusinessPlan",
     "MAX_BUSINESS_FILE_BYTES",
     "MAX_BUSINESS_PLANNING_SECONDS",

@@ -78,12 +78,12 @@ class BusinessDeclaration:
                 "object_handle": self.target.object_handle,
             }
         )
-        return {
+        return strict_json_copy({
             "contract": BUSINESS_DECLARATION_CONTRACT,
             "declaration_id": self.declaration_id,
             "target": target,
             "fields": dict(self.fields),
-        }
+        })
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,13 +139,13 @@ class BusinessPreview:
         )
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        return strict_json_copy({
             "contract": BUSINESS_PREVIEW_CONTRACT,
             "source_revision": self.source_revision,
             "readable_lines": list(self.readable_lines),
             "detail": dict(self.detail),
             "preview_digest": self.preview_digest,
-        }
+        })
 
     def readable_projection(self) -> dict[str, Any]:
         return {
@@ -271,7 +271,9 @@ class BusinessDeclarationSession:
         }
         if len(canonical_json_bytes(payload)) > MAX_BUSINESS_SESSION_BYTES:
             raise ValueError("business declaration session exceeds its fixed byte limit")
-        return payload
+        normalized = strict_json_copy(payload)
+        assert isinstance(normalized, dict)
+        return normalized
 
     @classmethod
     def from_dict(cls, payload: Any) -> "BusinessDeclarationSession":

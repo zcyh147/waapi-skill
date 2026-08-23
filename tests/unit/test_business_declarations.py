@@ -277,8 +277,14 @@ def test_repairs_are_bounded_and_do_not_echo_unbounded_input() -> None:
     assert captured.value.repair["error_code"] == "OBJECT_HANDLE_NOT_AVAILABLE"
 
 
-def test_live_field_binding_uses_exact_metadata_and_dynamic_enabled_state() -> None:
-    registry = BusinessHandleRegistry(_context(), token_bytes=lambda size: b"m" * size)
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_live_field_binding_uses_exact_metadata_and_dynamic_enabled_state(
+    version: str,
+) -> None:
+    registry = BusinessHandleRegistry(
+        _context(wwise_version=version, wwise_build=f"{version}.fixture"),
+        token_bytes=lambda size: b"m" * size,
+    )
     calls: list[tuple[str, dict[str, object], dict[str, object]]] = []
 
     def read(
@@ -331,8 +337,14 @@ def test_live_field_binding_uses_exact_metadata_and_dynamic_enabled_state() -> N
     }
 
 
-def test_live_field_binding_returns_exact_candidates_and_disabled_repair() -> None:
-    registry = BusinessHandleRegistry(_context(), token_bytes=lambda size: b"d" * size)
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_live_field_binding_returns_exact_candidates_and_disabled_repair(
+    version: str,
+) -> None:
+    registry = BusinessHandleRegistry(
+        _context(wwise_version=version, wwise_build=f"{version}.fixture"),
+        token_bytes=lambda size: b"d" * size,
+    )
 
     def missing_read(
         uri: str,
@@ -473,11 +485,16 @@ def test_common_business_fields_preserve_omission_and_explicit_units() -> None:
         ({"type": ["Bus", 7]}, "INVALID_METADATA"),
     ),
 )
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
 def test_live_reference_restrictions_fail_closed(
     restriction_row: object,
     error_code: str,
+    version: str,
 ) -> None:
-    registry = BusinessHandleRegistry(_context(), token_bytes=lambda size: b"q" * size)
+    registry = BusinessHandleRegistry(
+        _context(wwise_version=version, wwise_build=f"{version}.fixture"),
+        token_bytes=lambda size: b"q" * size,
+    )
 
     def read(
         uri: str,
@@ -508,8 +525,14 @@ def test_live_reference_restrictions_fail_closed(
     assert captured.value.repair["error_code"] == error_code
 
 
-def test_dependent_field_requires_exact_object_scope_for_enabled_check() -> None:
-    registry = BusinessHandleRegistry(_context(), token_bytes=lambda size: b"c" * size)
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_dependent_field_requires_exact_object_scope_for_enabled_check(
+    version: str,
+) -> None:
+    registry = BusinessHandleRegistry(
+        _context(wwise_version=version, wwise_build=f"{version}.fixture"),
+        token_bytes=lambda size: b"c" * size,
+    )
 
     def read(
         uri: str,
@@ -537,3 +560,48 @@ def test_dependent_field_requires_exact_object_scope_for_enabled_check() -> None
         )
     assert captured.value.repair["error_code"] == "FIELD_OBJECT_SCOPE_REQUIRED"
     assert captured.value.repair["dependency_fields"] == ["OverrideVolume"]
+
+
+@pytest.mark.parametrize(
+    "values",
+    (
+        [],
+        ["Infinite"],
+        [{"displayName": "Infinite"}],
+        [{"value": "Infinite"}, {"value": 7}],
+    ),
+)
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_live_property_enum_restrictions_fail_closed(
+    values: object,
+    version: str,
+) -> None:
+    registry = BusinessHandleRegistry(
+        _context(wwise_version=version, wwise_build=f"{version}.fixture"),
+        token_bytes=lambda size: b"u" * size,
+    )
+
+    def read(
+        uri: str,
+        args: dict[str, object],
+        options: dict[str, object],
+    ) -> dict[str, object]:
+        if uri.endswith("getPropertyAndReferenceNames"):
+            return {"return": ["LoopMode"]}
+        if uri.endswith("getPropertyInfo"):
+            return {
+                "name": "LoopMode",
+                "type": "String",
+                "restriction": {"type": "enum", "values": values},
+            }
+        raise AssertionError(uri)
+
+    with pytest.raises(BusinessDeclarationError) as captured:
+        bind_live_field(
+            registry,
+            read_call=read,
+            scope_kind="class",
+            scope_value=65552,
+            token="LoopMode",
+        )
+    assert captured.value.repair["error_code"] == "INVALID_METADATA"
