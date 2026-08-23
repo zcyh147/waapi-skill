@@ -80,17 +80,13 @@ def test_common_reads_use_closed_gateway_before_optional_references() -> None:
     assert "`shell_tool_timeout_ms`" in SKILL
     assert "outer shell tool call" in SKILL
     assert "never add it to the command argv" in SKILL
-    assert "Read one lane reference only when fixed commands are insufficient" in SKILL
+    assert "Read only the current-turn lane; never preload" in SKILL
 
 
 def test_lane_reads_follow_only_the_current_user_turn() -> None:
-    assert "Select the lane from the current user turn only" in SKILL
+    assert "Read only the current-turn lane; never preload" in SKILL
     assert (
-        "Never preload another lane for a possible later turn" in SKILL
-    )
-    assert (
-        "a read-only query does not read `references/waapi-operate.md` until a "
-        "later user message explicitly requests a change"
+        "Read-only work cannot read `waapi-operate.md` before a change request"
         in SKILL
     )
     assert "There is no raw-client fallback" in QUERY
