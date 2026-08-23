@@ -62,7 +62,7 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "initial rows; parents before children. Paths: "
     "copy parent backslashes; add one per child. timeout_ms>=30000; max "
     "shell_tool_timeout_ms wins. Append prompt terminal "
-    "scalars before completion_candidate.copy_command. Editable draft-apply "
+    "scalars before completion_candidate.copy_command. Editable draft-start/apply "
     "continues same turn via "
     "next_phase_decision; no progress reply while editable. "
     "draft-check is not Preview; run next_command before reply unless "

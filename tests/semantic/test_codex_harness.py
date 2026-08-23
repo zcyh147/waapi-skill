@@ -1494,7 +1494,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "shell_tool_timeout_ms" in instructions
     assert "timeout_ms>=30000" in instructions
     assert "draft-check is not Preview" in instructions
-    assert "Editable draft-apply continues same turn" in instructions
+    assert "Editable draft-start/apply continues same turn" in instructions
     assert "no progress reply while editable" in instructions
     assert "requires_later_user_message" in instructions
 
