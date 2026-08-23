@@ -1473,11 +1473,12 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "execute_after=all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "selected-branch constant" in instructions
+    assert "reuse only successful live tokens" in instructions
     assert "one scoped 1..8 call" in instructions
     assert "covers all prompt fields" in instructions
     assert "paired modes/routing" in instructions
-    assert "reuse; no repeat" in instructions
-    assert "exact-ID reread each selected GUID before schema" in instructions
+    assert "no repeat" in instructions
+    assert "exact-ID reread selected GUIDs before schema" in instructions
     assert "enum/const exactly" in instructions
     assert "typed_operation.continuation.gateway_argv_prefix verbatim" in instructions
     assert "incl --apply" in instructions
@@ -1490,8 +1491,8 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "no shorten/normalize" in instructions
     assert "prompt terminal scalars" in instructions
     assert "every prompt field/item/map/bool" in instructions
-    assert "Top facts first; exhaust current response/descendants" in instructions
-    assert "only then copy" in instructions
+    assert "Top facts first; exhaust response/descendants" in instructions
+    assert "then copy" in instructions
     assert "ancestor_next_item_source verbatim" in instructions
     assert "never type digest" in instructions
     assert "shell_tool_timeout_ms" in instructions
