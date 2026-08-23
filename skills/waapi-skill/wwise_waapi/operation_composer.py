@@ -1432,9 +1432,9 @@ def _metadata_query_batch_contract(
         **(
             {
                 "reconcile_before_command": (
-                    "list every requested property/reference assignment across all "
-                    "rows, then require equal distinct checklist and --query counts; "
-                    "familiar one-row fields such as Volume and OutputBus still count"
+                    "list every requested property/reference assignment across rows; "
+                    "require equal distinct checklist and --query counts; one-row "
+                    "Volume and OutputBus still count"
                 ),
                 "business_fact_inventory": (
                     "count every requested toggle, mode, scalar, and reference as "

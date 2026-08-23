@@ -872,9 +872,9 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
         "metadata_query_batch": {
             "scope": "one exact object, class, or object-type scope",
             "reconcile_before_command": (
-                "list every requested property/reference assignment across all "
-                "rows, then require equal distinct checklist and --query counts; "
-                "familiar one-row fields such as Volume and OutputBus still count"
+                "list every requested property/reference assignment across rows; "
+                "require equal distinct checklist and --query counts; one-row "
+                "Volume and OutputBus still count"
             ),
             "business_fact_inventory": (
                 "count every requested toggle, mode, scalar, and reference as one "

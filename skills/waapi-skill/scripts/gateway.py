@@ -4447,13 +4447,11 @@ def operation_composer_input_contract(
                 "request-map-container is only for an object or array value"
             ),
             "sequence": (
-                "use a root argv template only for a top-level handle; use the "
-                "matching nested argv template unchanged for a returned child; "
-                "then add the append/map-put Draft fact with the returned child handle; "
-                "disclosure never consumes or changes the Draft revision; do not "
-                "combine schema digest with parent lineage; do not add --member-key "
-                "until the parent "
-                "response explicitly returns branch_disclosure"
+                "root argv is only for top-level handles; returned children use the "
+                "matching nested argv unchanged; then append/map-put that child; "
+                "disclosure never consumes or changes the Draft revision; never "
+                "mix schema digest with parent lineage; add --member-key only when "
+                "branch_disclosure returns it"
             ),
         },
         "apply": apply_contract,

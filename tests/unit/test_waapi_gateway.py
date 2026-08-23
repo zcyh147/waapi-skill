@@ -900,7 +900,8 @@ def test_main_prints_object_set_operation_schema_as_bounded_compact_json(
     assert list(parsed) == list(payload)
     assert "request_envelope" not in parsed
     assert "request_envelope_policy" not in parsed
-    assert parsed["composer"]["start"]["gateway_argv"] == [
+    assert "gateway_argv" not in parsed["composer"]["start"]
+    assert parsed["composer"]["start"]["gateway_argv_after_preconditions"] == [
         "draft-start",
         "object.set",
     ]

@@ -106,7 +106,7 @@ For example, `object.setRTPC` authors a curve while `ak.soundengine.setRTPCValue
 - If exact type is unproven, first exact-query the unchanged root and require one type/name/path match. Then open `operation-schema object.create` and follow its sole continuation directly into the Draft; do not query the parent already determined by that verified path.
 - For the current-version default container Work Unit, use that preflight query for an `object.create` same-name-root merge; `object.set` instead uses its returned target base, live token discovery, and Composer validation. Do not insert `project-default-work-units`.
 - Existing `objects[]` never implies child-name merge; obey returned `fail`, `merge`, or guarded-replace guidance.
-- Never silently retarget an unsuitable parent. Report suitability evidence and ask for the intended writable child container before a new preview.
+- If it is not a valid direct writable parent, do not silently retarget the mutation; ask the user to confirm the intended writable child container.
 
 ## Resolve properties and references from live metadata
 
