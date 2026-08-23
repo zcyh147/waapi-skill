@@ -1974,8 +1974,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             "workflow_control": _metadata_workflow_control(),
             "activation_decision": _metadata_activation_decision(),
             "metadata_scope": (
-                "when the exact shared target type is known, keep --object-type "
-                "and do not substitute --object <target-path>"
+                "exact shared type: use --object-type; never --object <target-path>"
             ),
             "metadata_scope_decision": {
                 "first_source": "exact_shared_target_type_from_every_selector",
