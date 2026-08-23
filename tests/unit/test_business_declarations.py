@@ -1,0 +1,366 @@
+from __future__ import annotations
+
+import json
+
+import pytest
+
+from wwise_waapi.business_declarations import (
+    BusinessContext,
+    BusinessDeclarationError,
+    BusinessHandleRegistry,
+    ExistingObjectTarget,
+    NewDescendantTarget,
+    SUPPORTED_BUSINESS_KINDS,
+    SUPPORTED_WWISE_VERSIONS,
+    bind_live_field,
+    resolve_semantic_kind,
+)
+
+
+PROJECT_ID = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
+OTHER_PROJECT_ID = "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}"
+OBJECT_ID = "{11111111-1111-1111-1111-111111111111}"
+BUS_ID = "{22222222-2222-2222-2222-222222222222}"
+METADATA_DIGEST = "a" * 64
+
+
+def _context(**overrides: str) -> BusinessContext:
+    values = {
+        "task_authority": "da1-" + "1" * 40,
+        "project_id": PROJECT_ID,
+        "project_path": "/fixtures/SampleProject.wproj",
+        "wwise_version": "2022.1",
+        "wwise_build": "2022.1.19.8584",
+    }
+    values.update(overrides)
+    return BusinessContext.create(**values)
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_semantic_kinds_are_closed_and_deterministic_for_every_version(
+    version: str,
+) -> None:
+    sound = resolve_semantic_kind("sound-sfx", version=version)
+    assert sound.path_segment_type == "Sound SFX"
+    assert sound.native_object_type == "Sound SFX"
+    assert sound.metadata_object_type == "Sound"
+    assert sound.verifier_object_types == ("Sound", "Sound SFX")
+
+    actor_mixer = resolve_semantic_kind("actor-mixer", version=version)
+    assert actor_mixer.path_segment_type == "Actor-Mixer"
+    assert actor_mixer.native_object_type == "ActorMixer"
+    assert actor_mixer.metadata_object_type == (
+        "PropertyContainer" if version == "2025.1" else "ActorMixer"
+    )
+    assert actor_mixer.verifier_object_types == (
+        "ActorMixer",
+        *(('PropertyContainer',) if version == "2025.1" else ()),
+    )
+
+    again = resolve_semantic_kind("actor-mixer", version=version)
+    assert again == actor_mixer
+    assert again.binding_digest == actor_mixer.binding_digest
+
+
+def test_semantic_kind_repair_discloses_only_closed_choices() -> None:
+    with pytest.raises(BusinessDeclarationError) as captured:
+        resolve_semantic_kind("SFX Sound", version="2022.1")
+
+    assert captured.value.repair == {
+        "contract": "waapi-skill.business-repair/v1",
+        "error_code": "BUSINESS_KIND_UNAVAILABLE",
+        "field": "kind",
+        "draft_changed": False,
+        "choices": list(SUPPORTED_BUSINESS_KINDS),
+        "action": "choose one disclosed semantic kind",
+    }
+
+    with pytest.raises(BusinessDeclarationError) as unsupported:
+        resolve_semantic_kind("sound-sfx", version="2026.1")
+    assert unsupported.value.repair["error_code"] == "WWISE_VERSION_UNSUPPORTED"
+    assert unsupported.value.repair["choices"] == list(SUPPORTED_WWISE_VERSIONS)
+
+
+def test_new_descendant_uses_parent_handle_name_and_kind_only() -> None:
+    registry = BusinessHandleRegistry(_context(), token_bytes=lambda size: b"p" * size)
+    parent = registry.bind_object(
+        object_id=OBJECT_ID,
+        name="Weather",
+        object_type="ActorMixer",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\Weather",
+    )
+
+    target = registry.new_descendant(
+        parent_handle=parent.handle,
+        name="Rain_Bed",
+        kind="sound-sfx",
+    )
+
+    assert target == NewDescendantTarget(
+        parent_handle=parent.handle,
+        name="Rain_Bed",
+        kind="sound-sfx",
+    )
+    assert not hasattr(target, "object_path")
+    assert not hasattr(target, "object_type")
+
+
+def test_existing_target_uses_one_exact_bound_object_handle() -> None:
+    registry = BusinessHandleRegistry(_context(), token_bytes=lambda size: b"e" * size)
+    existing = registry.bind_object(
+        object_id=OBJECT_ID,
+        name="Rifle_Shot",
+        object_type="Sound",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\Weapons\Rifle_Shot",
+    )
+
+    assert registry.existing_target(existing.handle) == ExistingObjectTarget(
+        object_handle=existing.handle
+    )
+
+
+@pytest.mark.parametrize(
+    ("changed", "error_code"),
+    (
+        ({"task_authority": "da1-" + "2" * 40}, "HANDLE_TASK_MISMATCH"),
+        ({"project_id": OTHER_PROJECT_ID}, "HANDLE_PROJECT_MISMATCH"),
+        ({"wwise_version": "2023.1"}, "HANDLE_VERSION_MISMATCH"),
+        ({"wwise_build": "2022.1.19.9999"}, "HANDLE_BUILD_MISMATCH"),
+    ),
+)
+def test_object_handles_fail_closed_outside_their_live_binding(
+    changed: dict[str, str],
+    error_code: str,
+) -> None:
+    registry = BusinessHandleRegistry(_context(), token_bytes=lambda size: b"o" * size)
+    bound = registry.bind_object(
+        object_id=OBJECT_ID,
+        name="Weather",
+        object_type="ActorMixer",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\Weather",
+    )
+
+    with pytest.raises(BusinessDeclarationError) as captured:
+        registry.resolve_object(bound.handle, context=_context(**changed))
+
+    assert captured.value.repair["error_code"] == error_code
+    assert captured.value.repair["draft_changed"] is False
+    assert captured.value.repair["rejected_handle"] == bound.handle
+
+
+def test_field_handle_binds_scope_token_type_restrictions_and_metadata_digest() -> None:
+    registry = BusinessHandleRegistry(_context(), token_bytes=lambda size: b"f" * size)
+    field = registry.bind_field(
+        scope_kind="class",
+        scope_value="Sound",
+        token="Volume",
+        field_kind="property",
+        value_type="number",
+        restrictions={"minimum": -200.0, "maximum": 200.0},
+        metadata_digest=METADATA_DIGEST,
+    )
+
+    resolved = registry.resolve_field(
+        field.handle,
+        context=_context(),
+        scope_kind="class",
+        scope_value="Sound",
+        metadata_digest=METADATA_DIGEST,
+    )
+    assert resolved.token == "Volume"
+    assert resolved.value_type == "number"
+    assert resolved.restrictions == {"maximum": 200.0, "minimum": -200.0}
+    assert len(resolved.binding_digest) == 64
+
+    for mismatch in (
+        {"scope_kind": "class", "scope_value": "ActorMixer", "metadata_digest": METADATA_DIGEST},
+        {"scope_kind": "class", "scope_value": "Sound", "metadata_digest": "b" * 64},
+    ):
+        with pytest.raises(BusinessDeclarationError) as captured:
+            registry.resolve_field(field.handle, context=_context(), **mismatch)
+        assert captured.value.repair["error_code"] in {
+            "FIELD_HANDLE_SCOPE_MISMATCH",
+            "FIELD_HANDLE_STALE",
+        }
+
+
+def test_field_value_validation_returns_exact_range_enum_and_reference_repairs() -> None:
+    registry = BusinessHandleRegistry(_context(), token_bytes=lambda size: b"v" * size)
+    volume = registry.bind_field(
+        scope_kind="class",
+        scope_value="Sound",
+        token="Volume",
+        field_kind="property",
+        value_type="number",
+        restrictions={"minimum": -200.0, "maximum": 200.0},
+        metadata_digest=METADATA_DIGEST,
+    )
+    loop = registry.bind_field(
+        scope_kind="class",
+        scope_value="Sound",
+        token="LoopMode",
+        field_kind="property",
+        value_type="string",
+        restrictions={"enum_choices": ["Infinite", "Finite"]},
+        metadata_digest="b" * 64,
+    )
+    output_bus = registry.bind_field(
+        scope_kind="class",
+        scope_value="Sound",
+        token="OutputBus",
+        field_kind="reference",
+        value_type="reference",
+        restrictions={"allowed_target_types": ["Bus", "AuxBus"]},
+        metadata_digest="c" * 64,
+    )
+    wrong_target = registry.bind_object(
+        object_id=OBJECT_ID,
+        name="Weather",
+        object_type="ActorMixer",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\Weather",
+    )
+    bus_target = registry.bind_object(
+        object_id=BUS_ID,
+        name="Weather_Bus",
+        object_type="Bus",
+        path=r"\Master-Mixer Hierarchy\Default Work Unit\Weather_Bus",
+    )
+
+    assert registry.validate_field_value(volume, -4) == -4.0
+    assert registry.validate_field_value(loop, "Infinite") == "Infinite"
+    assert registry.validate_field_value(output_bus, bus_target.handle) == bus_target.handle
+
+    with pytest.raises(BusinessDeclarationError) as out_of_range:
+        registry.validate_field_value(volume, 201)
+    assert out_of_range.value.repair["valid_range"] == {
+        "minimum": -200.0,
+        "maximum": 200.0,
+    }
+
+    with pytest.raises(BusinessDeclarationError) as bad_enum:
+        registry.validate_field_value(loop, "Forever")
+    assert bad_enum.value.repair["choices"] == ["Infinite", "Finite"]
+
+    with pytest.raises(BusinessDeclarationError) as bad_reference:
+        registry.validate_field_value(output_bus, wrong_target.handle)
+    assert bad_reference.value.repair["allowed_target_types"] == ["AuxBus", "Bus"]
+
+
+def test_repairs_are_bounded_and_do_not_echo_unbounded_input() -> None:
+    registry = BusinessHandleRegistry(_context(), token_bytes=lambda size: b"z" * size)
+    huge = "x" * 100_000
+
+    with pytest.raises(BusinessDeclarationError) as captured:
+        registry.resolve_object(huge)
+
+    encoded = json.dumps(captured.value.repair, ensure_ascii=False).encode("utf-8")
+    assert len(encoded) <= 16 * 1024
+    assert huge not in encoded.decode("utf-8")
+    assert captured.value.repair["error_code"] == "OBJECT_HANDLE_NOT_AVAILABLE"
+
+
+def test_live_field_binding_uses_exact_metadata_and_dynamic_enabled_state() -> None:
+    registry = BusinessHandleRegistry(_context(), token_bytes=lambda size: b"m" * size)
+    calls: list[tuple[str, dict[str, object], dict[str, object]]] = []
+
+    def read(
+        uri: str,
+        args: dict[str, object],
+        options: dict[str, object],
+    ) -> dict[str, object]:
+        calls.append((uri, dict(args), dict(options)))
+        if uri.endswith("getPropertyAndReferenceNames"):
+            return {"return": ["Volume", "OutputBus"]}
+        if uri.endswith("getPropertyInfo"):
+            return {
+                "name": "Volume",
+                "type": "Real32",
+                "restriction": {"type": "range", "min": -96.3, "max": 12.0},
+                "dependencies": [
+                    {
+                        "type": "property",
+                        "action": "Enable",
+                        "context": "Self",
+                        "property": "OverrideVolume",
+                    }
+                ],
+            }
+        if uri.endswith("isPropertyEnabled"):
+            return {"return": True}
+        raise AssertionError(uri)
+
+    field = bind_live_field(
+        registry,
+        read_call=read,
+        scope_kind="object",
+        scope_value=OBJECT_ID,
+        token="Volume",
+        platform="Windows",
+    )
+
+    assert field.field_kind == "property"
+    assert field.value_type == "number"
+    assert field.restrictions == {"maximum": 12.0, "minimum": -96.3}
+    assert [call[0].rsplit(".", 1)[-1] for call in calls] == [
+        "getPropertyAndReferenceNames",
+        "getPropertyInfo",
+        "isPropertyEnabled",
+    ]
+    assert calls[-1][1] == {
+        "object": OBJECT_ID,
+        "property": "Volume",
+        "platform": "Windows",
+    }
+
+
+def test_live_field_binding_returns_exact_candidates_and_disabled_repair() -> None:
+    registry = BusinessHandleRegistry(_context(), token_bytes=lambda size: b"d" * size)
+
+    def missing_read(
+        uri: str,
+        args: dict[str, object],
+        options: dict[str, object],
+    ) -> dict[str, object]:
+        assert uri.endswith("getPropertyAndReferenceNames")
+        return {"return": ["Volume", "OutputBus"]}
+
+    with pytest.raises(BusinessDeclarationError) as missing:
+        bind_live_field(
+            registry,
+            read_call=missing_read,
+            scope_kind="class",
+            scope_value=65552,
+            token="Pitch",
+        )
+    assert missing.value.repair["error_code"] == "FIELD_TOKEN_NOT_AVAILABLE"
+    assert missing.value.repair["candidates"] == ["Volume", "OutputBus"]
+
+    def disabled_read(
+        uri: str,
+        args: dict[str, object],
+        options: dict[str, object],
+    ) -> dict[str, object]:
+        if uri.endswith("getPropertyAndReferenceNames"):
+            return {"return": ["Volume"]}
+        if uri.endswith("getPropertyInfo"):
+            return {
+                "name": "Volume",
+                "type": "Real32",
+                "dependencies": [{"property": "OverrideVolume"}],
+            }
+        if uri.endswith("isPropertyEnabled"):
+            return {"return": False}
+        raise AssertionError(uri)
+
+    with pytest.raises(BusinessDeclarationError) as disabled:
+        bind_live_field(
+            registry,
+            read_call=disabled_read,
+            scope_kind="object",
+            scope_value=OBJECT_ID,
+            token="Volume",
+            platform="Windows",
+        )
+    assert disabled.value.repair["error_code"] == "FIELD_DISABLED"
+    assert disabled.value.repair["dependency_fields"] == ["OverrideVolume"]
+    assert disabled.value.repair["draft_changed"] is False
