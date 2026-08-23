@@ -868,6 +868,15 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
             "partial_fallback": (
                 "one broader retry only when explicitly reported partial"
             ),
+            "limit_by_query_count": {
+                "1..2": 8,
+                "3..4": 3,
+                "5..8": 2,
+            },
+            "required_final_argv": [
+                "--limit",
+                "<derived-from-query-count>",
+            ],
         },
         "submit_only_explicit_user_facts": True,
         "draft_check_revalidates_dynamic_metadata": True,

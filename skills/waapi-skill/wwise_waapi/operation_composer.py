@@ -1421,10 +1421,12 @@ def _selector_cli_tokens(selector: Mapping[str, Any], *, depth: int = 0) -> tupl
     raise OperationComposerError("Typed selector is invalid.")
 
 
-def _metadata_query_batch_contract() -> dict[str, str]:
+def _metadata_query_batch_contract(
+    *, include_limit_discipline: bool = False
+) -> dict[str, Any]:
     """Describe the one scoped discovery batch used before one Draft."""
 
-    return {
+    contract: dict[str, Any] = {
         "scope": "one exact object, class, or object-type scope",
         "first_request": (
             "include every distinct prompt-present dynamic property/reference "
@@ -1441,6 +1443,17 @@ def _metadata_query_batch_contract() -> dict[str, str]:
             "one broader retry only when explicitly reported partial"
         ),
     }
+    if include_limit_discipline:
+        contract["limit_by_query_count"] = {
+            "1..2": 8,
+            "3..4": 3,
+            "5..8": 2,
+        }
+        contract["required_final_argv"] = [
+            "--limit",
+            "<derived-from-query-count>",
+        ]
+    return contract
 
 
 def _metadata_workflow_control() -> dict[str, str | bool]:
@@ -1450,6 +1463,20 @@ def _metadata_workflow_control() -> dict[str, str | bool]:
         "metadata_success_is_terminal": False,
         "continue_same_turn_after_metadata": "draft-start",
         "reply_before_draft_start": "invalid",
+    }
+
+
+def _audio_import_hierarchy_row_order_contract() -> dict[str, str | bool]:
+    """Keep import hierarchy ordering identical at schema and action time."""
+
+    return {
+        "requested_structure_rows_are_separate": True,
+        "structure_rows": "tree_preorder_before_every_media_row",
+        "media_rows": "prompt_order_after_all_structure_rows",
+        "typed_descendant_path_does_not_replace_requested_structure_row": True,
+        "batching": (
+            "concatenate_structure_then_media_and_split_only_at_batch_limit"
+        ),
     }
 
 
@@ -1712,15 +1739,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "when_requested": "include_in_initial_add_import_row",
                 "defer_or_omit": "invalid",
             },
-            "hierarchy_row_order": {
-                "requested_structure_rows_are_separate": True,
-                "structure_rows": "tree_preorder_before_every_media_row",
-                "media_rows": "prompt_order_after_all_structure_rows",
-                "typed_descendant_path_does_not_replace_requested_structure_row": True,
-                "batching": (
-                    "concatenate_structure_then_media_and_split_only_at_batch_limit"
-                ),
-            },
+            "hierarchy_row_order": _audio_import_hierarchy_row_order_contract(),
             "metadata_dependency_activation": (
                 "agent_selects_exact_token_gateway_validates_dependencies"
             ),
@@ -1889,7 +1908,9 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 ),
                 "workflow_control": _metadata_workflow_control(),
                 "activation_decision": _metadata_activation_decision(),
-                "metadata_query_batch": _metadata_query_batch_contract(),
+                "metadata_query_batch": _metadata_query_batch_contract(
+                    include_limit_discipline=True
+                ),
                 "submit_only_explicit_user_facts": True,
                 "draft_check_revalidates_dynamic_metadata": True,
             },
@@ -4344,7 +4365,8 @@ def _audio_import_composition_projection(
                 ),
                 "other_rows": "use none unless the user assigns that row",
                 "guessing_allowed": False,
-            }
+            },
+            "hierarchy_row_order": _audio_import_hierarchy_row_order_contract(),
         },
         "current_facts": facts,
         "missing_fields": missing,

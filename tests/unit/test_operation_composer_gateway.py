@@ -852,6 +852,18 @@ def test_metadata_preconditions_are_operation_local_in_composer_start(
     assert audio_import["composer"]["start"]["preconditions"][
         "agent_metadata_command_required"
     ] == "when_dynamic_token_is_not_already_exact_live_evidence"
+    audio_batch = audio_import["composer"]["start"]["preconditions"][
+        "metadata_query_batch"
+    ]
+    assert audio_batch["limit_by_query_count"] == {
+        "1..2": 8,
+        "3..4": 3,
+        "5..8": 2,
+    }
+    assert audio_batch["required_final_argv"] == [
+        "--limit",
+        "<derived-from-query-count>",
+    ]
     assert "preconditions" not in rtpc["composer"]["start"]
 
 
@@ -2051,6 +2063,15 @@ def test_audio_import_schema_requires_one_complete_metadata_query_batch(
         "split_within_limit": "invalid",
         "successful_complete_scope_result": "do_not_query_that_scope_again",
         "partial_fallback": "one broader retry only when explicitly reported partial",
+        "limit_by_query_count": {
+            "1..2": 8,
+            "3..4": 3,
+            "5..8": 2,
+        },
+        "required_final_argv": [
+            "--limit",
+            "<derived-from-query-count>",
+        ],
     }
 
 
