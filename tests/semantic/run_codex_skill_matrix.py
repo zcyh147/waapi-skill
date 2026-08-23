@@ -124,6 +124,12 @@ DEFAULT_COMPOUND_HEAVY_V1_SUITE = (
 DEFAULT_TYPED_INPUT_SUITE = (
     REPO_ROOT / "tests" / "semantic" / "data" / "typed-input-v1" / "profile.json"
 )
+DEFAULT_DEEP_INTERFACE_MVP_SUITE = (
+    REPO_ROOT / "tests" / "semantic" / "data" / "deep-interface-mvp" / "profile.json"
+)
+DEFAULT_DEEP_INTERFACE_MVP_SKILL = (
+    REPO_ROOT / "tests" / "semantic" / "data" / "deep-interface-mvp" / "skill"
+)
 DEFAULT_INTEGRATION_WORKFLOWS_V1_SUITE = (
     REPO_ROOT
     / "tests"
@@ -207,6 +213,7 @@ HEAVY_V3_PROFILE_ID = "heavy_cross_version_80"
 MODIFICATION_POLICY_V3_PROFILE_ID = "modification_policy_9"
 COMPOUND_HEAVY_V1_PROFILE_ID = "compound_heavy_cross_version_24"
 TYPED_INPUT_PROFILE_ID = "typed_input_cross_version_25"
+DEEP_INTERFACE_MVP_PROFILE_ID = "deep_interface_mvp_4"
 INTEGRATION_WORKFLOWS_V1_PROFILE_ID = "integration_workflows_cross_version_6"
 INTEGRATION_WORKFLOWS_V2_PROFILE_ID = "integration_workflows_v2_cross_version_6"
 INTEGRATION_PROFILE_ID = "integration"
@@ -222,6 +229,7 @@ EXECUTABLE_V3_PROFILE_IDS = frozenset(
         MODIFICATION_POLICY_V3_PROFILE_ID,
         COMPOUND_HEAVY_V1_PROFILE_ID,
         TYPED_INPUT_PROFILE_ID,
+        DEEP_INTERFACE_MVP_PROFILE_ID,
         INTEGRATION_WORKFLOWS_V1_PROFILE_ID,
         INTEGRATION_WORKFLOWS_V2_PROFILE_ID,
         INTEGRATION_PROFILE_ID,
@@ -414,6 +422,16 @@ HeavyV3DependencyPreflight = Callable[[], Mapping[str, Any]]
 def load_heavy_v3_units(options: RunnerOptions) -> tuple[Any, ...]:
     """Load and filter the reviewed V3 bundle without importing live runners."""
 
+    if options.profile == DEEP_INTERFACE_MVP_PROFILE_ID:
+        mvp_module = importlib.import_module(
+            "tests.semantic.support.codex_import_mvp_profile"
+        )
+        profile = mvp_module.load_import_mvp_profile(
+            options.suite_path,
+            unit_ids=options.case_ids,
+            versions=options.versions,
+        )
+        return tuple(profile.units)
     if options.profile == INTEGRATION_PROFILE_ID:
         integration_module = importlib.import_module(
             "tests.semantic.support.codex_integration_workflows"
@@ -538,12 +556,24 @@ def run_heavy_v3_matrix(
         )
     if options.pair_ids:
         raise HeavyV3MatrixError("V3 heavy execution does not accept pair filters")
-    if options.offline_only:
+    is_offline_mvp = options.profile == DEEP_INTERFACE_MVP_PROFILE_ID
+    if options.offline_only and not is_offline_mvp:
         raise HeavyV3MatrixError("V3 heavy execution is real-Wwise only")
 
     load_units = unit_loader or load_heavy_v3_units
     execute_unit = unit_runner or run_heavy_v3_unit
-    preflight = dependency_preflight or require_live_runner_dependencies
+    preflight = dependency_preflight or (
+        (
+            lambda: {
+                "contract": "waapi-skill.deep-interface-mvp-preflight/v1",
+                "ok": True,
+                "mode": "offline-test-only",
+                "wwise_started": False,
+            }
+        )
+        if is_offline_mvp
+        else require_live_runner_dependencies
+    )
     units = tuple(load_units(options))
     if not units:
         raise HeavyV3MatrixError("no V3 heavy units matched the requested filters")
@@ -640,6 +670,7 @@ def run_heavy_v3_matrix(
             if options.profile in {
                 MODIFICATION_POLICY_V3_PROFILE_ID,
                 TYPED_INPUT_PROFILE_ID,
+                DEEP_INTERFACE_MVP_PROFILE_ID,
             }:
                 thread_id = getattr(outcome, "thread_id", None)
                 outcome_status = getattr(outcome, "status", None)
@@ -718,6 +749,25 @@ def run_heavy_v3_unit(
 
     unit_row = _heavy_v3_unit_row(unit, sequence=1)
     api = unit_row["api"]
+    if options.profile == DEEP_INTERFACE_MVP_PROFILE_ID:
+        runner_module = importlib.import_module(
+            "tests.semantic.support.codex_import_mvp_agent_runner"
+        )
+        runner_options = runner_module.ImportMvpAgentOptions(
+            skill_source=options.skill_source,
+            codex_binary=options.codex_binary,
+            auth_json=options.auth_json,
+            model=options.model,
+            reasoning_effort=options.reasoning_effort,
+            service_tier=options.service_tier,
+            timeout_seconds=options.timeout_seconds,
+            windows_powershell_core_host=options.windows_powershell_core_host,
+        )
+        return runner_module.run_import_mvp_agent_unit(
+            unit,
+            scenario_root=scenario_root,
+            options=runner_options,
+        )
     live_environment = trusted_gateway_environment(
         {"WWISE_TEST_CONFIG": str(options.live_config)}
     )
@@ -3493,6 +3543,7 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     is_policy_v3 = args.profile == MODIFICATION_POLICY_V3_PROFILE_ID
     is_compound_v1 = args.profile == COMPOUND_HEAVY_V1_PROFILE_ID
     is_typed_input = args.profile == TYPED_INPUT_PROFILE_ID
+    is_deep_interface_mvp = args.profile == DEEP_INTERFACE_MVP_PROFILE_ID
     is_integration_v1 = args.profile == INTEGRATION_WORKFLOWS_V1_PROFILE_ID
     is_integration_v2 = args.profile == INTEGRATION_WORKFLOWS_V2_PROFILE_ID
     is_integration = args.profile == INTEGRATION_PROFILE_ID
@@ -3510,6 +3561,7 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     is_terra_v3 = (
         is_policy_v3
         or is_typed_input
+        or is_deep_interface_mvp
         or is_compound_v1
         or is_integration_v1
         or is_integration_v2
@@ -3543,6 +3595,13 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         parser.error(
             f"{MODIFICATION_POLICY_V3_PROFILE_ID} supports only --version 2022.1"
         )
+    if is_deep_interface_mvp and any(
+        version not in {"2022.1", "2025.1"} for version in args.version
+    ):
+        parser.error(
+            f"{DEEP_INTERFACE_MVP_PROFILE_ID} supports only "
+            "--version 2022.1 and 2025.1"
+        )
     if (
         is_compound_v1
         or is_integration_v1
@@ -3574,6 +3633,8 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         (
             DEFAULT_MODIFICATION_POLICY_V3_SUITE
             if is_policy_v3
+            else DEFAULT_DEEP_INTERFACE_MVP_SUITE
+            if is_deep_interface_mvp
             else DEFAULT_TYPED_INPUT_SUITE
             if is_typed_input
             else (
@@ -3597,6 +3658,12 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         (
             DEFAULT_MODIFICATION_POLICY_V3_ITERATION_ROOT
             if is_policy_v3
+            else (
+                SKILL_ROOT.parent
+                / "waapi-skill-workspace"
+                / "deep-interface-mvp-4"
+            )
+            if is_deep_interface_mvp
             else DEFAULT_TYPED_INPUT_ITERATION_ROOT
             if is_typed_input
             else (
@@ -3631,7 +3698,11 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         profile=str(args.profile),
         iteration_root=Path(iteration_root).expanduser().resolve(strict=False),
         suite_path=Path(suite).expanduser().resolve(strict=True),
-        skill_source=Path(args.skill_source).expanduser().resolve(strict=True),
+        skill_source=Path(
+            DEFAULT_DEEP_INTERFACE_MVP_SKILL
+            if is_deep_interface_mvp
+            else args.skill_source
+        ).expanduser().resolve(strict=True),
         codex_binary=codex_binary,
         auth_json=Path(args.auth_json).expanduser().resolve(strict=True),
         # This is a machine-local prerequisite, not part of argument syntax.
