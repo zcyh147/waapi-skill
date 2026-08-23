@@ -1456,17 +1456,18 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
 
     assert "First read SKILL.md once, standalone" in instructions
     assert "Get-Content -Raw -Encoding UTF8" not in instructions
-    assert "returned copy_instruction.source_field" in instructions
-    assert "preserve quotes" in instructions
+    assert "copy returned copy_instruction.source_field/fixed_argv_prefix" in instructions
+    assert "keep quotes" in instructions
     assert "fixed_argv_prefix" in instructions
     assert "never reconstruct" in instructions
     assert "No cwd override" in instructions
-    assert "Each fact one argv" in instructions
+    assert "Scheduled read first; no pre-read reply/clarification" in instructions
+    assert "One argv/fact" in instructions
     assert "every prompt field/item/map/bool" in instructions
     assert "batch_size 6" in instructions
-    assert "final batch has all remaining" in instructions
-    assert "may be shorter" in instructions
-    assert "allowed_action_argv governs TYPE position" in instructions
+    assert "final=all remaining" in instructions
+    assert "may shorten" in instructions
+    assert "allowed_action_argv owns TYPE" in instructions
     assert "not Real64/int16" in instructions
     assert "unapplied ancestor deferred_fact" in instructions
     assert "execute_after=all_pending_ancestor_facts_in_response_tree_preorder" in instructions
@@ -1474,35 +1475,39 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "selected-branch constant" in instructions
     assert "Metadata: obey composer.start.preconditions" in instructions
     assert "absent=none" in instructions
-    assert "prompt/schema != live" in instructions
-    assert "discover all dynamic tokens before draft-start" in instructions
+    assert "prompt/schema!=live" in instructions
+    assert "discover all dynamic tokens pre-draft" in instructions
     assert "single existing=>--object GUID" in instructions
     assert "--object-type only new/imported/plural" in instructions
     assert "reread selected pre-schema" in instructions
-    assert "exact user Wwise path => path selector, never exact-type-name" in instructions
-    assert "one query-object per hop; no merge" in instructions
+    assert "exact user Wwise path=>path selector, never exact-type-name" in instructions
+    assert "one query/hop; no merge" in instructions
     assert "enum/const exactly" in instructions
     assert "typed_operation.continuation.gateway_argv_prefix verbatim" in instructions
     assert "incl --apply" in instructions
     assert "selector kind/value separate argv" in instructions
-    assert "IDs/handles/tokens/digests opaque exact-copy" in instructions
+    assert "opaque IDs/handles/tokens/digests" in instructions
     assert "SFX => exact object_type Sound SFX, never Sound" in instructions
-    assert "all Events in initial rows" in instructions
-    assert "parents before children" in instructions
-    assert "POSIX Wwise paths: single-quote" in instructions
-    assert "preserve backslashes" in instructions
-    assert "add one per child" in instructions
-    assert "Files: supplied absolute path only; no relative/traversal" in instructions
+    assert "Import: Events initial" in instructions
+    assert "parents first" in instructions
+    assert "POSIX Wwise paths single-quoted" in instructions
+    assert "keep backslashes" in instructions
+    assert "add one/child" in instructions
+    assert "Files absolute only; no relative/traversal" in instructions
     assert "prompt terminal scalars" in instructions
     assert "every prompt field/item/map/bool" in instructions
     assert "Top facts first; exhaust tree" in instructions
-    assert "More item: copy ancestor_next_item_source" in instructions
-    assert "none: copy completion_candidate.copy_command incl task_authority" in instructions
+    assert "More=>ancestor_next_item_source" in instructions
+    assert "none=>completion_candidate.copy_command incl task_authority" in instructions
     assert "shell_tool_timeout_ms" in instructions
     assert "timeout_ms>=30000" in instructions
-    assert "draft-check is not Preview" in instructions
-    assert "Editable draft-start/apply continues same turn" in instructions
-    assert "no progress reply while editable" in instructions
+    assert "draft-check!=Preview" in instructions
+    assert (
+        "Preview-now request: finish schema/metadata/Preview this turn; "
+        "only execution waits for later confirmation"
+    ) in instructions
+    assert "Editable draft same turn" in instructions
+    assert "no progress reply" in instructions
     assert "requires_later_user_message" in instructions
 
 
