@@ -596,6 +596,11 @@ def test_object_create_parent_fact_resumes_the_exact_container_response(
         "decision_pointer": "/continuation/next_command_decision/evaluate_in_order",
         "selection": "first_remaining_business_present_candidate_in_order",
         "continue_in_same_turn": True,
+        "after_exhausted": "resume_ancestor_response_stack",
+        "ancestor_next_item_source": (
+            "next_item_disclosure.copy_command_by_shape"
+        ),
+        "retype_schema_digest": "invalid",
     }
     binding = put["draft"]["next_action_binding"]
     assert binding["resume_previous_container_response"] == continuation[
@@ -656,6 +661,11 @@ def test_object_create_parent_fact_resumes_the_exact_container_response(
             ),
             "selection": "first_remaining_business_present_candidate_in_order",
             "continue_in_same_turn": True,
+            "after_exhausted": "resume_ancestor_response_stack",
+            "ancestor_next_item_source": (
+                "next_item_disclosure.copy_command_by_shape"
+            ),
+            "retype_schema_digest": "invalid",
         },
     }
     assert leaf["draft"]["next_action_binding"][

@@ -365,6 +365,9 @@ def test_compact_generic_typed_fact_receipt_accepts_exact_container_resume() -> 
         "decision_pointer": "/continuation/next_command_decision/evaluate_in_order",
         "selection": "first_remaining_business_present_candidate_in_order",
         "continue_in_same_turn": True,
+        "after_exhausted": "resume_ancestor_response_stack",
+        "ancestor_next_item_source": "next_item_disclosure.copy_command_by_shape",
+        "retype_schema_digest": "invalid",
     }
     payload = {
         "action_result": {
@@ -436,6 +439,9 @@ def test_compact_generic_typed_fact_batch_accepts_exact_node_resume() -> None:
         "decision_pointer": "/continuation/next_command_decision/evaluate_in_order",
         "selection": "first_remaining_business_present_candidate_in_order",
         "continue_in_same_turn": True,
+        "after_exhausted": "resume_ancestor_response_stack",
+        "ancestor_next_item_source": "next_item_disclosure.copy_command_by_shape",
+        "retype_schema_digest": "invalid",
     }
     payload = {
         "action_result": {
@@ -527,6 +533,9 @@ def test_compact_generic_typed_fact_receipt_rejects_misbound_container_resume() 
         "decision_pointer": "/continuation/next_command_decision/evaluate_in_order",
         "selection": "first_remaining_business_present_candidate_in_order",
         "continue_in_same_turn": True,
+        "after_exhausted": "resume_ancestor_response_stack",
+        "ancestor_next_item_source": "next_item_disclosure.copy_command_by_shape",
+        "retype_schema_digest": "invalid",
     }
     payload = {
         "action_result": {

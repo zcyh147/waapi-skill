@@ -14128,6 +14128,11 @@ def _operation_draft_node_batch_continuation(
             ),
             "selection": "first_remaining_business_present_candidate_in_order",
             "continue_in_same_turn": True,
+            "after_exhausted": "resume_ancestor_response_stack",
+            "ancestor_next_item_source": (
+                "next_item_disclosure.copy_command_by_shape"
+            ),
+            "retype_schema_digest": "invalid",
         },
     }
 
@@ -14234,6 +14239,11 @@ def _operation_draft_compact_action_projection(
                     "first_remaining_business_present_candidate_in_order"
                 ),
                 "continue_in_same_turn": True,
+                "after_exhausted": "resume_ancestor_response_stack",
+                "ancestor_next_item_source": (
+                    "next_item_disclosure.copy_command_by_shape"
+                ),
+                "retype_schema_digest": "invalid",
             }
         action_result["construction_continuation"] = continuation
     if action.get("fact_action") == "choose" and isinstance(

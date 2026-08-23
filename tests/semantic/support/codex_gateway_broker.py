@@ -2327,6 +2327,9 @@ def _valid_draft_construction_continuation(
             "decision_pointer",
             "selection",
             "continue_in_same_turn",
+            "after_exhausted",
+            "ancestor_next_item_source",
+            "retype_schema_digest",
         }
         and resume.get("contract") == "waapi-skill.typed-container-handle/v1"
         and isinstance(resume.get("response_handle"), str)
@@ -2343,6 +2346,10 @@ def _valid_draft_construction_continuation(
         and resume.get("selection")
         == "first_remaining_business_present_candidate_in_order"
         and resume.get("continue_in_same_turn") is True
+        and resume.get("after_exhausted") == "resume_ancestor_response_stack"
+        and resume.get("ancestor_next_item_source")
+        == "next_item_disclosure.copy_command_by_shape"
+        and resume.get("retype_schema_digest") == "invalid"
     )
     try:
         key_valid = (

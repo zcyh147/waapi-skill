@@ -1490,11 +1490,9 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "no shorten/normalize" in instructions
     assert "prompt terminal scalars" in instructions
     assert "every prompt field/item/map/bool" in instructions
-    assert (
-        "Top facts precede root_dynamic_disclosure"
-        in instructions
-    )
-    assert "copy_command_by_shape verbatim" in instructions
+    assert "Top facts first" in instructions
+    assert "ancestor_next_item_source verbatim" in instructions
+    assert "never type digest" in instructions
     assert "shell_tool_timeout_ms" in instructions
     assert "timeout_ms>=30000" in instructions
     assert "draft-check is not Preview" in instructions
