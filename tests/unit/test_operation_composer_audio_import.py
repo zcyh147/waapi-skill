@@ -534,6 +534,15 @@ def test_audio_import_draft_start_places_assignment_rule_on_the_row_action(
         "other_rows": "use none unless the user assigns that row",
         "guessing_allowed": False,
     }
+    assert started["draft"]["action_guidance"]["hierarchy_row_order"] == {
+        "requested_structure_rows_are_separate": True,
+        "structure_rows": "tree_preorder_before_every_media_row",
+        "media_rows": "prompt_order_after_all_structure_rows",
+        "typed_descendant_path_does_not_replace_requested_structure_row": True,
+        "batching": (
+            "concatenate_structure_then_media_and_split_only_at_batch_limit"
+        ),
+    }
     assert "cancel" not in started["draft"]["allowed_actions"]
     assert "inspect" not in started["draft"]["allowed_actions"]
     assert started["draft"]["allowed_lifecycle_commands"] == [
