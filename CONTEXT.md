@@ -7,13 +7,48 @@ not a raw WAAPI payload or a shell command.
 ## Business Orchestration
 
 Business Orchestration is the Agent's responsibility for turning a user's
-request into ordered, meaningful authoring steps. It chooses targets, values,
-and transaction boundaries from the user's intent and Gateway evidence. It does
-not serialize native WAAPI requests, repair malformed JSON, or invent fields.
+request into closed, high-level business declarations. It chooses the requested
+targets, outcomes, values, and explicit operation modes from the user's intent
+and Gateway evidence. It does not choose native action order or batch
+boundaries, construct Wwise paths or wire types, serialize native WAAPI
+requests, repair malformed JSON, or invent fields.
 
 Example: “route these three weapons to the correct buses and lower the
-mechanical layer” becomes one reviewed batch of three target corrections. The
-Agent chooses those corrections; the Gateway owns their typed representation.
+mechanical layer” becomes three closed target/value declarations. The Agent
+chooses those corrections; the Gateway owns their typed representation,
+dependency order, batch construction, and exact Wwise execution plan.
+
+## Business Declaration
+
+A Business Declaration is one closed statement of requested authoring state in
+stable Wwise-facing terms. It identifies the intended object or parent, the
+requested outcome, and only the values the user stated or that the outcome
+necessarily implies. It contains no complete mutation path, native wire token,
+shell syntax, action ordering, or batch bookkeeping.
+
+Common fields use stable names with explicit units, such as `volume_db` and
+`fade_time_ms`. Long-tail fields use live-discovered, scope-bound Field Handles
+rather than caller-authored native property tokens.
+
+## Import Batch
+
+An Import Batch is one or more Business Declarations whose primary outcome is
+Wwise audio import. It may describe new structure or media under an exact
+parent, re-import media into an existing object, or explicitly replace an
+existing object. The Gateway compiles the complete batch into one native
+`audio.import` request whenever its resource boundary permits.
+
+`ImportPlan` is an internal compiler artifact, not a model-facing or
+user-facing domain term. Before execution, an Import Batch produces the same
+Change Preview as every other mutation.
+
+## Field Handle
+
+A Field Handle is Gateway-issued authority for one live-discovered Wwise
+property or reference in an exact object or class scope. It is bound to the
+current task, project, Wwise version/build, metadata snapshot, token, type, and
+restrictions. It lets the Agent provide a business value without retyping or
+guessing the native field token.
 
 ## Gateway-Owned Request Construction
 
@@ -43,15 +78,17 @@ fail when configuration, live Wwise, or a continuation disagrees.
 ## Operation Composer
 
 The Operation Composer is the Gateway-Owned Operation Input implementation for
-draft-shaped named mutations. It accepts small, versioned typed actions,
-validates them against the Operation Registry, and deterministically
-materializes one Canonical OperationRequest. Common lifecycle and errors are
-shared; action vocabulary is local to each operation Adapter.
+draft-shaped named mutations. It accepts small, versioned Business
+Declarations, validates them against the Operation Registry, and
+deterministically materializes one Canonical OperationRequest. Common lifecycle
+and errors are shared; declaration vocabulary is local to each operation
+Adapter.
 
-`object.set` and `audio.import` are the first two structurally different
-Adapters using this interface. Their common commands are start, apply, inspect,
-check, preview, and cancel. Their row fields and actions are intentionally not
-forced into a single generic business schema.
+`object.set` and `audio.import` are structurally different Adapters using this
+interface. Their lifecycle is shared, but their business declarations are not
+forced into a single generic schema. In particular, `audio.import` accepts an
+Import Batch and owns the exact Wwise type mapping, path construction,
+dependency ordering, native row expansion, and batching below that boundary.
 
 ## Generic Schema Composer
 
@@ -124,10 +161,10 @@ without creating a second parameter system.
 ## Operation Draft
 
 An Operation Draft is mutable, task-capability-bound composition state. It
-records typed facts, revisions, validation evidence, and one crash-safe handoff
-reservation. It has no Wwise side effect and is not permission to mutate a
-project. Invalid actions are atomic: they do not advance its revision or change
-its durable bytes.
+records Business Declarations, revisions, validation evidence, and one
+crash-safe handoff reservation. It has no Wwise side effect and is not
+permission to mutate a project. Invalid declarations are atomic: they do not
+advance its revision or change its durable bytes.
 
 The Operation Draft Store is separate from the immutable transaction store.
 Draft authority does not authorize Preview confirmation or execution.
@@ -182,10 +219,11 @@ authorization is still required before execution.
 ## Boundary summary
 
 - The user describes business outcomes.
-- The Agent performs Business Orchestration and supplies typed values.
+- The Agent performs Business Orchestration and supplies closed Business
+  Declarations.
 - Gateway-Owned Request Construction owns every normal WAAPI input.
 - Gateway-Owned Operation Input constructs every normal mutation request.
-- The Operation Composer manages draft-shaped complex inputs.
+- The Operation Composer compiles draft-shaped Business Declarations.
 - The Operation Registry owns field, type, version, and limit truth.
 - The Operation Draft Store owns mutable composition state.
 - The transaction store owns immutable Preview and authorization state.
