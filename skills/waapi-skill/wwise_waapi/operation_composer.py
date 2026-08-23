@@ -1613,11 +1613,6 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                         "applies_when": (
                             "unproven dynamic property/reference tokens are required"
                         ),
-                        "required_sequence": [
-                            "operation-schema",
-                            "metadata discover",
-                            "draft-start",
-                        ],
                         "workflow_control": _metadata_workflow_control(),
                         "activation_decision": _metadata_activation_decision(),
                         "metadata_scope": (
@@ -1967,11 +1962,6 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 "the request contains dynamic properties or references whose exact "
                 "live tokens are not already proven"
             ),
-            "required_sequence": [
-                "operation-schema",
-                "metadata discover",
-                "draft-start",
-            ],
             "workflow_control": _metadata_workflow_control(),
             "activation_decision": _metadata_activation_decision(),
             "metadata_scope": (

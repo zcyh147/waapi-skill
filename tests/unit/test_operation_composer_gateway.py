@@ -235,11 +235,7 @@ def test_object_set_composer_discloses_every_exact_typed_action_shape(
             "embedded_import",
         ],
     }
-    assert contract["start_preconditions"]["required_sequence"] == [
-        "operation-schema",
-        "metadata discover",
-        "draft-start",
-    ]
+    assert "required_sequence" not in contract["start_preconditions"]
     assert contract["start_preconditions"]["workflow_control"] == {
         "metadata_success_is_terminal": False,
         "continue_same_turn_after_metadata": "draft-start",

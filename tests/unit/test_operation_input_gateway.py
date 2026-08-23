@@ -657,9 +657,10 @@ def test_normal_object_set_schema_and_detail_expose_only_composer_input(
         "draft-start",
         "object.set",
     ]
+    assert "required_sequence" not in schema["composer"]["start"]["preconditions"]
     assert schema["composer"]["start"]["preconditions"][
-        "required_sequence"
-    ] == ["operation-schema", "metadata discover", "draft-start"]
+        "activation_decision"
+    ]["when_skipped_continue_same_turn_with"] == "draft-start"
     assert schema["composer"]["start"]["preconditions"][
         "metadata_gateway_argv_template"
     ] == [
@@ -958,9 +959,12 @@ def test_structurally_distinct_adapters_share_one_public_lifecycle(
     assert "never consumes or changes the Draft revision" in create_dynamic[
         "sequence"
     ]
+    assert "required_sequence" not in projections["object.create"]["start"][
+        "preconditions"
+    ]
     assert projections["object.create"]["start"]["preconditions"][
-        "required_sequence"
-    ] == ["operation-schema", "metadata discover", "draft-start"]
+        "activation_decision"
+    ]["when_skipped_continue_same_turn_with"] == "draft-start"
     assert "fact-action map-put" in create_dynamic["scalar_map_entry_action"]
 
     shared_keys = {
@@ -1077,11 +1081,7 @@ def test_structurally_distinct_adapters_share_one_public_lifecycle(
         "draft-start",
         "audio.import",
     ]
-    assert object_set["start"]["preconditions"]["required_sequence"] == [
-        "operation-schema",
-        "metadata discover",
-        "draft-start",
-    ]
+    assert "required_sequence" not in object_set["start"]["preconditions"]
     assert "preconditions" in audio_import["start"]
     assert set(object_set["actions"]) != set(audio_import["actions"])
 
