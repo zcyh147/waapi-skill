@@ -116,6 +116,8 @@ def test_query_reference_has_no_raw_client_fallback() -> None:
     assert "Raw WAQL itself is never a mutation identity" in query_flat
     assert "never alias another advanced expression onto" in query_flat
     assert "The exact-ID readback must match" in query_flat
+    assert "one separate `query-object --object-id` invocation per distinct GUID" in query_flat
+    assert "never merge repeated `--object-id`" in query_flat
     assert "`--all-results`" in query_reference
     assert "between `0` and `1000`" in query_reference
     assert "`QUERY_OBJECT_REQUIRED`" in query_reference

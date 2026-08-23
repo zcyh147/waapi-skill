@@ -1476,8 +1476,8 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "absent means none" in instructions
     assert "Metadata gate: prompt/schema != live" in instructions
     assert "discover every dynamic token before draft-start" in instructions
-    assert "Only query-selected" in instructions
-    assert "exact-ID reread GUIDs before schema" in instructions
+    assert "IDs: reread selected pre-schema" in instructions
+    assert "one query-object per hop; no merge" in instructions
     assert "enum/const exactly" in instructions
     assert "typed_operation.continuation.gateway_argv_prefix verbatim" in instructions
     assert "incl --apply" in instructions
