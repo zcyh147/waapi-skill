@@ -1486,8 +1486,8 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "SFX => exact object_type Sound SFX, never Sound" in instructions
     assert "requested Event belongs in initial add_import_row" in instructions
     assert "never defer/omit" in instructions
-    assert "Prompt absolute paths verbatim" in instructions
-    assert "no shorten/normalize" in instructions
+    assert "All prompt paths verbatim incl every backslash" in instructions
+    assert "no shortening" in instructions
     assert "prompt terminal scalars" in instructions
     assert "every prompt field/item/map/bool" in instructions
     assert "Top facts first; exhaust tree" in instructions
