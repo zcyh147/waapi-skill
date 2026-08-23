@@ -1472,10 +1472,8 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "execute_after=all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "selected-branch constant" in instructions
-    assert "successful tokens" in instructions
-    assert "Before draft-start, property/reference requires" in instructions
-    assert "one call: --query each" in instructions
-    assert "Volume+OutputBus" in instructions
+    assert "Change only after schema" in instructions
+    assert "metadata discover --query Volume --query OutputBus before draft-start" in instructions
     assert "omit name/notes" in instructions
     assert "object-query isn't proof" in instructions
     assert "end --limit 1..8" in instructions
