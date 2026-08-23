@@ -32,8 +32,10 @@ from .metadata_discovery import metadata_typed_value_type
 BUSINESS_REPAIR_CONTRACT = "waapi-skill.business-repair/v1"
 BUSINESS_KIND_CONTRACT = "waapi-skill.semantic-kind/v1"
 BUSINESS_CONTEXT_CONTRACT = "waapi-skill.business-context/v1"
+OPERATION_DRAFT_AUTHORITY_CONTRACT = "waapi-skill.operation-draft-authority/v1"
 BOUND_OBJECT_HANDLE_CONTRACT = "waapi-skill.bound-object-handle/v1"
 BOUND_FIELD_HANDLE_CONTRACT = "waapi-skill.bound-field-handle/v1"
+BUSINESS_HANDLE_REGISTRY_CONTRACT = "waapi-skill.business-handle-registry/v1"
 
 SUPPORTED_WWISE_VERSIONS = (
     "2021.1",
@@ -66,6 +68,14 @@ MAX_FIELD_TOKEN_BYTES = 256
 MAX_FIELD_STRING_BYTES = 16 * 1024
 MAX_FIELD_ENUM_CHOICES = 64
 MAX_REFERENCE_TARGET_TYPES = 64
+COMMON_BUSINESS_FIELDS = (
+    "delay_ms",
+    "fade_time_ms",
+    "loop",
+    "max_instances",
+    "output_bus",
+    "volume_db",
+)
 
 _TASK_AUTHORITY = re.compile(r"^da1-[0-9a-f]{40}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -126,7 +136,12 @@ class BusinessContext:
         if wwise_version not in SUPPORTED_WWISE_VERSIONS:
             raise ValueError("wwise_version is not supported")
         return cls(
-            task_authority_digest=sha256_hex(task_authority.encode("utf-8")),
+            task_authority_digest=canonical_sha256(
+                {
+                    "contract": OPERATION_DRAFT_AUTHORITY_CONTRACT,
+                    "task_authority": task_authority,
+                }
+            ),
             project_id=_required_text(project_id, field="project_id"),
             project_path=_required_text(project_path, field="project_path"),
             wwise_version=wwise_version,
@@ -142,6 +157,37 @@ class BusinessContext:
             "wwise_version": self.wwise_version,
             "wwise_build": self.wwise_build,
         }
+
+    @classmethod
+    def from_binding_dict(cls, payload: Mapping[str, Any]) -> "BusinessContext":
+        if not isinstance(payload, Mapping) or set(payload) != {
+            "contract",
+            "task_authority_digest",
+            "project_id",
+            "project_path",
+            "wwise_version",
+            "wwise_build",
+        }:
+            raise ValueError("business context fields are invalid")
+        if payload.get("contract") != BUSINESS_CONTEXT_CONTRACT:
+            raise ValueError("business context contract is invalid")
+        digest = payload.get("task_authority_digest")
+        version = payload.get("wwise_version")
+        if not isinstance(digest, str) or not _SHA256.fullmatch(digest):
+            raise ValueError("business context authority digest is invalid")
+        if version not in SUPPORTED_WWISE_VERSIONS:
+            raise ValueError("business context Wwise version is invalid")
+        return cls(
+            task_authority_digest=digest,
+            project_id=_required_text(payload.get("project_id"), field="project_id"),
+            project_path=_required_text(
+                payload.get("project_path"), field="project_path"
+            ),
+            wwise_version=str(version),
+            wwise_build=_required_text(
+                payload.get("wwise_build"), field="wwise_build"
+            ),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -309,6 +355,18 @@ def resolve_semantic_kind(name: str, *, version: str) -> SemanticKind:
     )
 
 
+def business_repair(
+    error_code: str,
+    *,
+    field: str,
+    action: str,
+    **details: Any,
+) -> BusinessDeclarationError:
+    """Build one bounded structured repair without reflecting unbounded input."""
+
+    return _error(error_code, field=field, action=action, **details)
+
+
 class BusinessHandleRegistry:
     """Current-task opaque handle table used by one operation Adapter.
 
@@ -371,6 +429,73 @@ class BusinessHandleRegistry:
         )
         self._objects[handle] = bound
         return bound
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "contract": BUSINESS_HANDLE_REGISTRY_CONTRACT,
+            "context": self.context.as_binding_dict(),
+            "objects": [
+                {
+                    "contract": BOUND_OBJECT_HANDLE_CONTRACT,
+                    "handle": row.handle,
+                    "object_id": row.object_id,
+                    "name": row.name,
+                    "object_type": row.object_type,
+                    "path": row.path,
+                    "binding_digest": row.binding_digest,
+                }
+                for row in sorted(self._objects.values(), key=lambda item: item.handle)
+            ],
+            "fields": [
+                {
+                    "contract": BOUND_FIELD_HANDLE_CONTRACT,
+                    "handle": row.handle,
+                    "scope_kind": row.scope_kind,
+                    "scope_value": row.scope_value,
+                    "token": row.token,
+                    "field_kind": row.field_kind,
+                    "value_type": row.value_type,
+                    "restrictions": dict(row.restrictions),
+                    "metadata_digest": row.metadata_digest,
+                    "binding_digest": row.binding_digest,
+                }
+                for row in sorted(self._fields.values(), key=lambda item: item.handle)
+            ],
+        }
+
+    @classmethod
+    def from_dict(
+        cls,
+        payload: Mapping[str, Any],
+        *,
+        token_bytes: TokenBytes = secrets.token_bytes,
+    ) -> "BusinessHandleRegistry":
+        if not isinstance(payload, Mapping) or set(payload) != {
+            "contract",
+            "context",
+            "objects",
+            "fields",
+        }:
+            raise ValueError("business handle registry fields are invalid")
+        if payload.get("contract") != BUSINESS_HANDLE_REGISTRY_CONTRACT:
+            raise ValueError("business handle registry contract is invalid")
+        context = BusinessContext.from_binding_dict(payload.get("context"))
+        registry = cls(context, token_bytes=token_bytes)
+        raw_objects = payload.get("objects")
+        raw_fields = payload.get("fields")
+        if not isinstance(raw_objects, list) or not isinstance(raw_fields, list):
+            raise ValueError("business handle registry rows are invalid")
+        for raw in raw_objects:
+            bound = _bound_object_from_dict(raw, context=context)
+            if bound.handle in registry._objects:
+                raise ValueError("business object handles must be unique")
+            registry._objects[bound.handle] = bound
+        for raw in raw_fields:
+            bound = _bound_field_from_dict(raw, context=context)
+            if bound.handle in registry._fields:
+                raise ValueError("business field handles must be unique")
+            registry._fields[bound.handle] = bound
+        return registry
 
     def resolve_object(
         self,
@@ -758,6 +883,187 @@ def bind_live_field(
     )
 
 
+def revalidate_live_field(
+    registry: BusinessHandleRegistry,
+    field: BoundFieldHandle,
+    *,
+    read_call: ReadCall,
+    platform: str | int | None = None,
+) -> BoundFieldHandle:
+    """Re-read one bound field and fail closed on scope or metadata drift."""
+
+    if not isinstance(field, BoundFieldHandle):
+        raise TypeError("field must be BoundFieldHandle")
+    live_scope = _live_metadata_scope(
+        read_call,
+        scope_kind=field.scope_kind,
+        scope_value=field.scope_value,
+    )
+    try:
+        names = parse_property_and_reference_names_result(
+            read_call(GET_PROPERTY_AND_REFERENCE_NAMES_URI, live_scope, {})
+        )
+        if field.token not in {row.name for row in names}:
+            raise business_repair(
+                "FIELD_HANDLE_STALE",
+                field="field_handle",
+                rejected_handle=field.handle,
+                action="refresh live metadata and use the new field handle",
+            )
+        info = parse_get_property_info_result(
+            read_call(
+                GET_PROPERTY_INFO_URI,
+                {**live_scope, "property": field.token},
+                {},
+            )
+        )
+    except BusinessDeclarationError:
+        raise
+    except (TypeError, ValueError) as exc:
+        raise _error(
+            "METADATA_READBACK_INVALID",
+            field="field_handle",
+            action="refresh live Wwise metadata before Preview",
+        ) from exc
+    if info.name != field.token:
+        raise _error(
+            "FIELD_HANDLE_STALE",
+            field="field_handle",
+            rejected_handle=field.handle,
+            action="refresh live metadata and use the new field handle",
+        )
+    dependency_fields = _dependency_field_tokens(info.dependencies)
+    if dependency_fields and field.scope_kind == "object":
+        if platform is None:
+            raise _error(
+                "FIELD_PLATFORM_REQUIRED",
+                field=field.token,
+                dependency_fields=dependency_fields,
+                action="provide the explicit platform for Preview revalidation",
+            )
+        try:
+            enabled = parse_is_property_enabled_result(
+                read_call(
+                    IS_PROPERTY_ENABLED_URI,
+                    {
+                        "object": field.scope_value,
+                        "property": field.token,
+                        "platform": platform,
+                    },
+                    {},
+                )
+            ).enabled
+        except (TypeError, ValueError) as exc:
+            raise _error(
+                "METADATA_READBACK_INVALID",
+                field=field.token,
+                action="refresh the live property-enabled state before Preview",
+            ) from exc
+        if not enabled:
+            raise _error(
+                "FIELD_DISABLED",
+                field=field.token,
+                dependency_fields=dependency_fields,
+                action="satisfy the disclosed dependency state or omit this field",
+            )
+    metadata_digest = canonical_sha256(
+        {
+            "scope_kind": field.scope_kind,
+            "scope_value": field.scope_value,
+            "metadata": info.as_dict(),
+        }
+    )
+    return registry.resolve_field(
+        field.handle,
+        scope_kind=field.scope_kind,
+        scope_value=field.scope_value,
+        metadata_digest=metadata_digest,
+    )
+
+
+def normalize_common_business_fields(fields: Mapping[str, Any]) -> dict[str, Any]:
+    """Normalize stable unit-bearing fields while preserving exact omission."""
+
+    if not isinstance(fields, Mapping):
+        raise business_repair(
+            "BUSINESS_FIELDS_INVALID",
+            field="fields",
+            action="provide one object of disclosed business fields",
+        )
+    unknown = sorted(
+        name for name in fields if not isinstance(name, str) or name not in COMMON_BUSINESS_FIELDS
+    )
+    if unknown:
+        raise business_repair(
+            "BUSINESS_FIELD_UNAVAILABLE",
+            field="fields",
+            choices=COMMON_BUSINESS_FIELDS,
+            action="use stable fields with explicit units or a live Field Handle",
+        )
+    normalized: dict[str, Any] = {}
+    for name, value in fields.items():
+        if name in {"volume_db", "fade_time_ms", "delay_ms"}:
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise _common_field_type_error(name, "finite number")
+            number = float(value)
+            if not math.isfinite(number):
+                raise _common_field_type_error(name, "finite number")
+            if name == "volume_db" and not -200.0 <= number <= 200.0:
+                raise _error(
+                    "FIELD_VALUE_OUT_OF_RANGE",
+                    field=name,
+                    valid_range={"minimum": -200.0, "maximum": 200.0},
+                    action="provide decibels inside the stable business range",
+                )
+            if name != "volume_db" and number < 0:
+                raise _error(
+                    "FIELD_VALUE_OUT_OF_RANGE",
+                    field=name,
+                    valid_range={"minimum": 0.0, "maximum": None},
+                    action="provide a non-negative millisecond value",
+                )
+            normalized[name] = number
+        elif name == "max_instances":
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or not 1 <= value <= 1_000_000
+            ):
+                raise _error(
+                    "FIELD_VALUE_OUT_OF_RANGE",
+                    field=name,
+                    valid_range={"minimum": 1, "maximum": 1_000_000},
+                    action="provide a positive bounded instance count",
+                )
+            normalized[name] = value
+        elif name == "loop":
+            if value != "infinite":
+                raise _error(
+                    "FIELD_VALUE_UNAVAILABLE",
+                    field=name,
+                    choices=("infinite",),
+                    action="choose the disclosed loop mode or omit the field",
+                )
+            normalized[name] = value
+        else:
+            if not isinstance(value, str) or not _OBJECT_HANDLE.fullmatch(value):
+                raise _common_field_type_error(name, "bound object handle")
+            normalized[name] = value
+    return dict(sorted(normalized.items()))
+
+
+def _common_field_type_error(
+    field: str,
+    expected: str,
+) -> BusinessDeclarationError:
+    return _error(
+        "FIELD_VALUE_TYPE_MISMATCH",
+        field=field,
+        expected_type=expected,
+        action="provide the disclosed business value type",
+    )
+
+
 def _live_metadata_scope(
     read_call: ReadCall,
     *,
@@ -857,6 +1163,154 @@ def _normalize_scope(scope_kind: str, scope_value: str | int) -> str | int:
     ):
         raise ValueError("object scope must be an exact GUID or absolute Wwise path")
     return scope_value.upper() if _CANONICAL_GUID.fullmatch(scope_value) else scope_value
+
+
+def _bound_object_from_dict(
+    payload: Any,
+    *,
+    context: BusinessContext,
+) -> BoundObjectHandle:
+    expected = {
+        "contract",
+        "handle",
+        "object_id",
+        "name",
+        "object_type",
+        "path",
+        "binding_digest",
+    }
+    if not isinstance(payload, Mapping) or set(payload) != expected:
+        raise ValueError("bound object handle fields are invalid")
+    handle = payload.get("handle")
+    object_id = payload.get("object_id")
+    digest = payload.get("binding_digest")
+    if payload.get("contract") != BOUND_OBJECT_HANDLE_CONTRACT:
+        raise ValueError("bound object handle contract is invalid")
+    if not isinstance(handle, str) or not _OBJECT_HANDLE.fullmatch(handle):
+        raise ValueError("bound object handle token is invalid")
+    if not isinstance(object_id, str) or not _CANONICAL_GUID.fullmatch(object_id):
+        raise ValueError("bound object id is invalid")
+    name = _bounded_required_text(
+        payload.get("name"), field="name", maximum_bytes=MAX_BUSINESS_NAME_BYTES
+    )
+    object_type = _bounded_required_text(
+        payload.get("object_type"),
+        field="object_type",
+        maximum_bytes=MAX_FIELD_TOKEN_BYTES,
+    )
+    path = _bounded_required_text(
+        payload.get("path"), field="path", maximum_bytes=MAX_BUSINESS_PATH_BYTES
+    )
+    if not path.startswith("\\") or path.endswith("\\"):
+        raise ValueError("bound object path is invalid")
+    material = {
+        "contract": BOUND_OBJECT_HANDLE_CONTRACT,
+        "context": context.as_binding_dict(),
+        "object_id": object_id.upper(),
+        "name": name,
+        "object_type": object_type,
+        "path": path,
+    }
+    expected_digest = canonical_sha256(material)
+    if (
+        not isinstance(digest, str)
+        or not _SHA256.fullmatch(digest)
+        or not hmac.compare_digest(digest, expected_digest)
+    ):
+        raise ValueError("bound object binding digest is invalid")
+    return BoundObjectHandle(
+        handle=handle,
+        context=context,
+        object_id=object_id.upper(),
+        name=name,
+        object_type=object_type,
+        path=path,
+        binding_digest=digest,
+    )
+
+
+def _bound_field_from_dict(
+    payload: Any,
+    *,
+    context: BusinessContext,
+) -> BoundFieldHandle:
+    expected = {
+        "contract",
+        "handle",
+        "scope_kind",
+        "scope_value",
+        "token",
+        "field_kind",
+        "value_type",
+        "restrictions",
+        "metadata_digest",
+        "binding_digest",
+    }
+    if not isinstance(payload, Mapping) or set(payload) != expected:
+        raise ValueError("bound field handle fields are invalid")
+    if payload.get("contract") != BOUND_FIELD_HANDLE_CONTRACT:
+        raise ValueError("bound field handle contract is invalid")
+    handle = payload.get("handle")
+    if not isinstance(handle, str) or not _FIELD_HANDLE.fullmatch(handle):
+        raise ValueError("bound field handle token is invalid")
+    scope_kind = payload.get("scope_kind")
+    if not isinstance(scope_kind, str):
+        raise ValueError("bound field scope kind is invalid")
+    scope_value = _normalize_scope(scope_kind, payload.get("scope_value"))
+    token = payload.get("token")
+    field_kind = payload.get("field_kind")
+    value_type = payload.get("value_type")
+    metadata_digest = payload.get("metadata_digest")
+    if not isinstance(token, str) or not _FIELD_TOKEN.fullmatch(token):
+        raise ValueError("bound field token is invalid")
+    if field_kind not in {"property", "reference"} or value_type not in {
+        "number",
+        "integer",
+        "boolean",
+        "string",
+        "reference",
+    }:
+        raise ValueError("bound field kind or value type is invalid")
+    if (field_kind == "reference") != (value_type == "reference"):
+        raise ValueError("bound field kind and value type disagree")
+    if not isinstance(metadata_digest, str) or not _SHA256.fullmatch(metadata_digest):
+        raise ValueError("bound field metadata digest is invalid")
+    restrictions = _normalize_restrictions(
+        payload.get("restrictions"),
+        field_kind=str(field_kind),
+        value_type=str(value_type),
+    )
+    material = {
+        "contract": BOUND_FIELD_HANDLE_CONTRACT,
+        "context": context.as_binding_dict(),
+        "scope_kind": scope_kind,
+        "scope_value": scope_value,
+        "token": token,
+        "field_kind": field_kind,
+        "value_type": value_type,
+        "restrictions": restrictions,
+        "metadata_digest": metadata_digest,
+    }
+    expected_digest = canonical_sha256(material)
+    digest = payload.get("binding_digest")
+    if (
+        not isinstance(digest, str)
+        or not _SHA256.fullmatch(digest)
+        or not hmac.compare_digest(digest, expected_digest)
+    ):
+        raise ValueError("bound field binding digest is invalid")
+    return BoundFieldHandle(
+        handle=handle,
+        context=context,
+        scope_kind=scope_kind,
+        scope_value=scope_value,
+        token=token,
+        field_kind=str(field_kind),
+        value_type=str(value_type),
+        restrictions=restrictions,
+        metadata_digest=metadata_digest,
+        binding_digest=digest,
+    )
 
 
 def _normalize_restrictions(
@@ -1026,6 +1480,7 @@ __all__ = [
     "BUSINESS_CONTEXT_CONTRACT",
     "BUSINESS_KIND_CONTRACT",
     "BUSINESS_REPAIR_CONTRACT",
+    "COMMON_BUSINESS_FIELDS",
     "BoundFieldHandle",
     "BoundObjectHandle",
     "BusinessContext",
@@ -1038,5 +1493,8 @@ __all__ = [
     "SUPPORTED_WWISE_VERSIONS",
     "SemanticKind",
     "bind_live_field",
+    "business_repair",
+    "normalize_common_business_fields",
+    "revalidate_live_field",
     "resolve_semantic_kind",
 ]

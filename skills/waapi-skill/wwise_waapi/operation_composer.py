@@ -15,6 +15,7 @@ import secrets
 from typing import Any, Callable, Mapping, Sequence
 
 from .canonical import canonical_json_bytes, canonical_sha256
+from .business_declaration_state import BusinessDeclarationSession
 from .builders.common import SemanticValidationError
 from .metadata_discovery import metadata_candidate_limit_contract
 from .operation_registry import (
@@ -4224,7 +4225,7 @@ def _normalize_audio_import_composition(
 ) -> dict[str, Any]:
     _require_json_object(composition, label="composition")
     required = {"contract", "imports"}
-    optional = {"request_options", "defaults"}
+    optional = {"request_options", "defaults", "business_session"}
     actual = set(composition)
     if not required.issubset(actual) or actual - required - optional:
         raise OperationComposerError(
@@ -4299,11 +4300,31 @@ def _normalize_audio_import_composition(
                 )
             object_paths.add(object_path)
         rows.append({"handle": handle, "fields": fields})
+    raw_business_session = composition.get("business_session")
+    business_session = None
+    if raw_business_session is not None:
+        if rows or defaults:
+            raise OperationComposerError(
+                "A business declaration session cannot mix with shallow import rows or defaults."
+            )
+        try:
+            business_session = BusinessDeclarationSession.from_dict(
+                raw_business_session
+            ).as_dict()
+        except (TypeError, ValueError) as exc:
+            raise OperationComposerError(
+                "audio.import business declaration state is invalid."
+            ) from exc
     return {
         "contract": OPERATION_COMPOSITION_CONTRACT,
         "request_options": options,
         "defaults": defaults,
         "imports": rows,
+        **(
+            {"business_session": business_session}
+            if business_session is not None
+            else {}
+        ),
     }
 
 
@@ -4311,6 +4332,12 @@ def _materialize_audio_import_request(
     version: str,
     composition: Mapping[str, Any],
 ) -> dict[str, Any]:
+    if composition.get("business_session") is not None:
+        raise OperationComposerError(
+            "Business declarations require the production semantic compiler before check.",
+            error_code="OPERATION_DRAFT_INCOMPLETE",
+            details={"missing_fields": ["compiled_business_plan"]},
+        )
     rows = composition["imports"]
     if not rows:
         raise OperationComposerError(
@@ -4361,6 +4388,27 @@ def _audio_import_composition_projection(
     composition: Mapping[str, Any],
 ) -> dict[str, Any]:
     del version
+    if composition.get("business_session") is not None:
+        session = BusinessDeclarationSession.from_dict(
+            composition["business_session"]
+        )
+        return {
+            "business_revision": session.revision,
+            "declarations": [row.as_dict() for row in session.declarations],
+            "preview": (
+                None
+                if session.active_preview is None
+                else session.active_preview.readable_projection()
+            ),
+            "detail_available": session.active_preview is not None,
+            "missing_fields": (
+                ["business_declaration"] if not session.declarations else []
+            ),
+            "missing_fields_status": (
+                "incomplete" if not session.declarations else "complete"
+            ),
+            "allowed_actions": ["inspect", "cancel"],
+        }
     defaults = composition["defaults"]
     facts = [
         {"handle": row["handle"], **_audio_import_public_fields(row["fields"])}

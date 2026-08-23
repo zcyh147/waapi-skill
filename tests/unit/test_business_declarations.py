@@ -13,6 +13,8 @@ from wwise_waapi.business_declarations import (
     SUPPORTED_BUSINESS_KINDS,
     SUPPORTED_WWISE_VERSIONS,
     bind_live_field,
+    normalize_common_business_fields,
+    revalidate_live_field,
     resolve_semantic_kind,
 )
 
@@ -364,3 +366,74 @@ def test_live_field_binding_returns_exact_candidates_and_disabled_repair() -> No
     assert disabled.value.repair["error_code"] == "FIELD_DISABLED"
     assert disabled.value.repair["dependency_fields"] == ["OverrideVolume"]
     assert disabled.value.repair["draft_changed"] is False
+
+
+def test_live_field_revalidation_detects_metadata_drift_before_preview() -> None:
+    registry = BusinessHandleRegistry(_context(), token_bytes=lambda size: b"r" * size)
+
+    def initial(
+        uri: str,
+        args: dict[str, object],
+        options: dict[str, object],
+    ) -> dict[str, object]:
+        if uri.endswith("getPropertyAndReferenceNames"):
+            return {"return": ["Volume"]}
+        if uri.endswith("getPropertyInfo"):
+            return {
+                "name": "Volume",
+                "type": "Real32",
+                "restriction": {"type": "range", "min": -96.3, "max": 12.0},
+            }
+        raise AssertionError(uri)
+
+    field = bind_live_field(
+        registry,
+        read_call=initial,
+        scope_kind="class",
+        scope_value=65552,
+        token="Volume",
+    )
+
+    def drifted(
+        uri: str,
+        args: dict[str, object],
+        options: dict[str, object],
+    ) -> dict[str, object]:
+        if uri.endswith("getPropertyAndReferenceNames"):
+            return {"return": ["Volume"]}
+        if uri.endswith("getPropertyInfo"):
+            return {
+                "name": "Volume",
+                "type": "Real32",
+                "restriction": {"type": "range", "min": -200.0, "max": 200.0},
+            }
+        raise AssertionError(uri)
+
+    with pytest.raises(BusinessDeclarationError) as stale:
+        revalidate_live_field(registry, field, read_call=drifted)
+    assert stale.value.repair["error_code"] == "FIELD_HANDLE_STALE"
+    assert stale.value.repair["rejected_handle"] == field.handle
+
+
+def test_common_business_fields_preserve_omission_and_explicit_units() -> None:
+    assert normalize_common_business_fields({"volume_db": -4}) == {
+        "volume_db": -4.0
+    }
+    assert normalize_common_business_fields(
+        {
+            "fade_time_ms": 250,
+            "delay_ms": 0,
+            "max_instances": 4,
+            "loop": "infinite",
+        }
+    ) == {
+        "delay_ms": 0.0,
+        "fade_time_ms": 250.0,
+        "loop": "infinite",
+        "max_instances": 4,
+    }
+
+    with pytest.raises(BusinessDeclarationError) as unitless:
+        normalize_common_business_fields({"volume": -4})
+    assert unitless.value.repair["error_code"] == "BUSINESS_FIELD_UNAVAILABLE"
+    assert "volume_db" in unitless.value.repair["choices"]

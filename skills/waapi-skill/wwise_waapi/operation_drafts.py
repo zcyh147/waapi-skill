@@ -23,6 +23,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Collection, Iterator, Mapping, Sequence
 
+from .business_declaration_state import BusinessDeclarationSession
+from .business_declarations import BusinessContext
 from .canonical import canonical_json_bytes, canonical_sha256
 from .filesystem_security import path_is_link_or_reparse
 from .operation_composer import (
@@ -741,6 +743,148 @@ class OperationDraftStore:
                 request=request,
                 request_digest=canonical_sha256(request),
             )
+
+    def apply_business_update(
+        self,
+        draft_id: str,
+        *,
+        task_authority: str,
+        expected_revision: int,
+        schema_digest: str,
+        composer_digest: str,
+        context: BusinessContext,
+        update: Callable[
+            [BusinessDeclarationSession], BusinessDeclarationSession
+        ],
+        event_type: str,
+        now: datetime | None = None,
+    ) -> OperationDraftRecord:
+        """CAS-publish one internally validated Business Declaration revision.
+
+        ``update`` is an in-process Adapter seam, never caller-authored code.
+        It runs under the existing per-Draft lock and the resulting state is
+        fully normalized before the first durable write.
+        """
+
+        if not isinstance(context, BusinessContext):
+            raise TypeError("context must be BusinessContext")
+        if not callable(update):
+            raise TypeError("update must be callable")
+        if (
+            not isinstance(event_type, str)
+            or not _AUDIT_EVENT_TYPE_PATTERN.fullmatch(event_type)
+        ):
+            raise ValueError("event_type must be one bounded audit token")
+        if not isinstance(draft_id, str) or not _DRAFT_ID_PATTERN.fullmatch(draft_id):
+            raise _not_available()
+        with self._existing_draft_lock(draft_id):
+            current = _utc_datetime(now)
+            loaded = self._inspect_unlocked(
+                draft_id,
+                task_authority=task_authority,
+                now=current,
+            )
+            record = loaded.record
+            _require_expected_revision(record, expected_revision)
+            if record.state is not OperationDraftState.EDITABLE:
+                raise OperationDraftInvalidTransition(
+                    "Only an editable Operation Draft accepts business declarations.",
+                    details={"state": record.state.value},
+                )
+            if record.schema_version != OPERATION_DRAFT_SCHEMA_VERSION:
+                raise OperationDraftRecreateRequired(
+                    "This legacy Operation Draft must be recreated before using business declarations."
+                )
+            _require_current_binding(
+                record,
+                schema_digest=schema_digest,
+                composer_digest=composer_digest,
+            )
+            if record.operation != "audio.import":
+                raise OperationDraftInvalidTransition(
+                    "This production Business Declaration Adapter currently supports audio.import only."
+                )
+            if record.composition is None:
+                raise OperationDraftStorageCorruption(
+                    "Composer-backed Operation Draft is missing its composition."
+                )
+            if not hmac.compare_digest(
+                context.task_authority_digest,
+                record.authority_digest,
+            ):
+                raise OperationDraftNotAvailable(
+                    "Business context does not belong to this task authority."
+                )
+            if context.wwise_version != record.version:
+                raise OperationDraftBindingDrift(
+                    "Business context Wwise version differs from the Draft binding."
+                )
+            raw_session = record.composition.get("business_session")
+            session = (
+                BusinessDeclarationSession.create(context)
+                if raw_session is None
+                else BusinessDeclarationSession.from_dict(raw_session)
+            )
+            if session.context != context:
+                raise OperationDraftBindingDrift(
+                    "Business context differs from the durable declaration binding."
+                )
+            # The Adapter callback, state round-trip, Composer normalization,
+            # and projection budget all complete before atomic replacement.
+            candidate_session = update(session)
+            if not isinstance(candidate_session, BusinessDeclarationSession):
+                raise TypeError("business update must return BusinessDeclarationSession")
+            if candidate_session.context != context:
+                raise OperationDraftBindingDrift(
+                    "Business update changed its task, project, or Wwise binding."
+                )
+            session_payload = candidate_session.as_dict()
+            composition = dict(record.composition)
+            composition["business_session"] = session_payload
+            _require_composition_projection_budget(
+                record.operation,
+                record.version,
+                composition,
+            )
+            updated_at = _timestamp(current)
+            updated = OperationDraftRecord(
+                draft_id=record.draft_id,
+                state=record.state,
+                revision=record.revision + 1,
+                operation=record.operation,
+                version=record.version,
+                schema_digest=record.schema_digest,
+                authority_digest=record.authority_digest,
+                created_at=record.created_at,
+                updated_at=updated_at,
+                expires_at=record.expires_at,
+                terminal_at=None,
+                audit=(
+                    *record.audit,
+                    _build_audit_event(
+                        draft_id=record.draft_id,
+                        sequence=len(record.audit) + 1,
+                        revision=record.revision + 1,
+                        event_type=event_type,
+                        from_state=record.state,
+                        to_state=record.state,
+                        timestamp=updated_at,
+                        previous_event_hash=str(record.audit[-1]["event_hash"]),
+                    ),
+                ),
+                limits_digest=record.limits_digest,
+                schema_version=record.schema_version,
+                composer_digest=record.composer_digest,
+                composition=composition,
+                check=None,
+                seal=None,
+            )
+            self._replace_record(
+                self._record_path(draft_id),
+                updated.as_durable_dict(),
+                expected_previous=loaded,
+            )
+            return updated
 
     def record_check(
         self,
