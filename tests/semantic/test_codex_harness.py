@@ -1459,10 +1459,9 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "returned copy_instruction.source_field" in instructions
     assert "preserve quotes" in instructions
     assert "fixed_argv_prefix" in instructions
-    assert "opaque handle" in instructions
     assert "never reconstruct" in instructions
     assert "No cwd override" in instructions
-    assert "Each fact one argv value" in instructions
+    assert "Each fact one argv" in instructions
     assert "every prompt field/item/map/bool" in instructions
     assert "batch_size 6" in instructions
     assert "final batch has all remaining" in instructions
@@ -1473,7 +1472,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "execute_after=all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "selected-branch constant" in instructions
-    assert "reuse live tokens" in instructions
+    assert "reuse only successful live tokens" in instructions
     assert "one call: each prompt property/reference" in instructions
     assert "Volume/paired modes/routing" in instructions
     assert "gets --query; end --limit 1..8" in instructions
@@ -1483,7 +1482,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "typed_operation.continuation.gateway_argv_prefix verbatim" in instructions
     assert "incl --apply" in instructions
     assert "selector kind/value are separate argv" in instructions
-    assert "IDs and opaque handles/tokens/digests are exact-copy values" in instructions
+    assert "IDs/handles/tokens/digests are opaque exact-copy values" in instructions
     assert "SFX => exact object_type Sound SFX, never Sound" in instructions
     assert "requested Event belongs in initial add_import_row" in instructions
     assert "never defer/omit" in instructions
