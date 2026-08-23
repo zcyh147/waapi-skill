@@ -1461,18 +1461,18 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "fixed_argv_prefix" in instructions
     assert "never reconstruct" in instructions
     assert "No cwd override" in instructions
-    assert "Scheduled read first; no pre-read reply/clarification" in instructions
+    assert "This-turn reads first; future reads forbidden" in instructions
+    assert "no pre-read reply/clarification" in instructions
     assert "One argv/fact" in instructions
     assert "every prompt field/item/map/bool" in instructions
-    assert "batch_size 6" in instructions
-    assert "final=all remaining" in instructions
-    assert "may shorten" in instructions
+    assert "batch_size=6" in instructions
+    assert "final=remaining" in instructions
     assert "allowed_action_argv owns TYPE" in instructions
     assert "not Real64/int16" in instructions
     assert "unapplied ancestor deferred_fact" in instructions
     assert "execute_after=all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "all_pending_ancestor_facts_in_response_tree_preorder" in instructions
-    assert "selected-branch constant" in instructions
+    assert "branch constant/value" in instructions
     assert "Metadata: obey composer.start.preconditions" in instructions
     assert "absent=none" in instructions
     assert "prompt/schema!=live" in instructions
