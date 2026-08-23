@@ -189,6 +189,26 @@ With PowerShell's ScheduledTasks cmdlets, pass `-LogonType Interactive` and
 in its exported XML and `Limited` in its Principal. Stop before launch if
 either attestation differs.
 
+### macOS Fresh Agent launch ownership
+
+A formal macOS campaign may outlive the Codex app's unified command session.
+Do not use a long-lived unified command or `nohup`: the former may deliver
+`SIGTERM`, while the latter can leave the child matrix running after the
+top-level campaign process has disappeared, so the attempt never seals. A
+matrix summary is not campaign evidence until the top-level attempt manifest
+and digest exist.
+
+Launch long macOS campaigns as a one-shot user LaunchAgent. Its temporary
+plist must use the exact Skill-local Python campaign argv, the clean candidate
+worktree as `WorkingDirectory`, `RunAtLoad=true`, and `KeepAlive=false`.
+Validate the plist, bootstrap it in `gui/$(id -u)`, and require exactly one run
+and exit code zero. Do not use `launchctl submit`: its generated job can relaunch
+the same immutable root after a successful run. After completion, require the
+sealed attempt manifest and digest, the expected consolidated result, and zero
+scoped Codex/Wwise/campaign processes; then boot out the job and remove its
+temporary plist. Freeze any interrupted or unsealed root without resume or
+verify-only replay.
+
 ### Failure-first campaign scheduling
 
 After a frozen full-profile root exposes ordinary semantic failures, repair the
