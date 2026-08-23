@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Barrier
 
 import pytest
 
@@ -190,6 +192,81 @@ def test_operation_draft_business_update_is_durable_atomic_and_cas_bound(
             update=lambda current: current,
             event_type="declaration.replayed",
         )
+
+
+def test_business_updates_serialize_concurrent_writers(tmp_path: Path) -> None:
+    state_dir = tmp_path / "state"
+    store = OperationDraftStore(state_dir)
+    schema_digest = operation_request_schema_digest("audio.import", "2022.1")
+    composer_digest = operation_composer_digest("audio.import", "2022.1")
+    started = store.start(
+        operation="audio.import",
+        version="2022.1",
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+    )
+    context = _context(started.task_authority)
+    barrier = Barrier(2)
+
+    def writer() -> str:
+        local = OperationDraftStore(state_dir)
+        barrier.wait()
+        try:
+            local.apply_business_update(
+                started.draft_id,
+                task_authority=started.task_authority,
+                expected_revision=1,
+                schema_digest=schema_digest,
+                composer_digest=composer_digest,
+                context=context,
+                update=_add_weather,
+                event_type="declaration.added",
+            )
+        except OperationDraftRevisionConflict:
+            return "conflict"
+        return "committed"
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        outcomes = sorted(executor.map(lambda _: writer(), range(2)))
+
+    assert outcomes == ["committed", "conflict"]
+    record = store.inspect(started.draft_id, task_authority=started.task_authority)
+    assert record.revision == 2
+
+
+def test_business_update_storage_crash_preserves_previous_bytes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = OperationDraftStore(tmp_path / "state")
+    schema_digest = operation_request_schema_digest("audio.import", "2022.1")
+    composer_digest = operation_composer_digest("audio.import", "2022.1")
+    started = store.start(
+        operation="audio.import",
+        version="2022.1",
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+    )
+    path = store.records_dir / f"{started.draft_id}.json"
+    before = path.read_bytes()
+
+    def crash(*args: object, **kwargs: object) -> None:
+        raise OSError("simulated publish crash")
+
+    monkeypatch.setattr(store, "_replace_record", crash)
+    with pytest.raises(OSError, match="simulated publish crash"):
+        store.apply_business_update(
+            started.draft_id,
+            task_authority=started.task_authority,
+            expected_revision=1,
+            schema_digest=schema_digest,
+            composer_digest=composer_digest,
+            context=_context(started.task_authority),
+            update=_add_weather,
+            event_type="declaration.added",
+        )
+
+    assert path.read_bytes() == before
 
 
 def _add_weather(session: BusinessDeclarationSession) -> BusinessDeclarationSession:
