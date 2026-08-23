@@ -4395,6 +4395,11 @@ def operation_composer_input_contract(
         if key != "start_preconditions"
     }
     start = {
+        **(
+            {"preconditions": dict(contract["start_preconditions"])}
+            if "start_preconditions" in contract
+            else {}
+        ),
         "subcommand": "draft-start",
         "gateway_argv": ["draft-start", operation],
         **(
@@ -4422,11 +4427,6 @@ def operation_composer_input_contract(
                 },
             }
             if "start_preconditions" not in contract
-            else {}
-        ),
-        **(
-            {"preconditions": dict(contract["start_preconditions"])}
-            if "start_preconditions" in contract
             else {}
         ),
     }

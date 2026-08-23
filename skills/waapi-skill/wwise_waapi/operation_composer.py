@@ -1463,6 +1463,20 @@ def _metadata_workflow_control() -> dict[str, str | bool]:
     }
 
 
+def _audio_import_metadata_gate_contract() -> dict[str, str | bool]:
+    """Put the exact live-token gate before the editable Draft command."""
+
+    return {
+        "before_draft_start": (
+            "required unless same-conversation metadata discover already covers "
+            "every requested property/reference"
+        ),
+        "prompt_or_schema_names_are_live_evidence": False,
+        "query_inventory": "union shared and all rows, including one-row-only fields",
+        "draft_start_before_gate": "invalid",
+    }
+
+
 def _audio_import_hierarchy_row_order_contract() -> dict[str, str | bool]:
     """Keep import hierarchy ordering identical at schema and action time."""
 
@@ -1900,13 +1914,14 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             },
             "planning_discipline": planning_discipline,
             "start_preconditions": {
-                "agent_metadata_command_required": (
-                    "when_dynamic_token_is_not_already_exact_live_evidence"
+                "metadata_gate": _audio_import_metadata_gate_contract(),
+                "metadata_query_batch": _metadata_query_batch_contract(
+                    include_limit_discipline=True
                 ),
                 "workflow_control": _metadata_workflow_control(),
                 "activation_decision": _metadata_activation_decision(),
-                "metadata_query_batch": _metadata_query_batch_contract(
-                    include_limit_discipline=True
+                "agent_metadata_command_required": (
+                    "when_dynamic_token_is_not_already_exact_live_evidence"
                 ),
                 "submit_only_explicit_user_facts": True,
                 "draft_check_revalidates_dynamic_metadata": True,

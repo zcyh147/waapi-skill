@@ -834,6 +834,17 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
     ]
     assert "assign_import_row_switch" not in action_argv
     assert schema["composer"]["start"]["preconditions"] == {
+        "metadata_gate": {
+            "before_draft_start": (
+                "required unless same-conversation metadata discover already "
+                "covers every requested property/reference"
+            ),
+            "prompt_or_schema_names_are_live_evidence": False,
+            "query_inventory": (
+                "union shared and all rows, including one-row-only fields"
+            ),
+            "draft_start_before_gate": "invalid",
+        },
         "agent_metadata_command_required": (
             "when_dynamic_token_is_not_already_exact_live_evidence"
         ),

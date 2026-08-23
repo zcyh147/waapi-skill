@@ -852,6 +852,27 @@ def test_metadata_preconditions_are_operation_local_in_composer_start(
     assert audio_import["composer"]["start"]["preconditions"][
         "agent_metadata_command_required"
     ] == "when_dynamic_token_is_not_already_exact_live_evidence"
+    assert list(audio_import["composer"]["start"])[:3] == [
+        "preconditions",
+        "subcommand",
+        "gateway_argv",
+    ]
+    preconditions = audio_import["composer"]["start"]["preconditions"]
+    assert list(preconditions)[:2] == [
+        "metadata_gate",
+        "metadata_query_batch",
+    ]
+    assert preconditions["metadata_gate"] == {
+        "before_draft_start": (
+            "required unless same-conversation metadata discover already covers "
+            "every requested property/reference"
+        ),
+        "prompt_or_schema_names_are_live_evidence": False,
+        "query_inventory": (
+            "union shared and all rows, including one-row-only fields"
+        ),
+        "draft_start_before_gate": "invalid",
+    }
     audio_batch = audio_import["composer"]["start"]["preconditions"][
         "metadata_query_batch"
     ]
