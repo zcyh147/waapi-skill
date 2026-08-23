@@ -5,7 +5,9 @@ description: Test-only deep audio import interface for the sealed #52 MVP campai
 
 # Deep audio import MVP
 
-This is a test-only fake Gateway. It cannot connect to or change Wwise.
+This is a test-only fake Gateway backed by the real MVP declaration compiler,
+canonical request parser, and immutable Preview builder. Its live reads are
+fixed fakes; it cannot connect to or change Wwise.
 
 Read this file exactly once with `cat` as the sole first shell command. Do not
 use Python, `rg`, `find`, `ls`, or `--help` to read or inspect the Skill.
@@ -20,8 +22,17 @@ Start `mvp-context` with the business family named by the request: `weather`,
 high-level commands.
 
 1. Declare a requested business container with `mvp-structure` when needed.
+   A disclosed `parent_handle` already identifies the requested bound parent;
+   never add another container with the same name. Weather explicitly asks for
+   a new container, so its bound parent is only the place to create Weather.
 2. Declare each complete new Sound with `mvp-asset`, or one existing-target
-   re-import with `mvp-existing-asset`.
+   re-import with `mvp-existing-asset`. Append `--replace` only when the user
+   explicitly requests replacement. For a disclosed long-tail field, pass its
+   opaque `--field-handle` with the requested `--field-number`; never replace
+   the handle with a Wwise token.
+   Different import modes cannot share one Preview: after every
+   `mvp-existing-asset`, run `mvp-preview` immediately; only then start a new
+   `mvp-context` for the next mode.
 3. Run `mvp-preview` once after every requested business fact is present.
 4. Stop after the Preview and summarize it. Nothing is executed in this MVP.
 

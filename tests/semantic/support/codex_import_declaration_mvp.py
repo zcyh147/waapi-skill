@@ -9,6 +9,8 @@ native row expansion, and the continuation remain compiler-owned.
 from __future__ import annotations
 
 import hashlib
+import os
+import shlex
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
@@ -18,6 +20,13 @@ from wwise_waapi.operation_registry import (
     ReadCall,
     _materialize_audio_import_dynamic_rows,
     parse_operation_request,
+)
+from wwise_waapi.platform_commands import (
+    GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+    WINDOWS_MODEL_COMMAND_FAMILY,
+    WINDOWS_POWERSHELL_ENCODED_FAMILY,
+    encode_windows_model_argv,
+    encode_windows_powershell_argv,
 )
 from wwise_waapi.transaction_runtime import (
     TransactionArtifact,
@@ -57,6 +66,7 @@ _MODEL_ASSET_FIELDS = (
     "volume_db",
     "loop",
     "output_bus",
+    "switch_value",
 )
 
 
@@ -92,6 +102,7 @@ class AssetDeclaration:
     volume_db: float | None
     loop: str | None
     output_bus: str | None
+    switch_value: str | None
     fields: Mapping[str, Any]
     fields_supplied: bool
     import_operation: str
@@ -292,6 +303,7 @@ class ImportBusinessMvp:
         volume_db: float | int | None = None,
         loop: str | None = None,
         output_bus: str | None = None,
+        switch_value: str | None = None,
         fields: Mapping[str, Any] | None = None,
     ) -> DeclarationResult:
         if parent not in self._objects:
@@ -315,6 +327,12 @@ class ImportBusinessMvp:
                 action="choose a disclosed business kind",
             )
         self._require_child_name(name)
+        if fields is not None and not isinstance(fields, Mapping):
+            raise self._repair(
+                "FIELD_BINDINGS_INVALID",
+                field="fields",
+                action="resubmit field handles and values as one object",
+            )
         normalized_fields: dict[str, Any] = {}
         for handle, value in dict(fields or {}).items():
             binding = self._fields.get(str(handle))
@@ -337,13 +355,43 @@ class ImportBusinessMvp:
                 binding,
                 value,
             )
-        source = Path(media_file).expanduser().resolve(strict=True)
-        normalized_volume = _finite_number(volume_db, field_name="volume_db")
+        source = self._require_media_file(media_file)
+        try:
+            normalized_volume = _finite_number(volume_db, field_name="volume_db")
+        except ValueError as exc:
+            raise self._repair(
+                "FIELD_VALUE_TYPE_MISMATCH",
+                field="volume_db",
+                action="resubmit volume_db as a finite number of decibels",
+            ) from exc
+        if normalized_volume is not None and not -200.0 <= normalized_volume <= 200.0:
+            raise self._repair(
+                "FIELD_VALUE_OUT_OF_RANGE",
+                field="volume_db",
+                action="resubmit volume_db inside the supported -200..200 dB range",
+            )
         normalized_loop = None if loop is None else str(loop).strip().casefold()
         if normalized_loop not in {None, "infinite"}:
-            raise ValueError("MVP loop accepts only infinite or omission")
+            raise self._repair(
+                "FIELD_VALUE_UNAVAILABLE",
+                field="loop",
+                action="use Infinite or omit the looping field",
+            )
         if not isinstance(language, str) or not language.strip():
-            raise ValueError("language is required")
+            raise self._repair(
+                "REQUIRED_FIELD_MISSING",
+                field="language",
+                action="resubmit one explicit import language",
+            )
+        normalized_switch = None
+        if switch_value is not None:
+            if not isinstance(switch_value, str) or not switch_value.strip():
+                raise self._repair(
+                    "FIELD_VALUE_TYPE_MISMATCH",
+                    field="switch_value",
+                    action="resubmit one non-empty Switch or State value name",
+                )
+            normalized_switch = switch_value.strip()
         declaration = AssetDeclaration(
             parent=parent,
             target=None,
@@ -354,6 +402,7 @@ class ImportBusinessMvp:
             volume_db=normalized_volume,
             loop=normalized_loop,
             output_bus=output_bus,
+            switch_value=normalized_switch,
             fields=normalized_fields,
             fields_supplied=fields is not None,
             import_operation="createNew",
@@ -396,18 +445,26 @@ class ImportBusinessMvp:
                 rejected_handle=target,
                 action="choose an existing Sound target",
             )
-        kind = "sound-voice" if language.casefold() != "sfx" else "sound-sfx"
-        source = Path(media_file).expanduser().resolve(strict=True)
+        if not isinstance(language, str) or not language.strip():
+            raise self._repair(
+                "REQUIRED_FIELD_MISSING",
+                field="language",
+                action="resubmit one explicit import language",
+            )
+        normalized_language = language.strip()
+        kind = "sound-voice" if normalized_language.casefold() != "sfx" else "sound-sfx"
+        source = self._require_media_file(media_file)
         declaration = AssetDeclaration(
             parent=None,
             target=target,
             name=bound.name,
             kind=kind,
             media_file=str(source),
-            language=language,
+            language=normalized_language,
             volume_db=None,
             loop=None,
             output_bus=None,
+            switch_value=None,
             fields={},
             fields_supplied=False,
             import_operation="replaceExisting" if replace else "useExisting",
@@ -434,7 +491,11 @@ class ImportBusinessMvp:
 
     def compile(self) -> MvpCompilation:
         if not self._assets:
-            raise ValueError("MVP import requires at least one complete asset")
+            raise self._repair(
+                "INCOMPLETE_DECLARATION",
+                field="assets",
+                action="declare at least one complete audio asset before Preview",
+            )
         modes = {asset.import_operation for asset in self._assets}
         if self._structures:
             modes.add("createNew")
@@ -520,6 +581,8 @@ class ImportBusinessMvp:
                 row["properties"] = properties
             if references:
                 row["references"] = references
+            if asset.switch_value is not None:
+                row["switch_assignment"] = asset.switch_value
             rows.append(row)
             property_specs.append(properties)
             reference_specs.append(references)
@@ -582,29 +645,13 @@ class ImportBusinessMvp:
                 row = dict(dispatch["imports"][native["native_index"]])
                 row["kind"] = native["kind"]
                 projected_rows.append(row)
-        draft_digest = hashlib.sha256(
-            repr((self.version, self.task_authority, rows)).encode("utf-8")
-        ).hexdigest()[:24]
-        model_command = f"gateway audio-import-mvp-preview --draft mvp-{draft_digest}"
+        next_command = _mvp_preview_next_command()
         return MvpCompilation(
             request=request.as_dict(),
             metadata_scopes=tuple(dict.fromkeys(scopes)),
             native_rows=tuple(projected_rows),
             native_row_mapping=tuple(dict(value) for value in mapping),
-            next_command={
-                "copy_instruction": {
-                    "contract": "waapi-skill.copy-instruction/v2",
-                    "source_field": "model_command",
-                    "action": "execute exactly one complete Gateway command",
-                    "forbidden_transformations": [
-                        "append",
-                        "reconstruct",
-                        "re-quote",
-                        "select another field",
-                    ],
-                },
-                "model_command": model_command,
-            },
+            next_command=next_command,
             model_authored_fields=(
                 *_MODEL_ASSET_FIELDS,
                 *(
@@ -713,8 +760,7 @@ class ImportBusinessMvp:
             action=f"resubmit a {binding.value_type} value",
         )
 
-    @staticmethod
-    def _require_child_name(name: str) -> None:
+    def _require_child_name(self, name: str) -> None:
         if (
             not isinstance(name, str)
             or not name
@@ -722,7 +768,28 @@ class ImportBusinessMvp:
             or "<" in name
             or ">" in name
         ):
-            raise ValueError("name must be one Wwise child name")
+            raise self._repair(
+                "INVALID_CHILD_NAME",
+                field="name",
+                action="resubmit one non-empty Wwise child name without path syntax",
+            )
+
+    def _require_media_file(self, value: str | Path) -> Path:
+        try:
+            path = Path(value).expanduser().resolve(strict=True)
+        except (OSError, TypeError, ValueError) as exc:
+            raise self._repair(
+                "MEDIA_FILE_UNAVAILABLE",
+                field="media_file",
+                action="resubmit one available absolute media file",
+            ) from exc
+        if not path.is_file():
+            raise self._repair(
+                "MEDIA_FILE_UNAVAILABLE",
+                field="media_file",
+                action="resubmit one available absolute media file",
+            )
+        return path
 
 
 def _opaque_handle(prefix: str, *parts: str) -> str:
@@ -739,6 +806,46 @@ def _finite_number(value: Any, *, field_name: str) -> float | None:
     if normalized != normalized or normalized in {float("inf"), float("-inf")}:
         raise ValueError(f"{field_name} must be a finite number")
     return normalized
+
+
+def _mvp_preview_next_command() -> dict[str, Any]:
+    full_argv = (
+        "python",
+        ".agents/skills/waapi-skill/scripts/run.py",
+        "gateway.py",
+        "mvp-preview",
+    )
+    payload: dict[str, Any] = {
+        "contract": "waapi-skill.transaction-next-command/v2",
+        "command": "mvp-preview",
+        "gateway_argv": ["mvp-preview"],
+        "full_argv": list(full_argv),
+        "copy_exactly": True,
+        "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+    }
+    if os.name == "nt":
+        payload["shell_family"] = WINDOWS_POWERSHELL_ENCODED_FAMILY
+        payload["shell_command"] = encode_windows_powershell_argv(full_argv)
+        payload["model_shell_family"] = WINDOWS_MODEL_COMMAND_FAMILY
+        payload["model_command"] = encode_windows_model_argv(full_argv)
+        source_field = "model_command"
+    else:
+        payload["shell_family"] = "posix-sh"
+        payload["shell_command"] = shlex.join(full_argv)
+        source_field = "shell_command"
+    payload["copy_instruction"] = {
+        "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+        "source_field": source_field,
+        "action": "execute_verbatim_as_one_shell_tool_call",
+        "forbidden_transformations": [
+            "reconstruct",
+            "shorten",
+            "normalize",
+            "substitute_path_segments",
+            "select_another_field",
+        ],
+    }
+    return payload
 
 
 __all__ = [

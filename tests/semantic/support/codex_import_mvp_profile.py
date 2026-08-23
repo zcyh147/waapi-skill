@@ -39,6 +39,7 @@ class ImportMvpUnit:
     family: str
     version: str
     prompt: str
+    paraphrases: tuple[str, str]
     commands: tuple[tuple[str, ...], ...]
     final_markers: tuple[str, ...]
     scenario: ImportMvpScenario
@@ -121,7 +122,7 @@ def _parse_unit(
         "unit_id",
         "family",
         "version",
-        "prompt",
+        "paraphrases",
         "commands",
         "final_markers",
     }:
@@ -129,9 +130,20 @@ def _parse_unit(
     if value.get("unit_id") != expected_id or value.get("family") != expected_family:
         raise ImportMvpProfileError("MVP unit identity or order drifted")
     version = value.get("version")
-    prompt = value.get("prompt")
-    if version not in {"2022.1", "2025.1"} or not isinstance(prompt, str) or not prompt:
-        raise ImportMvpProfileError("MVP unit version or prompt is invalid")
+    paraphrases_value = value.get("paraphrases")
+    if (
+        version not in {"2022.1", "2025.1"}
+        or not isinstance(paraphrases_value, list)
+        or len(paraphrases_value) != 2
+        or len(set(paraphrases_value)) != 2
+        or any(not isinstance(item, str) or not item for item in paraphrases_value)
+    ):
+        raise ImportMvpProfileError("MVP unit version or paraphrases are invalid")
+    paraphrases = (str(paraphrases_value[0]), str(paraphrases_value[1]))
+    prompt = (
+        "以下两种说法表达同一项业务要求；不要重复声明，只生成一次对应预览：\n"
+        f"说法 A：{paraphrases[0]}\n说法 B：{paraphrases[1]}"
+    )
     commands_value = value.get("commands")
     if (
         not isinstance(commands_value, list)
@@ -161,6 +173,7 @@ def _parse_unit(
         family=expected_family,
         version=str(version),
         prompt=prompt,
+        paraphrases=paraphrases,
         commands=commands,
         final_markers=tuple(markers_value),
         scenario=ImportMvpScenario(id=expected_id),

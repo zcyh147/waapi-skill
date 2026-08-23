@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -19,12 +20,20 @@ from tests.semantic.support.codex_harness import (
     semantic_task_developer_instructions,
 )
 from tests.semantic.support.codex_import_mvp_profile import ImportMvpUnit
+from tests.semantic.support.codex_import_mvp_fake_gateway import (
+    RUNTIME_ROOT_ENV,
+    SKILL_ROOT_ENV,
+    VERSION_ENV,
+    prepare_import_mvp_runtime,
+)
 from tests.semantic.support.codex_task_runner_v3 import _gateway_candidate_argvs
 
 
 OUTCOME_CONTRACT = "waapi-skill.deep-interface-mvp-agent-outcome/v1"
+REPO_ROOT = Path(__file__).resolve().parents[3]
 _NO_EXECUTION_MARKERS = (
     "未执行",
+    "未实际导入",
     "未修改",
     "没有修改",
     "no execution",
@@ -88,19 +97,36 @@ def preview_was_reported(
 
     if not broker_records:
         return False
-    last = broker_records[-1]
-    payload = getattr(last, "payload", None)
-    result = payload.get("agent_result") if isinstance(payload, Mapping) else None
-    preview = result.get("preview") if isinstance(result, Mapping) else None
+    preview_results: list[Mapping[str, Any]] = []
+    for record in broker_records:
+        if getattr(record, "step_name", "").split("-")[-2:] != ["mvp", "preview"]:
+            continue
+        payload = getattr(record, "payload", None)
+        result = payload.get("agent_result") if isinstance(payload, Mapping) else None
+        if not isinstance(result, Mapping):
+            return False
+        preview_results.append(result)
     if (
-        getattr(last, "step_name", "").split("-")[-2:] != ["mvp", "preview"]
-        or not isinstance(result, Mapping)
-        or result.get("wwise_mutated") is not False
-        or not isinstance(preview, list)
-        or not all(isinstance(line, str) for line in preview)
+        not preview_results
+        or getattr(broker_records[-1], "step_name", "").split("-")[-2:]
+        != ["mvp", "preview"]
+        or any(result.get("wwise_mutated") is not False for result in preview_results)
+        or any(
+            not isinstance(result.get("preview"), list)
+            or not all(isinstance(line, str) for line in result["preview"])
+            for result in preview_results
+        )
     ):
         return False
-    combined = (final_response + "\n" + "\n".join(preview)).casefold()
+    combined = (
+        final_response
+        + "\n"
+        + "\n".join(
+            line
+            for result in preview_results
+            for line in result["preview"]
+        )
+    ).casefold()
     return all(marker.casefold() in combined for marker in expected_markers) and any(
         marker in final_response.casefold() for marker in _NO_EXECUTION_MARKERS
     )
@@ -135,6 +161,7 @@ def run_import_mvp_agent_unit(
     workspace = task_root / "agent-workspace"
     evidence.mkdir(parents=True, exist_ok=False)
     skill_install = prepare_workspace_skill_install(workspace, options.skill_source)
+    runtime_root = prepare_import_mvp_runtime(task_root / "mvp-runtime")
     steps = tuple(
         ExpectedGatewayStep(
             name=f"step-{index:02d}-{command[0]}",
@@ -149,7 +176,17 @@ def run_import_mvp_agent_unit(
         expected_steps=steps,
         expected_wwise_version=unit.version,
         project_modification_policy="read_only",
-        runner_environment={},
+        runner_environment={
+            "PYTHONPATH": os.pathsep.join(
+                (
+                    str(REPO_ROOT),
+                    str(REPO_ROOT / "skills/waapi-skill"),
+                )
+            ),
+            RUNTIME_ROOT_ENV: str(runtime_root),
+            SKILL_ROOT_ENV: str(REPO_ROOT / "skills/waapi-skill"),
+            VERSION_ENV: unit.version,
+        },
         working_root=task_root / "broker",
         transport="tcp",
         runner_timeout_seconds=max(120.0, options.timeout_seconds),

@@ -12,52 +12,67 @@
       "unit_id": "MVP22-WEATHER",
       "family": "weather",
       "version": "2022.1",
-      "prompt": "请用测试 Gateway 准备一个 Weather 层：新建 Weather Actor Mixer，把 rain 和 wind 两份素材分别作为 Rain_Bed、Wind_Bed 的 SFX 导入；两者都无限循环，音量分别为 -4 dB 和 -6 dB，并都路由到任务中绑定的 Weather_Bus。只生成业务预览，不要执行。",
+      "paraphrases": [
+        "新建 Weather Actor Mixer，把 rain 和 wind 分别做成 Rain_Bed、Wind_Bed 两个循环 SFX，音量 -4 dB/-6 dB，并接到绑定总线；只预览。",
+        "做一个天气层，雨床与风床都无限循环，分别压到负四和负六分贝，走任务给出的 Bus，不执行导入。"
+      ],
       "commands": [
         ["mvp-context", "--family", "weather"],
-        ["mvp-structure", "--parent", "mvp-obj-root000000000000000001", "--name", "Weather", "--kind", "actor-mixer"],
-        ["mvp-asset", "--parent", "mvp-new-weather00000000000003", "--name", "Rain_Bed", "--kind", "sound-sfx", "--media", "rain", "--language", "SFX", "--volume-db", "-4", "--loop", "infinite", "--output-bus", "mvp-obj-bus000000000000000002"],
-        ["mvp-asset", "--parent", "mvp-new-weather00000000000003", "--name", "Wind_Bed", "--kind", "sound-sfx", "--media", "wind", "--language", "SFX", "--volume-db", "-6", "--loop", "infinite", "--output-bus", "mvp-obj-bus000000000000000002"],
+        ["mvp-structure", "--parent", "mvp-obj-c7dba8e8f4e007539f967fc2", "--name", "Weather", "--kind", "actor-mixer"],
+        ["mvp-asset", "--parent", "mvp-new-db113a9b61904b12257b05dd", "--name", "Rain_Bed", "--kind", "sound-sfx", "--media", "rain", "--language", "SFX", "--volume-db", "-4", "--loop", "infinite", "--output-bus", "mvp-obj-932e9021aeb68d959b5dd72a"],
+        ["mvp-asset", "--parent", "mvp-new-db113a9b61904b12257b05dd", "--name", "Wind_Bed", "--kind", "sound-sfx", "--media", "wind", "--language", "SFX", "--volume-db", "-6", "--loop", "infinite", "--output-bus", "mvp-obj-932e9021aeb68d959b5dd72a"],
         ["mvp-preview"]
       ],
-      "final_markers": ["Rain_Bed", "Wind_Bed", "Infinite", "-4 dB", "-6 dB", "未执行"]
+      "final_markers": ["Rain_Bed", "Wind_Bed", "Infinite", "-4 dB", "-6 dB"]
     },
     {
       "unit_id": "MVP22-RIFLE",
       "family": "rifle",
       "version": "2022.1",
-      "prompt": "现有 Rifle 对象已经由测试 Gateway 绑定。请用 rifle 素材安全重导入，保留现有对象身份；用户没有要求替换对象。只展示预览，不要执行。",
+      "paraphrases": [
+        "先给现有 Rifle 做一次保留对象身份的安全重导入预览；随后按用户明确要求再准备一次替换预览，两次都不执行。",
+        "先看 use-existing 的 Rifle 换素材方案，再看明确 replace 的方案；第一步不能擅自删除旧对象，最终也只展示。"
+      ],
       "commands": [
         ["mvp-context", "--family", "rifle"],
-        ["mvp-existing-asset", "--target", "mvp-obj-rifle0000000000000004", "--media", "rifle", "--language", "SFX"],
+        ["mvp-existing-asset", "--target", "mvp-obj-02e5f12fcaa6a0f92bb35efd", "--media", "rifle", "--language", "SFX"],
+        ["mvp-preview"],
+        ["mvp-context", "--family", "rifle"],
+        ["mvp-existing-asset", "--target", "mvp-obj-02e5f12fcaa6a0f92bb35efd", "--media", "rifle", "--language", "SFX", "--replace"],
         ["mvp-preview"]
       ],
-      "final_markers": ["Rifle", "Re-import", "未执行"]
+      "final_markers": ["Rifle", "useExisting", "replaceExisting"]
     },
     {
       "unit_id": "MVP25-FOOTSTEPS",
       "family": "footsteps",
       "version": "2025.1",
-      "prompt": "请在测试 Gateway 已绑定的 Footsteps 容器下导入 snow_step，业务名称为 Snow_Step，类型是 SFX，音量 -2 dB，输出到已绑定总线，并把 Switch 值设为 Snow。只看预览，不执行。",
+      "paraphrases": [
+        "在绑定的 Footsteps 下做 Snow_Step：snow_step 素材、SFX、-2 dB、绑定总线、Switch 值 Snow，只预览。",
+        "准备雪地脚步声，音量降两分贝并分配到 Snow 这个切换值，输出走任务总线，不要真正导入。"
+      ],
       "commands": [
         ["mvp-context", "--family", "footsteps"],
-        ["mvp-asset", "--parent", "mvp-obj-footsteps000000000005", "--name", "Snow_Step", "--kind", "sound-sfx", "--media", "snow_step", "--language", "SFX", "--volume-db", "-2", "--output-bus", "mvp-obj-bus000000000000000002", "--switch-value", "Snow"],
+        ["mvp-asset", "--parent", "mvp-obj-f2be814f7912b7823576192b", "--name", "Snow_Step", "--kind", "sound-sfx", "--media", "snow_step", "--language", "SFX", "--volume-db", "-2", "--output-bus", "mvp-obj-91b1167150c1be29d18b6b0f", "--switch-value", "Snow"],
         ["mvp-preview"]
       ],
-      "final_markers": ["Snow_Step", "Snow", "-2 dB", "未执行"]
+      "final_markers": ["Snow_Step", "Snow", "-2 dB"]
     },
     {
       "unit_id": "MVP25-WEAPONS",
       "family": "weapons",
       "version": "2025.1",
-      "prompt": "批量准备两条武器 SFX：mechanical 对应 Rifle_Mechanical、音量 -3 dB；tail 对应 Rifle_Tail、音量 -6 dB。两者放到测试 Gateway 已绑定的 Weapons 父对象并使用绑定总线。生成一个批量预览即可，不要执行。",
+      "paraphrases": [
+        "批量准备 Rifle_Mechanical(-3 dB) 与 Rifle_Tail(-6 dB)，都放到绑定 Weapons、走绑定总线；Mechanical 的现场 CustomWetness 字段设 0.75，只预览。",
+        "把机械层和尾音层一次规划好，分别负三/负六分贝；机械层湿度四分之三，使用 Gateway 给的字段句柄，不执行。"
+      ],
       "commands": [
         ["mvp-context", "--family", "weapons"],
-        ["mvp-asset", "--parent", "mvp-obj-weapons000000000000006", "--name", "Rifle_Mechanical", "--kind", "sound-sfx", "--media", "mechanical", "--language", "SFX", "--volume-db", "-3", "--output-bus", "mvp-obj-bus000000000000000002"],
-        ["mvp-asset", "--parent", "mvp-obj-weapons000000000000006", "--name", "Rifle_Tail", "--kind", "sound-sfx", "--media", "tail", "--language", "SFX", "--volume-db", "-6", "--output-bus", "mvp-obj-bus000000000000000002"],
+        ["mvp-asset", "--parent", "mvp-obj-e2df174575b0a7be331e265a", "--name", "Rifle_Mechanical", "--kind", "sound-sfx", "--media", "mechanical", "--language", "SFX", "--volume-db", "-3", "--output-bus", "mvp-obj-59c0a1e4cbbedf3ec4890322", "--field-handle", "mvp-field-d12938ec276454624f879057", "--field-number", "0.75"],
+        ["mvp-asset", "--parent", "mvp-obj-e2df174575b0a7be331e265a", "--name", "Rifle_Tail", "--kind", "sound-sfx", "--media", "tail", "--language", "SFX", "--volume-db", "-6", "--output-bus", "mvp-obj-59c0a1e4cbbedf3ec4890322"],
         ["mvp-preview"]
       ],
-      "final_markers": ["Rifle_Mechanical", "Rifle_Tail", "-3 dB", "-6 dB", "未执行"]
+      "final_markers": ["Rifle_Mechanical", "Rifle_Tail", "CustomWetness", "0.75", "-3 dB", "-6 dB"]
     }
   ]
 }

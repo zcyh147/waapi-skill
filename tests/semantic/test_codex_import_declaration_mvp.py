@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from collections import deque
 from types import SimpleNamespace
@@ -16,6 +17,13 @@ from tests.semantic.support.codex_import_mvp_profile import (
     REASONING_EFFORT,
     SERVICE_TIER,
     load_import_mvp_profile,
+)
+from tests.semantic.support.codex_import_mvp_fake_gateway import (
+    RUNTIME_ROOT_ENV,
+    SKILL_ROOT_ENV,
+    VERSION_ENV,
+    main as fake_gateway_main,
+    prepare_import_mvp_runtime,
 )
 from tests.semantic.support.codex_import_mvp_agent_runner import (
     import_mvp_developer_instructions,
@@ -169,8 +177,10 @@ def test_business_asset_compiles_without_model_authored_wwise_mechanics(
         "audio_file_source_media",
     ]
     assert compiled.next_command["copy_instruction"]["source_field"] == (
-        "model_command"
+        "shell_command"
     )
+    assert compiled.next_command["full_argv"][-1] == "mvp-preview"
+    assert compiled.next_command["shell_command"].endswith("mvp-preview")
     assert set(compiled.model_authored_fields) == {
         "parent",
         "name",
@@ -180,6 +190,7 @@ def test_business_asset_compiles_without_model_authored_wwise_mechanics(
         "volume_db",
         "loop",
         "output_bus",
+        "switch_value",
     }
     forbidden = {
         "object_path",
@@ -432,6 +443,51 @@ def test_field_handle_scope_and_range_fail_closed_atomically(tmp_path: Path) -> 
         assert mvp.inspect() == before
 
 
+def test_common_business_input_failures_return_atomic_structured_repairs(
+    tmp_path: Path,
+) -> None:
+    media = tmp_path / "valid.wav"
+    media.write_bytes(b"RIFF\x04\x00\x00\x00WAVE")
+    mvp = ImportBusinessMvp.create(
+        version="2022.1",
+        task_authority="task-common-repairs",
+        project_id="sample-project",
+    )
+    parent = mvp.bind_object(
+        object_id=PARENT_ID,
+        name="Weather",
+        object_type="ActorMixer",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\Weather",
+    )
+    invalid_rows = (
+        ({"name": "Bad\\Path", "media_file": media}, "INVALID_CHILD_NAME"),
+        ({"name": "Rain", "media_file": tmp_path / "missing.wav"}, "MEDIA_FILE_UNAVAILABLE"),
+        ({"name": "Rain", "media_file": media, "language": ""}, "REQUIRED_FIELD_MISSING"),
+        ({"name": "Rain", "media_file": media, "loop": "sometimes"}, "FIELD_VALUE_UNAVAILABLE"),
+        ({"name": "Rain", "media_file": media, "volume_db": 500}, "FIELD_VALUE_OUT_OF_RANGE"),
+    )
+    for overrides, error_code in invalid_rows:
+        before = mvp.inspect()
+        arguments = {
+            "parent": parent,
+            "name": "Rain",
+            "kind": "sound-sfx",
+            "media_file": media,
+            "language": "SFX",
+            **overrides,
+        }
+        with pytest.raises(MvpRepairError) as caught:
+            mvp.declare_asset(**arguments)
+        assert caught.value.repair["error_code"] == error_code
+        assert caught.value.repair["draft_changed"] is False
+        assert mvp.inspect() == before
+
+    with pytest.raises(MvpRepairError) as empty:
+        mvp.compile()
+    assert empty.value.repair["error_code"] == "INCOMPLETE_DECLARATION"
+    assert empty.value.repair["draft_changed"] is False
+
+
 def test_business_declaration_enters_existing_immutable_preview_pipeline(
     tmp_path: Path,
 ) -> None:
@@ -560,10 +616,79 @@ def test_fixed_mvp_profile_covers_four_paraphrased_integration_families() -> Non
         "shell_command",
     }
     for unit in profile.units:
+        assert len(unit.paraphrases) == 2
+        assert all(paraphrase in unit.prompt for paraphrase in unit.paraphrases)
         command_tokens = {token for command in unit.commands for token in command}
         assert forbidden_tokens.isdisjoint(command_tokens)
         assert unit.commands[0] == ("mvp-context", "--family", unit.family)
         assert unit.commands[-1] == ("mvp-preview",)
+
+
+def test_fixed_fake_gateway_cases_use_real_compiler_and_immutable_preview(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    profile = load_import_mvp_profile(MVP_PROFILE)
+    previews_by_family: dict[str, list[dict[str, Any]]] = {}
+
+    for unit in profile.units:
+        task_root = tmp_path / unit.unit_id
+        runtime_root = prepare_import_mvp_runtime(task_root / "runtime")
+        state_dir = task_root / "state"
+        state_dir.mkdir()
+        monkeypatch.setenv(RUNTIME_ROOT_ENV, str(runtime_root))
+        monkeypatch.setenv(SKILL_ROOT_ENV, str(SKILL_ROOT))
+        monkeypatch.setenv(VERSION_ENV, unit.version)
+        monkeypatch.setenv("WAAPI_SKILL_STATE_DIR", str(state_dir))
+        family_previews: list[dict[str, Any]] = []
+        for command in unit.commands:
+            assert fake_gateway_main(["gateway.py", *command]) == 0
+            payload = json.loads(capsys.readouterr().out)
+            assert payload["ok"] is True
+            assert payload["command"] == command[0]
+            if command[0] == "mvp-context":
+                assert "parent_handle" in payload["agent_result"]
+                assert "root_handle" not in payload["agent_result"]
+            if command[0] == "mvp-existing-asset":
+                assert payload["agent_result"]["next_action"].startswith(
+                    "run mvp-preview now"
+                )
+            if command[0] == "mvp-preview":
+                preview = payload["agent_result"]
+                family_previews.append(preview)
+                assert preview["test_only"] is True
+                assert preview["wwise_connected"] is False
+                assert preview["wwise_mutated"] is False
+                assert preview["production_accepted"] is False
+                assert len(preview["immutable_preview_sha256"]) == 64
+                evidence = preview["compiler_evidence"]
+                assert evidence["canonical_request"]["operation"] == "audio.import"
+                assert evidence["dispatch"]["uri"] == "ak.wwise.core.audio.import"
+                assert evidence["next_command"]["full_argv"][-1] == "mvp-preview"
+        previews_by_family[unit.family] = family_previews
+
+    assert len(previews_by_family["rifle"]) == 2
+    assert [
+        preview["compiler_evidence"]["canonical_request"]["arguments"][
+            "import_operation"
+        ]
+        for preview in previews_by_family["rifle"]
+    ] == ["useExisting", "replaceExisting"]
+    weapons_dispatch = previews_by_family["weapons"][0]["compiler_evidence"][
+        "dispatch"
+    ]
+    assert any(
+        row.get("@CustomWetness") == 0.75
+        for row in weapons_dispatch["args"]["imports"]
+    )
+    footsteps_dispatch = previews_by_family["footsteps"][0]["compiler_evidence"][
+        "dispatch"
+    ]
+    assert any(
+        row.get("switchAssignation") == "Snow"
+        for row in footsteps_dispatch["args"]["imports"]
+    )
 
 
 def test_mvp_agent_contract_uses_standard_skill_bootstrap_and_semantic_preview_grade(
