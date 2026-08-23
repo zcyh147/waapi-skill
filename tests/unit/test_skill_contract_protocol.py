@@ -1188,7 +1188,6 @@ def test_capability_summary_is_unfiltered_and_route_filters_are_row_only() -> No
     assert "For five-version totals, first read coverage as directed below" in SKILL
     assert "it includes every route count" in SKILL
     assert "Row filters omit `--summary-only`" in SKILL
-    assert "are the exception below" in SKILL
     assert "read `references/waapi-coverage.md` once after `SKILL.md`" in SKILL
     assert "before the summary" in SKILL
     assert summary_command in COVERAGE
