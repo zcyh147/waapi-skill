@@ -9993,12 +9993,30 @@ def test_weather_agent_metadata_step_crosses_broker_validation(
         "--limit",
         "3",
     )
-    collapsed_hash, collapsed_execution = broker._validate_step(  # noqa: SLF001
-        sound_metadata_step,
-        collapsed_sound_queries,
+    with pytest.raises(GatewayInvocationError, match="query slot count"):
+        broker._validate_step(  # noqa: SLF001
+            sound_metadata_step,
+            collapsed_sound_queries,
+        )
+    complete_sound_queries = (
+        "metadata",
+        "discover",
+        "--object-type",
+        "Sound",
+        *tuple(
+            item
+            for query in SOUND_METADATA_QUERIES
+            for item in ("--query", query)
+        ),
+        "--limit",
+        "2",
     )
-    assert len(collapsed_hash) == 64
-    assert collapsed_execution == collapsed_sound_queries
+    complete_hash, complete_execution = broker._validate_step(  # noqa: SLF001
+        sound_metadata_step,
+        complete_sound_queries,
+    )
+    assert len(complete_hash) == 64
+    assert complete_execution == complete_sound_queries
     metadata_step = next(
         step for step in protocol.steps if step.name == "tx02.metadata"
     )
