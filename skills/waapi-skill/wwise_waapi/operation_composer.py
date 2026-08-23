@@ -1930,10 +1930,10 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             "include_every_required_field": True,
             "include_only_selected_optional_fields": True,
             "additional_fields": False,
-            "prior_gateway_id": "opaque_exact_copy_only",
         },
         "flat_target_row_discipline": {
             "initial_action": "add_target",
+            "prior_gateway_id": "opaque_exact_copy_only",
             "include_every_known_field": [
                 "name",
                 "notes",

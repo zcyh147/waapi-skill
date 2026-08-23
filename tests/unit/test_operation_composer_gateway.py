@@ -198,10 +198,10 @@ def test_object_set_composer_discloses_every_exact_typed_action_shape(
         "include_every_required_field": True,
         "include_only_selected_optional_fields": True,
         "additional_fields": False,
-        "prior_gateway_id": "opaque_exact_copy_only",
     }
     assert contract["flat_target_row_discipline"] == {
         "initial_action": "add_target",
+        "prior_gateway_id": "opaque_exact_copy_only",
         "include_every_known_field": [
             "name",
             "notes",
