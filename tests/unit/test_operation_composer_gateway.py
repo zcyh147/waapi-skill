@@ -839,6 +839,22 @@ def test_audio_import_draft_start_repeats_wwise_path_discipline(
     }
 
 
+def test_metadata_preconditions_are_operation_local_in_composer_start(
+    tmp_path: Path,
+) -> None:
+    _, object_set = execute(tmp_path, "operation-schema", "object.set")
+    _, audio_import = execute(tmp_path, "operation-schema", "audio.import")
+    _, rtpc = execute(tmp_path, "operation-schema", "object.setRTPC")
+
+    assert object_set["composer"]["start"]["preconditions"][
+        "dynamic_metadata_before_draft_start"
+    ] is True
+    assert audio_import["composer"]["start"]["preconditions"][
+        "agent_metadata_command_required"
+    ] == "when_dynamic_token_is_not_already_exact_live_evidence"
+    assert "preconditions" not in rtpc["composer"]["start"]
+
+
 @pytest.mark.parametrize(
     ("version", "operation", "path", "expected"),
     (

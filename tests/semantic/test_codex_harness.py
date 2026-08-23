@@ -1472,21 +1472,14 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "execute_after=all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "selected-branch constant" in instructions
-    assert "Metadata only if required and op == object.set/audio.import" in instructions
-    assert "never otherwise" in instructions
-    assert "Post-schema discover" in instructions
-    assert "shared exact --object-type" in instructions
-    assert "--object-type from exact-ID target" not in instructions
-    assert "pre-draft-start" in instructions
-    assert "omit name+notes" in instructions
-    assert "exact query" in instructions
-    assert "--limit 1..8 once" in instructions
-    assert "Only selected query rows" in instructions
+    assert "Metadata: obey composer.start.preconditions exactly" in instructions
+    assert "absent means none" in instructions
+    assert "Only query-selected" in instructions
     assert "exact-ID reread GUIDs before schema" in instructions
     assert "enum/const exactly" in instructions
     assert "typed_operation.continuation.gateway_argv_prefix verbatim" in instructions
     assert "incl --apply" in instructions
-    assert "selector kind/value are separate argv" in instructions
+    assert "selector kind/value separate argv" in instructions
     assert "IDs/handles/tokens/digests opaque exact-copy" in instructions
     assert "SFX => exact object_type Sound SFX, never Sound" in instructions
     assert "all Events in initial rows" in instructions
@@ -1497,8 +1490,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "every prompt field/item/map/bool" in instructions
     assert "Top facts first; exhaust tree" in instructions
     assert "More item: copy ancestor_next_item_source" in instructions
-    assert "none: completion_candidate.copy_command" in instructions
-    assert "Never type digest" in instructions
+    assert "none: copy completion_candidate.copy_command incl task_authority" in instructions
     assert "shell_tool_timeout_ms" in instructions
     assert "timeout_ms>=30000" in instructions
     assert "draft-check is not Preview" in instructions
