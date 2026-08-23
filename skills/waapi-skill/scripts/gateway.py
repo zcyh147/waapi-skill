@@ -4394,42 +4394,42 @@ def operation_composer_input_contract(
         for key, value in contract.items()
         if key != "start_preconditions"
     }
-    start = {
-        **(
-            {"preconditions": dict(contract["start_preconditions"])}
-            if "start_preconditions" in contract
-            else {}
-        ),
-        "subcommand": "draft-start",
-        "gateway_argv": ["draft-start", operation],
-        **(
-            {
-                "copy_instruction": {
-                    "contract": OPERATION_DRAFT_COMMAND_COPY_INSTRUCTION_CONTRACT,
-                    "source_field": "gateway_argv",
-                    "action": (
-                        "append_to_packaged_gateway_prefix_and_execute_verbatim"
-                    ),
-                    "forbidden_transformations": [
-                        "reconstruct",
-                        "shorten",
-                        "normalize",
-                        "substitute_path_segments",
-                        "select_another_field",
-                    ],
-                },
-                "precondition_discipline": {
-                    "metadata_discover_allowed_only_when": (
-                        "preconditions is present and selects metadata"
-                    ),
-                    "when_preconditions_absent": "execute_gateway_argv_now",
-                    "infer_metadata_from_operation_constraints": False,
-                },
-            }
-            if "start_preconditions" not in contract
-            else {}
-        ),
+    has_start_preconditions = "start_preconditions" in contract
+    lock_draft_start = has_start_preconditions and operation in {
+        "audio.import",
+        "object.set",
     }
+    start: dict[str, Any] = {}
+    if has_start_preconditions:
+        start["preconditions"] = dict(contract["start_preconditions"])
+    subcommand_key = (
+        "subcommand_after_preconditions" if lock_draft_start else "subcommand"
+    )
+    gateway_argv_key = (
+        "gateway_argv_after_preconditions" if lock_draft_start else "gateway_argv"
+    )
+    start[subcommand_key] = "draft-start"
+    start[gateway_argv_key] = ["draft-start", operation]
+    if not has_start_preconditions:
+        start["copy_instruction"] = {
+            "contract": OPERATION_DRAFT_COMMAND_COPY_INSTRUCTION_CONTRACT,
+            "source_field": "gateway_argv",
+            "action": "append_to_packaged_gateway_prefix_and_execute_verbatim",
+            "forbidden_transformations": [
+                "reconstruct",
+                "shorten",
+                "normalize",
+                "substitute_path_segments",
+                "select_another_field",
+            ],
+        }
+        start["precondition_discipline"] = {
+            "metadata_discover_allowed_only_when": (
+                "preconditions is present and selects metadata"
+            ),
+            "when_preconditions_absent": "execute_gateway_argv_now",
+            "infer_metadata_from_operation_constraints": False,
+        }
     return {
         "start": start,
         **public_contract,
@@ -14131,13 +14131,22 @@ def _operation_draft_node_batch_continuation(
         or parent_fact.get("fact_action") not in {"append", "map-put", "set"}
         or not isinstance(response_handle, str)
         or not response_handle.startswith("trm1-")
-        or any(
-            row.get("action") != "add_typed_fact"
-            or row.get("field_handle") != response_handle
-            for row in actions[1:]
-        )
     ):
         return None
+    reachable_handles = {response_handle}
+    for row in actions[1:]:
+        if (
+            row.get("action") != "add_typed_fact"
+            or row.get("field_handle") not in reachable_handles
+        ):
+            return None
+        nested_handle = row.get("value")
+        if (
+            row.get("fact_action") in {"append", "map-put", "set"}
+            and isinstance(nested_handle, str)
+            and nested_handle.startswith("trm1-")
+        ):
+            reachable_handles.add(nested_handle)
     return {
         "source": "most_recent_typed_container_handle_response",
         "response_was_complete_not_truncated": True,

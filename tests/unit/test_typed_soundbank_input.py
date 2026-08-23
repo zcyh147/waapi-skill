@@ -1017,6 +1017,80 @@ def test_compact_inclusion_child_batch_carries_exact_next_root_item_command() ->
     assert disclosure["copy_command_by_shape"] == {"object": expected}
 
 
+def test_inclusion_selector_subtree_batch_resumes_the_disclosed_sibling() -> None:
+    operation = "soundbank.setInclusions"
+    version = "2022.1"
+    contract = draft_operation_request_contract(operation, version)
+    inclusions = _field(contract, ("inclusions",), shape="array")
+    item_handle = dynamic_array_item_handle(
+        contract,
+        array_handle=inclusions.handle,
+        index=0,
+        shape="object",
+    )
+    identity_handle = "trm1-0123456789abcdef01234567"
+
+    actions = [
+        {
+            "action": "add_typed_fact",
+            "fact_action": "append",
+            "field_handle": inclusions.handle,
+            "value_type": "object",
+            "value": item_handle,
+        },
+        {
+            "action": "add_typed_fact",
+            "fact_action": "choose-dynamic",
+            "field_handle": item_handle,
+            "key": "object",
+            "value_type": "choice",
+            "value": "trc1-0123456789abcdef01234567",
+        },
+        {
+            "action": "add_typed_fact",
+            "fact_action": "map-put",
+            "field_handle": item_handle,
+            "key": "object",
+            "value_type": "object",
+            "value": identity_handle,
+        },
+        {
+            "action": "add_typed_fact",
+            "fact_action": "map-put",
+            "field_handle": identity_handle,
+            "key": "kind",
+            "value_type": "string",
+            "value": "path",
+        },
+        {
+            "action": "add_typed_fact",
+            "fact_action": "map-put",
+            "field_handle": identity_handle,
+            "key": "value",
+            "value_type": "string",
+            "value": r"\Events\Default Work Unit\IntegrationLab\Harbor\Play_Harbor",
+        },
+    ]
+    continuation = gateway._operation_draft_node_batch_continuation(
+        actions,
+        operation=operation,
+        version=version,
+    )
+
+    assert continuation is not None
+    assert continuation["current_handle"] == item_handle
+    assert continuation["resume_previous_container_response"][
+        "response_handle"
+    ] == item_handle
+    disconnected = [dict(row) for row in actions]
+    disconnected[-1]["field_handle"] = "trm1-fedcba9876543210fedcba98"
+    assert gateway._operation_draft_node_batch_continuation(
+        disconnected,
+        operation=operation,
+        version=version,
+    ) is None
+
+
 def test_generate_and_replace_empty_inclusions_materialize_exact_operation_contracts(tmp_path: Path) -> None:
     generate = draft_operation_request_contract("soundbank.generate", "2025.1")
     banks = _field(generate, ("soundbanks",), shape="array")

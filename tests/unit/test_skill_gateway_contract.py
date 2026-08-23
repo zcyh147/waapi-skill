@@ -255,6 +255,8 @@ def test_metadata_gate_precedes_composer_draft_start() -> None:
     assert "`composer.start.preconditions` contains `metadata_gate`" in operate
     assert "covering every requested dynamic token before `draft-start`" in operate
     assert "Starting a Draft first is invalid" in operate
+    assert "run `composer.start.gateway_argv` only when present" in operate
+    assert "`gateway_argv_after_preconditions`, it is locked" in operate
     assert "reconcile the union against every requested property/reference" in operate
     assert "an assigned `Volume` and `OutputBus` each require a query" in operate
 

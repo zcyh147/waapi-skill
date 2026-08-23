@@ -1849,7 +1849,9 @@ def test_base_audio_import_adapter_is_the_only_disclosed_normal_input_after_cuto
     assert schema_code == 0
     assert schema["operation"]["input_mode"] == COMPOSER_INPUT_MODE
     assert "request_envelope" not in schema
-    assert schema["composer"]["start"]["gateway_argv"] == [
+    assert schema["composer"]["start"][
+        "gateway_argv_after_preconditions"
+    ] == [
         "draft-start",
         "audio.import",
     ]

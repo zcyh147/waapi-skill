@@ -854,9 +854,14 @@ def test_metadata_preconditions_are_operation_local_in_composer_start(
     ] == "when_dynamic_token_is_not_already_exact_live_evidence"
     assert list(audio_import["composer"]["start"])[:3] == [
         "preconditions",
-        "subcommand",
-        "gateway_argv",
+        "subcommand_after_preconditions",
+        "gateway_argv_after_preconditions",
     ]
+    assert "subcommand" not in audio_import["composer"]["start"]
+    assert "gateway_argv" not in audio_import["composer"]["start"]
+    assert audio_import["composer"]["start"][
+        "gateway_argv_after_preconditions"
+    ] == ["draft-start", "audio.import"]
     preconditions = audio_import["composer"]["start"]["preconditions"]
     assert list(preconditions)[:2] == [
         "metadata_gate",

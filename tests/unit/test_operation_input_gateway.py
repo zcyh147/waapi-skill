@@ -671,8 +671,12 @@ def test_normal_object_set_schema_and_detail_expose_only_composer_input(
             "embedded_import",
         ],
     }
-    assert schema["composer"]["start"]["subcommand"] == "draft-start"
-    assert schema["composer"]["start"]["gateway_argv"] == [
+    assert schema["composer"]["start"][
+        "subcommand_after_preconditions"
+    ] == "draft-start"
+    assert schema["composer"]["start"][
+        "gateway_argv_after_preconditions"
+    ] == [
         "draft-start",
         "object.set",
     ]
@@ -820,7 +824,9 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
     assert "request_envelope" not in schema
     assert "request_envelope_policy" not in schema
     assert schema["composer"]["operation"] == "audio.import"
-    assert schema["composer"]["start"]["gateway_argv"] == [
+    assert schema["composer"]["start"][
+        "gateway_argv_after_preconditions"
+    ] == [
         "draft-start",
         "audio.import",
     ]
@@ -1115,13 +1121,17 @@ def test_structurally_distinct_adapters_share_one_public_lifecycle(
         ],
     }
     assert "set_scalar" not in json.dumps(projections["object.create"]["apply"])
-    assert object_set["start"]["subcommand"] == "draft-start"
-    assert audio_import["start"]["subcommand"] == "draft-start"
-    assert object_set["start"]["gateway_argv"] == [
+    assert object_set["start"][
+        "subcommand_after_preconditions"
+    ] == "draft-start"
+    assert audio_import["start"][
+        "subcommand_after_preconditions"
+    ] == "draft-start"
+    assert object_set["start"]["gateway_argv_after_preconditions"] == [
         "draft-start",
         "object.set",
     ]
-    assert audio_import["start"]["gateway_argv"] == [
+    assert audio_import["start"]["gateway_argv_after_preconditions"] == [
         "draft-start",
         "audio.import",
     ]
