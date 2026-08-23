@@ -55,6 +55,8 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "Top facts first; exhaust tree. More item: copy ancestor_next_item_source; "
     "none: copy completion_candidate.copy_command incl task_authority. Metadata: obey "
     "composer.start.preconditions exactly; absent means none. "
+    "Metadata gate: prompt/schema != live; discover every dynamic token before "
+    "draft-start unless visibly proved. "
     "Only query-selected: exact-ID reread GUIDs before schema. "
     "enum/const exactly. typed_operation.continuation.gateway_argv_prefix "
     "verbatim incl --apply; selector kind/value separate argv. SFX => "

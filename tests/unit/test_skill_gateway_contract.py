@@ -246,6 +246,17 @@ def test_existing_transaction_continuation_precedes_named_operation_schema() -> 
     )
 
 
+def test_metadata_gate_precedes_composer_draft_start() -> None:
+    operate = (SKILL_ROOT / "references" / "waapi-operate.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "never exact live metadata evidence" in operate
+    assert "`composer.start.preconditions` contains `metadata_gate`" in operate
+    assert "covering every requested dynamic token before `draft-start`" in operate
+    assert "Starting a Draft first is invalid" in operate
+
+
 def test_normal_change_prose_stays_business_facing() -> None:
     skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
     operate = (SKILL_ROOT / "references" / "waapi-operate.md").read_text(

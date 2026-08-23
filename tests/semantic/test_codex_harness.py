@@ -1474,6 +1474,8 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "selected-branch constant" in instructions
     assert "Metadata: obey composer.start.preconditions exactly" in instructions
     assert "absent means none" in instructions
+    assert "Metadata gate: prompt/schema != live" in instructions
+    assert "discover every dynamic token before draft-start" in instructions
     assert "Only query-selected" in instructions
     assert "exact-ID reread GUIDs before schema" in instructions
     assert "enum/const exactly" in instructions
