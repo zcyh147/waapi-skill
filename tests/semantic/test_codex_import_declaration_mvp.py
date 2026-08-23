@@ -450,6 +450,47 @@ def test_field_handle_scope_and_range_fail_closed_atomically(tmp_path: Path) -> 
         assert mvp.inspect() == before
 
 
+def test_bound_reference_rejects_wrong_target_type_before_draft_change(
+    tmp_path: Path,
+) -> None:
+    media = tmp_path / "weapon.wav"
+    media.write_bytes(b"RIFF\x04\x00\x00\x00WAVE")
+    mvp = ImportBusinessMvp.create(
+        version="2025.1",
+        task_authority="task-reference-type",
+        project_id="sample-project",
+    )
+    parent = mvp.bind_object(
+        object_id=PARENT_ID,
+        name="Weapons",
+        object_type="ActorMixer",
+        path=r"\Containers\Default Work Unit\Weapons",
+    )
+    aux_bus = mvp.bind_field(
+        metadata_scope="Sound",
+        name="CustomAuxBus",
+        field_kind="reference",
+        value_type="reference",
+        metadata_digest="metadata-reference-1",
+        allowed_target_types=("Bus",),
+    )
+    before = mvp.inspect()
+
+    with pytest.raises(MvpRepairError) as caught:
+        mvp.declare_asset(
+            parent=parent,
+            name="Rifle",
+            kind="sound-sfx",
+            media_file=media,
+            language="SFX",
+            fields={aux_bus: parent},
+        )
+
+    assert caught.value.repair["error_code"] == "REFERENCE_TARGET_TYPE_MISMATCH"
+    assert caught.value.repair["draft_changed"] is False
+    assert mvp.inspect() == before
+
+
 def test_common_business_input_failures_return_atomic_structured_repairs(
     tmp_path: Path,
 ) -> None:
@@ -665,6 +706,7 @@ def test_fixed_fake_gateway_cases_use_real_compiler_and_immutable_preview(
         for command_index, command in enumerate(unit.commands):
             assert fake_gateway_main(["gateway.py", *command]) == 0
             payload = json.loads(capsys.readouterr().out)
+            assert list(payload)[-1] == "agent_result"
             assert payload["ok"] is True
             assert payload["command"] == command[0]
             if command[0] == "mvp-context":
@@ -739,6 +781,18 @@ def test_fake_gateway_cli_shape_errors_are_structured_and_atomic(
     monkeypatch.setenv(SKILL_ROOT_ENV, str(SKILL_ROOT))
     monkeypatch.setenv(VERSION_ENV, "2022.1")
     monkeypatch.setenv("WAAPI_SKILL_STATE_DIR", str(state_dir))
+    for command in (
+        ["gateway.py", "mvp-preview"],
+        ["gateway.py", "mvp-context", "--family", "unknown"],
+    ):
+        assert fake_gateway_main(command) == 2
+        early = json.loads(capsys.readouterr().out)
+        assert early["agent_result"]["contract"] == (
+            "waapi-skill.business-repair/v1"
+        )
+        assert early["agent_result"]["draft_changed"] is False
+        assert list(early)[-1] == "agent_result"
+
     assert fake_gateway_main(
         ["gateway.py", "mvp-context", "--family", "weather"]
     ) == 0
@@ -747,9 +801,10 @@ def test_fake_gateway_cli_shape_errors_are_structured_and_atomic(
     before = state_path.read_bytes()
 
     assert fake_gateway_main(
-        ["gateway.py", "mvp-asset", "--volume-db", "not-a-number"]
+        ["gateway.py", "mvp-asset", "--volume-db", "x" * 10_000]
     ) == 2
-    payload = json.loads(capsys.readouterr().out)
+    raw_payload = capsys.readouterr().out
+    payload = json.loads(raw_payload)
 
     assert payload["ok"] is False
     assert payload["agent_result"]["contract"] == "waapi-skill.business-repair/v1"
@@ -757,6 +812,8 @@ def test_fake_gateway_cli_shape_errors_are_structured_and_atomic(
         "INCOMPLETE_OR_MISTYPED_DECLARATION"
     )
     assert payload["agent_result"]["draft_changed"] is False
+    assert len(raw_payload.encode("utf-8")) < 1024
+    assert list(payload)[-1] == "agent_result"
     assert state_path.read_bytes() == before
 
 
@@ -849,7 +906,22 @@ def test_mvp_agent_contract_uses_standard_skill_bootstrap_and_semantic_preview_g
             "mvp-preview",
         ),
     )
-    assert mvp_continuations_were_used((declaration, preview))
+    shell_record = SimpleNamespace(
+        command=(
+            "/bin/bash -lc 'python .agents/skills/waapi-skill/scripts/run.py "
+            "gateway.py mvp-preview'"
+        ),
+        argv=(
+            "python",
+            ".agents/skills/waapi-skill/scripts/run.py",
+            "gateway.py",
+            "mvp-preview",
+        ),
+    )
+    assert mvp_continuations_were_used(
+        (declaration, preview),
+        (shell_record,),
+    )
 
 
 def test_mvp_broker_compares_high_level_option_pairs_semantically() -> None:

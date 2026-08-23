@@ -89,6 +89,7 @@ class BoundField:
     minimum: float | None
     maximum: float | None
     metadata_digest: str
+    allowed_target_types: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -207,13 +208,19 @@ class ImportBusinessMvp:
         metadata_digest: str,
         minimum: float | int | None = None,
         maximum: float | int | None = None,
+        allowed_target_types: tuple[str, ...] = (),
     ) -> str:
+        normalized_target_types = tuple(str(value) for value in allowed_target_types)
         if (
             not metadata_scope
             or not name
             or field_kind not in {"property", "reference"}
             or value_type not in {"number", "integer", "boolean", "string", "reference"}
             or not metadata_digest
+            or (field_kind == "reference") != (value_type == "reference")
+            or (field_kind == "reference" and not normalized_target_types)
+            or (field_kind == "property" and normalized_target_types)
+            or any(not value or value != value.strip() for value in normalized_target_types)
         ):
             raise ValueError("field binding requires complete live metadata")
         lower = _finite_number(minimum, field_name="minimum")
@@ -230,6 +237,7 @@ class ImportBusinessMvp:
             field_kind,
             value_type,
             metadata_digest,
+            *normalized_target_types,
         )
         self._fields[handle] = BoundField(
             handle=handle,
@@ -240,6 +248,7 @@ class ImportBusinessMvp:
             minimum=lower,
             maximum=upper,
             metadata_digest=metadata_digest,
+            allowed_target_types=normalized_target_types,
         )
         return handle
 
@@ -723,6 +732,22 @@ class ImportBusinessMvp:
                     field="fields",
                     rejected_handle=str(value),
                     action="resolve the reference target in this task",
+                )
+            target = self._objects[value]
+            allowed = {
+                item.casefold().replace(" ", "").replace("-", "")
+                for item in binding.allowed_target_types
+            }
+            actual = target.object_type.casefold().replace(" ", "").replace("-", "")
+            if actual not in allowed:
+                raise self._repair(
+                    "REFERENCE_TARGET_TYPE_MISMATCH",
+                    field="fields",
+                    rejected_handle=value,
+                    action=(
+                        "resolve a reference target whose live type is one of: "
+                        + ", ".join(binding.allowed_target_types)
+                    ),
                 )
             return value
         if binding.value_type in {"number", "integer"}:

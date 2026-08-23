@@ -62,6 +62,18 @@ class _ClosedArgumentParser(argparse.ArgumentParser):
         raise MvpCliRepair(message)
 
 
+def _repair_error(error_code: str, *, field: str, action: str) -> MvpRepairError:
+    return MvpRepairError(
+        {
+            "contract": "waapi-skill.business-repair/v1",
+            "error_code": error_code,
+            "field": field,
+            "draft_changed": False,
+            "action": action,
+        }
+    )
+
+
 def prepare_import_mvp_runtime(root: Path) -> Path:
     """Create only the fake media/project files needed by the real Preview."""
 
@@ -142,7 +154,11 @@ def family_spec(family: str, version: str) -> FamilySpec:
         "weapons": ("mechanical", "tail"),
     }
     if family not in additions or version not in {"2022.1", "2025.1"}:
-        raise ValueError("unsupported MVP family or version")
+        raise _repair_error(
+            "BUSINESS_CONTEXT_UNAVAILABLE",
+            field="family",
+            action="select one disclosed destination-bound business family",
+        )
     return FamilySpec(
         family=family,
         version=version,
@@ -190,6 +206,7 @@ def _new_mvp(
             field_kind="reference",
             value_type="reference",
             metadata_digest="fresh-mvp-custom-aux-bus-v1",
+            allowed_target_types=("Bus",),
         )
     return mvp, handles
 
@@ -203,7 +220,11 @@ def _replay(
     mvp, handles = _new_mvp(spec, runtime_root)
     for item in state.get("declarations", []):
         if not isinstance(item, Mapping):
-            raise ValueError("MVP declaration state is malformed")
+            raise _repair_error(
+                "DRAFT_STATE_INVALID",
+                field="declarations",
+                action="start a new MVP context",
+            )
         kind = item.get("declaration")
         if kind == "structure":
             result = mvp.declare_structure(
@@ -248,7 +269,11 @@ def _replay(
                 replace=item.get("replace") is True,
             )
         else:
-            raise ValueError("MVP declaration kind is malformed")
+            raise _repair_error(
+                "DRAFT_STATE_INVALID",
+                field="declarations",
+                action="start a new MVP context",
+            )
     return mvp, handles
 
 
@@ -293,9 +318,20 @@ def _load_state() -> dict[str, Any]:
     path = _state_path()
     if not path.exists():
         return {"family": None, "version": os.environ[VERSION_ENV], "declarations": []}
-    value = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise _repair_error(
+            "DRAFT_STATE_INVALID",
+            field="draft",
+            action="start a new MVP context",
+        ) from exc
     if not isinstance(value, dict):
-        raise ValueError("MVP state is malformed")
+        raise _repair_error(
+            "DRAFT_STATE_INVALID",
+            field="draft",
+            action="start a new MVP context",
+        )
     return value
 
 
@@ -573,7 +609,7 @@ def _emit(command: str, *, ok: bool, agent_result: Mapping[str, Any]) -> int:
         },
         "agent_result": dict(agent_result),
     }
-    print(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+    print(json.dumps(payload, ensure_ascii=False))
     return 0 if ok else 2
 
 
@@ -581,7 +617,7 @@ def main(argv: list[str] | None = None) -> int:
     raw_argv = list(argv if argv is not None else sys.argv[1:])
     try:
         args = _parser().parse_args(argv)
-    except MvpCliRepair as exc:
+    except MvpCliRepair:
         command = raw_argv[1] if len(raw_argv) > 1 else "mvp-request"
         return _emit(
             command,
@@ -592,11 +628,18 @@ def main(argv: list[str] | None = None) -> int:
                 "field": "command_arguments",
                 "draft_changed": False,
                 "action": "resubmit the disclosed high-level command shape",
-                "detail": str(exc),
             },
         )
     if args.script != "gateway.py":
-        return 2
+        return _emit(
+            args.command,
+            ok=False,
+            agent_result=_repair_error(
+                "COMMAND_BOUNDARY",
+                field="script",
+                action="use the disclosed gateway.py command boundary",
+            ).repair,
+        )
     runtime_root = Path(os.environ[RUNTIME_ROOT_ENV]).resolve(strict=True)
     version = os.environ[VERSION_ENV]
     try:
@@ -610,7 +653,14 @@ def main(argv: list[str] | None = None) -> int:
 
         state = _load_state()
         spec = family_spec(str(state.get("family")), str(state.get("version")))
-        declarations = list(state.get("declarations", []))
+        raw_declarations = state.get("declarations", [])
+        if not isinstance(raw_declarations, list):
+            raise _repair_error(
+                "DRAFT_STATE_INVALID",
+                field="declarations",
+                action="start a new MVP context",
+            )
+        declarations = list(raw_declarations)
         if args.command == "mvp-structure":
             declarations.append(
                 {

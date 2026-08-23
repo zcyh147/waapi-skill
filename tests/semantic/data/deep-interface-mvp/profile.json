@@ -68,7 +68,7 @@
       ],
       "commands": [
         ["mvp-context", "--family", "weapons"],
-        ["mvp-asset", "--parent", "mvp-obj-e2df174575b0a7be331e265a", "--name", "Rifle_Mechanical", "--kind", "sound-sfx", "--media", "mechanical", "--language", "SFX", "--volume-db", "-3", "--output-bus", "mvp-obj-59c0a1e4cbbedf3ec4890322", "--field-handle", "mvp-field-d12938ec276454624f879057", "--field-number", "0.75", "--reference-field-handle", "mvp-field-017a4f1f3e24dc417f6e5cad", "--reference-target-handle", "mvp-obj-a177d7efa608e3a36c8f67da"],
+        ["mvp-asset", "--parent", "mvp-obj-e2df174575b0a7be331e265a", "--name", "Rifle_Mechanical", "--kind", "sound-sfx", "--media", "mechanical", "--language", "SFX", "--volume-db", "-3", "--output-bus", "mvp-obj-59c0a1e4cbbedf3ec4890322", "--field-handle", "mvp-field-d12938ec276454624f879057", "--field-number", "0.75", "--reference-field-handle", "mvp-field-42168aa20c41d252a0461e5e", "--reference-target-handle", "mvp-obj-a177d7efa608e3a36c8f67da"],
         ["mvp-asset", "--parent", "mvp-obj-e2df174575b0a7be331e265a", "--name", "Rifle_Tail", "--kind", "sound-sfx", "--media", "tail", "--language", "SFX", "--volume-db", "-6", "--output-bus", "mvp-obj-59c0a1e4cbbedf3ec4890322"],
         ["mvp-preview"]
       ],

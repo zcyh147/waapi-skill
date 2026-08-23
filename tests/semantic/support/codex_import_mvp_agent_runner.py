@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -141,10 +142,18 @@ def mvp_command_set_is_closed(
     )
 
 
-def mvp_continuations_were_used(broker_records: tuple[Any, ...]) -> bool:
+def mvp_continuations_were_used(
+    broker_records: tuple[Any, ...],
+    command_records: tuple[Any, ...],
+) -> bool:
     """Bind every Preview command to the immediately preceding continuation."""
 
     preview_count = 0
+    preview_commands = tuple(
+        record
+        for record in command_records
+        if tuple(getattr(record, "argv", ()))[-1:] == ("mvp-preview",)
+    )
     for index, record in enumerate(broker_records):
         if getattr(record, "step_name", "").split("-")[-2:] != ["mvp", "preview"]:
             continue
@@ -174,16 +183,31 @@ def mvp_continuations_were_used(broker_records: tuple[Any, ...]) -> bool:
         )
         full_argv = next_command.get("full_argv") if isinstance(next_command, Mapping) else None
         model_argv = getattr(record, "model_argv", None)
+        selected_command = (
+            next_command.get(source_field)
+            if isinstance(next_command, Mapping) and isinstance(source_field, str)
+            else None
+        )
+        if preview_count > len(preview_commands):
+            return False
+        shell_record = preview_commands[preview_count - 1]
+        try:
+            shell_wrapper = shlex.split(str(getattr(shell_record, "command", "")))
+        except ValueError:
+            return False
         if (
             source_field not in {"shell_command", "model_command"}
-            or not isinstance(next_command.get(source_field), str)
+            or not isinstance(selected_command, str)
             or not isinstance(full_argv, list)
             or not isinstance(model_argv, tuple | list)
             or list(model_argv[1:]) != full_argv[1:]
             or Path(str(model_argv[0])).name.casefold() not in {"python", "python3", "python.exe"}
+            or len(shell_wrapper) != 3
+            or shell_wrapper[1] != "-lc"
+            or shell_wrapper[2] != selected_command
         ):
             return False
-    return preview_count > 0
+    return preview_count > 0 and preview_count == len(preview_commands)
 
 
 def run_import_mvp_agent_unit(
@@ -296,7 +320,8 @@ def run_import_mvp_agent_unit(
             broker_records=broker_evidence.records,
         ),
         "continuations_used": mvp_continuations_were_used(
-            broker_evidence.records
+            broker_evidence.records,
+            facts.command_records,
         ),
     }
     errors = [name for name, passed in gates.items() if not passed]
