@@ -1473,10 +1473,11 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "execute_after=all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "selected-branch constant" in instructions
-    assert "prior successful live-result tokens" in instructions
-    assert "inventory every distinct same-scope prompt property/reference" in instructions
-    assert "paired modes and routing included" in instructions
-    assert "no split or later same-scope query" in instructions
+    assert "reuse prior live tokens" in instructions
+    assert "inventory every same-scope prompt property/reference" in instructions
+    assert "paired modes/routing" in instructions
+    assert "one 1..8-query call" in instructions
+    assert "never query that scope again" in instructions
     assert "enum/const exactly" in instructions
     assert "typed_operation.continuation.gateway_argv_prefix verbatim" in instructions
     assert "incl --apply" in instructions
