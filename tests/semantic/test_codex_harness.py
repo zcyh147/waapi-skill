@@ -1472,12 +1472,13 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "execute_after=all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "selected-branch constant" in instructions
-    assert "Change after schema" in instructions
-    assert "metadata discover exact --query Volume --query OutputBus" in instructions
+    assert "Mutation after schema" in instructions
+    assert "metadata discover every prompt property/reference" in instructions
+    assert "under exact shared --object-type" in instructions
     assert "before draft-start" in instructions
-    assert "object-query isn't proof" in instructions
-    assert "end --limit 1..8" in instructions
-    assert "no repeat" in instructions
+    assert "omit name/notes" in instructions
+    assert "query isn't proof" in instructions
+    assert "--limit 1..8; once" in instructions
     assert "exact-ID reread selected GUIDs before schema" in instructions
     assert "enum/const exactly" in instructions
     assert "typed_operation.continuation.gateway_argv_prefix verbatim" in instructions
