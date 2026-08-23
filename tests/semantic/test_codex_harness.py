@@ -1472,13 +1472,14 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "execute_after=all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "selected-branch constant" in instructions
-    assert "Mutation post-schema" in instructions
-    assert "metadata discover each property/reference" in instructions
-    assert "--object-type exact shared target type" in instructions
+    assert "object.set/audio.import dynamic fields only" in instructions
+    assert "metadata discover post-schema" in instructions
+    assert "post-schema" in instructions
+    assert "--object-type shared exact type" in instructions
     assert "--object-type from exact-ID target" not in instructions
-    assert "before draft-start" in instructions
+    assert "pre-draft-start" in instructions
     assert "omit name+notes" in instructions
-    assert "query no proof" in instructions
+    assert "exact queries" in instructions
     assert "end --limit 1..8; once" in instructions
     assert "exact-ID reread selected GUIDs before schema" in instructions
     assert "enum/const exactly" in instructions
@@ -1489,8 +1490,8 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "SFX => exact object_type Sound SFX, never Sound" in instructions
     assert "all Events in initial rows" in instructions
     assert "parents before children" in instructions
-    assert "Paths: every backslash verbatim" in instructions
-    assert "no shortening" in instructions
+    assert "Paths: copy parent backslashes" in instructions
+    assert "add one per child" in instructions
     assert "prompt terminal scalars" in instructions
     assert "every prompt field/item/map/bool" in instructions
     assert "Top facts first; exhaust tree" in instructions

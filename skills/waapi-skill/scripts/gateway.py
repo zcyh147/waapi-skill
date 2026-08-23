@@ -14653,6 +14653,14 @@ def operation_draft_payload(
                     "copy_placeholder_positions_exactly": True,
                     "insert_type_only_where_template_contains_TYPE": True,
                 }
+            if record.operation == "audio.import":
+                next_action_binding["wwise_path_discipline"] = {
+                    "parent_source": "exact_user_supplied_business_path",
+                    "append_descendant": (
+                        "one_literal_backslash_before_each_child_name"
+                    ),
+                    "remove_or_normalize_existing_separators": "invalid",
+                }
         if generic_typed_draft:
             typed_draft_contract = (
                 request_contract(record.version, record.operation)

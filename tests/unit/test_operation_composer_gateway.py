@@ -826,6 +826,19 @@ def test_object_set_draft_start_repeats_exact_allowed_action_argv(
     }
 
 
+def test_audio_import_draft_start_repeats_wwise_path_discipline(
+    tmp_path: Path,
+) -> None:
+    code, payload = execute(tmp_path, "draft-start", "audio.import")
+
+    assert code == 0
+    assert payload["draft"]["next_action_binding"]["wwise_path_discipline"] == {
+        "parent_source": "exact_user_supplied_business_path",
+        "append_descendant": "one_literal_backslash_before_each_child_name",
+        "remove_or_normalize_existing_separators": "invalid",
+    }
+
+
 @pytest.mark.parametrize(
     ("version", "operation", "path", "expected"),
     (
