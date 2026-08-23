@@ -63,7 +63,7 @@
       "family": "weapons",
       "version": "2025.1",
       "paraphrases": [
-        "批量准备 mechanical 对应的 Rifle_Mechanical(-3 dB) 与 tail 对应的 Rifle_Tail(-6 dB)，都放到绑定 Weapons、走绑定总线；Mechanical 的现场 CustomWetness 设 0.75，并把 CustomAuxBus 引用设为绑定的 Weapons_Aux，只预览。",
+        "批量准备两条：mechanical 对应 Rifle_Mechanical，音量 -3 dB；tail 对应 Rifle_Tail，音量 -6 dB。都放到绑定 Weapons、走绑定总线；Mechanical 的现场 CustomWetness 设 0.75，并把 CustomAuxBus 引用设为绑定的 Weapons_Aux，只预览。",
         "把 mechanical 做成 Rifle_Mechanical、tail 做成 Rifle_Tail，一次放进绑定的 Weapons 并都走绑定输出总线，分别负三/负六分贝；Mechanical 的湿度四分之三，并把 CustomAuxBus 指向绑定的 Weapons_Aux，两个字段都使用 Gateway 给的句柄，不执行。"
       ],
       "commands": [

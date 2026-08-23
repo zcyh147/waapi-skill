@@ -641,6 +641,7 @@ def test_fixed_mvp_profile_runs_each_family_paraphrase_independently() -> None:
             media = command[command.index("--media") + 1]
             assert name in unit.prompt
             assert media in unit.prompt
+            assert f"{name}(" not in unit.prompt
 
 
 def test_fixed_fake_gateway_cases_use_real_compiler_and_immutable_preview(
