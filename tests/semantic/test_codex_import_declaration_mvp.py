@@ -822,6 +822,29 @@ def test_fake_gateway_cli_shape_errors_are_structured_and_atomic(
     assert unknown["command"] == "mvp-request"
     assert len(unknown_raw.encode("utf-8")) < 1024
 
+    assert fake_gateway_main(
+        [
+            "gateway.py",
+            "mvp-asset",
+            "--parent",
+            "x" * 10_000,
+            "--name",
+            "Rain_Bed",
+            "--kind",
+            "sound-sfx",
+            "--media",
+            "rain",
+            "--language",
+            "SFX",
+        ]
+    ) == 2
+    bounded_raw = capsys.readouterr().out
+    bounded = json.loads(bounded_raw)
+    assert bounded["agent_result"]["error_code"] == "REPAIR_RESULT_TOO_LARGE"
+    assert bounded["agent_result"]["draft_changed"] is False
+    assert len(bounded_raw.encode("utf-8")) < 1024
+    assert state_path.read_bytes() == before
+
 
 def test_mvp_agent_contract_uses_standard_skill_bootstrap_and_semantic_preview_grade(
     tmp_path: Path,

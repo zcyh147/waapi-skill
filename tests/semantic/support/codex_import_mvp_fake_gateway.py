@@ -33,6 +33,7 @@ MVP_COMMANDS = frozenset(
         "mvp-preview",
     }
 )
+MVP_FAILURE_RESULT_MAX_BYTES = 4096
 ROOT_ID = "{11111111-1111-1111-1111-111111111111}"
 BUS_ID = "{22222222-2222-2222-2222-222222222222}"
 RIFLE_ID = "{33333333-3333-3333-3333-333333333333}"
@@ -618,7 +619,17 @@ def _emit(command: str, *, ok: bool, agent_result: Mapping[str, Any]) -> int:
         },
         "agent_result": dict(agent_result),
     }
-    print(json.dumps(payload, ensure_ascii=False))
+    encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    if not ok and len(encoded) > MVP_FAILURE_RESULT_MAX_BYTES:
+        payload["agent_result"] = {
+            "contract": "waapi-skill.business-repair/v1",
+            "error_code": "REPAIR_RESULT_TOO_LARGE",
+            "field": "request",
+            "draft_changed": False,
+            "action": "resubmit bounded high-level values from the disclosed schema",
+        }
+        encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    print(encoded.decode("utf-8"))
     return 0 if ok else 2
 
 
