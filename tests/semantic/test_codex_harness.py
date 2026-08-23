@@ -1486,14 +1486,14 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "SFX => exact object_type Sound SFX, never Sound" in instructions
     assert "requested Event belongs in initial add_import_row" in instructions
     assert "never defer/omit" in instructions
-    assert "All prompt paths verbatim incl every backslash" in instructions
+    assert "Paths: every backslash verbatim" in instructions
     assert "no shortening" in instructions
     assert "prompt terminal scalars" in instructions
     assert "every prompt field/item/map/bool" in instructions
     assert "Top facts first; exhaust tree" in instructions
-    assert "then copy" in instructions
-    assert "field named by ancestor_next_item_source verbatim" in instructions
-    assert "never type digest" in instructions
+    assert "More item: copy ancestor_next_item_source" in instructions
+    assert "none: completion_candidate.copy_command" in instructions
+    assert "Never type digest" in instructions
     assert "shell_tool_timeout_ms" in instructions
     assert "timeout_ms>=30000" in instructions
     assert "draft-check is not Preview" in instructions
