@@ -528,7 +528,7 @@
         {
           "index": 2,
           "kind": "confirmation",
-          "prompt": "为这三个 Event 增加 Event、Structure 和 Media 三类包含内容、移除 Debug 包含项的预览都符合要求，Harbor_Control 也会保持不变。请执行并保存；完成后先给我看 Windows 和 Mac 两个平台 SFX 发布产物的生成预览。",
+          "prompt": "为这三个 Event 增加 Event、Structure 和 Media 三类包含内容、移除 Debug 包含项的预览都符合要求，Harbor_Control 也会保持不变。请执行并保存；完成后先给我看 Windows 和 Mac 两个平台 SFX 发布产物的生成预览。生成选项仍保持：Harbor_Release rebuild=false、写入磁盘、跳过语言变体、不重建全部 SoundBank、不清空音频缓存、不重建 Init Bank，并沿用上一轮给出的可信 io_root。",
           "confirms_transaction": 1,
           "expects_preview_transaction": 2
         },

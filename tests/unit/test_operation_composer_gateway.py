@@ -2036,6 +2036,18 @@ def test_registry_composer_lanes_and_real_adapters_are_one_to_one() -> None:
     }
 
 
+def test_soundbank_generate_composer_keeps_explicit_false_batch_controls() -> None:
+    contract = operation_composer_contract("soundbank.generate", "2022.1")
+
+    assert contract["top_level_fact_plan"]["explicit_false_controls"] == {
+        "rebuild_soundbanks": "do_not_rebuild_all_soundbanks",
+        "clear_audio_file_cache": "do_not_clear_audio_file_cache",
+        "rebuild_init_bank": "do_not_rebuild_init_bank",
+        "prompt_present_false_is_not_omitted_as_default": True,
+        "batch_with_every_remaining_complete_top_level_fact": True,
+    }
+
+
 def test_live_check_is_bounded_durable_and_any_edit_invalidates_it(
     tmp_path: Path,
 ) -> None:

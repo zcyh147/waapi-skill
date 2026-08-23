@@ -145,6 +145,12 @@ def test_weather_and_harbor_prompts_express_only_the_exact_business_facts() -> N
 
     assert "都启用循环，并把循环模式设为无限循环" in weather.turns[0].prompt
     assert "Harbor_Release 这一行的 rebuild 明确设为 false" in harbor.turns[0].prompt
+    assert (
+        "Harbor_Release rebuild=false、写入磁盘、跳过语言变体、"
+        "不重建全部 SoundBank、不清空音频缓存、不重建 Init Bank"
+        in harbor.turns[1].prompt
+    )
+    assert "可信 io_root" in harbor.turns[1].prompt
     assert "Event 或 Aux Bus" not in harbor.turns[0].prompt
     assert "清单明确为空" not in harbor.turns[0].prompt
 

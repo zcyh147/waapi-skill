@@ -1562,6 +1562,17 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                     "properties,references,children in that order"
                 ),
             }
+        if operation == "soundbank.generate":
+            top_level_fact_plan = {
+                **top_level_fact_plan,
+                "explicit_false_controls": {
+                    "rebuild_soundbanks": "do_not_rebuild_all_soundbanks",
+                    "clear_audio_file_cache": "do_not_clear_audio_file_cache",
+                    "rebuild_init_bank": "do_not_rebuild_init_bank",
+                    "prompt_present_false_is_not_omitted_as_default": True,
+                    "batch_with_every_remaining_complete_top_level_fact": True,
+                },
+            }
         return {
             "contract": OPERATION_COMPOSER_CONTRACT,
             "operation": operation,
