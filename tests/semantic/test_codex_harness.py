@@ -1465,7 +1465,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "Each fact one argv value" in instructions
     assert "every prompt field/item/map/bool" in instructions
     assert "batch_size 6" in instructions
-    assert "final batch holds all remaining" in instructions
+    assert "final batch has all remaining" in instructions
     assert "may be shorter" in instructions
     assert "CLI TYPE: string/number/integer/boolean" in instructions
     assert "not Real64/int16" in instructions
@@ -1474,9 +1474,9 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "selected-branch constant" in instructions
     assert "reuse only successful live tokens" in instructions
-    assert "one scoped 1..8 call" in instructions
-    assert "covers all prompt fields" in instructions
+    assert "one call: each prompt property/reference" in instructions
     assert "paired modes/routing" in instructions
+    assert "gets --query; end --limit 1..8" in instructions
     assert "no repeat" in instructions
     assert "exact-ID reread selected GUIDs before schema" in instructions
     assert "enum/const exactly" in instructions
