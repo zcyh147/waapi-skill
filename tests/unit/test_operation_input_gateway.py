@@ -319,6 +319,18 @@ def test_generic_draft_start_requires_first_fact_batch_before_disclosure(
     assert children["copy_command_by_shape"]["object"] == (
         waapi_gateway.operation_draft_copy_command(expected_disclosure_argv)
     )
+    assert children["copy_instruction"] == {
+        "contract": "waapi-skill.operation-draft-command-copy-instruction/v1",
+        "source_field": "copy_command_by_shape.object",
+        "action": "execute_verbatim_as_one_shell_tool_call",
+        "forbidden_transformations": [
+            "reconstruct",
+            "shorten",
+            "normalize",
+            "substitute_path_segments",
+            "select_another_field",
+        ],
+    }
     assert disclosures["copy_selected_argv_exactly"] is True
     assert disclosures["copy_selected_command_exactly"] is True
 

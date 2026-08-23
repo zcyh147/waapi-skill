@@ -5652,6 +5652,24 @@ def _dynamic_disclosure_copy_commands(value: Any) -> Any:
             )
         if copy_by_shape:
             projected["copy_command_by_shape"] = copy_by_shape
+            if len(copy_by_shape) == 1:
+                selected_shape = next(iter(copy_by_shape))
+                projected["copy_instruction"] = {
+                    "contract": (
+                        OPERATION_DRAFT_COMMAND_COPY_INSTRUCTION_CONTRACT
+                    ),
+                    "source_field": (
+                        f"copy_command_by_shape.{selected_shape}"
+                    ),
+                    "action": "execute_verbatim_as_one_shell_tool_call",
+                    "forbidden_transformations": [
+                        "reconstruct",
+                        "shorten",
+                        "normalize",
+                        "substitute_path_segments",
+                        "select_another_field",
+                    ],
+                }
 
     argv = concrete_disclosure_argv(value.get("argv"))
     if argv is not None:

@@ -45,7 +45,7 @@ DEFAULT_SERVICE_TIER = "priority"
 DEFAULT_TIMEOUT_SECONDS = 180.0
 SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "First read SKILL.md once, standalone. Execute exact "
-    "next_command.copy_instruction.source_field; preserve "
+    "returned copy_instruction.source_field; preserve "
     "quotes; never reconstruct. Copy fixed_argv_prefix; IDs and opaque handles/"
     "tokens/digests are exact-copy values. Each fact one argv value; cover every prompt field/item/map/bool; "
     "no defaults. batch_size 6; final batch holds all remaining and may be shorter. CLI "

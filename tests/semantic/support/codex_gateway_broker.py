@@ -93,6 +93,9 @@ TRANSACTION_NEXT_COMMAND_CONTRACT = "waapi-skill.gateway-next-command/v2"
 TRANSACTION_COPY_INSTRUCTION_CONTRACT = (
     "waapi-skill.gateway-command-copy-instruction/v2"
 )
+OPERATION_DRAFT_COPY_INSTRUCTION_CONTRACT = (
+    "waapi-skill.operation-draft-command-copy-instruction/v1"
+)
 TRANSACTION_COPY_ACTION = "execute_verbatim_as_one_shell_tool_call"
 TRANSACTION_FORBIDDEN_TRANSFORMATIONS = (
     "reconstruct",
@@ -6630,6 +6633,25 @@ def _project_operation_draft_runner(
                     platform_name=platform_name,
                 )
             projected["copy_command_by_shape"] = projected_copies
+            instruction = nested.get("copy_instruction")
+            expected_instruction = (
+                {
+                    "contract": OPERATION_DRAFT_COPY_INSTRUCTION_CONTRACT,
+                    "source_field": (
+                        "copy_command_by_shape." + next(iter(concrete_shapes))
+                    ),
+                    "action": TRANSACTION_COPY_ACTION,
+                    "forbidden_transformations": list(
+                        TRANSACTION_FORBIDDEN_TRANSFORMATIONS
+                    ),
+                }
+                if len(concrete_shapes) == 1
+                else None
+            )
+            if instruction != expected_instruction:
+                raise GatewayInvocationError(
+                    "Gateway Draft disclosure copy instruction is invalid"
+                )
         gateway_argv = nested.get("argv")
         concrete_argv = (
             isinstance(gateway_argv, list)

@@ -1456,7 +1456,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
 
     assert "First read SKILL.md once, standalone" in instructions
     assert "Get-Content -Raw -Encoding UTF8" not in instructions
-    assert "next_command.copy_instruction.source_field" in instructions
+    assert "returned copy_instruction.source_field" in instructions
     assert "preserve quotes" in instructions
     assert "fixed_argv_prefix" in instructions
     assert "opaque handle" in instructions
