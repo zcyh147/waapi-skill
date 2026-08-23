@@ -205,6 +205,10 @@ def test_weather_prompt_distinguishes_the_boolean_instance_limit_from_its_value(
 
     assert "自身播放实例限制这个开关设为启用" in prompt
     assert "另行设置每个 Sound 的最大播放实例数数值" in prompt
+    assert (
+        "这七类字段彼此独立、都要保留：循环启用、循环模式、忽略父对象限制、"
+        "自身实例限制启用、最大实例数、输出总线、音量"
+    ) in prompt
 
 
 @pytest.mark.parametrize(
