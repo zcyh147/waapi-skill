@@ -14129,6 +14129,9 @@ def _operation_draft_node_batch_continuation(
             "selection": "first_remaining_business_present_candidate_in_order",
             "continue_in_same_turn": True,
             "after_exhausted": "resume_ancestor_response_stack",
+            "ancestor_resume_gate": (
+                "current_response_and_all_descendant_business_candidates_exhausted"
+            ),
             "ancestor_next_item_source": (
                 "next_item_disclosure.copy_command_by_shape"
             ),
@@ -14240,6 +14243,9 @@ def _operation_draft_compact_action_projection(
                 ),
                 "continue_in_same_turn": True,
                 "after_exhausted": "resume_ancestor_response_stack",
+                "ancestor_resume_gate": (
+                    "current_response_and_all_descendant_business_candidates_exhausted"
+                ),
                 "ancestor_next_item_source": (
                     "next_item_disclosure.copy_command_by_shape"
                 ),

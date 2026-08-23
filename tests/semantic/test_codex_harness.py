@@ -1475,7 +1475,9 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "selected-branch constant" in instructions
     assert "prior successful live-result tokens" in instructions
     assert "each requested property/reference token distinctly" in instructions
-    assert "batch all same-scope shared/per-row fields first" in instructions
+    assert "inventory every same-scope prompt property/reference" in instructions
+    assert "paired modes and routing included" in instructions
+    assert "no later same-scope query" in instructions
     assert "never split 1..8" in instructions
     assert "repeat after success" in instructions
     assert "enum/const exactly" in instructions
@@ -1490,7 +1492,8 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "no shorten/normalize" in instructions
     assert "prompt terminal scalars" in instructions
     assert "every prompt field/item/map/bool" in instructions
-    assert "Top facts first" in instructions
+    assert "Top facts first; exhaust current response/descendants" in instructions
+    assert "only then copy" in instructions
     assert "ancestor_next_item_source verbatim" in instructions
     assert "never type digest" in instructions
     assert "shell_tool_timeout_ms" in instructions

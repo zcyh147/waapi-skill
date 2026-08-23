@@ -2328,6 +2328,7 @@ def _valid_draft_construction_continuation(
             "selection",
             "continue_in_same_turn",
             "after_exhausted",
+            "ancestor_resume_gate",
             "ancestor_next_item_source",
             "retype_schema_digest",
         }
@@ -2347,6 +2348,8 @@ def _valid_draft_construction_continuation(
         == "first_remaining_business_present_candidate_in_order"
         and resume.get("continue_in_same_turn") is True
         and resume.get("after_exhausted") == "resume_ancestor_response_stack"
+        and resume.get("ancestor_resume_gate")
+        == "current_response_and_all_descendant_business_candidates_exhausted"
         and resume.get("ancestor_next_item_source")
         == "next_item_disclosure.copy_command_by_shape"
         and resume.get("retype_schema_digest") == "invalid"
