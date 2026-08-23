@@ -144,3 +144,12 @@ def test_zero_dispatch_tab_import_names_its_would_be_import_mode() -> None:
     assert case.primary_dispatch.count == 0
     assert "useExisting" in case.prompt
     assert asset_spec["tsv"][0]["import_operation"] == "useExisting"
+
+
+def test_operate_reference_keeps_playback_limit_metadata_queries_independent() -> None:
+    reference = OPERATE_REFERENCE.read_text(encoding="utf-8")
+
+    assert "`ignore parent playback limit`" in reference
+    assert "`limit sound instances`" in reference
+    assert "`maximum playback instances`" in reference
+    assert "three independent settings" in reference
