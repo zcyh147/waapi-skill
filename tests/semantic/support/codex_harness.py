@@ -54,7 +54,7 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "tree_preorder. After choose add required selected-branch constant/value facts. "
     "Top facts first; exhaust tree. More item: copy ancestor_next_item_source; "
     "none: completion_candidate.copy_command. Never type digest. Metadata only if "
-    "object.set/audio.import requires it; never object.setRTPC. Post-schema discover; "
+    "required and op == object.set/audio.import; never otherwise. Post-schema discover; "
     "shared exact --object-type; pre-draft-start; omit name+notes; exact query; "
     "--limit 1..8 once. "
     "Only selected query rows: exact-ID reread GUIDs before schema. "
