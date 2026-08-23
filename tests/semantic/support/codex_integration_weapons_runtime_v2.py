@@ -31,7 +31,9 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_object_set_composer_transaction_steps,
 )
 from tests.semantic.support.codex_gateway_broker import (
+    DraftActionMetadataBinding,
     ExpectedGatewayStep,
+    MetadataQueryArgument,
     gateway_step_prefix_matches,
     gateway_step_sequence_matches,
 )
@@ -419,10 +421,36 @@ def prepare_weapons_integration_runtime(
                 strict=True,
             )
         }
-        transaction_steps = build_object_set_composer_transaction_steps(
+        metadata_step = ExpectedGatewayStep(
+            name="tx01.metadata",
+            subcommand="metadata",
+            arguments=(
+                "discover",
+                "--object-type",
+                "Sound",
+                "--query",
+                MetadataQueryArgument("Volume"),
+                "--query",
+                MetadataQueryArgument("Output Bus"),
+                "--limit",
+                "8",
+            ),
+        )
+        metadata_binding = DraftActionMetadataBinding(
+            step=metadata_step.name,
+            object_type="Sound",
+            required_tokens=("Volume", "OutputBus"),
+        )
+        composer_steps = build_object_set_composer_transaction_steps(
             request,
             label="tx01",
             reference_identity_sources=reference_identity_sources,
+            metadata_binding=metadata_binding,
+        )
+        transaction_steps = (
+            composer_steps[0],
+            metadata_step,
+            *composer_steps[1:],
         )
         identity_steps = tuple(
             _identity_readback_step(role, before.objects_by_role()[role])
@@ -629,8 +657,8 @@ class _WeaponsSession:
                 "identity.audit_tail",
                 "identity.audit_mechanical",
             )
-            or transaction_names[:2]
-            != ("tx01.operation-schema", "tx01.draft-start")
+            or transaction_names[:3]
+            != ("tx01.operation-schema", "tx01.metadata", "tx01.draft-start")
             or tuple(
                 step.subcommand for step in protocol.steps[6:]
             ).count("draft-apply")
@@ -646,7 +674,7 @@ class _WeaponsSession:
             )
             or tuple(protocol.steps[1 : 1 + len(output_bus_steps)])
             != output_bus_steps
-            or protocol.turn_prefix_counts != (3, 11, 15)
+            or protocol.turn_prefix_counts != (3, 12, 16)
             or protocol.commutative_read_only_step_groups
             != (output_bus_names,)
         ):

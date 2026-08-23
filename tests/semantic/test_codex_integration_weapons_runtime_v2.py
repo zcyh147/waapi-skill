@@ -27,10 +27,12 @@ from tests.semantic.support.codex_integration_workflows_v2 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     CodexGatewayBroker,
+    DraftActionMetadataBinding,
     DraftTypedActionBatchArgument,
     DraftTypedActionArgument,
     DraftActionQueryIdentityBinding,
     GatewayInvocationError,
+    MetadataQueryArgument,
     ResponseBinding,
     SealedQueryIdentityBoundJsonArgument,
     SemanticJsonArgument,
@@ -604,6 +606,9 @@ def _typed_action_broker(
             "current_facts": [],
         },
     }
+    broker._payloads_by_step["tx01.metadata"] = (  # noqa: SLF001
+        _weapons_metadata_payload()
+    )
     for member in _draft_action_members(step):
         for binding in member.query_identity_bindings:
             source_step = next(
@@ -627,6 +632,62 @@ def _typed_action_broker(
             }
     supplied_action = copy.deepcopy(dict(argument.expected))
     return broker, step, supplied_action
+
+
+def _weapons_metadata_payload() -> dict[str, object]:
+    def row(name: str) -> dict[str, object]:
+        dependency = name == "OutputBus"
+        return {
+            "name": name,
+            "kind": "reference" if dependency else "property",
+            "matched_queries": ["requested field"],
+            "same_object_dependencies": ["OverrideOutput"] if dependency else [],
+            "dependency_requirements": (
+                [
+                    {
+                        "action": "Enable",
+                        "context": "Self",
+                        "property": "OverrideOutput",
+                        "required_values": [True],
+                        "type": "override",
+                    }
+                ]
+                if dependency
+                else []
+            ),
+            "metadata": {
+                "name": name,
+                "type": (
+                    ""
+                    if dependency
+                    else "Boolean"
+                    if name == "OverrideOutput"
+                    else "Real32"
+                ),
+                "default": None,
+                "display": {"name": name},
+                "restriction": {},
+            },
+        }
+
+    return {
+        "agent_result": {
+            "contract": "waapi-skill.metadata-discovery/v2",
+            "authority": "live-waapi",
+            "result_detail": "compact",
+            "scope": {
+                "kind": "object_type",
+                "requested": "Sound",
+                "resolved": {"classId": 1, "name": "Sound", "type": "Sound"},
+            },
+            "candidates": [row("Volume"), row("OutputBus")],
+            "dependency_candidates": [row("OverrideOutput")],
+            "dependency_closure_complete": True,
+            "unresolved_dependencies": [],
+            "selection_required": True,
+            "exact_live_name_required_for_mutation": True,
+        }
+    }
 
 
 def _draft_action_members(step: Any) -> tuple[DraftTypedActionArgument, ...]:
@@ -722,7 +783,7 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
         if version == "2022.1"
         else r"\Busses\Default Work Unit\WAAPI_V2_Weapons"
     )
-    assert tuple(step.name for step in prepared.protocol.steps[:8]) == (
+    assert tuple(step.name for step in prepared.protocol.steps[:9]) == (
         "audit.scope",
         "relationship.output_bus.01",
         "relationship.output_bus.02",
@@ -730,9 +791,10 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
         "identity.audit_tail",
         "identity.audit_mechanical",
         "tx01.operation-schema",
+        "tx01.metadata",
         "tx01.draft-start",
     )
-    assert prepared.protocol.turn_prefix_counts == (3, 11, 15)
+    assert prepared.protocol.turn_prefix_counts == (3, 12, 16)
     assert prepared.protocol.commutative_read_only_step_groups == (
         (
             "relationship.output_bus.01",
@@ -758,7 +820,20 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
         match="pre-Draft query-object response",
     ):
         deserialize_protocol(tampered)
-    composer_steps = prepared.protocol.steps[7:11]
+    metadata_step = prepared.protocol.steps[7]
+    assert metadata_step.subcommand == "metadata"
+    assert metadata_step.arguments == (
+        "discover",
+        "--object-type",
+        "Sound",
+        "--query",
+        MetadataQueryArgument("Volume"),
+        "--query",
+        MetadataQueryArgument("Output Bus"),
+        "--limit",
+        "8",
+    )
+    composer_steps = prepared.protocol.steps[8:12]
     assert composer_steps[0].subcommand == "draft-start"
     assert [step.subcommand for step in composer_steps[-2:]] == [
         "draft-check",
@@ -769,6 +844,16 @@ def test_prepares_scoped_complete_query_and_one_strict_batch(
     ]
     assert len(action_steps) == 1
     assert isinstance(action_steps[0].arguments[-1], DraftTypedActionBatchArgument)
+    assert {
+        member.metadata_binding
+        for member in _draft_action_members(action_steps[0])
+    } == {
+        DraftActionMetadataBinding(
+            step="tx01.metadata",
+            object_type="Sound",
+            required_tokens=("Volume", "OutputBus"),
+        )
+    }
     reference_actions = [
         argument
         for step in action_steps
