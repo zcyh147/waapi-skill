@@ -13,7 +13,7 @@
       "family": "weather",
       "version": "2022.1",
       "paraphrases": [
-        "新建 Weather Actor Mixer，把 rain 和 wind 分别做成 Rain_Bed、Wind_Bed 两个循环 SFX，音量 -4 dB/-6 dB，并接到绑定总线；只预览。",
+        "新建一个名为 Weather 的 Actor Mixer，把 rain 和 wind 分别做成 Rain_Bed、Wind_Bed 两个循环 SFX，音量 -4 dB/-6 dB，并接到绑定总线；只预览。",
         "做一个 Weather 天气层：rain 命名为 Rain_Bed、wind 命名为 Wind_Bed，两条 SFX 都无限循环，分别压到负四和负六分贝，走任务给出的 Bus，不执行导入。"
       ],
       "commands": [

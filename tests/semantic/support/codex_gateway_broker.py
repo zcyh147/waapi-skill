@@ -1607,6 +1607,47 @@ def _normalize_commutative_wait_topic_facts(
     )
 
 
+def _normalize_commutative_option_pairs(
+    step: "ExpectedGatewayStep",
+    supplied: Sequence[str],
+) -> tuple[str, ...]:
+    """Canonicalize one explicitly declared unordered high-level flag map."""
+
+    actual = tuple(supplied)
+    if not step.commutative_option_pairs or actual == step.arguments:
+        return actual
+
+    def parse(values: Sequence[str]) -> dict[str, str | bool] | None:
+        parsed: dict[str, str | bool] = {}
+        index = 0
+        while index < len(values):
+            token = values[index]
+            if not isinstance(token, str) or not token.startswith("--"):
+                return None
+            if "=" in token:
+                name, value = token.split("=", 1)
+                if not value or name in parsed or name in step.commutative_boolean_flags:
+                    return None
+                parsed[name] = value
+                index += 1
+                continue
+            if token in step.commutative_boolean_flags:
+                if token in parsed:
+                    return None
+                parsed[token] = True
+                index += 1
+                continue
+            if index + 1 >= len(values) or token in parsed:
+                return None
+            parsed[token] = values[index + 1]
+            index += 2
+        return parsed
+
+    expected = parse(step.arguments)
+    observed = parse(actual)
+    return step.arguments if expected is not None and observed == expected else actual
+
+
 @dataclass(frozen=True, slots=True)
 class ExpectedGatewayStep:
     """One exact, ordered packaged gateway invocation."""
@@ -1622,6 +1663,8 @@ class ExpectedGatewayStep:
     expected_result_command: str = ""
     terminal_execute: bool = False
     metadata_binding: DraftActionMetadataBinding | None = None
+    commutative_option_pairs: bool = False
+    commutative_boolean_flags: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.name or not self.name.strip():
@@ -1632,6 +1675,23 @@ class ExpectedGatewayStep:
             self.metadata_binding, DraftActionMetadataBinding
         ):
             raise ValueError("ExpectedGatewayStep metadata binding is invalid")
+        if type(self.commutative_option_pairs) is not bool or (
+            self.commutative_boolean_flags and not self.commutative_option_pairs
+        ):
+            raise ValueError(
+                "ExpectedGatewayStep commutative option policy is invalid"
+            )
+        if (
+            len(set(self.commutative_boolean_flags))
+            != len(self.commutative_boolean_flags)
+            or any(
+                not isinstance(flag, str) or not flag.startswith("--")
+                for flag in self.commutative_boolean_flags
+            )
+        ):
+            raise ValueError(
+                "ExpectedGatewayStep commutative boolean flags are invalid"
+            )
         inline_witnesses = tuple(
             argument
             for argument in self.arguments
@@ -9001,6 +9061,10 @@ class CodexGatewayBroker:
                 ),
             )
         validation_arguments = _normalize_commutative_wait_topic_facts(
+            step,
+            validation_arguments,
+        )
+        validation_arguments = _normalize_commutative_option_pairs(
             step,
             validation_arguments,
         )

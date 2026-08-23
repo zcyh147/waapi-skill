@@ -32,6 +32,10 @@ from tests.semantic.support.codex_import_mvp_agent_runner import (
     mvp_continuations_were_used,
     preview_was_reported,
 )
+from tests.semantic.support.codex_gateway_broker import (
+    ExpectedGatewayStep,
+    _normalize_commutative_option_pairs,
+)
 from wwise_waapi.transactions import TransactionStore
 
 
@@ -839,3 +843,34 @@ def test_mvp_agent_contract_uses_standard_skill_bootstrap_and_semantic_preview_g
         ),
     )
     assert mvp_continuations_were_used((declaration, preview))
+
+
+def test_mvp_broker_compares_high_level_option_pairs_semantically() -> None:
+    step = ExpectedGatewayStep(
+        name="mvp-asset",
+        subcommand="mvp-asset",
+        arguments=(
+            "--name",
+            "Rain_Bed",
+            "--volume-db",
+            "-4",
+            "--loop",
+            "infinite",
+        ),
+        commutative_option_pairs=True,
+    )
+
+    assert _normalize_commutative_option_pairs(
+        step,
+        (
+            "--loop",
+            "infinite",
+            "--volume-db=-4",
+            "--name",
+            "Rain_Bed",
+        ),
+    ) == step.arguments
+    assert _normalize_commutative_option_pairs(
+        step,
+        ("--name", "Wrong", "--volume-db", "-4", "--loop", "infinite"),
+    ) != step.arguments

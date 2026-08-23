@@ -212,6 +212,12 @@ def run_import_mvp_agent_unit(
             name=f"step-{index:02d}-{command[0]}",
             subcommand=command[0],
             arguments=tuple(command[1:]),
+            commutative_option_pairs=command[0] != "mvp-preview",
+            commutative_boolean_flags=(
+                ("--replace",)
+                if command[0] == "mvp-existing-asset"
+                else ()
+            ),
         )
         for index, command in enumerate(unit.commands, start=1)
     )
