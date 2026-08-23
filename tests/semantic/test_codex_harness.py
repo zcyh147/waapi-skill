@@ -1456,17 +1456,17 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
 
     assert "First read SKILL.md once, standalone" in instructions
     assert "Get-Content -Raw -Encoding UTF8" not in instructions
-    assert "copy returned copy_instruction.source_field/fixed_argv_prefix" in instructions
-    assert "keep quotes" in instructions
+    assert "copy returned source_field/fixed_argv_prefix verbatim" in instructions
+    assert "keep quotes/runner" in instructions
     assert "fixed_argv_prefix" in instructions
     assert "never reconstruct" in instructions
     assert "No cwd override" in instructions
-    assert "This-turn reads first; future reads forbidden" in instructions
-    assert "no pre-read reply/clarification" in instructions
-    assert "One argv/fact" in instructions
+    assert "This-turn reads first; no future reads/pre-read reply/clarification" in instructions
+    assert "Typed facts: one argv/fact" in instructions
     assert "every prompt field/item/map/bool" in instructions
     assert "batch_size=6" in instructions
     assert "final=remaining" in instructions
+    assert "Composer: one action/call" in instructions
     assert "allowed_action_argv owns TYPE" in instructions
     assert "not Real64/int16" in instructions
     assert "unapplied ancestor deferred_fact" in instructions
@@ -1476,7 +1476,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "Metadata: obey composer.start.preconditions" in instructions
     assert "absent=none" in instructions
     assert "prompt/schema!=live" in instructions
-    assert "discover all dynamic tokens pre-draft" in instructions
+    assert "all dynamic tokens pre-draft" in instructions
     assert "single existing=>--object GUID" in instructions
     assert "--object-type only new/imported/plural" in instructions
     assert "reread selected pre-schema" in instructions
@@ -1491,11 +1491,11 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "query type=Sound" in instructions
     assert "Events initial" in instructions
     assert "parents first" in instructions
-    assert "POSIX Wwise paths single-quoted" in instructions
+    assert "POSIX paths single-quoted" in instructions
     assert "keep backslashes" in instructions
     assert "add one/child" in instructions
-    assert "Files absolute only; no relative/traversal" in instructions
-    assert "prompt terminal scalars" in instructions
+    assert "Files absolute; no relative/traversal" in instructions
+    assert "terminal scalars first" in instructions
     assert "every prompt field/item/map/bool" in instructions
     assert "Top facts first; exhaust tree" in instructions
     assert "More=>ancestor_next_item_source" in instructions
