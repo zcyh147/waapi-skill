@@ -75,3 +75,10 @@ def test_operate_contract_preserves_posix_wwise_path_backslashes() -> None:
     assert "to preserve backslashes" in text
     assert "`audio_file`: supplied absolute path only" in text
     assert "no relative/traversal" in text
+
+
+def test_operate_contract_keeps_single_object_metadata_on_the_exact_guid_scope() -> None:
+    text = doc_text("references/waapi-operate.md")
+
+    assert "`--object` for one existing object means `--object <canonical-guid>`" in text
+    assert "`--object-type` is invalid for that single object" in text

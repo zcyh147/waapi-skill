@@ -260,6 +260,22 @@ def test_metadata_backed_contract_discloses_token_source_and_scalar_types() -> N
         "source": "successful live metadata discover for this object/class scope",
         "never_infer": True,
         "preview_revalidates": True,
+        "scope_selection": {
+            "one_existing_object": {
+                "flag": "--object",
+                "value": "canonical_guid_from_prior_exact_read",
+                "object_type_flag": "invalid",
+            },
+            "multiple_existing_objects_one_proven_type": {
+                "flag": "--object-type",
+                "value": "exact_shared_object_type",
+            },
+            "new_or_imported_object_type": {
+                "flag": "--object-type",
+                "value": "exact_object_type",
+            },
+            "path_value_for_object_flag": "invalid",
+        },
         "accepted_value_types": ["string", "integer", "number", "boolean"],
     }
     assert contract["bounds"]["value_utf8_bytes"] == MAX_INLINE_OPERATION_VALUE_BYTES

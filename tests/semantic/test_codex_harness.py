@@ -1472,10 +1472,12 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "execute_after=all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "selected-branch constant" in instructions
-    assert "Metadata: obey composer.start.preconditions exactly" in instructions
-    assert "absent means none" in instructions
-    assert "Metadata gate: prompt/schema != live" in instructions
-    assert "discover every dynamic token before draft-start" in instructions
+    assert "Metadata: obey composer.start.preconditions" in instructions
+    assert "absent=none" in instructions
+    assert "prompt/schema != live" in instructions
+    assert "discover all dynamic tokens before draft-start" in instructions
+    assert "single existing=>--object GUID" in instructions
+    assert "--object-type only new/imported/plural" in instructions
     assert "reread selected pre-schema" in instructions
     assert "exact user Wwise path => path selector, never exact-type-name" in instructions
     assert "one query-object per hop; no merge" in instructions
@@ -1487,9 +1489,8 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "SFX => exact object_type Sound SFX, never Sound" in instructions
     assert "all Events in initial rows" in instructions
     assert "parents before children" in instructions
-    assert "Paths: on POSIX single-quote every Wwise path value" in instructions
-    assert "so backslashes survive" in instructions
-    assert "copy parent backslashes" in instructions
+    assert "POSIX Wwise paths: single-quote" in instructions
+    assert "preserve backslashes" in instructions
     assert "add one per child" in instructions
     assert "Files: supplied absolute path only; no relative/traversal" in instructions
     assert "prompt terminal scalars" in instructions

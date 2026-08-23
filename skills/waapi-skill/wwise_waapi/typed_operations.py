@@ -693,6 +693,25 @@ def inline_operation_cli_argument_variants(
     )
 
 
+def _metadata_scope_selection_contract() -> dict[str, Any]:
+    return {
+        "one_existing_object": {
+            "flag": "--object",
+            "value": "canonical_guid_from_prior_exact_read",
+            "object_type_flag": "invalid",
+        },
+        "multiple_existing_objects_one_proven_type": {
+            "flag": "--object-type",
+            "value": "exact_shared_object_type",
+        },
+        "new_or_imported_object_type": {
+            "flag": "--object-type",
+            "value": "exact_object_type",
+        },
+        "path_value_for_object_flag": "invalid",
+    }
+
+
 def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
     """Return one concise, exact-version continuation for public discovery."""
 
@@ -753,6 +772,15 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
             "--apply",
         ],
         "required_flag": "--apply",
+        "assembly_order": [
+            "copy_every_gateway_argv_prefix_element_in_order",
+            "append_each_business_field_as_separate_argv",
+        ],
+        "gateway_argv_prefix_copy_policy": {
+            "verbatim": True,
+            "required_flag_included": "--apply",
+            "omission_or_reordering": "invalid",
+        },
     }
     if operation in {
         "debug.restartWaapiServers",
@@ -872,6 +900,7 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
             "never_infer": True,
             "preview_revalidates": True,
             "accepted_value_types": ["string", "integer", "number", "boolean"],
+            "scope_selection": _metadata_scope_selection_contract(),
         }
     elif operation in {"object.setReference", "object.setLinked"}:
         contract["metadata_dependency"] = {
@@ -879,6 +908,7 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
             "source": "successful live metadata discover for this object/class scope",
             "never_infer": True,
             "preview_revalidates": True,
+            "scope_selection": _metadata_scope_selection_contract(),
         }
     return contract
 

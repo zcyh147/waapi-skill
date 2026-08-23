@@ -219,6 +219,62 @@ def test_inline_operation_schema_exposes_one_typed_continuation(tmp_path: Path) 
     assert "request-json" not in json.dumps(payload["typed_operation"])
 
 
+def test_inline_mutation_continuation_requires_exact_prefix_before_business_fields(
+    tmp_path: Path,
+) -> None:
+    code, payload = offline_execute(
+        tmp_path,
+        "--version",
+        "2022.1",
+        "operation-schema",
+        "switchContainer.removeAssignment",
+    )
+
+    assert code == 0, payload
+    continuation = payload["typed_operation"]["continuation"]
+    assert continuation["assembly_order"] == [
+        "copy_every_gateway_argv_prefix_element_in_order",
+        "append_each_business_field_as_separate_argv",
+    ]
+    assert continuation["gateway_argv_prefix_copy_policy"] == {
+        "verbatim": True,
+        "required_flag_included": "--apply",
+        "omission_or_reordering": "invalid",
+    }
+    assert continuation["gateway_argv_prefix"][-1] == "--apply"
+
+
+def test_inline_metadata_dependency_selects_exact_guid_for_one_existing_object(
+    tmp_path: Path,
+) -> None:
+    code, payload = offline_execute(
+        tmp_path,
+        "--version",
+        "2025.1",
+        "operation-schema",
+        "object.setReference",
+    )
+
+    assert code == 0, payload
+    dependency = payload["typed_operation"]["metadata_dependency"]
+    assert dependency["scope_selection"] == {
+        "one_existing_object": {
+            "flag": "--object",
+            "value": "canonical_guid_from_prior_exact_read",
+            "object_type_flag": "invalid",
+        },
+        "multiple_existing_objects_one_proven_type": {
+            "flag": "--object-type",
+            "value": "exact_shared_object_type",
+        },
+        "new_or_imported_object_type": {
+            "flag": "--object-type",
+            "value": "exact_object_type",
+        },
+        "path_value_for_object_flag": "invalid",
+    }
+
+
 def test_generic_draft_start_requires_first_fact_batch_before_disclosure(
     tmp_path: Path,
 ) -> None:
