@@ -14,6 +14,8 @@ from wwise_waapi.business_declarations import (
 from wwise_waapi.business_planning import (
     BusinessBatch,
     BusinessEffect,
+    BusinessFileEvidence,
+    MAX_BUSINESS_FILE_BYTES,
     compile_business_plan,
 )
 
@@ -90,6 +92,26 @@ def _materialize_audio_import(
     }
 
 
+def _continuation(
+    request: dict[str, object],
+    request_digest: str,
+) -> dict[str, object]:
+    assert request_digest
+    command = "python skill/scripts/run.py gateway.py transaction-preview --draft od1"
+    return {
+        "contract": "waapi-skill.transaction-next-command/v2",
+        "gateway_argv": ["transaction-preview", "--draft", "od1"],
+        "full_argv": ["python", "skill/scripts/run.py", "gateway.py"],
+        "shell_command": command,
+        "copy_exactly": True,
+        "copy_instruction": {
+            "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+            "source_field": "shell_command",
+            "action": "execute_verbatim_as_one_shell_tool_call",
+        },
+    }
+
+
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
 def test_business_plan_owns_deterministic_order_batches_and_native_request(
     version: str,
@@ -106,6 +128,7 @@ def test_business_plan_owns_deterministic_order_batches_and_native_request(
         operation="audio.import",
         effects=effects,
         materialize=lambda batches: _materialize_audio_import(version, batches),
+        build_continuation=_continuation,
     )
 
     assert compiled.ordered_effect_ids == ("container", "sound", "event")
@@ -124,6 +147,9 @@ def test_business_plan_owns_deterministic_order_batches_and_native_request(
     )
     assert compiled.preview.readable_projection()["detail_available"] is True
     assert "native_request" in compiled.preview.detail
+    assert compiled.continuation["copy_instruction"]["source_field"] == (
+        "shell_command"
+    )
 
 
 def test_business_plan_cycle_and_missing_dependencies_return_atomic_repair() -> None:
@@ -135,9 +161,11 @@ def test_business_plan_cycle_and_missing_dependencies_return_atomic_repair() -> 
             operation="audio.import",
             effects=(_effect("sound", depends_on=("missing",)),),
             materialize=lambda batches: {},
+            build_continuation=_continuation,
         )
     assert missing.value.repair["error_code"] == "BUSINESS_PLAN_DEPENDENCY_MISSING"
     assert missing.value.repair["missing_dependencies"] == ["missing"]
+    assert missing.value.repair["draft_revision"] == session.revision
 
     with pytest.raises(BusinessDeclarationError) as cycle:
         compile_business_plan(
@@ -148,6 +176,7 @@ def test_business_plan_cycle_and_missing_dependencies_return_atomic_repair() -> 
                 _effect("sound", depends_on=("container",)),
             ),
             materialize=lambda batches: {},
+            build_continuation=_continuation,
         )
     assert cycle.value.repair["error_code"] == "BUSINESS_PLAN_DEPENDENCY_CYCLE"
     assert cycle.value.repair["cycle_candidates"] == ["container", "sound"]
@@ -167,5 +196,63 @@ def test_business_plan_rejects_request_for_another_operation_or_version() -> Non
                 "operation": "object.set",
                 "arguments": {"objects": []},
             },
+            build_continuation=_continuation,
         )
     assert mismatch.value.repair["error_code"] == "BUSINESS_PLAN_REQUEST_MISMATCH"
+
+
+def test_business_effect_detaches_nested_adapter_inputs() -> None:
+    fragment = {"rows": [{"value": -4.0}]}
+    verifier = {"expected": {"value": -4.0}}
+    effect = BusinessEffect.create(
+        effect_id="sound",
+        declaration_id="rain-bed",
+        batch_key="audio.import",
+        native_fragment=fragment,
+        verifier_expectation=verifier,
+        readable_lines=("音量：-4 dB",),
+    )
+
+    fragment["rows"][0]["value"] = 99.0
+    verifier["expected"]["value"] = 99.0
+
+    assert effect.native_fragment == {"rows": [{"value": -4.0}]}
+    assert effect.verifier_expectation == {"expected": {"value": -4.0}}
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_business_plan_enforces_file_and_time_budgets(version: str) -> None:
+    session = _session(version)
+    effects = (
+        _effect("container"),
+        _effect("sound", depends_on=("container",)),
+        _effect("event", depends_on=("sound",), batch_key="event"),
+    )
+    with pytest.raises(BusinessDeclarationError) as oversized:
+        compile_business_plan(
+            session,
+            operation="audio.import",
+            effects=effects,
+            materialize=lambda batches: _materialize_audio_import(version, batches),
+            build_continuation=_continuation,
+            file_evidence=(
+                BusinessFileEvidence.create(
+                    path="/tmp/huge.wav",
+                    size_bytes=MAX_BUSINESS_FILE_BYTES + 1,
+                    sha256="a" * 64,
+                ),
+            ),
+        )
+    assert oversized.value.repair["error_code"] == "BUSINESS_FILE_LIMIT_EXCEEDED"
+
+    times = iter((0.0, 31.0))
+    with pytest.raises(BusinessDeclarationError) as timed_out:
+        compile_business_plan(
+            session,
+            operation="audio.import",
+            effects=effects,
+            materialize=lambda batches: _materialize_audio_import(version, batches),
+            build_continuation=_continuation,
+            clock=lambda: next(times),
+        )
+    assert timed_out.value.repair["error_code"] == "BUSINESS_PLANNING_TIMEOUT"

@@ -150,8 +150,15 @@ def test_object_handles_fail_closed_outside_their_live_binding(
     assert captured.value.repair["rejected_handle"] == bound.handle
 
 
-def test_field_handle_binds_scope_token_type_restrictions_and_metadata_digest() -> None:
-    registry = BusinessHandleRegistry(_context(), token_bytes=lambda size: b"f" * size)
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_field_handle_binds_scope_token_type_restrictions_and_metadata_digest(
+    version: str,
+) -> None:
+    context = _context(
+        wwise_version=version,
+        wwise_build=f"{version}.fixture",
+    )
+    registry = BusinessHandleRegistry(context, token_bytes=lambda size: b"f" * size)
     field = registry.bind_field(
         scope_kind="class",
         scope_value="Sound",
@@ -164,7 +171,7 @@ def test_field_handle_binds_scope_token_type_restrictions_and_metadata_digest() 
 
     resolved = registry.resolve_field(
         field.handle,
-        context=_context(),
+        context=context,
         scope_kind="class",
         scope_value="Sound",
         metadata_digest=METADATA_DIGEST,
@@ -179,15 +186,24 @@ def test_field_handle_binds_scope_token_type_restrictions_and_metadata_digest() 
         {"scope_kind": "class", "scope_value": "Sound", "metadata_digest": "b" * 64},
     ):
         with pytest.raises(BusinessDeclarationError) as captured:
-            registry.resolve_field(field.handle, context=_context(), **mismatch)
+            registry.resolve_field(field.handle, context=context, **mismatch)
         assert captured.value.repair["error_code"] in {
             "FIELD_HANDLE_SCOPE_MISMATCH",
             "FIELD_HANDLE_STALE",
         }
 
 
-def test_field_value_validation_returns_exact_range_enum_and_reference_repairs() -> None:
-    registry = BusinessHandleRegistry(_context(), token_bytes=lambda size: b"v" * size)
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_field_value_validation_returns_exact_range_enum_and_reference_repairs(
+    version: str,
+) -> None:
+    registry = BusinessHandleRegistry(
+        _context(
+            wwise_version=version,
+            wwise_build=f"{version}.fixture",
+        ),
+        token_bytes=lambda size: b"v" * size,
+    )
     volume = registry.bind_field(
         scope_kind="class",
         scope_value="Sound",
@@ -368,8 +384,17 @@ def test_live_field_binding_returns_exact_candidates_and_disabled_repair() -> No
     assert disabled.value.repair["draft_changed"] is False
 
 
-def test_live_field_revalidation_detects_metadata_drift_before_preview() -> None:
-    registry = BusinessHandleRegistry(_context(), token_bytes=lambda size: b"r" * size)
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_live_field_revalidation_detects_metadata_drift_before_preview(
+    version: str,
+) -> None:
+    registry = BusinessHandleRegistry(
+        _context(
+            wwise_version=version,
+            wwise_build=f"{version}.fixture",
+        ),
+        token_bytes=lambda size: b"r" * size,
+    )
 
     def initial(
         uri: str,
@@ -437,3 +462,78 @@ def test_common_business_fields_preserve_omission_and_explicit_units() -> None:
         normalize_common_business_fields({"volume": -4})
     assert unitless.value.repair["error_code"] == "BUSINESS_FIELD_UNAVAILABLE"
     assert "volume_db" in unitless.value.repair["choices"]
+
+
+@pytest.mark.parametrize(
+    ("restriction_row", "error_code"),
+    (
+        ("playable", "CONSTRAINED_REFERENCE_BOUNDARY"),
+        ("unknown", "INVALID_METADATA"),
+        (7, "INVALID_METADATA"),
+        ({"type": ["Bus", 7]}, "INVALID_METADATA"),
+    ),
+)
+def test_live_reference_restrictions_fail_closed(
+    restriction_row: object,
+    error_code: str,
+) -> None:
+    registry = BusinessHandleRegistry(_context(), token_bytes=lambda size: b"q" * size)
+
+    def read(
+        uri: str,
+        args: dict[str, object],
+        options: dict[str, object],
+    ) -> dict[str, object]:
+        if uri.endswith("getPropertyAndReferenceNames"):
+            return {"return": ["OutputBus"]}
+        if uri.endswith("getPropertyInfo"):
+            return {
+                "name": "OutputBus",
+                "type": "Reference",
+                "restriction": {
+                    "type": "reference",
+                    "restrictions": [restriction_row],
+                },
+            }
+        raise AssertionError(uri)
+
+    with pytest.raises(BusinessDeclarationError) as captured:
+        bind_live_field(
+            registry,
+            read_call=read,
+            scope_kind="class",
+            scope_value=65552,
+            token="OutputBus",
+        )
+    assert captured.value.repair["error_code"] == error_code
+
+
+def test_dependent_field_requires_exact_object_scope_for_enabled_check() -> None:
+    registry = BusinessHandleRegistry(_context(), token_bytes=lambda size: b"c" * size)
+
+    def read(
+        uri: str,
+        args: dict[str, object],
+        options: dict[str, object],
+    ) -> dict[str, object]:
+        if uri.endswith("getPropertyAndReferenceNames"):
+            return {"return": ["Volume"]}
+        if uri.endswith("getPropertyInfo"):
+            return {
+                "name": "Volume",
+                "type": "Real32",
+                "dependencies": [{"property": "OverrideVolume"}],
+            }
+        raise AssertionError(uri)
+
+    with pytest.raises(BusinessDeclarationError) as captured:
+        bind_live_field(
+            registry,
+            read_call=read,
+            scope_kind="class",
+            scope_value=65552,
+            token="Volume",
+            platform="Windows",
+        )
+    assert captured.value.repair["error_code"] == "FIELD_OBJECT_SCOPE_REQUIRED"
+    assert captured.value.repair["dependency_fields"] == ["OverrideVolume"]

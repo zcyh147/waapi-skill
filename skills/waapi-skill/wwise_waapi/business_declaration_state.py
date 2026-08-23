@@ -8,13 +8,15 @@ from typing import Any, Mapping, Sequence
 
 from .business_declarations import (
     BusinessContext,
+    BusinessDeclarationError,
     BusinessHandleRegistry,
     ExistingObjectTarget,
     NewDescendantTarget,
     business_repair,
+    repair_at_draft_revision,
     resolve_semantic_kind,
 )
-from .canonical import canonical_json_bytes, canonical_sha256
+from .canonical import canonical_json_bytes, canonical_sha256, strict_json_copy
 
 
 BUSINESS_DECLARATION_SESSION_CONTRACT = (
@@ -32,6 +34,13 @@ MAX_BUSINESS_PREVIEW_LINES = 4_096
 MAX_BUSINESS_PREVIEW_BYTES = 256 * 1024
 MAX_BUSINESS_PREVIEW_AUDIT = 64
 MAX_BUSINESS_PREVIEW_DETAIL_BYTES = 256 * 1024
+BUSINESS_SESSION_UPDATE_EVENTS = frozenset(
+    {
+        "declaration.added",
+        "declaration.revised",
+        "preview.recorded",
+    }
+)
 
 _DECLARATION_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$")
 _BUSINESS_FIELD = re.compile(r"^[a-z][a-z0-9_]{0,127}$")
@@ -209,6 +218,7 @@ class BusinessDeclarationSession:
             raise business_repair(
                 "DECLARATION_NOT_AVAILABLE",
                 field="declaration_id",
+                draft_revision=self.revision,
                 action="use one declaration id from the current task",
             )
         return self._with_declaration(
@@ -225,9 +235,10 @@ class BusinessDeclarationSession:
             raise business_repair(
                 "PREVIEW_SOURCE_REVISION_STALE",
                 field="source_revision",
+                draft_revision=self.revision,
                 action="compile a new Preview from the current declaration revision",
             )
-        return BusinessDeclarationSession(
+        candidate = BusinessDeclarationSession(
             context=self.context,
             handles=self.handles,
             revision=self.revision,
@@ -235,6 +246,16 @@ class BusinessDeclarationSession:
             active_preview=preview,
             preview_audit=self.preview_audit,
         )
+        try:
+            candidate.as_dict()
+        except ValueError as exc:
+            raise business_repair(
+                "PREVIEW_LIMIT_EXCEEDED",
+                field="preview",
+                draft_revision=self.revision,
+                action="split the task into bounded business declaration batches",
+            ) from exc
+        return candidate
 
     def as_dict(self) -> dict[str, Any]:
         payload = {
@@ -246,7 +267,7 @@ class BusinessDeclarationSession:
             "active_preview": (
                 None if self.active_preview is None else self.active_preview.as_dict()
             ),
-            "preview_audit": [dict(row) for row in self.preview_audit],
+            "preview_audit": [strict_json_copy(row) for row in self.preview_audit],
         }
         if len(canonical_json_bytes(payload)) > MAX_BUSINESS_SESSION_BYTES:
             raise ValueError("business declaration session exceeds its fixed byte limit")
@@ -305,6 +326,47 @@ class BusinessDeclarationSession:
         session.as_dict()
         return session
 
+    @classmethod
+    def validate_transition(
+        cls,
+        previous_payload: Mapping[str, Any],
+        candidate: "BusinessDeclarationSession",
+        *,
+        event_type: str,
+    ) -> None:
+        """Validate one closed durable transition from an immutable snapshot."""
+
+        if event_type not in BUSINESS_SESSION_UPDATE_EVENTS:
+            raise ValueError("event_type must be one closed business session update")
+        if not isinstance(candidate, BusinessDeclarationSession):
+            raise TypeError("candidate must be BusinessDeclarationSession")
+        previous = cls.from_dict(previous_payload)
+        candidate_payload = candidate.as_dict()
+        if candidate.context != previous.context:
+            raise ValueError("business session transition changed its live binding")
+        if event_type.startswith("declaration."):
+            if (
+                candidate.revision != previous.revision + 1
+                or candidate.active_preview is not None
+                or candidate_payload["declarations"]
+                == previous_payload["declarations"]
+            ):
+                raise ValueError(
+                    "declaration transition must change exactly one revision and invalidate Preview"
+                )
+            return
+        if (
+            candidate.revision != previous.revision
+            or candidate_payload["declarations"]
+            != previous_payload["declarations"]
+            or candidate_payload["handles"] != previous_payload["handles"]
+            or candidate.active_preview is None
+            or candidate.active_preview.source_revision != previous.revision
+        ):
+            raise ValueError(
+                "Preview transition must preserve facts and bind the current revision"
+            )
+
     def _with_declaration(
         self,
         *,
@@ -313,7 +375,9 @@ class BusinessDeclarationSession:
         fields: Mapping[str, Any],
         replace: bool,
     ) -> "BusinessDeclarationSession":
-        normalized_id = _declaration_id(declaration_id)
+        normalized_id = _declaration_id(
+            declaration_id, draft_revision=self.revision
+        )
         current = {
             row.declaration_id: row for row in self.declarations
         }
@@ -321,10 +385,18 @@ class BusinessDeclarationSession:
             raise business_repair(
                 "DECLARATION_ID_CONFLICT" if not replace else "DECLARATION_NOT_AVAILABLE",
                 field="declaration_id",
+                draft_revision=self.revision,
                 action="use a unique new id or revise one current declaration id",
             )
-        normalized_target = _validate_target(target, handles=self.handles)
-        normalized_fields = _normalize_fields(fields)
+        normalized_target = _validate_target(
+            target,
+            handles=self.handles,
+            draft_revision=self.revision,
+        )
+        normalized_fields = _normalize_fields(
+            fields,
+            draft_revision=self.revision,
+        )
         declaration = BusinessDeclaration(
             declaration_id=normalized_id,
             target=normalized_target,
@@ -334,6 +406,7 @@ class BusinessDeclarationSession:
             raise business_repair(
                 "DECLARATION_LIMIT_EXCEEDED",
                 field="declaration",
+                draft_revision=self.revision,
                 action="split the requested business facts into a bounded batch",
             )
         rows = tuple(
@@ -344,6 +417,7 @@ class BusinessDeclarationSession:
             raise business_repair(
                 "DECLARATION_LIMIT_EXCEEDED",
                 field="declarations",
+                draft_revision=self.revision,
                 action="finish the current bounded batch before declaring more work",
             )
         audit = self.preview_audit
@@ -352,14 +426,14 @@ class BusinessDeclarationSession:
                 raise business_repair(
                     "PREVIEW_AUDIT_LIMIT_EXCEEDED",
                     field="preview",
+                    draft_revision=self.revision,
                     action="finish or abandon the current task-local Draft",
                 )
             audit = (
                 *audit,
                 {
                     "contract": BUSINESS_PREVIEW_AUDIT_CONTRACT,
-                    "source_revision": self.active_preview.source_revision,
-                    "preview_digest": self.active_preview.preview_digest,
+                    "preview": self.active_preview.as_dict(),
                     "invalidated_by_revision": self.revision + 1,
                 },
             )
@@ -371,7 +445,15 @@ class BusinessDeclarationSession:
             active_preview=None,
             preview_audit=audit,
         )
-        candidate.as_dict()
+        try:
+            candidate.as_dict()
+        except ValueError as exc:
+            raise business_repair(
+                "DECLARATION_LIMIT_EXCEEDED",
+                field="declaration",
+                draft_revision=self.revision,
+                action="finish or abandon the current bounded task-local Draft",
+            ) from exc
         return candidate
 
 
@@ -379,6 +461,7 @@ def _validate_target(
     target: Any,
     *,
     handles: BusinessHandleRegistry,
+    draft_revision: int | None = None,
 ) -> NewDescendantTarget | ExistingObjectTarget:
     if isinstance(target, NewDescendantTarget):
         missing = [
@@ -394,33 +477,59 @@ def _validate_target(
             raise business_repair(
                 "DECLARATION_INCOMPLETE",
                 field="target",
+                draft_revision=draft_revision,
                 missing_fields=missing,
                 action="provide every required new-object business fact",
             )
-        handles.resolve_object(target.parent_handle)
+        try:
+            handles.resolve_object(target.parent_handle)
+        except BusinessDeclarationError as exc:
+            raise repair_at_draft_revision(
+                exc,
+                draft_revision=0 if draft_revision is None else draft_revision,
+            ) from exc
         if any(character in target.name for character in ("\\", "<", ">")):
             raise business_repair(
                 "INVALID_CHILD_NAME",
                 field="name",
+                draft_revision=draft_revision,
                 action="provide one child name without Wwise path syntax",
             )
-        resolve_semantic_kind(target.kind, version=handles.context.wwise_version)
+        try:
+            resolve_semantic_kind(target.kind, version=handles.context.wwise_version)
+        except BusinessDeclarationError as exc:
+            raise repair_at_draft_revision(
+                exc,
+                draft_revision=0 if draft_revision is None else draft_revision,
+            ) from exc
         return target
     if isinstance(target, ExistingObjectTarget):
-        handles.resolve_object(target.object_handle)
+        try:
+            handles.resolve_object(target.object_handle)
+        except BusinessDeclarationError as exc:
+            raise repair_at_draft_revision(
+                exc,
+                draft_revision=0 if draft_revision is None else draft_revision,
+            ) from exc
         return target
     raise business_repair(
         "DECLARATION_TARGET_INVALID",
         field="target",
+        draft_revision=draft_revision,
         action="use a new-descendant or exact existing-object target",
     )
 
 
-def _normalize_fields(fields: Any) -> dict[str, Any]:
+def _normalize_fields(
+    fields: Any,
+    *,
+    draft_revision: int | None = None,
+) -> dict[str, Any]:
     if not isinstance(fields, Mapping) or len(fields) > MAX_BUSINESS_DECLARATION_FIELDS:
         raise business_repair(
             "DECLARATION_FIELDS_INVALID",
             field="fields",
+            draft_revision=draft_revision,
             action="provide one bounded object of stable business fields",
         )
     normalized: dict[str, Any] = {}
@@ -429,15 +538,25 @@ def _normalize_fields(fields: Any) -> dict[str, Any]:
             raise business_repair(
                 "DECLARATION_FIELD_NAME_INVALID",
                 field="fields",
+                draft_revision=draft_revision,
                 action="use one disclosed stable business field name",
             )
         if name in _NATIVE_FIELDS:
             raise business_repair(
                 "NATIVE_PLANNING_FIELD_FORBIDDEN",
                 field=name,
+                draft_revision=draft_revision,
                 action="provide business meaning and let the Gateway derive native planning",
             )
-        normalized[name] = _strict_json(value, label=f"field {name}")
+        try:
+            normalized[name] = _strict_json(value, label=f"field {name}")
+        except ValueError as exc:
+            raise business_repair(
+                "DECLARATION_FIELD_VALUE_INVALID",
+                field=name,
+                draft_revision=draft_revision,
+                action="provide one bounded strict-JSON business value",
+            ) from exc
     return dict(sorted(normalized.items()))
 
 
@@ -514,36 +633,38 @@ def _preview_from_dict(payload: Any) -> BusinessPreview:
 def _preview_audit_from_dict(payload: Any) -> dict[str, Any]:
     expected = {
         "contract",
-        "source_revision",
-        "preview_digest",
+        "preview",
         "invalidated_by_revision",
     }
     if not isinstance(payload, Mapping) or set(payload) != expected:
         raise ValueError("business Preview audit fields are invalid")
     if payload.get("contract") != BUSINESS_PREVIEW_AUDIT_CONTRACT:
         raise ValueError("business Preview audit contract is invalid")
-    source = payload.get("source_revision")
+    preview = _preview_from_dict(payload.get("preview"))
     invalidated = payload.get("invalidated_by_revision")
-    digest = payload.get("preview_digest")
     if (
-        isinstance(source, bool)
-        or not isinstance(source, int)
-        or source < 1
-        or isinstance(invalidated, bool)
+        isinstance(invalidated, bool)
         or not isinstance(invalidated, int)
-        or invalidated <= source
-        or not isinstance(digest, str)
-        or not re.fullmatch(r"[0-9a-f]{64}", digest)
+        or invalidated <= preview.source_revision
     ):
         raise ValueError("business Preview audit values are invalid")
-    return dict(payload)
+    return {
+        "contract": BUSINESS_PREVIEW_AUDIT_CONTRACT,
+        "preview": preview.as_dict(),
+        "invalidated_by_revision": invalidated,
+    }
 
 
-def _declaration_id(value: Any) -> str:
+def _declaration_id(
+    value: Any,
+    *,
+    draft_revision: int | None = None,
+) -> str:
     if not isinstance(value, str) or not _DECLARATION_ID.fullmatch(value):
         raise business_repair(
             "DECLARATION_ID_INVALID",
             field="declaration_id",
+            draft_revision=draft_revision,
             action="provide one short task-local declaration id",
         )
     return value
@@ -556,24 +677,11 @@ def _strict_json_object(value: Any, *, label: str) -> dict[str, Any]:
 
 
 def _strict_json(value: Any, *, label: str, depth: int = 0) -> Any:
-    if depth > 12:
-        raise ValueError(f"{label} exceeds the JSON nesting limit")
-    if value is None or type(value) is bool or isinstance(value, (int, str)):
-        return value
-    if isinstance(value, float):
-        if value != value or value in {float("inf"), float("-inf")}:
-            raise ValueError(f"{label} contains a non-finite number")
-        return value
-    if isinstance(value, Mapping):
-        if not all(isinstance(key, str) for key in value):
-            raise ValueError(f"{label} object keys must be strings")
-        return {
-            key: _strict_json(item, label=label, depth=depth + 1)
-            for key, item in value.items()
-        }
-    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-        return [_strict_json(item, label=label, depth=depth + 1) for item in value]
-    raise ValueError(f"{label} must contain strict JSON values")
+    del depth
+    try:
+        return strict_json_copy(value)
+    except (RecursionError, TypeError, UnicodeError, ValueError) as exc:
+        raise ValueError(f"{label} must contain bounded strict JSON values") from exc
 
 
 def _bounded_text(value: Any, *, field: str, maximum_bytes: int) -> str:
@@ -592,6 +700,7 @@ __all__ = [
     "BUSINESS_DECLARATION_SESSION_CONTRACT",
     "BUSINESS_PREVIEW_AUDIT_CONTRACT",
     "BUSINESS_PREVIEW_CONTRACT",
+    "BUSINESS_SESSION_UPDATE_EVENTS",
     "BusinessDeclaration",
     "BusinessDeclarationSession",
     "BusinessPreview",

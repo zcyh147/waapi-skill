@@ -46,3 +46,34 @@ def canonical_sha256(value: Any) -> str:
     """Hash the canonical UTF-8 JSON representation of *value*."""
 
     return sha256_hex(canonical_json_bytes(value))
+
+
+def strict_json_copy(value: Any, *, maximum_depth: int = 12) -> Any:
+    """Return a detached strict-JSON copy with one explicit nesting bound."""
+
+    if (
+        isinstance(maximum_depth, bool)
+        or not isinstance(maximum_depth, int)
+        or maximum_depth < 0
+    ):
+        raise ValueError("maximum_depth must be a non-negative integer")
+    _require_json_depth(value, remaining=maximum_depth)
+    return json.loads(canonical_json(value))
+
+
+def _require_json_depth(value: Any, *, remaining: int) -> None:
+    if value is None or type(value) is bool or isinstance(value, (int, float, str)):
+        return
+    if remaining == 0:
+        raise ValueError("strict JSON value exceeds its nesting limit")
+    if isinstance(value, dict):
+        if not all(isinstance(key, str) for key in value):
+            raise TypeError("strict JSON object keys must be strings")
+        for item in value.values():
+            _require_json_depth(item, remaining=remaining - 1)
+        return
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            _require_json_depth(item, remaining=remaining - 1)
+        return
+    raise TypeError("value is not strict JSON")

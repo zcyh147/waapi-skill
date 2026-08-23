@@ -14,6 +14,7 @@ from wwise_waapi.business_declarations import (
     BusinessContext,
     BusinessDeclarationError,
     NewDescendantTarget,
+    SUPPORTED_WWISE_VERSIONS,
 )
 from wwise_waapi.operation_composer import operation_composer_digest
 from wwise_waapi.operation_drafts import (
@@ -27,18 +28,24 @@ PROJECT_ID = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
 PARENT_ID = "{11111111-1111-1111-1111-111111111111}"
 
 
-def _context(task_authority: str = "da1-" + "1" * 40) -> BusinessContext:
+def _context(
+    task_authority: str = "da1-" + "1" * 40,
+    version: str = "2022.1",
+) -> BusinessContext:
     return BusinessContext.create(
         task_authority=task_authority,
         project_id=PROJECT_ID,
         project_path="/fixtures/SampleProject.wproj",
-        wwise_version="2022.1",
-        wwise_build="2022.1.19.8584",
+        wwise_version=version,
+        wwise_build=f"{version}.19.8584",
     )
 
 
-def _session(task_authority: str = "da1-" + "1" * 40) -> BusinessDeclarationSession:
-    session = BusinessDeclarationSession.create(_context(task_authority))
+def _session(
+    task_authority: str = "da1-" + "1" * 40,
+    version: str = "2022.1",
+) -> BusinessDeclarationSession:
+    session = BusinessDeclarationSession.create(_context(task_authority, version))
     parent = session.handles.bind_object(
         object_id=PARENT_ID,
         name="Weather",
@@ -56,8 +63,11 @@ def _session(task_authority: str = "da1-" + "1" * 40) -> BusinessDeclarationSess
     )
 
 
-def test_business_session_round_trips_without_exposing_native_planning() -> None:
-    session = _session()
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_business_session_round_trips_without_exposing_native_planning(
+    version: str,
+) -> None:
+    session = _session(version=version)
 
     restored = BusinessDeclarationSession.from_dict(session.as_dict())
 
@@ -73,8 +83,9 @@ def test_business_session_round_trips_without_exposing_native_planning() -> None
     assert "loop" not in declaration.fields
 
 
-def test_invalid_or_incomplete_declaration_is_atomic() -> None:
-    session = _session()
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_invalid_or_incomplete_declaration_is_atomic(version: str) -> None:
+    session = _session(version=version)
     before = session.as_dict()
 
     with pytest.raises(BusinessDeclarationError) as captured:
@@ -90,11 +101,40 @@ def test_invalid_or_incomplete_declaration_is_atomic() -> None:
 
     assert captured.value.repair["error_code"] == "DECLARATION_INCOMPLETE"
     assert captured.value.repair["missing_fields"] == ["name"]
+    assert captured.value.repair["draft_revision"] == session.revision
+    assert session.as_dict() == before
+
+    with pytest.raises(BusinessDeclarationError) as invalid_value:
+        session.revise_declaration(
+            declaration_id="rain-bed",
+            fields={"volume_db": float("nan")},
+        )
+    assert invalid_value.value.repair["error_code"] == (
+        "DECLARATION_FIELD_VALUE_INVALID"
+    )
+    assert invalid_value.value.repair["draft_revision"] == session.revision
+    assert session.as_dict() == before
+
+    with pytest.raises(BusinessDeclarationError) as stale_parent:
+        session.with_new_declaration(
+            declaration_id="stale",
+            target=NewDescendantTarget(
+                parent_handle="boh1-" + "0" * 32,
+                name="Stale",
+                kind="sound-sfx",
+            ),
+            fields={},
+        )
+    assert stale_parent.value.repair["error_code"] == "OBJECT_HANDLE_NOT_AVAILABLE"
+    assert stale_parent.value.repair["draft_revision"] == session.revision
     assert session.as_dict() == before
 
 
-def test_revision_invalidates_active_preview_and_preserves_audit() -> None:
-    session = _session().with_preview(
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_revision_invalidates_active_preview_and_preserves_audit(
+    version: str,
+) -> None:
+    session = _session(version=version).with_preview(
         BusinessPreview.create(
             source_revision=1,
             readable_lines=(
@@ -115,24 +155,34 @@ def test_revision_invalidates_active_preview_and_preserves_audit() -> None:
     assert revised.revision == 2
     assert revised.active_preview is None
     assert len(revised.preview_audit) == 1
-    assert revised.preview_audit[0]["source_revision"] == 1
-    assert revised.preview_audit[0]["preview_digest"] == session.active_preview.preview_digest
+    assert revised.preview_audit[0]["preview"]["source_revision"] == 1
+    assert (
+        revised.preview_audit[0]["preview"]["preview_digest"]
+        == session.active_preview.preview_digest
+    )
+    assert revised.preview_audit[0]["preview"]["readable_lines"] == [
+        "对象：Rain_Bed",
+        "类型：Sound SFX",
+        "音量：-4 dB",
+    ]
     assert session.active_preview is not None
 
 
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
 def test_operation_draft_business_update_is_durable_atomic_and_cas_bound(
     tmp_path: Path,
+    version: str,
 ) -> None:
     store = OperationDraftStore(tmp_path / "state")
-    schema_digest = operation_request_schema_digest("audio.import", "2022.1")
-    composer_digest = operation_composer_digest("audio.import", "2022.1")
+    schema_digest = operation_request_schema_digest("audio.import", version)
+    composer_digest = operation_composer_digest("audio.import", version)
     started = store.start(
         operation="audio.import",
-        version="2022.1",
+        version=version,
         schema_digest=schema_digest,
         composer_digest=composer_digest,
     )
-    context = _context(started.task_authority)
+    context = _context(started.task_authority, version)
     record_path = store.records_dir / f"{started.draft_id}.json"
     before = record_path.read_bytes()
 
@@ -231,18 +281,22 @@ def test_operation_draft_business_update_is_durable_atomic_and_cas_bound(
         )
 
 
-def test_business_updates_serialize_concurrent_writers(tmp_path: Path) -> None:
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_business_updates_serialize_concurrent_writers(
+    tmp_path: Path,
+    version: str,
+) -> None:
     state_dir = tmp_path / "state"
     store = OperationDraftStore(state_dir)
-    schema_digest = operation_request_schema_digest("audio.import", "2022.1")
-    composer_digest = operation_composer_digest("audio.import", "2022.1")
+    schema_digest = operation_request_schema_digest("audio.import", version)
+    composer_digest = operation_composer_digest("audio.import", version)
     started = store.start(
         operation="audio.import",
-        version="2022.1",
+        version=version,
         schema_digest=schema_digest,
         composer_digest=composer_digest,
     )
-    context = _context(started.task_authority)
+    context = _context(started.task_authority, version)
     barrier = Barrier(2)
 
     def writer() -> str:
@@ -271,16 +325,18 @@ def test_business_updates_serialize_concurrent_writers(tmp_path: Path) -> None:
     assert record.revision == 2
 
 
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
 def test_business_update_storage_crash_preserves_previous_bytes(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    version: str,
 ) -> None:
     store = OperationDraftStore(tmp_path / "state")
-    schema_digest = operation_request_schema_digest("audio.import", "2022.1")
-    composer_digest = operation_composer_digest("audio.import", "2022.1")
+    schema_digest = operation_request_schema_digest("audio.import", version)
+    composer_digest = operation_composer_digest("audio.import", version)
     started = store.start(
         operation="audio.import",
-        version="2022.1",
+        version=version,
         schema_digest=schema_digest,
         composer_digest=composer_digest,
     )
@@ -298,7 +354,7 @@ def test_business_update_storage_crash_preserves_previous_bytes(
             expected_revision=1,
             schema_digest=schema_digest,
             composer_digest=composer_digest,
-            context=_context(started.task_authority),
+            context=_context(started.task_authority, version),
             update=_add_weather,
             event_type="declaration.added",
         )

@@ -61,6 +61,10 @@ from .host_paths import (
     parse_relative_host_path,
 )
 from .io_policy import IOPolicyError, validate_isolated_io
+from .metadata_restrictions import (
+    MetadataRestrictionError,
+    reference_allowed_types,
+)
 from .operation_import import (
     AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS,
     ImportContractError,
@@ -20213,56 +20217,14 @@ def _require_reference_target_allowed(
     metadata: PropertyInfoMetadataRecord,
     target: ResolvedObject,
 ) -> None:
-    restrictions = metadata.restriction.get("restrictions")
-    if restrictions is None:
-        return
-    if not isinstance(restrictions, list):
+    try:
+        allowed_types = set(reference_allowed_types(metadata.restriction))
+    except MetadataRestrictionError as exc:
         raise OperationContractError(
-            "INVALID_METADATA",
-            "Reference restriction metadata must be an array when present.",
+            exc.error_code,
+            str(exc),
             details={"reference": metadata.name, "restriction": dict(metadata.restriction)},
-        )
-    allowed_types: set[str] = set()
-    for item in restrictions:
-        if isinstance(item, str):
-            if item == "notNull":
-                # The closed identity resolver has already proved one concrete,
-                # non-null target before this metadata check.
-                continue
-            if item == "playable":
-                raise OperationContractError(
-                    "CONSTRAINED_REFERENCE_BOUNDARY",
-                    "Playable reference restrictions require a dedicated live target classifier.",
-                    details={
-                        "reference": metadata.name,
-                        "restriction": dict(metadata.restriction),
-                    },
-                )
-            raise OperationContractError(
-                "INVALID_METADATA",
-                "Reference restriction metadata contains an unknown string flag.",
-                details={
-                    "reference": metadata.name,
-                    "restriction": dict(metadata.restriction),
-                    "flag": item,
-                },
-            )
-        if not isinstance(item, Mapping):
-            raise OperationContractError(
-                "INVALID_METADATA",
-                "Reference restriction entries must be objects or supported string flags.",
-                details={"reference": metadata.name, "restriction": dict(metadata.restriction)},
-            )
-        values = item.get("type")
-        if values is None:
-            continue
-        if not isinstance(values, list) or not all(isinstance(value, str) and value for value in values):
-            raise OperationContractError(
-                "INVALID_METADATA",
-                "Reference restriction type entries must be non-empty string arrays.",
-                details={"reference": metadata.name, "restriction": dict(metadata.restriction)},
-            )
-        allowed_types.update(values)
+        ) from exc
     if not allowed_types:
         return
     target_type = target.row.get("type")

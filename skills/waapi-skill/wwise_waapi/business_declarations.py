@@ -27,6 +27,10 @@ from .builders.metadata import (
 )
 from .canonical import canonical_json_bytes, canonical_sha256, sha256_hex
 from .metadata_discovery import metadata_typed_value_type
+from .metadata_restrictions import (
+    MetadataRestrictionError,
+    reference_allowed_types,
+)
 
 
 BUSINESS_REPAIR_CONTRACT = "waapi-skill.business-repair/v1"
@@ -360,11 +364,47 @@ def business_repair(
     *,
     field: str,
     action: str,
+    draft_revision: int | None = None,
     **details: Any,
 ) -> BusinessDeclarationError:
     """Build one bounded structured repair without reflecting unbounded input."""
 
-    return _error(error_code, field=field, action=action, **details)
+    return _error(
+        error_code,
+        field=field,
+        action=action,
+        draft_revision=draft_revision,
+        **details,
+    )
+
+
+def repair_at_draft_revision(
+    error: BusinessDeclarationError,
+    *,
+    draft_revision: int,
+) -> BusinessDeclarationError:
+    """Attach the current revision to a nested bounded repair exactly once."""
+
+    if not isinstance(error, BusinessDeclarationError):
+        raise TypeError("error must be BusinessDeclarationError")
+    if (
+        isinstance(draft_revision, bool)
+        or not isinstance(draft_revision, int)
+        or draft_revision < 0
+    ):
+        raise ValueError("draft_revision must be a non-negative integer")
+    if error.repair.get("draft_revision") == draft_revision:
+        return error
+    payload = dict(error.repair)
+    payload["draft_revision"] = draft_revision
+    if len(canonical_json_bytes(payload)) <= MAX_BUSINESS_REPAIR_BYTES:
+        return BusinessDeclarationError(payload)
+    return _error(
+        str(payload.get("error_code", "BUSINESS_DECLARATION_ERROR")),
+        field=str(payload.get("field", "declaration")),
+        draft_revision=draft_revision,
+        action="refresh the bounded declaration evidence and retry",
+    )
 
 
 class BusinessHandleRegistry:
@@ -827,12 +867,26 @@ def bind_live_field(
             field=token,
             action="use a separately reviewed Adapter for this metadata type",
         )
-    restrictions = _restrictions_from_live_metadata(
-        info.restriction,
-        field_kind=field_kind,
-    )
+    try:
+        restrictions = _restrictions_from_live_metadata(
+            info.restriction,
+            field_kind=field_kind,
+        )
+    except MetadataRestrictionError as exc:
+        raise _error(
+            exc.error_code,
+            field=token,
+            action="use a separately reviewed Adapter for this live restriction",
+        ) from exc
     dependency_fields = _dependency_field_tokens(info.dependencies)
-    if dependency_fields and scope_kind == "object":
+    if dependency_fields and scope_kind != "object":
+        raise _error(
+            "FIELD_OBJECT_SCOPE_REQUIRED",
+            field=token,
+            dependency_fields=dependency_fields,
+            action="resolve the exact target object before checking this dependent field",
+        )
+    if dependency_fields:
         if platform is None:
             raise _error(
                 "FIELD_PLATFORM_REQUIRED",
@@ -933,7 +987,15 @@ def revalidate_live_field(
             action="refresh live metadata and use the new field handle",
         )
     dependency_fields = _dependency_field_tokens(info.dependencies)
-    if dependency_fields and field.scope_kind == "object":
+    if dependency_fields and field.scope_kind != "object":
+        raise _error(
+            "FIELD_OBJECT_SCOPE_REQUIRED",
+            field=field.token,
+            rejected_handle=field.handle,
+            dependency_fields=dependency_fields,
+            action="resolve an exact target object and issue a new field handle",
+        )
+    if dependency_fields:
         if platform is None:
             raise _error(
                 "FIELD_PLATFORM_REQUIRED",
@@ -1117,19 +1179,9 @@ def _restrictions_from_live_metadata(
             if choices:
                 normalized["enum_choices"] = choices
     if field_kind == "reference":
-        allowed: set[str] = set()
-        rows = restriction.get("restrictions")
-        if isinstance(rows, Sequence) and not isinstance(rows, (str, bytes)):
-            for row in rows:
-                if not isinstance(row, Mapping):
-                    continue
-                values = row.get("type")
-                if isinstance(values, Sequence) and not isinstance(values, (str, bytes)):
-                    allowed.update(
-                        value for value in values if isinstance(value, str) and value
-                    )
+        allowed = reference_allowed_types(restriction)
         if allowed:
-            normalized["allowed_target_types"] = sorted(allowed)
+            normalized["allowed_target_types"] = list(allowed)
     return normalized
 
 
@@ -1404,6 +1456,7 @@ def _error(
     *,
     field: str,
     action: str,
+    draft_revision: int | None = None,
     **details: Any,
 ) -> BusinessDeclarationError:
     payload: dict[str, Any] = {
@@ -1412,8 +1465,16 @@ def _error(
             error_code, field="error_code", maximum_bytes=128
         ),
         "field": _bounded_required_text(field, field="field", maximum_bytes=256),
-        "draft_changed": False,
     }
+    if draft_revision is not None:
+        if (
+            isinstance(draft_revision, bool)
+            or not isinstance(draft_revision, int)
+            or draft_revision < 0
+        ):
+            raise ValueError("draft_revision must be a non-negative integer")
+        payload["draft_revision"] = draft_revision
+    payload["draft_changed"] = False
     payload.update(_bounded_repair_details(details))
     payload["action"] = _bounded_required_text(
         action, field="action", maximum_bytes=MAX_BUSINESS_REPAIR_TEXT_BYTES
@@ -1496,5 +1557,6 @@ __all__ = [
     "business_repair",
     "normalize_common_business_fields",
     "revalidate_live_field",
+    "repair_at_draft_revision",
     "resolve_semantic_kind",
 ]

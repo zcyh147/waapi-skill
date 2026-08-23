@@ -9,7 +9,9 @@ and the readable/detail Preview split.
 from __future__ import annotations
 
 import heapq
+import math
 import re
+import time
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Sequence
 
@@ -18,7 +20,7 @@ from .business_declaration_state import (
     BusinessPreview,
 )
 from .business_declarations import BusinessDeclarationError, business_repair
-from .canonical import canonical_json_bytes, canonical_sha256
+from .canonical import canonical_json_bytes, canonical_sha256, strict_json_copy
 from .operation_registry import OperationContractError, parse_operation_request
 
 
@@ -31,6 +33,11 @@ MAX_BUSINESS_EFFECT_DEPENDENCIES = 256
 MAX_BUSINESS_EFFECT_BYTES = 128 * 1024
 MAX_BUSINESS_PLAN_BYTES = 1024 * 1024
 MAX_BUSINESS_BATCHES = 4_096
+MAX_BUSINESS_FILES = 2_048
+MAX_BUSINESS_FILE_BYTES = 8 * 1024 * 1024 * 1024
+MAX_BUSINESS_TOTAL_FILE_BYTES = 64 * 1024 * 1024 * 1024
+MAX_BUSINESS_PLANNING_SECONDS = 30.0
+MAX_BUSINESS_CONTINUATION_BYTES = 64 * 1024
 
 _PLAN_TOKEN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,255}$")
 
@@ -124,6 +131,40 @@ class BusinessBatch:
 
 
 @dataclass(frozen=True, slots=True)
+class BusinessFileEvidence:
+    path: str
+    size_bytes: int
+    sha256: str
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        path: str,
+        size_bytes: int,
+        sha256: str,
+    ) -> "BusinessFileEvidence":
+        if not isinstance(path, str) or not path or path != path.strip():
+            raise ValueError("file evidence path must be non-empty text")
+        if (
+            isinstance(size_bytes, bool)
+            or not isinstance(size_bytes, int)
+            or size_bytes < 0
+        ):
+            raise ValueError("file evidence size must be non-negative")
+        if not isinstance(sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", sha256):
+            raise ValueError("file evidence digest must be a lowercase SHA-256")
+        return cls(path=path, size_bytes=size_bytes, sha256=sha256)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "path": self.path,
+            "size_bytes": self.size_bytes,
+            "sha256": self.sha256,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class CompiledBusinessPlan:
     operation: str
     version: str
@@ -134,6 +175,7 @@ class CompiledBusinessPlan:
     request_digest: str
     verifier_expectations: tuple[Mapping[str, Any], ...]
     preview: BusinessPreview
+    continuation: Mapping[str, Any]
 
     def as_dict(self, *, detail: bool = False) -> dict[str, Any]:
         payload = {
@@ -158,12 +200,14 @@ class CompiledBusinessPlan:
                     "verifier_expectations": [
                         dict(row) for row in self.verifier_expectations
                     ],
+                    "continuation": dict(self.continuation),
                 }
             )
         return payload
 
 
 MaterializePlan = Callable[[Sequence[BusinessBatch]], Mapping[str, Any]]
+BuildContinuation = Callable[[Mapping[str, Any], str], Mapping[str, Any]]
 
 
 def compile_business_plan(
@@ -172,16 +216,25 @@ def compile_business_plan(
     operation: str,
     effects: Sequence[BusinessEffect],
     materialize: MaterializePlan,
+    build_continuation: BuildContinuation,
+    file_evidence: Sequence[BusinessFileEvidence] = (),
+    clock: Callable[[], float] = time.monotonic,
 ) -> CompiledBusinessPlan:
     """Compile one complete, exact-revision business plan without mutation."""
 
     if not isinstance(session, BusinessDeclarationSession):
         raise TypeError("session must be BusinessDeclarationSession")
+    if not callable(clock):
+        raise TypeError("clock must be callable")
+    started_at = clock()
+    if not isinstance(started_at, (int, float)) or not math.isfinite(started_at):
+        raise ValueError("planning clock must return a finite number")
     normalized_operation = _token(operation, field="operation")
     if not session.declarations or session.revision < 1:
         raise business_repair(
             "BUSINESS_DECLARATION_INCOMPLETE",
             field="declarations",
+            draft_revision=session.revision,
             missing_fields=("business_declaration",),
             action="complete at least one declaration before Preview",
         )
@@ -195,16 +248,24 @@ def compile_business_plan(
         raise business_repair(
             "BUSINESS_PLAN_EFFECTS_INVALID",
             field="effects",
+            draft_revision=session.revision,
             action="expand declarations into one bounded closed effect graph",
         )
     if not callable(materialize):
         raise TypeError("materialize must be callable")
+    if not callable(build_continuation):
+        raise TypeError("build_continuation must be callable")
+    normalized_files = _validate_file_evidence(
+        file_evidence,
+        draft_revision=session.revision,
+    )
     effect_rows = tuple(effects)
     by_id = {row.effect_id: row for row in effect_rows}
     if len(by_id) != len(effect_rows):
         raise business_repair(
             "BUSINESS_PLAN_EFFECT_ID_CONFLICT",
             field="effect_id",
+            draft_revision=session.revision,
             action="issue one unique Gateway-owned effect id per plan node",
         )
     declaration_ids = {row.declaration_id for row in session.declarations}
@@ -215,6 +276,7 @@ def compile_business_plan(
         raise business_repair(
             "BUSINESS_PLAN_DECLARATION_MISSING",
             field="declaration_id",
+            draft_revision=session.revision,
             missing_declarations=unknown_declarations,
             action="expand only declarations in the current task revision",
         )
@@ -230,11 +292,12 @@ def compile_business_plan(
         raise business_repair(
             "BUSINESS_PLAN_DEPENDENCY_MISSING",
             field="depends_on",
+            draft_revision=session.revision,
             missing_dependencies=missing_dependencies,
             action="supply every Gateway-owned prerequisite effect",
         )
-    ordered = _topological_order(effect_rows)
-    batches = _layout_batches(ordered)
+    ordered = _topological_order(effect_rows, draft_revision=session.revision)
+    batches = _layout_batches(ordered, draft_revision=session.revision)
     try:
         raw_request = materialize(batches)
     except BusinessDeclarationError:
@@ -243,12 +306,14 @@ def compile_business_plan(
         raise business_repair(
             "BUSINESS_PLAN_MATERIALIZATION_FAILED",
             field="native_request",
+            draft_revision=session.revision,
             action="repair the closed Adapter instead of authoring native parameters",
         ) from exc
     if not isinstance(raw_request, Mapping):
         raise business_repair(
             "BUSINESS_PLAN_REQUEST_INVALID",
             field="native_request",
+            draft_revision=session.revision,
             action="repair the closed Adapter's canonical request materializer",
         )
     if (
@@ -258,6 +323,7 @@ def compile_business_plan(
         raise business_repair(
             "BUSINESS_PLAN_REQUEST_MISMATCH",
             field="native_request",
+            draft_revision=session.revision,
             action="materialize the current operation and exact Wwise version",
         )
     try:
@@ -269,10 +335,23 @@ def compile_business_plan(
         raise business_repair(
             "BUSINESS_PLAN_REQUEST_INVALID",
             field="native_request",
+            draft_revision=session.revision,
             cause_error_code=exc.error_code,
             action="repair the closed Adapter's canonical request materializer",
         ) from exc
     request_digest = canonical_sha256(request)
+    try:
+        raw_continuation = build_continuation(request, request_digest)
+        continuation = _validate_continuation(raw_continuation)
+    except BusinessDeclarationError:
+        raise
+    except Exception as exc:
+        raise business_repair(
+            "BUSINESS_CONTINUATION_INVALID",
+            field="continuation",
+            draft_revision=session.revision,
+            action="repair the Gateway-owned single continuation builder",
+        ) from exc
     verifier_expectations = tuple(
         dict(row.verifier_expectation) for row in ordered
     )
@@ -283,20 +362,45 @@ def compile_business_plan(
         "native_request": request,
         "native_request_digest": request_digest,
         "verifier_expectations": [dict(row) for row in verifier_expectations],
+        "file_evidence": [row.as_dict() for row in normalized_files],
+        "continuation": continuation,
     }
     if len(canonical_json_bytes(detail)) > MAX_BUSINESS_PLAN_BYTES:
         raise business_repair(
             "BUSINESS_PLAN_LIMIT_EXCEEDED",
             field="plan",
+            draft_revision=session.revision,
             action="split the task into bounded business declaration batches",
         )
-    preview = BusinessPreview.create(
-        source_revision=session.revision,
-        readable_lines=tuple(
-            line for row in ordered for line in row.readable_lines
-        ),
-        detail=detail,
-    )
+    try:
+        preview = BusinessPreview.create(
+            source_revision=session.revision,
+            readable_lines=tuple(
+                line for row in ordered for line in row.readable_lines
+            ),
+            detail=detail,
+        )
+    except ValueError as exc:
+        raise business_repair(
+            "BUSINESS_PLAN_LIMIT_EXCEEDED",
+            field="preview",
+            draft_revision=session.revision,
+            action="split the task into bounded business declaration batches",
+        ) from exc
+    finished_at = clock()
+    if (
+        not isinstance(finished_at, (int, float))
+        or not math.isfinite(finished_at)
+        or finished_at < started_at
+        or finished_at - started_at > MAX_BUSINESS_PLANNING_SECONDS
+    ):
+        raise business_repair(
+            "BUSINESS_PLANNING_TIMEOUT",
+            field="plan",
+            draft_revision=session.revision,
+            timeout_seconds=MAX_BUSINESS_PLANNING_SECONDS,
+            action="retry from fresh live evidence with a bounded Adapter",
+        )
     return CompiledBusinessPlan(
         operation=normalized_operation,
         version=session.context.wwise_version,
@@ -307,11 +411,97 @@ def compile_business_plan(
         request_digest=request_digest,
         verifier_expectations=verifier_expectations,
         preview=preview,
+        continuation=continuation,
     )
+
+
+def _validate_file_evidence(
+    rows: Sequence[BusinessFileEvidence],
+    *,
+    draft_revision: int,
+) -> tuple[BusinessFileEvidence, ...]:
+    if (
+        not isinstance(rows, Sequence)
+        or isinstance(rows, (str, bytes, bytearray))
+        or len(rows) > MAX_BUSINESS_FILES
+        or any(not isinstance(row, BusinessFileEvidence) for row in rows)
+    ):
+        raise business_repair(
+            "BUSINESS_FILE_LIMIT_EXCEEDED",
+            field="files",
+            draft_revision=draft_revision,
+            file_limit=MAX_BUSINESS_FILES,
+            action="split the task into bounded file batches",
+        )
+    normalized = tuple(rows)
+    oversized = tuple(
+        row.path for row in normalized if row.size_bytes > MAX_BUSINESS_FILE_BYTES
+    )
+    total = sum(row.size_bytes for row in normalized)
+    if oversized or total > MAX_BUSINESS_TOTAL_FILE_BYTES:
+        raise business_repair(
+            "BUSINESS_FILE_LIMIT_EXCEEDED",
+            field="files",
+            draft_revision=draft_revision,
+            file_limit=MAX_BUSINESS_FILES,
+            file_bytes_limit=MAX_BUSINESS_FILE_BYTES,
+            total_file_bytes_limit=MAX_BUSINESS_TOTAL_FILE_BYTES,
+            action="split the task into bounded file batches",
+        )
+    return normalized
+
+
+def _validate_continuation(value: Any) -> dict[str, Any]:
+    continuation = _strict_json_object(value, label="continuation")
+    if len(canonical_json_bytes(continuation)) > MAX_BUSINESS_CONTINUATION_BYTES:
+        raise ValueError("continuation exceeds its fixed byte limit")
+    required = {
+        "contract",
+        "gateway_argv",
+        "full_argv",
+        "shell_command",
+        "copy_exactly",
+        "copy_instruction",
+    }
+    if not required.issubset(continuation):
+        raise ValueError("continuation is missing its complete execution envelope")
+    if continuation.get("contract") != "waapi-skill.transaction-next-command/v2":
+        raise ValueError("continuation contract is invalid")
+    for field in ("gateway_argv", "full_argv"):
+        argv = continuation.get(field)
+        if (
+            not isinstance(argv, list)
+            or not argv
+            or not all(isinstance(item, str) and item for item in argv)
+        ):
+            raise ValueError(f"continuation {field} is invalid")
+    if not isinstance(continuation.get("shell_command"), str) or not continuation[
+        "shell_command"
+    ]:
+        raise ValueError("continuation shell_command is invalid")
+    if continuation.get("copy_exactly") is not True:
+        raise ValueError("continuation must require exact copying")
+    copy_instruction = continuation.get("copy_instruction")
+    if not isinstance(copy_instruction, Mapping):
+        raise ValueError("continuation copy instruction is invalid")
+    if copy_instruction.get("contract") != (
+        "waapi-skill.gateway-command-copy-instruction/v2"
+    ):
+        raise ValueError("continuation copy instruction contract is invalid")
+    source_field = copy_instruction.get("source_field")
+    if (
+        not isinstance(source_field, str)
+        or not isinstance(continuation.get(source_field), str)
+        or not continuation[source_field]
+    ):
+        raise ValueError("continuation source field does not name one complete command")
+    return continuation
 
 
 def _topological_order(
     effects: Sequence[BusinessEffect],
+    *,
+    draft_revision: int,
 ) -> tuple[BusinessEffect, ...]:
     by_id = {row.effect_id: row for row in effects}
     incoming = {row.effect_id: len(row.depends_on) for row in effects}
@@ -336,6 +526,7 @@ def _topological_order(
         raise business_repair(
             "BUSINESS_PLAN_DEPENDENCY_CYCLE",
             field="depends_on",
+            draft_revision=draft_revision,
             cycle_candidates=candidates,
             action="repair the Gateway-owned dependency graph",
         )
@@ -344,6 +535,8 @@ def _topological_order(
 
 def _layout_batches(
     ordered: Sequence[BusinessEffect],
+    *,
+    draft_revision: int,
 ) -> tuple[BusinessBatch, ...]:
     batches: list[BusinessBatch] = []
     current: list[BusinessEffect] = []
@@ -360,6 +553,7 @@ def _layout_batches(
         raise business_repair(
             "BUSINESS_PLAN_BATCH_LIMIT_EXCEEDED",
             field="batches",
+            draft_revision=draft_revision,
             action="split the task into bounded business declaration batches",
         )
     return tuple(batches)
@@ -399,10 +593,11 @@ def _strict_json_object(value: Any, *, label: str) -> dict[str, Any]:
     if not isinstance(value, Mapping):
         raise ValueError(f"{label} must be an object")
     try:
-        canonical_json_bytes(value)
+        normalized = strict_json_copy(dict(value))
     except (RecursionError, TypeError, UnicodeError, ValueError) as exc:
         raise ValueError(f"{label} must contain strict JSON") from exc
-    return dict(value)
+    assert isinstance(normalized, dict)
+    return normalized
 
 
 __all__ = [
@@ -411,6 +606,9 @@ __all__ = [
     "COMPILED_BUSINESS_PLAN_CONTRACT",
     "BusinessBatch",
     "BusinessEffect",
+    "BusinessFileEvidence",
     "CompiledBusinessPlan",
+    "MAX_BUSINESS_FILE_BYTES",
+    "MAX_BUSINESS_PLANNING_SECONDS",
     "compile_business_plan",
 ]
