@@ -1472,11 +1472,12 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "execute_after=all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "all_pending_ancestor_facts_in_response_tree_preorder" in instructions
     assert "selected-branch constant" in instructions
-    assert "reuse only successful live tokens" in instructions
-    assert "one call: each property/reference" in instructions
-    assert "skip name/notes" in instructions
-    assert "query fields are not metadata tokens" in instructions
-    assert "gets --query" in instructions
+    assert "reuse successful live tokens" in instructions
+    assert "Before draft-start, if prompt has property/reference" in instructions
+    assert "one call: --query every property/reference" in instructions
+    assert "incl Volume+OutputBus" in instructions
+    assert "omit name/notes" in instructions
+    assert "object-query isn't proof" in instructions
     assert "end --limit 1..8" in instructions
     assert "no repeat" in instructions
     assert "exact-ID reread selected GUIDs before schema" in instructions
