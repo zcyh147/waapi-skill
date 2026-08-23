@@ -4403,6 +4403,35 @@ def operation_composer_input_contract(
             "subcommand": "draft-start",
             "gateway_argv": ["draft-start", operation],
             **(
+                {
+                    "copy_instruction": {
+                        "contract": (
+                            OPERATION_DRAFT_COMMAND_COPY_INSTRUCTION_CONTRACT
+                        ),
+                        "source_field": "gateway_argv",
+                        "action": (
+                            "append_to_packaged_gateway_prefix_and_execute_verbatim"
+                        ),
+                        "forbidden_transformations": [
+                            "reconstruct",
+                            "shorten",
+                            "normalize",
+                            "substitute_path_segments",
+                            "select_another_field",
+                        ],
+                    },
+                    "precondition_discipline": {
+                        "metadata_discover_allowed_only_when": (
+                            "preconditions is present and selects metadata"
+                        ),
+                        "when_preconditions_absent": "execute_gateway_argv_now",
+                        "infer_metadata_from_operation_constraints": False,
+                    },
+                }
+                if "start_preconditions" not in contract
+                else {}
+            ),
+            **(
                 {"preconditions": dict(contract["start_preconditions"])}
                 if "start_preconditions" in contract
                 else {}

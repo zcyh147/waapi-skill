@@ -537,7 +537,21 @@ def test_public_schema_and_draft_start_share_one_exact_operation(
     )
     assert code == 0, schema
     assert schema["operation"]["input_mode"] == "composer"
-    assert schema["composer"]["start"]["gateway_argv"] == ["draft-start", operation]
+    start = schema["composer"]["start"]
+    assert start["gateway_argv"] == ["draft-start", operation]
+    assert start["copy_instruction"]["source_field"] == "gateway_argv"
+    assert start["copy_instruction"]["action"] == (
+        "append_to_packaged_gateway_prefix_and_execute_verbatim"
+    )
+    assert start["precondition_discipline"] == {
+        "metadata_discover_allowed_only_when": (
+            "preconditions is present and selects metadata"
+        ),
+        "when_preconditions_absent": "execute_gateway_argv_now",
+        "infer_metadata_from_operation_constraints": False,
+    }
+    if operation == "object.setRTPC":
+        assert "preconditions" not in start
     start_code, started = gateway.execute_gateway(
         [
             "--version", version, "--state-dir",
