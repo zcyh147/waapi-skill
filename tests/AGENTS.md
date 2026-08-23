@@ -184,6 +184,11 @@ user's Scheduled Task with `InteractiveToken` and `Limited`; SSH only creates,
 starts, waits for, reads, and removes that task. Ordinary `ci\test.bat` and
 pytest runs continue directly over SSH.
 
+With PowerShell's ScheduledTasks cmdlets, pass `-LogonType Interactive` and
+`-RunLevel Limited`; the registered task must then report `InteractiveToken`
+in its exported XML and `Limited` in its Principal. Stop before launch if
+either attestation differs.
+
 ### Failure-first campaign scheduling
 
 After a frozen full-profile root exposes ordinary semantic failures, repair the
