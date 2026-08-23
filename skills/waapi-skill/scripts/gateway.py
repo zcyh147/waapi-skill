@@ -14537,6 +14537,12 @@ def operation_draft_payload(
                     "set selected path choice kind handle to string path",
                     "set selected path choice value handle to the exact business path",
                 ],
+                "exact_type_name_selector_exact_sequence": [
+                    "choose branch handle with the exact-type-name choice handle",
+                    "set selected choice kind handle to string exact-type-name",
+                    "set selected choice type handle to the exact business object type",
+                    "set selected choice name handle to the exact business object name",
+                ],
                 "copy_handles_from_operation_schema_exactly": True,
             }
             root_disclosures = _root_dynamic_disclosure_commands(
