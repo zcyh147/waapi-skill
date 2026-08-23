@@ -439,7 +439,7 @@
         {
           "index": 2,
           "kind": "confirmation",
-        "prompt": "名为 Snow 的 Random Container、四条 Snow_Step 声音和 Surface/Snow 分配的预览都正确，请执行。Player_Footsteps Switch Container 位于 {footsteps_container_path}，它下面名为 Mud 的 Random Container 就是要解除分配的对象；对应的 Mud Switch 位于 {surface_group_path}\\Mud。完成后只给我看解除这对现有分配的预览，不要删除 Mud 相关对象。",
+        "prompt": "名为 Snow 的 Random Container、四条 Snow_Step 声音和 Surface/Snow 分配的预览都正确，请执行。Player_Footsteps Switch Container 位于 `{footsteps_container_path}`，它下面名为 Mud 的 Random Container 就是要解除分配的对象；对应的 Mud Switch 位于 `{surface_group_path}\\Mud`。这两个 Wwise 路径都是不透明的完整业务值，请逐字保留其中每个反斜杠分隔符。完成后只给我看解除这对现有分配的预览，不要删除 Mud 相关对象。",
           "confirms_transaction": 1,
           "expects_preview_transaction": 2
         },

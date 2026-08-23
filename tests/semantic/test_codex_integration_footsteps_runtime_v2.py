@@ -593,6 +593,17 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
     ):
         assert f"`{prepared.visible_values[name]}`" in prompt
     assert "逐字保留其中每个反斜杠分隔符" in prompt
+    confirmation_prompt = case.unit.turns[1].prompt.format_map(
+        prepared.visible_values
+    )
+    assert f"`{prepared.visible_values['footsteps_container_path']}`" in (
+        confirmation_prompt
+    )
+    assert (
+        f"`{prepared.visible_values['surface_group_path']}\\Mud`"
+        in confirmation_prompt
+    )
+    assert "逐字保留其中每个反斜杠分隔符" in confirmation_prompt
     assert prepared.protocol.turn_prefix_counts == (5, 11, 15)
     assert len(prepared.protocol.steps) == 15
     assert [
