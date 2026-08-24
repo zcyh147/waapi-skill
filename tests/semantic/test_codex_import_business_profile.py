@@ -115,10 +115,9 @@ def test_implicit_create_uses_the_planned_parent_instead_of_live_binding_it() ->
         r"\Actor-Mixer Hierarchy\Default Work Unit"
         r"\BusinessImportRoot\<Actor-Mixer>Weather"
     ) not in bound_paths
-    configure = next(
-        step for step in steps if step.subcommand == "draft-business-configure"
+    assert all(
+        step.subcommand != "draft-business-configure" for step in steps
     )
-    assert configure.arguments[-2:] == ("--mode", "create")
     sound_declarations = [
         step
         for step in steps

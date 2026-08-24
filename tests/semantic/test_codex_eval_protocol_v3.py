@@ -1031,7 +1031,7 @@ def test_metadata_transaction_protocol_selects_closed_audio_import_equivalence()
         required_tokens=("IsLoopingEnabled",),
         equivalence="audio_import_v1",
     )
-    assert protocol.turn_prefix_counts == (8, 12)
+    assert protocol.turn_prefix_counts == (7, 11)
     assert tuple(step.subcommand for step in protocol.steps[:2]) == (
         "operation-schema",
         "draft-start",

@@ -593,7 +593,7 @@ def build_audio_import_composer_transaction_steps(
         return binding
 
     native_mode = arguments.get("import_operation")
-    mode = "create" if native_mode is None else {
+    mode = None if native_mode is None else {
         "createNew": "create",
         "useExisting": "reimport",
         "replaceExisting": "replace",
@@ -885,7 +885,7 @@ def build_audio_import_composer_transaction_steps(
             )
         )
         latest_revision_step = declaration_name
-        if mode == "create":
+        if mode not in {"reimport", "replace"}:
             planned_by_path[target_path] = ResponseBinding(
                 declaration_name,
                 f"/draft/declarations/{row_index}/result_handle",

@@ -14971,8 +14971,8 @@ def _audio_import_business_next_action_binding(
         "configure": {
             "fixed_argv_prefix": configure_prefix,
             "append": [
-                "--mode",
-                "<create|reimport|replace>",
+                "[--mode replace] only_for_explicit_replacement; "
+                "create_and_reimport_derive_from_target_form",
                 "[--add-to-source-control|--no-add-to-source-control]",
                 "[--check-out-from-source-control|--no-check-out-from-source-control]",
                 "[--default <stable-field> <business-value>]...",

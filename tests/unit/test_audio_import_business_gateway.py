@@ -324,6 +324,10 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     assert start_next["configure"]["reference_default_rule"] == (
         "copy_one_bound_object_handle_never_a_path_or_name"
     )
+    assert start_next["configure"]["append"][0] == (
+        "[--mode replace] only_for_explicit_replacement; "
+        "create_and_reimport_derive_from_target_form"
+    )
     assert start_next["declare_new"]["known_user_fields"] == (
         "complete_on_first_submission"
     )
