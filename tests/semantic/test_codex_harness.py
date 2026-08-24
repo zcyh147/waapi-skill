@@ -1460,7 +1460,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "keep quotes/runner" in instructions
     assert "fixed_argv_prefix" in instructions
     assert "never reconstruct" in instructions
-    assert "No cwd override" in instructions
+    assert "Keep cwd" in instructions
     assert "This-turn reads first; no future reads/pre-read reply/clarification" in instructions
     assert "Typed facts: one argv/fact" in instructions
     assert "every prompt field/item/map/bool" in instructions
@@ -1480,12 +1480,14 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "single existing=>--object GUID" in instructions
     assert "--object-type only new/imported/plural" in instructions
     assert "reread selected pre-schema" in instructions
-    assert "exact user Wwise path=>path selector, never exact-type-name" in instructions
+    assert "business_declaration=>by_unique_name LEAF direct" in instructions
+    assert "ambiguous=>by_id later" in instructions
+    assert "Else exact path=>path" in instructions
     assert "one query/hop; no merge" in instructions
-    assert "enum/const exactly" in instructions
-    assert "typed_operation.continuation.gateway_argv_prefix verbatim" in instructions
+    assert "enum/const exact" in instructions
+    assert "typed_operation: copy gateway_argv_prefix" in instructions
     assert "incl --apply" in instructions
-    assert "selector kind/value separate argv" in instructions
+    assert "selector kind/value separate" in instructions
     assert "opaque IDs/handles/tokens/digests" in instructions
     assert "Import object_type=Sound SFX" in instructions
     assert "query type=Sound" in instructions
@@ -1504,8 +1506,8 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "timeout_ms>=30000" in instructions
     assert "draft-check!=Preview" in instructions
     assert (
-        "Preview-now request: finish schema/metadata/Preview this turn; "
-        "only execution waits for later confirmation"
+        "Preview-now: finish schema/metadata/Preview now; "
+        "only execution waits for confirmation"
     ) in instructions
     assert "Editable draft same turn" in instructions
     assert "no progress reply" in instructions

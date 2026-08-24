@@ -831,7 +831,8 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "preserving `--expected-revision` and `--apply`" in OPERATE
     assert "there is no `lua.executeFile` operation" in OPERATE
     assert "keep it as one `path` selector" in OPERATE
-    assert "`--apply` marks Preview, not execution" in OPERATE
+    assert "Preview change intent" in OPERATE
+    assert "configure a default only when the user requested it" in OPERATE
     assert "Exact reflected URIs use `request-schema`" in OPERATE
     assert "Follow the schema's sole `input_mode`" in OPERATE
     assert "Unknown fields fail" in OPERATE
