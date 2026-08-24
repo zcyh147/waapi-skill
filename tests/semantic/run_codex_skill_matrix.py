@@ -947,12 +947,17 @@ def _heavy_v3_unit_row(unit: Any, *, sequence: int) -> dict[str, Any]:
         raise HeavyV3MatrixError(
             f"V3 heavy scenario id is not path-safe: {scenario_id!r}"
         )
+    runner_lane = getattr(unit, "runner_lane", None)
+    if runner_lane is None:
+        runner_lane = "cli" if api.startswith("ak.wwise.cli.") else "project"
+    if runner_lane not in {"project", "cli", "agent"}:
+        raise HeavyV3MatrixError("V3 heavy unit has an invalid runner lane")
     row = {
         "sequence": sequence,
         "scenario_id": scenario_id,
         "version": version,
         "api": api,
-        "runner": "cli" if api.startswith("ak.wwise.cli.") else "project",
+        "runner": runner_lane,
     }
     base_scenario_id = getattr(unit, "base_scenario_id", None)
     if base_scenario_id is not None:

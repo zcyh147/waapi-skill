@@ -369,6 +369,9 @@ HEAVY_V3_PHASE = "scenario"
 HEAVY_V3_GROUP_ID = "heavy-v3"
 HEAVY_V3_PROJECT_OUTCOME_CONTRACT = "waapi-skill.codex-heavy-project-run/v3"
 HEAVY_V3_CLI_OUTCOME_CONTRACT = "waapi-skill.codex-heavy-cli-run/v3"
+AUDIO_IMPORT_BUSINESS_OUTCOME_CONTRACT = (
+    "waapi-skill.audio-import-business-agent-outcome/v1"
+)
 HEAVY_V3_PROJECT_LIFECYCLE_CONTRACT = (
     "waapi-skill.codex-semantic-scenario-lifecycle/v3"
 )
@@ -737,7 +740,10 @@ def run_campaign(options: CampaignOptions) -> int:
         raise CampaignConfigError("no semantic sessions matched the requested filters")
     required_units = required_unit_map(sessions)
     windows_path_budget = None
-    if not options.verify_only:
+    if (
+        not options.verify_only
+        and options.profile != AUDIO_IMPORT_BUSINESS_PROFILE_ID
+    ):
         try:
             windows_path_budget = _require_standard_windows_path_budget(
                 options,
@@ -2053,6 +2059,18 @@ def _heavy_v3_live_input_fingerprints(
 
     if not unit_rows:
         raise CampaignEvidenceError("heavy live-input fingerprint requires selected units")
+    if options.profile == AUDIO_IMPORT_BUSINESS_PROFILE_ID:
+        versions = sorted({str(row.get("version")) for row in unit_rows})
+        if any(version not in {"2022.1", "2025.1"} for version in versions):
+            raise CampaignEvidenceError(
+                "audio import business profile has an invalid fixture version"
+            )
+        return {
+            "mode": "deterministic-waapi-read-shim",
+            "versions": versions,
+            "wwise_started": False,
+            "production_gateway": True,
+        }
     versions: list[str] = []
     migration_selected = False
     for row in unit_rows:
@@ -2228,12 +2246,17 @@ def heavy_v3_unit_row(unit: Any, *, sequence: int) -> dict[str, Any]:
         or not api
     ):
         raise CampaignEvidenceError("heavy unit has an invalid identity")
+    runner_lane = getattr(unit, "runner_lane", None)
+    if runner_lane is None:
+        runner_lane = "cli" if api.startswith("ak.wwise.cli.") else "project"
+    if runner_lane not in {"project", "cli", "agent"}:
+        raise CampaignEvidenceError("heavy unit has an invalid runner lane")
     row = {
         "sequence": sequence,
         "scenario_id": scenario_id,
         "version": version,
         "api": api,
-        "runner": "cli" if api.startswith("ak.wwise.cli.") else "project",
+        "runner": runner_lane,
     }
     base_scenario_id = getattr(unit, "base_scenario_id", None)
     if base_scenario_id is not None:
@@ -2373,7 +2396,11 @@ def validate_heavy_v3_child_run(
         expected_profile=options.profile,
         expected_rows=expected_rows,
     )
-    _validate_heavy_v3_live_preflight(root, summary=summary)
+    _validate_heavy_v3_live_preflight(
+        root,
+        summary=summary,
+        expected_profile=options.profile,
+    )
     _validate_heavy_v3_progress(run_config["progress"], summary=summary)
 
     case_rows = summary["case_records"]
@@ -2813,12 +2840,26 @@ def _validate_heavy_v3_live_preflight(
     root: Path,
     *,
     summary: Mapping[str, Any],
+    expected_profile: str,
 ) -> None:
     payload = load_strict_regular_json(root / "live-preflight.json")
     if not isinstance(payload, Mapping):
         raise CampaignEvidenceError("heavy matrix live preflight must be an object")
     state = summary.get("preflight")
     if state == "passed":
+        if expected_profile == AUDIO_IMPORT_BUSINESS_PROFILE_ID:
+            expected = {
+                "contract": "waapi-skill.audio-import-business-preflight/v1",
+                "ok": True,
+                "mode": "offline-production-gateway",
+                "wwise_started": False,
+                "production_gateway": True,
+            }
+            if dict(payload) != expected:
+                raise CampaignEvidenceError(
+                    "audio import business preflight evidence is malformed"
+                )
+            return
         required = {
             "contract",
             "ok",
@@ -2933,6 +2974,14 @@ def _validate_heavy_v3_matrix_case(
     outcome = load_strict_regular_json(outcome_path)
     if outcome != runner_outcome:
         raise CampaignEvidenceError("heavy outcome file differs from matrix-case")
+    if value.get("runner") == "agent":
+        _validate_audio_import_business_agent_outcome(
+            outcome,
+            matrix_case=value,
+            expected_unit=expected_unit,
+            scenario_root=scenario_root,
+        )
+        return
     expected_outcome_keys = {
         "contract",
         "scenario_id",
@@ -2988,6 +3037,86 @@ def _validate_heavy_v3_matrix_case(
                 expected_unit=expected_unit,
                 scenario_root=scenario_root,
             )
+
+
+def _validate_audio_import_business_agent_outcome(
+    outcome: Mapping[str, Any],
+    *,
+    matrix_case: Mapping[str, Any],
+    expected_unit: Any,
+    scenario_root: Path,
+) -> None:
+    expected_keys = {
+        "contract",
+        "scenario_id",
+        "version",
+        "status",
+        "reason",
+        "thread_id",
+        "gates",
+        "command_count",
+        "transaction_count",
+        "production_gateway",
+        "wwise_started",
+        "final_response",
+    }
+    if set(outcome) != expected_keys:
+        raise CampaignEvidenceError(
+            "audio import business Agent outcome schema is not closed"
+        )
+    for key in ("scenario_id", "version", "status", "reason"):
+        if outcome.get(key) != matrix_case.get(key):
+            raise CampaignEvidenceError(
+                f"audio import business Agent outcome mismatch for {key}"
+            )
+    gates = outcome.get("gates")
+    transaction_count = getattr(expected_unit, "transaction_count", None)
+    if (
+        outcome.get("contract") != AUDIO_IMPORT_BUSINESS_OUTCOME_CONTRACT
+        or not isinstance(gates, Mapping)
+        or not gates
+        or any(type(value) is not bool for value in gates.values())
+        or type(outcome.get("command_count")) is not int
+        or outcome["command_count"] < 1
+        or type(outcome.get("transaction_count")) is not int
+        or outcome.get("transaction_count") != transaction_count
+        or outcome.get("production_gateway") is not True
+        or outcome.get("wwise_started") is not False
+        or not isinstance(outcome.get("final_response"), str)
+    ):
+        raise CampaignEvidenceError(
+            "audio import business Agent outcome facts are malformed"
+        )
+    if outcome.get("status") == "PASS" and (
+        not isinstance(outcome.get("thread_id"), str)
+        or not outcome["thread_id"]
+        or not all(gates.values())
+    ):
+        raise CampaignEvidenceError(
+            "audio import business PASS lacks a fresh thread or passing gates"
+        )
+
+    evidence_root = _require_real_directory(
+        scenario_root / "evidence",
+        label="audio import business Agent evidence root",
+    )
+    nested_outcome = load_strict_regular_json(evidence_root / "outcome.json")
+    reconciliation = load_strict_regular_json(
+        evidence_root / "broker-reconciliation.json"
+    )
+    broker = load_strict_regular_json(evidence_root / "broker-evidence.json")
+    load_strict_regular_json(evidence_root / "codex-result-facts.json")
+    if nested_outcome != outcome:
+        raise CampaignEvidenceError(
+            "audio import business nested outcome differs from scenario outcome"
+        )
+    if outcome.get("status") == "PASS" and (
+        reconciliation.get("passed") is not True
+        or broker.get("complete") is not True
+    ):
+        raise CampaignEvidenceError(
+            "audio import business PASS lacks complete Broker reconciliation"
+        )
 
 
 def _validate_heavy_v3_pre_materialization_block(
@@ -13159,6 +13288,8 @@ def _heavy_v3_outcome_contract(runner: str) -> str:
         return HEAVY_V3_PROJECT_OUTCOME_CONTRACT
     if runner == "cli":
         return HEAVY_V3_CLI_OUTCOME_CONTRACT
+    if runner == "agent":
+        return AUDIO_IMPORT_BUSINESS_OUTCOME_CONTRACT
     raise CampaignEvidenceError(f"unknown heavy runner lane: {runner}")
 
 

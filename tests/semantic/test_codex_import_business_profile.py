@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from tests.semantic import run_codex_skill_matrix as matrix
@@ -203,3 +204,77 @@ def test_campaign_wires_the_same_suite_and_forbids_same_root_retries(
 
     assert options.suite_path == PROFILE
     assert options.max_pre_action_retries == 0
+
+
+def test_campaign_uses_the_agent_lane_and_closed_offline_preflight(tmp_path: Path) -> None:
+    unit = load_import_business_profile(
+        PROFILE,
+        unit_ids=("AIB22-WEATHER-A",),
+    ).units[0]
+    matrix_row = matrix._heavy_v3_unit_row(unit, sequence=1)
+    campaign_row = campaign.heavy_v3_unit_row(unit, sequence=1)
+    assert matrix_row == campaign_row
+    assert matrix_row["runner"] == "agent"
+    assert unit.user_turn_count == 1
+    assert unit.transaction_count == 1
+    assert len(unit.scenario.prompt_sha256) == 64
+
+    (tmp_path / "live-preflight.json").write_text(
+        json.dumps(
+            {
+                "contract": "waapi-skill.audio-import-business-preflight/v1",
+                "ok": True,
+                "mode": "offline-production-gateway",
+                "wwise_started": False,
+                "production_gateway": True,
+            }
+        ),
+        encoding="utf-8",
+    )
+    campaign._validate_heavy_v3_live_preflight(
+        tmp_path,
+        summary={"preflight": "passed"},
+        expected_profile="audio_import_business_8",
+    )
+
+
+def test_campaign_validates_the_profile_specific_agent_outcome(tmp_path: Path) -> None:
+    unit = load_import_business_profile(
+        PROFILE,
+        unit_ids=("AIB25-WEAPONS-A",),
+    ).units[0]
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    outcome = {
+        "contract": "waapi-skill.audio-import-business-agent-outcome/v1",
+        "scenario_id": unit.unit_id,
+        "version": unit.version,
+        "status": "PASS",
+        "reason": "",
+        "thread_id": "thread-fixture",
+        "gates": {"broker_passed": True, "exact_protocol": True},
+        "command_count": 11,
+        "transaction_count": unit.transaction_count,
+        "production_gateway": True,
+        "wwise_started": False,
+        "final_response": "预览完成",
+    }
+    for name, payload in (
+        ("outcome.json", outcome),
+        ("broker-reconciliation.json", {"passed": True}),
+        ("broker-evidence.json", {"complete": True}),
+        ("codex-result-facts.json", {}),
+    ):
+        (evidence / name).write_text(json.dumps(payload), encoding="utf-8")
+
+    campaign._validate_audio_import_business_agent_outcome(
+        outcome,
+        matrix_case={
+            "scenario_id": unit.unit_id,
+            "version": unit.version,
+            "status": "PASS",
+            "reason": "",
+        },
+        expected_unit=unit,
+        scenario_root=tmp_path,
+    )

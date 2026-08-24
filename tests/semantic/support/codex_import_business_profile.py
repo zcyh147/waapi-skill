@@ -44,6 +44,7 @@ class ImportBusinessProfileError(ValueError):
 @dataclass(frozen=True, slots=True)
 class ImportBusinessScenario:
     id: str
+    prompt_sha256: str
     api: str = "ak.wwise.core.audio.import"
 
 
@@ -59,6 +60,18 @@ class ImportBusinessUnit:
     transactions: tuple[Mapping[str, Any], ...]
     final_markers: tuple[str, ...]
     scenario: ImportBusinessScenario
+
+    @property
+    def user_turn_count(self) -> int:
+        return 1
+
+    @property
+    def transaction_count(self) -> int:
+        return len(self.transactions)
+
+    @property
+    def runner_lane(self) -> str:
+        return "agent"
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,7 +190,12 @@ def _parse_case(
             fields=frozen_fields,
             transactions=frozen_transactions,
             final_markers=tuple(str(item) for item in markers),
-            scenario=ImportBusinessScenario(id=f"{expected_id}-{variant}"),
+            scenario=ImportBusinessScenario(
+                id=f"{expected_id}-{variant}",
+                prompt_sha256=hashlib.sha256(
+                    str(prompt).encode("utf-8")
+                ).hexdigest(),
+            ),
         )
         for variant, prompt in zip(("A", "B"), paraphrases, strict=True)
     )
