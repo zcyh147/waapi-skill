@@ -231,6 +231,32 @@ recorded source hash/mtime stayed unchanged; PASS sandboxes were removed, FAIL
 sandboxes were sealed/quarantined, and scoped residual-process checks were
 empty.
 
+The production business-declaration `audio.import` cutover has a later,
+single-candidate Fresh Agent result. Exact packaged-Skill candidate
+`4be64fd80fb14d800a8890012f65fca666ab98f4` passed all eight
+`audio_import_business_8` units in macOS root
+`imac-aib-4be64fd-r17-full` and native-Windows root
+`iwin-aib-4be64fd-r17-full`; both roots then passed identical
+`--resume --verify-only`. The units are two paraphrases each of Weather,
+Rifle, Footsteps, and custom-field Weapons. Each used a fresh memory-off
+`gpt-5.6-terra` task with medium reasoning and the default service tier, ended
+at immutable Preview, and started no Wwise process. All ten sealed files per
+host matched their hashes, scoped process checks were empty, and temporary
+LaunchAgent or `InteractiveToken`/`Limited` Scheduled Task launchers were
+deleted. Earlier r15/r16 semantic failures remain frozen without verify-only.
+
+Real-Wwise proof followed through the shared closed-workflow node on exact Git
+candidate `6251481c1dcafb362a52f25602e6023635e581a8`; commits after
+`4be64fd` changed only tests and the real-test Adapter, not the packaged Skill
+tree, Fresh suite, or semantic harness. Wwise 2022.1 and 2025.1 each passed the
+node once on macOS and once on native Windows. The business Draft compiled the
+canonical `Sound SFX` import, produced one immutable Preview, executed once
+after confirmation, and verified imported identity, path, notes, and source
+evidence before the broader workflow completed. Every one of the four retained
+category-evidence rows records equal source hash and tree metadata before and
+after, deleted sandbox, cleaned lifecycle, and zero residual processes.
+Configured WwiseConsole hosts explicitly block Authoring-UI credit.
+
 The legacy internal `integration_workflows_cross_version_6` component is
 defined by `tests/semantic/data/integration-workflows-v1/profile.json`. It
 supplies Weather, Alarm, and Harbor once per version: six tasks, 20 user turns,
