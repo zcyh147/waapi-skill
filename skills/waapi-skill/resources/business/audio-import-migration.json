@@ -1,0 +1,1898 @@
+{
+  "contract": "waapi-skill.audio-import-business-migration/v1",
+  "cutover_policy": {
+    "fallback": false,
+    "historical_evidence": "frozen_commits_only",
+    "old_interface": "remove_in_same_change_after_parity"
+  },
+  "destination_kinds": [
+    "bound_object_handle",
+    "closed_adapter",
+    "exact_user_artifact",
+    "gateway_derivation",
+    "live_field_handle",
+    "prohibited_boundary",
+    "stable_business_field"
+  ],
+  "inventory_digest": "708890148eb12a31056d89836d4612baa671c3ba6028cc3e7899daae7cd98b4c",
+  "lanes": [
+    {
+      "actions": [
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "declaration.add",
+          "destination_kind": "stable_business_field",
+          "source": "add_import_row",
+          "source_contract_digest": "26545f8a21dfcab066da654589263a94128bc02b22581b0dcd131083ceadf928"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.explicit_defaults.omit",
+          "destination_kind": "stable_business_field",
+          "source": "clear_import_default",
+          "source_contract_digest": "efa697477d146df55643817a479ccdbb62052c9499d966be240920db3abd6a5e"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.settings.omit",
+          "destination_kind": "stable_business_field",
+          "source": "clear_import_option",
+          "source_contract_digest": "0fbac9a8dc102ba68dbdba14ab345edbd59805e90bd878ed9f2351950940d48b"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "declaration.revise_with_omission",
+          "destination_kind": "stable_business_field",
+          "source": "clear_import_row_field",
+          "source_contract_digest": "fd3ef678ed4ce2e615bb1c2f25d6d7cdd194f254275e2dde79cab012256d468e"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "declaration.remove",
+          "destination_kind": "stable_business_field",
+          "source": "remove_import_row",
+          "source_contract_digest": "a7b46ac90c5412701a58081214dfa297688f9e447a8654f4db089f3545fbdd7f"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.explicit_defaults",
+          "destination_kind": "stable_business_field",
+          "source": "set_import_default",
+          "source_contract_digest": "2a1f32b0dd2d4c0cfee254994deae6e408dd443e49f9c7968d644469084189a6"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.mode",
+          "destination_kind": "stable_business_field",
+          "source": "set_import_operation",
+          "source_contract_digest": "9344c57c99ae25ba0d5ddf082a04040c928b55955bd6472e177a01048edb1c76"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.settings",
+          "destination_kind": "stable_business_field",
+          "source": "set_import_option",
+          "source_contract_digest": "fe1dc037a250300a2b4035e3af34c921d7d8125e478c5e4b16d2f9399f6d20ec"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "declaration.revise",
+          "destination_kind": "stable_business_field",
+          "source": "set_import_row_field",
+          "source_contract_digest": "305543ee6580e992de0216e7d12a2749b8e95c78cf72d262ae57c3449923ca46"
+        }
+      ],
+      "limits": {
+        "canonical_request_bytes": null,
+        "imports": 128,
+        "source": "registry_contract"
+      },
+      "nested_fields": [
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "inline_wav.opaque_base64",
+          "destination_kind": "exact_user_artifact",
+          "source": "audio_file_base64.base64",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "inline_wav.relative_path",
+          "destination_kind": "exact_user_artifact",
+          "source": "audio_file_base64.relative_path",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "event_action",
+          "destination_kind": "stable_business_field",
+          "source": "event.action",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_event_parent_handle",
+          "destination_kind": "bound_object_handle",
+          "source": "event.path",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "target_parent_handle.form",
+          "destination_kind": "gateway_derivation",
+          "source": "import_location.kind",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_parent_exact_name",
+          "destination_kind": "gateway_derivation",
+          "source": "import_location.name",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_parent_scope_handle",
+          "destination_kind": "bound_object_handle",
+          "source": "import_location.parent",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_parent_expected_type",
+          "destination_kind": "gateway_derivation",
+          "source": "import_location.type",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "target_parent_handle",
+          "destination_kind": "bound_object_handle",
+          "source": "import_location.value",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "field_handle",
+          "destination_kind": "live_field_handle",
+          "source": "properties[].name",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "typed_field_value",
+          "destination_kind": "stable_business_field",
+          "source": "properties[].value",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "field_handle",
+          "destination_kind": "live_field_handle",
+          "source": "references[].name",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_object_handle",
+          "destination_kind": "bound_object_handle",
+          "source": "references[].target",
+          "source_contract_digest": null
+        }
+      ],
+      "request_options": [
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "add_to_source_control",
+          "destination_kind": "stable_business_field",
+          "omission": "gateway_native_default_false",
+          "ownership": "user_explicit_batch_setting",
+          "source": "auto_add_to_source_control",
+          "source_contract_digest": "f56777819c8be28f711bc04bdfdb5fb6a82bdaf4109198c616273cb0003e4137"
+        },
+        {
+          "available": false,
+          "cutover": "remove_old_model_input",
+          "destination": "check_out_from_source_control",
+          "destination_kind": "stable_business_field",
+          "omission": "gateway_version_default_false_or_absent",
+          "ownership": "user_explicit_batch_setting",
+          "source": "auto_check_out_to_source_control",
+          "source_contract_digest": "99cd37ff523c3c307a5a992583ddd6633ad1287990d5d719622eefd144235a9b"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "mode",
+          "destination_kind": "stable_business_field",
+          "omission": "derive_only_unique_mode_else_repair",
+          "ownership": "user_when_explicit_else_gateway_unique_derivation",
+          "source": "import_operation",
+          "source_contract_digest": "e268850a07c7f44ff45897589d6004229f584cd7576ffa3a2f86f0216d44f292"
+        }
+      ],
+      "row_fields": [
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "media_file",
+          "destination_kind": "exact_user_artifact",
+          "omission": "preserve_omission_for_structure_only_declaration",
+          "ownership": "user_selected_regular_file",
+          "source": "audio_file",
+          "source_contract_digest": "9bc9afaf0da36a6811c6ccbc5660fa2adbc2c69639727730f52395bfceb2505c"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "inline_wav",
+          "destination_kind": "exact_user_artifact",
+          "omission": "preserve_omission",
+          "ownership": "user_owned_opaque_inline_wav",
+          "source": "audio_file_base64",
+          "source_contract_digest": "9caf8353b2dc4c45025fb2a4fd1c0199ffd99f61bfe7b2d90af6ecb315de0570"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "audio_source_notes",
+          "destination_kind": "stable_business_field",
+          "omission": "preserve_omission",
+          "ownership": "user_explicit_business_text",
+          "source": "audio_source_notes",
+          "source_contract_digest": "00404e686415370f1711c4d7acfa2905444d3cf23cef2e10c47d445ebe690f96"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "dialogue_event_directive",
+          "destination_kind": "closed_adapter",
+          "omission": "preserve_omission",
+          "ownership": "exact_user_requested_native_directive_only",
+          "source": "dialogue_event",
+          "source_contract_digest": "a387f82f6dca79c01e8e59c33c2884bdd92d04f8e1be00bcdc73fc025f57b0ed"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "event_declaration",
+          "destination_kind": "closed_adapter",
+          "omission": "preserve_omission",
+          "ownership": "bound_event_parent_name_and_business_action",
+          "source": "event",
+          "source_contract_digest": "4c973bc5d6a8bc927a8bf7c65870491741021614dd401f9b42cbcdbeaee233cb"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "language",
+          "destination_kind": "stable_business_field",
+          "omission": "required_for_media_unless_uniquely_derived",
+          "ownership": "user_explicit_or_project_validated_sfx_consequence",
+          "source": "import_language",
+          "source_contract_digest": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "target_parent_handle",
+          "destination_kind": "gateway_derivation",
+          "omission": "derive_from_target_form",
+          "ownership": "gateway_from_target_parent_or_exact_user_handle",
+          "source": "import_location",
+          "source_contract_digest": "b2bb079f7369ee516099b6c0a25dfe674aa43aac955e2b5d8ef0183cca124e25"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "notes",
+          "destination_kind": "stable_business_field",
+          "omission": "preserve_omission",
+          "ownership": "user_explicit_business_text",
+          "source": "notes",
+          "source_contract_digest": "00404e686415370f1711c4d7acfa2905444d3cf23cef2e10c47d445ebe690f96"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "canonical_object_path",
+          "destination_kind": "gateway_derivation",
+          "omission": "not_a_model_input",
+          "ownership": "gateway_from_parent_handle_name_and_kind",
+          "source": "object_path",
+          "source_contract_digest": "7fada0fe2d30c9b44fb7cc57d94f496d60ad320f69f24bc52ec2fde315d8c935"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "native_object_type",
+          "destination_kind": "gateway_derivation",
+          "omission": "not_a_model_input",
+          "ownership": "gateway_from_semantic_kind_and_version",
+          "source": "object_type",
+          "source_contract_digest": "8caf8224900be8fc9ccd2725e3affec234f3f5a6d43e75763973a49c32601fdb"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "originals_subfolder",
+          "destination_kind": "stable_business_field",
+          "omission": "preserve_omission",
+          "ownership": "user_explicit_relative_destination",
+          "source": "originals_subfolder",
+          "source_contract_digest": "6704b914c0ec54658330148a77071bda283467305d41ee2db721428304089401"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "property_field_values",
+          "destination_kind": "live_field_handle",
+          "omission": "preserve_omission",
+          "ownership": "live_metadata_bound_field_handle_and_typed_value",
+          "source": "properties",
+          "source_contract_digest": "cd29e8cc39556a2e3815ec2a45ae4a57263bb9d78de38b2be2d84fa00a3653ce"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "reference_field_values",
+          "destination_kind": "live_field_handle",
+          "omission": "preserve_omission",
+          "ownership": "live_metadata_bound_field_and_object_handles",
+          "source": "references",
+          "source_contract_digest": "fa813a31677be9cc79b95b20451376c8bea83f4ea632ecc9bb24cb0deb9fd64b"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "switch_value",
+          "destination_kind": "stable_business_field",
+          "omission": "preserve_omission",
+          "ownership": "user_business_value_with_gateway_context_binding",
+          "source": "switch_assignment",
+          "source_contract_digest": "66ed14be45e29cd8a10e68377c46beae8fc5186ca04cc9196ee326a224e29b1b"
+        }
+      ],
+      "safety_rules": [
+        "one immutable Preview per current business revision",
+        "at most one dispatch and no automatic retry",
+        "every existing object and dynamic field is revalidated before Preview",
+        "regular files and inline WAV data retain immutable bounded evidence",
+        "create, re-import, and explicit replacement never mix ambiguously",
+        "localized existing targets retain their proven field boundary",
+        "every derived target and requested business state is verified after dispatch",
+        "native paths, wire types, metadata scopes, order, batches, and shell quoting are Gateway-owned"
+      ],
+      "source_composer_digest": "38a63a38379e946bd64693e0db94326c36b194bba81f5d5671595710dad35e1e",
+      "source_schema_digest": "e6dd5db7f66b3e4e4afddb1472d39a5d110e25f76dc6365f3a8d24d9577686ec",
+      "version": "2021.1"
+    },
+    {
+      "actions": [
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "declaration.add",
+          "destination_kind": "stable_business_field",
+          "source": "add_import_row",
+          "source_contract_digest": "26545f8a21dfcab066da654589263a94128bc02b22581b0dcd131083ceadf928"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.explicit_defaults.omit",
+          "destination_kind": "stable_business_field",
+          "source": "clear_import_default",
+          "source_contract_digest": "efa697477d146df55643817a479ccdbb62052c9499d966be240920db3abd6a5e"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.settings.omit",
+          "destination_kind": "stable_business_field",
+          "source": "clear_import_option",
+          "source_contract_digest": "0fbac9a8dc102ba68dbdba14ab345edbd59805e90bd878ed9f2351950940d48b"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "declaration.revise_with_omission",
+          "destination_kind": "stable_business_field",
+          "source": "clear_import_row_field",
+          "source_contract_digest": "fd3ef678ed4ce2e615bb1c2f25d6d7cdd194f254275e2dde79cab012256d468e"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "declaration.remove",
+          "destination_kind": "stable_business_field",
+          "source": "remove_import_row",
+          "source_contract_digest": "a7b46ac90c5412701a58081214dfa297688f9e447a8654f4db089f3545fbdd7f"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.explicit_defaults",
+          "destination_kind": "stable_business_field",
+          "source": "set_import_default",
+          "source_contract_digest": "2a1f32b0dd2d4c0cfee254994deae6e408dd443e49f9c7968d644469084189a6"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.mode",
+          "destination_kind": "stable_business_field",
+          "source": "set_import_operation",
+          "source_contract_digest": "9344c57c99ae25ba0d5ddf082a04040c928b55955bd6472e177a01048edb1c76"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.settings",
+          "destination_kind": "stable_business_field",
+          "source": "set_import_option",
+          "source_contract_digest": "fe1dc037a250300a2b4035e3af34c921d7d8125e478c5e4b16d2f9399f6d20ec"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "declaration.revise",
+          "destination_kind": "stable_business_field",
+          "source": "set_import_row_field",
+          "source_contract_digest": "305543ee6580e992de0216e7d12a2749b8e95c78cf72d262ae57c3449923ca46"
+        }
+      ],
+      "limits": {
+        "canonical_request_bytes": null,
+        "imports": 128,
+        "source": "registry_contract"
+      },
+      "nested_fields": [
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "inline_wav.opaque_base64",
+          "destination_kind": "exact_user_artifact",
+          "source": "audio_file_base64.base64",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "inline_wav.relative_path",
+          "destination_kind": "exact_user_artifact",
+          "source": "audio_file_base64.relative_path",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "event_action",
+          "destination_kind": "stable_business_field",
+          "source": "event.action",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_event_parent_handle",
+          "destination_kind": "bound_object_handle",
+          "source": "event.path",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "target_parent_handle.form",
+          "destination_kind": "gateway_derivation",
+          "source": "import_location.kind",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_parent_exact_name",
+          "destination_kind": "gateway_derivation",
+          "source": "import_location.name",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_parent_scope_handle",
+          "destination_kind": "bound_object_handle",
+          "source": "import_location.parent",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_parent_expected_type",
+          "destination_kind": "gateway_derivation",
+          "source": "import_location.type",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "target_parent_handle",
+          "destination_kind": "bound_object_handle",
+          "source": "import_location.value",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "field_handle",
+          "destination_kind": "live_field_handle",
+          "source": "properties[].name",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "typed_field_value",
+          "destination_kind": "stable_business_field",
+          "source": "properties[].value",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "field_handle",
+          "destination_kind": "live_field_handle",
+          "source": "references[].name",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_object_handle",
+          "destination_kind": "bound_object_handle",
+          "source": "references[].target",
+          "source_contract_digest": null
+        }
+      ],
+      "request_options": [
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "add_to_source_control",
+          "destination_kind": "stable_business_field",
+          "omission": "gateway_native_default_false",
+          "ownership": "user_explicit_batch_setting",
+          "source": "auto_add_to_source_control",
+          "source_contract_digest": "f56777819c8be28f711bc04bdfdb5fb6a82bdaf4109198c616273cb0003e4137"
+        },
+        {
+          "available": false,
+          "cutover": "remove_old_model_input",
+          "destination": "check_out_from_source_control",
+          "destination_kind": "stable_business_field",
+          "omission": "gateway_version_default_false_or_absent",
+          "ownership": "user_explicit_batch_setting",
+          "source": "auto_check_out_to_source_control",
+          "source_contract_digest": "99cd37ff523c3c307a5a992583ddd6633ad1287990d5d719622eefd144235a9b"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "mode",
+          "destination_kind": "stable_business_field",
+          "omission": "derive_only_unique_mode_else_repair",
+          "ownership": "user_when_explicit_else_gateway_unique_derivation",
+          "source": "import_operation",
+          "source_contract_digest": "e268850a07c7f44ff45897589d6004229f584cd7576ffa3a2f86f0216d44f292"
+        }
+      ],
+      "row_fields": [
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "media_file",
+          "destination_kind": "exact_user_artifact",
+          "omission": "preserve_omission_for_structure_only_declaration",
+          "ownership": "user_selected_regular_file",
+          "source": "audio_file",
+          "source_contract_digest": "9bc9afaf0da36a6811c6ccbc5660fa2adbc2c69639727730f52395bfceb2505c"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "inline_wav",
+          "destination_kind": "exact_user_artifact",
+          "omission": "preserve_omission",
+          "ownership": "user_owned_opaque_inline_wav",
+          "source": "audio_file_base64",
+          "source_contract_digest": "9caf8353b2dc4c45025fb2a4fd1c0199ffd99f61bfe7b2d90af6ecb315de0570"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "audio_source_notes",
+          "destination_kind": "stable_business_field",
+          "omission": "preserve_omission",
+          "ownership": "user_explicit_business_text",
+          "source": "audio_source_notes",
+          "source_contract_digest": "00404e686415370f1711c4d7acfa2905444d3cf23cef2e10c47d445ebe690f96"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "dialogue_event_directive",
+          "destination_kind": "closed_adapter",
+          "omission": "preserve_omission",
+          "ownership": "exact_user_requested_native_directive_only",
+          "source": "dialogue_event",
+          "source_contract_digest": "a387f82f6dca79c01e8e59c33c2884bdd92d04f8e1be00bcdc73fc025f57b0ed"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "event_declaration",
+          "destination_kind": "closed_adapter",
+          "omission": "preserve_omission",
+          "ownership": "bound_event_parent_name_and_business_action",
+          "source": "event",
+          "source_contract_digest": "4c973bc5d6a8bc927a8bf7c65870491741021614dd401f9b42cbcdbeaee233cb"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "language",
+          "destination_kind": "stable_business_field",
+          "omission": "required_for_media_unless_uniquely_derived",
+          "ownership": "user_explicit_or_project_validated_sfx_consequence",
+          "source": "import_language",
+          "source_contract_digest": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "target_parent_handle",
+          "destination_kind": "gateway_derivation",
+          "omission": "derive_from_target_form",
+          "ownership": "gateway_from_target_parent_or_exact_user_handle",
+          "source": "import_location",
+          "source_contract_digest": "b2bb079f7369ee516099b6c0a25dfe674aa43aac955e2b5d8ef0183cca124e25"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "notes",
+          "destination_kind": "stable_business_field",
+          "omission": "preserve_omission",
+          "ownership": "user_explicit_business_text",
+          "source": "notes",
+          "source_contract_digest": "00404e686415370f1711c4d7acfa2905444d3cf23cef2e10c47d445ebe690f96"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "canonical_object_path",
+          "destination_kind": "gateway_derivation",
+          "omission": "not_a_model_input",
+          "ownership": "gateway_from_parent_handle_name_and_kind",
+          "source": "object_path",
+          "source_contract_digest": "ca9c90885bf68e3280bb5d14c9dc7140583dabf9e415dc011f181c7e2d5e0aa9"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "native_object_type",
+          "destination_kind": "gateway_derivation",
+          "omission": "not_a_model_input",
+          "ownership": "gateway_from_semantic_kind_and_version",
+          "source": "object_type",
+          "source_contract_digest": "8caf8224900be8fc9ccd2725e3affec234f3f5a6d43e75763973a49c32601fdb"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "originals_subfolder",
+          "destination_kind": "stable_business_field",
+          "omission": "preserve_omission",
+          "ownership": "user_explicit_relative_destination",
+          "source": "originals_subfolder",
+          "source_contract_digest": "6704b914c0ec54658330148a77071bda283467305d41ee2db721428304089401"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "property_field_values",
+          "destination_kind": "live_field_handle",
+          "omission": "preserve_omission",
+          "ownership": "live_metadata_bound_field_handle_and_typed_value",
+          "source": "properties",
+          "source_contract_digest": "cd29e8cc39556a2e3815ec2a45ae4a57263bb9d78de38b2be2d84fa00a3653ce"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "reference_field_values",
+          "destination_kind": "live_field_handle",
+          "omission": "preserve_omission",
+          "ownership": "live_metadata_bound_field_and_object_handles",
+          "source": "references",
+          "source_contract_digest": "fa813a31677be9cc79b95b20451376c8bea83f4ea632ecc9bb24cb0deb9fd64b"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "switch_value",
+          "destination_kind": "stable_business_field",
+          "omission": "preserve_omission",
+          "ownership": "user_business_value_with_gateway_context_binding",
+          "source": "switch_assignment",
+          "source_contract_digest": "66ed14be45e29cd8a10e68377c46beae8fc5186ca04cc9196ee326a224e29b1b"
+        }
+      ],
+      "safety_rules": [
+        "one immutable Preview per current business revision",
+        "at most one dispatch and no automatic retry",
+        "every existing object and dynamic field is revalidated before Preview",
+        "regular files and inline WAV data retain immutable bounded evidence",
+        "create, re-import, and explicit replacement never mix ambiguously",
+        "localized existing targets retain their proven field boundary",
+        "every derived target and requested business state is verified after dispatch",
+        "native paths, wire types, metadata scopes, order, batches, and shell quoting are Gateway-owned"
+      ],
+      "source_composer_digest": "8a14f5836b2f70493fe831c366769187bba88f403fbfb5595527ed1748824308",
+      "source_schema_digest": "b84f8a7a23a1b5944a45d4889eaf996b96beefa346671917550f71fdc90f8d8a",
+      "version": "2022.1"
+    },
+    {
+      "actions": [
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "declaration.add",
+          "destination_kind": "stable_business_field",
+          "source": "add_import_row",
+          "source_contract_digest": "26545f8a21dfcab066da654589263a94128bc02b22581b0dcd131083ceadf928"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.explicit_defaults.omit",
+          "destination_kind": "stable_business_field",
+          "source": "clear_import_default",
+          "source_contract_digest": "efa697477d146df55643817a479ccdbb62052c9499d966be240920db3abd6a5e"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.settings.omit",
+          "destination_kind": "stable_business_field",
+          "source": "clear_import_option",
+          "source_contract_digest": "c69f467bb159bdaca358325d6e916f573d9087253301601bf60d2e200e6c592b"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "declaration.revise_with_omission",
+          "destination_kind": "stable_business_field",
+          "source": "clear_import_row_field",
+          "source_contract_digest": "fd3ef678ed4ce2e615bb1c2f25d6d7cdd194f254275e2dde79cab012256d468e"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "declaration.remove",
+          "destination_kind": "stable_business_field",
+          "source": "remove_import_row",
+          "source_contract_digest": "a7b46ac90c5412701a58081214dfa297688f9e447a8654f4db089f3545fbdd7f"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.explicit_defaults",
+          "destination_kind": "stable_business_field",
+          "source": "set_import_default",
+          "source_contract_digest": "2a1f32b0dd2d4c0cfee254994deae6e408dd443e49f9c7968d644469084189a6"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.mode",
+          "destination_kind": "stable_business_field",
+          "source": "set_import_operation",
+          "source_contract_digest": "9344c57c99ae25ba0d5ddf082a04040c928b55955bd6472e177a01048edb1c76"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.settings",
+          "destination_kind": "stable_business_field",
+          "source": "set_import_option",
+          "source_contract_digest": "cc7d8ba963cfe89b9753a5d36e9df743ccf91e33fdb565bfb21398627939a98a"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "declaration.revise",
+          "destination_kind": "stable_business_field",
+          "source": "set_import_row_field",
+          "source_contract_digest": "305543ee6580e992de0216e7d12a2749b8e95c78cf72d262ae57c3449923ca46"
+        }
+      ],
+      "limits": {
+        "canonical_request_bytes": null,
+        "imports": 128,
+        "source": "registry_contract"
+      },
+      "nested_fields": [
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "inline_wav.opaque_base64",
+          "destination_kind": "exact_user_artifact",
+          "source": "audio_file_base64.base64",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "inline_wav.relative_path",
+          "destination_kind": "exact_user_artifact",
+          "source": "audio_file_base64.relative_path",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "event_action",
+          "destination_kind": "stable_business_field",
+          "source": "event.action",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_event_parent_handle",
+          "destination_kind": "bound_object_handle",
+          "source": "event.path",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "target_parent_handle.form",
+          "destination_kind": "gateway_derivation",
+          "source": "import_location.kind",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_parent_exact_name",
+          "destination_kind": "gateway_derivation",
+          "source": "import_location.name",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_parent_scope_handle",
+          "destination_kind": "bound_object_handle",
+          "source": "import_location.parent",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_parent_expected_type",
+          "destination_kind": "gateway_derivation",
+          "source": "import_location.type",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "target_parent_handle",
+          "destination_kind": "bound_object_handle",
+          "source": "import_location.value",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "field_handle",
+          "destination_kind": "live_field_handle",
+          "source": "properties[].name",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "typed_field_value",
+          "destination_kind": "stable_business_field",
+          "source": "properties[].value",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "field_handle",
+          "destination_kind": "live_field_handle",
+          "source": "references[].name",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_object_handle",
+          "destination_kind": "bound_object_handle",
+          "source": "references[].target",
+          "source_contract_digest": null
+        }
+      ],
+      "request_options": [
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "add_to_source_control",
+          "destination_kind": "stable_business_field",
+          "omission": "gateway_native_default_false",
+          "ownership": "user_explicit_batch_setting",
+          "source": "auto_add_to_source_control",
+          "source_contract_digest": "f56777819c8be28f711bc04bdfdb5fb6a82bdaf4109198c616273cb0003e4137"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "check_out_from_source_control",
+          "destination_kind": "stable_business_field",
+          "omission": "gateway_version_default_false_or_absent",
+          "ownership": "user_explicit_batch_setting",
+          "source": "auto_check_out_to_source_control",
+          "source_contract_digest": "99cd37ff523c3c307a5a992583ddd6633ad1287990d5d719622eefd144235a9b"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "mode",
+          "destination_kind": "stable_business_field",
+          "omission": "derive_only_unique_mode_else_repair",
+          "ownership": "user_when_explicit_else_gateway_unique_derivation",
+          "source": "import_operation",
+          "source_contract_digest": "e268850a07c7f44ff45897589d6004229f584cd7576ffa3a2f86f0216d44f292"
+        }
+      ],
+      "row_fields": [
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "media_file",
+          "destination_kind": "exact_user_artifact",
+          "omission": "preserve_omission_for_structure_only_declaration",
+          "ownership": "user_selected_regular_file",
+          "source": "audio_file",
+          "source_contract_digest": "9bc9afaf0da36a6811c6ccbc5660fa2adbc2c69639727730f52395bfceb2505c"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "inline_wav",
+          "destination_kind": "exact_user_artifact",
+          "omission": "preserve_omission",
+          "ownership": "user_owned_opaque_inline_wav",
+          "source": "audio_file_base64",
+          "source_contract_digest": "9caf8353b2dc4c45025fb2a4fd1c0199ffd99f61bfe7b2d90af6ecb315de0570"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "audio_source_notes",
+          "destination_kind": "stable_business_field",
+          "omission": "preserve_omission",
+          "ownership": "user_explicit_business_text",
+          "source": "audio_source_notes",
+          "source_contract_digest": "00404e686415370f1711c4d7acfa2905444d3cf23cef2e10c47d445ebe690f96"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "dialogue_event_directive",
+          "destination_kind": "closed_adapter",
+          "omission": "preserve_omission",
+          "ownership": "exact_user_requested_native_directive_only",
+          "source": "dialogue_event",
+          "source_contract_digest": "a387f82f6dca79c01e8e59c33c2884bdd92d04f8e1be00bcdc73fc025f57b0ed"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "event_declaration",
+          "destination_kind": "closed_adapter",
+          "omission": "preserve_omission",
+          "ownership": "bound_event_parent_name_and_business_action",
+          "source": "event",
+          "source_contract_digest": "4c973bc5d6a8bc927a8bf7c65870491741021614dd401f9b42cbcdbeaee233cb"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "language",
+          "destination_kind": "stable_business_field",
+          "omission": "required_for_media_unless_uniquely_derived",
+          "ownership": "user_explicit_or_project_validated_sfx_consequence",
+          "source": "import_language",
+          "source_contract_digest": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "target_parent_handle",
+          "destination_kind": "gateway_derivation",
+          "omission": "derive_from_target_form",
+          "ownership": "gateway_from_target_parent_or_exact_user_handle",
+          "source": "import_location",
+          "source_contract_digest": "b2bb079f7369ee516099b6c0a25dfe674aa43aac955e2b5d8ef0183cca124e25"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "notes",
+          "destination_kind": "stable_business_field",
+          "omission": "preserve_omission",
+          "ownership": "user_explicit_business_text",
+          "source": "notes",
+          "source_contract_digest": "00404e686415370f1711c4d7acfa2905444d3cf23cef2e10c47d445ebe690f96"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "canonical_object_path",
+          "destination_kind": "gateway_derivation",
+          "omission": "not_a_model_input",
+          "ownership": "gateway_from_parent_handle_name_and_kind",
+          "source": "object_path",
+          "source_contract_digest": "83e5401197d1479ebdc4c88c0c59e10880165881234c60757d17e58abe4f3203"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "native_object_type",
+          "destination_kind": "gateway_derivation",
+          "omission": "not_a_model_input",
+          "ownership": "gateway_from_semantic_kind_and_version",
+          "source": "object_type",
+          "source_contract_digest": "8caf8224900be8fc9ccd2725e3affec234f3f5a6d43e75763973a49c32601fdb"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "originals_subfolder",
+          "destination_kind": "stable_business_field",
+          "omission": "preserve_omission",
+          "ownership": "user_explicit_relative_destination",
+          "source": "originals_subfolder",
+          "source_contract_digest": "6704b914c0ec54658330148a77071bda283467305d41ee2db721428304089401"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "property_field_values",
+          "destination_kind": "live_field_handle",
+          "omission": "preserve_omission",
+          "ownership": "live_metadata_bound_field_handle_and_typed_value",
+          "source": "properties",
+          "source_contract_digest": "cd29e8cc39556a2e3815ec2a45ae4a57263bb9d78de38b2be2d84fa00a3653ce"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "reference_field_values",
+          "destination_kind": "live_field_handle",
+          "omission": "preserve_omission",
+          "ownership": "live_metadata_bound_field_and_object_handles",
+          "source": "references",
+          "source_contract_digest": "fa813a31677be9cc79b95b20451376c8bea83f4ea632ecc9bb24cb0deb9fd64b"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "switch_value",
+          "destination_kind": "stable_business_field",
+          "omission": "preserve_omission",
+          "ownership": "user_business_value_with_gateway_context_binding",
+          "source": "switch_assignment",
+          "source_contract_digest": "66ed14be45e29cd8a10e68377c46beae8fc5186ca04cc9196ee326a224e29b1b"
+        }
+      ],
+      "safety_rules": [
+        "one immutable Preview per current business revision",
+        "at most one dispatch and no automatic retry",
+        "every existing object and dynamic field is revalidated before Preview",
+        "regular files and inline WAV data retain immutable bounded evidence",
+        "create, re-import, and explicit replacement never mix ambiguously",
+        "localized existing targets retain their proven field boundary",
+        "every derived target and requested business state is verified after dispatch",
+        "native paths, wire types, metadata scopes, order, batches, and shell quoting are Gateway-owned"
+      ],
+      "source_composer_digest": "dc2f7aaf67dab88fbf54df5844f33dd038acbc7b97afd6ce0f3eaddd8cd86aca",
+      "source_schema_digest": "2d46db8f8cad71e4dd9927c0d62b21f6c202f0755363ba8a92b54ea4a2adf384",
+      "version": "2023.1"
+    },
+    {
+      "actions": [
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "declaration.add",
+          "destination_kind": "stable_business_field",
+          "source": "add_import_row",
+          "source_contract_digest": "26545f8a21dfcab066da654589263a94128bc02b22581b0dcd131083ceadf928"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.explicit_defaults.omit",
+          "destination_kind": "stable_business_field",
+          "source": "clear_import_default",
+          "source_contract_digest": "efa697477d146df55643817a479ccdbb62052c9499d966be240920db3abd6a5e"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.settings.omit",
+          "destination_kind": "stable_business_field",
+          "source": "clear_import_option",
+          "source_contract_digest": "c69f467bb159bdaca358325d6e916f573d9087253301601bf60d2e200e6c592b"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "declaration.revise_with_omission",
+          "destination_kind": "stable_business_field",
+          "source": "clear_import_row_field",
+          "source_contract_digest": "fd3ef678ed4ce2e615bb1c2f25d6d7cdd194f254275e2dde79cab012256d468e"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "declaration.remove",
+          "destination_kind": "stable_business_field",
+          "source": "remove_import_row",
+          "source_contract_digest": "a7b46ac90c5412701a58081214dfa297688f9e447a8654f4db089f3545fbdd7f"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.explicit_defaults",
+          "destination_kind": "stable_business_field",
+          "source": "set_import_default",
+          "source_contract_digest": "2a1f32b0dd2d4c0cfee254994deae6e408dd443e49f9c7968d644469084189a6"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.mode",
+          "destination_kind": "stable_business_field",
+          "source": "set_import_operation",
+          "source_contract_digest": "9344c57c99ae25ba0d5ddf082a04040c928b55955bd6472e177a01048edb1c76"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.settings",
+          "destination_kind": "stable_business_field",
+          "source": "set_import_option",
+          "source_contract_digest": "cc7d8ba963cfe89b9753a5d36e9df743ccf91e33fdb565bfb21398627939a98a"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "declaration.revise",
+          "destination_kind": "stable_business_field",
+          "source": "set_import_row_field",
+          "source_contract_digest": "305543ee6580e992de0216e7d12a2749b8e95c78cf72d262ae57c3449923ca46"
+        }
+      ],
+      "limits": {
+        "canonical_request_bytes": null,
+        "imports": 128,
+        "source": "registry_contract"
+      },
+      "nested_fields": [
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "inline_wav.opaque_base64",
+          "destination_kind": "exact_user_artifact",
+          "source": "audio_file_base64.base64",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "inline_wav.relative_path",
+          "destination_kind": "exact_user_artifact",
+          "source": "audio_file_base64.relative_path",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "event_action",
+          "destination_kind": "stable_business_field",
+          "source": "event.action",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_event_parent_handle",
+          "destination_kind": "bound_object_handle",
+          "source": "event.path",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "target_parent_handle.form",
+          "destination_kind": "gateway_derivation",
+          "source": "import_location.kind",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_parent_exact_name",
+          "destination_kind": "gateway_derivation",
+          "source": "import_location.name",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_parent_scope_handle",
+          "destination_kind": "bound_object_handle",
+          "source": "import_location.parent",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_parent_expected_type",
+          "destination_kind": "gateway_derivation",
+          "source": "import_location.type",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "target_parent_handle",
+          "destination_kind": "bound_object_handle",
+          "source": "import_location.value",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "field_handle",
+          "destination_kind": "live_field_handle",
+          "source": "properties[].name",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "typed_field_value",
+          "destination_kind": "stable_business_field",
+          "source": "properties[].value",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "field_handle",
+          "destination_kind": "live_field_handle",
+          "source": "references[].name",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_object_handle",
+          "destination_kind": "bound_object_handle",
+          "source": "references[].target",
+          "source_contract_digest": null
+        }
+      ],
+      "request_options": [
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "add_to_source_control",
+          "destination_kind": "stable_business_field",
+          "omission": "gateway_native_default_false",
+          "ownership": "user_explicit_batch_setting",
+          "source": "auto_add_to_source_control",
+          "source_contract_digest": "f56777819c8be28f711bc04bdfdb5fb6a82bdaf4109198c616273cb0003e4137"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "check_out_from_source_control",
+          "destination_kind": "stable_business_field",
+          "omission": "gateway_version_default_false_or_absent",
+          "ownership": "user_explicit_batch_setting",
+          "source": "auto_check_out_to_source_control",
+          "source_contract_digest": "99cd37ff523c3c307a5a992583ddd6633ad1287990d5d719622eefd144235a9b"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "mode",
+          "destination_kind": "stable_business_field",
+          "omission": "derive_only_unique_mode_else_repair",
+          "ownership": "user_when_explicit_else_gateway_unique_derivation",
+          "source": "import_operation",
+          "source_contract_digest": "e268850a07c7f44ff45897589d6004229f584cd7576ffa3a2f86f0216d44f292"
+        }
+      ],
+      "row_fields": [
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "media_file",
+          "destination_kind": "exact_user_artifact",
+          "omission": "preserve_omission_for_structure_only_declaration",
+          "ownership": "user_selected_regular_file",
+          "source": "audio_file",
+          "source_contract_digest": "9bc9afaf0da36a6811c6ccbc5660fa2adbc2c69639727730f52395bfceb2505c"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "inline_wav",
+          "destination_kind": "exact_user_artifact",
+          "omission": "preserve_omission",
+          "ownership": "user_owned_opaque_inline_wav",
+          "source": "audio_file_base64",
+          "source_contract_digest": "9caf8353b2dc4c45025fb2a4fd1c0199ffd99f61bfe7b2d90af6ecb315de0570"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "audio_source_notes",
+          "destination_kind": "stable_business_field",
+          "omission": "preserve_omission",
+          "ownership": "user_explicit_business_text",
+          "source": "audio_source_notes",
+          "source_contract_digest": "00404e686415370f1711c4d7acfa2905444d3cf23cef2e10c47d445ebe690f96"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "dialogue_event_directive",
+          "destination_kind": "closed_adapter",
+          "omission": "preserve_omission",
+          "ownership": "exact_user_requested_native_directive_only",
+          "source": "dialogue_event",
+          "source_contract_digest": "a387f82f6dca79c01e8e59c33c2884bdd92d04f8e1be00bcdc73fc025f57b0ed"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "event_declaration",
+          "destination_kind": "closed_adapter",
+          "omission": "preserve_omission",
+          "ownership": "bound_event_parent_name_and_business_action",
+          "source": "event",
+          "source_contract_digest": "4c973bc5d6a8bc927a8bf7c65870491741021614dd401f9b42cbcdbeaee233cb"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "language",
+          "destination_kind": "stable_business_field",
+          "omission": "required_for_media_unless_uniquely_derived",
+          "ownership": "user_explicit_or_project_validated_sfx_consequence",
+          "source": "import_language",
+          "source_contract_digest": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "target_parent_handle",
+          "destination_kind": "gateway_derivation",
+          "omission": "derive_from_target_form",
+          "ownership": "gateway_from_target_parent_or_exact_user_handle",
+          "source": "import_location",
+          "source_contract_digest": "b2bb079f7369ee516099b6c0a25dfe674aa43aac955e2b5d8ef0183cca124e25"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "notes",
+          "destination_kind": "stable_business_field",
+          "omission": "preserve_omission",
+          "ownership": "user_explicit_business_text",
+          "source": "notes",
+          "source_contract_digest": "00404e686415370f1711c4d7acfa2905444d3cf23cef2e10c47d445ebe690f96"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "canonical_object_path",
+          "destination_kind": "gateway_derivation",
+          "omission": "not_a_model_input",
+          "ownership": "gateway_from_parent_handle_name_and_kind",
+          "source": "object_path",
+          "source_contract_digest": "2837464462d9acbddc9277bc27edb192c5d22b63cb59b26ff316393875f7c696"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "native_object_type",
+          "destination_kind": "gateway_derivation",
+          "omission": "not_a_model_input",
+          "ownership": "gateway_from_semantic_kind_and_version",
+          "source": "object_type",
+          "source_contract_digest": "8caf8224900be8fc9ccd2725e3affec234f3f5a6d43e75763973a49c32601fdb"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "originals_subfolder",
+          "destination_kind": "stable_business_field",
+          "omission": "preserve_omission",
+          "ownership": "user_explicit_relative_destination",
+          "source": "originals_subfolder",
+          "source_contract_digest": "6704b914c0ec54658330148a77071bda283467305d41ee2db721428304089401"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "property_field_values",
+          "destination_kind": "live_field_handle",
+          "omission": "preserve_omission",
+          "ownership": "live_metadata_bound_field_handle_and_typed_value",
+          "source": "properties",
+          "source_contract_digest": "cd29e8cc39556a2e3815ec2a45ae4a57263bb9d78de38b2be2d84fa00a3653ce"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "reference_field_values",
+          "destination_kind": "live_field_handle",
+          "omission": "preserve_omission",
+          "ownership": "live_metadata_bound_field_and_object_handles",
+          "source": "references",
+          "source_contract_digest": "fa813a31677be9cc79b95b20451376c8bea83f4ea632ecc9bb24cb0deb9fd64b"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "switch_value",
+          "destination_kind": "stable_business_field",
+          "omission": "preserve_omission",
+          "ownership": "user_business_value_with_gateway_context_binding",
+          "source": "switch_assignment",
+          "source_contract_digest": "66ed14be45e29cd8a10e68377c46beae8fc5186ca04cc9196ee326a224e29b1b"
+        }
+      ],
+      "safety_rules": [
+        "one immutable Preview per current business revision",
+        "at most one dispatch and no automatic retry",
+        "every existing object and dynamic field is revalidated before Preview",
+        "regular files and inline WAV data retain immutable bounded evidence",
+        "create, re-import, and explicit replacement never mix ambiguously",
+        "localized existing targets retain their proven field boundary",
+        "every derived target and requested business state is verified after dispatch",
+        "native paths, wire types, metadata scopes, order, batches, and shell quoting are Gateway-owned"
+      ],
+      "source_composer_digest": "cec570300fad1767b9ea9b7ba2b16485ed9a536b54840c5ee5f51a8b91484fda",
+      "source_schema_digest": "bbc540540a07f62e8cfb34f2d83eaf5f00713cc01c327b59c2e4383dc1ca7cba",
+      "version": "2024.1"
+    },
+    {
+      "actions": [
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "declaration.add",
+          "destination_kind": "stable_business_field",
+          "source": "add_import_row",
+          "source_contract_digest": "26545f8a21dfcab066da654589263a94128bc02b22581b0dcd131083ceadf928"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.explicit_defaults.omit",
+          "destination_kind": "stable_business_field",
+          "source": "clear_import_default",
+          "source_contract_digest": "efa697477d146df55643817a479ccdbb62052c9499d966be240920db3abd6a5e"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.settings.omit",
+          "destination_kind": "stable_business_field",
+          "source": "clear_import_option",
+          "source_contract_digest": "c69f467bb159bdaca358325d6e916f573d9087253301601bf60d2e200e6c592b"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "declaration.revise_with_omission",
+          "destination_kind": "stable_business_field",
+          "source": "clear_import_row_field",
+          "source_contract_digest": "fd3ef678ed4ce2e615bb1c2f25d6d7cdd194f254275e2dde79cab012256d468e"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "declaration.remove",
+          "destination_kind": "stable_business_field",
+          "source": "remove_import_row",
+          "source_contract_digest": "a7b46ac90c5412701a58081214dfa297688f9e447a8654f4db089f3545fbdd7f"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.explicit_defaults",
+          "destination_kind": "stable_business_field",
+          "source": "set_import_default",
+          "source_contract_digest": "2a1f32b0dd2d4c0cfee254994deae6e408dd443e49f9c7968d644469084189a6"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.mode",
+          "destination_kind": "stable_business_field",
+          "source": "set_import_operation",
+          "source_contract_digest": "9344c57c99ae25ba0d5ddf082a04040c928b55955bd6472e177a01048edb1c76"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "batch.settings",
+          "destination_kind": "stable_business_field",
+          "source": "set_import_option",
+          "source_contract_digest": "cc7d8ba963cfe89b9753a5d36e9df743ccf91e33fdb565bfb21398627939a98a"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "declaration.revise",
+          "destination_kind": "stable_business_field",
+          "source": "set_import_row_field",
+          "source_contract_digest": "305543ee6580e992de0216e7d12a2749b8e95c78cf72d262ae57c3449923ca46"
+        }
+      ],
+      "limits": {
+        "canonical_request_bytes": null,
+        "imports": 128,
+        "source": "registry_contract"
+      },
+      "nested_fields": [
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "inline_wav.opaque_base64",
+          "destination_kind": "exact_user_artifact",
+          "source": "audio_file_base64.base64",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "inline_wav.relative_path",
+          "destination_kind": "exact_user_artifact",
+          "source": "audio_file_base64.relative_path",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "event_action",
+          "destination_kind": "stable_business_field",
+          "source": "event.action",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_event_parent_handle",
+          "destination_kind": "bound_object_handle",
+          "source": "event.path",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "target_parent_handle.form",
+          "destination_kind": "gateway_derivation",
+          "source": "import_location.kind",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_parent_exact_name",
+          "destination_kind": "gateway_derivation",
+          "source": "import_location.name",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_parent_scope_handle",
+          "destination_kind": "bound_object_handle",
+          "source": "import_location.parent",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_parent_expected_type",
+          "destination_kind": "gateway_derivation",
+          "source": "import_location.type",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "target_parent_handle",
+          "destination_kind": "bound_object_handle",
+          "source": "import_location.value",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "field_handle",
+          "destination_kind": "live_field_handle",
+          "source": "properties[].name",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "typed_field_value",
+          "destination_kind": "stable_business_field",
+          "source": "properties[].value",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "field_handle",
+          "destination_kind": "live_field_handle",
+          "source": "references[].name",
+          "source_contract_digest": null
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "bound_object_handle",
+          "destination_kind": "bound_object_handle",
+          "source": "references[].target",
+          "source_contract_digest": null
+        }
+      ],
+      "request_options": [
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "add_to_source_control",
+          "destination_kind": "stable_business_field",
+          "omission": "gateway_native_default_false",
+          "ownership": "user_explicit_batch_setting",
+          "source": "auto_add_to_source_control",
+          "source_contract_digest": "f56777819c8be28f711bc04bdfdb5fb6a82bdaf4109198c616273cb0003e4137"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "check_out_from_source_control",
+          "destination_kind": "stable_business_field",
+          "omission": "gateway_version_default_false_or_absent",
+          "ownership": "user_explicit_batch_setting",
+          "source": "auto_check_out_to_source_control",
+          "source_contract_digest": "99cd37ff523c3c307a5a992583ddd6633ad1287990d5d719622eefd144235a9b"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "mode",
+          "destination_kind": "stable_business_field",
+          "omission": "derive_only_unique_mode_else_repair",
+          "ownership": "user_when_explicit_else_gateway_unique_derivation",
+          "source": "import_operation",
+          "source_contract_digest": "e268850a07c7f44ff45897589d6004229f584cd7576ffa3a2f86f0216d44f292"
+        }
+      ],
+      "row_fields": [
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "media_file",
+          "destination_kind": "exact_user_artifact",
+          "omission": "preserve_omission_for_structure_only_declaration",
+          "ownership": "user_selected_regular_file",
+          "source": "audio_file",
+          "source_contract_digest": "9bc9afaf0da36a6811c6ccbc5660fa2adbc2c69639727730f52395bfceb2505c"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "inline_wav",
+          "destination_kind": "exact_user_artifact",
+          "omission": "preserve_omission",
+          "ownership": "user_owned_opaque_inline_wav",
+          "source": "audio_file_base64",
+          "source_contract_digest": "9caf8353b2dc4c45025fb2a4fd1c0199ffd99f61bfe7b2d90af6ecb315de0570"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "audio_source_notes",
+          "destination_kind": "stable_business_field",
+          "omission": "preserve_omission",
+          "ownership": "user_explicit_business_text",
+          "source": "audio_source_notes",
+          "source_contract_digest": "00404e686415370f1711c4d7acfa2905444d3cf23cef2e10c47d445ebe690f96"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "dialogue_event_directive",
+          "destination_kind": "closed_adapter",
+          "omission": "preserve_omission",
+          "ownership": "exact_user_requested_native_directive_only",
+          "source": "dialogue_event",
+          "source_contract_digest": "a387f82f6dca79c01e8e59c33c2884bdd92d04f8e1be00bcdc73fc025f57b0ed"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "event_declaration",
+          "destination_kind": "closed_adapter",
+          "omission": "preserve_omission",
+          "ownership": "bound_event_parent_name_and_business_action",
+          "source": "event",
+          "source_contract_digest": "4c973bc5d6a8bc927a8bf7c65870491741021614dd401f9b42cbcdbeaee233cb"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "language",
+          "destination_kind": "stable_business_field",
+          "omission": "required_for_media_unless_uniquely_derived",
+          "ownership": "user_explicit_or_project_validated_sfx_consequence",
+          "source": "import_language",
+          "source_contract_digest": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "target_parent_handle",
+          "destination_kind": "gateway_derivation",
+          "omission": "derive_from_target_form",
+          "ownership": "gateway_from_target_parent_or_exact_user_handle",
+          "source": "import_location",
+          "source_contract_digest": "b2bb079f7369ee516099b6c0a25dfe674aa43aac955e2b5d8ef0183cca124e25"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "notes",
+          "destination_kind": "stable_business_field",
+          "omission": "preserve_omission",
+          "ownership": "user_explicit_business_text",
+          "source": "notes",
+          "source_contract_digest": "00404e686415370f1711c4d7acfa2905444d3cf23cef2e10c47d445ebe690f96"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "canonical_object_path",
+          "destination_kind": "gateway_derivation",
+          "omission": "not_a_model_input",
+          "ownership": "gateway_from_parent_handle_name_and_kind",
+          "source": "object_path",
+          "source_contract_digest": "8d988e56c6e2b4987839a1580487c2de0b30ffbd340d4222128f0623fb67dff7"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "native_object_type",
+          "destination_kind": "gateway_derivation",
+          "omission": "not_a_model_input",
+          "ownership": "gateway_from_semantic_kind_and_version",
+          "source": "object_type",
+          "source_contract_digest": "8caf8224900be8fc9ccd2725e3affec234f3f5a6d43e75763973a49c32601fdb"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "originals_subfolder",
+          "destination_kind": "stable_business_field",
+          "omission": "preserve_omission",
+          "ownership": "user_explicit_relative_destination",
+          "source": "originals_subfolder",
+          "source_contract_digest": "6704b914c0ec54658330148a77071bda283467305d41ee2db721428304089401"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "property_field_values",
+          "destination_kind": "live_field_handle",
+          "omission": "preserve_omission",
+          "ownership": "live_metadata_bound_field_handle_and_typed_value",
+          "source": "properties",
+          "source_contract_digest": "cd29e8cc39556a2e3815ec2a45ae4a57263bb9d78de38b2be2d84fa00a3653ce"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "reference_field_values",
+          "destination_kind": "live_field_handle",
+          "omission": "preserve_omission",
+          "ownership": "live_metadata_bound_field_and_object_handles",
+          "source": "references",
+          "source_contract_digest": "fa813a31677be9cc79b95b20451376c8bea83f4ea632ecc9bb24cb0deb9fd64b"
+        },
+        {
+          "available": true,
+          "cutover": "remove_old_model_input",
+          "destination": "switch_value",
+          "destination_kind": "stable_business_field",
+          "omission": "preserve_omission",
+          "ownership": "user_business_value_with_gateway_context_binding",
+          "source": "switch_assignment",
+          "source_contract_digest": "66ed14be45e29cd8a10e68377c46beae8fc5186ca04cc9196ee326a224e29b1b"
+        }
+      ],
+      "safety_rules": [
+        "one immutable Preview per current business revision",
+        "at most one dispatch and no automatic retry",
+        "every existing object and dynamic field is revalidated before Preview",
+        "regular files and inline WAV data retain immutable bounded evidence",
+        "create, re-import, and explicit replacement never mix ambiguously",
+        "localized existing targets retain their proven field boundary",
+        "every derived target and requested business state is verified after dispatch",
+        "native paths, wire types, metadata scopes, order, batches, and shell quoting are Gateway-owned"
+      ],
+      "source_composer_digest": "58df9676b40b5e9f4667cf5c2aa7a3a1fccaf250fb42a82dc3f0d099d8c0b123",
+      "source_schema_digest": "f1f5d15fb16db06a6a3d5bf1d3749a7f0cf7b8a0a3efcbfbbf09515b2b72967d",
+      "version": "2025.1"
+    }
+  ],
+  "operation": "audio.import",
+  "versions": [
+    "2021.1",
+    "2022.1",
+    "2023.1",
+    "2024.1",
+    "2025.1"
+  ]
+}
