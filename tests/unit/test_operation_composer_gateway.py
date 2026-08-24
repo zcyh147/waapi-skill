@@ -826,17 +826,20 @@ def test_object_set_draft_start_repeats_exact_allowed_action_argv(
     }
 
 
-def test_audio_import_draft_start_repeats_wwise_path_discipline(
+def test_audio_import_draft_start_routes_to_gateway_owned_business_binding(
     tmp_path: Path,
 ) -> None:
     code, payload = execute(tmp_path, "draft-start", "audio.import")
 
     assert code == 0
-    assert payload["draft"]["next_action_binding"]["wwise_path_discipline"] == {
-        "parent_source": "exact_user_supplied_business_path",
-        "append_descendant": "one_literal_backslash_before_each_child_name",
-        "remove_or_normalize_existing_separators": "invalid",
+    binding = payload["draft"]["next_action_binding"]
+    assert binding["responsibility_split"] == {
+        "agent": "natural_language_to_closed_high_level_business_facts",
+        "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
     }
+    assert binding["required_next_phase"] == "bind_required_business_objects"
+    assert "wwise_path_discipline" not in binding
+    assert "draft-apply" not in json.dumps(binding)
 
 
 def test_metadata_preconditions_are_operation_local_in_composer_start(

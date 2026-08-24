@@ -103,6 +103,7 @@ class BusinessDeclarationError(ValueError):
 
     def __init__(self, repair: Mapping[str, Any]) -> None:
         self.repair = dict(repair)
+        self.details = dict(repair)
         super().__init__(str(self.repair.get("error_code", "BUSINESS_DECLARATION_ERROR")))
 
     @property

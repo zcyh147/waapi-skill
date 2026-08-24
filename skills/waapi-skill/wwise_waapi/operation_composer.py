@@ -4407,7 +4407,18 @@ def _audio_import_composition_projection(
             "missing_fields_status": (
                 "incomplete" if not session.declarations else "complete"
             ),
-            "allowed_actions": ["inspect", "cancel"],
+            "allowed_actions": [
+                "bind-object",
+                "bind-field",
+                "configure",
+                "declare-new",
+                "declare-existing",
+                "revise-declaration",
+                "remove-declaration",
+                "check",
+                "inspect",
+                "cancel",
+            ],
         }
     defaults = composition["defaults"]
     facts = [

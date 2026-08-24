@@ -455,6 +455,85 @@ def test_business_update_storage_crash_preserves_previous_bytes(
     assert path.read_bytes() == before
 
 
+def test_live_check_atomically_persists_the_compiled_business_preview(
+    tmp_path: Path,
+) -> None:
+    store = OperationDraftStore(tmp_path / "state")
+    version = "2022.1"
+    schema_digest = operation_request_schema_digest("audio.import", version)
+    composer_digest = operation_composer_digest("audio.import", version)
+    started = store.start(
+        operation="audio.import",
+        version=version,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+    )
+    context = _context(started.task_authority, version)
+
+    def add_structure(
+        session: BusinessDeclarationSession,
+    ) -> BusinessDeclarationSession:
+        parent = session.handles.bind_object(
+            object_id=PARENT_ID,
+            name="Weather",
+            object_type="ActorMixer",
+            path=r"\Actor-Mixer Hierarchy\Default Work Unit\Weather",
+        )
+        return session.with_new_declaration(
+            declaration_id="variants",
+            target=NewDescendantTarget(
+                parent_handle=parent.handle,
+                name="Variants",
+                kind="random-container",
+            ),
+            fields={},
+        )
+
+    edited = store.apply_business_update(
+        started.draft_id,
+        task_authority=started.task_authority,
+        expected_revision=1,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+        context=context,
+        update=add_structure,
+        event_type="declaration.added",
+    )
+    materialized = store.materialize_request(
+        started.draft_id,
+        task_authority=started.task_authority,
+        expected_revision=edited.revision,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+    )
+    preview = BusinessPreview.create(
+        source_revision=1,
+        readable_lines=("对象：Variants", "类型：Random Container"),
+        detail={"native_request_digest": materialized.request_digest},
+    )
+
+    checked = store.record_check(
+        started.draft_id,
+        task_authority=started.task_authority,
+        expected_revision=edited.revision,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+        request_digest=materialized.request_digest,
+        project_guard={"project": PROJECT_ID},
+        runtime_guard_fingerprint="a" * 64,
+        prepared_digest="b" * 64,
+        business_preview=preview,
+    )
+
+    assert checked.composition is not None
+    restored = BusinessDeclarationSession.from_dict(
+        checked.composition["business_session"]
+    )
+    assert restored.active_preview == preview
+    assert checked.check is not None
+    assert checked.check["source_revision"] == edited.revision
+
+
 def _add_weather(session: BusinessDeclarationSession) -> BusinessDeclarationSession:
     parent = session.handles.bind_object(
         object_id=PARENT_ID,

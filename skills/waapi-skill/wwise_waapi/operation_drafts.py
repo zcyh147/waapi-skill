@@ -26,8 +26,9 @@ from typing import Any, Callable, Collection, Iterator, Mapping, Sequence
 from .business_declaration_state import (
     BUSINESS_SESSION_UPDATE_EVENTS,
     BusinessDeclarationSession,
+    BusinessPreview,
 )
-from .business_declarations import BusinessContext
+from .business_declarations import BusinessContext, BusinessDeclarationError
 from .audio_import_business import materialize_audio_import_business_request
 from .canonical import canonical_json_bytes, canonical_sha256
 from .filesystem_security import path_is_link_or_reparse
@@ -913,6 +914,7 @@ class OperationDraftStore:
         project_guard: Mapping[str, Any],
         runtime_guard_fingerprint: str,
         prepared_digest: str,
+        business_preview: BusinessPreview | None = None,
         now: datetime | None = None,
     ) -> OperationDraftRecord:
         """CAS-publish bounded successful live-check evidence."""
@@ -974,6 +976,34 @@ class OperationDraftStore:
                     "Operation Draft facts changed before live check evidence could be recorded.",
                     details={"actual_revision": record.revision},
                 )
+            composition = record.composition
+            if business_preview is not None:
+                if not isinstance(business_preview, BusinessPreview):
+                    raise TypeError("business_preview must be BusinessPreview")
+                raw_session = composition.get("business_session")
+                if record.operation != "audio.import" or raw_session is None:
+                    raise OperationDraftInvalidTransition(
+                        "Only a deep audio.import Draft can record a business Preview."
+                    )
+                try:
+                    session = BusinessDeclarationSession.from_dict(raw_session)
+                    candidate = session.with_preview(business_preview)
+                    BusinessDeclarationSession.validate_transition(
+                        session.as_dict(),
+                        candidate,
+                        event_type="preview.recorded",
+                    )
+                except (BusinessDeclarationError, TypeError, ValueError) as exc:
+                    raise OperationDraftInvalidTransition(
+                        "Business Preview does not match the checked declaration revision."
+                    ) from exc
+                composition = dict(composition)
+                composition["business_session"] = candidate.as_dict()
+                _require_composition_projection_budget(
+                    record.operation,
+                    record.version,
+                    composition,
+                )
             checked_at = _timestamp(current)
             check = {
                 "checked_at": checked_at,
@@ -1021,7 +1051,7 @@ class OperationDraftStore:
                 limits_digest=record.limits_digest,
                 schema_version=record.schema_version,
                 composer_digest=record.composer_digest,
-                composition=record.composition,
+                composition=composition,
                 check=check,
                 seal=None,
             )
