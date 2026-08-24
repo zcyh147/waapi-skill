@@ -27,6 +27,7 @@ from .builders.metadata import (
 )
 from .canonical import canonical_json_bytes, canonical_sha256, sha256_hex
 from .metadata_discovery import metadata_typed_value_type
+from .identity_limits import MULTI_IDENTITY_READ_MAX_IDS
 from .metadata_restrictions import (
     MetadataRestrictionError,
     reference_allowed_types,
@@ -1110,27 +1111,86 @@ def revalidate_live_object(
 ) -> BoundObjectHandle:
     """Re-read one bound object by GUID and require its exact sealed quartet."""
 
+    return revalidate_live_objects(registry, (bound,), read_call=read_call)[0]
+
+
+def revalidate_live_objects(
+    registry: BusinessHandleRegistry,
+    bounds: Sequence[BoundObjectHandle],
+    *,
+    read_call: ReadCall,
+) -> tuple[BoundObjectHandle, ...]:
+    """Re-read one deduplicated bounded GUID set and require every sealed row."""
+
     if not isinstance(registry, BusinessHandleRegistry):
         raise TypeError("registry must be BusinessHandleRegistry")
-    if not isinstance(bound, BoundObjectHandle):
-        raise TypeError("bound must be BoundObjectHandle")
+    if (
+        not isinstance(bounds, Sequence)
+        or isinstance(bounds, (str, bytes))
+        or any(not isinstance(bound, BoundObjectHandle) for bound in bounds)
+    ):
+        raise TypeError("bounds must be a sequence of BoundObjectHandle values")
+    if not bounds:
+        return ()
+    unique_ids = list(dict.fromkeys(bound.object_id for bound in bounds))
+    if len(unique_ids) > MULTI_IDENTITY_READ_MAX_IDS:
+        raise _error(
+            "OBJECT_READ_LIMIT_EXCEEDED",
+            field="object_handle",
+            actual_count=len(unique_ids),
+            limit=MULTI_IDENTITY_READ_MAX_IDS,
+            action="reduce the exact bound object set before Preview",
+        )
     try:
         return_fields = ["id", "name", "type", "path"]
-        if bound.semantic_kind is not None:
+        if any(bound.semantic_kind is not None for bound in bounds):
             return_fields.append("@IsVoice")
         payload = read_call(
             "ak.wwise.core.object.get",
-            {"from": {"id": [bound.object_id]}},
+            {"from": {"id": unique_ids}},
             {"return": return_fields},
         )
+        if not isinstance(payload, Mapping):
+            raise ValueError("object readback is not a JSON object")
         rows = payload.get("return")
-        if (
-            not isinstance(rows, list)
-            or len(rows) != 1
-            or not isinstance(rows[0], Mapping)
-        ):
-            raise ValueError("object readback is not exactly one row")
-        row = rows[0]
+        if not isinstance(rows, list) or len(rows) > MULTI_IDENTITY_READ_MAX_IDS:
+            raise ValueError("object readback exceeds its bounded row contract")
+        expected_ids = set(unique_ids)
+        rows_by_id: dict[str, Mapping[str, Any]] = {}
+        for row in rows:
+            if not isinstance(row, Mapping):
+                raise ValueError("object readback row is not an object")
+            object_id = row.get("id")
+            if not isinstance(object_id, str) or not _CANONICAL_GUID.fullmatch(object_id):
+                raise ValueError("object readback row has no canonical GUID")
+            canonical_id = object_id.upper()
+            if (
+                canonical_id not in expected_ids
+                and len(unique_ids) == 1
+                and len(rows) == 1
+            ):
+                raise _error(
+                    "OBJECT_HANDLE_STALE",
+                    field="object_handle",
+                    rejected_handle=bounds[0].handle,
+                    action="resolve the exact live object again before Preview",
+                )
+            if canonical_id not in expected_ids or canonical_id in rows_by_id:
+                raise ValueError("object readback contains an extra or duplicate GUID")
+            rows_by_id[canonical_id] = row
+        if set(rows_by_id) != expected_ids:
+            raise ValueError("object readback is missing one or more exact GUIDs")
+    except BusinessDeclarationError:
+        raise
+    except (TypeError, ValueError) as exc:
+        raise _error(
+            "OBJECT_READBACK_INVALID",
+            field="object_handle",
+            action="resolve the exact live object again before Preview",
+        ) from exc
+    result: list[BoundObjectHandle] = []
+    for bound in bounds:
+        row = rows_by_id[bound.object_id]
         live = {
             "id": str(row.get("id", "")).upper(),
             "name": row.get("name"),
@@ -1140,33 +1200,30 @@ def revalidate_live_object(
         if bound.semantic_kind is not None:
             is_voice = row.get("@IsVoice")
             if type(is_voice) is not bool:
-                raise ValueError("Sound subtype readback is not a boolean")
+                raise _error(
+                    "OBJECT_READBACK_INVALID",
+                    field="object_handle",
+                    rejected_handle=bound.handle,
+                    action="resolve the exact live object again before Preview",
+                )
             live["semantic_kind"] = "sound-voice" if is_voice else "sound-sfx"
-    except BusinessDeclarationError:
-        raise
-    except (TypeError, ValueError) as exc:
-        raise _error(
-            "OBJECT_READBACK_INVALID",
-            field="object_handle",
-            rejected_handle=bound.handle,
-            action="resolve the exact live object again before Preview",
-        ) from exc
-    expected = {
-        "id": bound.object_id,
-        "name": bound.name,
-        "type": bound.object_type,
-        "path": bound.path,
-    }
-    if bound.semantic_kind is not None:
-        expected["semantic_kind"] = bound.semantic_kind
-    if live != expected:
-        raise _error(
-            "OBJECT_HANDLE_STALE",
-            field="object_handle",
-            rejected_handle=bound.handle,
-            action="resolve the exact live object again before Preview",
-        )
-    return registry.resolve_object(bound.handle)
+        expected = {
+            "id": bound.object_id,
+            "name": bound.name,
+            "type": bound.object_type,
+            "path": bound.path,
+        }
+        if bound.semantic_kind is not None:
+            expected["semantic_kind"] = bound.semantic_kind
+        if live != expected:
+            raise _error(
+                "OBJECT_HANDLE_STALE",
+                field="object_handle",
+                rejected_handle=bound.handle,
+                action="resolve the exact live object again before Preview",
+            )
+        result.append(registry.resolve_object(bound.handle))
+    return tuple(result)
 
 
 def normalize_common_business_fields(fields: Mapping[str, Any]) -> dict[str, Any]:
@@ -1766,6 +1823,7 @@ __all__ = [
     "normalize_common_business_fields",
     "revalidate_live_field",
     "revalidate_live_object",
+    "revalidate_live_objects",
     "repair_at_draft_revision",
     "resolve_semantic_kind",
 ]

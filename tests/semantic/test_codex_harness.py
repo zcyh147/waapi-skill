@@ -1481,7 +1481,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "--object-type only new/imported/plural" in instructions
     assert "reread selected pre-schema" in instructions
     assert "path=>by_path_segments one arg/segment" in instructions
-    assert "name=>by_unique_name" in instructions
+    assert "name=>query>ID=>by_id" in instructions
     assert "GUID=>by_id" in instructions
     assert "Else exact path=>path" in instructions
     assert "one query/hop; no merge" in instructions

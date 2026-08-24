@@ -243,10 +243,7 @@ from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore
     NewDescendantTarget,
     bind_live_field,
     revalidate_live_field,
-    revalidate_live_object,
-)
-from wwise_waapi.waql import (  # noqa: E402  # pyright: ignore[reportMissingImports]
-    quote_waql_literal,
+    revalidate_live_objects,
 )
 from wwise_waapi.operation_composer import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_TYPED_ACTIONS_PER_APPLY,
@@ -1884,7 +1881,6 @@ def build_parser() -> argparse.ArgumentParser:
     object_selector.add_argument("--object-id")
     object_selector.add_argument("--object-path")
     object_selector.add_argument("--object-path-segment", action="append")
-    object_selector.add_argument("--object-name")
 
     draft_bind_field = subparsers.add_parser(
         "draft-bind-field",
@@ -9988,13 +9984,15 @@ def dispatch_operation_draft_check(
     )
     if canonical_request.operation == "audio.import" and raw_business_session is not None:
         business_session = BusinessDeclarationSession.from_dict(raw_business_session)
-        for row in business_session.handles.as_dict()["objects"]:
-            bound_object = business_session.handles.resolve_object(row["handle"])
-            revalidate_live_object(
-                business_session.handles,
-                bound_object,
-                read_call=read_call,
-            )
+        bound_objects = tuple(
+            business_session.handles.resolve_object(row["handle"])
+            for row in business_session.handles.as_dict()["objects"]
+        )
+        revalidate_live_objects(
+            business_session.handles,
+            bound_objects,
+            read_call=read_call,
+        )
         for row in business_session.handles.as_dict()["fields"]:
             bound_field = business_session.handles.bound_field(row["handle"])
             revalidate_live_field(
@@ -10359,7 +10357,18 @@ def _business_object_path_from_segments(values: Any) -> str:
     return path
 
 
-def dispatch_business_object_binding(
+@dataclass(frozen=True, slots=True)
+class _AudioImportBusinessBinding:
+    state_dir: Path
+    store: OperationDraftStore
+    record: OperationDraftRecord
+    project: Mapping[str, Any]
+    project_call: Any
+    context: BusinessContext
+    read_call: Callable[[str, Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any]]
+
+
+def _open_audio_import_business_binding(
     args: argparse.Namespace,
     *,
     env: Mapping[str, str],
@@ -10367,17 +10376,13 @@ def dispatch_business_object_binding(
     detected_version: str,
     live_info: Mapping[str, Any],
     dispatcher: WwiseDispatcher,
-    common: Mapping[str, Any],
-) -> dict[str, Any]:
+) -> _AudioImportBusinessBinding:
     state_dir = resolve_transaction_state_directory(args, env=env)
     store = OperationDraftStore(state_dir)
-    inspected = store.inspect(
-        args.draft_id,
-        task_authority=args.task_authority,
-    )
-    if inspected.operation != "audio.import":
-        raise GatewayInputError("Object binding currently supports audio.import Drafts only")
-    if inspected.version != detected_version:
+    record = store.inspect(args.draft_id, task_authority=args.task_authority)
+    if record.operation != "audio.import":
+        raise GatewayInputError("Business binding currently supports audio.import Drafts only")
+    if record.version != detected_version:
         raise OperationDraftBindingDrift(
             "Operation Draft version does not match the connected Wwise version."
         )
@@ -10393,10 +10398,38 @@ def dispatch_business_object_binding(
         detected_version=detected_version,
         live_info=live_info,
     )
-    read_call = transaction_read_call(
-        dispatcher,
+    return _AudioImportBusinessBinding(
+        state_dir=state_dir,
+        store=store,
+        record=record,
+        project=project,
+        project_call=project_call,
+        context=context,
+        read_call=transaction_read_call(
+            dispatcher,
+            connection=connection,
+            version=detected_version,
+        ),
+    )
+
+
+def dispatch_business_object_binding(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    binding = _open_audio_import_business_binding(
+        args,
+        env=env,
         connection=connection,
-        version=detected_version,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
     )
     object_path = args.object_path
     if args.object_path_segment is not None:
@@ -10406,27 +10439,8 @@ def dispatch_business_object_binding(
     elif object_path is not None:
         selector = {"from": {"path": [object_path]}}
     else:
-        object_name = args.object_name
-        if (
-            not isinstance(object_name, str)
-            or not object_name.strip()
-            or len(object_name.encode("utf-8")) > MAX_BUSINESS_NAME_BYTES
-        ):
-            raise GatewayInputError(
-                "Business object name must be one bounded non-empty UTF-8 value."
-            )
-        try:
-            literal = quote_waql_literal(object_name)
-        except ValueError as exc:
-            raise GatewayInputError(
-                "Business object name is outside the packaged WAQL literal boundary."
-            ) from exc
-        selector = {
-            "waql": (
-                f"from search {literal} where name = {literal} take 2"
-            )
-        }
-    raw = read_call(
+        raise GatewayInputError("Business object binding requires an exact GUID or path")
+    raw = binding.read_call(
         OBJECT_GET_URI,
         selector,
         {"return": ["id", "name", "type", "path"]},
@@ -10459,7 +10473,6 @@ def dispatch_business_object_binding(
         )
         or (args.object_id is not None and str(row["id"]).upper() != args.object_id.upper())
         or (object_path is not None and row["path"] != object_path)
-        or (args.object_name is not None and row["name"] != args.object_name)
     ):
         raise GatewayResultShapeError(
             "Live business object row does not match its exact selector.",
@@ -10468,7 +10481,7 @@ def dispatch_business_object_binding(
         )
     semantic_kind: str | None = None
     if str(row["type"]).casefold() == "sound":
-        subtype_raw = read_call(
+        subtype_raw = binding.read_call(
             OBJECT_GET_URI,
             {"from": {"id": [str(row["id"])]}},
             {"return": ["id", "@IsVoice"]},
@@ -10506,13 +10519,13 @@ def dispatch_business_object_binding(
 
     schema_digest = operation_draft_schema_digest("audio.import", detected_version)
     composer_digest = operation_composer_digest("audio.import", detected_version)
-    record = store.apply_business_update(
+    record = binding.store.apply_business_update(
         args.draft_id,
         task_authority=args.task_authority,
         expected_revision=args.expected_revision,
         schema_digest=schema_digest,
         composer_digest=composer_digest,
-        context=context,
+        context=binding.context,
         update=bind,
         event_type="handles.bound",
     )
@@ -10527,7 +10540,7 @@ def dispatch_business_object_binding(
         {
             "endpoint": dict(common["endpoint"]),
             "detected_version": detected_version,
-            "project_call": dispatch_call_summary(project_call),
+            "project_call": dispatch_call_summary(binding.project_call),
             "bound_object": {
                 "handle": bound.handle,
                 "name": bound.name,
@@ -10549,39 +10562,23 @@ def dispatch_business_field_binding(
     dispatcher: WwiseDispatcher,
     common: Mapping[str, Any],
 ) -> dict[str, Any]:
-    state_dir = resolve_transaction_state_directory(args, env=env)
-    store = OperationDraftStore(state_dir)
-    inspected = store.inspect(
-        args.draft_id,
-        task_authority=args.task_authority,
+    binding = _open_audio_import_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
     )
-    if inspected.operation != "audio.import":
-        raise GatewayInputError("Field binding currently supports audio.import Drafts only")
-    if inspected.version != detected_version:
-        raise OperationDraftBindingDrift(
-            "Operation Draft version does not match the connected Wwise version."
-        )
     raw_session = (
-        inspected.composition.get("business_session")
-        if inspected.composition is not None
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
         else None
     )
     if raw_session is None:
         raise GatewayInputError("Bind one exact object before binding custom fields")
     session = BusinessDeclarationSession.from_dict(raw_session)
-    project, project_call = current_project(
-        dispatcher,
-        connection=connection,
-        version=detected_version,
-    )
-    assert project is not None
-    context = _business_context_from_live(
-        task_authority=args.task_authority,
-        project=project,
-        detected_version=detected_version,
-        live_info=live_info,
-    )
-    if context != session.context:
+    if binding.context != session.context:
         raise OperationDraftBindingDrift(
             "Live project or Wwise build differs from the business declaration binding."
         )
@@ -10593,18 +10590,13 @@ def dispatch_business_field_binding(
     else:
         scope_kind = "class"
         scope_value = args.class_name
-    read_call = transaction_read_call(
-        dispatcher,
-        connection=connection,
-        version=detected_version,
-    )
     read_call = metadata_cached_read_call(
-        read_call,
+        binding.read_call,
         connection=connection,
         version=detected_version,
         live_info=live_info,
-        project=project,
-        state_dir=state_dir,
+        project=binding.project,
+        state_dir=binding.state_dir,
     )
     captured: list[Any] = []
 
@@ -10623,13 +10615,13 @@ def dispatch_business_field_binding(
 
     schema_digest = operation_draft_schema_digest("audio.import", detected_version)
     composer_digest = operation_composer_digest("audio.import", detected_version)
-    record = store.apply_business_update(
+    record = binding.store.apply_business_update(
         args.draft_id,
         task_authority=args.task_authority,
         expected_revision=args.expected_revision,
         schema_digest=schema_digest,
         composer_digest=composer_digest,
-        context=context,
+        context=binding.context,
         update=bind,
         event_type="handles.bound",
     )
@@ -10644,7 +10636,7 @@ def dispatch_business_field_binding(
         {
             "endpoint": dict(common["endpoint"]),
             "detected_version": detected_version,
-            "project_call": dispatch_call_summary(project_call),
+            "project_call": dispatch_call_summary(binding.project_call),
             "bound_field": {
                 "handle": bound.handle,
                 "token": bound.token,
@@ -14942,11 +14934,6 @@ def _audio_import_business_next_action_binding(
     check = [*base, "draft-check", *binding]
     by_id = operation_draft_prefix_copy_binding(object_bind_prefix)
     by_id["append"] = ["--object-id", "<exact-guid>"]
-    by_unique_name = operation_draft_prefix_copy_binding(object_bind_prefix)
-    by_unique_name["append"] = [
-        "--object-name",
-        "<exact-user-visible-name>",
-    ]
     by_path_segments = operation_draft_prefix_copy_binding(object_bind_prefix)
     by_path_segments["append_repeated"] = [
         "--object-path-segment",
@@ -14956,19 +14943,16 @@ def _audio_import_business_next_action_binding(
     object_binding = {
         "by_id": by_id,
         "by_path_segments": by_path_segments,
-        "by_unique_name": by_unique_name,
         "selection_rule": (
             "user_supplied_complete_path_requires_by_path_segments; "
-            "user_supplied_name_without_a_path_uses_by_unique_name; "
+            "user_supplied_name_without_a_path_requires_query_then_by_id; "
             "user_selected_guid_uses_by_id"
         ),
         "path_rule": (
             "copy_each_nonempty_user_path_segment_root_to_leaf; gateway_inserts_"
             "every_wwise_separator"
         ),
-        "name_rule": (
-            "zero_or_multiple_name_matches_fail_closed_with_bounded_candidates"
-        ),
+        "name_rule": "unscoped_name_is_not_a_mutation_identity",
         "result": "copy_the_returned_bound_object.handle",
         "result_validation_rule": (
             "before_declaration_compare_returned_name_type_path_to_the_user_"

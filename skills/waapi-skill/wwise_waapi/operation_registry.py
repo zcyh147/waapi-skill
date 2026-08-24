@@ -62,6 +62,7 @@ from .host_paths import (
     parse_relative_host_path,
 )
 from .io_policy import IOPolicyError, validate_isolated_io
+from .identity_limits import MULTI_IDENTITY_READ_MAX_IDS
 from .metadata_restrictions import (
     MetadataRestrictionError,
     reference_allowed_types,
@@ -318,7 +319,6 @@ UNDO_GROUP_INNER_URIS_BY_VERSION: Mapping[str, frozenset[str]] = {
 }
 SWITCH_GROUP_REFERENCE = "SwitchGroupOrStateGroup"
 IDENTITY_RETURN_FIELDS = ("id", "name", "type", "path", "parent", "notes")
-MULTI_IDENTITY_READ_MAX_IDS = 4096
 # ``ak.wwise.core.object.get`` does not accept a bare numeric Short ID.  Its
 # ``from.id`` Short ID selector is a closed object whose numeric ``type`` is
 # the WAAPI object-type code.  Only Definition directives with an official

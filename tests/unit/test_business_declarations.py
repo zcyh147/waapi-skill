@@ -4,6 +4,7 @@ import json
 
 import pytest
 
+from wwise_waapi import business_declarations as business_declarations_module
 from wwise_waapi.business_declarations import (
     BusinessContext,
     BusinessDeclarationError,
@@ -16,6 +17,7 @@ from wwise_waapi.business_declarations import (
     normalize_common_business_fields,
     revalidate_live_field,
     revalidate_live_object,
+    revalidate_live_objects,
     resolve_semantic_kind,
 )
 
@@ -175,6 +177,152 @@ def test_live_object_revalidation_requires_the_original_guid_quartet(
         )
     assert stale.value.repair["error_code"] == "OBJECT_HANDLE_STALE"
     assert stale.value.repair["rejected_handle"] == bound.handle
+
+
+def test_live_object_revalidation_deduplicates_guids_into_one_bounded_read() -> None:
+    tokens = iter((b"a" * 32, b"b" * 32, b"c" * 32))
+    registry = BusinessHandleRegistry(_context(), token_bytes=lambda _size: next(tokens))
+    weather = registry.bind_object(
+        object_id=OBJECT_ID,
+        name="Weather",
+        object_type="ActorMixer",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\Weather",
+    )
+    weather_again = registry.bind_object(
+        object_id=OBJECT_ID,
+        name="Weather",
+        object_type="ActorMixer",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\Weather",
+    )
+    bus = registry.bind_object(
+        object_id=BUS_ID,
+        name="Master Audio Bus",
+        object_type="Bus",
+        path=r"\Master-Mixer Hierarchy\Default Work Unit\Master Audio Bus",
+    )
+    calls: list[tuple[object, object]] = []
+
+    def read(_uri: str, args: dict[str, object], options: dict[str, object]) -> dict[str, object]:
+        calls.append((args, options))
+        return {
+            "return": [
+                {
+                    "id": BUS_ID,
+                    "name": "Master Audio Bus",
+                    "type": "Bus",
+                    "path": r"\Master-Mixer Hierarchy\Default Work Unit\Master Audio Bus",
+                },
+                {
+                    "id": OBJECT_ID,
+                    "name": "Weather",
+                    "type": "ActorMixer",
+                    "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Weather",
+                },
+            ]
+        }
+
+    assert revalidate_live_objects(
+        registry,
+        (weather, weather_again, bus),
+        read_call=read,
+    ) == (weather, weather_again, bus)
+    assert calls == [
+        (
+            {"from": {"id": [OBJECT_ID, BUS_ID]}},
+            {"return": ["id", "name", "type", "path"]},
+        )
+    ]
+
+
+@pytest.mark.parametrize(
+    "rows",
+    (
+        [],
+        [
+            {
+                "id": OBJECT_ID,
+                "name": "Weather",
+                "type": "ActorMixer",
+                "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Weather",
+            },
+            {
+                "id": OBJECT_ID,
+                "name": "Weather",
+                "type": "ActorMixer",
+                "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Weather",
+            },
+        ],
+        [
+            {
+                "id": OBJECT_ID,
+                "name": "Weather",
+                "type": "ActorMixer",
+                "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Weather",
+            },
+            {
+                "id": BUS_ID,
+                "name": "Unexpected",
+                "type": "Bus",
+                "path": r"\Master-Mixer Hierarchy\Unexpected",
+            },
+        ],
+        [{"id": "not-a-guid", "name": "Weather", "type": "ActorMixer", "path": "x"}],
+    ),
+)
+def test_live_object_batch_revalidation_rejects_inexact_row_sets(
+    rows: list[dict[str, object]],
+) -> None:
+    registry = BusinessHandleRegistry(_context(), token_bytes=lambda size: b"r" * size)
+    bound = registry.bind_object(
+        object_id=OBJECT_ID,
+        name="Weather",
+        object_type="ActorMixer",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\Weather",
+    )
+
+    with pytest.raises(BusinessDeclarationError) as invalid:
+        revalidate_live_objects(
+            registry,
+            (bound,),
+            read_call=lambda _uri, _args, _options: {"return": rows},
+        )
+
+    assert invalid.value.repair["error_code"] == "OBJECT_READBACK_INVALID"
+
+
+def test_live_object_batch_revalidation_rejects_oversized_unique_set_before_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tokens = iter((b"x" * 32, b"y" * 32))
+    registry = BusinessHandleRegistry(_context(), token_bytes=lambda _size: next(tokens))
+    first = registry.bind_object(
+        object_id=OBJECT_ID,
+        name="Weather",
+        object_type="ActorMixer",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\Weather",
+    )
+    second = registry.bind_object(
+        object_id=BUS_ID,
+        name="Master Audio Bus",
+        object_type="Bus",
+        path=r"\Master-Mixer Hierarchy\Default Work Unit\Master Audio Bus",
+    )
+    monkeypatch.setattr(
+        business_declarations_module,
+        "MULTI_IDENTITY_READ_MAX_IDS",
+        1,
+    )
+
+    with pytest.raises(BusinessDeclarationError) as limited:
+        revalidate_live_objects(
+            registry,
+            (first, second),
+            read_call=lambda *_args, **_kwargs: pytest.fail("oversized set dispatched"),
+        )
+
+    assert limited.value.repair["error_code"] == "OBJECT_READ_LIMIT_EXCEEDED"
+    assert limited.value.repair["actual_count"] == 2
+    assert limited.value.repair["limit"] == 1
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)

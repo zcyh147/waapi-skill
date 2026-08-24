@@ -174,73 +174,6 @@ def _offline(tmp_path: Path, *argv: str) -> tuple[int, dict[str, Any]]:
     )
 
 
-def test_audio_import_business_binds_one_unique_visible_name_without_a_path(
-    tmp_path: Path,
-) -> None:
-    code, started = _offline(tmp_path, "draft-start", "audio.import")
-    assert code == 0, started
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": [_info()],
-            "ak.wwise.core.getProjectInfo": [
-                {
-                    "id": PROJECT_ID,
-                    "name": "SampleProject",
-                    "path": str(_project_path(tmp_path)),
-                }
-            ],
-            "ak.wwise.core.object.get": [
-                {
-                    "return": [
-                        {
-                            "id": PARENT_ID,
-                            "name": "Weather",
-                            "type": "ActorMixer",
-                            "path": (
-                                r"\Actor-Mixer Hierarchy\Default Work Unit\Weather"
-                            ),
-                        }
-                    ]
-                }
-            ],
-        }
-    )
-
-    bind_code, bound = waapi_gateway.execute_gateway(
-        [
-            "--state-dir",
-            str(tmp_path / "state"),
-            "draft-bind-object",
-            started["draft"]["draft_id"],
-            "--task-authority",
-            started["task_authority"],
-            "--expected-revision",
-            "1",
-            "--object-name",
-            "Weather",
-        ],
-        env=_env(tmp_path),
-        client_factory=lambda _url: client,
-    )
-
-    assert bind_code == 0, bound
-    assert bound["bound_object"] == {
-        "handle": bound["bound_object"]["handle"],
-        "name": "Weather",
-        "type": "ActorMixer",
-        "semantic_kind": None,
-    }
-    assert client.calls[-1] == (
-        "ak.wwise.core.object.get",
-        {
-            "waql": (
-                'from search "Weather" where name = "Weather" take 2'
-            )
-        },
-        {"return": ["id", "name", "type", "path"]},
-    )
-
-
 def test_audio_import_business_binds_user_path_segments_without_model_separators(
     tmp_path: Path,
 ) -> None:
@@ -304,64 +237,6 @@ def test_audio_import_business_binds_user_path_segments_without_model_separators
     )
 
 
-def test_audio_import_business_unique_name_binding_returns_bounded_candidates(
-    tmp_path: Path,
-) -> None:
-    code, started = _offline(tmp_path, "draft-start", "audio.import")
-    assert code == 0, started
-    rows = [
-        {
-            "id": f"{{11111111-1111-1111-1111-11111111111{index}}}",
-            "name": "Weather",
-            "type": "ActorMixer",
-            "path": rf"\Actor-Mixer Hierarchy\Work Unit {index}\Weather",
-        }
-        for index in (1, 2)
-    ]
-    client = FakeClient(
-        {
-            "ak.wwise.core.getInfo": [_info()],
-            "ak.wwise.core.getProjectInfo": [
-                {
-                    "id": PROJECT_ID,
-                    "name": "SampleProject",
-                    "path": str(_project_path(tmp_path)),
-                }
-            ],
-            "ak.wwise.core.object.get": [{"return": rows}],
-        }
-    )
-
-    bind_code, boundary = waapi_gateway.execute_gateway(
-        [
-            "--state-dir",
-            str(tmp_path / "state"),
-            "draft-bind-object",
-            started["draft"]["draft_id"],
-            "--task-authority",
-            started["task_authority"],
-            "--expected-revision",
-            "1",
-            "--object-name",
-            "Weather",
-        ],
-        env=_env(tmp_path),
-        client_factory=lambda _url: client,
-    )
-
-    assert bind_code == 2
-    assert boundary["error_code"] == "BUSINESS_OBJECT_NOT_UNIQUE"
-    assert boundary["details"] == {
-        "actual_count": 2,
-        "candidates": rows,
-    }
-    record = OperationDraftStore(tmp_path / "state").inspect(
-        started["draft"]["draft_id"],
-        task_authority=started["task_authority"],
-    )
-    assert record.revision == 1
-
-
 def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     tmp_path: Path,
 ) -> None:
@@ -374,9 +249,7 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     assert start_next["object_binding"]["by_id"]["fixed_argv_prefix"][3] == (
         "draft-bind-object"
     )
-    assert start_next["object_binding"]["by_unique_name"][
-        "fixed_argv_prefix"
-    ][3] == "draft-bind-object"
+    assert "by_unique_name" not in start_next["object_binding"]
     assert start_next["object_binding"]["by_path_segments"][
         "fixed_argv_prefix"
     ][3] == "draft-bind-object"
@@ -671,12 +544,7 @@ def test_audio_import_business_start_discloses_only_copy_ready_object_binding(
             "completion_candidate",
         )
     )
-    by_name = next_action["object_binding"]["by_unique_name"]
-    assert by_name["fixed_argv_prefix"][3] == "draft-bind-object"
-    assert by_name["fixed_argv_prefix_copy_instruction"]["source_field"] == (
-        "fixed_argv_prefix_copy"
-    )
-    assert by_name["append"] == ["--object-name", "<exact-user-visible-name>"]
+    assert "by_unique_name" not in next_action["object_binding"]
     by_segments = next_action["object_binding"]["by_path_segments"]
     assert by_segments["fixed_argv_prefix"][3] == "draft-bind-object"
     assert by_segments["fixed_argv_prefix_copy_instruction"]["source_field"] == (
@@ -691,7 +559,7 @@ def test_audio_import_business_start_discloses_only_copy_ready_object_binding(
     assert (
         next_action["object_binding"]["selection_rule"]
         == "user_supplied_complete_path_requires_by_path_segments; "
-        "user_supplied_name_without_a_path_uses_by_unique_name; "
+        "user_supplied_name_without_a_path_requires_query_then_by_id; "
         "user_selected_guid_uses_by_id"
     )
 

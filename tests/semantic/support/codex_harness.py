@@ -58,7 +58,7 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "pre-draft; single existing=>--object GUID; --object-type "
     "only new/imported/plural. "
     "ID: business_declaration path=>by_path_segments one arg/segment; "
-    "name=>by_unique_name; GUID=>by_id. "
+    "name=>query>ID=>by_id; GUID=>by_id. "
     "Else exact path=>path; never exact-type-name; reread selected "
     "pre-schema; one query/hop; no merge. "
     "enum/const exact. typed_operation: copy gateway_argv_prefix incl --apply; "
