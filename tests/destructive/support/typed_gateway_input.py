@@ -272,6 +272,14 @@ def _container_action(payload: Mapping[str, Any]) -> list[str] | None:
     if not isinstance(action_argv, list):
         if payload.get("status") == "choice_required":
             return None
+        decision = (
+            continuation.get("next_command_decision")
+            if isinstance(continuation, Mapping)
+            else None
+        )
+        candidates = decision.get("evaluate_in_order") if isinstance(decision, Mapping) else None
+        if isinstance(candidates, list) and candidates:
+            return None
         raise AssertionError("container response did not disclose a typed action")
     return [payload.get("handle") if value == "<child_handle>" else value for value in action_argv]
 

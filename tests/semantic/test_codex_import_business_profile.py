@@ -25,6 +25,7 @@ from tests.semantic.support.codex_gateway_broker import (
     ExpectedGatewayStep,
 )
 from tests.destructive.support.typed_gateway_input import (
+    _container_action,
     _require_disclosed_continuation,
     _render_step_arguments,
 )
@@ -181,6 +182,21 @@ def test_real_gateway_adapter_renders_atomic_draft_action_batches() -> None:
         "string",
         "useExisting",
     ]
+
+
+def test_real_gateway_adapter_allows_branch_first_container_disclosure() -> None:
+    assert _container_action(
+        {
+            "continuation": {
+                "next_command_decision": {
+                    "evaluate_in_order": [
+                        "branch_disclosure",
+                        "deferred_fact_queue",
+                    ]
+                }
+            }
+        }
+    ) is None
 
 
 def test_production_audio_import_profile_has_four_independent_business_pairs() -> None:
