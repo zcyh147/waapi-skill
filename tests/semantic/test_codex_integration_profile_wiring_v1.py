@@ -803,20 +803,15 @@ def test_campaign_rejects_cross_bound_transaction_and_protocol_steps() -> None:
         version=unit.version,
         transactions=(wrong_transaction, *unit.transactions[1:]),
     )
-    cross_bound = project_runner._compile_integration_workflow_plan(
-        unit=wrong_unit,
-        protocol=protocol,
-        visible_values={"profile_unit": unit.unit_id},
-        oracle_requirements=(),
-    )
     with pytest.raises(
-        campaign.CampaignEvidenceError,
-        match="transaction topology drifted",
+        WorkflowBusinessPlanError,
+        match="workflow tx01 does not contain one complete transaction",
     ):
-        campaign._validate_heavy_v3_typed_business_plan(
-            cross_bound.writer_kwargs(),
-            expected_unit=unit,
-            provenance=_provenance(unit, protocol),
+        project_runner._compile_integration_workflow_plan(
+            unit=wrong_unit,
+            protocol=protocol,
+            visible_values={"profile_unit": unit.unit_id},
+            oracle_requirements=(),
         )
 
     checkpoint = ExpectedGatewayStep(

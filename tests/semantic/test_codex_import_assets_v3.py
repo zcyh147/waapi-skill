@@ -15,8 +15,6 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_metadata_transaction_protocol,
 )
 from tests.semantic.support.codex_gateway_broker import (
-    DraftTypedActionArgument,
-    DraftTypedActionBatchArgument,
     project_required_metadata_tokens,
 )
 from tests.semantic.support.codex_import_assets_v3 import (
@@ -382,8 +380,8 @@ def test_compound_direct_import_binds_defaults_row_overrides_and_inline_wav(
     )
     assert tuple(step.name for step in protocol.steps[:3]) == (
         "tx01.operation-schema",
-        "metadata.discover",
         "tx01.draft-start",
+        "tx01.configure",
     )
     assert next(step for step in protocol.steps if step.name == "tx01.preview").subcommand == (
         "preview-from-draft"
@@ -394,31 +392,22 @@ def test_compound_direct_import_binds_defaults_row_overrides_and_inline_wav(
         if step.subcommand == "preview-from-draft"
     )
     assert protocol.turn_prefix_counts == (preview_index, len(protocol.steps))
-    action_containers = [
-        step.arguments[-1]
+    declarations = [
+        step
         for step in protocol.steps
-        if step.subcommand == "draft-apply"
+        if step.subcommand in {"draft-declare-new", "draft-declare-existing"}
     ]
-    action_arguments = [
-        action
-        for container in action_containers
-        for action in (
-            container.actions
-            if isinstance(container, DraftTypedActionBatchArgument)
-            else (container,)
-        )
+    assert declarations
+    assert not any(step.subcommand == "draft-apply" for step in protocol.steps)
+    field_bindings = [
+        step for step in protocol.steps if step.subcommand == "draft-bind-field"
     ]
-    assert action_arguments
-    assert all(isinstance(item, DraftTypedActionArgument) for item in action_arguments)
-    metadata_arguments = [
-        item for item in action_arguments if item.metadata_binding is not None
-    ]
-    assert metadata_arguments
-    assert all(
-        item.metadata_binding.step == "metadata.discover"
-        for item in metadata_arguments
-    )
-    assert sum(step.subcommand == "metadata" for step in protocol.steps) == 1
+    assert field_bindings
+    assert {
+        step.arguments[step.arguments.index("--token") + 1]
+        for step in field_bindings
+    } == {"IsLoopingEnabled", "MaxSoundPerInstance", "OverrideOutput"}
+    assert not any(step.subcommand == "metadata" for step in protocol.steps)
 
     mission = _compound_unit("CMP22-O22-AUDIO-IMPORT-03")
     mission_staged = materialize_import_case(
