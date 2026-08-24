@@ -314,6 +314,12 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     assert start_next["object_binding"]["by_unique_name"][3] == (
         "draft-bind-object"
     )
+    assert "final_nonempty_segment" in (
+        start_next["object_binding"]["full_user_path_rule"]
+    )
+    assert "returned_name_type_path" in (
+        start_next["object_binding"]["result_validation_rule"]
+    )
     assert "by_path" not in start_next["object_binding"]
     assert "switch_value" in start_next["binding_decision"]["literal_never_bind"]
     assert start_next["binding_decision"]["bound_object_handle_fields"] == [
@@ -323,6 +329,12 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     ]
     assert start_next["configure"]["reference_default_rule"] == (
         "copy_one_bound_object_handle_never_a_path_or_name"
+    )
+    assert start_next["configure"]["default_scope"] == (
+        "every_declaration_in_the_batch_after_expansion"
+    )
+    assert "valid_for_every_target_kind" in (
+        start_next["configure"]["default_use_rule"]
     )
     assert start_next["configure"]["append"][0] == (
         "[--mode replace] only_for_explicit_replacement; "

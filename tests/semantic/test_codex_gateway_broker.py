@@ -4078,6 +4078,7 @@ def test_business_draft_setup_broker_selects_unique_binding_and_configuration(
         "operation": "audio.import",
         "arguments": {
             "import_operation": "createNew",
+            "auto_add_to_source_control": True,
             "imports": [
                 {
                     "audio_file": native_absolute_test_path("inputs", "rain.wav"),
@@ -4144,8 +4145,7 @@ def test_business_draft_setup_broker_selects_unique_binding_and_configuration(
             authority,
             "--expected-revision",
             "2",
-            "--mode",
-            "create",
+            "--add-to-source-control",
         )
     )
     assert configured is not None

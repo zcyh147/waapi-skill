@@ -206,6 +206,11 @@ residual-process match. Either exclude the complete checker ancestor chain or,
 preferably, finish the checker and use a fresh read-only SSH process query.
 Never kill a matching process until its exact PID, ancestry, and command line
 prove that it belongs to the completed campaign rather than to the check itself.
+Put a Windows process query that uses PowerShell `$variables` in a temporary
+profile-free `.ps1`, copy and run it through SSH, then remove it. An inline
+`-Command` can lose those variables across the SSH and shell layers. Filter by
+the exact campaign-root token; existing Codex app-server or proxy processes
+without that token are unrelated and remain untouched.
 
 ### macOS Fresh Agent launch ownership
 

@@ -602,8 +602,8 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
         in confirmation_prompt
     )
     assert "逐字保留其中每个反斜杠分隔符" in confirmation_prompt
-    assert prepared.protocol.turn_prefix_counts == (11, 17, 21)
-    assert len(prepared.protocol.steps) == 21
+    assert prepared.protocol.turn_prefix_counts == (10, 16, 20)
+    assert len(prepared.protocol.steps) == 20
     assert [
         (step.name, step.subcommand)
         for step in prepared.protocol.steps[:2]
@@ -845,7 +845,7 @@ def test_observer_preserves_exact_terminal_indeterminate_execute(
         },
     )
 
-    assert case.prepared.protocol.turn_prefix_counts == (11, 17, 21)
+    assert case.prepared.protocol.turn_prefix_counts == (10, 16, 20)
     assert case.prepared.operation_requests[0]["arguments"]["imports"][0][
         "switch_assignment"
     ] == "Snow"

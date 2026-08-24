@@ -593,13 +593,10 @@ def build_audio_import_composer_transaction_steps(
         return binding
 
     native_mode = arguments.get("import_operation")
-    mode = None if native_mode is None else {
-        "createNew": "create",
-        "useExisting": "reimport",
-        "replaceExisting": "replace",
-    }.get(native_mode)
-    if native_mode is not None and mode is None:
+    if native_mode not in {None, "createNew", "useExisting", "replaceExisting"}:
         raise V3ProtocolError("audio.import business mode is unsupported")
+    mode = "replace" if native_mode == "replaceExisting" else None
+    existing_target_form = native_mode in {"useExisting", "replaceExisting"}
     configure_arguments: list[Any] = [*draft_prefix()]
     if mode is not None:
         configure_arguments.extend(("--mode", mode))
@@ -729,7 +726,7 @@ def build_audio_import_composer_transaction_steps(
             language=language,
         )
         existing_target_handle: ResponseBinding | None = None
-        if mode in {"reimport", "replace"}:
+        if existing_target_form:
             existing_target_handle = bind_object({"kind": "path", "value": target_path})
             target_arguments: list[Any] = [
                 "--object-handle",
@@ -885,7 +882,7 @@ def build_audio_import_composer_transaction_steps(
             )
         )
         latest_revision_step = declaration_name
-        if mode not in {"reimport", "replace"}:
+        if not existing_target_form:
             planned_by_path[target_path] = ResponseBinding(
                 declaration_name,
                 f"/draft/declarations/{row_index}/result_handle",

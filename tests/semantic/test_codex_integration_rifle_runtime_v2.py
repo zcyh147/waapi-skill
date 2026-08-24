@@ -738,7 +738,7 @@ def test_prepares_exact_gateway_checked_use_existing_batch(
         "tx01.execute",
         "tx01.verify",
     )
-    assert prepared.protocol.turn_prefix_counts == (14, 18)
+    assert prepared.protocol.turn_prefix_counts == (13, 17)
     assert prepared.protocol.commutative_read_only_step_groups == ()
     assert prepared.protocol.commutative_composer_setup_step_groups == ()
     assert all(step.subcommand != "metadata" for step in prepared.protocol.steps)
@@ -764,10 +764,9 @@ def test_rifle_business_protocol_preserves_every_exact_import_row(
     assert len(declarations) == 4
     assert all(step.subcommand == "draft-declare-existing" for step in declarations)
     assert all(step.subcommand != "draft-apply" for step in prepared.protocol.steps)
-    configure = next(
-        step for step in prepared.protocol.steps if step.name == "tx01.configure"
+    assert all(
+        step.name != "tx01.configure" for step in prepared.protocol.steps
     )
-    assert configure.arguments[-2:] == ("--mode", "reimport")
     rows = _plain(prepared.operation_request)["arguments"]["imports"]
     for declaration, row in zip(declarations, rows, strict=True):
         assert "media_file" in declaration.arguments

@@ -1461,7 +1461,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "fixed_argv_prefix" in instructions
     assert "never reconstruct" in instructions
     assert "Keep cwd" in instructions
-    assert "This-turn reads first; no future reads/pre-read reply/clarification" in instructions
+    assert "Reads now; no future/pre-read reply/questions" in instructions
     assert "Typed facts: one argv/fact" in instructions
     assert "every prompt field/item/map/bool" in instructions
     assert "batch_size=6" in instructions
@@ -1480,7 +1480,8 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "single existing=>--object GUID" in instructions
     assert "--object-type only new/imported/plural" in instructions
     assert "reread selected pre-schema" in instructions
-    assert "business_declaration=>by_unique_name LEAF direct" in instructions
+    assert "business_declaration=>by_unique_name LAST path segment" in instructions
+    assert "never ancestor" in instructions
     assert "ambiguous=>by_id later" in instructions
     assert "Else exact path=>path" in instructions
     assert "one query/hop; no merge" in instructions

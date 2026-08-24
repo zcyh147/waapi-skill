@@ -45,7 +45,7 @@ DEFAULT_SERVICE_TIER = "priority"
 DEFAULT_TIMEOUT_SECONDS = 180.0
 SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "First read SKILL.md once, standalone. "
-    "This-turn reads first; no future reads/pre-read reply/clarification. "
+    "Reads now; no future/pre-read reply/questions. "
     "copy returned source_field/fixed_argv_prefix verbatim; keep quotes/runner; never reconstruct; "
     "opaque IDs/handles/tokens/digests. Typed facts: one argv/fact; batch_size=6; "
     "final=remaining; cover every prompt field/item/map/bool. Composer: one action/call. "
@@ -57,7 +57,7 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "composer.start.preconditions; absent=none; prompt/schema!=live; all dynamic tokens "
     "pre-draft; single existing=>--object GUID; --object-type "
     "only new/imported/plural. "
-    "IDs: business_declaration=>by_unique_name LEAF direct; ambiguous=>by_id later. "
+    "IDs: business_declaration=>by_unique_name LAST path segment; never ancestor; ambiguous=>by_id later. "
     "Else exact path=>path; never exact-type-name; reread selected "
     "pre-schema; one query/hop; no merge. "
     "enum/const exact. typed_operation: copy gateway_argv_prefix incl --apply; "

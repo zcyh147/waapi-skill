@@ -128,6 +128,37 @@ def test_implicit_create_uses_the_planned_parent_instead_of_live_binding_it() ->
     assert all("language" not in step.arguments for step in sound_declarations)
 
 
+def test_existing_target_derives_reimport_while_replace_remains_explicit() -> None:
+    profile = load_import_business_profile(
+        PROFILE,
+        unit_ids=("AIB22-RIFLE-A", "AIB22-RIFLE-B"),
+    )
+
+    steps_by_unit = {}
+    for unit in profile.units:
+        request = {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": unit.version,
+            "operation": "audio.import",
+            "arguments": unit.transactions[0]["arguments"],
+        }
+        steps_by_unit[unit.unit_id] = build_audio_import_composer_transaction_steps(
+            request,
+            label="tx01",
+        )
+
+    assert all(
+        step.subcommand != "draft-business-configure"
+        for step in steps_by_unit["AIB22-RIFLE-A"]
+    )
+    replace = next(
+        step
+        for step in steps_by_unit["AIB22-RIFLE-B"]
+        if step.subcommand == "draft-business-configure"
+    )
+    assert replace.arguments[-2:] == ("--mode", "replace")
+
+
 def test_profile_filters_preserve_independent_unit_identity() -> None:
     selected = load_import_business_profile(
         PROFILE,

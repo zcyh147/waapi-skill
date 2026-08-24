@@ -14919,7 +14919,15 @@ def _audio_import_business_next_action_binding(
                 "matches_fail_closed_with_bounded_candidates; use_by_id_after_"
                 "the_user_selects_one_candidate"
             ),
+            "full_user_path_rule": (
+                "copy_only_the_exact_final_nonempty_segment_after_the_last_"
+                "backslash_as_the_visible_name; never_copy_a_parent_or_ancestor"
+            ),
             "result": "copy_the_returned_bound_object.handle",
+            "result_validation_rule": (
+                "before_declaration_compare_returned_name_type_path_to_the_user_"
+                "target; bind_again_or_stop_if_they_differ"
+            ),
             "use_only_for": [
                 "existing_target",
                 "new_target_parent",
@@ -14980,6 +14988,12 @@ def _audio_import_business_next_action_binding(
             ],
             "reference_default_rule": (
                 "copy_one_bound_object_handle_never_a_path_or_name"
+            ),
+            "default_scope": "every_declaration_in_the_batch_after_expansion",
+            "default_use_rule": (
+                "use_only_when_the_user_explicitly_requests_one_value_for_every_"
+                "declaration_and_the_field_is_valid_for_every_target_kind; otherwise_"
+                "put_the_field_on_each_applicable_declaration"
             ),
         },
         "declare_new": {
