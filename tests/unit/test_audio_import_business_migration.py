@@ -5,15 +5,14 @@ from pathlib import Path
 
 import pytest
 
-from wwise_waapi.audio_import_business_migration import (
+from tests.maintenance.audio_import_business_migration import (
     AUDIO_IMPORT_MIGRATION_INVENTORY_CONTRACT,
     AUDIO_IMPORT_MIGRATION_RESOURCE,
-    MIGRATION_DESTINATION_KINDS,
     build_audio_import_migration_inventory,
+    load_frozen_audio_import_contract,
 )
 from wwise_waapi.operation_registry import audio_import_business_contract
 from wwise_waapi.business_declarations import SUPPORTED_WWISE_VERSIONS
-from wwise_waapi.operation_registry import audio_import_composer_fragment_contract
 
 
 def test_generated_inventory_covers_every_old_field_action_and_version_once() -> None:
@@ -25,16 +24,18 @@ def test_generated_inventory_covers_every_old_field_action_and_version_once() ->
     assert inventory["cutover_policy"] == {
         "status": "deep_business_interface_public",
         "public_input_mode": "business_declaration",
-        "old_interface": "retired_from_gateway_and_agent_contracts",
-        "legacy_internal_role": "test_only_offline_archive_codec",
+        "old_interface": "deleted_from_packaged_runtime",
+        "legacy_internal_role": "test_maintenance_frozen_contract_only",
         "fallback": False,
         "historical_evidence": "frozen_commits_only",
     }
     assert len(inventory["lanes"]) == len(SUPPORTED_WWISE_VERSIONS)
 
+    frozen = load_frozen_audio_import_contract()
+    destinations = set(inventory["destination_kinds"])
     for lane in inventory["lanes"]:
         version = lane["version"]
-        fragments = audio_import_composer_fragment_contract(version)
+        fragments = frozen["versions"][version]
         assert [row["source"] for row in lane["request_options"]] == sorted(
             fragments["request_options"]
         )
@@ -65,10 +66,23 @@ def test_generated_inventory_covers_every_old_field_action_and_version_once() ->
         )
         for family in ("request_options", "row_fields", "nested_fields", "actions"):
             assert all(
-                row["destination_kind"] in MIGRATION_DESTINATION_KINDS
+                row["destination_kind"] in destinations
                 and row["cutover"] == "remove_old_model_input"
                 for row in lane[family]
             )
+        expected_contract_inventory = {
+            f"{family}.{source}": dict(_flatten_contract(contract))
+            for family in ("request_options", "row_fields", "actions")
+            for source, contract in fragments[family].items()
+        }
+        assert set(lane["source_contract_inventory"]) == set(
+            expected_contract_inventory
+        )
+        for source, expected_leaves in expected_contract_inventory.items():
+            recorded = lane["source_contract_inventory"][source]
+            assert recorded["contract_leaves"] == expected_leaves
+            assert recorded["leaf_count"] == len(expected_leaves)
+            assert recorded["migration_source"] == source.partition(".")[2]
 
 
 def test_inventory_keeps_native_mechanics_gateway_owned_and_dynamic_fields_bound() -> None:
@@ -93,6 +107,59 @@ def test_inventory_keeps_native_mechanics_gateway_owned_and_dynamic_fields_bound
         )
         assert nested["event.path"]["destination"] == "bound_event_parent_handle"
         assert nested["event.action"]["destination"] == "event_action"
+        assert nested["add_import_row.assignment.mode"]["destination"] == (
+            "switch_value.mode"
+        )
+        assert nested["add_import_row.assignment.value"]["destination"] == (
+            "switch_value"
+        )
+
+
+def test_inventory_exhaustively_records_defaults_enums_and_assignment_shape() -> None:
+    inventory = build_audio_import_migration_inventory()
+
+    for lane in inventory["lanes"]:
+        leaves = {
+            f"{source}{pointer}": value
+            for source, inventory in lane["source_contract_inventory"].items()
+            for pointer, value in inventory["contract_leaves"].items()
+        }
+        assert leaves[
+            "request_options.import_operation/default"
+        ] == "createNew"
+        import_modes = {
+            value
+            for path, value in leaves.items()
+            if path.startswith("request_options.import_operation/enum/")
+        }
+        assert import_modes == {"createNew", "useExisting", "replaceExisting"}
+        assignment_modes = {
+            value
+            for path, value in leaves.items()
+            if path.startswith(
+                "actions.add_import_row/field_contracts/assignment/oneOf/"
+            )
+            and path.endswith("/properties/mode/const")
+        }
+        assert assignment_modes == {"none", "switch"}
+        assert any(
+            path.startswith(
+                "actions.add_import_row/field_contracts/assignment/oneOf/"
+            )
+            and path.endswith("/properties/value/type")
+            and value == "string"
+            for path, value in leaves.items()
+        )
+        default_names = {
+            value
+            for path, value in leaves.items()
+            if path.startswith(
+                "actions.set_import_default/field_contracts/name/enum/"
+            )
+        }
+        assert default_names == {
+            row["source"] for row in lane["row_fields"]
+        }
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
@@ -113,9 +180,11 @@ def test_inventory_pins_version_delta_omission_and_safety_rules(version: str) ->
     assert row_fields["notes"]["omission"] == "preserve_omission"
     assert row_fields["audio_source_notes"]["omission"] == "preserve_omission"
     assert lane["safety_rules"]
-    assert lane["limits"]["source"] == "registry_contract"
+    assert lane["limits"]["source"] == "frozen_pre_cutover_contract"
     assert lane["source_schema_digest"] == (
-        audio_import_composer_fragment_contract(version)["source_schema_digest"]
+        load_frozen_audio_import_contract()["versions"][version][
+            "source_schema_digest"
+        ]
     )
 
 
@@ -150,6 +219,7 @@ def test_every_migration_destination_is_owned_by_the_deep_adapter(version: str) 
         "property_field_values",
         "reference_field_values",
         "switch_value",
+        "switch_value.mode",
         "event_action",
         "bound_event_parent_handle",
         "inline_wav.relative_path",
@@ -170,3 +240,26 @@ def test_every_migration_destination_is_owned_by_the_deep_adapter(version: str) 
     }
     for family in ("request_options", "row_fields", "nested_fields", "actions"):
         assert {row["destination"] for row in lane[family]} <= owned
+
+
+def _flatten_contract(value: object, pointer: str = "") -> list[tuple[str, object]]:
+    if isinstance(value, dict):
+        if not value:
+            return [(pointer, {})]
+        return [
+            row
+            for key in sorted(value)
+            for row in _flatten_contract(
+                value[key],
+                f"{pointer}/{str(key).replace('~', '~0').replace('/', '~1')}",
+            )
+        ]
+    if isinstance(value, list):
+        if not value:
+            return [(pointer, [])]
+        return [
+            row
+            for index, item in enumerate(value)
+            for row in _flatten_contract(item, f"{pointer}/{index}")
+        ]
+    return [(pointer, value)]

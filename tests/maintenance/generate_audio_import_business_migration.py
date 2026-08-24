@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 
-from wwise_waapi.audio_import_business_migration import (
+from audio_import_business_migration import (
     AUDIO_IMPORT_MIGRATION_RESOURCE,
     build_audio_import_migration_inventory,
 )
