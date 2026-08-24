@@ -450,6 +450,7 @@ def build_audio_import_composer_transaction_steps(
     *,
     label: str,
     metadata_binding: DraftActionMetadataBinding | None = None,
+    prefer_unique_name_bindings: bool = False,
 ) -> tuple[ExpectedGatewayStep, ...]:
     """Translate one canonical audio.import request into deep business Draft steps."""
 
@@ -512,7 +513,19 @@ def build_audio_import_composer_transaction_steps(
         value = selector.get("value")
         if kind not in {"id", "path"} or not isinstance(value, str) or not value:
             raise V3ProtocolError("audio.import business identity must be exact id or path")
-        key = (str(kind), value)
+        binding_kind = str(kind)
+        binding_value = value
+        if prefer_unique_name_bindings and kind == "path":
+            leaf = value.rpartition("\\")[2]
+            if leaf.startswith("<") and ">" in leaf:
+                leaf = leaf.split(">", 1)[1]
+            if not leaf:
+                raise V3ProtocolError(
+                    "audio.import business path has no visible object name"
+                )
+            binding_kind = "name"
+            binding_value = leaf
+        key = (binding_kind, binding_value)
         existing = object_bindings.get(key)
         if existing is not None:
             return existing
@@ -524,8 +537,12 @@ def build_audio_import_composer_transaction_steps(
                 subcommand="draft-bind-object",
                 arguments=(
                     *draft_prefix(),
-                    "--object-id" if kind == "id" else "--object-path",
-                    value,
+                    {
+                        "id": "--object-id",
+                        "name": "--object-name",
+                        "path": "--object-path",
+                    }[binding_kind],
+                    binding_value,
                 ),
             )
         )

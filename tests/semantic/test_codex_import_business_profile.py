@@ -154,6 +154,12 @@ def test_runtime_resolves_media_and_stops_every_transaction_at_preview(tmp_path:
     assert all(path.is_file() for path in runtime.media_paths)
     assert "media://" not in runtime.prompt
     assert sum(step.subcommand == "preview-from-draft" for step in steps) == 1
+    object_bindings = [
+        step for step in steps if step.subcommand == "draft-bind-object"
+    ]
+    assert object_bindings
+    assert all("--object-name" in step.arguments for step in object_bindings)
+    assert all("--object-path" not in step.arguments for step in object_bindings)
     assert all(step.subcommand not in {"confirm", "execute", "verify"} for step in steps)
 
 

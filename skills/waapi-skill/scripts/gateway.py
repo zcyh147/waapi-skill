@@ -234,6 +234,7 @@ from wwise_waapi.audio_import_business import (  # noqa: E402  # pyright: ignore
     compile_audio_import_business,
 )
 from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    MAX_BUSINESS_NAME_BYTES,
     BusinessContext,
     BusinessDeclarationError,
     BusinessHandleRegistry,
@@ -242,6 +243,9 @@ from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore
     bind_live_field,
     revalidate_live_field,
     revalidate_live_object,
+)
+from wwise_waapi.waql import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    quote_waql_literal,
 )
 from wwise_waapi.operation_composer import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_TYPED_ACTIONS_PER_APPLY,
@@ -1877,6 +1881,7 @@ def build_parser() -> argparse.ArgumentParser:
     object_selector = draft_bind_object.add_mutually_exclusive_group(required=True)
     object_selector.add_argument("--object-id")
     object_selector.add_argument("--object-path")
+    object_selector.add_argument("--object-name")
 
     draft_bind_field = subparsers.add_parser(
         "draft-bind-field",
@@ -10351,21 +10356,53 @@ def dispatch_business_object_binding(
         connection=connection,
         version=detected_version,
     )
-    selector = (
-        {"id": [args.object_id]}
-        if args.object_id is not None
-        else {"path": [args.object_path]}
-    )
+    if args.object_id is not None:
+        selector = {"from": {"id": [args.object_id]}}
+    elif args.object_path is not None:
+        selector = {"from": {"path": [args.object_path]}}
+    else:
+        object_name = args.object_name
+        if (
+            not isinstance(object_name, str)
+            or not object_name.strip()
+            or len(object_name.encode("utf-8")) > MAX_BUSINESS_NAME_BYTES
+        ):
+            raise GatewayInputError(
+                "Business object name must be one bounded non-empty UTF-8 value."
+            )
+        try:
+            literal = quote_waql_literal(object_name)
+        except ValueError as exc:
+            raise GatewayInputError(
+                "Business object name is outside the packaged WAQL literal boundary."
+            ) from exc
+        selector = {
+            "waql": (
+                f"from search {literal} where name = {literal} take 2"
+            )
+        }
     raw = read_call(
         OBJECT_GET_URI,
-        {"from": selector},
+        selector,
         {"return": ["id", "name", "type", "path"]},
     )
     rows = raw.get("return")
     if not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], Mapping):
+        candidates = [
+            {
+                field: row[field]
+                for field in ("id", "name", "type", "path")
+                if field in row
+            }
+            for row in (rows[:2] if isinstance(rows, list) else [])
+            if isinstance(row, Mapping)
+        ]
         raise GatewayResultShapeError(
             "Exact business object binding requires one live Wwise object row.",
-            details={"actual_count": len(rows) if isinstance(rows, list) else None},
+            details={
+                "actual_count": len(rows) if isinstance(rows, list) else None,
+                "candidates": candidates,
+            },
             error_code="BUSINESS_OBJECT_NOT_UNIQUE",
         )
     row = dict(rows[0])
@@ -10377,6 +10414,7 @@ def dispatch_business_object_binding(
         )
         or (args.object_id is not None and str(row["id"]).upper() != args.object_id.upper())
         or (args.object_path is not None and row["path"] != args.object_path)
+        or (args.object_name is not None and row["name"] != args.object_name)
     ):
         raise GatewayResultShapeError(
             "Live business object row does not match its exact selector.",
@@ -14871,7 +14909,16 @@ def _audio_import_business_next_action_binding(
         "business_contract": audio_import_business_contract(record.version),
         "object_binding": {
             "by_id": [*object_bind_prefix, "--object-id", "<exact-guid>"],
-            "by_path": [*object_bind_prefix, "--object-path", "<exact-wwise-path>"],
+            "by_unique_name": [
+                *object_bind_prefix,
+                "--object-name",
+                "<exact-user-visible-name>",
+            ],
+            "selection_rule": (
+                "use_by_unique_name_for_a_named_existing_object; zero_or_multiple_"
+                "matches_fail_closed_with_bounded_candidates; use_by_id_after_"
+                "the_user_selects_one_candidate"
+            ),
             "result": "copy_the_returned_bound_object.handle",
             "use_only_for": [
                 "existing_target",

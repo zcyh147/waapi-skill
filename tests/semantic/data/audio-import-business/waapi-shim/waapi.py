@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -34,6 +35,10 @@ _BUILTIN_FIELDS = {
         },
     },
 }
+_UNIQUE_NAME_WAQL = re.compile(
+    r'^from search "(?P<name>[^"\r\n]+)" '
+    r'where name = "(?P=name)" take 2$'
+)
 
 
 class WaapiRequestFailed(RuntimeError):
@@ -149,14 +154,22 @@ class WaapiClient:
         if uri == "ak.wwise.core.object.get":
             source = arguments.get("from", {})
             if not isinstance(source, Mapping):
-                return {"return": []}
+                source = {}
             selected: list[Mapping[str, Any]] = []
             ids = source.get("id")
             paths = source.get("path")
+            waql = arguments.get("waql")
+            name_match = (
+                _UNIQUE_NAME_WAQL.fullmatch(waql)
+                if isinstance(waql, str)
+                else None
+            )
             for row in self.fixture["objects"]:
                 if isinstance(ids, list) and row["id"] in ids:
                     selected.append(row)
                 elif isinstance(paths, list) and row["path"] in paths:
+                    selected.append(row)
+                elif name_match is not None and row["name"] == name_match["name"]:
                     selected.append(row)
             result = []
             for row in selected:

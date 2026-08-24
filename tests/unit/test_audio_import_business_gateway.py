@@ -174,6 +174,131 @@ def _offline(tmp_path: Path, *argv: str) -> tuple[int, dict[str, Any]]:
     )
 
 
+def test_audio_import_business_binds_one_unique_visible_name_without_a_path(
+    tmp_path: Path,
+) -> None:
+    code, started = _offline(tmp_path, "draft-start", "audio.import")
+    assert code == 0, started
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [_info()],
+            "ak.wwise.core.getProjectInfo": [
+                {
+                    "id": PROJECT_ID,
+                    "name": "SampleProject",
+                    "path": str(_project_path(tmp_path)),
+                }
+            ],
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": PARENT_ID,
+                            "name": "Weather",
+                            "type": "ActorMixer",
+                            "path": (
+                                r"\Actor-Mixer Hierarchy\Default Work Unit\Weather"
+                            ),
+                        }
+                    ]
+                }
+            ],
+        }
+    )
+
+    bind_code, bound = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-bind-object",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            "1",
+            "--object-name",
+            "Weather",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert bind_code == 0, bound
+    assert bound["bound_object"] == {
+        "handle": bound["bound_object"]["handle"],
+        "name": "Weather",
+        "type": "ActorMixer",
+        "semantic_kind": None,
+    }
+    assert client.calls[-1] == (
+        "ak.wwise.core.object.get",
+        {
+            "waql": (
+                'from search "Weather" where name = "Weather" take 2'
+            )
+        },
+        {"return": ["id", "name", "type", "path"]},
+    )
+
+
+def test_audio_import_business_unique_name_binding_returns_bounded_candidates(
+    tmp_path: Path,
+) -> None:
+    code, started = _offline(tmp_path, "draft-start", "audio.import")
+    assert code == 0, started
+    rows = [
+        {
+            "id": f"{{11111111-1111-1111-1111-11111111111{index}}}",
+            "name": "Weather",
+            "type": "ActorMixer",
+            "path": rf"\Actor-Mixer Hierarchy\Work Unit {index}\Weather",
+        }
+        for index in (1, 2)
+    ]
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [_info()],
+            "ak.wwise.core.getProjectInfo": [
+                {
+                    "id": PROJECT_ID,
+                    "name": "SampleProject",
+                    "path": str(_project_path(tmp_path)),
+                }
+            ],
+            "ak.wwise.core.object.get": [{"return": rows}],
+        }
+    )
+
+    bind_code, boundary = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-bind-object",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            "1",
+            "--object-name",
+            "Weather",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert bind_code == 2
+    assert boundary["error_code"] == "BUSINESS_OBJECT_NOT_UNIQUE"
+    assert boundary["details"] == {
+        "actual_count": 2,
+        "candidates": rows,
+    }
+    record = OperationDraftStore(tmp_path / "state").inspect(
+        started["draft"]["draft_id"],
+        task_authority=started["task_authority"],
+    )
+    assert record.revision == 1
+
+
 def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     tmp_path: Path,
 ) -> None:
@@ -186,6 +311,10 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
         "bind_only_handle_typed_business_objects_then_configure_and_declare"
     )
     assert start_next["object_binding"]["by_id"][3] == "draft-bind-object"
+    assert start_next["object_binding"]["by_unique_name"][3] == (
+        "draft-bind-object"
+    )
+    assert "by_path" not in start_next["object_binding"]
     assert "switch_value" in start_next["binding_decision"]["literal_never_bind"]
     assert start_next["binding_decision"]["bound_object_handle_fields"] == [
         "output_bus",

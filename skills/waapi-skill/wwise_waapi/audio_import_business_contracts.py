@@ -74,6 +74,7 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
             "native_object_type",
             "sfx_import_language",
             "target_parent_handle",
+            "unique_name_to_object_handle",
             "dependency_order",
             "batch_layout",
             "native_request",
