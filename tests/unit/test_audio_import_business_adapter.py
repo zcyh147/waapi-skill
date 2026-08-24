@@ -101,6 +101,7 @@ def test_new_media_declaration_compiles_all_common_business_fields(
             "language": "SFX",
             "volume_db": -4.0,
             "loop": "infinite",
+            "max_instances": 3,
             "output_bus": bus,
             "switch_value": "Rain",
             "notes": "steady rain bed",
@@ -125,6 +126,8 @@ def test_new_media_declaration_compiles_all_common_business_fields(
         {"name": "IsLoopingEnabled", "value": True},
         {"name": "IsLoopingInfinite", "value": True},
         {"name": "Volume", "value": -4.0},
+        {"name": "UseMaxSoundPerInstance", "value": True},
+        {"name": "MaxSoundPerInstance", "value": 3},
     ]
     assert row["references"] == [
         {"name": "OutputBus", "target": {"kind": "id", "value": BUS_ID}}
@@ -274,6 +277,86 @@ def test_invalid_mixed_modes_and_native_fields_repair_without_guessing(
             fields={"object_path": r"\Actor-Mixer Hierarchy\Bad"},
         )
     assert native.value.repair["error_code"] == "NATIVE_PLANNING_FIELD_FORBIDDEN"
+
+    explicit_reimport = session.with_settings({"mode": "reimport"}).with_new_declaration(
+        declaration_id="new-reimport",
+        target=NewDescendantTarget(parent, "New_Reimport", "sound-sfx"),
+        fields={"media_file": str(media), "language": "SFX"},
+    )
+    with pytest.raises(BusinessDeclarationError) as wrong_form:
+        compile_audio_import_business(
+            explicit_reimport,
+            build_continuation=_continuation,
+        )
+    assert wrong_form.value.repair["error_code"] == (
+        "AUDIO_IMPORT_MODE_TARGET_MISMATCH"
+    )
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_existing_structure_preserves_bound_non_sound_type(version: str) -> None:
+    session, parent, _bus = _session(version)
+    existing = session.handles.bind_object(
+        object_id=SOUND_ID,
+        name="Variants",
+        object_type="RandomSequenceContainer",
+        path=session.handles.resolve_object(parent).path + r"\Variants",
+    )
+    session = session.with_existing_declaration(
+        declaration_id="variants",
+        target=ExistingObjectTarget(existing.handle),
+        fields={},
+    )
+
+    compiled = compile_audio_import_business(
+        session,
+        build_continuation=_continuation,
+    )
+
+    row = compiled.request["arguments"]["imports"][0]
+    assert row["object_type"] == "RandomSequenceContainer"
+    assert "audio_file" not in row
+    assert "import_language" not in row
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_object_scoped_field_handle_cannot_cross_existing_targets(
+    version: str,
+) -> None:
+    session, parent, _bus = _session(version)
+    first = session.handles.bind_object(
+        object_id=SOUND_ID,
+        name="First",
+        object_type="Sound",
+        path=session.handles.resolve_object(parent).path + r"\First",
+    )
+    second = session.handles.bind_object(
+        object_id=EVENT_PARENT_ID,
+        name="Second",
+        object_type="Sound",
+        path=session.handles.resolve_object(parent).path + r"\Second",
+    )
+    custom = session.handles.bind_field(
+        scope_kind="object",
+        scope_value=first.object_id,
+        token="CustomGain",
+        field_kind="property",
+        value_type="number",
+        restrictions={"minimum": -24.0, "maximum": 24.0},
+        metadata_digest="c" * 64,
+    )
+    session = session.with_existing_declaration(
+        declaration_id="second",
+        target=ExistingObjectTarget(second.handle),
+        fields={"field_values": {custom.handle: -3.0}},
+    )
+
+    with pytest.raises(BusinessDeclarationError) as mismatch:
+        compile_audio_import_business(
+            session,
+            build_continuation=_continuation,
+        )
+    assert mismatch.value.repair["error_code"] == "FIELD_HANDLE_SCOPE_MISMATCH"
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)

@@ -3,7 +3,7 @@
   "cutover_policy": {
     "fallback": false,
     "historical_evidence": "frozen_commits_only",
-    "legacy_internal_role": "sealed_archive_compatibility_only",
+    "legacy_internal_role": "test_only_offline_archive_codec",
     "old_interface": "retired_from_gateway_and_agent_contracts",
     "public_input_mode": "business_declaration",
     "status": "deep_business_interface_public"
@@ -17,7 +17,7 @@
     "prohibited_boundary",
     "stable_business_field"
   ],
-  "inventory_digest": "2ae5a16d86ec975b559dead8a4b1915f13be3a35c2fb5421a78f258f06a53413",
+  "inventory_digest": "7a8f99e090d3569605850208204cef905dc9cc743da3c5a81d6ebbfec52c3f35",
   "lanes": [
     {
       "actions": [
@@ -27,7 +27,7 @@
           "destination": "declaration.add",
           "destination_kind": "stable_business_field",
           "source": "add_import_row",
-          "source_contract_digest": "26545f8a21dfcab066da654589263a94128bc02b22581b0dcd131083ceadf928"
+          "source_contract_digest": "f40bfbb4240d2c9a999bde097112c91fbfcd39f4e01649336e0c8ee55c29389b"
         },
         {
           "available": true,
@@ -35,7 +35,7 @@
           "destination": "batch.explicit_defaults.omit",
           "destination_kind": "stable_business_field",
           "source": "clear_import_default",
-          "source_contract_digest": "efa697477d146df55643817a479ccdbb62052c9499d966be240920db3abd6a5e"
+          "source_contract_digest": "a0d53104c77aed804eef375d08358473df51972797dc6a1221bd000469454bd4"
         },
         {
           "available": true,
@@ -43,7 +43,7 @@
           "destination": "batch.settings.omit",
           "destination_kind": "stable_business_field",
           "source": "clear_import_option",
-          "source_contract_digest": "0fbac9a8dc102ba68dbdba14ab345edbd59805e90bd878ed9f2351950940d48b"
+          "source_contract_digest": "a0d53104c77aed804eef375d08358473df51972797dc6a1221bd000469454bd4"
         },
         {
           "available": true,
@@ -51,7 +51,7 @@
           "destination": "declaration.revise_with_omission",
           "destination_kind": "stable_business_field",
           "source": "clear_import_row_field",
-          "source_contract_digest": "fd3ef678ed4ce2e615bb1c2f25d6d7cdd194f254275e2dde79cab012256d468e"
+          "source_contract_digest": "6c332903d73a2ea6d91f5848ab63ddece8baa3c830af9cd0692452552c3b8b40"
         },
         {
           "available": true,
@@ -59,7 +59,7 @@
           "destination": "declaration.remove",
           "destination_kind": "stable_business_field",
           "source": "remove_import_row",
-          "source_contract_digest": "a7b46ac90c5412701a58081214dfa297688f9e447a8654f4db089f3545fbdd7f"
+          "source_contract_digest": "47b55ea72ac59eaba497185cd3e88a92dd700b972b0607611b734977a7ff0eb5"
         },
         {
           "available": true,
@@ -67,7 +67,7 @@
           "destination": "batch.explicit_defaults",
           "destination_kind": "stable_business_field",
           "source": "set_import_default",
-          "source_contract_digest": "2a1f32b0dd2d4c0cfee254994deae6e408dd443e49f9c7968d644469084189a6"
+          "source_contract_digest": "f43137bb4a583defdb0da224e65cb24400aecf15ba3c7f1f131289ac0cf51e25"
         },
         {
           "available": true,
@@ -75,7 +75,7 @@
           "destination": "batch.mode",
           "destination_kind": "stable_business_field",
           "source": "set_import_operation",
-          "source_contract_digest": "9344c57c99ae25ba0d5ddf082a04040c928b55955bd6472e177a01048edb1c76"
+          "source_contract_digest": "d4a984def21446f98121cbedaec21dbd1df2e8f0613113659e104642f62105f5"
         },
         {
           "available": true,
@@ -83,7 +83,7 @@
           "destination": "batch.settings",
           "destination_kind": "stable_business_field",
           "source": "set_import_option",
-          "source_contract_digest": "fe1dc037a250300a2b4035e3af34c921d7d8125e478c5e4b16d2f9399f6d20ec"
+          "source_contract_digest": "f43137bb4a583defdb0da224e65cb24400aecf15ba3c7f1f131289ac0cf51e25"
         },
         {
           "available": true,
@@ -91,7 +91,7 @@
           "destination": "declaration.revise",
           "destination_kind": "stable_business_field",
           "source": "set_import_row_field",
-          "source_contract_digest": "305543ee6580e992de0216e7d12a2749b8e95c78cf72d262ae57c3449923ca46"
+          "source_contract_digest": "fc49b425a00d6f13916e90a6e43eefd5b5a51d678c49941db12674536e2181ab"
         }
       ],
       "limits": {
@@ -389,7 +389,7 @@
         "every derived target and requested business state is verified after dispatch",
         "native paths, wire types, metadata scopes, order, batches, and shell quoting are Gateway-owned"
       ],
-      "source_composer_digest": "38a63a38379e946bd64693e0db94326c36b194bba81f5d5671595710dad35e1e",
+      "source_composer_digest": "011fe53b13f4a554e0fa70603545d6854a8ae73bb74236976c92e5e34fc16e99",
       "source_schema_digest": "e6dd5db7f66b3e4e4afddb1472d39a5d110e25f76dc6365f3a8d24d9577686ec",
       "version": "2021.1"
     },
@@ -401,7 +401,7 @@
           "destination": "declaration.add",
           "destination_kind": "stable_business_field",
           "source": "add_import_row",
-          "source_contract_digest": "26545f8a21dfcab066da654589263a94128bc02b22581b0dcd131083ceadf928"
+          "source_contract_digest": "f40bfbb4240d2c9a999bde097112c91fbfcd39f4e01649336e0c8ee55c29389b"
         },
         {
           "available": true,
@@ -409,7 +409,7 @@
           "destination": "batch.explicit_defaults.omit",
           "destination_kind": "stable_business_field",
           "source": "clear_import_default",
-          "source_contract_digest": "efa697477d146df55643817a479ccdbb62052c9499d966be240920db3abd6a5e"
+          "source_contract_digest": "a0d53104c77aed804eef375d08358473df51972797dc6a1221bd000469454bd4"
         },
         {
           "available": true,
@@ -417,7 +417,7 @@
           "destination": "batch.settings.omit",
           "destination_kind": "stable_business_field",
           "source": "clear_import_option",
-          "source_contract_digest": "0fbac9a8dc102ba68dbdba14ab345edbd59805e90bd878ed9f2351950940d48b"
+          "source_contract_digest": "a0d53104c77aed804eef375d08358473df51972797dc6a1221bd000469454bd4"
         },
         {
           "available": true,
@@ -425,7 +425,7 @@
           "destination": "declaration.revise_with_omission",
           "destination_kind": "stable_business_field",
           "source": "clear_import_row_field",
-          "source_contract_digest": "fd3ef678ed4ce2e615bb1c2f25d6d7cdd194f254275e2dde79cab012256d468e"
+          "source_contract_digest": "6c332903d73a2ea6d91f5848ab63ddece8baa3c830af9cd0692452552c3b8b40"
         },
         {
           "available": true,
@@ -433,7 +433,7 @@
           "destination": "declaration.remove",
           "destination_kind": "stable_business_field",
           "source": "remove_import_row",
-          "source_contract_digest": "a7b46ac90c5412701a58081214dfa297688f9e447a8654f4db089f3545fbdd7f"
+          "source_contract_digest": "47b55ea72ac59eaba497185cd3e88a92dd700b972b0607611b734977a7ff0eb5"
         },
         {
           "available": true,
@@ -441,7 +441,7 @@
           "destination": "batch.explicit_defaults",
           "destination_kind": "stable_business_field",
           "source": "set_import_default",
-          "source_contract_digest": "2a1f32b0dd2d4c0cfee254994deae6e408dd443e49f9c7968d644469084189a6"
+          "source_contract_digest": "f43137bb4a583defdb0da224e65cb24400aecf15ba3c7f1f131289ac0cf51e25"
         },
         {
           "available": true,
@@ -449,7 +449,7 @@
           "destination": "batch.mode",
           "destination_kind": "stable_business_field",
           "source": "set_import_operation",
-          "source_contract_digest": "9344c57c99ae25ba0d5ddf082a04040c928b55955bd6472e177a01048edb1c76"
+          "source_contract_digest": "d4a984def21446f98121cbedaec21dbd1df2e8f0613113659e104642f62105f5"
         },
         {
           "available": true,
@@ -457,7 +457,7 @@
           "destination": "batch.settings",
           "destination_kind": "stable_business_field",
           "source": "set_import_option",
-          "source_contract_digest": "fe1dc037a250300a2b4035e3af34c921d7d8125e478c5e4b16d2f9399f6d20ec"
+          "source_contract_digest": "f43137bb4a583defdb0da224e65cb24400aecf15ba3c7f1f131289ac0cf51e25"
         },
         {
           "available": true,
@@ -465,7 +465,7 @@
           "destination": "declaration.revise",
           "destination_kind": "stable_business_field",
           "source": "set_import_row_field",
-          "source_contract_digest": "305543ee6580e992de0216e7d12a2749b8e95c78cf72d262ae57c3449923ca46"
+          "source_contract_digest": "fc49b425a00d6f13916e90a6e43eefd5b5a51d678c49941db12674536e2181ab"
         }
       ],
       "limits": {
@@ -763,7 +763,7 @@
         "every derived target and requested business state is verified after dispatch",
         "native paths, wire types, metadata scopes, order, batches, and shell quoting are Gateway-owned"
       ],
-      "source_composer_digest": "8a14f5836b2f70493fe831c366769187bba88f403fbfb5595527ed1748824308",
+      "source_composer_digest": "011fe53b13f4a554e0fa70603545d6854a8ae73bb74236976c92e5e34fc16e99",
       "source_schema_digest": "b84f8a7a23a1b5944a45d4889eaf996b96beefa346671917550f71fdc90f8d8a",
       "version": "2022.1"
     },
@@ -775,7 +775,7 @@
           "destination": "declaration.add",
           "destination_kind": "stable_business_field",
           "source": "add_import_row",
-          "source_contract_digest": "26545f8a21dfcab066da654589263a94128bc02b22581b0dcd131083ceadf928"
+          "source_contract_digest": "f40bfbb4240d2c9a999bde097112c91fbfcd39f4e01649336e0c8ee55c29389b"
         },
         {
           "available": true,
@@ -783,7 +783,7 @@
           "destination": "batch.explicit_defaults.omit",
           "destination_kind": "stable_business_field",
           "source": "clear_import_default",
-          "source_contract_digest": "efa697477d146df55643817a479ccdbb62052c9499d966be240920db3abd6a5e"
+          "source_contract_digest": "a0d53104c77aed804eef375d08358473df51972797dc6a1221bd000469454bd4"
         },
         {
           "available": true,
@@ -791,7 +791,7 @@
           "destination": "batch.settings.omit",
           "destination_kind": "stable_business_field",
           "source": "clear_import_option",
-          "source_contract_digest": "c69f467bb159bdaca358325d6e916f573d9087253301601bf60d2e200e6c592b"
+          "source_contract_digest": "a0d53104c77aed804eef375d08358473df51972797dc6a1221bd000469454bd4"
         },
         {
           "available": true,
@@ -799,7 +799,7 @@
           "destination": "declaration.revise_with_omission",
           "destination_kind": "stable_business_field",
           "source": "clear_import_row_field",
-          "source_contract_digest": "fd3ef678ed4ce2e615bb1c2f25d6d7cdd194f254275e2dde79cab012256d468e"
+          "source_contract_digest": "6c332903d73a2ea6d91f5848ab63ddece8baa3c830af9cd0692452552c3b8b40"
         },
         {
           "available": true,
@@ -807,7 +807,7 @@
           "destination": "declaration.remove",
           "destination_kind": "stable_business_field",
           "source": "remove_import_row",
-          "source_contract_digest": "a7b46ac90c5412701a58081214dfa297688f9e447a8654f4db089f3545fbdd7f"
+          "source_contract_digest": "47b55ea72ac59eaba497185cd3e88a92dd700b972b0607611b734977a7ff0eb5"
         },
         {
           "available": true,
@@ -815,7 +815,7 @@
           "destination": "batch.explicit_defaults",
           "destination_kind": "stable_business_field",
           "source": "set_import_default",
-          "source_contract_digest": "2a1f32b0dd2d4c0cfee254994deae6e408dd443e49f9c7968d644469084189a6"
+          "source_contract_digest": "f43137bb4a583defdb0da224e65cb24400aecf15ba3c7f1f131289ac0cf51e25"
         },
         {
           "available": true,
@@ -823,7 +823,7 @@
           "destination": "batch.mode",
           "destination_kind": "stable_business_field",
           "source": "set_import_operation",
-          "source_contract_digest": "9344c57c99ae25ba0d5ddf082a04040c928b55955bd6472e177a01048edb1c76"
+          "source_contract_digest": "d4a984def21446f98121cbedaec21dbd1df2e8f0613113659e104642f62105f5"
         },
         {
           "available": true,
@@ -831,7 +831,7 @@
           "destination": "batch.settings",
           "destination_kind": "stable_business_field",
           "source": "set_import_option",
-          "source_contract_digest": "cc7d8ba963cfe89b9753a5d36e9df743ccf91e33fdb565bfb21398627939a98a"
+          "source_contract_digest": "f43137bb4a583defdb0da224e65cb24400aecf15ba3c7f1f131289ac0cf51e25"
         },
         {
           "available": true,
@@ -839,7 +839,7 @@
           "destination": "declaration.revise",
           "destination_kind": "stable_business_field",
           "source": "set_import_row_field",
-          "source_contract_digest": "305543ee6580e992de0216e7d12a2749b8e95c78cf72d262ae57c3449923ca46"
+          "source_contract_digest": "fc49b425a00d6f13916e90a6e43eefd5b5a51d678c49941db12674536e2181ab"
         }
       ],
       "limits": {
@@ -1137,7 +1137,7 @@
         "every derived target and requested business state is verified after dispatch",
         "native paths, wire types, metadata scopes, order, batches, and shell quoting are Gateway-owned"
       ],
-      "source_composer_digest": "dc2f7aaf67dab88fbf54df5844f33dd038acbc7b97afd6ce0f3eaddd8cd86aca",
+      "source_composer_digest": "011fe53b13f4a554e0fa70603545d6854a8ae73bb74236976c92e5e34fc16e99",
       "source_schema_digest": "2d46db8f8cad71e4dd9927c0d62b21f6c202f0755363ba8a92b54ea4a2adf384",
       "version": "2023.1"
     },
@@ -1149,7 +1149,7 @@
           "destination": "declaration.add",
           "destination_kind": "stable_business_field",
           "source": "add_import_row",
-          "source_contract_digest": "26545f8a21dfcab066da654589263a94128bc02b22581b0dcd131083ceadf928"
+          "source_contract_digest": "f40bfbb4240d2c9a999bde097112c91fbfcd39f4e01649336e0c8ee55c29389b"
         },
         {
           "available": true,
@@ -1157,7 +1157,7 @@
           "destination": "batch.explicit_defaults.omit",
           "destination_kind": "stable_business_field",
           "source": "clear_import_default",
-          "source_contract_digest": "efa697477d146df55643817a479ccdbb62052c9499d966be240920db3abd6a5e"
+          "source_contract_digest": "a0d53104c77aed804eef375d08358473df51972797dc6a1221bd000469454bd4"
         },
         {
           "available": true,
@@ -1165,7 +1165,7 @@
           "destination": "batch.settings.omit",
           "destination_kind": "stable_business_field",
           "source": "clear_import_option",
-          "source_contract_digest": "c69f467bb159bdaca358325d6e916f573d9087253301601bf60d2e200e6c592b"
+          "source_contract_digest": "a0d53104c77aed804eef375d08358473df51972797dc6a1221bd000469454bd4"
         },
         {
           "available": true,
@@ -1173,7 +1173,7 @@
           "destination": "declaration.revise_with_omission",
           "destination_kind": "stable_business_field",
           "source": "clear_import_row_field",
-          "source_contract_digest": "fd3ef678ed4ce2e615bb1c2f25d6d7cdd194f254275e2dde79cab012256d468e"
+          "source_contract_digest": "6c332903d73a2ea6d91f5848ab63ddece8baa3c830af9cd0692452552c3b8b40"
         },
         {
           "available": true,
@@ -1181,7 +1181,7 @@
           "destination": "declaration.remove",
           "destination_kind": "stable_business_field",
           "source": "remove_import_row",
-          "source_contract_digest": "a7b46ac90c5412701a58081214dfa297688f9e447a8654f4db089f3545fbdd7f"
+          "source_contract_digest": "47b55ea72ac59eaba497185cd3e88a92dd700b972b0607611b734977a7ff0eb5"
         },
         {
           "available": true,
@@ -1189,7 +1189,7 @@
           "destination": "batch.explicit_defaults",
           "destination_kind": "stable_business_field",
           "source": "set_import_default",
-          "source_contract_digest": "2a1f32b0dd2d4c0cfee254994deae6e408dd443e49f9c7968d644469084189a6"
+          "source_contract_digest": "f43137bb4a583defdb0da224e65cb24400aecf15ba3c7f1f131289ac0cf51e25"
         },
         {
           "available": true,
@@ -1197,7 +1197,7 @@
           "destination": "batch.mode",
           "destination_kind": "stable_business_field",
           "source": "set_import_operation",
-          "source_contract_digest": "9344c57c99ae25ba0d5ddf082a04040c928b55955bd6472e177a01048edb1c76"
+          "source_contract_digest": "d4a984def21446f98121cbedaec21dbd1df2e8f0613113659e104642f62105f5"
         },
         {
           "available": true,
@@ -1205,7 +1205,7 @@
           "destination": "batch.settings",
           "destination_kind": "stable_business_field",
           "source": "set_import_option",
-          "source_contract_digest": "cc7d8ba963cfe89b9753a5d36e9df743ccf91e33fdb565bfb21398627939a98a"
+          "source_contract_digest": "f43137bb4a583defdb0da224e65cb24400aecf15ba3c7f1f131289ac0cf51e25"
         },
         {
           "available": true,
@@ -1213,7 +1213,7 @@
           "destination": "declaration.revise",
           "destination_kind": "stable_business_field",
           "source": "set_import_row_field",
-          "source_contract_digest": "305543ee6580e992de0216e7d12a2749b8e95c78cf72d262ae57c3449923ca46"
+          "source_contract_digest": "fc49b425a00d6f13916e90a6e43eefd5b5a51d678c49941db12674536e2181ab"
         }
       ],
       "limits": {
@@ -1511,7 +1511,7 @@
         "every derived target and requested business state is verified after dispatch",
         "native paths, wire types, metadata scopes, order, batches, and shell quoting are Gateway-owned"
       ],
-      "source_composer_digest": "cec570300fad1767b9ea9b7ba2b16485ed9a536b54840c5ee5f51a8b91484fda",
+      "source_composer_digest": "011fe53b13f4a554e0fa70603545d6854a8ae73bb74236976c92e5e34fc16e99",
       "source_schema_digest": "bbc540540a07f62e8cfb34f2d83eaf5f00713cc01c327b59c2e4383dc1ca7cba",
       "version": "2024.1"
     },
@@ -1523,7 +1523,7 @@
           "destination": "declaration.add",
           "destination_kind": "stable_business_field",
           "source": "add_import_row",
-          "source_contract_digest": "26545f8a21dfcab066da654589263a94128bc02b22581b0dcd131083ceadf928"
+          "source_contract_digest": "f40bfbb4240d2c9a999bde097112c91fbfcd39f4e01649336e0c8ee55c29389b"
         },
         {
           "available": true,
@@ -1531,7 +1531,7 @@
           "destination": "batch.explicit_defaults.omit",
           "destination_kind": "stable_business_field",
           "source": "clear_import_default",
-          "source_contract_digest": "efa697477d146df55643817a479ccdbb62052c9499d966be240920db3abd6a5e"
+          "source_contract_digest": "a0d53104c77aed804eef375d08358473df51972797dc6a1221bd000469454bd4"
         },
         {
           "available": true,
@@ -1539,7 +1539,7 @@
           "destination": "batch.settings.omit",
           "destination_kind": "stable_business_field",
           "source": "clear_import_option",
-          "source_contract_digest": "c69f467bb159bdaca358325d6e916f573d9087253301601bf60d2e200e6c592b"
+          "source_contract_digest": "a0d53104c77aed804eef375d08358473df51972797dc6a1221bd000469454bd4"
         },
         {
           "available": true,
@@ -1547,7 +1547,7 @@
           "destination": "declaration.revise_with_omission",
           "destination_kind": "stable_business_field",
           "source": "clear_import_row_field",
-          "source_contract_digest": "fd3ef678ed4ce2e615bb1c2f25d6d7cdd194f254275e2dde79cab012256d468e"
+          "source_contract_digest": "6c332903d73a2ea6d91f5848ab63ddece8baa3c830af9cd0692452552c3b8b40"
         },
         {
           "available": true,
@@ -1555,7 +1555,7 @@
           "destination": "declaration.remove",
           "destination_kind": "stable_business_field",
           "source": "remove_import_row",
-          "source_contract_digest": "a7b46ac90c5412701a58081214dfa297688f9e447a8654f4db089f3545fbdd7f"
+          "source_contract_digest": "47b55ea72ac59eaba497185cd3e88a92dd700b972b0607611b734977a7ff0eb5"
         },
         {
           "available": true,
@@ -1563,7 +1563,7 @@
           "destination": "batch.explicit_defaults",
           "destination_kind": "stable_business_field",
           "source": "set_import_default",
-          "source_contract_digest": "2a1f32b0dd2d4c0cfee254994deae6e408dd443e49f9c7968d644469084189a6"
+          "source_contract_digest": "f43137bb4a583defdb0da224e65cb24400aecf15ba3c7f1f131289ac0cf51e25"
         },
         {
           "available": true,
@@ -1571,7 +1571,7 @@
           "destination": "batch.mode",
           "destination_kind": "stable_business_field",
           "source": "set_import_operation",
-          "source_contract_digest": "9344c57c99ae25ba0d5ddf082a04040c928b55955bd6472e177a01048edb1c76"
+          "source_contract_digest": "d4a984def21446f98121cbedaec21dbd1df2e8f0613113659e104642f62105f5"
         },
         {
           "available": true,
@@ -1579,7 +1579,7 @@
           "destination": "batch.settings",
           "destination_kind": "stable_business_field",
           "source": "set_import_option",
-          "source_contract_digest": "cc7d8ba963cfe89b9753a5d36e9df743ccf91e33fdb565bfb21398627939a98a"
+          "source_contract_digest": "f43137bb4a583defdb0da224e65cb24400aecf15ba3c7f1f131289ac0cf51e25"
         },
         {
           "available": true,
@@ -1587,7 +1587,7 @@
           "destination": "declaration.revise",
           "destination_kind": "stable_business_field",
           "source": "set_import_row_field",
-          "source_contract_digest": "305543ee6580e992de0216e7d12a2749b8e95c78cf72d262ae57c3449923ca46"
+          "source_contract_digest": "fc49b425a00d6f13916e90a6e43eefd5b5a51d678c49941db12674536e2181ab"
         }
       ],
       "limits": {
@@ -1885,7 +1885,7 @@
         "every derived target and requested business state is verified after dispatch",
         "native paths, wire types, metadata scopes, order, batches, and shell quoting are Gateway-owned"
       ],
-      "source_composer_digest": "58df9676b40b5e9f4667cf5c2aa7a3a1fccaf250fb42a82dc3f0d099d8c0b123",
+      "source_composer_digest": "011fe53b13f4a554e0fa70603545d6854a8ae73bb74236976c92e5e34fc16e99",
       "source_schema_digest": "f1f5d15fb16db06a6a3d5bf1d3749a7f0cf7b8a0a3efcbfbbf09515b2b72967d",
       "version": "2025.1"
     }

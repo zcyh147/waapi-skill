@@ -11,15 +11,16 @@ from tests.semantic.support.codex_gateway_broker import (
     GatewayInvocationError,
     project_required_metadata_tokens,
 )
+from tests.semantic.support import legacy_audio_import_composer
 
 from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
 from wwise_waapi.operation_composer import (
     OperationComposerError,
-    apply_composer_action,
-    composition_projection,
-    new_composition,
-    operation_composer_contract,
-    parse_typed_action_cli_arguments,
+    apply_composer_action as _current_apply_composer_action,
+    composition_projection as _current_composition_projection,
+    new_composition as _current_new_composition,
+    operation_composer_contract as _current_operation_composer_contract,
+    parse_typed_action_cli_arguments as _current_parse_typed_action_cli_arguments,
 )
 from wwise_waapi.operation_drafts import (
     OperationDraftError,
@@ -52,6 +53,68 @@ _DRAFT_SUBCOMMANDS = frozenset(
 
 class ComposerArchiveError(RuntimeError):
     """Composer evidence is missing, inconsistent, or not replayable."""
+
+
+def operation_composer_contract(operation: str, version: str) -> Mapping[str, Any]:
+    if operation == "audio.import":
+        return legacy_audio_import_composer.contract(version)
+    return _current_operation_composer_contract(operation, version)
+
+
+def parse_typed_action_cli_arguments(
+    arguments: Sequence[str],
+    *,
+    legacy_compatibility: bool = False,
+) -> Mapping[str, Any]:
+    try:
+        return _current_parse_typed_action_cli_arguments(
+            arguments,
+            legacy_compatibility=legacy_compatibility,
+        )
+    except OperationComposerError:
+        if not legacy_compatibility:
+            raise
+        return legacy_audio_import_composer.parse_typed_action(arguments)
+
+
+def new_composition(operation: str, version: str) -> dict[str, Any]:
+    if operation == "audio.import":
+        return legacy_audio_import_composer.new_composition(version)
+    return _current_new_composition(operation, version)
+
+
+def composition_projection(
+    operation: str,
+    version: str,
+    composition: Mapping[str, Any],
+) -> dict[str, Any]:
+    if operation == "audio.import":
+        return legacy_audio_import_composer.projection(version, composition)
+    return _current_composition_projection(operation, version, composition)
+
+
+def apply_composer_action(
+    operation: str,
+    version: str,
+    composition: Mapping[str, Any],
+    action: Mapping[str, Any],
+    *,
+    handle_factory: Callable[[], str] | None = None,
+) -> tuple[dict[str, Any], str]:
+    if operation == "audio.import":
+        return legacy_audio_import_composer.apply_action(
+            version,
+            composition,
+            action,
+            handle_factory=handle_factory,
+        )
+    return _current_apply_composer_action(
+        operation,
+        version,
+        composition,
+        action,
+        handle_factory=handle_factory,
+    )
 
 
 def classify_composer_failure_stage(subcommand: str) -> str:

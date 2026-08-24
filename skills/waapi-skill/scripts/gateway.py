@@ -199,6 +199,7 @@ from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[re
     UI_COMMAND_OPERATIONS,
     OperationContractError,
     VerificationResult,
+    audio_import_business_contract,
     build_undo_group_execution_plan,
     describe_operation,
     list_operation_specs,
@@ -230,7 +231,6 @@ from wwise_waapi.business_declaration_state import (  # noqa: E402  # pyright: i
     BusinessDeclarationSession,
 )
 from wwise_waapi.audio_import_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
-    audio_import_business_contract,
     compile_audio_import_business,
 )
 from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore[reportMissingImports]
@@ -241,6 +241,7 @@ from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore
     NewDescendantTarget,
     bind_live_field,
     revalidate_live_field,
+    revalidate_live_object,
 )
 from wwise_waapi.operation_composer import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_TYPED_ACTIONS_PER_APPLY,
@@ -1792,7 +1793,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_business_draft_binding_arguments(draft_business_configure)
     draft_business_configure.add_argument(
-        "--mode", choices=("create", "reimport", "replace"), required=True
+        "--mode", choices=("create", "reimport", "replace")
     )
     source_control = draft_business_configure.add_mutually_exclusive_group()
     source_control.add_argument(
@@ -4293,18 +4294,6 @@ def operation_composer_input_contract(
                 "limit_by_query_count": metadata_candidate_limit_contract(),
             }
             contract = {**contract, "start_preconditions": exact_preconditions}
-    audio_import_option_names = (
-        contract.get("action_shapes", {})
-        .get("set_import_option", {})
-        .get("allowed_names", [])
-    )
-    if operation == "audio.import" and (
-        not isinstance(audio_import_option_names, list)
-        or not audio_import_option_names
-        or not all(isinstance(name, str) and name for name in audio_import_option_names)
-    ):
-        raise RuntimeError("audio.import source-control option projection is invalid")
-    audio_import_option_choice = "(" + "|".join(audio_import_option_names) + ")"
     generic_typed_action_argv = {
         "add_typed_fact": [
             "--fact-action", "ACTION", "--field-handle", "HANDLE",
@@ -4399,42 +4388,6 @@ def operation_composer_input_contract(
             ],
             "clear_import_option": ["--owner-handle", "HANDLE", "--option", "NAME"],
             "remove_import": ["--owner-handle", "HANDLE"],
-        },
-        "audio.import": {
-            "set_import_operation": ["--mode", "MODE"],
-            "set_import_option": [
-                "--option",
-                audio_import_option_choice,
-                "boolean",
-                "VALUE",
-            ],
-            "clear_import_option": [
-                "--option",
-                audio_import_option_choice,
-            ],
-            "set_import_default": [
-                "(--default NAME TYPE VALUE | --import-location SELECTOR_KIND SELECTOR_VALUES... | --event ACTION PATH | --event-path PATH | --property NAME TYPE VALUE... | --empty-properties | --reference NAME SELECTOR_KIND SELECTOR_VALUES... | --empty-references)"
-            ],
-            "clear_import_default": ["--default", "NAME"],
-            "add_import_row": [
-                "--object-path", "PATH", "--object-type", "TYPE",
-                "[--audio-file PATH]", "[--audio-file-base64 DATA]",
-                "[--audio-source-notes VALUE]", "[--dialogue-event VALUE]",
-                "[(--event ACTION PATH | --event-path PATH)]", "[--import-language VALUE]",
-                "[--import-location SELECTOR_KIND SELECTOR_VALUES...]", "[--notes VALUE]",
-                "[--originals-subfolder VALUE]",
-                "[--property NAME TYPE VALUE]...",
-                "[--empty-properties]",
-                "[--reference NAME SELECTOR_KIND SELECTOR_VALUES...]...",
-                "[--empty-references]",
-                "(--assignment none | --assignment switch VALUE)",
-            ],
-            "set_import_row_field": [
-                "--import-handle", "HANDLE",
-                "(--field NAME TYPE VALUE | --import-location SELECTOR_KIND SELECTOR_VALUES... | --event ACTION PATH | --event-path PATH | --property NAME TYPE VALUE... | --empty-properties | --reference NAME SELECTOR_KIND SELECTOR_VALUES... | --empty-references)",
-            ],
-            "clear_import_row_field": ["--import-handle", "HANDLE", "--field", "NAME"],
-            "remove_import_row": ["--import-handle", "HANDLE"],
         },
         **{
             operation_name: generic_typed_action_argv
@@ -7328,27 +7281,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 request_version,
             )
         if normal_business and request_version is not None:
-            payload["business_adapter"] = {
-                **audio_import_business_contract(request_version),
-                "input_mode": BUSINESS_DECLARATION_INPUT_MODE,
-                "start": {
-                    "subcommand": "draft-start",
-                    "gateway_argv": ["draft-start", spec.name],
-                    "first_required_phase": "bind_required_business_objects",
-                },
-                "commands": [
-                    "draft-bind-object",
-                    "draft-bind-field",
-                    "draft-business-configure",
-                    "draft-declare-new",
-                    "draft-declare-existing",
-                    "draft-revise-declaration",
-                    "draft-remove-declaration",
-                    "draft-check",
-                    "preview-from-draft",
-                ],
-                "legacy_shallow_composer_public": False,
-            }
+            payload["business_adapter"] = audio_import_business_contract(
+                request_version
+            )
         payload["operation"] = operation_projection
         if normal_inline and request_version is not None:
             operation_projection["input_mode"] = INLINE_TYPED_INPUT_MODE
@@ -10045,6 +9980,13 @@ def dispatch_operation_draft_check(
     )
     if canonical_request.operation == "audio.import" and raw_business_session is not None:
         business_session = BusinessDeclarationSession.from_dict(raw_business_session)
+        for row in business_session.handles.as_dict()["objects"]:
+            bound_object = business_session.handles.resolve_object(row["handle"])
+            revalidate_live_object(
+                business_session.handles,
+                bound_object,
+                read_call=read_call,
+            )
         for row in business_session.handles.as_dict()["fields"]:
             bound_field = business_session.handles.bound_field(row["handle"])
             revalidate_live_field(
@@ -10184,19 +10126,12 @@ def _parse_audio_import_business_fields(
     event_name: str | None = None,
     event_action: str | None = None,
 ) -> dict[str, Any]:
-    field_types = {
-        "audio_source_notes": "string",
-        "dialogue_event_directive": "string",
-        "inline_wav": "string",
-        "language": "string",
-        "loop": "string",
-        "media_file": "string",
-        "notes": "string",
-        "originals_subfolder": "string",
-        "output_bus": "reference",
-        "switch_value": "string",
-        "volume_db": "number",
-    }
+    raw_field_types = audio_import_business_contract(
+        session.context.wwise_version
+    )["field_value_types"]
+    if not isinstance(raw_field_types, Mapping):  # pragma: no cover - Registry invariant
+        raise GatewayInputError("audio import business field contract is invalid")
+    field_types = dict(raw_field_types)
     fields: dict[str, Any] = {}
     for pair in pairs:
         if len(pair) != 2:
@@ -10274,7 +10209,9 @@ def dispatch_offline_business_draft_update(
             event_name=args.default_event_name,
             event_action=args.default_event_action,
         )
-        settings: dict[str, Any] = {"mode": args.mode}
+        settings: dict[str, Any] = {}
+        if args.mode is not None:
+            settings["mode"] = args.mode
         if args.add_to_source_control is not None:
             settings["add_to_source_control"] = args.add_to_source_control
         if args.check_out_from_source_control is not None:
@@ -10283,6 +10220,10 @@ def dispatch_offline_business_draft_update(
             )
         if defaults:
             settings["defaults"] = defaults
+        if not settings:
+            raise GatewayInputError(
+                "Business configuration requires at least one explicit batch setting"
+            )
         update = lambda current: current.with_settings(settings)
         event_type = "settings.revised"
     elif args.command == "draft-remove-declaration":

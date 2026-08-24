@@ -51,6 +51,11 @@ from wwise_waapi.operation_composer import (
     parse_typed_action_cli_argument_sequence,
     typed_action_cli_arguments,
 )
+from wwise_waapi.operation_drafts import OperationDraftStore
+from wwise_waapi.business_declaration_state import BusinessDeclarationSession
+from wwise_waapi.audio_import_business import (
+    materialize_audio_import_business_request,
+)
 from wwise_waapi.operation_registry import (
     OperationContractError,
     parse_operation_request,
@@ -10625,6 +10630,53 @@ class CodexGatewayBroker:
                     "Business request witness is missing its flow-local audio.import "
                     "draft-start"
                 )
+            if (self.skill_source / "wwise_waapi").is_dir():
+                start_payload = self._payloads_by_step.get(prior_starts[-1].name)
+                start_draft = (
+                    start_payload.get("draft")
+                    if isinstance(start_payload, Mapping)
+                    else None
+                )
+                draft_id = (
+                    start_draft.get("draft_id")
+                    if isinstance(start_draft, Mapping)
+                    else None
+                )
+                authority = (
+                    start_payload.get("task_authority")
+                    if isinstance(start_payload, Mapping)
+                    else None
+                )
+                if not isinstance(draft_id, str) or not isinstance(authority, str):
+                    raise GatewayInvocationError(
+                        "Business request replay is missing its durable Draft binding"
+                    )
+                try:
+                    record = OperationDraftStore(self.state_directory).inspect(
+                        draft_id,
+                        task_authority=authority,
+                    )
+                    raw_session = (
+                        record.composition.get("business_session")
+                        if isinstance(record.composition, Mapping)
+                        else None
+                    )
+                    session = BusinessDeclarationSession.from_dict(raw_session)
+                    replayed = materialize_audio_import_business_request(session)
+                except Exception as exc:
+                    raise GatewayInvocationError(
+                        "Business request cannot be replayed from the durable Draft"
+                    ) from exc
+                if _normalize_audio_import_request_named_fields(
+                    replayed
+                ) != _normalize_audio_import_request_named_fields(
+                    preview_step.expected_operation_request
+                ):
+                    raise GatewayInvocationError(
+                        "Durable business declarations differ from the sealed request "
+                        "witness"
+                    )
+                return replayed
             return preview_step.expected_operation_request
         sealed_request = self._offline_replay_preview_requests.get(preview_step.name)
         if sealed_request is not None:

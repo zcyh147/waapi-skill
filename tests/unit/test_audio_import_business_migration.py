@@ -11,9 +11,8 @@ from wwise_waapi.audio_import_business_migration import (
     MIGRATION_DESTINATION_KINDS,
     build_audio_import_migration_inventory,
 )
-from wwise_waapi.audio_import_business import audio_import_business_contract
+from wwise_waapi.operation_registry import audio_import_business_contract
 from wwise_waapi.business_declarations import SUPPORTED_WWISE_VERSIONS
-from wwise_waapi.operation_composer import operation_composer_contract
 from wwise_waapi.operation_registry import audio_import_composer_fragment_contract
 
 
@@ -27,7 +26,7 @@ def test_generated_inventory_covers_every_old_field_action_and_version_once() ->
         "status": "deep_business_interface_public",
         "public_input_mode": "business_declaration",
         "old_interface": "retired_from_gateway_and_agent_contracts",
-        "legacy_internal_role": "sealed_archive_compatibility_only",
+        "legacy_internal_role": "test_only_offline_archive_codec",
         "fallback": False,
         "historical_evidence": "frozen_commits_only",
     }
@@ -36,7 +35,6 @@ def test_generated_inventory_covers_every_old_field_action_and_version_once() ->
     for lane in inventory["lanes"]:
         version = lane["version"]
         fragments = audio_import_composer_fragment_contract(version)
-        composer = operation_composer_contract("audio.import", version)
         assert [row["source"] for row in lane["request_options"]] == sorted(
             fragments["request_options"]
         )
@@ -44,7 +42,17 @@ def test_generated_inventory_covers_every_old_field_action_and_version_once() ->
             fragments["row_fields"]
         )
         assert [row["source"] for row in lane["actions"]] == sorted(
-            composer["actions"]
+            {
+                "add_import_row",
+                "clear_import_default",
+                "clear_import_option",
+                "clear_import_row_field",
+                "remove_import_row",
+                "set_import_default",
+                "set_import_operation",
+                "set_import_option",
+                "set_import_row_field",
+            }
         )
         assert len({row["source"] for row in lane["request_options"]}) == len(
             lane["request_options"]

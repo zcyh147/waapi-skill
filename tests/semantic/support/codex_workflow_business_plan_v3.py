@@ -534,10 +534,11 @@ def _matches_transaction_step_sequence(
         name.removeprefix(f"{transaction_id}.") for name, _kind in construction
     ]
     if input_mode == BUSINESS_DECLARATION_INPUT_MODE:
-        if not prefixes or prefixes[0] != "configure":
+        if not prefixes:
             return False
+        offset = 1 if prefixes[0] == "configure" else 0
         counters = {"bind-object": [], "bind-field": [], "declare": []}
-        for prefix in prefixes[1:]:
+        for prefix in prefixes[offset:]:
             family, separator, raw_index = prefix.rpartition(".")
             if (
                 not separator

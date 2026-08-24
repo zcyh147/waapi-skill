@@ -6,7 +6,6 @@ import pytest
 
 from tests.support.platform_filesystem import native_absolute_test_path
 from tests.semantic.support.codex_eval_protocol_v3 import (
-    _materialize_audio_import_composer_actions,
     StructuredRefusal,
     V3GatewayProtocol,
     V3ProtocolError,
@@ -355,34 +354,7 @@ def test_audio_import_switch_assignment_is_part_of_the_business_declaration() ->
     assert "switch_value" not in ordinary.arguments
 
 
-def test_audio_import_archive_replay_preserves_the_removed_assigned_row_action() -> None:
-    materialized = _materialize_audio_import_composer_actions(
-        (
-            {
-                "contract": "waapi-skill.operation-draft-action/v1",
-                "action": "add_switch_assigned_import_row",
-                "object_path": (
-                    r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps\Snow"
-                ),
-                "object_type": "RandomSequenceContainer",
-                "assignment": {"mode": "switch", "value": "Snow"},
-            },
-        ),
-        version="2022.1",
-    )
-
-    assert materialized["arguments"]["imports"] == [
-        {
-            "object_path": (
-                r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps\Snow"
-            ),
-            "object_type": "RandomSequenceContainer",
-            "switch_assignment": "Snow",
-        }
-    ]
-
-
-def test_audio_import_composer_rejects_unreviewed_request_fields() -> None:
+def test_audio_import_business_builder_rejects_unreviewed_request_fields() -> None:
     request = _audio_import_request()
     request["arguments"]["native_args"] = {}  # type: ignore[index]
 
@@ -1059,7 +1031,7 @@ def test_metadata_transaction_protocol_selects_closed_audio_import_equivalence()
         required_tokens=("IsLoopingEnabled",),
         equivalence="audio_import_v1",
     )
-    assert protocol.turn_prefix_counts == (8, 12)
+    assert protocol.turn_prefix_counts == (7, 11)
     assert tuple(step.subcommand for step in protocol.steps[:2]) == (
         "operation-schema",
         "draft-start",

@@ -15,6 +15,7 @@ from wwise_waapi.business_declarations import (
     bind_live_field,
     normalize_common_business_fields,
     revalidate_live_field,
+    revalidate_live_object,
     resolve_semantic_kind,
 )
 
@@ -119,6 +120,61 @@ def test_existing_target_uses_one_exact_bound_object_handle() -> None:
     assert registry.existing_target(existing.handle) == ExistingObjectTarget(
         object_handle=existing.handle
     )
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_live_object_revalidation_requires_the_original_guid_quartet(
+    version: str,
+) -> None:
+    registry = BusinessHandleRegistry(
+        _context(wwise_version=version, wwise_build=f"{version}.fixture"),
+        token_bytes=lambda size: b"j" * size,
+    )
+    bound = registry.bind_object(
+        object_id=OBJECT_ID,
+        name="Weather",
+        object_type="ActorMixer",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\Weather",
+    )
+
+    def exact(
+        uri: str,
+        args: dict[str, object],
+        options: dict[str, object],
+    ) -> dict[str, object]:
+        assert uri == "ak.wwise.core.object.get"
+        assert args == {"from": {"id": [OBJECT_ID]}}
+        assert options == {"return": ["id", "name", "type", "path"]}
+        return {
+            "return": [
+                {
+                    "id": OBJECT_ID,
+                    "name": "Weather",
+                    "type": "ActorMixer",
+                    "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Weather",
+                }
+            ]
+        }
+
+    assert revalidate_live_object(registry, bound, read_call=exact) == bound
+
+    def replaced_at_same_path(
+        uri: str,
+        args: dict[str, object],
+        options: dict[str, object],
+    ) -> dict[str, object]:
+        row = exact(uri, args, options)["return"][0]
+        assert isinstance(row, dict)
+        return {"return": [{**row, "id": OTHER_PROJECT_ID}]}
+
+    with pytest.raises(BusinessDeclarationError) as stale:
+        revalidate_live_object(
+            registry,
+            bound,
+            read_call=replaced_at_same_path,
+        )
+    assert stale.value.repair["error_code"] == "OBJECT_HANDLE_STALE"
+    assert stale.value.repair["rejected_handle"] == bound.handle
 
 
 @pytest.mark.parametrize(

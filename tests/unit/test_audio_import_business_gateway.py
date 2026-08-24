@@ -7,24 +7,18 @@ from collections import deque
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from wwise_waapi.operation_composer import (
-    operation_composer_contract,
-    operation_composer_digest,
-)
+from wwise_waapi.operation_composer import operation_composer_digest
 from wwise_waapi.canonical import canonical_sha256
-from wwise_waapi.audio_import_business import audio_import_business_contract
+from wwise_waapi.operation_registry import audio_import_business_contract
 
 
-def test_audio_import_draft_digest_binds_deep_adapter_and_archive_contract() -> None:
+def test_audio_import_draft_digest_binds_only_the_registry_business_adapter() -> None:
     version = "2022.1"
 
     assert operation_composer_digest("audio.import", version) == canonical_sha256(
         {
             "contract": "waapi-skill.audio-import-draft-binding/v1",
             "business_adapter": audio_import_business_contract(version),
-            "sealed_archive_compatibility": operation_composer_contract(
-                "audio.import", version
-            ),
         }
     )
 from wwise_waapi.operation_drafts import (

@@ -7,7 +7,6 @@ from typing import Any, Mapping
 
 from .business_declarations import SUPPORTED_WWISE_VERSIONS
 from .canonical import canonical_sha256, strict_json_copy
-from .operation_composer import operation_composer_contract
 from .operation_registry import audio_import_composer_fragment_contract
 
 
@@ -234,6 +233,23 @@ _ACTION_MIGRATION: Mapping[str, Mapping[str, Any]] = {
     },
 }
 
+_HISTORICAL_ACTION_FIELDS: Mapping[
+    str, tuple[tuple[str, ...], tuple[str, ...]]
+] = {
+    "set_import_operation": (("mode",), ()),
+    "set_import_option": (("name", "value"), ()),
+    "clear_import_option": (("name",), ()),
+    "set_import_default": (("name", "value"), ()),
+    "clear_import_default": (("name",), ()),
+    "add_import_row": (
+        ("object_path", "assignment"),
+        tuple(sorted(set(_ROW_FIELD_MIGRATION) - {"object_path", "switch_assignment"})),
+    ),
+    "set_import_row_field": (("import_handle", "name", "value"), ()),
+    "clear_import_row_field": (("import_handle", "name"), ()),
+    "remove_import_row": (("import_handle",), ()),
+}
+
 _SAFETY_RULES = (
     "one immutable Preview per current business revision",
     "at most one dispatch and no automatic retry",
@@ -260,7 +276,7 @@ def build_audio_import_migration_inventory() -> dict[str, Any]:
             "status": "deep_business_interface_public",
             "public_input_mode": "business_declaration",
             "old_interface": "retired_from_gateway_and_agent_contracts",
-            "legacy_internal_role": "sealed_archive_compatibility_only",
+            "legacy_internal_role": "test_only_offline_archive_codec",
             "fallback": False,
             "historical_evidence": "frozen_commits_only",
         },
@@ -271,10 +287,9 @@ def build_audio_import_migration_inventory() -> dict[str, Any]:
 
 def _build_lane(version: str) -> dict[str, Any]:
     fragments = audio_import_composer_fragment_contract(version)
-    composer = operation_composer_contract("audio.import", version)
     option_names = set(fragments["request_options"])
     row_names = set(fragments["row_fields"])
-    action_names = set(composer["actions"])
+    action_names = set(_ACTION_MIGRATION)
     _require_exact_coverage(
         "request option", option_names, set(_REQUEST_OPTION_MIGRATION)
     )
@@ -310,7 +325,10 @@ def _build_lane(version: str) -> dict[str, Any]:
             _source_row(
                 name,
                 _ACTION_MIGRATION[name],
-                source_contract=composer["action_shapes"].get(name),
+                source_contract={
+                    "required_fields": list(_HISTORICAL_ACTION_FIELDS[name][0]),
+                    "optional_fields": list(_HISTORICAL_ACTION_FIELDS[name][1]),
+                },
                 available=True,
             )
             for name in sorted(action_names)
@@ -321,7 +339,12 @@ def _build_lane(version: str) -> dict[str, Any]:
             **strict_json_copy(fragments["limits"]),
         },
         "source_schema_digest": fragments["source_schema_digest"],
-        "source_composer_digest": canonical_sha256(composer),
+        "source_composer_digest": canonical_sha256(
+            {
+                "contract": "waapi-skill.retired-audio-import-actions/v1",
+                "action_fields": _HISTORICAL_ACTION_FIELDS,
+            }
+        ),
     }
 
 

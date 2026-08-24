@@ -1092,6 +1092,63 @@ def revalidate_live_field(
     )
 
 
+def revalidate_live_object(
+    registry: BusinessHandleRegistry,
+    bound: BoundObjectHandle,
+    *,
+    read_call: ReadCall,
+) -> BoundObjectHandle:
+    """Re-read one bound object by GUID and require its exact sealed quartet."""
+
+    if not isinstance(registry, BusinessHandleRegistry):
+        raise TypeError("registry must be BusinessHandleRegistry")
+    if not isinstance(bound, BoundObjectHandle):
+        raise TypeError("bound must be BoundObjectHandle")
+    try:
+        payload = read_call(
+            "ak.wwise.core.object.get",
+            {"from": {"id": [bound.object_id]}},
+            {"return": ["id", "name", "type", "path"]},
+        )
+        rows = payload.get("return")
+        if (
+            not isinstance(rows, list)
+            or len(rows) != 1
+            or not isinstance(rows[0], Mapping)
+        ):
+            raise ValueError("object readback is not exactly one row")
+        row = rows[0]
+        live = {
+            "id": str(row.get("id", "")).upper(),
+            "name": row.get("name"),
+            "type": row.get("type"),
+            "path": row.get("path"),
+        }
+    except BusinessDeclarationError:
+        raise
+    except (TypeError, ValueError) as exc:
+        raise _error(
+            "OBJECT_READBACK_INVALID",
+            field="object_handle",
+            rejected_handle=bound.handle,
+            action="resolve the exact live object again before Preview",
+        ) from exc
+    expected = {
+        "id": bound.object_id,
+        "name": bound.name,
+        "type": bound.object_type,
+        "path": bound.path,
+    }
+    if live != expected:
+        raise _error(
+            "OBJECT_HANDLE_STALE",
+            field="object_handle",
+            rejected_handle=bound.handle,
+            action="resolve the exact live object again before Preview",
+        )
+    return registry.resolve_object(bound.handle)
+
+
 def normalize_common_business_fields(fields: Mapping[str, Any]) -> dict[str, Any]:
     """Normalize stable unit-bearing fields while preserving exact omission."""
 
@@ -1679,6 +1736,7 @@ __all__ = [
     "business_repair",
     "normalize_common_business_fields",
     "revalidate_live_field",
+    "revalidate_live_object",
     "repair_at_draft_revision",
     "resolve_semantic_kind",
 ]

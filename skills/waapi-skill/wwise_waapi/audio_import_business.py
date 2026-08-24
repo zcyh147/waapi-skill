@@ -15,7 +15,6 @@ from .business_declarations import (
     BusinessDeclarationError,
     ExistingObjectTarget,
     NewDescendantTarget,
-    SUPPORTED_BUSINESS_KINDS,
     business_repair,
     repair_at_draft_revision,
     resolve_semantic_kind,
@@ -30,6 +29,12 @@ from .business_planning import (
     compile_business_plan,
     plan_business_request,
 )
+from .audio_import_business_contracts import (
+    AUDIO_IMPORT_BUSINESS_DECLARATION_FIELDS,
+    AUDIO_IMPORT_BUSINESS_MODES,
+    AUDIO_IMPORT_BUSINESS_SETTING_FIELDS,
+    AUDIO_IMPORT_EVENT_ACTIONS,
+)
 from .operation_import import (
     ImportContractError,
     normalize_inline_audio_file,
@@ -37,38 +42,10 @@ from .operation_import import (
 )
 
 
-AUDIO_IMPORT_BUSINESS_CONTRACT = "waapi-skill.audio-import-business/v1"
-_SETTING_FIELDS = frozenset(
-    {
-        "mode",
-        "add_to_source_control",
-        "check_out_from_source_control",
-        "defaults",
-    }
-)
-_DECLARATION_FIELDS = frozenset(
-    {
-        "media_file",
-        "inline_wav",
-        "language",
-        "originals_subfolder",
-        "notes",
-        "audio_source_notes",
-        "event",
-        "dialogue_event_directive",
-        "switch_value",
-        "volume_db",
-        "loop",
-        "output_bus",
-        "field_values",
-    }
-)
-_MODE_TO_NATIVE = {
-    "create": "createNew",
-    "reimport": "useExisting",
-    "replace": "replaceExisting",
-}
-_EVENT_ACTIONS = frozenset({"Play", "Stop", "Pause", "Resume", "Break", "Seek"})
+_SETTING_FIELDS = frozenset(AUDIO_IMPORT_BUSINESS_SETTING_FIELDS)
+_DECLARATION_FIELDS = frozenset(AUDIO_IMPORT_BUSINESS_DECLARATION_FIELDS)
+_MODE_TO_NATIVE = AUDIO_IMPORT_BUSINESS_MODES
+_EVENT_ACTIONS = frozenset(AUDIO_IMPORT_EVENT_ACTIONS)
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,42 +55,6 @@ class _ObjectIdentity:
     object_type: str
     object_id: str | None
     declaration_id: str | None = None
-
-
-def audio_import_business_contract(version: str) -> dict[str, Any]:
-    """Project the closed deep Adapter vocabulary for parity/audit tooling."""
-
-    if version not in {"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"}:
-        raise ValueError("unsupported Wwise version")
-    return {
-        "contract": AUDIO_IMPORT_BUSINESS_CONTRACT,
-        "operation": "audio.import",
-        "version": version,
-        "settings": sorted(_SETTING_FIELDS),
-        "declaration_fields": sorted(_DECLARATION_FIELDS),
-        "semantic_kinds": list(SUPPORTED_BUSINESS_KINDS),
-        "modes": sorted(_MODE_TO_NATIVE),
-        "event_actions": sorted(_EVENT_ACTIONS),
-        "gateway_derivations": [
-            "canonical_object_path",
-            "native_object_type",
-            "target_parent_handle",
-            "dependency_order",
-            "batch_layout",
-            "native_request",
-            "continuation",
-        ],
-        "live_handles": [
-            "bound_object_handle",
-            "field_handle",
-            "typed_field_value",
-        ],
-        "exact_user_artifacts": ["media_file", "inline_wav"],
-        "version_features": {
-            "check_out_from_source_control": version
-            in {"2023.1", "2024.1", "2025.1"},
-        },
-    }
 
 
 def compile_audio_import_business(
@@ -319,7 +260,7 @@ def _resolve_mode(
     assert isinstance(explicit_mode, str)
     if explicit_mode == "create" and forms != {"new"}:
         raise _mode_target_mismatch(session, explicit_mode, forms)
-    if explicit_mode == "replace" and forms != {"existing"}:
+    if explicit_mode in {"reimport", "replace"} and forms != {"existing"}:
         raise _mode_target_mismatch(session, explicit_mode, forms)
     return explicit_mode
 
@@ -385,18 +326,25 @@ def _compile_declaration(
     elif isinstance(target, ExistingObjectTarget):
         existing = _resolve_object(session, target.object_handle)
         language = fields.get("language")
-        kind_name = (
-            "sound-voice"
-            if isinstance(language, str) and language.casefold() != "sfx"
-            else "sound-sfx"
-        )
-        kind = resolve_semantic_kind(
-            kind_name,
-            version=session.context.wwise_version,
-        )
         object_path = existing.path
-        object_type = kind.native_object_type
         object_name = existing.name
+        if _type_token(existing.object_type) in {"sound", "soundsfx", "soundvoice"}:
+            kind_name = (
+                "sound-voice"
+                if isinstance(language, str) and language.casefold() != "sfx"
+                else "sound-sfx"
+            )
+            kind = resolve_semantic_kind(
+                kind_name,
+                version=session.context.wwise_version,
+            )
+            object_type = kind.native_object_type
+            metadata_type = kind.metadata_object_type
+            readable_type = kind.path_segment_type
+        else:
+            object_type = existing.object_type
+            metadata_type = existing.object_type
+            readable_type = existing.object_type
     else:  # pragma: no cover - closed dataclass union
         raise RuntimeError("unsupported business target")
 
@@ -522,6 +470,26 @@ def _compile_declaration(
                 action="provide a finite value in decibels",
             )
         properties.append({"name": "Volume", "value": float(volume)})
+    if "max_instances" in fields:
+        maximum = fields["max_instances"]
+        if (
+            isinstance(maximum, bool)
+            or not isinstance(maximum, int)
+            or not 1 <= maximum <= 1_000_000
+        ):
+            raise _repair(
+                session,
+                "FIELD_VALUE_OUT_OF_RANGE",
+                field="max_instances",
+                valid_range={"minimum": 1, "maximum": 1_000_000},
+                action="provide a positive bounded instance count",
+            )
+        properties.extend(
+            (
+                {"name": "UseMaxSoundPerInstance", "value": True},
+                {"name": "MaxSoundPerInstance", "value": maximum},
+            )
+        )
     if "output_bus" in fields:
         bus = _resolve_object(session, fields["output_bus"])
         if _type_token(bus.object_type) not in {"bus", "audiobus", "auxbus", "auxiliarybus"}:
@@ -541,7 +509,16 @@ def _compile_declaration(
     _append_dynamic_fields(
         session,
         fields.get("field_values"),
-        metadata_type=kind.metadata_object_type,
+        metadata_type=(
+            kind.metadata_object_type
+            if isinstance(target, NewDescendantTarget)
+            else metadata_type
+        ),
+        target_object_id=(
+            None
+            if isinstance(target, NewDescendantTarget)
+            else existing.object_id
+        ),
         properties=properties,
         references=references,
     )
@@ -552,7 +529,10 @@ def _compile_declaration(
     if "event" in fields:
         row["event"] = _compile_event(session, fields["event"])
 
-    readable = [f"对象：{object_name}", f"类型：{kind.path_segment_type}"]
+    readable = [
+        f"对象：{object_name}",
+        f"类型：{kind.path_segment_type if isinstance(target, NewDescendantTarget) else readable_type}",
+    ]
     if "volume_db" in fields:
         readable.append(f"音量：{float(fields['volume_db']):g} dB")
     if fields.get("loop") == "infinite":
@@ -584,6 +564,7 @@ def _append_dynamic_fields(
     value: Any,
     *,
     metadata_type: str,
+    target_object_id: str | None,
     properties: list[dict[str, Any]],
     references: list[dict[str, Any]],
 ) -> None:
@@ -600,11 +581,16 @@ def _append_dynamic_fields(
             normalized_value = session.handles.validate_field_value(field, raw_value)
         except BusinessDeclarationError as exc:
             raise repair_at_draft_revision(exc, draft_revision=session.revision) from exc
-        if (
+        class_scope_mismatch = (
             field.scope_kind == "class"
             and isinstance(field.scope_value, str)
             and _type_token(field.scope_value) != _type_token(metadata_type)
-        ):
+        )
+        object_scope_mismatch = field.scope_kind == "object" and (
+            target_object_id is None
+            or str(field.scope_value).upper() != target_object_id.upper()
+        )
+        if class_scope_mismatch or object_scope_mismatch:
             raise _repair(
                 session,
                 "FIELD_HANDLE_SCOPE_MISMATCH",
@@ -750,8 +736,6 @@ def _type_token(value: str) -> str:
 
 
 __all__ = [
-    "AUDIO_IMPORT_BUSINESS_CONTRACT",
-    "audio_import_business_contract",
     "compile_audio_import_business",
     "materialize_audio_import_business_request",
 ]

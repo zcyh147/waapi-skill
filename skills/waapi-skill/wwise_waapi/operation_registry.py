@@ -23,6 +23,7 @@ from typing import Any, Callable, Mapping, NoReturn, Sequence
 from xml.etree import ElementTree as ET
 
 from .canonical import canonical_json_bytes, canonical_sha256
+from .audio_import_business_contracts import audio_import_business_contract_data
 from .builders.identity import ObjectIdentity, ResolvedObject, plan_object_resolution
 from .builders.metadata import (
     GET_PROPERTY_AND_REFERENCE_NAMES_URI,
@@ -3630,6 +3631,17 @@ def operation_input_mode(name: str, version: str) -> str:
             },
         )
     return _operation_input_mode_index(OPERATION_INPUT_MODE_LANES)[(name, version)]
+
+
+def audio_import_business_contract(version: str) -> dict[str, Any]:
+    """Publish Registry-owned audio.import business shape and safety metadata."""
+
+    if operation_input_mode("audio.import", version) != BUSINESS_DECLARATION_INPUT_MODE:
+        raise OperationContractError(
+            "OPERATION_INPUT_MODE_INVALID",
+            "audio.import does not expose the business declaration input mode.",
+        )
+    return audio_import_business_contract_data(version)
 
 
 def operation_input_modes_by_version(name: str) -> dict[str, str]:
@@ -20939,6 +20951,7 @@ def _audio_import_object_path_contract(
 __all__ = [
     "COMPOSER_INPUT_MODE",
     "BUSINESS_DECLARATION_INPUT_MODE",
+    "audio_import_business_contract",
     "INLINE_TYPED_INPUT_MODE",
     "CONDITIONAL_LOCAL_FILESYSTEM_OPERATIONS",
     "DYNAMIC_LOCAL_FILESYSTEM_OPERATIONS",

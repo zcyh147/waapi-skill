@@ -575,15 +575,17 @@ def build_audio_import_composer_transaction_steps(
         field_bindings[key] = binding
         return binding
 
-    native_mode = arguments.get("import_operation", "createNew")
-    mode = {
+    native_mode = arguments.get("import_operation")
+    mode = None if native_mode is None else {
         "createNew": "create",
         "useExisting": "reimport",
         "replaceExisting": "replace",
     }.get(native_mode)
-    if mode is None:
+    if native_mode is not None and mode is None:
         raise V3ProtocolError("audio.import business mode is unsupported")
-    configure_arguments: list[Any] = [*draft_prefix(), "--mode", mode]
+    configure_arguments: list[Any] = [*draft_prefix()]
+    if mode is not None:
+        configure_arguments.extend(("--mode", mode))
     if "auto_add_to_source_control" in arguments:
         configure_arguments.append(
             "--add-to-source-control"
@@ -596,15 +598,17 @@ def build_audio_import_composer_transaction_steps(
             if arguments["auto_check_out_to_source_control"] is True
             else "--no-check-out-from-source-control"
         )
-    configure_name = f"{label}.configure"
-    steps.append(
-        ExpectedGatewayStep(
-            name=configure_name,
-            subcommand="draft-business-configure",
-            arguments=tuple(configure_arguments),
+    configure_name: str | None = None
+    if len(configure_arguments) > len(draft_prefix()):
+        configure_name = f"{label}.configure"
+        steps.append(
+            ExpectedGatewayStep(
+                name=configure_name,
+                subcommand="draft-business-configure",
+                arguments=tuple(configure_arguments),
+            )
         )
-    )
-    latest_revision_step = configure_name
+        latest_revision_step = configure_name
 
     def value_text(value: Any) -> str:
         if isinstance(value, bool):
@@ -754,6 +758,16 @@ def build_audio_import_composer_transaction_steps(
             property_by_name.pop("IsLoopingEnabled")
             property_by_name.pop("IsLoopingInfinite")
             business_fields.append(("loop", "infinite"))
+        max_instances_enabled = property_by_name.get("UseMaxSoundPerInstance")
+        max_instances = property_by_name.get("MaxSoundPerInstance")
+        if (
+            max_instances_enabled is True
+            and isinstance(max_instances, int)
+            and not isinstance(max_instances, bool)
+        ):
+            property_by_name.pop("UseMaxSoundPerInstance")
+            property_by_name.pop("MaxSoundPerInstance")
+            business_fields.append(("max_instances", max_instances))
 
         references = fields.get("references", [])
         if not isinstance(references, list):
@@ -895,69 +909,6 @@ def build_audio_import_composer_transaction_steps(
         )
     )
     return tuple(steps)
-
-
-def _materialize_audio_import_composer_actions(
-    actions: Sequence[Mapping[str, Any]],
-    *,
-    version: str,
-) -> dict[str, Any]:
-    return _materialize_audio_import_composer_action_entries(
-        tuple(
-            (f"action.{index:03d}", action, ())
-            for index, action in enumerate(actions, start=1)
-        ),
-        version=version,
-    )
-
-
-def _materialize_audio_import_composer_action_entries(
-    entries: Sequence[
-        tuple[
-            str,
-            Mapping[str, Any],
-            tuple[DraftActionResponseBinding, ...],
-        ]
-    ],
-    *,
-    version: str,
-) -> dict[str, Any]:
-    composition = new_composition("audio.import", version)
-    created_handles: dict[str, str] = {}
-    handles = iter(f"odh1-{index:024x}" for index in range(1, len(entries) + 1))
-    for step_name, action, response_bindings in entries:
-        resolved_action = dict(action)
-        for binding in response_bindings:
-            if (
-                binding.pointer != "/import_handle"
-                or binding.response_pointer
-                != "/draft/action_result/created_handles/0"
-            ):
-                raise OperationComposerError(
-                    "audio.import protocol contains an unsupported dynamic handle"
-                )
-            try:
-                resolved_action["import_handle"] = created_handles[binding.step]
-            except KeyError as exc:
-                raise OperationComposerError(
-                    "audio.import protocol handle is not available"
-                ) from exc
-        if resolved_action.get("action") in {
-            "add_import_row_without_switch_assignment",
-            "add_switch_assigned_import_row",
-        }:
-            resolved_action["action"] = "add_import_row"
-        generated_handle = next(handles)
-        composition, _action_name = apply_composer_action(
-            "audio.import",
-            version,
-            composition,
-            resolved_action,
-            handle_factory=lambda: generated_handle,
-        )
-        if resolved_action.get("action") == "add_import_row":
-            created_handles[step_name] = generated_handle
-    return materialize_operation_request("audio.import", version, composition)
 
 
 def materialize_audio_import_composer_protocol_request(

@@ -23,7 +23,6 @@ from tests.semantic.support.codex_operation_draft_archive_v3 import (
 from tests.semantic.support import codex_operation_draft_archive_v3 as archive_module
 from wwise_waapi.canonical import canonical_sha256
 from wwise_waapi.operation_composer import (
-    composition_projection,
     typed_action_cli_arguments,
 )
 from wwise_waapi.operation_drafts import (
@@ -157,7 +156,7 @@ def test_archive_replays_frozen_generic_audio_import_typed_argv() -> None:
 def test_archive_accepts_both_frozen_audio_import_projection_contracts(
     legacy_index: int,
 ) -> None:
-    projection = composition_projection(
+    projection = archive_module.composition_projection(
         "audio.import",
         "2022.1",
         {
@@ -200,7 +199,7 @@ def _draft_payload(
     *,
     task_authority: str | None = None,
 ) -> dict[str, Any]:
-    projection = composition_projection(
+    projection = archive_module.composition_projection(
         record.operation,
         record.version,
         record.composition or {},
