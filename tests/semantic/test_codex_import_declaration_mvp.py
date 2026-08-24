@@ -981,6 +981,7 @@ def test_mvp_agent_contract_uses_standard_skill_bootstrap_and_semantic_preview_g
     assert mvp_continuations_were_used(
         (declaration, preview),
         (shell_record,),
+        platform_name="posix",
     )
 
 
