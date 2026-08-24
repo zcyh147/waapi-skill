@@ -39,6 +39,7 @@ BUSINESS_SESSION_UPDATE_EVENTS = frozenset(
         "declaration.added",
         "declaration.removed",
         "declaration.revised",
+        "handles.bound",
         "preview.recorded",
         "settings.revised",
     }
@@ -278,6 +279,30 @@ class BusinessDeclarationSession:
             declarations=self.declarations,
         )
 
+    def with_handle_registry(
+        self,
+        handles: BusinessHandleRegistry,
+    ) -> "BusinessDeclarationSession":
+        """Publish one cloned current-task handle table without changing facts."""
+
+        if not isinstance(handles, BusinessHandleRegistry):
+            raise TypeError("handles must be BusinessHandleRegistry")
+        if handles.context != self.context:
+            raise ValueError("business handle registry context differs")
+        if handles.as_dict() == self.handles.as_dict():
+            raise ValueError("business handle registry is unchanged")
+        candidate = BusinessDeclarationSession(
+            context=self.context,
+            handles=handles,
+            settings=self.settings,
+            revision=self.revision,
+            declarations=self.declarations,
+            active_preview=self.active_preview,
+            preview_audit=self.preview_audit,
+        )
+        candidate.as_dict()
+        return candidate
+
     def with_preview(self, preview: BusinessPreview) -> "BusinessDeclarationSession":
         if not isinstance(preview, BusinessPreview):
             raise TypeError("preview must be BusinessPreview")
@@ -432,6 +457,22 @@ class BusinessDeclarationSession:
             ):
                 raise ValueError(
                     "settings transition must change exactly one revision and invalidate Preview"
+                )
+            return
+        if event_type == "handles.bound":
+            if (
+                candidate.revision != previous.revision
+                or candidate_payload["declarations"]
+                != previous_payload["declarations"]
+                or candidate_payload["handles"] == previous_payload["handles"]
+                or candidate_payload["settings"] != previous_payload["settings"]
+                or candidate_payload["active_preview"]
+                != previous_payload["active_preview"]
+                or candidate_payload["preview_audit"]
+                != previous_payload["preview_audit"]
+            ):
+                raise ValueError(
+                    "handle transition must change only the current-task handle table"
                 )
             return
         if (

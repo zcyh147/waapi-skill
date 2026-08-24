@@ -28,6 +28,7 @@ from .business_declaration_state import (
     BusinessDeclarationSession,
 )
 from .business_declarations import BusinessContext
+from .audio_import_business import materialize_audio_import_business_request
 from .canonical import canonical_json_bytes, canonical_sha256
 from .filesystem_security import path_is_link_or_reparse
 from .operation_composer import (
@@ -736,7 +737,7 @@ class OperationDraftStore:
                 raise OperationDraftStorageCorruption(
                     "Composer-backed Operation Draft is missing its composition."
                 )
-            request = materialize_operation_request(
+            request = _materialize_draft_composition(
                 record.operation,
                 record.version,
                 record.composition,
@@ -962,7 +963,7 @@ class OperationDraftStore:
                 raise OperationDraftStorageCorruption(
                     "Composer-backed Operation Draft is missing its composition."
                 )
-            current_request = materialize_operation_request(
+            current_request = _materialize_draft_composition(
                 record.operation,
                 record.version,
                 record.composition,
@@ -1104,7 +1105,7 @@ class OperationDraftStore:
                 raise OperationDraftCheckRequired(
                     "Operation Draft check evidence is stale for the current revision."
                 )
-            request = materialize_operation_request(
+            request = _materialize_draft_composition(
                 record.operation,
                 record.version,
                 record.composition,
@@ -2058,7 +2059,7 @@ def _replay_seal_reservation(
         raise OperationDraftStorageCorruption(
             "Reserved Operation Draft is missing its composition."
         )
-    current_request = materialize_operation_request(
+    current_request = _materialize_draft_composition(
         record.operation,
         record.version,
         record.composition,
@@ -2095,6 +2096,33 @@ def _validate_durable_composition(
         allow_cleaned_file_evidence=allow_cleaned_file_evidence,
     )
     return normalized
+
+
+def _materialize_draft_composition(
+    operation: str,
+    version: str,
+    composition: Mapping[str, Any],
+    *,
+    allow_cleaned_file_evidence: bool = False,
+) -> Mapping[str, Any]:
+    raw_business_session = composition.get("business_session")
+    if operation == "audio.import" and raw_business_session is not None:
+        try:
+            session = BusinessDeclarationSession.from_dict(raw_business_session)
+            return materialize_audio_import_business_request(
+                session,
+                allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+            )
+        except (TypeError, ValueError) as exc:
+            raise OperationComposerError(
+                "audio.import business declarations cannot materialize their canonical request."
+            ) from exc
+    return materialize_operation_request(
+        operation,
+        version,
+        composition,
+        allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+    )
 
 
 def _require_composition_projection_budget(
@@ -2615,7 +2643,7 @@ def _record_from_mapping(
         )
         if seal is not None:
             try:
-                composed_request = materialize_operation_request(
+                composed_request = _materialize_draft_composition(
                     payload["operation"],
                     payload["version"],
                     composition,

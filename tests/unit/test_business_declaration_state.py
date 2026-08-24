@@ -202,6 +202,36 @@ def test_batch_settings_and_declaration_removal_are_atomic_revisions(
     assert removed.as_dict() == before
 
 
+def test_handle_binding_is_a_fact_preserving_durable_transition() -> None:
+    context = _context()
+    session = BusinessDeclarationSession.create(context)
+    previous = session.as_dict()
+    handles = type(session.handles).from_dict(session.handles.as_dict())
+    bound = handles.bind_object(
+        object_id=PARENT_ID,
+        name="Weather",
+        object_type="ActorMixer",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\Weather",
+    )
+
+    candidate = session.with_handle_registry(handles)
+
+    BusinessDeclarationSession.validate_transition(
+        previous,
+        candidate,
+        event_type="handles.bound",
+    )
+    assert candidate.revision == 0
+    assert candidate.handles.resolve_object(bound.handle) == bound
+
+    with pytest.raises(ValueError, match="handle transition"):
+        BusinessDeclarationSession.validate_transition(
+            previous,
+            session,
+            event_type="handles.bound",
+        )
+
+
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
 def test_operation_draft_business_update_is_durable_atomic_and_cas_bound(
     tmp_path: Path,

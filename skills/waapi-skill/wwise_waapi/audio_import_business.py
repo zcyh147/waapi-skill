@@ -27,6 +27,7 @@ from .business_planning import (
     BusinessPlanningDeadline,
     CompiledBusinessPlan,
     compile_business_plan,
+    plan_business_request,
 )
 from .operation_import import (
     ImportContractError,
@@ -123,6 +124,30 @@ def compile_audio_import_business(
 
     if not isinstance(session, BusinessDeclarationSession):
         raise TypeError("session must be BusinessDeclarationSession")
+    effects, materialize, file_evidence = _audio_import_plan_inputs(
+        session,
+        collect_file_evidence=True,
+    )
+    return compile_business_plan(
+        session,
+        operation="audio.import",
+        effects=effects,
+        materialize=materialize,
+        build_continuation=build_continuation,
+        file_evidence=file_evidence,
+        clock=clock,
+    )
+
+
+def _audio_import_plan_inputs(
+    session: BusinessDeclarationSession,
+    *,
+    collect_file_evidence: bool,
+) -> tuple[
+    tuple[BusinessEffect, ...],
+    Callable[[Sequence[BusinessBatch], BusinessPlanningDeadline], Mapping[str, Any]],
+    tuple[BusinessFileEvidence, ...],
+]:
     settings = _normalize_settings(session)
     mode = _resolve_mode(session, settings.get("mode"))
     default_fields = settings.get("defaults", {})
@@ -142,6 +167,7 @@ def compile_audio_import_business(
             default_fields=default_fields,
             planned=planned,
             identity_cache=identity_cache,
+            collect_file_evidence=collect_file_evidence,
         )
         effects.append(effect)
         if evidence is not None:
@@ -184,15 +210,30 @@ def compile_audio_import_business(
             "arguments": {"imports": rows, **request_options},
         }
 
-    return compile_business_plan(
+    return tuple(effects), materialize, tuple(file_evidence)
+
+
+def materialize_audio_import_business_request(
+    session: BusinessDeclarationSession,
+    *,
+    allow_cleaned_file_evidence: bool = False,
+) -> Mapping[str, Any]:
+    """Return the canonical request without inventing a public continuation."""
+
+    if not isinstance(allow_cleaned_file_evidence, bool):
+        raise TypeError("allow_cleaned_file_evidence must be a boolean")
+    effects, materialize, file_evidence = _audio_import_plan_inputs(
+        session,
+        collect_file_evidence=not allow_cleaned_file_evidence,
+    )
+    return plan_business_request(
         session,
         operation="audio.import",
-        effects=tuple(effects),
+        effects=effects,
         materialize=materialize,
-        build_continuation=build_continuation,
-        file_evidence=tuple(file_evidence),
-        clock=clock,
-    )
+        file_evidence=file_evidence,
+        verify_file_evidence=not allow_cleaned_file_evidence,
+    ).request
 
 
 def _normalize_settings(session: BusinessDeclarationSession) -> dict[str, Any]:
@@ -302,6 +343,7 @@ def _compile_declaration(
     default_fields: Mapping[str, Any],
     planned: Mapping[str, BusinessDeclaration],
     identity_cache: dict[str, _ObjectIdentity],
+    collect_file_evidence: bool,
 ) -> tuple[BusinessEffect, BusinessFileEvidence | None]:
     fields = {**dict(default_fields), **dict(declaration.fields)}
     unknown = sorted(set(fields) - _DECLARATION_FIELDS)
@@ -373,16 +415,19 @@ def _compile_declaration(
     if media_file is not None:
         if not isinstance(media_file, str):
             raise _field_type_repair(session, "media_file", "absolute regular file")
-        try:
-            evidence = BusinessFileEvidence.from_path(media_file)
-        except (ImportContractError, OSError, ValueError) as exc:
-            raise _repair(
-                session,
-                "MEDIA_FILE_UNAVAILABLE",
-                field="media_file",
-                action="provide one available absolute regular media file",
-            ) from exc
-        row["audio_file"] = evidence.path
+        if collect_file_evidence:
+            try:
+                evidence = BusinessFileEvidence.from_path(media_file)
+            except (ImportContractError, OSError, ValueError) as exc:
+                raise _repair(
+                    session,
+                    "MEDIA_FILE_UNAVAILABLE",
+                    field="media_file",
+                    action="provide one available absolute regular media file",
+                ) from exc
+            row["audio_file"] = evidence.path
+        else:
+            row["audio_file"] = media_file
     elif inline_wav is not None:
         try:
             normalized_inline, _proof = normalize_inline_audio_file(
@@ -706,4 +751,5 @@ __all__ = [
     "AUDIO_IMPORT_BUSINESS_CONTRACT",
     "audio_import_business_contract",
     "compile_audio_import_business",
+    "materialize_audio_import_business_request",
 ]

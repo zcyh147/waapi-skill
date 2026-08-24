@@ -315,6 +315,23 @@ class CompiledBusinessPlan:
         return payload
 
 
+@dataclass(frozen=True, slots=True)
+class PlannedBusinessRequest:
+    """Canonical request planning result before any public continuation exists."""
+
+    operation: str
+    version: str
+    source_revision: int
+    ordered_effect_ids: tuple[str, ...]
+    batches: tuple[BusinessBatch, ...]
+    request: Mapping[str, Any]
+    request_digest: str
+    verifier_expectations: tuple[Mapping[str, Any], ...]
+    file_evidence: tuple[BusinessFileEvidence, ...]
+    readable_lines: tuple[str, ...]
+    deadline: BusinessPlanningDeadline
+
+
 MaterializePlan = Callable[
     [Sequence[BusinessBatch], BusinessPlanningDeadline],
     Mapping[str, Any],
@@ -336,6 +353,92 @@ def compile_business_plan(
     clock: Callable[[], float] = time.monotonic,
 ) -> CompiledBusinessPlan:
     """Compile one complete, exact-revision business plan without mutation."""
+
+    planned = plan_business_request(
+        session,
+        operation=operation,
+        effects=effects,
+        materialize=materialize,
+        file_evidence=file_evidence,
+        clock=clock,
+    )
+    deadline = planned.deadline
+    if not callable(build_continuation):
+        raise TypeError("build_continuation must be callable")
+    try:
+        raw_continuation = build_continuation(
+            planned.request,
+            planned.request_digest,
+            deadline,
+        )
+        continuation = _validate_continuation(raw_continuation)
+    except BusinessDeclarationError:
+        raise
+    except Exception as exc:
+        raise business_repair(
+            "BUSINESS_CONTINUATION_INVALID",
+            field="continuation",
+            draft_revision=session.revision,
+            action="repair the Gateway-owned single continuation builder",
+        ) from exc
+    detail = {
+        "contract": COMPILED_BUSINESS_PLAN_CONTRACT,
+        "ordered_effect_ids": list(planned.ordered_effect_ids),
+        "batches": [batch.as_dict() for batch in planned.batches],
+        "native_request": planned.request,
+        "native_request_digest": planned.request_digest,
+        "verifier_expectations": [
+            dict(row) for row in planned.verifier_expectations
+        ],
+        "file_evidence": [row.as_dict() for row in planned.file_evidence],
+        "continuation": continuation,
+    }
+    if len(canonical_json_bytes(detail)) > MAX_BUSINESS_PLAN_BYTES:
+        raise business_repair(
+            "BUSINESS_PLAN_LIMIT_EXCEEDED",
+            field="plan",
+            draft_revision=session.revision,
+            action="split the task into bounded business declaration batches",
+        )
+    try:
+        preview = BusinessPreview.create(
+            source_revision=session.revision,
+            readable_lines=planned.readable_lines,
+            detail=detail,
+        )
+    except ValueError as exc:
+        raise business_repair(
+            "BUSINESS_PLAN_LIMIT_EXCEEDED",
+            field="preview",
+            draft_revision=session.revision,
+            action="split the task into bounded business declaration batches",
+        ) from exc
+    deadline.checkpoint()
+    return CompiledBusinessPlan(
+        operation=planned.operation,
+        version=planned.version,
+        source_revision=planned.source_revision,
+        ordered_effect_ids=planned.ordered_effect_ids,
+        batches=planned.batches,
+        request=planned.request,
+        request_digest=planned.request_digest,
+        verifier_expectations=planned.verifier_expectations,
+        preview=preview,
+        continuation=continuation,
+    )
+
+
+def plan_business_request(
+    session: BusinessDeclarationSession,
+    *,
+    operation: str,
+    effects: Sequence[BusinessEffect],
+    materialize: MaterializePlan,
+    file_evidence: Sequence[BusinessFileEvidence],
+    verify_file_evidence: bool = True,
+    clock: Callable[[], float] = time.monotonic,
+) -> PlannedBusinessRequest:
+    """Plan and validate one request without manufacturing a continuation."""
 
     if not isinstance(session, BusinessDeclarationSession):
         raise TypeError("session must be BusinessDeclarationSession")
@@ -370,8 +473,8 @@ def compile_business_plan(
         )
     if not callable(materialize):
         raise TypeError("materialize must be callable")
-    if not callable(build_continuation):
-        raise TypeError("build_continuation must be callable")
+    if not isinstance(verify_file_evidence, bool):
+        raise TypeError("verify_file_evidence must be a boolean")
     normalized_files = _validate_file_evidence(
         file_evidence,
         draft_revision=session.revision,
@@ -459,87 +562,44 @@ def compile_business_plan(
         ) from exc
     request_digest = canonical_sha256(request)
     deadline.checkpoint()
-    try:
-        request_files = _request_file_paths(normalized_operation, request)
-    except ValueError as exc:
-        raise business_repair(
-            "BUSINESS_FILE_EVIDENCE_INVALID",
-            field="files",
-            draft_revision=session.revision,
-            action="repair the closed Adapter's canonical request-file mapping",
-        ) from exc
-    evidence_paths = tuple(row.path for row in normalized_files)
-    if Counter(request_files) != Counter(evidence_paths):
-        raise business_repair(
-            "BUSINESS_FILE_EVIDENCE_MISMATCH",
-            field="files",
-            draft_revision=session.revision,
-            request_file_count=len(request_files),
-            evidence_file_count=len(evidence_paths),
-            action="bind every native request file to exact immutable evidence",
-        )
-    try:
-        for row in normalized_files:
-            verify_regular_file_proof(
-                row.as_import_proof(),
-                field="business file evidence",
+    if verify_file_evidence:
+        try:
+            request_files = _request_file_paths(normalized_operation, request)
+        except ValueError as exc:
+            raise business_repair(
+                "BUSINESS_FILE_EVIDENCE_INVALID",
+                field="files",
+                draft_revision=session.revision,
+                action="repair the closed Adapter's canonical request-file mapping",
+            ) from exc
+        evidence_paths = tuple(row.path for row in normalized_files)
+        if Counter(request_files) != Counter(evidence_paths):
+            raise business_repair(
+                "BUSINESS_FILE_EVIDENCE_MISMATCH",
+                field="files",
+                draft_revision=session.revision,
+                request_file_count=len(request_files),
+                evidence_file_count=len(evidence_paths),
+                action="bind every native request file to exact immutable evidence",
             )
-    except (ImportContractError, ValueError) as exc:
-        raise business_repair(
-            "BUSINESS_FILE_EVIDENCE_STALE",
-            field="files",
-            draft_revision=session.revision,
-            action="refresh immutable file evidence before Preview",
-        ) from exc
-    try:
-        raw_continuation = build_continuation(request, request_digest, deadline)
-        continuation = _validate_continuation(raw_continuation)
-    except BusinessDeclarationError:
-        raise
-    except Exception as exc:
-        raise business_repair(
-            "BUSINESS_CONTINUATION_INVALID",
-            field="continuation",
-            draft_revision=session.revision,
-            action="repair the Gateway-owned single continuation builder",
-        ) from exc
+        try:
+            for row in normalized_files:
+                verify_regular_file_proof(
+                    row.as_import_proof(),
+                    field="business file evidence",
+                )
+        except (ImportContractError, ValueError) as exc:
+            raise business_repair(
+                "BUSINESS_FILE_EVIDENCE_STALE",
+                field="files",
+                draft_revision=session.revision,
+                action="refresh immutable file evidence before Preview",
+            ) from exc
     verifier_expectations = tuple(
         dict(row.verifier_expectation) for row in ordered
     )
-    detail = {
-        "contract": COMPILED_BUSINESS_PLAN_CONTRACT,
-        "ordered_effect_ids": [row.effect_id for row in ordered],
-        "batches": [batch.as_dict() for batch in batches],
-        "native_request": request,
-        "native_request_digest": request_digest,
-        "verifier_expectations": [dict(row) for row in verifier_expectations],
-        "file_evidence": [row.as_dict() for row in normalized_files],
-        "continuation": continuation,
-    }
-    if len(canonical_json_bytes(detail)) > MAX_BUSINESS_PLAN_BYTES:
-        raise business_repair(
-            "BUSINESS_PLAN_LIMIT_EXCEEDED",
-            field="plan",
-            draft_revision=session.revision,
-            action="split the task into bounded business declaration batches",
-        )
-    try:
-        preview = BusinessPreview.create(
-            source_revision=session.revision,
-            readable_lines=tuple(
-                line for row in ordered for line in row.readable_lines
-            ),
-            detail=detail,
-        )
-    except ValueError as exc:
-        raise business_repair(
-            "BUSINESS_PLAN_LIMIT_EXCEEDED",
-            field="preview",
-            draft_revision=session.revision,
-            action="split the task into bounded business declaration batches",
-        ) from exc
     deadline.checkpoint()
-    return CompiledBusinessPlan(
+    return PlannedBusinessRequest(
         operation=normalized_operation,
         version=session.context.wwise_version,
         source_revision=session.revision,
@@ -548,8 +608,11 @@ def compile_business_plan(
         request=request,
         request_digest=request_digest,
         verifier_expectations=verifier_expectations,
-        preview=preview,
-        continuation=continuation,
+        file_evidence=normalized_files,
+        readable_lines=tuple(
+            line for row in ordered for line in row.readable_lines
+        ),
+        deadline=deadline,
     )
 
 
@@ -797,8 +860,10 @@ __all__ = [
     "BusinessEffect",
     "BusinessFileEvidence",
     "BusinessPlanningDeadline",
+    "PlannedBusinessRequest",
     "CompiledBusinessPlan",
     "MAX_BUSINESS_FILE_BYTES",
     "MAX_BUSINESS_PLANNING_SECONDS",
     "compile_business_plan",
+    "plan_business_request",
 ]

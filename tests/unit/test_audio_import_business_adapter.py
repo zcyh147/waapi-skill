@@ -6,7 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from wwise_waapi.audio_import_business import compile_audio_import_business
+from wwise_waapi.audio_import_business import (
+    compile_audio_import_business,
+    materialize_audio_import_business_request,
+)
 from wwise_waapi.business_declaration_state import BusinessDeclarationSession
 from wwise_waapi.business_declarations import (
     BusinessContext,
@@ -131,6 +134,37 @@ def test_new_media_declaration_compiles_all_common_business_fields(
         "对象：Rain_Bed",
         "类型：Sound SFX",
         "音量：-4 dB",
+    )
+
+
+def test_request_materialization_has_no_continuation_and_allows_sealed_file_cleanup(
+    tmp_path: Path,
+) -> None:
+    media = tmp_path / "rain.wav"
+    media.write_bytes(b"RIFF-test")
+    session, parent, _bus = _session("2022.1")
+    session = session.with_new_declaration(
+        declaration_id="rain-bed",
+        target=NewDescendantTarget(
+            parent_handle=parent,
+            name="Rain_Bed",
+            kind="sound-sfx",
+        ),
+        fields={"media_file": str(media), "language": "SFX"},
+    )
+
+    request = materialize_audio_import_business_request(session)
+    media.unlink()
+
+    with pytest.raises(BusinessDeclarationError) as stale:
+        materialize_audio_import_business_request(session)
+    assert stale.value.repair["error_code"] == "MEDIA_FILE_UNAVAILABLE"
+    assert (
+        materialize_audio_import_business_request(
+            session,
+            allow_cleaned_file_evidence=True,
+        )
+        == request
     )
 
 
