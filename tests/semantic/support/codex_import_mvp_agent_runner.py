@@ -283,6 +283,9 @@ def run_import_mvp_agent_unit(
     with broker:
         with CodexCliTask(config, extra_env=broker.model_environment_overrides()) as task:
             result = task.run_initial(unit.prompt, output_dir=task_root / "turn-01")
+            attested_windows_powershell_core_host = (
+                task.windows_powershell_core_host
+            )
         broker_evidence = broker.evidence()
         argvs = _gateway_candidate_argvs(
             result,
@@ -325,7 +328,9 @@ def run_import_mvp_agent_unit(
             broker_evidence.records,
             facts.command_records,
             platform_name=os.name,
-            windows_powershell_core_host=options.windows_powershell_core_host,
+            windows_powershell_core_host=(
+                attested_windows_powershell_core_host
+            ),
         ),
     }
     errors = [name for name, passed in gates.items() if not passed]

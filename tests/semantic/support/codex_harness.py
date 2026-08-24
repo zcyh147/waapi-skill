@@ -1896,6 +1896,12 @@ class CodexCliTask:
             raise CodexHarnessError("CodexCliTask has not entered its isolated environment")
         return self._execution_environment
 
+    @property
+    def windows_powershell_core_host(self) -> WindowsPowerShellCoreHost | None:
+        """Return the task's actually attested native Windows shell host."""
+
+        return self._windows_powershell_core_host
+
     def __enter__(self) -> CodexCliTask:
         if self._state != "new":
             raise CodexHarnessError("CodexCliTask is one-shot and cannot be re-entered")
