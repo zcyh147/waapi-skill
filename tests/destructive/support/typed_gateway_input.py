@@ -103,21 +103,58 @@ def _require_nested_container_disclosure(
     command: Sequence[str],
 ) -> None:
     continuation = payload.get("continuation")
-    if not isinstance(continuation, Mapping) or not _contains_exact_argv(
+    if not isinstance(continuation, Mapping) or not _contains_disclosed_argv(
         continuation,
         command,
+        payload=payload,
     ):
         raise AssertionError("container response did not disclose exact nested construction")
 
 
-def _contains_exact_argv(value: Any, command: Sequence[str]) -> bool:
+def _contains_disclosed_argv(
+    value: Any,
+    command: Sequence[str],
+    *,
+    payload: Mapping[str, Any],
+) -> bool:
     if isinstance(value, list):
-        if value == list(command):
+        if _argv_template_matches(value, command, payload=payload):
             return True
-        return any(_contains_exact_argv(item, command) for item in value)
+        return any(
+            _contains_disclosed_argv(item, command, payload=payload)
+            for item in value
+        )
     if isinstance(value, Mapping):
-        return any(_contains_exact_argv(item, command) for item in value.values())
+        return any(
+            _contains_disclosed_argv(item, command, payload=payload)
+            for item in value.values()
+        )
     return False
+
+
+def _argv_template_matches(
+    template: Sequence[Any],
+    command: Sequence[str],
+    *,
+    payload: Mapping[str, Any],
+) -> bool:
+    if len(template) != len(command) or any(not isinstance(item, str) for item in template):
+        return False
+    choice_handles = {
+        str(node["handle"])
+        for node in _mapping_nodes(payload.get("child_contract", {}))
+        if isinstance(node.get("handle"), str)
+    }
+    for expected, actual in zip(template, command, strict=True):
+        if expected == "<exact-key>":
+            if not actual:
+                return False
+        elif expected == "<selected-choice-handle-from-child_contract>":
+            if actual not in choice_handles:
+                return False
+        elif expected != actual:
+            return False
+    return True
 
 
 def _require_disclosed_continuation(
@@ -243,10 +280,14 @@ def _business_copy_binding_was_used(
     return False
 
 
-def _mapping_nodes(value: Mapping[str, Any]) -> list[Mapping[str, Any]]:
-    nodes: list[Mapping[str, Any]] = [value]
-    for item in value.values():
-        if isinstance(item, Mapping):
+def _mapping_nodes(value: Any) -> list[Mapping[str, Any]]:
+    nodes: list[Mapping[str, Any]] = []
+    if isinstance(value, Mapping):
+        nodes.append(value)
+        for item in value.values():
+            nodes.extend(_mapping_nodes(item))
+    elif isinstance(value, list):
+        for item in value:
             nodes.extend(_mapping_nodes(item))
     return nodes
 

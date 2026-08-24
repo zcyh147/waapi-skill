@@ -214,16 +214,21 @@ def test_real_gateway_adapter_follows_exact_nested_container_disclosure() -> Non
         "lineage-token",
     ]
 
-    _require_nested_container_disclosure(
-        {
-            "continuation": {
-                "next_command_decision": {
-                    "branch_disclosure": {"argv_by_shape": {"object": command}}
-                }
+    template = list(command)
+    template[template.index("object")] = "<exact-key>"
+    template[-1] = "<selected-choice-handle-from-child_contract>"
+    payload = {
+        "child_contract": {
+            "branch_choices": [{"choices": [{"handle": "lineage-token"}]}]
+        },
+        "continuation": {
+            "next_command_decision": {
+                "branch_disclosure": {"argv_by_shape": {"object": template}}
             }
         },
-        command,
-    )
+    }
+
+    _require_nested_container_disclosure(payload, command)
 
 
 def test_production_audio_import_profile_has_four_independent_business_pairs() -> None:
