@@ -876,6 +876,11 @@ def build_audio_import_composer_transaction_steps(
                 name=declaration_name,
                 subcommand=subcommand,
                 arguments=tuple(declaration_arguments),
+                allow_explicit_derived_sfx_language=(
+                    kind == "sound-sfx"
+                    and isinstance(language, str)
+                    and language.casefold() == "sfx"
+                ),
             )
         )
         latest_revision_step = declaration_name

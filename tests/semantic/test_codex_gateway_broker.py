@@ -4049,6 +4049,46 @@ def test_business_declaration_field_order_is_semantic_but_duplicates_stay_invali
     )
 
 
+def test_business_declaration_accepts_only_exact_explicit_derived_sfx_language() -> None:
+    fixed = (
+        "od1-" + "1" * 32,
+        "--task-authority",
+        "da1-" + "2" * 40,
+        "--expected-revision",
+        "2",
+        "--declaration-id",
+        "rifle",
+        "--object-handle",
+        "boh1-" + "3" * 32,
+        "--field",
+        "media_file",
+        "/tmp/rifle.wav",
+    )
+    step = ExpectedGatewayStep(
+        name="tx01.declare.001",
+        subcommand="draft-declare-existing",
+        arguments=fixed,
+        allow_explicit_derived_sfx_language=True,
+    )
+    broker = SimpleNamespace(_payloads_by_step={})
+    explicit_sfx = (*fixed, "--field", "language", "SFX")
+
+    assert CodexGatewayBroker._normalize_business_declaration_fact_order(
+        broker,
+        step,
+        explicit_sfx,
+    ) == fixed
+    for invalid in (
+        (*fixed, "--field", "language", "English(US)"),
+        (*explicit_sfx, "--field", "language", "SFX"),
+    ):
+        assert CodexGatewayBroker._normalize_business_declaration_fact_order(
+            broker,
+            step,
+            invalid,
+        ) == invalid
+
+
 def test_business_request_normalizes_only_exact_live_bound_reference_paths() -> None:
     bound_path = r"\Master-Mixer Hierarchy\Default Work Unit\Weather_Bus"
     unknown_path = r"\Master-Mixer Hierarchy\Default Work Unit\Unknown"

@@ -1670,6 +1670,7 @@ class ExpectedGatewayStep:
     metadata_binding: DraftActionMetadataBinding | None = None
     commutative_option_pairs: bool = False
     commutative_boolean_flags: tuple[str, ...] = ()
+    allow_explicit_derived_sfx_language: bool = False
     expected_operation_request: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
@@ -1720,6 +1721,13 @@ class ExpectedGatewayStep:
         ):
             raise ValueError(
                 "ExpectedGatewayStep commutative option policy is invalid"
+            )
+        if type(self.allow_explicit_derived_sfx_language) is not bool or (
+            self.allow_explicit_derived_sfx_language
+            and self.subcommand not in {"draft-declare-new", "draft-declare-existing"}
+        ):
+            raise ValueError(
+                "ExpectedGatewayStep derived SFX-language policy is invalid"
             )
         if (
             len(set(self.commutative_boolean_flags))
@@ -9320,6 +9328,11 @@ class CodexGatewayBroker:
         actual_groups = parse(tuple(actual))
         if expected_groups is None or actual_groups is None:
             return tuple(actual)
+        if step.allow_explicit_derived_sfx_language:
+            derived_language = ("--field", "language", "SFX")
+            occurrences = actual_groups.count(derived_language)
+            if occurrences == 1 and derived_language not in expected_groups:
+                actual_groups.remove(derived_language)
         expected_keys = [key(group, expected=True) for group in expected_groups]
         actual_keys = [key(group, expected=False) for group in actual_groups]
         if (
