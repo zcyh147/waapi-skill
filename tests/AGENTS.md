@@ -194,6 +194,9 @@ backslash task-local runner spelling. Do not emit the POSIX spelling and rely on
 Broker path normalization: Fresh Agents otherwise reconstruct the familiar
 Windows spelling instead of copying the continuation verbatim, and exact
 continuation provenance is lost even when the resulting argv is equivalent.
+Continuation grading must unwrap the attested host frame through the shared
+command-record helper; never assume every recorded command is a three-token
+POSIX `shell -lc <script>` wrapper when grading native Windows evidence.
 
 Run the final scoped-process check from a separate SSH invocation after the
 Scheduled Task reports `Ready`. A cleanup script whose own path contains the

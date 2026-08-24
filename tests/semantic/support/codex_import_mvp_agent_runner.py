@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import shlex
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -17,6 +16,7 @@ from tests.semantic.support.codex_harness import (
     CodexCliTask,
     CodexHarnessConfig,
     WindowsPowerShellCoreHost,
+    _raw_shell_tool_command,
     prepare_workspace_skill_install,
     semantic_task_developer_instructions,
 )
@@ -145,6 +145,9 @@ def mvp_command_set_is_closed(
 def mvp_continuations_were_used(
     broker_records: tuple[Any, ...],
     command_records: tuple[Any, ...],
+    *,
+    platform_name: str | None = None,
+    windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
 ) -> bool:
     """Bind every Preview command to the immediately preceding continuation."""
 
@@ -191,10 +194,11 @@ def mvp_continuations_were_used(
         if preview_count > len(preview_commands):
             return False
         shell_record = preview_commands[preview_count - 1]
-        try:
-            shell_wrapper = shlex.split(str(getattr(shell_record, "command", "")))
-        except ValueError:
-            return False
+        raw_shell_command, _parser_kind = _raw_shell_tool_command(
+            shell_record,
+            platform_name=os.name if platform_name is None else platform_name,
+            windows_powershell_core_host=windows_powershell_core_host,
+        )
         if (
             source_field not in {"shell_command", "model_command"}
             or not isinstance(selected_command, str)
@@ -202,9 +206,7 @@ def mvp_continuations_were_used(
             or not isinstance(model_argv, tuple | list)
             or list(model_argv[1:]) != full_argv[1:]
             or Path(str(model_argv[0])).name.casefold() not in {"python", "python3", "python.exe"}
-            or len(shell_wrapper) != 3
-            or shell_wrapper[1] != "-lc"
-            or shell_wrapper[2] != selected_command
+            or raw_shell_command != selected_command
         ):
             return False
     return preview_count > 0 and preview_count == len(preview_commands)
@@ -322,6 +324,8 @@ def run_import_mvp_agent_unit(
         "continuations_used": mvp_continuations_were_used(
             broker_evidence.records,
             facts.command_records,
+            platform_name=os.name,
+            windows_powershell_core_host=options.windows_powershell_core_host,
         ),
     }
     errors = [name for name, passed in gates.items() if not passed]

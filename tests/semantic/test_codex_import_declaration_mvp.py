@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 from pathlib import Path
 from collections import deque
 from types import SimpleNamespace
@@ -40,6 +41,7 @@ from tests.semantic.support.codex_gateway_broker import (
     ExpectedGatewayStep,
     _normalize_commutative_option_pairs,
 )
+from tests.semantic.support.codex_harness import WindowsPowerShellCoreHost
 from wwise_waapi.transactions import TransactionStore
 from wwise_waapi.platform_commands import decode_windows_model_argv
 
@@ -955,6 +957,7 @@ def test_mvp_agent_contract_uses_standard_skill_bootstrap_and_semantic_preview_g
             "/bin/bash -lc 'python .agents/skills/waapi-skill/scripts/run.py "
             "gateway.py mvp-preview'"
         ),
+        parser_kind="posix-shell",
         argv=(
             "python",
             ".agents/skills/waapi-skill/scripts/run.py",
@@ -965,6 +968,42 @@ def test_mvp_agent_contract_uses_standard_skill_bootstrap_and_semantic_preview_g
     assert mvp_continuations_were_used(
         (declaration, preview),
         (shell_record,),
+    )
+
+
+def test_mvp_continuation_binding_unwraps_attested_windows_pwsh_command() -> None:
+    next_command = _mvp_preview_next_command(platform_name="nt")
+    declaration = SimpleNamespace(
+        step_name="step-02-mvp-asset",
+        payload={"agent_result": {"next_command": next_command}},
+    )
+    preview = SimpleNamespace(
+        step_name="step-03-mvp-preview",
+        model_argv=(
+            "python",
+            *next_command["full_argv"][1:],
+        ),
+    )
+    pwsh = r"C:\Program Files\PowerShell\7\pwsh.exe"
+    shell_record = SimpleNamespace(
+        command=shlex.join(
+            (pwsh, "-NoProfile", "-Command", next_command["model_command"])
+        ),
+        parser_kind="windows-pwsh-command",
+        argv=tuple(next_command["full_argv"]),
+    )
+    host = WindowsPowerShellCoreHost(
+        executable=pwsh,
+        version="7.6.4",
+        native_argument_passing="Standard",
+        sha256="1" * 64,
+    )
+
+    assert mvp_continuations_were_used(
+        (declaration, preview),
+        (shell_record,),
+        platform_name="nt",
+        windows_powershell_core_host=host,
     )
 
 
