@@ -19,10 +19,31 @@ from tests.semantic.support.codex_import_business_agent_runner import (
     build_preview_only_business_steps,
     prepare_import_business_runtime,
 )
+from tests.semantic.support.codex_gateway_broker import ExpectedGatewayStep
+from tests.destructive.support.typed_gateway_input import (
+    _require_disclosed_continuation,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PROFILE = REPO_ROOT / "tests/semantic/data/audio-import-business/profile.json"
+
+
+def test_real_gateway_adapter_follows_business_schema_start() -> None:
+    _require_disclosed_continuation(
+        ExpectedGatewayStep(
+            name="tx01.operation-schema",
+            subcommand="operation-schema",
+            arguments=("audio.import",),
+        ),
+        {
+            "business_adapter": {
+                "start": {"gateway_argv": ["draft-start", "audio.import"]}
+            }
+        },
+        ["draft-start", "audio.import"],
+        pending_container_actions=[],
+    )
 
 
 def test_production_audio_import_profile_has_four_independent_business_pairs() -> None:

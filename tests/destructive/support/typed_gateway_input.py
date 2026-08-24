@@ -121,9 +121,13 @@ def _require_disclosed_continuation(
             if continuation.get("operation") != command[1]:
                 raise AssertionError("typed-operation continuation changed operation identity")
             return
-        composer = payload.get("composer")
-        start = composer.get("start") if isinstance(composer, Mapping) else None
-        if not isinstance(start, Mapping) or start.get("gateway_argv") != list(command):
+        starts = [
+            adapter.get("start")
+            for key in ("business_adapter", "composer")
+            if isinstance((adapter := payload.get(key)), Mapping)
+            and isinstance(adapter.get("start"), Mapping)
+        ]
+        if len(starts) != 1 or starts[0].get("gateway_argv") != list(command):
             raise AssertionError("operation-schema did not disclose the exact draft-start")
         return
 
