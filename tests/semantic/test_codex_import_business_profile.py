@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 from tests.semantic import run_codex_skill_matrix as matrix
 from tests.semantic import run_codex_skill_campaign as campaign
@@ -13,6 +14,7 @@ from tests.semantic.support.codex_import_business_profile import (
     load_import_business_profile,
 )
 from tests.semantic.support.codex_import_business_agent_runner import (
+    _business_protocol_is_exact,
     build_preview_only_business_steps,
     prepare_import_business_runtime,
 )
@@ -22,7 +24,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 PROFILE = REPO_ROOT / "tests/semantic/data/audio-import-business/profile.json"
 
 
-def test_production_audio_import_profile_has_four_independent_paraphrase_pairs() -> None:
+def test_production_audio_import_profile_has_four_independent_business_pairs() -> None:
     profile = load_import_business_profile(PROFILE)
 
     assert tuple(unit.unit_id for unit in profile.units) == UNIT_IDS
@@ -55,6 +57,12 @@ def test_every_profile_transaction_compiles_to_the_production_business_draft() -
             assert "draft-check" in subcommands
             assert "preview-from-draft" in subcommands
             assert "draft-apply" not in subcommands
+            preview = next(
+                step
+                for step in steps
+                if step.subcommand == "preview-from-draft"
+            )
+            assert "--apply" not in preview.arguments
 
 
 def test_protocol_accepts_the_normal_wwise_actor_mixer_path_token() -> None:
@@ -142,11 +150,41 @@ def test_runtime_resolves_media_and_stops_every_transaction_at_preview(tmp_path:
     runtime = prepare_import_business_runtime(unit, tmp_path / "runtime")
     steps = build_preview_only_business_steps(runtime.requests)
 
-    assert len(runtime.requests) == 2
+    assert len(runtime.requests) == 1
     assert all(path.is_file() for path in runtime.media_paths)
     assert "media://" not in runtime.prompt
-    assert sum(step.subcommand == "preview-from-draft" for step in steps) == 2
+    assert sum(step.subcommand == "preview-from-draft" for step in steps) == 1
     assert all(step.subcommand not in {"confirm", "execute", "verify"} for step in steps)
+
+
+def test_rifle_modes_are_isolated_into_one_preview_per_fresh_unit() -> None:
+    units = load_import_business_profile(
+        PROFILE,
+        unit_ids=("AIB22-RIFLE-A", "AIB22-RIFLE-B"),
+    ).units
+
+    assert [unit.transaction_count for unit in units] == [1, 1]
+    assert [
+        unit.transactions[0]["arguments"]["import_operation"]
+        for unit in units
+    ] == ["useExisting", "replaceExisting"]
+    assert [unit.final_markers for unit in units] == [
+        ("Rifle", "保留"),
+        ("Rifle", "替换"),
+    ]
+
+
+def test_agent_outcome_accepts_broker_proven_commutative_binding_order() -> None:
+    evidence = SimpleNamespace(
+        passed=True,
+        expected_step_names=("bind-field.001", "bind-object.002"),
+        consumed_step_names=("bind-object.002", "bind-field.001"),
+    )
+
+    assert _business_protocol_is_exact(
+        evidence,
+        SimpleNamespace(passed=True),
+    )
 
 
 def test_matrix_wires_the_profile_to_the_packaged_skill(

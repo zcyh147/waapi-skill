@@ -949,7 +949,6 @@ def build_audio_import_composer_transaction_steps(
                     ResponseBinding(draft_start, "/task_authority"),
                     "--expected-revision",
                     ResponseBinding(check_name, "/draft/revision"),
-                    "--apply",
                 ),
                 expected_operation_request=normalized,
             ),

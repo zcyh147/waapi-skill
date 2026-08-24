@@ -10010,7 +10010,6 @@ def dispatch_operation_draft_check(
                     args.task_authority,
                     "--expected-revision",
                     str(materialized.record.revision + 1),
-                    "--apply",
                 ],
             )
 
@@ -10076,17 +10075,19 @@ def dispatch_operation_draft_check(
             "project_call": dispatch_call_summary(project_call),
         }
     )
+    preview_arguments = [
+        "preview-from-draft",
+        record.draft_id,
+        "--task-authority",
+        args.task_authority,
+        "--expected-revision",
+        str(record.revision),
+    ]
+    if canonical_request.operation != "audio.import":
+        preview_arguments.append("--apply")
     payload["next_command"] = transaction_next_command(
         "preview-from-draft",
-        [
-            "preview-from-draft",
-            record.draft_id,
-            "--task-authority",
-            args.task_authority,
-            "--expected-revision",
-            str(record.revision),
-            "--apply",
-        ],
+        preview_arguments,
     )
     return payload
 
@@ -10607,6 +10608,11 @@ def dispatch_operation_draft_preview(
                 "live_version": detected_version,
             },
         )
+    # A checked audio.import Business Draft is itself a closed request to
+    # preview a project change.  Do not make the caller restate that fact with
+    # the easily misread generic ``--apply`` transport flag.
+    if inspected.operation == "audio.import":
+        args.apply = True
     policy = load_gateway_config(env).config.project_modification_policy
     reservation: Any | None = None
     reserve_transaction_id: Callable[[], str] | None = None
@@ -14834,7 +14840,7 @@ def _audio_import_business_next_action_binding(
         else BusinessDeclarationSession.from_dict(raw_session)
     )
     if record.check is not None:
-        preview = [*base, "preview-from-draft", *binding, "--apply"]
+        preview = [*base, "preview-from-draft", *binding]
         return {
             "contract": "waapi-skill.business-draft-next-action/v1",
             "required_next_phase": "preview_from_checked_business_draft",

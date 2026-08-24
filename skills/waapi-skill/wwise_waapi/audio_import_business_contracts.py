@@ -91,7 +91,7 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
             "gateway_argv": ["draft-start", "audio.import"],
             "copy_exactly": True,
             "append_arguments": "forbidden",
-            "apply_flag_location": "preview-from-draft_only",
+            "preview_change_intent": "gateway_inferred_from_checked_business_draft",
             "first_required_phase": (
                 "bind_only_handle_typed_business_objects_then_configure_and_declare"
             ),

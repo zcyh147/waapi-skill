@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 
-PROFILE_CONTRACT = "waapi-skill.audio-import-business-profile/v1"
+PROFILE_CONTRACT = "waapi-skill.audio-import-business-profile/v2"
 PROFILE_ID = "audio_import_business_8"
 MODEL = "gpt-5.6-terra"
 REASONING_EFFORT = "medium"
@@ -141,29 +141,42 @@ def _parse_case(
     expected_family: str,
 ) -> tuple[ImportBusinessUnit, ImportBusinessUnit]:
     expected_keys = {
-        "unit_id", "family", "version", "paraphrases", "objects", "fields",
-        "transactions", "final_markers",
+        "unit_id", "family", "version", "variants", "objects", "fields",
+        "transactions",
     }
     if not isinstance(value, Mapping) or set(value) != expected_keys:
         raise ImportBusinessProfileError("audio import business case is not closed")
     if value.get("unit_id") != expected_id or value.get("family") != expected_family:
         raise ImportBusinessProfileError("audio import business case identity drifted")
     version = value.get("version")
-    paraphrases = value.get("paraphrases")
+    variants = value.get("variants")
     objects = value.get("objects")
     fields = value.get("fields")
     transactions = value.get("transactions")
-    markers = value.get("final_markers")
     if version not in {"2022.1", "2025.1"}:
         raise ImportBusinessProfileError("audio import business version is invalid")
     if (
-        not isinstance(paraphrases, list)
-        or len(paraphrases) != 2
-        or len(set(paraphrases)) != 2
-        or any(not isinstance(item, str) or not item.strip() for item in paraphrases)
+        not isinstance(variants, list)
+        or len(variants) != 2
     ):
-        raise ImportBusinessProfileError("audio import business paraphrases are invalid")
-    prompt_text = "\n".join(paraphrases).casefold()
+        raise ImportBusinessProfileError("audio import business variants are invalid")
+    expected_variant_keys = {
+        "id", "prompt", "transaction_indexes", "final_markers",
+    }
+    if any(
+        not isinstance(item, Mapping) or set(item) != expected_variant_keys
+        for item in variants
+    ):
+        raise ImportBusinessProfileError("audio import business variant is not closed")
+    if [item.get("id") for item in variants] != ["A", "B"]:
+        raise ImportBusinessProfileError("audio import business variant identity drifted")
+    prompts = [item.get("prompt") for item in variants]
+    if (
+        len(set(prompts)) != 2
+        or any(not isinstance(item, str) or not item.strip() for item in prompts)
+    ):
+        raise ImportBusinessProfileError("audio import business prompts are invalid")
+    prompt_text = "\n".join(str(item) for item in prompts).casefold()
     if any(token in prompt_text for token in _FORBIDDEN_PROMPT_MECHANICS):
         raise ImportBusinessProfileError("Agent prompt exposes raw Wwise request mechanics")
     if not isinstance(objects, list) or not objects:
@@ -172,33 +185,57 @@ def _parse_case(
         raise ImportBusinessProfileError("audio import business fixture fields are invalid")
     if not isinstance(transactions, list) or not transactions:
         raise ImportBusinessProfileError("audio import business transactions are invalid")
-    if not isinstance(markers, list) or not markers or any(not isinstance(item, str) for item in markers):
-        raise ImportBusinessProfileError("audio import business final markers are invalid")
     frozen_objects = tuple(dict(item) for item in objects if isinstance(item, Mapping))
     frozen_fields = tuple(dict(item) for item in fields if isinstance(item, Mapping))
     frozen_transactions = tuple(dict(item) for item in transactions if isinstance(item, Mapping))
     if len(frozen_objects) != len(objects) or len(frozen_fields) != len(fields) or len(frozen_transactions) != len(transactions):
         raise ImportBusinessProfileError("audio import business fixture rows must be objects")
-    return tuple(
-        ImportBusinessUnit(
-            unit_id=f"{expected_id}-{variant}",
-            family=expected_family,
-            version=str(version),
-            prompt_template=str(prompt),
-            variant=variant,
-            objects=frozen_objects,
-            fields=frozen_fields,
-            transactions=frozen_transactions,
-            final_markers=tuple(str(item) for item in markers),
-            scenario=ImportBusinessScenario(
-                id=f"{expected_id}-{variant}",
-                prompt_sha256=hashlib.sha256(
-                    str(prompt).encode("utf-8")
-                ).hexdigest(),
-            ),
+    parsed_units: list[ImportBusinessUnit] = []
+    for item in variants:
+        indexes = item.get("transaction_indexes")
+        markers = item.get("final_markers")
+        if (
+            not isinstance(indexes, list)
+            or not indexes
+            or any(type(index) is not int for index in indexes)
+            or len(set(indexes)) != len(indexes)
+            or any(not 0 <= index < len(frozen_transactions) for index in indexes)
+        ):
+            raise ImportBusinessProfileError(
+                "audio import business variant transaction indexes are invalid"
+            )
+        if (
+            not isinstance(markers, list)
+            or not markers
+            or any(not isinstance(marker, str) or not marker for marker in markers)
+        ):
+            raise ImportBusinessProfileError(
+                "audio import business variant final markers are invalid"
+            )
+        variant = str(item["id"])
+        prompt = str(item["prompt"])
+        parsed_units.append(
+            ImportBusinessUnit(
+                unit_id=f"{expected_id}-{variant}",
+                family=expected_family,
+                version=str(version),
+                prompt_template=prompt,
+                variant=variant,
+                objects=frozen_objects,
+                fields=frozen_fields,
+                transactions=tuple(
+                    frozen_transactions[index] for index in indexes
+                ),
+                final_markers=tuple(str(marker) for marker in markers),
+                scenario=ImportBusinessScenario(
+                    id=f"{expected_id}-{variant}",
+                    prompt_sha256=hashlib.sha256(
+                        prompt.encode("utf-8")
+                    ).hexdigest(),
+                ),
+            )
         )
-        for variant, prompt in zip(("A", "B"), paraphrases, strict=True)
-    )
+    return parsed_units[0], parsed_units[1]
 
 
 __all__ = [

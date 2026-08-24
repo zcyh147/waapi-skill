@@ -79,6 +79,15 @@ class ImportBusinessAgentOutcome:
         return {"contract": OUTCOME_CONTRACT, **asdict(self)}
 
 
+def _business_protocol_is_exact(
+    broker_evidence: Any,
+    reconciliation: Any,
+) -> bool:
+    """Trust the Broker's dependency-aware ordering proof exactly once."""
+
+    return bool(broker_evidence.passed and reconciliation.passed)
+
+
 def prepare_import_business_runtime(
     unit: ImportBusinessUnit,
     root: str | Path,
@@ -247,9 +256,10 @@ def run_import_business_agent_unit(
         "codex_exit_zero": result.exit_status == 0 and not result.timed_out,
         "fresh_thread": bool(result.thread_id),
         "broker_passed": broker_evidence.passed,
-        "exact_protocol": reconciliation.passed
-        and tuple(broker_evidence.consumed_step_names)
-        == tuple(step.name for step in steps),
+        "exact_protocol": _business_protocol_is_exact(
+            broker_evidence,
+            reconciliation,
+        ),
         "production_skill_read": facts.skill_read
         and set(facts.skill_read_files)
         == {"SKILL.md", "references/waapi-operate.md"},

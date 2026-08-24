@@ -507,6 +507,7 @@ def test_structure_declaration_reaches_live_check_and_persists_readable_preview(
         "preview_from_checked_business_draft"
     )
     assert checked["next_command"]["gateway_argv"][0] == "preview-from-draft"
+    assert "--apply" not in checked["next_command"]["gateway_argv"]
     record = OperationDraftStore(tmp_path / "state").inspect(
         draft_id,
         task_authority=authority,
@@ -529,7 +530,6 @@ def test_structure_declaration_reaches_live_check_and_persists_readable_preview(
             authority,
             "--expected-revision",
             "4",
-            "--apply",
         ],
         env=_env(tmp_path),
         client_factory=lambda _url: preview_client,
