@@ -879,7 +879,8 @@ def test_mvp_agent_contract_uses_standard_skill_bootstrap_and_semantic_preview_g
             "'.agents\\skills\\waapi-skill\\SKILL.md'"
         ) in instructions
         assert (
-            "python .agents\\skills\\waapi-skill\\scripts\\run.py gateway.py"
+            "python '.agents\\skills\\waapi-skill\\scripts\\run.py' "
+            "'gateway.py'"
         ) in instructions
     else:
         assert "cat '.agents/skills/waapi-skill/SKILL.md'" in instructions
