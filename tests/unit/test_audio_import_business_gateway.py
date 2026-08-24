@@ -182,8 +182,22 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     code, started = _offline(tmp_path, "draft-start", "audio.import")
     assert code == 0, started
     start_next = started["draft"]["next_action_binding"]
-    assert start_next["required_next_phase"] == "bind_required_business_objects"
+    assert start_next["required_next_phase"] == (
+        "bind_only_handle_typed_business_objects_then_configure_and_declare"
+    )
     assert start_next["object_binding"]["by_id"][3] == "draft-bind-object"
+    assert "switch_value" in start_next["binding_decision"]["literal_never_bind"]
+    assert start_next["binding_decision"]["bound_object_handle_fields"] == [
+        "output_bus",
+        "event_parent",
+        "custom_reference_value",
+    ]
+    assert start_next["configure"]["reference_default_rule"] == (
+        "copy_one_bound_object_handle_never_a_path_or_name"
+    )
+    assert start_next["declare_new"]["known_user_fields"] == (
+        "complete_on_first_submission"
+    )
     assert "draft-apply" not in json.dumps(start_next)
     assert "wwise_path_discipline" not in start_next
     assert "object_path" in start_next["forbidden_inputs"]

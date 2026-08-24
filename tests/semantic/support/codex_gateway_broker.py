@@ -2158,6 +2158,9 @@ _BUSINESS_DRAFT_REVISION_SUBCOMMANDS = frozenset(
         "preview-from-draft",
     }
 )
+_TASK_LOCAL_DECLARATION_ID_RE = re.compile(
+    r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
+)
 _MAX_REQUIRED_FOLLOWUP_FACTS = 64
 _MAX_REQUIRED_FOLLOWUP_BYTES = 32 * 1024
 
@@ -8667,10 +8670,14 @@ class CodexGatewayBroker:
                     f"broker is terminal {self._terminal_state}",
                     authenticated=True,
                 )
-            step = self._execution_steps[self._next_step]
-            step = self._rebase_business_draft_revision(step)
-            self._execution_steps[self._next_step] = step
             try:
+                step = self._execution_steps[self._next_step]
+                step = self._rebase_business_draft_revision(step)
+                step = self._bind_task_local_declaration_id(
+                    step,
+                    resolved.gateway_arguments,
+                )
+                self._execution_steps[self._next_step] = step
                 semantic_hash, execution_arguments = self._validate_step(
                     step,
                     resolved.gateway_arguments,
@@ -8810,6 +8817,68 @@ class CodexGatewayBroker:
         ):
             return step
         arguments[4] = ResponseBinding(previous.name, "/draft/revision")
+        return replace(step, arguments=tuple(arguments))
+
+    def _bind_task_local_declaration_id(
+        self,
+        step: ExpectedGatewayStep,
+        actual: Sequence[str],
+    ) -> ExpectedGatewayStep:
+        """Accept one bounded unique declaration label without making it business data."""
+
+        if step.subcommand not in {
+            "draft-declare-new",
+            "draft-declare-existing",
+        }:
+            return step
+        actual_values = tuple(str(value) for value in actual)
+        if actual_values.count("--declaration-id") != 1:
+            raise GatewayInvocationError(
+                "business declaration requires one bounded task-local id"
+            )
+        actual_index = actual_values.index("--declaration-id")
+        if actual_index + 1 >= len(actual_values):
+            raise GatewayInvocationError(
+                "business declaration requires one bounded task-local id"
+            )
+        declaration_id = actual_values[actual_index + 1]
+        if _TASK_LOCAL_DECLARATION_ID_RE.fullmatch(declaration_id) is None:
+            raise GatewayInvocationError(
+                "business declaration requires one bounded task-local id"
+            )
+        prior_ids: set[str] = set()
+        for candidate in self._execution_steps[: self._next_step]:
+            if candidate.subcommand not in {
+                "draft-declare-new",
+                "draft-declare-existing",
+            }:
+                continue
+            try:
+                marker_index = candidate.arguments.index("--declaration-id")
+            except ValueError:
+                continue
+            value = candidate.arguments[marker_index + 1]
+            if isinstance(value, str):
+                prior_ids.add(value)
+        if declaration_id in prior_ids:
+            raise GatewayInvocationError(
+                "business declaration task-local ids must be unique"
+            )
+        arguments = list(step.arguments)
+        try:
+            expected_index = arguments.index("--declaration-id")
+        except ValueError as exc:
+            raise GatewayInvocationError(
+                "sealed business declaration lacks its task-local id slot"
+            ) from exc
+        if (
+            expected_index + 1 >= len(arguments)
+            or not isinstance(arguments[expected_index + 1], str)
+        ):
+            raise GatewayInvocationError(
+                "sealed business declaration id slot is invalid"
+            )
+        arguments[expected_index + 1] = declaration_id
         return replace(step, arguments=tuple(arguments))
 
     def _match_dependency_ready_business_setup_step(

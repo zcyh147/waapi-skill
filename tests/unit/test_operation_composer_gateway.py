@@ -838,7 +838,10 @@ def test_audio_import_draft_start_routes_to_gateway_owned_business_binding(
         "agent": "natural_language_to_closed_high_level_business_facts",
         "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
     }
-    assert binding["required_next_phase"] == "bind_required_business_objects"
+    assert (
+        binding["required_next_phase"]
+        == "bind_only_handle_typed_business_objects_then_configure_and_declare"
+    )
     assert "wwise_path_discipline" not in binding
     assert "draft-apply" not in json.dumps(binding)
 

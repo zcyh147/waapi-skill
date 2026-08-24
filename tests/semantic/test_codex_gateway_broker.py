@@ -4050,6 +4050,111 @@ def test_business_draft_setup_broker_selects_unique_binding_and_configuration(
     assert declaration.arguments[4].step == previous.name
 
 
+def test_business_declaration_ids_are_task_local_but_bounded_and_unique(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+
+    start = ExpectedGatewayStep(
+        "tx01.draft-start",
+        "draft-start",
+        ("audio.import",),
+    )
+
+    def declaration(
+        name: str,
+        canonical_id: str,
+        revision_source: str,
+    ) -> ExpectedGatewayStep:
+        return ExpectedGatewayStep(
+            name,
+            "draft-declare-new",
+            (
+                ResponseBinding(start.name, "/draft/draft_id"),
+                "--task-authority",
+                ResponseBinding(start.name, "/task_authority"),
+                "--expected-revision",
+                ResponseBinding(revision_source, "/draft/revision"),
+                "--declaration-id",
+                canonical_id,
+                "--parent-handle",
+                "boh1-" + "3" * 32,
+                "--name",
+                "Weather",
+                "--kind",
+                "actor-mixer",
+            ),
+        )
+
+    first = declaration("tx01.declare.001", "row-001", start.name)
+    second = declaration("tx01.declare.002", "row-002", first.name)
+    check = ExpectedGatewayStep(
+        "tx01.check",
+        "draft-check",
+        (
+            ResponseBinding(start.name, "/draft/draft_id"),
+            "--task-authority",
+            ResponseBinding(start.name, "/task_authority"),
+            "--expected-revision",
+            ResponseBinding(second.name, "/draft/revision"),
+        ),
+    )
+    preview = ExpectedGatewayStep(
+        "tx01.preview",
+        "preview-from-draft",
+        (
+            ResponseBinding(start.name, "/draft/draft_id"),
+            "--task-authority",
+            ResponseBinding(start.name, "/task_authority"),
+            "--expected-revision",
+            ResponseBinding(check.name, "/draft/revision"),
+            "--apply",
+        ),
+    )
+    broker = CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=(start, first, second, check, preview),
+        expected_wwise_version="2022.1",
+    )
+
+    def argv(declaration_id: str) -> tuple[str, ...]:
+        return (
+            "draft-declare-new",
+            "od1-" + "1" * 32,
+            "--task-authority",
+            "da1-" + "2" * 40,
+            "--expected-revision",
+            "1",
+            "--declaration-id",
+            declaration_id,
+            "--parent-handle",
+            "boh1-" + "3" * 32,
+            "--name",
+            "Weather",
+            "--kind",
+            "actor-mixer",
+        )
+
+    rebound = broker._bind_task_local_declaration_id(  # noqa: SLF001
+        first,
+        argv("weather_interactive"),
+    )
+    assert rebound.arguments[6] == "weather_interactive"
+    broker._execution_steps[1] = rebound  # noqa: SLF001
+    broker._next_step = 2  # noqa: SLF001
+
+    with pytest.raises(GatewayInvocationError, match="unique"):
+        broker._bind_task_local_declaration_id(  # noqa: SLF001
+            second,
+            argv("weather_interactive"),
+        )
+    with pytest.raises(GatewayInvocationError, match="bounded"):
+        broker._bind_task_local_declaration_id(  # noqa: SLF001
+            second,
+            argv("../not-local"),
+        )
+
+
 def _read_only_draft_evidence_fixture(
     tmp_path: Path,
 ) -> tuple[

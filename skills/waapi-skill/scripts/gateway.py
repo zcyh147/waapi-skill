@@ -14854,7 +14854,7 @@ def _audio_import_business_next_action_binding(
     return {
         "contract": "waapi-skill.business-draft-next-action/v1",
         "required_next_phase": (
-            "bind_required_business_objects"
+            "bind_only_handle_typed_business_objects_then_configure_and_declare"
             if session is None
             else "complete_business_declarations_then_check"
         ),
@@ -14867,6 +14867,13 @@ def _audio_import_business_next_action_binding(
             "by_id": [*object_bind_prefix, "--object-id", "<exact-guid>"],
             "by_path": [*object_bind_prefix, "--object-path", "<exact-wwise-path>"],
             "result": "copy_the_returned_bound_object.handle",
+            "use_only_for": [
+                "existing_target",
+                "new_target_parent",
+                "output_bus",
+                "event_parent",
+                "custom_reference_value",
+            ],
         },
         "field_binding": {
             "object_scope": [
@@ -14884,6 +14891,29 @@ def _audio_import_business_next_action_binding(
                 "<exact-live-field-token>",
             ],
             "result": "copy_the_returned_bound_field.handle_and_restrictions",
+            "use_only_for": "custom_property_or_reference_field_values",
+        },
+        "binding_decision": {
+            "bound_object_handle_fields": [
+                "output_bus",
+                "event_parent",
+                "custom_reference_value",
+            ],
+            "literal_never_bind": [
+                "audio_source_notes",
+                "dialogue_event_directive",
+                "inline_wav",
+                "language",
+                "loop",
+                "max_instances",
+                "media_file",
+                "notes",
+                "originals_subfolder",
+                "override_parent_instance_limit",
+                "switch_value",
+                "volume_db",
+            ],
+            "rule": "bind_only_when_the_disclosed_value_type_requires_a_handle",
         },
         "configure": {
             "fixed_argv_prefix": configure_prefix,
@@ -14895,6 +14925,9 @@ def _audio_import_business_next_action_binding(
                 "[--default <stable-field> <business-value>]...",
                 "[--default-field-value <bound-field-handle> <business-value>]...",
             ],
+            "reference_default_rule": (
+                "copy_one_bound_object_handle_never_a_path_or_name"
+            ),
         },
         "declare_new": {
             "fixed_argv_prefix": declare_new_prefix,
@@ -14910,6 +14943,8 @@ def _audio_import_business_next_action_binding(
                 "[--field <stable-field> <business-value>]...",
                 "[--field-value <bound-field-handle> <business-value>]...",
             ],
+            "task_local_id": "bounded_unique_not_business_data",
+            "known_user_fields": "complete_on_first_submission",
         },
         "declare_existing": {
             "fixed_argv_prefix": declare_existing_prefix,
@@ -14921,8 +14956,13 @@ def _audio_import_business_next_action_binding(
                 "[--field <stable-field> <business-value>]...",
                 "[--field-value <bound-field-handle> <business-value>]...",
             ],
+            "task_local_id": "bounded_unique_not_business_data",
+            "known_user_fields": "complete_on_first_submission",
         },
-        "revise": {"fixed_argv_prefix": revise_prefix},
+        "revise": {
+            "fixed_argv_prefix": revise_prefix,
+            "use_only_for": "correction_or_late_discovered_fact",
+        },
         "remove": {"fixed_argv_prefix": remove_prefix},
         "completion_candidate": {
             "condition": "all_user_requested_business_declarations_are_complete",

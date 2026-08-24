@@ -88,7 +88,31 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
         "start": {
             "subcommand": "draft-start",
             "gateway_argv": ["draft-start", "audio.import"],
-            "first_required_phase": "bind_required_business_objects",
+            "copy_exactly": True,
+            "append_arguments": "forbidden",
+            "apply_flag_location": "preview-from-draft_only",
+            "first_required_phase": (
+                "bind_only_handle_typed_business_objects_then_configure_and_declare"
+            ),
+        },
+        "field_transport": {
+            "literal_fields": sorted(
+                name
+                for name, value_type in AUDIO_IMPORT_BUSINESS_VALUE_TYPES.items()
+                if value_type != "reference"
+            ),
+            "bound_object_handle_fields": ["output_bus"],
+            "bound_field_handle_container": "field_values",
+            "reference_value_rule": (
+                "copy_one_bound_object_handle_never_a_path_or_name"
+            ),
+            "switch_value_rule": "copy_the_user_requested_switch_value_name",
+        },
+        "declaration_discipline": {
+            "task_local_id": "bounded_unique_not_business_data",
+            "known_user_fields": "complete_on_first_submission",
+            "revise_only_for": "correction_or_late_discovered_fact",
+            "check_only_after": "all_user_requested_declarations_are_complete",
         },
         "legacy_shallow_composer_public": False,
         "safety": {
