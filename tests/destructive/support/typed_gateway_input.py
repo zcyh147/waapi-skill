@@ -102,9 +102,8 @@ def _require_nested_container_disclosure(
     payload: Mapping[str, Any],
     command: Sequence[str],
 ) -> None:
-    continuation = payload.get("continuation")
-    if not isinstance(continuation, Mapping) or not _contains_disclosed_argv(
-        continuation,
+    if not _contains_disclosed_argv(
+        payload,
         command,
         payload=payload,
     ):

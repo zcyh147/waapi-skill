@@ -221,9 +221,13 @@ def test_real_gateway_adapter_follows_exact_nested_container_disclosure() -> Non
         "child_contract": {
             "branch_choices": [{"choices": [{"handle": "lineage-token"}]}]
         },
-        "continuation": {
-            "next_command_decision": {
-                "branch_disclosure": {"argv_by_shape": {"object": template}}
+        "draft": {
+            "next_action_binding": {
+                "resume_previous_container_response": {
+                    "next_command_decision": {
+                        "branch_disclosure": {"argv_by_shape": {"object": template}}
+                    }
+                }
             }
         },
     }
