@@ -131,6 +131,9 @@ def _require_disclosed_continuation(
             raise AssertionError("operation-schema did not disclose the exact draft-start")
         return
 
+    if _business_copy_binding_was_used(payload, command):
+        return
+
     if command[0] == "draft-apply":
         if previous_step.subcommand in {"request-map-container", "request-array-item"}:
             if not matched_container_action:
@@ -176,6 +179,90 @@ def _require_disclosed_continuation(
         raise AssertionError(
             f"{previous_step.subcommand} did not disclose exact continuation {list(command)!r}"
         )
+
+
+def _business_copy_binding_was_used(
+    payload: Mapping[str, Any],
+    command: Sequence[str],
+) -> bool:
+    draft = payload.get("draft")
+    binding = draft.get("next_action_binding") if isinstance(draft, Mapping) else None
+    if (
+        not isinstance(binding, Mapping)
+        or binding.get("contract") != "waapi-skill.business-draft-next-action/v1"
+    ):
+        return False
+    for candidate in _mapping_nodes(binding):
+        prefix = candidate.get("fixed_argv_prefix")
+        if (
+            not isinstance(prefix, list)
+            or len(prefix) < 4
+            or prefix[:1] != ["python"]
+            or prefix[2:3] != ["gateway.py"]
+        ):
+            continue
+        gateway_prefix = [
+            command[index]
+            if value == "<task-authority-from-draft-start>"
+            else value
+            for index, value in enumerate(prefix[3:])
+        ]
+        if list(command[: len(gateway_prefix)]) != gateway_prefix:
+            continue
+        suffix = list(command[len(gateway_prefix) :])
+        if _business_binding_suffix_matches(candidate, suffix):
+            return True
+    return False
+
+
+def _mapping_nodes(value: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    nodes: list[Mapping[str, Any]] = [value]
+    for item in value.values():
+        if isinstance(item, Mapping):
+            nodes.extend(_mapping_nodes(item))
+    return nodes
+
+
+def _business_binding_suffix_matches(
+    candidate: Mapping[str, Any],
+    suffix: Sequence[str],
+) -> bool:
+    repeated = candidate.get("append_repeated")
+    if isinstance(repeated, list):
+        if (
+            len(repeated) != 2
+            or not all(isinstance(item, str) and item for item in repeated)
+            or not suffix
+            or len(suffix) % 2
+        ):
+            return False
+        return all(
+            suffix[index] == repeated[0] and bool(suffix[index + 1])
+            for index in range(0, len(suffix), 2)
+        )
+
+    append = candidate.get("append")
+    if not isinstance(append, list):
+        return True
+    mandatory: list[str] = []
+    has_optional = False
+    for item in append:
+        if not isinstance(item, str) or not item:
+            return False
+        if item.startswith("["):
+            has_optional = True
+            break
+        mandatory.append(item)
+    if len(suffix) < len(mandatory) or (not has_optional and len(suffix) != len(mandatory)):
+        return False
+    return all(
+        bool(actual) if expected.startswith("<") and expected.endswith(">") else actual == expected
+        for expected, actual in zip(
+            mandatory,
+            suffix[: len(mandatory)],
+            strict=True,
+        )
+    )
 
 
 def _container_action(payload: Mapping[str, Any]) -> list[str] | None:

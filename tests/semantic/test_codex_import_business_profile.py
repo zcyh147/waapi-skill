@@ -46,6 +46,102 @@ def test_real_gateway_adapter_follows_business_schema_start() -> None:
     )
 
 
+def test_real_gateway_adapter_follows_business_copy_bindings() -> None:
+    draft_id = "od1-" + "1" * 32
+    authority = "da1-" + "2" * 40
+
+    def binding(subcommand: str, revision: int) -> list[str]:
+        return [
+            "python",
+            "/task/skill/scripts/run.py",
+            "gateway.py",
+            subcommand,
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(revision),
+        ]
+
+    bind_prefix = binding("draft-bind-object", 1)
+    _require_disclosed_continuation(
+        ExpectedGatewayStep(
+            name="tx01.draft-start",
+            subcommand="draft-start",
+            arguments=("audio.import",),
+        ),
+        {
+            "draft": {
+                "next_action_binding": {
+                    "contract": "waapi-skill.business-draft-next-action/v1",
+                    "object_binding": {
+                        "by_path_segments": {
+                            "fixed_argv_prefix": bind_prefix,
+                            "append_repeated": [
+                                "--object-path-segment",
+                                "<one-segment>",
+                            ],
+                        }
+                    }
+                }
+            }
+        },
+        [
+            *bind_prefix[3:],
+            "--object-path-segment",
+            "Actor-Mixer Hierarchy",
+            "--object-path-segment",
+            "Default Work Unit",
+        ],
+        pending_container_actions=[],
+    )
+
+    declare_prefix = binding("draft-declare-new", 2)
+    _require_disclosed_continuation(
+        ExpectedGatewayStep(
+            name="tx01.bind-object.001",
+            subcommand="draft-bind-object",
+            arguments=(),
+        ),
+        {
+            "draft": {
+                "next_action_binding": {
+                    "contract": "waapi-skill.business-draft-next-action/v1",
+                    "declare_new": {
+                        "fixed_argv_prefix": declare_prefix,
+                        "append": [
+                            "--declaration-id",
+                            "<task-local-id>",
+                            "--parent-handle",
+                            "<bound-handle>",
+                            "--name",
+                            "<name>",
+                            "--kind",
+                            "<kind>",
+                            "[--field <name> <value>]...",
+                        ],
+                    }
+                }
+            }
+        },
+        [
+            *declare_prefix[3:],
+            "--declaration-id",
+            "rain",
+            "--parent-handle",
+            "boh1-" + "3" * 32,
+            "--name",
+            "Rain",
+            "--kind",
+            "sound-sfx",
+            "--field",
+            "volume_db",
+            "-4",
+        ],
+        pending_container_actions=[],
+    )
+
+
 def test_production_audio_import_profile_has_four_independent_business_pairs() -> None:
     profile = load_import_business_profile(PROFILE)
 
