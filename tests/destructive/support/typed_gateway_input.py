@@ -16,6 +16,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import build_transaction_prot
 from tests.semantic.support.codex_eval_protocol_v3 import wait_topic_step
 from tests.semantic.support.codex_gateway_broker import (
     DraftTypedActionArgument,
+    DraftTypedActionBatchArgument,
     ExpectedGatewayStep,
     InlineTypedOperationArgument,
     ResponseBinding,
@@ -299,18 +300,10 @@ def _render_step_arguments(
                 raise AssertionError("inline typed operation witness is misbound")
             result.extend(argv[1:])
         elif isinstance(argument, DraftTypedActionArgument):
-            action = json.loads(json.dumps(dict(argument.expected)))
-            for binding in argument.response_bindings:
-                _set_json_pointer(
-                    action,
-                    binding.pointer,
-                    _bound_scalar(
-                        responses,
-                        binding.step,
-                        binding.response_pointer,
-                    ),
-                )
-            result.extend(typed_action_cli_arguments(action))
+            result.extend(_draft_action_argv(argument, responses))
+        elif isinstance(argument, DraftTypedActionBatchArgument):
+            for action in argument.actions:
+                result.extend(_draft_action_argv(action, responses))
         elif isinstance(argument, TypedRequestFactsArgument):
             construction = typed_request_construction_for_values(
                 argument.contract,
@@ -323,6 +316,24 @@ def _render_step_arguments(
                 f"typed real-test adapter does not support {type(argument).__name__}"
             )
     return result
+
+
+def _draft_action_argv(
+    argument: DraftTypedActionArgument,
+    responses: Mapping[str, Mapping[str, Any]],
+) -> tuple[str, ...]:
+    action = json.loads(json.dumps(dict(argument.expected)))
+    for binding in argument.response_bindings:
+        _set_json_pointer(
+            action,
+            binding.pointer,
+            _bound_scalar(
+                responses,
+                binding.step,
+                binding.response_pointer,
+            ),
+        )
+    return typed_action_cli_arguments(action)
 
 
 def _typed_fact_argv(

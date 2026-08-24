@@ -19,9 +19,14 @@ from tests.semantic.support.codex_import_business_agent_runner import (
     build_preview_only_business_steps,
     prepare_import_business_runtime,
 )
-from tests.semantic.support.codex_gateway_broker import ExpectedGatewayStep
+from tests.semantic.support.codex_gateway_broker import (
+    DraftTypedActionArgument,
+    DraftTypedActionBatchArgument,
+    ExpectedGatewayStep,
+)
 from tests.destructive.support.typed_gateway_input import (
     _require_disclosed_continuation,
+    _render_step_arguments,
 )
 
 
@@ -95,7 +100,6 @@ def test_real_gateway_adapter_follows_business_copy_bindings() -> None:
         ],
         pending_container_actions=[],
     )
-
     declare_prefix = binding("draft-declare-new", 2)
     _require_disclosed_continuation(
         ExpectedGatewayStep(
@@ -140,6 +144,43 @@ def test_real_gateway_adapter_follows_business_copy_bindings() -> None:
         ],
         pending_container_actions=[],
     )
+
+
+def test_real_gateway_adapter_renders_atomic_draft_action_batches() -> None:
+    actions = tuple(
+        DraftTypedActionArgument(
+            {
+                "contract": "waapi-skill.operation-draft-action/v1",
+                "action": "set_import_option",
+                "name": "import_operation",
+                "value": value,
+            },
+            operation="audio.import",
+        )
+        for value in ("createNew", "useExisting")
+    )
+    step = ExpectedGatewayStep(
+        name="tx01.action.001",
+        subcommand="draft-apply",
+        arguments=(DraftTypedActionBatchArgument(actions),),
+    )
+
+    rendered = _render_step_arguments(step, {})
+
+    assert rendered == [
+        "--action",
+        "set_import_option",
+        "--option",
+        "import_operation",
+        "string",
+        "createNew",
+        "--action",
+        "set_import_option",
+        "--option",
+        "import_operation",
+        "string",
+        "useExisting",
+    ]
 
 
 def test_production_audio_import_profile_has_four_independent_business_pairs() -> None:
