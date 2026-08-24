@@ -47,7 +47,7 @@ def _continuation(
     gateway_argv = ["transaction-preview", "--request-digest", request_digest]
     full_argv = ["python", "skill/run.py", "gateway.py", *gateway_argv]
     return {
-        "contract": "waapi-skill.transaction-next-command/v2",
+        "contract": "waapi-skill.gateway-next-command/v2",
         "gateway_argv": gateway_argv,
         "full_argv": full_argv,
         "shell_family": "posix-sh",

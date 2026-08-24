@@ -18,11 +18,14 @@ from wwise_waapi.business_declarations import (
 )
 from wwise_waapi.operation_composer import operation_composer_digest
 from wwise_waapi.operation_drafts import (
+    OperationDraftState,
     OperationDraftInvalidTransition,
     OperationDraftRevisionConflict,
     OperationDraftStore,
+    parse_operation_draft_archive_bytes,
 )
 from wwise_waapi.operation_registry import operation_request_schema_digest
+from wwise_waapi.transactions import new_transaction_id
 
 
 PROJECT_ID = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
@@ -532,6 +535,114 @@ def test_live_check_atomically_persists_the_compiled_business_preview(
     assert restored.active_preview == preview
     assert checked.check is not None
     assert checked.check["source_revision"] == edited.revision
+
+
+def test_sealed_media_business_draft_replays_after_source_cleanup(
+    tmp_path: Path,
+) -> None:
+    media = tmp_path / "rain.wav"
+    media.write_bytes(b"RIFF-test")
+    store = OperationDraftStore(tmp_path / "state")
+    version = "2022.1"
+    schema_digest = operation_request_schema_digest("audio.import", version)
+    composer_digest = operation_composer_digest("audio.import", version)
+    started = store.start(
+        operation="audio.import",
+        version=version,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+    )
+    context = _context(started.task_authority, version)
+
+    def add_media(session: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        parent = session.handles.bind_object(
+            object_id=PARENT_ID,
+            name="Weather",
+            object_type="ActorMixer",
+            path=r"\Actor-Mixer Hierarchy\Default Work Unit\Weather",
+        )
+        return session.with_new_declaration(
+            declaration_id="rain-bed",
+            target=NewDescendantTarget(
+                parent_handle=parent.handle,
+                name="Rain_Bed",
+                kind="sound-sfx",
+            ),
+            fields={"media_file": str(media), "language": "SFX"},
+        )
+
+    edited = store.apply_business_update(
+        started.draft_id,
+        task_authority=started.task_authority,
+        expected_revision=1,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+        context=context,
+        update=add_media,
+        event_type="declaration.added",
+    )
+    materialized = store.materialize_request(
+        started.draft_id,
+        task_authority=started.task_authority,
+        expected_revision=edited.revision,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+    )
+    preview = BusinessPreview.create(
+        source_revision=1,
+        readable_lines=("对象：Rain_Bed", "类型：Sound SFX", "语言：SFX"),
+        detail={"native_request_digest": materialized.request_digest},
+    )
+    checked = store.record_check(
+        started.draft_id,
+        task_authority=started.task_authority,
+        expected_revision=edited.revision,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+        request_digest=materialized.request_digest,
+        project_guard={"project": PROJECT_ID},
+        runtime_guard_fingerprint="a" * 64,
+        prepared_digest="b" * 64,
+        business_preview=preview,
+    )
+    transaction_id = new_transaction_id()
+    reservation = store.reserve_seal(
+        started.draft_id,
+        task_authority=started.task_authority,
+        expected_revision=checked.revision,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+        transaction_id=transaction_id,
+        apply=True,
+        ttl_seconds=300,
+        policy="ask_before_changes",
+    )
+    sealed = store.commit_seal(
+        started.draft_id,
+        task_authority=started.task_authority,
+        source_revision=reservation.source_revision,
+        transaction_id=transaction_id,
+        artifact_hash="c" * 64,
+        transaction_state="awaiting_confirmation",
+    )
+    media.unlink()
+    record_path = store.records_dir / f"{started.draft_id}.json"
+
+    with pytest.raises(ValueError, match="canonical request"):
+        parse_operation_draft_archive_bytes(
+            record_path.read_bytes(),
+            expected_draft_id=started.draft_id,
+        )
+    restored = parse_operation_draft_archive_bytes(
+        record_path.read_bytes(),
+        expected_draft_id=started.draft_id,
+        allow_cleaned_file_evidence=True,
+    )
+
+    assert sealed.state is OperationDraftState.SEALED
+    assert restored.state is OperationDraftState.SEALED
+    assert restored.seal is not None
+    assert restored.seal["request"] == materialized.request
 
 
 def _add_weather(session: BusinessDeclarationSession) -> BusinessDeclarationSession:

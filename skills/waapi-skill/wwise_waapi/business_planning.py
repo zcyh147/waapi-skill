@@ -695,7 +695,7 @@ def _validate_continuation(value: Any) -> dict[str, Any]:
     }
     if not required.issubset(continuation):
         raise ValueError("continuation is missing its complete execution envelope")
-    if continuation.get("contract") != "waapi-skill.transaction-next-command/v2":
+    if continuation.get("contract") != "waapi-skill.gateway-next-command/v2":
         raise ValueError("continuation contract is invalid")
     for field in ("gateway_argv", "full_argv"):
         argv = continuation.get(field)

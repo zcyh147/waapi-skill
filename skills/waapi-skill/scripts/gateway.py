@@ -10579,6 +10579,7 @@ def dispatch_business_field_binding(
                 "token": bound.token,
                 "field_kind": bound.field_kind,
                 "value_type": bound.value_type,
+                "platform": bound.platform,
                 "restrictions": dict(bound.restrictions),
             },
         }

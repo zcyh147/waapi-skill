@@ -8,7 +8,11 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from wwise_waapi.operation_composer import operation_composer_digest
-from wwise_waapi.operation_drafts import OperationDraftStore
+from wwise_waapi.operation_drafts import (
+    OperationDraftState,
+    OperationDraftStore,
+    parse_operation_draft_archive_bytes,
+)
 from wwise_waapi.operation_registry import operation_request_schema_digest
 
 
@@ -33,6 +37,10 @@ PROJECT_ID = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
 PARENT_ID = "{11111111-1111-1111-1111-111111111111}"
 
 
+def _project_path(tmp_path: Path) -> Path:
+    return tmp_path / "project" / "SampleProject.wproj"
+
+
 class FakeClient:
     def __init__(self, responses: Mapping[str, Sequence[Any]]) -> None:
         self.responses = {uri: deque(values) for uri, values in responses.items()}
@@ -44,6 +52,58 @@ class FakeClient:
         if not values:
             raise AssertionError(f"Unexpected WAAPI call: {uri} {args!r} {options!r}")
         return values.popleft()
+
+    def disconnect(self) -> None:
+        return None
+
+
+class BusinessCheckClient:
+    def __init__(self, tmp_path: Path) -> None:
+        self.tmp_path = tmp_path
+        self.calls: list[tuple[str, Any, Any]] = []
+
+    def call(self, uri: str, args: Any = None, options: Any = None) -> Any:
+        self.calls.append((uri, args, options))
+        if uri == "ak.wwise.core.getInfo":
+            return _info()
+        if uri == "ak.wwise.core.getProjectInfo":
+            return {
+                "id": PROJECT_ID,
+                "name": "SampleProject",
+                "path": str(_project_path(self.tmp_path)),
+            }
+        if uri == "ak.wwise.core.object.getTypes":
+            return {
+                "return": [
+                    {"classId": 1, "name": "ActorMixer", "type": "ActorMixer"},
+                    {
+                        "classId": 2,
+                        "name": "RandomSequenceContainer",
+                        "type": "RandomSequenceContainer",
+                    },
+                ]
+            }
+        if uri == "ak.wwise.core.object.get":
+            source = args.get("from", {}) if isinstance(args, Mapping) else {}
+            paths = source.get("path", []) if isinstance(source, Mapping) else []
+            ids = source.get("id", []) if isinstance(source, Mapping) else []
+            if ids == [PARENT_ID] or paths == [
+                r"\Actor-Mixer Hierarchy\Default Work Unit\Weather"
+            ]:
+                return {
+                    "return": [
+                        {
+                            "id": PARENT_ID,
+                            "name": "Weather",
+                            "type": "ActorMixer",
+                            "path": (
+                                r"\Actor-Mixer Hierarchy\Default Work Unit\Weather"
+                            ),
+                        }
+                    ]
+                }
+            return {"return": []}
+        raise AssertionError(f"Unexpected WAAPI call: {uri} {args!r} {options!r}")
 
     def disconnect(self) -> None:
         return None
@@ -154,7 +214,7 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
                 {
                     "id": PROJECT_ID,
                     "name": "SampleProject",
-                    "path": str(tmp_path / "SampleProject.wproj"),
+                    "path": str(_project_path(tmp_path)),
                 }
             ],
             "ak.wwise.core.object.get": [
@@ -202,7 +262,7 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
                 {
                     "id": PROJECT_ID,
                     "name": "SampleProject",
-                    "path": str(tmp_path / "SampleProject.wproj"),
+                    "path": str(_project_path(tmp_path)),
                 }
             ],
             "ak.wwise.core.object.getTypes": [
@@ -324,3 +384,153 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
             {"name": "CustomGain", "value": -2.5},
         ],
     }
+
+
+def test_structure_declaration_reaches_live_check_and_persists_readable_preview(
+    tmp_path: Path,
+) -> None:
+    code, started = _offline(tmp_path, "draft-start", "audio.import")
+    assert code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    bind_client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [_info()],
+            "ak.wwise.core.getProjectInfo": [
+                {
+                    "id": PROJECT_ID,
+                    "name": "SampleProject",
+                    "path": str(_project_path(tmp_path)),
+                }
+            ],
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": PARENT_ID,
+                            "name": "Weather",
+                            "type": "ActorMixer",
+                            "path": (
+                                r"\Actor-Mixer Hierarchy\Default Work Unit\Weather"
+                            ),
+                        }
+                    ]
+                }
+            ],
+        }
+    )
+    bind_code, bound = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-bind-object",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "1",
+            "--object-id",
+            PARENT_ID,
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: bind_client,
+    )
+    assert bind_code == 0, bound
+    declare_code, declared = _offline(
+        tmp_path,
+        "draft-declare-new",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "2",
+        "--declaration-id",
+        "variants",
+        "--parent-handle",
+        bound["bound_object"]["handle"],
+        "--name",
+        "Variants",
+        "--kind",
+        "random-container",
+    )
+    assert declare_code == 0, declared
+    check_client = BusinessCheckClient(tmp_path)
+
+    check_code, checked = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-check",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "3",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: check_client,
+    )
+
+    assert check_code == 0, json.dumps(checked, indent=2)
+    assert checked["draft"]["revision"] == 4
+    assert checked["draft"]["preview"]["readable_lines"] == [
+        "对象：Variants",
+        "类型：Random Container",
+    ]
+    assert checked["draft"]["next_action_binding"]["required_next_phase"] == (
+        "preview_from_checked_business_draft"
+    )
+    assert checked["next_command"]["gateway_argv"][0] == "preview-from-draft"
+    record = OperationDraftStore(tmp_path / "state").inspect(
+        draft_id,
+        task_authority=authority,
+    )
+    assert record.composition is not None
+    session = record.composition["business_session"]
+    assert session["active_preview"]["readable_lines"] == [
+        "对象：Variants",
+        "类型：Random Container",
+    ]
+
+    preview_client = BusinessCheckClient(tmp_path)
+    preview_code, previewed = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "preview-from-draft",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "4",
+            "--apply",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: preview_client,
+    )
+    assert preview_code == 0, json.dumps(previewed, indent=2)
+    assert previewed["state"] == "awaiting_confirmation"
+    assert previewed["agent_result"]["request"]["arguments"]["imports"] == [
+        {
+            "object_path": (
+                r"\Actor-Mixer Hierarchy\Default Work Unit\Weather"
+                r"\<Random Container>Variants"
+            ),
+            "object_type": "RandomSequenceContainer",
+        }
+    ]
+    record_path = (
+        tmp_path
+        / "state"
+        / "operation-drafts-v1"
+        / "records"
+        / f"{draft_id}.json"
+    )
+    archived = parse_operation_draft_archive_bytes(
+        record_path.read_bytes(),
+        expected_draft_id=draft_id,
+        allow_cleaned_file_evidence=True,
+    )
+    assert archived.state is OperationDraftState.SEALED
+    assert archived.seal is not None
+    assert archived.seal["request"] == previewed["agent_result"]["request"]

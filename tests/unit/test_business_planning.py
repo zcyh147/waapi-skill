@@ -112,7 +112,7 @@ def _continuation(
         *gateway_argv,
     ]
     return {
-        "contract": "waapi-skill.transaction-next-command/v2",
+        "contract": "waapi-skill.gateway-next-command/v2",
         "gateway_argv": gateway_argv,
         "full_argv": full_argv,
         "shell_family": "posix-sh",

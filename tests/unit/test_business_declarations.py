@@ -324,6 +324,7 @@ def test_live_field_binding_uses_exact_metadata_and_dynamic_enabled_state(
 
     assert field.field_kind == "property"
     assert field.value_type == "number"
+    assert field.platform == "Windows"
     assert field.restrictions == {"maximum": 12.0, "minimum": -96.3}
     assert [call[0].rsplit(".", 1)[-1] for call in calls] == [
         "getPropertyAndReferenceNames",
@@ -335,6 +336,9 @@ def test_live_field_binding_uses_exact_metadata_and_dynamic_enabled_state(
         "property": "Volume",
         "platform": "Windows",
     }
+
+    assert revalidate_live_field(registry, field, read_call=read) == field
+    assert calls[-1][1]["platform"] == "Windows"
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)

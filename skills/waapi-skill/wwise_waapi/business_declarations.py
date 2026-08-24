@@ -226,6 +226,7 @@ class BoundFieldHandle:
     token: str
     field_kind: str
     value_type: str
+    platform: str | int | None
     restrictions: Mapping[str, Any]
     metadata_digest: str
     binding_digest: str
@@ -496,6 +497,7 @@ class BusinessHandleRegistry:
                     "token": row.token,
                     "field_kind": row.field_kind,
                     "value_type": row.value_type,
+                    "platform": row.platform,
                     "restrictions": dict(row.restrictions),
                     "metadata_digest": row.metadata_digest,
                     "binding_digest": row.binding_digest,
@@ -569,6 +571,7 @@ class BusinessHandleRegistry:
         token: str,
         field_kind: str,
         value_type: str,
+        platform: str | int | None = None,
         restrictions: Mapping[str, Any],
         metadata_digest: str,
     ) -> BoundFieldHandle:
@@ -590,6 +593,7 @@ class BusinessHandleRegistry:
             field_kind=field_kind,
             value_type=value_type,
         )
+        normalized_platform = _normalize_field_platform(platform)
         material = {
             "contract": BOUND_FIELD_HANDLE_CONTRACT,
             "context": self.context.as_binding_dict(),
@@ -598,6 +602,7 @@ class BusinessHandleRegistry:
             "token": token,
             "field_kind": field_kind,
             "value_type": value_type,
+            "platform": normalized_platform,
             "restrictions": normalized_restrictions,
             "metadata_digest": metadata_digest,
         }
@@ -611,6 +616,7 @@ class BusinessHandleRegistry:
             token=token,
             field_kind=field_kind,
             value_type=value_type,
+            platform=normalized_platform,
             restrictions=normalized_restrictions,
             metadata_digest=metadata_digest,
             binding_digest=digest,
@@ -953,6 +959,7 @@ def bind_live_field(
             token=token,
             field_kind=field_kind,
             value_type=value_type,
+            platform=platform,
             restrictions=restrictions,
             metadata_digest=metadata_digest,
         )
@@ -975,6 +982,21 @@ def revalidate_live_field(
 
     if not isinstance(field, BoundFieldHandle):
         raise TypeError("field must be BoundFieldHandle")
+    normalized_platform = _normalize_field_platform(platform)
+    if (
+        normalized_platform is not None
+        and field.platform is not None
+        and normalized_platform != field.platform
+    ):
+        raise _error(
+            "FIELD_HANDLE_PLATFORM_MISMATCH",
+            field="field_handle",
+            rejected_handle=field.handle,
+            action="reuse the platform sealed into the current Field Handle",
+        )
+    effective_platform = (
+        field.platform if normalized_platform is None else normalized_platform
+    )
     live_scope = _live_metadata_scope(
         read_call,
         scope_kind=field.scope_kind,
@@ -1023,7 +1045,7 @@ def revalidate_live_field(
             action="resolve an exact target object and issue a new field handle",
         )
     if dependency_fields:
-        if platform is None:
+        if effective_platform is None:
             raise _error(
                 "FIELD_PLATFORM_REQUIRED",
                 field=field.token,
@@ -1037,7 +1059,7 @@ def revalidate_live_field(
                     {
                         "object": field.scope_value,
                         "property": field.token,
-                        "platform": platform,
+                        "platform": effective_platform,
                     },
                     {},
                 )
@@ -1247,6 +1269,22 @@ def _normalize_scope(scope_kind: str, scope_value: str | int) -> str | int:
     return scope_value.upper() if _CANONICAL_GUID.fullmatch(scope_value) else scope_value
 
 
+def _normalize_field_platform(value: Any) -> str | int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (str, int)):
+        raise ValueError("field platform must be an exact name, id, or omission")
+    if isinstance(value, int):
+        if not 0 <= value <= 0xFFFFFFFF:
+            raise ValueError("field platform id must be uint32")
+        return value
+    return _bounded_required_text(
+        value,
+        field="platform",
+        maximum_bytes=MAX_FIELD_TOKEN_BYTES,
+    )
+
+
 def _bound_object_from_dict(
     payload: Any,
     *,
@@ -1324,6 +1362,7 @@ def _bound_field_from_dict(
         "token",
         "field_kind",
         "value_type",
+        "platform",
         "restrictions",
         "metadata_digest",
         "binding_digest",
@@ -1342,6 +1381,7 @@ def _bound_field_from_dict(
     token = payload.get("token")
     field_kind = payload.get("field_kind")
     value_type = payload.get("value_type")
+    platform = _normalize_field_platform(payload.get("platform"))
     metadata_digest = payload.get("metadata_digest")
     if not isinstance(token, str) or not _FIELD_TOKEN.fullmatch(token):
         raise ValueError("bound field token is invalid")
@@ -1370,6 +1410,7 @@ def _bound_field_from_dict(
         "token": token,
         "field_kind": field_kind,
         "value_type": value_type,
+        "platform": platform,
         "restrictions": restrictions,
         "metadata_digest": metadata_digest,
     }
@@ -1389,6 +1430,7 @@ def _bound_field_from_dict(
         token=token,
         field_kind=str(field_kind),
         value_type=str(value_type),
+        platform=platform,
         restrictions=restrictions,
         metadata_digest=metadata_digest,
         binding_digest=digest,
