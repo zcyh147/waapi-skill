@@ -48,7 +48,12 @@ def create_typed_transaction_preview(
     for step in protocol.steps:
         command = [step.subcommand, *_render_step_arguments(step, responses)]
         if command[0] in {"request-map-container", "request-array-item"}:
-            _require_container_disclosure(operation_schema, command)
+            if "--schema-digest" in command:
+                _require_container_disclosure(operation_schema, command)
+            elif previous is not None:
+                _require_nested_container_disclosure(previous[1], command)
+            else:
+                raise AssertionError("nested container command has no disclosure source")
         elif previous is not None:
             _require_disclosed_continuation(
                 previous[0],
@@ -91,6 +96,28 @@ def _require_container_disclosure(
     )
     if expected != command[0] or dynamic.get("schema_digest") != command[3]:
         raise AssertionError("operation-schema did not disclose exact dynamic container construction")
+
+
+def _require_nested_container_disclosure(
+    payload: Mapping[str, Any],
+    command: Sequence[str],
+) -> None:
+    continuation = payload.get("continuation")
+    if not isinstance(continuation, Mapping) or not _contains_exact_argv(
+        continuation,
+        command,
+    ):
+        raise AssertionError("container response did not disclose exact nested construction")
+
+
+def _contains_exact_argv(value: Any, command: Sequence[str]) -> bool:
+    if isinstance(value, list):
+        if value == list(command):
+            return True
+        return any(_contains_exact_argv(item, command) for item in value)
+    if isinstance(value, Mapping):
+        return any(_contains_exact_argv(item, command) for item in value.values())
+    return False
 
 
 def _require_disclosed_continuation(

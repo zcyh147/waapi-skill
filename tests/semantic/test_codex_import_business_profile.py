@@ -27,6 +27,7 @@ from tests.semantic.support.codex_gateway_broker import (
 from tests.destructive.support.typed_gateway_input import (
     _container_action,
     _require_disclosed_continuation,
+    _require_nested_container_disclosure,
     _render_step_arguments,
 )
 
@@ -197,6 +198,32 @@ def test_real_gateway_adapter_allows_branch_first_container_disclosure() -> None
             }
         }
     ) is None
+
+
+def test_real_gateway_adapter_follows_exact_nested_container_disclosure() -> None:
+    command = [
+        "request-map-container",
+        "soundbank.setInclusions",
+        "--map-handle",
+        "trm1-child",
+        "--key",
+        "object",
+        "--shape",
+        "object",
+        "--parent-schema-token",
+        "lineage-token",
+    ]
+
+    _require_nested_container_disclosure(
+        {
+            "continuation": {
+                "next_command_decision": {
+                    "branch_disclosure": {"argv_by_shape": {"object": command}}
+                }
+            }
+        },
+        command,
+    )
 
 
 def test_production_audio_import_profile_has_four_independent_business_pairs() -> None:
