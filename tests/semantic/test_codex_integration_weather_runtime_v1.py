@@ -401,15 +401,14 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
             (),
             (),
         ),
-        reused_metadata_steps={"tx03": "tx01"},
     )
     assert len(protocol.turn_prefix_counts) == 4
     metadata_steps = [
         step for step in protocol.steps if step.subcommand == "metadata"
     ]
     assert [step.name for step in metadata_steps] == [
-        "tx01.metadata",
         "tx02.metadata",
+        "tx03.metadata",
     ]
     from tests.semantic.support.codex_typed_draft_evidence_v3 import (
         _composer_flow_step_indexes,
@@ -419,14 +418,13 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         protocol.steps[index].name
         for index in _composer_flow_step_indexes(protocol.steps, "tx03")
     )
-    assert "tx01.metadata" in tx03_archive_names
+    assert "tx03.metadata" in tx03_archive_names
     assert "tx01.draft-start" not in tx03_archive_names
     assert [step.arguments[-2:] for step in metadata_steps] == [
-        ("--limit", "2"),
+        ("--limit", "8"),
         ("--limit", "8"),
     ]
     assert protocol.commutative_read_only_step_groups == (
-        ("tx01.operation-schema", "tx01.metadata"),
         ("tx02.operation-schema", "tx02.metadata"),
     )
     assert [
@@ -435,9 +433,9 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         if step.subcommand in {"metadata", "operation-schema"}
     ] == [
         ("tx01.operation-schema", "operation-schema"),
-        ("tx01.metadata", "metadata"),
         ("tx02.operation-schema", "operation-schema"),
         ("tx02.metadata", "metadata"),
+        ("tx03.metadata", "metadata"),
         ("tx03.operation-schema", "operation-schema"),
     ]
     assert [step.name for step in protocol.steps if step.subcommand == "execute"] == [
@@ -549,15 +547,14 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
         step.subcommand == "preview" and step.name.startswith("tx02.")
         for step in protocol.steps
     )
-    rtpc_schema_index = next(
-        index
-        for index, step in enumerate(protocol.steps)
-        if step.name == "tx03.operation-schema"
-    )
     rtpc_steps = [
         step for step in protocol.steps if step.name.startswith("tx03.")
     ]
-    assert rtpc_steps[1].name == "tx03.draft-start"
+    assert [step.name for step in rtpc_steps[:3]] == [
+        "tx03.metadata",
+        "tx03.operation-schema",
+        "tx03.draft-start",
+    ]
     rtpc_preview = next(step for step in rtpc_steps if step.name == "tx03.preview")
     assert rtpc_preview.subcommand == "preview-from-draft"
     rtpc_actions = [
@@ -582,7 +579,7 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
     ]
     assert bound_rtpc_actions
     assert all(
-        argument.metadata_binding.step == "tx01.metadata"
+        argument.metadata_binding.step == "tx03.metadata"
         and argument.metadata_binding.object_type == "Sound"
         and argument.metadata_binding.required_tokens == ("Volume",)
         and tuple(

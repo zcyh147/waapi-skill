@@ -7060,6 +7060,75 @@ def _project_operation_draft_runner(
             )
         return projected
 
+    def project_business_binding(binding: Mapping[str, Any]) -> dict[str, Any]:
+        if (
+            binding.get("contract")
+            != "waapi-skill.business-draft-next-action/v1"
+            or binding.get("shell_tool_timeout_ms")
+            != GATEWAY_SHELL_TOOL_TIMEOUT_MS
+        ):
+            raise GatewayInvocationError(
+                "Gateway business Draft continuation contract is invalid"
+            )
+        projected_count = 0
+
+        def walk(nested: Any) -> Any:
+            nonlocal projected_count
+            if isinstance(nested, list):
+                if (
+                    len(nested) >= 3
+                    and nested[0] == "python"
+                    and nested[2] == "gateway.py"
+                ):
+                    if (
+                        any(not isinstance(token, str) for token in nested)
+                        or nested[1] != expected_candidate
+                    ):
+                        raise GatewayInvocationError(
+                            "Gateway business Draft continuation is not bound to "
+                            "the sealed candidate runner"
+                        )
+                    projected_count += 1
+                    return [
+                        "python",
+                        str(invocation_runner),
+                        "gateway.py",
+                        *nested[3:],
+                    ]
+                return [walk(item) for item in nested]
+            if not isinstance(nested, Mapping):
+                return nested
+            projected = {key: walk(item) for key, item in nested.items()}
+            if "copy_command" in nested:
+                argv_key = next(
+                    (
+                        key
+                        for key in ("fixed_full_argv", "fixed_argv_prefix")
+                        if isinstance(nested.get(key), list)
+                    ),
+                    None,
+                )
+                if argv_key is None or nested.get("copy_command") != _draft_copy_command(
+                    nested[argv_key],
+                    platform_name=platform_name,
+                ):
+                    raise GatewayInvocationError(
+                        "Gateway business Draft continuation command representation "
+                        "is not exact"
+                    )
+                projected["copy_command"] = _draft_copy_command(
+                    projected[argv_key],
+                    platform_name=platform_name,
+                )
+            return projected
+
+        projected = walk(binding)
+        if projected_count == 0 or not isinstance(projected, dict):
+            raise GatewayInvocationError(
+                "Gateway business Draft continuation has no sealed command"
+            )
+        return projected
+
     def project_binding(binding: Mapping[str, Any]) -> dict[str, Any]:
         projected = project_disclosure_commands(binding)
         root_disclosures = binding.get("root_dynamic_disclosure_commands")
@@ -7109,13 +7178,20 @@ def _project_operation_draft_runner(
 
     if value.get("contract") == "waapi-skill.operation-draft-next-action/v1":
         return project_binding(value)
+    if value.get("contract") == "waapi-skill.business-draft-next-action/v1":
+        return project_business_binding(value)
     if value.get("contract") == "waapi-skill.typed-container-handle/v1":
         return project_disclosure_commands(value)
 
     projected_draft = project_disclosure_commands(value)
     binding = value.get("next_action_binding")
     if isinstance(binding, Mapping):
-        projected_draft["next_action_binding"] = project_binding(binding)
+        projected_draft["next_action_binding"] = (
+            project_business_binding(binding)
+            if binding.get("contract")
+            == "waapi-skill.business-draft-next-action/v1"
+            else project_binding(binding)
+        )
     action_result = value.get("action_result")
     if isinstance(action_result, Mapping):
         projected_action = project_disclosure_commands(action_result)
@@ -7151,6 +7227,7 @@ def _project_model_visible_runner(
         if value.get("contract") in {
             "waapi-skill.operation-draft/v1",
             "waapi-skill.operation-draft-next-action/v1",
+            "waapi-skill.business-draft-next-action/v1",
             "waapi-skill.typed-container-handle/v1",
         }:
             return _project_operation_draft_runner(

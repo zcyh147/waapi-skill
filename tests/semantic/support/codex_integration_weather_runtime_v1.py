@@ -410,7 +410,6 @@ def prepare_weather_workflow(
             (),
             (),
         ),
-        reused_metadata_steps={"tx03": "tx01"},
     )
     visible_values = MappingProxyType(
         {
@@ -1155,18 +1154,11 @@ def _build_metadata_workflow_protocol(
             "weather transactions require schema-first token discovery and "
             "Gateway-owned draft-check validation"
         )
-    tx01_metadata = metadata[0]
     tx02_metadata = metadata[1]
-    assert tx01_metadata is not None and tx02_metadata is not None
+    assert tx02_metadata is not None
     composer_tx01 = build_audio_import_composer_transaction_steps(
         requests[0],
         label="tx01",
-        metadata_binding=DraftActionMetadataBinding(
-            step="tx01.metadata",
-            object_type=tx01_metadata[0],
-            required_tokens=tuple(tx01_metadata[2]),
-            expected_projection=tuple(tx01_metadata[3]),
-        ),
     )
     legacy_base = build_transaction_protocol(requests)
     composer_tx02 = build_object_set_composer_transaction_steps(
@@ -1228,6 +1220,11 @@ def _build_metadata_workflow_protocol(
         prefix = step.name.split(".", 1)[0]
         if step.subcommand == "operation-schema":
             metadata_row = metadata_by_tx[prefix]
+            transaction_index = int(prefix[2:]) - 1
+            operation = requests[transaction_index].get("operation")
+            if operation == "audio.import":
+                steps.append(step)
+                continue
             if metadata_row is None:
                 steps.append(step)
                 continue
@@ -1260,9 +1257,7 @@ def _build_metadata_workflow_protocol(
                 subcommand="metadata",
                 arguments=tuple(arguments),
             )
-            transaction_index = int(prefix[2:]) - 1
-            operation = requests[transaction_index].get("operation")
-            if operation in {"object.create", "object.set", "audio.import"}:
+            if operation in {"object.create", "object.set"}:
                 steps.extend((step, metadata_step))
             else:
                 steps.extend((metadata_step, step))
@@ -1326,9 +1321,13 @@ def _build_metadata_workflow_protocol(
     return V3GatewayProtocol(
         tuple(steps),
         prefixes,
-        commutative_read_only_step_groups=(
-            ("tx01.operation-schema", "tx01.metadata"),
-            ("tx02.operation-schema", "tx02.metadata"),
+        commutative_read_only_step_groups=tuple(
+            (f"{prefix}.operation-schema", f"{prefix}.metadata")
+            for prefix, metadata_row in metadata_by_tx.items()
+            if metadata_row is not None
+            and prefix not in reused_metadata_steps
+            and requests[int(prefix[2:]) - 1].get("operation")
+            in {"object.create", "object.set"}
         ),
     )
 

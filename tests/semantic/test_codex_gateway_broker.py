@@ -1707,6 +1707,113 @@ def test_broker_projects_draft_action_and_completion_prefixes_to_task_install(
         )
 
 
+@pytest.mark.parametrize("platform_name", ("posix", "nt"))
+def test_broker_projects_every_business_draft_command_to_task_install(
+    tmp_path: Path,
+    platform_name: str,
+) -> None:
+    candidate_runner = tmp_path / "candidate" / "scripts" / "run.py"
+    candidate_runner.parent.mkdir(parents=True)
+    candidate_runner.write_text("# candidate\n", encoding="utf-8")
+    invocation_runner = (
+        tmp_path
+        / "agent workspace"
+        / ".agents"
+        / "skills"
+        / "waapi-skill"
+        / "scripts"
+        / "run.py"
+    )
+    candidate = str(candidate_runner.resolve(strict=True))
+
+    def command(subcommand: str, *suffix: str) -> list[str]:
+        return ["python", candidate, "gateway.py", subcommand, *suffix]
+
+    completion = command(
+        "draft-check",
+        "od1-0123456789abcdef0123456789abcdef",
+        "--task-authority",
+        "da1-0123456789abcdef0123456789abcdef01234567",
+        "--expected-revision",
+        "1",
+    )
+    binding = {
+        "contract": "waapi-skill.business-draft-next-action/v1",
+        "shell_tool_timeout_ms": 30_000,
+        "object_binding": {
+            "by_id": command("draft-bind-object", "<draft>", "--object-id", "<id>"),
+            "by_path": command(
+                "draft-bind-object", "<draft>", "--object-path", "<path>"
+            ),
+        },
+        "field_binding": {
+            "class_scope": command(
+                "draft-bind-field", "<draft>", "--class-name", "<class>"
+            ),
+            "object_scope": command(
+                "draft-bind-field", "<draft>", "--object-handle", "<handle>"
+            ),
+        },
+        "configure": {"fixed_argv_prefix": command("draft-business-configure")},
+        "declare_new": {"fixed_argv_prefix": command("draft-declare-new")},
+        "declare_existing": {"fixed_argv_prefix": command("draft-declare-existing")},
+        "revise": {"fixed_argv_prefix": command("draft-revise-declaration")},
+        "remove": {"fixed_argv_prefix": command("draft-remove-declaration")},
+        "completion_candidate": {
+            "fixed_full_argv": completion,
+            "copy_command": (
+                encode_windows_model_argv(completion)
+                if platform_name == "nt"
+                else shlex.join(completion)
+            ),
+        },
+    }
+
+    projected = broker_module._project_model_visible_runner(  # noqa: SLF001
+        {
+            "contract": "waapi-skill.operation-draft/v1",
+            "next_action_binding": binding,
+        },
+        candidate_runner=candidate_runner,
+        invocation_runner=invocation_runner,
+        platform_name=platform_name,
+    )["next_action_binding"]
+
+    def runner_paths(value: object) -> list[str]:
+        if isinstance(value, dict):
+            return [path for item in value.values() for path in runner_paths(item)]
+        if isinstance(value, list) and len(value) >= 3 and value[0] == "python":
+            return [value[1]]
+        if isinstance(value, list):
+            return [path for item in value for path in runner_paths(item)]
+        return []
+
+    assert runner_paths(projected)
+    assert set(runner_paths(projected)) == {str(invocation_runner)}
+    projected_completion = projected["completion_candidate"]["fixed_full_argv"]
+    assert projected["completion_candidate"]["copy_command"] == (
+        encode_windows_model_argv(projected_completion)
+        if platform_name == "nt"
+        else shlex.join(projected_completion)
+    )
+
+    tampered = json.loads(json.dumps(binding))
+    tampered["object_binding"]["by_id"][1] = str(tmp_path / "other.py")
+    with pytest.raises(
+        GatewayInvocationError,
+        match="business Draft continuation is not bound",
+    ):
+        broker_module._project_model_visible_runner(  # noqa: SLF001
+            {
+                "contract": "waapi-skill.operation-draft/v1",
+                "next_action_binding": tampered,
+            },
+            candidate_runner=candidate_runner,
+            invocation_runner=invocation_runner,
+            platform_name=platform_name,
+        )
+
+
 FAKE_RUNNER = r'''from __future__ import annotations
 import base64
 import hashlib
@@ -9212,58 +9319,36 @@ def test_weather_agent_metadata_step_crosses_broker_validation(
                 "wire_exact",
             ),
         ),
-        reused_metadata_steps={"tx03": "tx01"},
     )
     assert [
         step.name for step in protocol.steps if step.subcommand == "metadata"
-    ] == ["tx01.metadata", "tx02.metadata"]
+    ] == ["tx02.metadata", "tx03.metadata"]
     broker = CodexGatewayBroker(
         skill_source=tmp_path / "waapi-skill",
         expected_steps=protocol.steps,
     )
-    sound_metadata_step = next(
-        step for step in protocol.steps if step.name == "tx01.metadata"
+    rtpc_metadata_step = next(
+        step for step in protocol.steps if step.name == "tx03.metadata"
     )
-    collapsed_sound_queries = (
-        "metadata",
-        "discover",
-        "--object-type",
-        "Sound",
-        "--query",
-        "looping",
-        "--query",
-        "playback instance limit",
-        "--query",
-        "volume",
-        "--query",
-        "output bus",
-        "--limit",
-        "3",
-    )
-    with pytest.raises(GatewayInvocationError, match="query slot count"):
-        broker._validate_step(  # noqa: SLF001
-            sound_metadata_step,
-            collapsed_sound_queries,
-        )
-    complete_sound_queries = (
+    complete_rtpc_queries = (
         "metadata",
         "discover",
         "--object-type",
         "Sound",
         *tuple(
             item
-            for query in SOUND_METADATA_QUERIES
+            for query in RTPC_METADATA_QUERIES
             for item in ("--query", query)
         ),
         "--limit",
-        "2",
+        "8",
     )
     complete_hash, complete_execution = broker._validate_step(  # noqa: SLF001
-        sound_metadata_step,
-        complete_sound_queries,
+        rtpc_metadata_step,
+        complete_rtpc_queries,
     )
     assert len(complete_hash) == 64
-    assert complete_execution == complete_sound_queries
+    assert complete_execution == complete_rtpc_queries
     metadata_step = next(
         step for step in protocol.steps if step.name == "tx02.metadata"
     )
