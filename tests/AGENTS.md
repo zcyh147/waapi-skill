@@ -189,6 +189,12 @@ With PowerShell's ScheduledTasks cmdlets, pass `-LogonType Interactive` and
 in its exported XML and `Limited` in its Principal. Stop before launch if
 either attestation differs.
 
+On native Windows, a Gateway-owned v2 `model_command` intentionally uses the
+fixed task-local runner with forward slashes even though its installed absolute
+path uses backslashes. Broker path binding must recognize those two exact
+spellings as the same sealed task-local runner; do not broaden this into general
+path normalization or permit any other relative runner spelling.
+
 Run the final scoped-process check from a separate SSH invocation after the
 Scheduled Task reports `Ready`. A cleanup script whose own path contains the
 campaign-root token also places that token in its parent `bash.exe` command

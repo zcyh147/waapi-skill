@@ -29,14 +29,17 @@ def task_local_runner_matches_normalized(
 ) -> bool:
     """Bind one exact task-local spelling to its absolute installed runner."""
 
-    if raw_runner == TASK_LOCAL_RUNNER_POSIX:
-        path = PurePosixPath(normalized_runner)
-        expected_tail = PurePosixPath(TASK_LOCAL_RUNNER_POSIX).parts
-    elif raw_runner == TASK_LOCAL_RUNNER_WINDOWS:
-        path = PureWindowsPath(normalized_runner)
+    if raw_runner not in {TASK_LOCAL_RUNNER_POSIX, TASK_LOCAL_RUNNER_WINDOWS}:
+        return False
+    windows_path = PureWindowsPath(normalized_runner)
+    if windows_path.is_absolute():
+        path = windows_path
         expected_tail = PureWindowsPath(TASK_LOCAL_RUNNER_WINDOWS).parts
     else:
-        return False
+        if raw_runner != TASK_LOCAL_RUNNER_POSIX:
+            return False
+        path = PurePosixPath(normalized_runner)
+        expected_tail = PurePosixPath(TASK_LOCAL_RUNNER_POSIX).parts
     return path.is_absolute() and path.parts[-len(expected_tail) :] == expected_tail
 
 
