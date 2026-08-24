@@ -822,11 +822,19 @@ def _complete_transaction(
     assert preview["state"] == TransactionState.AWAITING_CONFIRMATION.value
     preview_request = preview["preview_summary"]["request"]
     if operation == "audio.import":
+        canonical_imports = []
+        for row in request["arguments"]["imports"]:
+            canonical_row = dict(row)
+            canonical_row["object_path"] = canonical_row["object_path"].replace(
+                r"\<Sound>",
+                r"\<Sound SFX>",
+            )
+            canonical_row["object_type"] = "Sound SFX"
+            canonical_imports.append(canonical_row)
         assert preview_request == {
             **request,
             "arguments": {
-                **request["arguments"],
-                "import_operation": "createNew",
+                "imports": canonical_imports,
             },
         }
     else:
