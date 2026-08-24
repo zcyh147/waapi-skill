@@ -35,6 +35,13 @@ WAAPI_SHIM_ROOT = (
     / "audio-import-business"
     / "waapi-shim"
 )
+_REPORT_MINUS_TRANSLATION = str.maketrans(
+    {
+        "\N{MINUS SIGN}": "-",
+        "\N{SMALL HYPHEN-MINUS}": "-",
+        "\N{FULLWIDTH HYPHEN-MINUS}": "-",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,6 +93,39 @@ def _business_protocol_is_exact(
     """Trust the Broker's dependency-aware ordering proof exactly once."""
 
     return bool(broker_evidence.passed and reconciliation.passed)
+
+
+def _final_response_reports_preview(
+    final_response: str,
+    *,
+    markers: Sequence[str],
+) -> bool:
+    """Accept a semantic prose summary or the exact machine Preview payload."""
+
+    normalized = final_response.translate(_REPORT_MINUS_TRANSLATION).casefold()
+    normalized_markers = tuple(
+        marker.translate(_REPORT_MINUS_TRANSLATION).casefold()
+        for marker in markers
+    )
+    if all(marker in normalized for marker in normalized_markers) and (
+        "预览" in normalized or "preview" in normalized
+    ):
+        return True
+    try:
+        payload = json.loads(final_response)
+    except (json.JSONDecodeError, TypeError):
+        return False
+    if not isinstance(payload, Mapping):
+        return False
+    request = payload.get("request")
+    return bool(
+        payload.get("operation") == "audio.import"
+        and payload.get("state") == "awaiting_confirmation"
+        and payload.get("executed") is False
+        and isinstance(request, Mapping)
+        and request.get("contract") == "waapi-skill.operation-request/v1"
+        and request.get("operation") == "audio.import"
+    )
 
 
 def prepare_import_business_runtime(
@@ -247,8 +287,10 @@ def run_import_business_agent_unit(
         reconciliation = broker.reconcile(argvs)
 
     facts = result.command_facts
-    final_text = result.final_response.casefold()
-    markers_reported = all(marker.casefold() in final_text for marker in unit.final_markers)
+    preview_reported = _final_response_reports_preview(
+        result.final_response,
+        markers=unit.final_markers,
+    )
     preview_count = sum(
         record.step_name is not None and record.step_name.endswith(".preview")
         for record in broker_evidence.records
@@ -271,8 +313,7 @@ def run_import_business_agent_unit(
         "no_workspace_changes": result.file_change_count == 0,
         "skill_unchanged": result.skill_tree_unchanged,
         "all_previews_reported": preview_count == len(runtime.requests)
-        and markers_reported
-        and ("预览" in final_text or "preview" in final_text),
+        and preview_reported,
         "no_execute": all(step.subcommand != "execute" for step in steps)
         and not any(record.gateway_arguments[:1] == ("execute",) for record in broker_evidence.records),
     }

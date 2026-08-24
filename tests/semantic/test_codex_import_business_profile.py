@@ -15,6 +15,7 @@ from tests.semantic.support.codex_import_business_profile import (
 )
 from tests.semantic.support.codex_import_business_agent_runner import (
     _business_protocol_is_exact,
+    _final_response_reports_preview,
     build_preview_only_business_steps,
     prepare_import_business_runtime,
 )
@@ -168,6 +169,35 @@ def test_profile_filters_preserve_independent_unit_identity() -> None:
     assert tuple(unit.unit_id for unit in selected.units) == (
         "AIB22-WEATHER-B",
         "AIB25-WEAPONS-A",
+    )
+
+
+def test_final_preview_report_accepts_typographic_minus_without_fixed_wording() -> None:
+    assert _final_response_reports_preview(
+        "预览已生成：Rain_Bed −4 dB；Wind_Bed −6 dB。",
+        markers=("Rain_Bed", "Wind_Bed", "-4", "-6"),
+    )
+
+
+def test_final_preview_report_accepts_exact_machine_result() -> None:
+    payload = {
+        "operation": "audio.import",
+        "state": "awaiting_confirmation",
+        "executed": False,
+        "request": {
+            "contract": "waapi-skill.operation-request/v1",
+            "operation": "audio.import",
+            "arguments": {"import_operation": "replaceExisting"},
+        },
+    }
+    assert _final_response_reports_preview(
+        json.dumps(payload),
+        markers=("Rifle", "替换"),
+    )
+    payload["executed"] = True
+    assert not _final_response_reports_preview(
+        json.dumps(payload),
+        markers=("Rifle", "替换"),
     )
 
 
