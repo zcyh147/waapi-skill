@@ -728,8 +728,33 @@ def test_fixed_fake_gateway_cases_use_real_compiler_and_immutable_preview(
             assert payload["ok"] is True
             assert payload["command"] == command[0]
             if command[0] == "mvp-context":
-                assert "parent_handle" in payload["agent_result"]
-                assert "root_handle" not in payload["agent_result"]
+                context = payload["agent_result"]
+                assert "parent_handle" in context
+                assert "root_handle" not in context
+                schemas = context["command_schemas"]
+                assert set(schemas) == {
+                    "weather": {"mvp-structure", "mvp-asset"},
+                    "rifle": {"mvp-existing-asset"},
+                    "footsteps": {"mvp-asset"},
+                    "weapons": {"mvp-asset"},
+                }[unit.family]
+                if "mvp-asset" in schemas:
+                    fields = schemas["mvp-asset"]["field_contracts"]
+                    assert fields["--kind"]["allowed_values"] == ["sound-sfx"]
+                    assert fields["--media"]["allowed_values"] == list(
+                        {
+                            "weather": ("rain", "wind"),
+                            "footsteps": ("snow_step",),
+                            "weapons": ("mechanical", "tail"),
+                        }[unit.family]
+                    )
+                    assert schemas["mvp-asset"]["forbidden_options"] == [
+                        "--batch-size",
+                        "--final",
+                        "--object-path",
+                        "--object-type",
+                        "--metadata-scope",
+                    ]
             if command[0] == "mvp-existing-asset":
                 assert payload["agent_result"]["next_action"].startswith(
                     "execute next_command"

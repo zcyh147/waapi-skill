@@ -356,6 +356,96 @@ def _save_state(value: Mapping[str, Any]) -> None:
 
 
 def _context_payload(spec: FamilySpec, handles: Mapping[str, str]) -> dict[str, Any]:
+    asset_schema = {
+        "required": ["--parent", "--name", "--kind", "--media", "--language"],
+        "field_contracts": {
+            "--parent": {
+                "value_type": "bound_object_handle",
+                "source": "parent_handle_or_returned_structure_handle",
+            },
+            "--name": {
+                "value_type": "business_object_name",
+                "rule": "copy_requested_wwise_object_name_not_media_key",
+            },
+            "--kind": {
+                "value_type": "closed_enum",
+                "allowed_values": ["sound-sfx"],
+                "rule": "never_substitute_a_wwise_wire_or_display_type",
+            },
+            "--media": {
+                "value_type": "closed_enum",
+                "allowed_values": list(spec.media_keys),
+                "rule": "copy_source_media_key_not_object_name",
+            },
+            "--language": {
+                "value_type": "closed_enum",
+                "allowed_values": ["SFX"],
+            },
+            "--loop": {
+                "value_type": "closed_enum",
+                "allowed_values": ["infinite"],
+            },
+        },
+        "optional_when_requested": [
+            "--volume-db",
+            "--loop",
+            "--output-bus",
+            "--switch-value",
+            "--field-handle with --field-number",
+            "--reference-field-handle with --reference-target-handle",
+        ],
+        "forbidden_options": [
+            "--batch-size",
+            "--final",
+            "--object-path",
+            "--object-type",
+            "--metadata-scope",
+        ],
+    }
+    command_schemas = {
+        "weather": {
+            "mvp-structure": {
+                "required": ["--parent", "--name", "--kind"],
+                "field_contracts": {
+                    "--parent": {
+                        "value_type": "bound_object_handle",
+                        "source": "parent_handle",
+                    },
+                    "--name": {
+                        "value_type": "business_object_name",
+                        "rule": "copy_requested_wwise_object_name",
+                    },
+                    "--kind": {
+                        "value_type": "closed_enum",
+                        "allowed_values": ["actor-mixer"],
+                    },
+                },
+            },
+            "mvp-asset": asset_schema,
+        },
+        "rifle": {
+            "mvp-existing-asset": {
+                "required": ["--target", "--media", "--language"],
+                "field_contracts": {
+                    "--target": {
+                        "value_type": "bound_object_handle",
+                        "source": "target_handle",
+                    },
+                    "--media": {
+                        "value_type": "closed_enum",
+                        "allowed_values": list(spec.media_keys),
+                    },
+                    "--language": {
+                        "value_type": "closed_enum",
+                        "allowed_values": ["SFX"],
+                    },
+                },
+                "explicit_replacement": "append --replace only when requested",
+            },
+        },
+        "footsteps": {"mvp-asset": asset_schema},
+        "weapons": {"mvp-asset": asset_schema},
+    }[spec.family]
     result: dict[str, Any] = {
         "contract": "waapi-skill.audio-import-mvp-context/v1",
         "family": spec.family,
@@ -366,26 +456,7 @@ def _context_payload(spec: FamilySpec, handles: Mapping[str, str]) -> dict[str, 
             handles["root"] if spec.family == "weather" else handles["parent"]
         ),
         "output_bus_handle": handles["output_bus"],
-        "command_schemas": {
-            "mvp-structure": {
-                "required": ["--parent", "--name", "--kind"],
-            },
-            "mvp-asset": {
-                "required": ["--parent", "--name", "--kind", "--media", "--language"],
-                "optional_when_requested": [
-                    "--volume-db",
-                    "--loop",
-                    "--output-bus",
-                    "--switch-value",
-                    "--field-handle with --field-number",
-                    "--reference-field-handle with --reference-target-handle",
-                ],
-            },
-            "mvp-existing-asset": {
-                "required": ["--target", "--media", "--language"],
-                "explicit_replacement": "append --replace only when requested",
-            },
-        },
+        "command_schemas": command_schemas,
         "compiler_owns": [
             "wwise_path",
             "wire_type",
