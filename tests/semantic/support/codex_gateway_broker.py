@@ -9198,6 +9198,96 @@ class CodexGatewayBroker:
         )
         return candidate, semantic_hash, execution_arguments
 
+    def _normalize_business_declaration_fact_order(
+        self,
+        step: ExpectedGatewayStep,
+        actual: Sequence[str],
+    ) -> tuple[str, ...]:
+        """Order declaration fields by identity without weakening their values."""
+
+        if step.subcommand not in {
+            "draft-declare-new",
+            "draft-declare-existing",
+            "draft-revise-declaration",
+        }:
+            return tuple(actual)
+        fixed_count = 5
+        if len(step.arguments) < fixed_count or len(actual) < fixed_count:
+            return tuple(actual)
+        option_arity = {
+            "--declaration-id": 1,
+            "--parent-handle": 1,
+            "--name": 1,
+            "--kind": 1,
+            "--object-handle": 1,
+            "--field": 2,
+            "--field-value": 2,
+            "--event-parent-handle": 1,
+            "--event-name": 1,
+            "--event-action": 1,
+        }
+
+        def parse(values: Sequence[Any]) -> list[tuple[Any, ...]] | None:
+            groups: list[tuple[Any, ...]] = []
+            cursor = fixed_count
+            while cursor < len(values):
+                option = values[cursor]
+                arity = option_arity.get(option) if isinstance(option, str) else None
+                if arity is None or cursor + arity >= len(values):
+                    return None
+                groups.append(tuple(values[cursor : cursor + arity + 1]))
+                cursor += arity + 1
+            return groups
+
+        def bound_text(value: Any) -> str | None:
+            if isinstance(value, str):
+                return value
+            if not isinstance(value, ResponseBinding):
+                return None
+            source = self._payloads_by_step.get(value.step)
+            if source is None:
+                return None
+            try:
+                result = _json_pointer(source, value.pointer)
+            except (GatewayInvocationError, KeyError, TypeError, ValueError):
+                return None
+            return str(result) if isinstance(result, (str, int, float, bool)) else None
+
+        def key(group: tuple[Any, ...], *, expected: bool) -> tuple[str, ...] | None:
+            option = group[0]
+            if not isinstance(option, str):
+                return None
+            if option == "--field":
+                name = group[1]
+                return (option, name) if isinstance(name, str) else None
+            if option == "--field-value":
+                handle = bound_text(group[1]) if expected else group[1]
+                return (option, handle) if isinstance(handle, str) else None
+            return (option,)
+
+        expected_groups = parse(step.arguments)
+        actual_groups = parse(tuple(actual))
+        if expected_groups is None or actual_groups is None:
+            return tuple(actual)
+        expected_keys = [key(group, expected=True) for group in expected_groups]
+        actual_keys = [key(group, expected=False) for group in actual_groups]
+        if (
+            any(item is None for item in (*expected_keys, *actual_keys))
+            or len(set(expected_keys)) != len(expected_keys)
+            or len(set(actual_keys)) != len(actual_keys)
+            or set(expected_keys) != set(actual_keys)
+        ):
+            return tuple(actual)
+        actual_by_key = dict(zip(actual_keys, actual_groups, strict=True))
+        return (
+            *tuple(actual[:fixed_count]),
+            *(
+                token
+                for expected_key in expected_keys
+                for token in actual_by_key[expected_key]
+            ),
+        )
+
     def _validate_step(
         self,
         step: ExpectedGatewayStep,
@@ -9390,6 +9480,10 @@ class CodexGatewayBroker:
                 ),
             )
         validation_arguments = _normalize_commutative_wait_topic_facts(
+            step,
+            validation_arguments,
+        )
+        validation_arguments = self._normalize_business_declaration_fact_order(
             step,
             validation_arguments,
         )

@@ -12,6 +12,7 @@ import subprocess
 import threading
 import time
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Mapping
 
 import pytest
@@ -3947,6 +3948,82 @@ def test_business_draft_setup_sequence_matches_any_exact_dependency_ready_order(
     assert not gateway_step_sequence_matches(
         expected,
         (*actual[:5], "tx01.bind-object.001", *actual[6:]),
+    )
+
+
+def test_business_declaration_field_order_is_semantic_but_duplicates_stay_invalid() -> None:
+    fixed = (
+        "draft-id",
+        "--task-authority",
+        "authority",
+        "--expected-revision",
+        "5",
+        "--declaration-id",
+        "rain",
+        "--parent-handle",
+        "parent",
+        "--name",
+        "Rain",
+        "--kind",
+        "sound-sfx",
+    )
+    step = ExpectedGatewayStep(
+        name="tx01.declare.001",
+        subcommand="draft-declare-new",
+        arguments=(
+            *fixed,
+            "--field",
+            "media_file",
+            "/tmp/rain.wav",
+            "--field",
+            "volume_db",
+            "-4",
+            "--field",
+            "loop",
+            "infinite",
+            "--field-value",
+            "field-a",
+            "0.75",
+            "--field-value",
+            "field-b",
+            "target-handle",
+        ),
+    )
+    reordered = (
+        *fixed,
+        "--field",
+        "loop",
+        "infinite",
+        "--field-value",
+        "field-b",
+        "target-handle",
+        "--field",
+        "media_file",
+        "/tmp/rain.wav",
+        "--field-value",
+        "field-a",
+        "0.75",
+        "--field",
+        "volume_db",
+        "-4",
+    )
+    broker = SimpleNamespace(_payloads_by_step={})
+
+    normalized = CodexGatewayBroker._normalize_business_declaration_fact_order(
+        broker,
+        step,
+        reordered,
+    )
+
+    assert normalized == step.arguments
+    duplicated = (*reordered, "--field", "volume_db", "-4")
+    assert (
+        CodexGatewayBroker._normalize_business_declaration_fact_order(
+            broker,
+            step,
+            duplicated,
+        )
+        == duplicated
     )
 
 
