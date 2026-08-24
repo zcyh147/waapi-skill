@@ -15,6 +15,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
+from tests.semantic.support.codex_gateway_contracts import (
+    TASK_LOCAL_RUNNER_POSIX,
+    TASK_LOCAL_RUNNER_WINDOWS,
+)
 from wwise_waapi.operation_import import build_audio_import_plan
 from wwise_waapi.operation_registry import (
     ReadCall,
@@ -841,10 +845,19 @@ def _finite_number(value: Any, *, field_name: str) -> float | None:
     return normalized
 
 
-def _mvp_preview_next_command() -> dict[str, Any]:
+def _mvp_preview_next_command(
+    *,
+    platform_name: str | None = None,
+) -> dict[str, Any]:
+    host_platform = platform_name or os.name
+    runner = (
+        TASK_LOCAL_RUNNER_WINDOWS
+        if host_platform == "nt"
+        else TASK_LOCAL_RUNNER_POSIX
+    )
     full_argv = (
         "python",
-        ".agents/skills/waapi-skill/scripts/run.py",
+        runner,
         "gateway.py",
         "mvp-preview",
     )
@@ -856,7 +869,7 @@ def _mvp_preview_next_command() -> dict[str, Any]:
         "copy_exactly": True,
         "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
     }
-    if os.name == "nt":
+    if host_platform == "nt":
         payload["shell_family"] = WINDOWS_POWERSHELL_ENCODED_FAMILY
         payload["shell_command"] = encode_windows_powershell_argv(full_argv)
         payload["model_shell_family"] = WINDOWS_MODEL_COMMAND_FAMILY

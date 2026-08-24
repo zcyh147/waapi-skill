@@ -11,6 +11,10 @@ import pytest
 from tests.semantic.support.codex_import_declaration_mvp import (
     ImportBusinessMvp,
     MvpRepairError,
+    _mvp_preview_next_command,
+)
+from tests.semantic.support.codex_gateway_contracts import (
+    TASK_LOCAL_RUNNER_WINDOWS,
 )
 from tests.semantic.support.codex_import_mvp_profile import (
     MODEL,
@@ -37,6 +41,7 @@ from tests.semantic.support.codex_gateway_broker import (
     _normalize_commutative_option_pairs,
 )
 from wwise_waapi.transactions import TransactionStore
+from wwise_waapi.platform_commands import decode_windows_model_argv
 
 
 PARENT_ID = "{11111111-1111-1111-1111-111111111111}"
@@ -44,6 +49,16 @@ BUS_ID = "{22222222-2222-2222-2222-222222222222}"
 ROOT = Path(__file__).resolve().parents[2]
 MVP_PROFILE = ROOT / "tests/semantic/data/deep-interface-mvp/profile.json"
 SKILL_ROOT = ROOT / "skills/waapi-skill"
+
+
+def test_windows_mvp_continuation_uses_native_task_local_runner_spelling() -> None:
+    next_command = _mvp_preview_next_command(platform_name="nt")
+
+    assert next_command["full_argv"][1] == TASK_LOCAL_RUNNER_WINDOWS
+    assert next_command["copy_instruction"]["source_field"] == "model_command"
+    assert decode_windows_model_argv(next_command["model_command"]) == tuple(
+        next_command["full_argv"]
+    )
 
 
 class ScriptedReader:

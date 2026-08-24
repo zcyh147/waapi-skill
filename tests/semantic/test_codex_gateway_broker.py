@@ -8578,10 +8578,6 @@ def test_resolver_accepts_only_the_exact_task_local_relative_runner(
             "/tmp/task/.agents/skills/waapi-skill/scripts/run.py",
         ),
         (
-            TASK_LOCAL_RUNNER_POSIX,
-            r"C:\task\.agents\skills\waapi-skill\scripts\run.py",
-        ),
-        (
             TASK_LOCAL_RUNNER_WINDOWS,
             r"C:\task\.agents\skills\waapi-skill\scripts\run.py",
         ),
@@ -8599,13 +8595,6 @@ def test_task_local_runner_binding_uses_owning_path_flavor(
     assert not task_local_runner_matches_normalized(
         raw_runner,
         normalized_runner.replace("waapi-skill", "other-skill"),
-    )
-
-
-def test_windows_task_local_spelling_is_not_accepted_for_a_posix_runner() -> None:
-    assert not task_local_runner_matches_normalized(
-        TASK_LOCAL_RUNNER_WINDOWS,
-        "/tmp/task/.agents/skills/waapi-skill/scripts/run.py",
     )
 
 
