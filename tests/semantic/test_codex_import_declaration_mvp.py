@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shlex
 from pathlib import Path
 from collections import deque
@@ -872,8 +873,19 @@ def test_mvp_agent_contract_uses_standard_skill_bootstrap_and_semantic_preview_g
         skill_install=skill_install,
     )
 
-    assert "cat '.agents/skills/waapi-skill/SKILL.md'" in instructions
-    assert "python .agents/skills/waapi-skill/scripts/run.py gateway.py" in instructions
+    if os.name == "nt":
+        assert (
+            "Get-Content -Raw -Encoding UTF8 "
+            "'.agents\\skills\\waapi-skill\\SKILL.md'"
+        ) in instructions
+        assert (
+            "python .agents\\skills\\waapi-skill\\scripts\\run.py gateway.py"
+        ) in instructions
+    else:
+        assert "cat '.agents/skills/waapi-skill/SKILL.md'" in instructions
+        assert (
+            "python .agents/skills/waapi-skill/scripts/run.py gateway.py"
+        ) in instructions
 
     class Record:
         step_name = "step-05-mvp-preview"
