@@ -772,8 +772,8 @@ def test_rifle_business_protocol_preserves_every_exact_import_row(
     for declaration, row in zip(declarations, rows, strict=True):
         assert "media_file" in declaration.arguments
         assert row["audio_file"] in declaration.arguments
-        assert "language" in declaration.arguments
-        assert row["import_language"] in declaration.arguments
+        assert "language" not in declaration.arguments
+        assert row["import_language"] == "SFX"
     assert "volume_db" in declarations[-1].arguments
     assert "output_bus" in declarations[-1].arguments
     preview = next(

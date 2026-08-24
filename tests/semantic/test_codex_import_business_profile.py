@@ -111,6 +111,14 @@ def test_implicit_create_uses_the_planned_parent_instead_of_live_binding_it() ->
         step for step in steps if step.subcommand == "draft-business-configure"
     )
     assert configure.arguments[-2:] == ("--mode", "create")
+    sound_declarations = [
+        step
+        for step in steps
+        if step.subcommand == "draft-declare-new"
+        and "sound-sfx" in step.arguments
+    ]
+    assert sound_declarations
+    assert all("language" not in step.arguments for step in sound_declarations)
 
 
 def test_profile_filters_preserve_independent_unit_identity() -> None:

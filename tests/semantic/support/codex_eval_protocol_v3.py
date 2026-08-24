@@ -746,6 +746,12 @@ def build_audio_import_composer_transaction_steps(
         )
         for native_name, business_name in direct_mapping:
             if native_name in fields:
+                if (
+                    native_name == "import_language"
+                    and kind == "sound-sfx"
+                    and str(fields[native_name]).casefold() == "sfx"
+                ):
+                    continue
                 business_fields.append((business_name, fields[native_name]))
 
         properties = fields.get("properties", [])

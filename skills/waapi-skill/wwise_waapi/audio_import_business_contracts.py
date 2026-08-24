@@ -72,6 +72,7 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
         "gateway_derivations": [
             "canonical_object_path",
             "native_object_type",
+            "sfx_import_language",
             "target_parent_handle",
             "dependency_order",
             "batch_layout",
@@ -107,6 +108,9 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
                 "copy_one_bound_object_handle_never_a_path_or_name"
             ),
             "switch_value_rule": "copy_the_user_requested_switch_value_name",
+            "language_rule": (
+                "derive_SFX_from_sound-sfx_else_copy_exact_project_language"
+            ),
         },
         "declaration_discipline": {
             "task_local_id": "bounded_unique_not_business_data",

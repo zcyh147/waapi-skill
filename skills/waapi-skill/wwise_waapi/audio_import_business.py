@@ -300,6 +300,7 @@ def _compile_declaration(
         )
     target = declaration.target
     dependencies: tuple[str, ...] = ()
+    semantic_kind_name: str | None = None
     if isinstance(target, NewDescendantTarget):
         parent = _resolve_identity(
             session,
@@ -313,6 +314,7 @@ def _compile_declaration(
             target.kind,
             version=session.context.wwise_version,
         )
+        semantic_kind_name = kind.name
         object_path = f"{parent.path}\\<{kind.path_segment_type}>{target.name}"
         object_type = kind.native_object_type
         object_name = target.name
@@ -349,6 +351,7 @@ def _compile_declaration(
                     action="use a language that matches the exact bound Sound kind",
                 )
             kind_name = live_kind or declared_kind
+            semantic_kind_name = kind_name
             if kind_name is None:
                 object_type = existing.object_type
                 metadata_type = "Sound"
@@ -416,6 +419,8 @@ def _compile_declaration(
     has_media = media_file is not None or inline_wav is not None
     language = fields.get("language")
     if has_media:
+        if language is None and semantic_kind_name == "sound-sfx":
+            language = "SFX"
         if not isinstance(language, str) or not language.strip():
             raise _repair(
                 session,

@@ -174,6 +174,73 @@ def test_request_materialization_has_no_continuation_and_allows_sealed_file_clea
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_sound_sfx_kind_derives_the_only_valid_import_language(
+    version: str,
+    tmp_path: Path,
+) -> None:
+    media = tmp_path / "rain.wav"
+    media.write_bytes(b"RIFF-test")
+    session, parent, _bus = _session(version)
+    session = session.with_new_declaration(
+        declaration_id="rain-bed",
+        target=NewDescendantTarget(parent, "Rain_Bed", "sound-sfx"),
+        fields={"media_file": str(media)},
+    )
+
+    request = materialize_audio_import_business_request(session)
+
+    assert request["arguments"]["imports"][0]["import_language"] == "SFX"
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_sound_voice_still_requires_an_exact_project_language(
+    version: str,
+    tmp_path: Path,
+) -> None:
+    media = tmp_path / "line.wav"
+    media.write_bytes(b"RIFF-test")
+    session, parent, _bus = _session(version)
+    session = session.with_new_declaration(
+        declaration_id="line",
+        target=NewDescendantTarget(parent, "Line", "sound-voice"),
+        fields={"media_file": str(media)},
+    )
+
+    with pytest.raises(BusinessDeclarationError) as missing:
+        materialize_audio_import_business_request(session)
+
+    assert missing.value.repair["error_code"] == "REQUIRED_FIELD_MISSING"
+    assert missing.value.repair["field"] == "language"
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_exact_existing_sfx_kind_also_derives_sfx_for_reimport(
+    version: str,
+    tmp_path: Path,
+) -> None:
+    media = tmp_path / "rifle.wav"
+    media.write_bytes(b"RIFF-test")
+    session, parent, _bus = _session(version)
+    existing = session.handles.bind_object(
+        object_id=SOUND_ID,
+        name="Rifle",
+        object_type="Sound",
+        path=session.handles.resolve_object(parent).path + r"\Rifle",
+        semantic_kind="sound-sfx",
+    )
+    session = session.with_existing_declaration(
+        declaration_id="rifle",
+        target=ExistingObjectTarget(existing.handle),
+        fields={"media_file": str(media)},
+    )
+
+    request = materialize_audio_import_business_request(session)
+
+    assert request["arguments"]["import_operation"] == "useExisting"
+    assert request["arguments"]["imports"][0]["import_language"] == "SFX"
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
 def test_structure_inline_existing_and_explicit_replace_modes(
     version: str,
     tmp_path: Path,
