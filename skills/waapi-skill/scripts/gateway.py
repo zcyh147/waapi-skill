@@ -10382,6 +10382,30 @@ def dispatch_business_object_binding(
             details={"required_fields": ["id", "name", "type", "path"]},
             error_code="BUSINESS_OBJECT_BINDING_MISMATCH",
         )
+    semantic_kind: str | None = None
+    if str(row["type"]).casefold() == "sound":
+        subtype_raw = read_call(
+            OBJECT_GET_URI,
+            {"from": {"id": [str(row["id"])]}},
+            {"return": ["id", "@IsVoice"]},
+        )
+        subtype_rows = subtype_raw.get("return")
+        if (
+            not isinstance(subtype_rows, list)
+            or len(subtype_rows) != 1
+            or not isinstance(subtype_rows[0], Mapping)
+            or str(subtype_rows[0].get("id", "")).upper()
+            != str(row["id"]).upper()
+            or type(subtype_rows[0].get("@IsVoice")) is not bool
+        ):
+            raise GatewayResultShapeError(
+                "Live Sound binding requires one exact IsVoice readback.",
+                details={"required_fields": ["id", "@IsVoice"]},
+                error_code="BUSINESS_OBJECT_SUBTYPE_UNRESOLVED",
+            )
+        semantic_kind = (
+            "sound-voice" if subtype_rows[0]["@IsVoice"] else "sound-sfx"
+        )
     captured: list[Any] = []
 
     def bind(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
@@ -10391,6 +10415,7 @@ def dispatch_business_object_binding(
             name=str(row["name"]),
             object_type=str(row["type"]),
             path=str(row["path"]),
+            semantic_kind=semantic_kind,
         )
         captured.append(bound)
         return current.with_handle_registry(handles)
@@ -10423,6 +10448,7 @@ def dispatch_business_object_binding(
                 "handle": bound.handle,
                 "name": bound.name,
                 "type": bound.object_type,
+                "semantic_kind": bound.semantic_kind,
             },
         }
     )

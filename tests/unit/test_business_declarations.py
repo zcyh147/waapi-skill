@@ -177,6 +177,64 @@ def test_live_object_revalidation_requires_the_original_guid_quartet(
     assert stale.value.repair["rejected_handle"] == bound.handle
 
 
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+@pytest.mark.parametrize(
+    ("semantic_kind", "is_voice"),
+    (("sound-sfx", False), ("sound-voice", True)),
+)
+def test_live_sound_revalidation_seals_the_exact_is_voice_subtype(
+    version: str,
+    semantic_kind: str,
+    is_voice: bool,
+) -> None:
+    registry = BusinessHandleRegistry(
+        _context(wwise_version=version, wwise_build=f"{version}.fixture"),
+        token_bytes=lambda size: b"v" * size,
+    )
+    bound = registry.bind_object(
+        object_id=OBJECT_ID,
+        name="Line",
+        object_type="Sound",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\Line",
+        semantic_kind=semantic_kind,
+    )
+
+    def read(
+        _uri: str,
+        _args: dict[str, object],
+        options: dict[str, object],
+    ) -> dict[str, object]:
+        assert options["return"] == ["id", "name", "type", "path", "@IsVoice"]
+        return {
+            "return": [
+                {
+                    "id": OBJECT_ID,
+                    "name": "Line",
+                    "type": "Sound",
+                    "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Line",
+                    "@IsVoice": is_voice,
+                }
+            ]
+        }
+
+    assert revalidate_live_object(registry, bound, read_call=read) == bound
+
+    with pytest.raises(BusinessDeclarationError) as stale:
+        revalidate_live_object(
+            registry,
+            bound,
+            read_call=lambda uri, args, options: {
+                "return": [
+                    {
+                        **read(uri, args, options)["return"][0],
+                        "@IsVoice": not is_voice,
+                    }
+                ]
+            },
+        )
+    assert stale.value.repair["error_code"] == "OBJECT_HANDLE_STALE"
+
+
 @pytest.mark.parametrize(
     ("changed", "error_code"),
     (

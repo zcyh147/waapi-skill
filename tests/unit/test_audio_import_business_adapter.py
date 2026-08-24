@@ -102,6 +102,7 @@ def test_new_media_declaration_compiles_all_common_business_fields(
             "volume_db": -4.0,
             "loop": "infinite",
             "max_instances": 3,
+            "override_parent_instance_limit": True,
             "output_bus": bus,
             "switch_value": "Rain",
             "notes": "steady rain bed",
@@ -128,6 +129,7 @@ def test_new_media_declaration_compiles_all_common_business_fields(
         {"name": "Volume", "value": -4.0},
         {"name": "UseMaxSoundPerInstance", "value": True},
         {"name": "MaxSoundPerInstance", "value": 3},
+        {"name": "IgnoreParentMaxSoundInstance", "value": True},
     ]
     assert row["references"] == [
         {"name": "OutputBus", "target": {"kind": "id", "value": BUS_ID}}
@@ -237,6 +239,41 @@ def test_structure_inline_existing_and_explicit_replace_modes(
     assert replace_plan.request["arguments"]["imports"][0]["object_path"].endswith(
         r"\Rifle_Shot"
     )
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+@pytest.mark.parametrize(
+    ("semantic_kind", "expected_type"),
+    (("sound-sfx", "Sound SFX"), ("sound-voice", "Sound Voice")),
+)
+def test_structure_only_existing_sound_preserves_live_subtype_without_language(
+    version: str,
+    semantic_kind: str,
+    expected_type: str,
+) -> None:
+    session, _parent, _bus = _session(version)
+    existing = session.handles.bind_object(
+        object_id=SOUND_ID,
+        name="Existing_Line",
+        object_type="Sound",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\Existing_Line",
+        semantic_kind=semantic_kind,
+    )
+    session = session.with_existing_declaration(
+        declaration_id="existing-line",
+        target=ExistingObjectTarget(existing.handle),
+        fields={"notes": "preserve the exact live Sound kind"},
+    )
+
+    request = materialize_audio_import_business_request(session)
+
+    assert request["arguments"]["imports"] == [
+        {
+            "object_path": existing.path,
+            "object_type": expected_type,
+            "notes": "preserve the exact live Sound kind",
+        }
+    ]
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)

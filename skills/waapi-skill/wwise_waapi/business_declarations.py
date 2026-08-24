@@ -214,6 +214,7 @@ class BoundObjectHandle:
     name: str
     object_type: str
     path: str
+    semantic_kind: str | None
     binding_digest: str
 
 
@@ -436,6 +437,7 @@ class BusinessHandleRegistry:
         name: str,
         object_type: str,
         path: str,
+        semantic_kind: str | None = None,
     ) -> BoundObjectHandle:
         if not isinstance(object_id, str) or not _CANONICAL_GUID.fullmatch(object_id):
             raise ValueError("object_id must be a canonical Wwise GUID")
@@ -450,6 +452,11 @@ class BusinessHandleRegistry:
         ).rstrip("\\")
         if not normalized_path.startswith("\\"):
             raise ValueError("path must be an absolute Wwise path")
+        if semantic_kind is not None:
+            if semantic_kind not in {"sound-sfx", "sound-voice"}:
+                raise ValueError("semantic_kind must be a closed Sound kind")
+            if _type_token(normalized_type) != "sound":
+                raise ValueError("semantic_kind is valid only for live Sound objects")
         material = {
             "contract": BOUND_OBJECT_HANDLE_CONTRACT,
             "context": self.context.as_binding_dict(),
@@ -457,6 +464,7 @@ class BusinessHandleRegistry:
             "name": normalized_name,
             "object_type": normalized_type,
             "path": normalized_path,
+            "semantic_kind": semantic_kind,
         }
         digest = canonical_sha256(material)
         handle = self._new_handle("boh1", digest)
@@ -467,6 +475,7 @@ class BusinessHandleRegistry:
             name=normalized_name,
             object_type=normalized_type,
             path=normalized_path,
+            semantic_kind=semantic_kind,
             binding_digest=digest,
         )
         self._objects[handle] = bound
@@ -484,6 +493,7 @@ class BusinessHandleRegistry:
                     "name": row.name,
                     "object_type": row.object_type,
                     "path": row.path,
+                    "semantic_kind": row.semantic_kind,
                     "binding_digest": row.binding_digest,
                 }
                 for row in sorted(self._objects.values(), key=lambda item: item.handle)
@@ -1105,10 +1115,13 @@ def revalidate_live_object(
     if not isinstance(bound, BoundObjectHandle):
         raise TypeError("bound must be BoundObjectHandle")
     try:
+        return_fields = ["id", "name", "type", "path"]
+        if bound.semantic_kind is not None:
+            return_fields.append("@IsVoice")
         payload = read_call(
             "ak.wwise.core.object.get",
             {"from": {"id": [bound.object_id]}},
-            {"return": ["id", "name", "type", "path"]},
+            {"return": return_fields},
         )
         rows = payload.get("return")
         if (
@@ -1124,6 +1137,11 @@ def revalidate_live_object(
             "type": row.get("type"),
             "path": row.get("path"),
         }
+        if bound.semantic_kind is not None:
+            is_voice = row.get("@IsVoice")
+            if type(is_voice) is not bool:
+                raise ValueError("Sound subtype readback is not a boolean")
+            live["semantic_kind"] = "sound-voice" if is_voice else "sound-sfx"
     except BusinessDeclarationError:
         raise
     except (TypeError, ValueError) as exc:
@@ -1139,6 +1157,8 @@ def revalidate_live_object(
         "type": bound.object_type,
         "path": bound.path,
     }
+    if bound.semantic_kind is not None:
+        expected["semantic_kind"] = bound.semantic_kind
     if live != expected:
         raise _error(
             "OBJECT_HANDLE_STALE",
@@ -1354,6 +1374,7 @@ def _bound_object_from_dict(
         "name",
         "object_type",
         "path",
+        "semantic_kind",
         "binding_digest",
     }
     if not isinstance(payload, Mapping) or set(payload) != expected:
@@ -1375,6 +1396,12 @@ def _bound_object_from_dict(
         field="object_type",
         maximum_bytes=MAX_FIELD_TOKEN_BYTES,
     )
+    semantic_kind = payload.get("semantic_kind")
+    if semantic_kind is not None:
+        if semantic_kind not in {"sound-sfx", "sound-voice"}:
+            raise ValueError("bound object semantic kind is invalid")
+        if _type_token(object_type) != "sound":
+            raise ValueError("bound object semantic kind requires a Sound")
     path = _bounded_required_text(
         payload.get("path"), field="path", maximum_bytes=MAX_BUSINESS_PATH_BYTES
     )
@@ -1387,6 +1414,7 @@ def _bound_object_from_dict(
         "name": name,
         "object_type": object_type,
         "path": path,
+        "semantic_kind": semantic_kind,
     }
     expected_digest = canonical_sha256(material)
     if (
@@ -1402,6 +1430,7 @@ def _bound_object_from_dict(
         name=name,
         object_type=object_type,
         path=path,
+        semantic_kind=semantic_kind,
         binding_digest=digest,
     )
 

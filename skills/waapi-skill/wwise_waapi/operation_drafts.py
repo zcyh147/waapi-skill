@@ -2110,6 +2110,7 @@ def _validate_durable_composition(
     operation: str,
     version: str,
     allow_cleaned_file_evidence: bool = False,
+    allow_retired_audio_import_composition: bool = False,
 ) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise ValueError("draft composition fields are invalid")
@@ -2119,12 +2120,19 @@ def _validate_durable_composition(
         raise ValueError("draft composition is not strict JSON") from exc
     if not isinstance(normalized, Mapping):  # pragma: no cover - mapping invariant
         raise ValueError("draft composition is invalid")
-    composition_projection(
-        operation,
-        version,
-        normalized,
-        allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+    retired_audio_import = (
+        allow_retired_audio_import_composition
+        and operation == "audio.import"
+        and set(normalized) == {"contract", "request_options", "defaults", "imports"}
+        and normalized.get("contract") == "waapi-skill.operation-composition/v1"
     )
+    if not retired_audio_import:
+        composition_projection(
+            operation,
+            version,
+            normalized,
+            allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+        )
     return normalized
 
 
@@ -2403,12 +2411,14 @@ def _parse_canonical_record_bytes(
     *,
     expected_draft_id: str,
     allow_cleaned_file_evidence: bool = False,
+    allow_retired_audio_import_composition: bool = False,
 ) -> OperationDraftRecord:
     payload = json.loads(data.decode("utf-8"))
     record = _record_from_mapping(
         payload,
         expected_draft_id=expected_draft_id,
         allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+        allow_retired_audio_import_composition=allow_retired_audio_import_composition,
     )
     if not hmac.compare_digest(data, canonical_json_bytes(record.as_durable_dict())):
         raise ValueError("draft record bytes are not in canonical durable form")
@@ -2420,6 +2430,7 @@ def parse_operation_draft_archive_bytes(
     *,
     expected_draft_id: str,
     allow_cleaned_file_evidence: bool = False,
+    allow_retired_audio_import_composition: bool = False,
 ) -> OperationDraftRecord:
     """Strictly parse one bounded canonical record without opening a live Store."""
 
@@ -2436,6 +2447,7 @@ def parse_operation_draft_archive_bytes(
             data,
             expected_draft_id=expected_draft_id,
             allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+            allow_retired_audio_import_composition=allow_retired_audio_import_composition,
         )
     except (json.JSONDecodeError, RecursionError, UnicodeError) as exc:
         raise ValueError("Operation Draft archive record is invalid") from exc
@@ -2446,6 +2458,7 @@ def load_operation_draft_archive_record(
     draft_id: str,
     *,
     allow_cleaned_file_evidence: bool = False,
+    allow_retired_audio_import_composition: bool = False,
 ) -> OperationDraftRecord:
     """Read one frozen Draft record without creating, locking, or repairing state."""
 
@@ -2453,6 +2466,7 @@ def load_operation_draft_archive_record(
         state_dir,
         (draft_id,),
         allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+        allow_retired_audio_import_composition=allow_retired_audio_import_composition,
     )[draft_id]
 
 
@@ -2461,8 +2475,14 @@ def load_operation_draft_archive_records(
     draft_ids: Collection[str],
     *,
     allow_cleaned_file_evidence: bool = False,
+    allow_retired_audio_import_composition: bool = False,
 ) -> dict[str, OperationDraftRecord]:
-    """Read exactly the frozen Draft records bound by one semantic protocol."""
+    """Read exactly the frozen Draft records bound by one semantic protocol.
+
+    ``allow_retired_audio_import_composition`` is a read-only compatibility
+    aperture for the formal semantic archive verifier. It never changes the
+    current Store or Gateway grammar.
+    """
 
     if not isinstance(state_dir, Path) or not state_dir.is_absolute():
         raise ValueError("state_dir must be one absolute pathlib.Path")
@@ -2524,6 +2544,7 @@ def load_operation_draft_archive_records(
             snapshot.data,
             expected_draft_id=draft_id,
             allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+            allow_retired_audio_import_composition=allow_retired_audio_import_composition,
         )
     return records
 
@@ -2533,6 +2554,7 @@ def _record_from_mapping(
     *,
     expected_draft_id: str,
     allow_cleaned_file_evidence: bool = False,
+    allow_retired_audio_import_composition: bool = False,
 ) -> OperationDraftRecord:
     if not isinstance(payload, Mapping):
         raise TypeError("draft record must be an object")
@@ -2651,6 +2673,7 @@ def _record_from_mapping(
             operation=payload["operation"],
             version=payload["version"],
             allow_cleaned_file_evidence=cleaned_file_replay,
+            allow_retired_audio_import_composition=allow_retired_audio_import_composition,
         )
         check = _validate_durable_check(
             payload["check"],
@@ -2671,7 +2694,12 @@ def _record_from_mapping(
             check=check,
             updated_at=payload["updated_at"],
         )
-        if seal is not None:
+        retired_audio_import = (
+            allow_retired_audio_import_composition
+            and payload["operation"] == "audio.import"
+            and set(composition) == {"contract", "request_options", "defaults", "imports"}
+        )
+        if seal is not None and not retired_audio_import:
             try:
                 composed_request = _materialize_draft_composition(
                     payload["operation"],

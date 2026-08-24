@@ -450,40 +450,29 @@ def test_weather_protocol_and_business_plan_cover_all_three_transactions(
     )
     assert import_preview.subcommand == "preview-from-draft"
     assert "--request-json" not in import_preview.arguments
-    import_action_containers = [
-        step.arguments[-1]
+    import_declarations = [
+        step
         for step in protocol.steps
-        if step.name.startswith("tx01.action.")
+        if step.name.startswith("tx01.declare.")
     ]
-    assert [
-        len(container.actions)
-        if isinstance(container, DraftTypedActionBatchArgument)
-        else 1
-        for container in import_action_containers
-    ] == [6, 3]
-    import_actions = [
-        action
-        for container in import_action_containers
-        for action in (
-            container.actions
-            if isinstance(container, DraftTypedActionBatchArgument)
-            else (container,)
-        )
-    ]
-    assert import_actions
+    assert len(import_declarations) == 9
     assert all(
-        isinstance(argument, DraftTypedActionArgument)
-        and argument.operation == "audio.import"
-        for argument in import_actions
+        step.subcommand == "draft-declare-new" for step in import_declarations
     )
-    bound_import_actions = [
-        argument for argument in import_actions if argument.metadata_binding is not None
-    ]
-    assert bound_import_actions
-    assert all(
-        argument.metadata_binding.step == "tx01.metadata"
-        for argument in bound_import_actions
+    assert not any(
+        step.name.startswith("tx01.") and step.subcommand == "draft-bind-field"
+        for step in protocol.steps
     )
+    media_declarations = import_declarations[4:]
+    assert len(media_declarations) == 5
+    for declaration in media_declarations:
+        fields = {
+            declaration.arguments[index + 1]: declaration.arguments[index + 2]
+            for index, token in enumerate(declaration.arguments)
+            if token == "--field"
+        }
+        assert fields["override_parent_instance_limit"] == "true"
+        assert "IgnoreParentMaxSoundInstance" not in declaration.arguments
     action_preview = next(
         step for step in protocol.steps if step.name == "tx02.preview"
     )

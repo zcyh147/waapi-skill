@@ -50,34 +50,142 @@ def parse_typed_action(arguments: Sequence[str]) -> dict[str, Any]:
     index = 2
     properties: dict[str, list[dict[str, Any]]] = {}
     references: dict[str, list[dict[str, Any]]] = {}
+    action_name = tokens[1]
     while index < len(tokens):
         flag = tokens[index]
-        if flag == "--value" and index + 3 < len(tokens):
+        if flag == "--mode" and action_name == "set_import_operation" and index + 1 < len(tokens):
+            action["mode"] = tokens[index + 1]
+            index += 2
+        elif flag in {"--option", "--default"}:
+            expected_actions = (
+                {"set_import_option", "clear_import_option"}
+                if flag == "--option"
+                else {"set_import_default", "clear_import_default"}
+            )
+            if action_name not in expected_actions or index + 1 >= len(tokens):
+                raise OperationComposerError("retired named option is invalid")
+            action["name"] = tokens[index + 1]
+            if action_name.startswith("set_"):
+                if index + 3 >= len(tokens):
+                    raise OperationComposerError("retired named option is incomplete")
+                action["value"] = _scalar(tokens[index + 2], tokens[index + 3])
+                index += 4
+            else:
+                index += 2
+        elif flag in {
+            "--object-path",
+            "--audio-file",
+            "--audio-file-base64",
+            "--audio-source-notes",
+            "--dialogue-event",
+            "--import-language",
+            "--notes",
+            "--object-type",
+            "--originals-subfolder",
+        } and action_name == "add_import_row" and index + 1 < len(tokens):
+            field = {
+                "--object-path": "object_path",
+                "--audio-file": "audio_file",
+                "--audio-file-base64": "audio_file_base64",
+                "--audio-source-notes": "audio_source_notes",
+                "--dialogue-event": "dialogue_event",
+                "--import-language": "import_language",
+                "--notes": "notes",
+                "--object-type": "object_type",
+                "--originals-subfolder": "originals_subfolder",
+            }[flag]
+            action[field] = tokens[index + 1]
+            index += 2
+        elif flag == "--import-location" and index + 2 < len(tokens):
+            selector, consumed = _selector(tokens[index + 1 :])
+            if action_name == "add_import_row":
+                action["import_location"] = selector
+            elif action_name in {"set_import_default", "set_import_row_field"}:
+                action.update({"name": "import_location", "value": selector})
+            else:
+                raise OperationComposerError("retired import location is invalid")
+            index += 1 + consumed
+        elif flag == "--import-handle" and action_name in {
+            "set_import_row_field",
+            "clear_import_row_field",
+            "remove_import_row",
+        } and index + 1 < len(tokens):
+            action["import_handle"] = tokens[index + 1]
+            index += 2
+        elif flag == "--field" and action_name in {
+            "set_import_row_field",
+            "clear_import_row_field",
+        } and index + 1 < len(tokens):
+            action["name"] = tokens[index + 1]
+            if action_name == "set_import_row_field":
+                if index + 3 >= len(tokens):
+                    raise OperationComposerError("retired row field is incomplete")
+                action["value"] = _scalar(tokens[index + 2], tokens[index + 3])
+                index += 4
+            else:
+                index += 2
+        elif flag == "--value" and index + 3 < len(tokens):
             field, value_type, raw = tokens[index + 1 : index + 4]
             action[field] = _scalar(value_type, raw)
             index += 4
+        elif flag == "--null" and index + 1 < len(tokens):
+            action[tokens[index + 1]] = None
+            index += 2
         elif flag == "--selector" and index + 3 < len(tokens):
             field = tokens[index + 1]
             action[field], consumed = _selector(tokens[index + 2 :])
             index += 2 + consumed
-        elif flag == "--property" and index + 4 < len(tokens):
-            field, name, value_type, raw = tokens[index + 1 : index + 5]
+        elif flag == "--property" and index + 3 < len(tokens):
+            has_legacy_field = tokens[index + 1] in {"properties", "value"}
+            field = tokens[index + 1] if has_legacy_field else (
+                "properties" if action_name == "add_import_row" else "value"
+            )
+            offset = 2 if has_legacy_field else 1
+            name, value_type, raw = tokens[index + offset : index + offset + 3]
             properties.setdefault(field, []).append(
                 {"name": name, "value": _scalar(value_type, raw)}
             )
-            index += 5
-        elif flag == "--reference" and index + 4 < len(tokens):
-            field, name = tokens[index + 1 : index + 3]
-            target, consumed = _selector(tokens[index + 3 :])
+            if action_name in {"set_import_default", "set_import_row_field"}:
+                action.setdefault("name", "properties")
+            index += offset + 3
+        elif flag == "--reference" and index + 3 < len(tokens):
+            has_legacy_field = tokens[index + 1] in {"references", "value"}
+            field = tokens[index + 1] if has_legacy_field else (
+                "references" if action_name == "add_import_row" else "value"
+            )
+            offset = 2 if has_legacy_field else 1
+            name = tokens[index + offset]
+            target, consumed = _selector(tokens[index + offset + 1 :])
             references.setdefault(field, []).append({"name": name, "target": target})
-            index += 3 + consumed
-        elif flag == "--event" and index + 3 < len(tokens):
-            field, event_action, path = tokens[index + 1 : index + 4]
+            if action_name in {"set_import_default", "set_import_row_field"}:
+                action.setdefault("name", "references")
+            index += offset + 1 + consumed
+        elif flag == "--event" and index + 2 < len(tokens):
+            has_legacy_field = tokens[index + 1] in {"event", "value"}
+            field = tokens[index + 1] if has_legacy_field else (
+                "event" if action_name == "add_import_row" else "value"
+            )
+            offset = 2 if has_legacy_field else 1
+            event_action, path = tokens[index + offset : index + offset + 2]
             action[field] = {"action": event_action, "path": path}
-            index += 4
+            if action_name in {"set_import_default", "set_import_row_field"}:
+                action.setdefault("name", "event")
+            index += offset + 2
         elif flag == "--event-path" and index + 1 < len(tokens):
-            action["event"] = {"path": tokens[index + 1]}
+            field = "event" if action_name == "add_import_row" else "value"
+            action[field] = {"path": tokens[index + 1]}
+            if action_name in {"set_import_default", "set_import_row_field"}:
+                action.setdefault("name", "event")
             index += 2
+        elif flag in {"--empty-properties", "--empty-references"}:
+            field = flag.removeprefix("--empty-")
+            if action_name == "add_import_row":
+                action[field] = []
+            elif action_name in {"set_import_default", "set_import_row_field"}:
+                action.update({"name": field, "value": []})
+            else:
+                raise OperationComposerError("retired empty descriptor is invalid")
+            index += 1
         elif flag == "--assignment" and index + 1 < len(tokens):
             mode = tokens[index + 1]
             if mode == "none":

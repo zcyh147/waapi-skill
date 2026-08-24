@@ -627,7 +627,11 @@ def validate_operation_draft_archive(
                 _fail("draft-start evidence is missing its issued Draft id")
             draft_ids.append(draft_id)
         durable_records = (
-            load_operation_draft_archive_records(state_directory, draft_ids)
+            load_operation_draft_archive_records(
+                state_directory,
+                draft_ids,
+                allow_retired_audio_import_composition=True,
+            )
             if draft_ids
             else {}
         )

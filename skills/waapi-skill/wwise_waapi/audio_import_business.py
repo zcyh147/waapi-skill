@@ -329,18 +329,38 @@ def _compile_declaration(
         object_path = existing.path
         object_name = existing.name
         if _type_token(existing.object_type) in {"sound", "soundsfx", "soundvoice"}:
-            kind_name = (
-                "sound-voice"
-                if isinstance(language, str) and language.casefold() != "sfx"
-                else "sound-sfx"
+            live_kind = existing.semantic_kind
+            if live_kind is None:
+                live_kind = {
+                    "soundsfx": "sound-sfx",
+                    "soundvoice": "sound-voice",
+                }.get(_type_token(existing.object_type))
+            declared_kind = (
+                None
+                if not isinstance(language, str)
+                else ("sound-sfx" if language.casefold() == "sfx" else "sound-voice")
             )
-            kind = resolve_semantic_kind(
-                kind_name,
-                version=session.context.wwise_version,
-            )
-            object_type = kind.native_object_type
-            metadata_type = kind.metadata_object_type
-            readable_type = kind.path_segment_type
+            if live_kind is not None and declared_kind not in {None, live_kind}:
+                raise _repair(
+                    session,
+                    "EXISTING_SOUND_KIND_MISMATCH",
+                    field="language",
+                    choices=("SFX",) if live_kind == "sound-sfx" else ("project language",),
+                    action="use a language that matches the exact bound Sound kind",
+                )
+            kind_name = live_kind or declared_kind
+            if kind_name is None:
+                object_type = existing.object_type
+                metadata_type = "Sound"
+                readable_type = "Sound (exact existing kind unresolved)"
+            else:
+                kind = resolve_semantic_kind(
+                    kind_name,
+                    version=session.context.wwise_version,
+                )
+                object_type = kind.native_object_type
+                metadata_type = kind.metadata_object_type
+                readable_type = kind.path_segment_type
         else:
             object_type = existing.object_type
             metadata_type = existing.object_type
@@ -490,6 +510,17 @@ def _compile_declaration(
                 {"name": "MaxSoundPerInstance", "value": maximum},
             )
         )
+    if "override_parent_instance_limit" in fields:
+        override_parent = fields["override_parent_instance_limit"]
+        if type(override_parent) is not bool:
+            raise _field_type_repair(
+                session,
+                "override_parent_instance_limit",
+                "boolean",
+            )
+        properties.append(
+            {"name": "IgnoreParentMaxSoundInstance", "value": override_parent}
+        )
     if "output_bus" in fields:
         bus = _resolve_object(session, fields["output_bus"])
         if _type_token(bus.object_type) not in {"bus", "audiobus", "auxbus", "auxiliarybus"}:
@@ -537,6 +568,8 @@ def _compile_declaration(
         readable.append(f"音量：{float(fields['volume_db']):g} dB")
     if fields.get("loop") == "infinite":
         readable.append("循环方式：Infinite")
+    if fields.get("override_parent_instance_limit") is True:
+        readable.append("实例上限来源：此对象（忽略父级）")
     if "output_bus" in fields:
         readable.append(f"输出总线：{_resolve_object(session, fields['output_bus']).name}")
     if has_media:

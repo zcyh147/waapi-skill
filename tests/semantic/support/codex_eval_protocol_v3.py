@@ -768,6 +768,13 @@ def build_audio_import_composer_transaction_steps(
             property_by_name.pop("UseMaxSoundPerInstance")
             property_by_name.pop("MaxSoundPerInstance")
             business_fields.append(("max_instances", max_instances))
+        if "IgnoreParentMaxSoundInstance" in property_by_name:
+            business_fields.append(
+                (
+                    "override_parent_instance_limit",
+                    property_by_name.pop("IgnoreParentMaxSoundInstance"),
+                )
+            )
 
         references = fields.get("references", [])
         if not isinstance(references, list):
