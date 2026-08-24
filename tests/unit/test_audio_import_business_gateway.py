@@ -314,9 +314,10 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     assert start_next["object_binding"]["by_unique_name"][
         "fixed_argv_prefix"
     ][3] == "draft-bind-object"
-    assert "final_nonempty_segment" in (
-        start_next["object_binding"]["full_user_path_rule"]
-    )
+    assert start_next["object_binding"]["by_exact_user_path"][
+        "fixed_argv_prefix"
+    ][3] == "draft-bind-object"
+    assert "complete_user_supplied_path" in start_next["object_binding"]["path_rule"]
     assert "returned_name_type_path" in (
         start_next["object_binding"]["result_validation_rule"]
     )
@@ -325,7 +326,8 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     assert "declare_new" not in start_next
     assert "draft-apply" not in json.dumps(start_next)
     assert "wwise_path_discipline" not in start_next
-    assert "object_path" in start_next["forbidden_inputs"]
+    assert "object_path" not in start_next["forbidden_inputs"]
+    assert "model_invented_object_path" in start_next["forbidden_inputs"]
     assert "object_type" in start_next["forbidden_inputs"]
     draft_id = started["draft"]["draft_id"]
     authority = started["task_authority"]
@@ -610,6 +612,21 @@ def test_audio_import_business_start_discloses_only_copy_ready_object_binding(
         "fixed_argv_prefix_copy"
     )
     assert by_name["append"] == ["--object-name", "<exact-user-visible-name>"]
+    by_path = next_action["object_binding"]["by_exact_user_path"]
+    assert by_path["fixed_argv_prefix"][3] == "draft-bind-object"
+    assert by_path["fixed_argv_prefix_copy_instruction"]["source_field"] == (
+        "fixed_argv_prefix_copy"
+    )
+    assert by_path["append"] == [
+        "--object-path",
+        "<exact-complete-user-supplied-wwise-path>",
+    ]
+    assert (
+        next_action["object_binding"]["selection_rule"]
+        == "user_supplied_complete_path_requires_by_exact_user_path; "
+        "user_supplied_name_without_a_path_uses_by_unique_name; "
+        "user_selected_guid_uses_by_id"
+    )
 
 
 def test_structure_declaration_reaches_live_check_and_persists_readable_preview(

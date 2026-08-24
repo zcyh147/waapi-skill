@@ -1480,9 +1480,9 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "single existing=>--object GUID" in instructions
     assert "--object-type only new/imported/plural" in instructions
     assert "reread selected pre-schema" in instructions
-    assert "business_declaration=>by_unique_name LAST path segment" in instructions
-    assert "never ancestor" in instructions
-    assert "ambiguous=>by_id later" in instructions
+    assert "path=>by_exact_user_path whole" in instructions
+    assert "name=>by_unique_name" in instructions
+    assert "GUID=>by_id" in instructions
     assert "Else exact path=>path" in instructions
     assert "one query/hop; no merge" in instructions
     assert "enum/const exact" in instructions

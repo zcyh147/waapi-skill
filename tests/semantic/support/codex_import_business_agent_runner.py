@@ -200,7 +200,6 @@ def build_preview_only_business_steps(
         transaction_steps = build_audio_import_composer_transaction_steps(
             request,
             label=f"tx{index:02d}",
-            prefer_unique_name_bindings=True,
         )
         preview_index = next(
             position

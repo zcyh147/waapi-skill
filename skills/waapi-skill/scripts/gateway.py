@@ -14902,17 +14902,23 @@ def _audio_import_business_next_action_binding(
         "--object-name",
         "<exact-user-visible-name>",
     ]
+    by_exact_user_path = operation_draft_prefix_copy_binding(object_bind_prefix)
+    by_exact_user_path["append"] = [
+        "--object-path",
+        "<exact-complete-user-supplied-wwise-path>",
+    ]
     object_binding = {
         "by_id": by_id,
+        "by_exact_user_path": by_exact_user_path,
         "by_unique_name": by_unique_name,
         "selection_rule": (
-            "use_by_unique_name_for_a_named_existing_object; zero_or_multiple_"
-            "matches_fail_closed_with_bounded_candidates; use_by_id_after_"
-            "the_user_selects_one_candidate"
+            "user_supplied_complete_path_requires_by_exact_user_path; "
+            "user_supplied_name_without_a_path_uses_by_unique_name; "
+            "user_selected_guid_uses_by_id"
         ),
-        "full_user_path_rule": (
-            "copy_only_the_exact_final_nonempty_segment_after_the_last_"
-            "backslash_as_the_visible_name; never_copy_a_parent_or_ancestor"
+        "path_rule": "copy_the_complete_user_supplied_path_without_reconstruction",
+        "name_rule": (
+            "zero_or_multiple_name_matches_fail_closed_with_bounded_candidates"
         ),
         "result": "copy_the_returned_bound_object.handle",
         "result_validation_rule": (
@@ -14929,7 +14935,7 @@ def _audio_import_business_next_action_binding(
     }
     forbidden_inputs = [
         "native_request",
-        "object_path",
+        "model_invented_object_path",
         "object_type",
         "metadata_scope",
         "waapi_args",
