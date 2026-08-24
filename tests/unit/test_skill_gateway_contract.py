@@ -249,7 +249,7 @@ def test_existing_transaction_continuation_precedes_named_operation_schema() -> 
     )
 
 
-def test_metadata_gate_precedes_composer_draft_start() -> None:
+def test_metadata_order_follows_the_disclosed_input_mode() -> None:
     operate = (SKILL_ROOT / "references" / "waapi-operate.md").read_text(
         encoding="utf-8"
     )
@@ -257,9 +257,10 @@ def test_metadata_gate_precedes_composer_draft_start() -> None:
     assert "never exact live metadata evidence" in operate
     assert "`composer.start.preconditions` contains `metadata_gate`" in operate
     assert "covering every requested dynamic token before `draft-start`" in operate
-    assert "Starting a Draft first is invalid" in operate
-    assert "run `composer.start.gateway_argv` only when present" in operate
-    assert "`gateway_argv_after_preconditions`, it is locked" in operate
+    assert "For `business_declaration`, start the Draft first" in operate
+    assert "use its live binding command instead" in operate
+    assert "binds a custom token through the business Draft's live `draft-bind-field`" in operate
+    assert "common fields such as volume, infinite looping, output bus" in operate
     assert "reconcile the union against every requested property/reference" in operate
     assert "an assigned `Volume` and `OutputBus` each require a query" in operate
 
