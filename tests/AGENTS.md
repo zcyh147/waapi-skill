@@ -189,6 +189,15 @@ With PowerShell's ScheduledTasks cmdlets, pass `-LogonType Interactive` and
 in its exported XML and `Limited` in its Principal. Stop before launch if
 either attestation differs.
 
+Run the final scoped-process check from a separate SSH invocation after the
+Scheduled Task reports `Ready`. A cleanup script whose own path contains the
+campaign-root token also places that token in its parent `bash.exe` command
+line; filtering only the current PowerShell PID therefore creates a false
+residual-process match. Either exclude the complete checker ancestor chain or,
+preferably, finish the checker and use a fresh read-only SSH process query.
+Never kill a matching process until its exact PID, ancestry, and command line
+prove that it belongs to the completed campaign rather than to the check itself.
+
 ### macOS Fresh Agent launch ownership
 
 A formal macOS campaign may outlive the Codex app's unified command session.

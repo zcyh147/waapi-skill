@@ -891,7 +891,7 @@ def test_rifle_setup_accepts_only_dependency_valid_action_orders(
     assert not gateway_step_sequence_matches(
         canonical, canonical[:-1], groups, setup_groups
     )
-    assert not gateway_step_sequence_matches(
+    assert gateway_step_sequence_matches(
         canonical,
         (canonical[0], canonical[1], canonical[3], canonical[2]),
         groups,

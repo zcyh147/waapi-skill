@@ -2142,6 +2142,22 @@ _DRAFT_HANDLE_RE = re.compile(
     r"^(?:odh1|odn1|tdh1|trm1|trh1|trc1)-[0-9a-f]{24}$"
 )
 _NUMBERED_DRAFT_ACTION_STEP_RE = re.compile(r"^(?P<prefix>.+\.action\.)\d{3}$")
+_BUSINESS_DRAFT_SETUP_STEP_RE = re.compile(
+    r"^(?P<prefix>.+)\.(?:configure|bind-(?:object|field)\.\d{3})$"
+)
+_BUSINESS_DRAFT_REVISION_SUBCOMMANDS = frozenset(
+    {
+        "draft-bind-object",
+        "draft-bind-field",
+        "draft-business-configure",
+        "draft-declare-new",
+        "draft-declare-existing",
+        "draft-revise-declaration",
+        "draft-remove-declaration",
+        "draft-check",
+        "preview-from-draft",
+    }
+)
 _MAX_REQUIRED_FOLLOWUP_FACTS = 64
 _MAX_REQUIRED_FOLLOWUP_BYTES = 32 * 1024
 
@@ -3241,6 +3257,32 @@ def _gateway_step_prefix_matches_one_order(
 
     index = 0
     while index < len(actual_names):
+        business_setup = _BUSINESS_DRAFT_SETUP_STEP_RE.fullmatch(
+            expected_names[index]
+        )
+        if business_setup is not None:
+            prefix = business_setup.group("prefix")
+            end = index
+            while (
+                end < len(expected_names)
+                and (
+                    candidate := _BUSINESS_DRAFT_SETUP_STEP_RE.fullmatch(
+                        expected_names[end]
+                    )
+                )
+                is not None
+                and candidate.group("prefix") == prefix
+            ):
+                end += 1
+            expected_group = expected_names[index:end]
+            supplied_group = actual_names[index : min(end, len(actual_names))]
+            if (
+                len(set(supplied_group)) != len(supplied_group)
+                or not set(supplied_group) <= set(expected_group)
+            ):
+                return False
+            index += len(supplied_group)
+            continue
         numbered = _NUMBERED_DRAFT_ACTION_STEP_RE.fullmatch(
             expected_names[index]
         )
@@ -8626,6 +8668,8 @@ class CodexGatewayBroker:
                     authenticated=True,
                 )
             step = self._execution_steps[self._next_step]
+            step = self._rebase_business_draft_revision(step)
+            self._execution_steps[self._next_step] = step
             try:
                 semantic_hash, execution_arguments = self._validate_step(
                     step,
@@ -8646,6 +8690,16 @@ class CodexGatewayBroker:
                     )
                 if reordered is not None:
                     step, semantic_hash, execution_arguments = reordered
+                elif (
+                    business_setup_reordered := (
+                        self._match_dependency_ready_business_setup_step(
+                            resolved.gateway_arguments,
+                        )
+                    )
+                ) is not None:
+                    step, semantic_hash, execution_arguments = (
+                        business_setup_reordered
+                    )
                 elif (
                     read_only_reordered := self._match_commutative_read_only_step(
                         resolved.gateway_arguments,
@@ -8718,6 +8772,88 @@ class CodexGatewayBroker:
             execution_arguments=execution_arguments,
             submitted_draft_actions=submitted_draft_actions,
         )
+
+    def _rebase_business_draft_revision(
+        self,
+        step: ExpectedGatewayStep,
+    ) -> ExpectedGatewayStep:
+        """Bind one business command to the latest actual Draft receipt."""
+
+        if (
+            step.subcommand not in _BUSINESS_DRAFT_REVISION_SUBCOMMANDS
+            or self._next_step <= 0
+            or "." not in step.name
+        ):
+            return step
+        prefix = step.name.split(".", 1)[0]
+        business_start = next(
+            (
+                candidate
+                for candidate in self._execution_steps
+                if candidate.name == f"{prefix}.draft-start"
+                and candidate.subcommand == "draft-start"
+                and candidate.arguments == ("audio.import",)
+            ),
+            None,
+        )
+        if business_start is None:
+            return step
+        previous = self._execution_steps[self._next_step - 1]
+        if not previous.name.startswith(f"{prefix}."):
+            return step
+        arguments = list(step.arguments)
+        if (
+            len(arguments) < 5
+            or arguments[3] != "--expected-revision"
+            or not isinstance(arguments[4], ResponseBinding)
+            or previous.name not in self._payloads_by_step
+        ):
+            return step
+        arguments[4] = ResponseBinding(previous.name, "/draft/revision")
+        return replace(step, arguments=tuple(arguments))
+
+    def _match_dependency_ready_business_setup_step(
+        self,
+        actual: Sequence[str],
+    ) -> tuple[ExpectedGatewayStep, str, tuple[str, ...]] | None:
+        """Select one unique exact business binding/configuration in any safe order."""
+
+        current = self._execution_steps[self._next_step]
+        current_match = _BUSINESS_DRAFT_SETUP_STEP_RE.fullmatch(current.name)
+        if current_match is None:
+            return None
+        prefix = current_match.group("prefix")
+        matches: list[
+            tuple[int, ExpectedGatewayStep, str, tuple[str, ...]]
+        ] = []
+        for index in range(self._next_step, len(self._execution_steps)):
+            candidate = self._execution_steps[index]
+            candidate_match = _BUSINESS_DRAFT_SETUP_STEP_RE.fullmatch(
+                candidate.name
+            )
+            if candidate_match is None or candidate_match.group("prefix") != prefix:
+                break
+            candidate = self._rebase_business_draft_revision(candidate)
+            try:
+                semantic_hash, execution_arguments = self._validate_step(
+                    candidate,
+                    actual,
+                )
+            except GatewayInvocationError:
+                continue
+            matches.append(
+                (index, candidate, semantic_hash, execution_arguments)
+            )
+        if not matches:
+            return None
+        if len(matches) != 1:
+            raise GatewayInvocationError(
+                "business Draft setup matches multiple dependency-ready sealed steps"
+            )
+        index, candidate, semantic_hash, execution_arguments = matches[0]
+        self._execution_steps.pop(index)
+        self._execution_steps.insert(self._next_step, candidate)
+        return candidate, semantic_hash, execution_arguments
 
     def _match_dependency_ready_draft_batch(
         self,

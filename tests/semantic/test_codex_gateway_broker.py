@@ -3922,6 +3922,134 @@ def test_numbered_draft_action_sequence_matches_any_exact_permutation() -> None:
     )
 
 
+def test_business_draft_setup_sequence_matches_any_exact_dependency_ready_order() -> None:
+    expected = (
+        "tx01.operation-schema",
+        "tx01.draft-start",
+        "tx01.bind-object.001",
+        "tx01.bind-object.002",
+        "tx01.bind-field.001",
+        "tx01.configure",
+        "tx01.declare.001",
+    )
+    actual = (
+        "tx01.operation-schema",
+        "tx01.draft-start",
+        "tx01.bind-object.002",
+        "tx01.configure",
+        "tx01.bind-object.001",
+        "tx01.bind-field.001",
+        "tx01.declare.001",
+    )
+
+    assert gateway_step_sequence_matches(expected, actual)
+    assert gateway_step_prefix_matches(expected, actual[:4])
+    assert not gateway_step_sequence_matches(
+        expected,
+        (*actual[:5], "tx01.bind-object.001", *actual[6:]),
+    )
+
+
+def test_business_draft_setup_broker_selects_unique_binding_and_configuration(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "import_operation": "createNew",
+            "imports": [
+                {
+                    "audio_file": native_absolute_test_path("inputs", "rain.wav"),
+                    "object_path": r"\Actor-Mixer Hierarchy\Weather\Rain",
+                    "object_type": "Sound SFX",
+                    "import_language": "SFX",
+                    "event": {
+                        "path": r"\Events\Play_Rain",
+                        "action": "Play",
+                    },
+                    "references": [
+                        {
+                            "name": "OutputBus",
+                            "target": {
+                                "kind": "path",
+                                "value": r"\Master-Mixer Hierarchy\Weather",
+                            },
+                        }
+                    ],
+                }
+            ],
+        },
+    }
+    steps = build_audio_import_composer_transaction_steps(request, label="tx01")
+    broker = CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        expected_wwise_version="2022.1",
+    )
+    draft_id = "od1-" + "1" * 32
+    authority = "da1-" + "2" * 40
+    start = next(step for step in steps if step.name == "tx01.draft-start")
+    broker._payloads_by_step[start.name] = {  # noqa: SLF001
+        "task_authority": authority,
+        "draft": {"draft_id": draft_id, "revision": 1},
+    }
+    broker._next_step = 2  # noqa: SLF001
+
+    selected = broker._match_dependency_ready_business_setup_step(  # noqa: SLF001
+        (
+            "draft-bind-object",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "1",
+            "--object-path",
+            r"\Events",
+        )
+    )
+    assert selected is not None
+    assert selected[0].name == "tx01.bind-object.003"
+
+    first_binding = broker._execution_steps[2]  # noqa: SLF001
+    broker._payloads_by_step[first_binding.name] = {  # noqa: SLF001
+        "draft": {"draft_id": draft_id, "revision": 2},
+    }
+    broker._next_step = 3  # noqa: SLF001
+    configured = broker._match_dependency_ready_business_setup_step(  # noqa: SLF001
+        (
+            "draft-business-configure",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "2",
+            "--mode",
+            "create",
+        )
+    )
+    assert configured is not None
+    assert configured[0].name == "tx01.configure"
+
+    declaration_index = next(
+        index
+        for index, step in enumerate(broker._execution_steps)  # noqa: SLF001
+        if step.name == "tx01.declare.001"
+    )
+    previous = broker._execution_steps[declaration_index - 1]  # noqa: SLF001
+    broker._payloads_by_step[previous.name] = {  # noqa: SLF001
+        "draft": {"draft_id": draft_id, "revision": 5},
+    }
+    broker._next_step = declaration_index  # noqa: SLF001
+    declaration = broker._rebase_business_draft_revision(  # noqa: SLF001
+        broker._execution_steps[declaration_index]  # noqa: SLF001
+    )
+    assert isinstance(declaration.arguments[4], ResponseBinding)
+    assert declaration.arguments[4].step == previous.name
+
+
 def _read_only_draft_evidence_fixture(
     tmp_path: Path,
 ) -> tuple[
