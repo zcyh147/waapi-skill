@@ -652,7 +652,12 @@ def build_audio_import_composer_transaction_steps(
         typed_segment: str | None,
         language: Any,
     ) -> str:
-        token = str(typed_segment or object_type or "").casefold().replace(" ", "")
+        token = (
+            str(typed_segment or object_type or "")
+            .casefold()
+            .replace(" ", "")
+            .replace("-", "")
+        )
         if token in {"sound", "soundsfx"}:
             return "sound-sfx" if str(language).casefold() == "sfx" else "sound-voice"
         if token == "soundvoice":
@@ -857,7 +862,7 @@ def build_audio_import_composer_transaction_steps(
             )
         )
         latest_revision_step = declaration_name
-        if mode == "create":
+        if mode in {None, "create"}:
             planned_by_path[target_path] = ResponseBinding(
                 declaration_name,
                 f"/draft/declarations/{row_index}/result_handle",

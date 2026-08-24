@@ -4072,9 +4072,9 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
                 f"wait-topic --event-count must be between 1 and {MAX_WAIT_EVENT_COUNT}"
             )
     elif args.command == "draft-apply":
-        # The authorized Draft binding decides whether this is a legacy typed
-        # Composer edit or a retired audio.import shallow action.  Dispatch
-        # performs that state-bound decision before parsing action grammar.
+        # The authorized Draft binding decides the operation-local typed
+        # Composer grammar. Dispatch performs that state-bound decision before
+        # parsing any action facts.
         return
 
 

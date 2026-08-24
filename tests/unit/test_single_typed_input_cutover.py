@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from wwise_waapi import operation_registry
 from wwise_waapi.operation_composer import operation_composer_digest
 from wwise_waapi.operation_drafts import (
     OperationDraftRecreateRequired,
@@ -114,6 +115,33 @@ def test_packaged_guidance_contains_no_model_facing_raw_json_spelling() -> None:
         text = document.read_text(encoding="utf-8")
         for spelling in forbidden:
             assert spelling not in text, (document, spelling)
+
+
+def test_packaged_skill_contains_no_retired_audio_import_composer_surface() -> None:
+    skill_root = REPO_ROOT / "skills" / "waapi-skill"
+
+    assert not (
+        skill_root / "wwise_waapi" / "audio_import_business_migration.py"
+    ).exists()
+    assert not (
+        skill_root / "resources" / "business" / "audio-import-migration.json"
+    ).exists()
+    assert not hasattr(operation_registry, "audio_import_composer_fragment_contract")
+    assert not hasattr(operation_registry, "validate_audio_import_composer_fragment")
+
+    public_text = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in (
+            skill_root / "SKILL.md",
+            *(skill_root / "references").glob("waapi-*.md"),
+        )
+    )
+    for retired in (
+        "add_import_row",
+        "set_import_operation",
+        "audio-import-composer-fragments",
+    ):
+        assert retired not in public_text
 
 
 def test_internal_canonical_waapi_call_is_not_a_public_operation() -> None:

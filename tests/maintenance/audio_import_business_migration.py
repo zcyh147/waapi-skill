@@ -21,7 +21,7 @@ LEGACY_AUDIO_IMPORT_CONTRACT_RESOURCE = (
 )
 AUDIO_IMPORT_MIGRATION_RESOURCE = (
     REPO_ROOT
-    / "skills/waapi-skill/resources/business/audio-import-migration.json"
+    / "tests/fixtures/legacy/audio-import-business-migration.json"
 )
 AUDIO_IMPORT_MIGRATION_INVENTORY_CONTRACT = (
     "waapi-skill.audio-import-business-migration/v2"
