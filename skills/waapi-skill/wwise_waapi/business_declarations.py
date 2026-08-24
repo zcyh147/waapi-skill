@@ -658,6 +658,26 @@ class BusinessHandleRegistry:
             )
         return bound
 
+    def bound_field(self, handle: str) -> BoundFieldHandle:
+        """Return one current-task field binding without weakening live revalidation."""
+
+        if not isinstance(handle, str) or not _FIELD_HANDLE.fullmatch(handle):
+            raise _error(
+                "FIELD_HANDLE_NOT_AVAILABLE",
+                field="field_handle",
+                action="discover the field in this task and use its returned handle",
+            )
+        bound = self._fields.get(handle)
+        if bound is None:
+            raise _error(
+                "FIELD_HANDLE_NOT_AVAILABLE",
+                field="field_handle",
+                rejected_handle=handle,
+                action="discover the field in this task and use its returned handle",
+            )
+        self._require_context(bound.context, self.context, handle=handle)
+        return bound
+
     def new_descendant(
         self,
         *,

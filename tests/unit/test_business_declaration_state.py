@@ -170,6 +170,39 @@ def test_revision_invalidates_active_preview_and_preserves_audit(
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_batch_settings_and_declaration_removal_are_atomic_revisions(
+    version: str,
+) -> None:
+    session = _session(version=version)
+
+    configured = session.with_settings(
+        {
+            "mode": "create",
+            "add_to_source_control": True,
+            "defaults": {"volume_db": -4.0},
+        }
+    )
+    assert configured.revision == 2
+    assert configured.settings == {
+        "add_to_source_control": True,
+        "defaults": {"volume_db": -4.0},
+        "mode": "create",
+    }
+
+    removed = configured.remove_declaration("rain-bed")
+    assert removed.revision == 3
+    assert removed.declarations == ()
+    assert removed.settings == configured.settings
+
+    before = removed.as_dict()
+    with pytest.raises(BusinessDeclarationError) as missing:
+        removed.remove_declaration("rain-bed")
+    assert missing.value.repair["error_code"] == "DECLARATION_NOT_AVAILABLE"
+    assert missing.value.repair["draft_revision"] == removed.revision
+    assert removed.as_dict() == before
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
 def test_operation_draft_business_update_is_durable_atomic_and_cas_bound(
     tmp_path: Path,
     version: str,

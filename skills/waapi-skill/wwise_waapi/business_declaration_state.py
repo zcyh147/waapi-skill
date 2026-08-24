@@ -37,13 +37,16 @@ MAX_BUSINESS_PREVIEW_DETAIL_BYTES = 256 * 1024
 BUSINESS_SESSION_UPDATE_EVENTS = frozenset(
     {
         "declaration.added",
+        "declaration.removed",
         "declaration.revised",
         "preview.recorded",
+        "settings.revised",
     }
 )
 
 _DECLARATION_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$")
 _BUSINESS_FIELD = re.compile(r"^[a-z][a-z0-9_]{0,127}$")
+_PLANNED_OBJECT_HANDLE = re.compile(r"^bnh1-[0-9a-f]{32}$")
 _NATIVE_FIELDS = frozenset(
     {
         "object_path",
@@ -61,6 +64,7 @@ _NATIVE_FIELDS = frozenset(
 @dataclass(frozen=True, slots=True)
 class BusinessDeclaration:
     declaration_id: str
+    result_handle: str
     target: NewDescendantTarget | ExistingObjectTarget
     fields: Mapping[str, Any]
 
@@ -81,6 +85,7 @@ class BusinessDeclaration:
         return strict_json_copy({
             "contract": BUSINESS_DECLARATION_CONTRACT,
             "declaration_id": self.declaration_id,
+            "result_handle": self.result_handle,
             "target": target,
             "fields": dict(self.fields),
         })
@@ -161,6 +166,7 @@ class BusinessPreview:
 class BusinessDeclarationSession:
     context: BusinessContext
     handles: BusinessHandleRegistry
+    settings: Mapping[str, Any]
     revision: int
     declarations: tuple[BusinessDeclaration, ...]
     active_preview: BusinessPreview | None
@@ -171,6 +177,7 @@ class BusinessDeclarationSession:
         return cls(
             context=context,
             handles=BusinessHandleRegistry(context),
+            settings={},
             revision=0,
             declarations=(),
             active_preview=None,
@@ -228,6 +235,49 @@ class BusinessDeclarationSession:
             replace=True,
         )
 
+    def remove_declaration(
+        self,
+        declaration_id: str,
+    ) -> "BusinessDeclarationSession":
+        normalized_id = _declaration_id(
+            declaration_id,
+            draft_revision=self.revision,
+        )
+        rows = tuple(
+            row for row in self.declarations if row.declaration_id != normalized_id
+        )
+        if len(rows) == len(self.declarations):
+            raise business_repair(
+                "DECLARATION_NOT_AVAILABLE",
+                field="declaration_id",
+                draft_revision=self.revision,
+                action="use one declaration id from the current task",
+            )
+        return self._publish_fact_revision(
+            settings=self.settings,
+            declarations=rows,
+        )
+
+    def with_settings(
+        self,
+        settings: Mapping[str, Any],
+    ) -> "BusinessDeclarationSession":
+        normalized = _normalize_fields(
+            settings,
+            draft_revision=self.revision,
+        )
+        if normalized == self.settings:
+            raise business_repair(
+                "BUSINESS_SETTINGS_UNCHANGED",
+                field="settings",
+                draft_revision=self.revision,
+                action="provide one changed complete batch setting object",
+            )
+        return self._publish_fact_revision(
+            settings=normalized,
+            declarations=self.declarations,
+        )
+
     def with_preview(self, preview: BusinessPreview) -> "BusinessDeclarationSession":
         if not isinstance(preview, BusinessPreview):
             raise TypeError("preview must be BusinessPreview")
@@ -241,6 +291,7 @@ class BusinessDeclarationSession:
         candidate = BusinessDeclarationSession(
             context=self.context,
             handles=self.handles,
+            settings=self.settings,
             revision=self.revision,
             declarations=self.declarations,
             active_preview=preview,
@@ -262,6 +313,7 @@ class BusinessDeclarationSession:
             "contract": BUSINESS_DECLARATION_SESSION_CONTRACT,
             "context": self.context.as_binding_dict(),
             "handles": self.handles.as_dict(),
+            "settings": dict(self.settings),
             "revision": self.revision,
             "declarations": [row.as_dict() for row in self.declarations],
             "active_preview": (
@@ -281,6 +333,7 @@ class BusinessDeclarationSession:
             "contract",
             "context",
             "handles",
+            "settings",
             "revision",
             "declarations",
             "active_preview",
@@ -303,9 +356,19 @@ class BusinessDeclarationSession:
             or len(raw_declarations) > MAX_BUSINESS_DECLARATIONS
         ):
             raise ValueError("business declarations are invalid or exceed their limit")
-        declarations = tuple(
-            _declaration_from_dict(row, handles=handles) for row in raw_declarations
-        )
+        declarations_list: list[BusinessDeclaration] = []
+        planned_handles: set[str] = set()
+        for row in raw_declarations:
+            declaration = _declaration_from_dict(
+                row,
+                handles=handles,
+                planned_parent_handles=planned_handles,
+            )
+            declarations_list.append(declaration)
+            if isinstance(declaration.target, NewDescendantTarget):
+                planned_handles.add(declaration.result_handle)
+        declarations = tuple(declarations_list)
+        settings = _normalize_fields(payload.get("settings"))
         ids = tuple(row.declaration_id for row in declarations)
         if len(ids) != len(set(ids)) or revision < len(declarations):
             raise ValueError("business declaration ids or revision are invalid")
@@ -320,6 +383,7 @@ class BusinessDeclarationSession:
         session = cls(
             context=context,
             handles=handles,
+            settings=settings,
             revision=revision,
             declarations=declarations,
             active_preview=preview,
@@ -352,9 +416,22 @@ class BusinessDeclarationSession:
                 or candidate.active_preview is not None
                 or candidate_payload["declarations"]
                 == previous_payload["declarations"]
+                or candidate_payload["settings"] != previous_payload["settings"]
             ):
                 raise ValueError(
                     "declaration transition must change exactly one revision and invalidate Preview"
+                )
+            return
+        if event_type == "settings.revised":
+            if (
+                candidate.revision != previous.revision + 1
+                or candidate.active_preview is not None
+                or candidate_payload["declarations"]
+                != previous_payload["declarations"]
+                or candidate_payload["settings"] == previous_payload["settings"]
+            ):
+                raise ValueError(
+                    "settings transition must change exactly one revision and invalidate Preview"
                 )
             return
         if (
@@ -362,6 +439,7 @@ class BusinessDeclarationSession:
             or candidate_payload["declarations"]
             != previous_payload["declarations"]
             or candidate_payload["handles"] != previous_payload["handles"]
+            or candidate_payload["settings"] != previous_payload["settings"]
             or candidate.active_preview is None
             or candidate.active_preview.source_revision != previous.revision
         ):
@@ -393,14 +471,30 @@ class BusinessDeclarationSession:
         normalized_target = _validate_target(
             target,
             handles=self.handles,
+            planned_parent_handles={
+                row.result_handle
+                for row in self.declarations
+                if isinstance(row.target, NewDescendantTarget)
+            },
             draft_revision=self.revision,
         )
         normalized_fields = _normalize_fields(
             fields,
             draft_revision=self.revision,
         )
+        existing_declaration = current.get(normalized_id)
+        result_handle = (
+            existing_declaration.result_handle
+            if existing_declaration is not None
+            else _planned_result_handle(
+                normalized_id,
+                normalized_target,
+                context=self.context,
+            )
+        )
         declaration = BusinessDeclaration(
             declaration_id=normalized_id,
+            result_handle=result_handle,
             target=normalized_target,
             fields=normalized_fields,
         )
@@ -422,6 +516,17 @@ class BusinessDeclarationSession:
                 draft_revision=self.revision,
                 action="finish the current bounded batch before declaring more work",
             )
+        return self._publish_fact_revision(
+            settings=self.settings,
+            declarations=rows,
+        )
+
+    def _publish_fact_revision(
+        self,
+        *,
+        settings: Mapping[str, Any],
+        declarations: tuple[BusinessDeclaration, ...],
+    ) -> "BusinessDeclarationSession":
         audit = self.preview_audit
         if self.active_preview is not None:
             if len(audit) >= MAX_BUSINESS_PREVIEW_AUDIT:
@@ -442,8 +547,9 @@ class BusinessDeclarationSession:
         candidate = BusinessDeclarationSession(
             context=self.context,
             handles=self.handles,
+            settings=settings,
             revision=self.revision + 1,
-            declarations=rows,
+            declarations=declarations,
             active_preview=None,
             preview_audit=audit,
         )
@@ -463,6 +569,7 @@ def _validate_target(
     target: Any,
     *,
     handles: BusinessHandleRegistry,
+    planned_parent_handles: set[str] | None = None,
     draft_revision: int | None = None,
 ) -> NewDescendantTarget | ExistingObjectTarget:
     if isinstance(target, NewDescendantTarget):
@@ -483,13 +590,14 @@ def _validate_target(
                 missing_fields=missing,
                 action="provide every required new-object business fact",
             )
-        try:
-            handles.resolve_object(target.parent_handle)
-        except BusinessDeclarationError as exc:
-            raise repair_at_draft_revision(
-                exc,
-                draft_revision=0 if draft_revision is None else draft_revision,
-            ) from exc
+        if target.parent_handle not in (planned_parent_handles or set()):
+            try:
+                handles.resolve_object(target.parent_handle)
+            except BusinessDeclarationError as exc:
+                raise repair_at_draft_revision(
+                    exc,
+                    draft_revision=0 if draft_revision is None else draft_revision,
+                ) from exc
         if any(character in target.name for character in ("\\", "<", ">")):
             raise business_repair(
                 "INVALID_CHILD_NAME",
@@ -566,10 +674,12 @@ def _declaration_from_dict(
     payload: Any,
     *,
     handles: BusinessHandleRegistry,
+    planned_parent_handles: set[str],
 ) -> BusinessDeclaration:
     if not isinstance(payload, Mapping) or set(payload) != {
         "contract",
         "declaration_id",
+        "result_handle",
         "target",
         "fields",
     }:
@@ -600,15 +710,51 @@ def _declaration_from_dict(
         )
     else:
         raise ValueError("business declaration target form is invalid")
-    normalized_target = _validate_target(target, handles=handles)
+    normalized_target = _validate_target(
+        target,
+        handles=handles,
+        planned_parent_handles=planned_parent_handles,
+    )
+    declaration_id = _declaration_id(payload.get("declaration_id"))
+    expected_result_handle = _planned_result_handle(
+        declaration_id,
+        normalized_target,
+        context=handles.context,
+    )
+    if payload.get("result_handle") != expected_result_handle:
+        raise ValueError("business declaration result handle is invalid")
     declaration = BusinessDeclaration(
-        declaration_id=_declaration_id(payload.get("declaration_id")),
+        declaration_id=declaration_id,
+        result_handle=expected_result_handle,
         target=normalized_target,
         fields=_normalize_fields(payload.get("fields")),
     )
     if len(canonical_json_bytes(declaration.as_dict())) > MAX_BUSINESS_DECLARATION_BYTES:
         raise ValueError("business declaration exceeds its fixed byte limit")
     return declaration
+
+
+def _planned_result_handle(
+    declaration_id: str,
+    target: NewDescendantTarget | ExistingObjectTarget,
+    *,
+    context: BusinessContext,
+) -> str:
+    if isinstance(target, ExistingObjectTarget):
+        return target.object_handle
+    digest = canonical_sha256(
+        {
+            "contract": "waapi-skill.planned-object-handle/v1",
+            "context": context.as_binding_dict(),
+            "declaration_id": declaration_id,
+            "parent_handle": target.parent_handle,
+            "name": target.name,
+            "kind": target.kind,
+        }
+    )
+    handle = f"bnh1-{digest[:32]}"
+    assert _PLANNED_OBJECT_HANDLE.fullmatch(handle)
+    return handle
 
 
 def _preview_from_dict(payload: Any) -> BusinessPreview:
