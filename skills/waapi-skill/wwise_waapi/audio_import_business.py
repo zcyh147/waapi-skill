@@ -15,6 +15,7 @@ from .business_declarations import (
     BusinessDeclarationError,
     ExistingObjectTarget,
     NewDescendantTarget,
+    SUPPORTED_BUSINESS_KINDS,
     business_repair,
     repair_at_draft_revision,
     resolve_semantic_kind,
@@ -90,6 +91,7 @@ def audio_import_business_contract(version: str) -> dict[str, Any]:
         "version": version,
         "settings": sorted(_SETTING_FIELDS),
         "declaration_fields": sorted(_DECLARATION_FIELDS),
+        "semantic_kinds": list(SUPPORTED_BUSINESS_KINDS),
         "modes": sorted(_MODE_TO_NATIVE),
         "event_actions": sorted(_EVENT_ACTIONS),
         "gateway_derivations": [

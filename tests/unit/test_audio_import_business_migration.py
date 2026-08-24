@@ -23,6 +23,14 @@ def test_generated_inventory_covers_every_old_field_action_and_version_once() ->
     assert inventory["contract"] == AUDIO_IMPORT_MIGRATION_INVENTORY_CONTRACT
     assert inventory["versions"] == list(SUPPORTED_WWISE_VERSIONS)
     assert inventory["operation"] == "audio.import"
+    assert inventory["cutover_policy"] == {
+        "status": "deep_business_interface_public",
+        "public_input_mode": "business_declaration",
+        "old_interface": "retired_from_gateway_and_agent_contracts",
+        "legacy_internal_role": "sealed_archive_compatibility_only",
+        "fallback": False,
+        "historical_evidence": "frozen_commits_only",
+    }
     assert len(inventory["lanes"]) == len(SUPPORTED_WWISE_VERSIONS)
 
     for lane in inventory["lanes"]:

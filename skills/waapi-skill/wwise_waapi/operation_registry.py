@@ -183,9 +183,15 @@ VERIFICATION_RESULT_CONTRACT = "waapi-skill.operation-verification/v1"
 ROLE_VALIDATION_CONTRACT = "waapi-skill.role-validation/v1"
 INTERNAL_CANONICAL_INPUT_MODE = "internal_canonical"
 COMPOSER_INPUT_MODE = "composer"
+BUSINESS_DECLARATION_INPUT_MODE = "business_declaration"
 INLINE_TYPED_INPUT_MODE = "inline_typed"
 SUPPORTED_OPERATION_INPUT_MODES = frozenset(
-    {INTERNAL_CANONICAL_INPUT_MODE, COMPOSER_INPUT_MODE, INLINE_TYPED_INPUT_MODE}
+    {
+        INTERNAL_CANONICAL_INPUT_MODE,
+        COMPOSER_INPUT_MODE,
+        BUSINESS_DECLARATION_INPUT_MODE,
+        INLINE_TYPED_INPUT_MODE,
+    }
 )
 OBJECT_GET_URI = "ak.wwise.core.object.get"
 OBJECT_GET_TYPES_URI = "ak.wwise.core.object.getTypes"
@@ -3501,7 +3507,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
 _OPERATION_INPUT_MODE_DECLARATIONS: tuple[
     tuple[str, tuple[str, ...], str], ...
 ] = (
-    ("audio.import", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
+    ("audio.import", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
     ("audio.importTabDelimited", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
     ("debug.restartWaapiServers", ("2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
     ("debug.setAsserts", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
@@ -20932,6 +20938,7 @@ def _audio_import_object_path_contract(
 
 __all__ = [
     "COMPOSER_INPUT_MODE",
+    "BUSINESS_DECLARATION_INPUT_MODE",
     "INLINE_TYPED_INPUT_MODE",
     "CONDITIONAL_LOCAL_FILESYSTEM_OPERATIONS",
     "DYNAMIC_LOCAL_FILESYSTEM_OPERATIONS",

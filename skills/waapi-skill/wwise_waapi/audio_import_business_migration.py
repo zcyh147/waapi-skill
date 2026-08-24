@@ -257,7 +257,10 @@ def build_audio_import_migration_inventory() -> dict[str, Any]:
         "destination_kinds": sorted(MIGRATION_DESTINATION_KINDS),
         "lanes": lanes,
         "cutover_policy": {
-            "old_interface": "remove_in_same_change_after_parity",
+            "status": "deep_business_interface_public",
+            "public_input_mode": "business_declaration",
+            "old_interface": "retired_from_gateway_and_agent_contracts",
+            "legacy_internal_role": "sealed_archive_compatibility_only",
             "fallback": False,
             "historical_evidence": "frozen_commits_only",
         },

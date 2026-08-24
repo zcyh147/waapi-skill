@@ -24,6 +24,7 @@ from wwise_waapi.typed_operations import (  # pyright: ignore[reportMissingImpor
     compound_child_request_contract,
 )
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
+    BUSINESS_DECLARATION_INPUT_MODE,
     COMPOSER_INPUT_MODE,
     INTERNAL_CANONICAL_INPUT_MODE,
     OPERATION_INPUT_MODE_LANES,
@@ -133,10 +134,11 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
     )
     for name, spec in specs.items():
         expected_mode = (
-            COMPOSER_INPUT_MODE
+            BUSINESS_DECLARATION_INPUT_MODE
+            if name == "audio.import"
+            else COMPOSER_INPUT_MODE
             if name
-            in {
-                "audio.import",
+                in {
                 "object.create",
                 "object.createPlugin",
                 "object.set",

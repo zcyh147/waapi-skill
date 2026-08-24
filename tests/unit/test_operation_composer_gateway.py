@@ -22,6 +22,7 @@ from wwise_waapi.operation_composer import (  # pyright: ignore[reportMissingImp
     typed_action_cli_arguments,
 )
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
+    BUSINESS_DECLARATION_INPUT_MODE,
     COMPOSER_INPUT_MODE,
     INTERNAL_CANONICAL_INPUT_MODE,
     list_operation_specs,
@@ -849,56 +850,19 @@ def test_metadata_preconditions_are_operation_local_in_composer_start(
     _, audio_import = execute(tmp_path, "operation-schema", "audio.import")
     _, rtpc = execute(tmp_path, "operation-schema", "object.setRTPC")
 
-    assert object_set["composer"]["start"]["preconditions"][
-        "dynamic_metadata_before_draft_start"
-    ] is True
-    assert audio_import["composer"]["start"]["preconditions"][
-        "agent_metadata_command_required"
-    ] == "when_dynamic_token_is_not_already_exact_live_evidence"
-    assert list(audio_import["composer"]["start"])[:3] == [
-        "preconditions",
-        "subcommand_after_preconditions",
-        "gateway_argv_after_preconditions",
-    ]
-    assert "subcommand" not in audio_import["composer"]["start"]
-    assert "gateway_argv" not in audio_import["composer"]["start"]
-    assert audio_import["composer"]["start"][
-        "gateway_argv_after_preconditions"
-    ] == ["draft-start", "audio.import"]
-    preconditions = audio_import["composer"]["start"]["preconditions"]
-    assert list(preconditions)[:2] == [
-        "metadata_gate",
-        "metadata_query_batch",
-    ]
-    assert preconditions["metadata_gate"] == {
-        "before_draft_start": (
-            "required unless same-conversation metadata discover already covers "
-            "every requested property/reference"
-        ),
-        "prompt_or_schema_names_are_live_evidence": False,
-        "query_inventory": (
-            "union shared and all rows, including one-row-only fields"
-        ),
-        "draft_start_before_gate": "invalid",
-    }
-    audio_batch = audio_import["composer"]["start"]["preconditions"][
-        "metadata_query_batch"
-    ]
-    assert audio_batch["limit_by_query_count"] == {
-        "1..2": 8,
-        "3..4": 3,
-        "5..8": 2,
-    }
-    assert audio_batch["required_final_argv"] == [
-        "--limit",
-        "<derived-from-query-count>",
-    ]
-    assert audio_batch["reconcile_before_command"] == (
-        "list every requested property/reference assignment across rows; require "
-        "equal distinct checklist and --query counts; one-row Volume and OutputBus "
-        "still count"
+    assert audio_import["operation"]["input_mode"] == (
+        BUSINESS_DECLARATION_INPUT_MODE
     )
-    assert "preconditions" not in rtpc["composer"]["start"]
+    assert "composer" not in audio_import
+    assert audio_import["business_adapter"]["live_handles"] == [
+        "bound_object_handle",
+        "field_handle",
+        "typed_field_value",
+    ]
+    assert audio_import["business_adapter"]["start"]["gateway_argv"] == [
+        "draft-start",
+        "audio.import",
+    ]
 
 
 @pytest.mark.parametrize(
@@ -908,10 +872,7 @@ def test_metadata_preconditions_are_operation_local_in_composer_start(
             "2021.1",
             "object.create",
             ["args", "on_name_conflict"],
-            {
-                "phase": "before_dynamic_disclosure",
-                "fact_action": "set",
-            },
+            {"phase": "before_dynamic_disclosure", "fact_action": "set"},
         ),
         (
             "2022.1",
@@ -1311,22 +1272,6 @@ def test_invalid_or_mixed_typed_action_argv_is_atomic(
             owner_handle="odh1-111111111111111111111111",
             name="OutputBus",
             target={"kind": "id", "value": TARGET_ID},
-        ),
-        action_mapping(
-            "set_import_row_field",
-            import_handle="odh1-222222222222222222222222",
-            name="event",
-            value={
-                "action": "Play",
-                "path": r"\Events\Default Work Unit\Play_One",
-            },
-        ),
-        action_mapping(
-            "add_import_row",
-            object_path=r"\Actor-Mixer Hierarchy\Default Work Unit\One",
-            object_type="Sound SFX",
-            properties=[{"name": "Volume", "value": -6.25}],
-            assignment={"mode": "switch", "value": "Snow"},
         ),
     ],
 )
@@ -2080,49 +2025,15 @@ def test_audio_import_schema_requires_one_complete_metadata_query_batch(
     )
 
     assert exit_code == 0, payload
-    assert "start_preconditions" not in payload["composer"]
-    assert payload["composer"]["start"]["preconditions"][
-        "metadata_query_batch"
-    ] == {
-        "scope": "one exact object, class, or object-type scope",
-        "reconcile_before_command": (
-            "list every requested property/reference assignment across rows; require "
-            "equal distinct checklist and --query counts; one-row Volume and "
-            "OutputBus still count"
-        ),
-        "business_fact_inventory": (
-            "count every requested toggle, mode, scalar, and reference as one "
-            "distinct checklist item even when one query could return several "
-            "candidates"
-        ),
-        "paired_setting_discipline": {
-            "loop_enabled_and_infinite_mode": "two distinct checklist items",
-            "ignore_parent_enable_self_and_maximum_value": (
-                "three distinct checklist items"
-            ),
-        },
-        "first_request": (
-            "include every distinct prompt-present dynamic property/reference "
-            "token for this operation and scope"
-        ),
-        "row_field_inventory": (
-            "include shared and every row-local dynamic property/reference, "
-            "including scalar fields whose values differ by row"
-        ),
-        "one_to_eight_queries": "one metadata discover command",
-        "split_within_limit": "invalid",
-        "successful_complete_scope_result": "do_not_query_that_scope_again",
-        "partial_fallback": "one broader retry only when explicitly reported partial",
-        "limit_by_query_count": {
-            "1..2": 8,
-            "3..4": 3,
-            "5..8": 2,
-        },
-        "required_final_argv": [
-            "--limit",
-            "<derived-from-query-count>",
-        ],
-    }
+    assert "composer" not in payload
+    assert payload["business_adapter"]["input_mode"] == (
+        BUSINESS_DECLARATION_INPUT_MODE
+    )
+    assert payload["business_adapter"]["commands"][:2] == [
+        "draft-bind-object",
+        "draft-bind-field",
+    ]
+    assert payload["business_adapter"]["legacy_shallow_composer_public"] is False
 
 
 def test_registry_composer_lanes_and_real_adapters_are_one_to_one() -> None:
@@ -2141,11 +2052,15 @@ def test_registry_composer_lanes_and_real_adapters_are_one_to_one() -> None:
             else:
                 assert contract["operation"] == spec.name
                 assert contract["version"] == version
+                if spec.name == "audio.import":
+                    assert operation_input_mode(*lane) == (
+                        BUSINESS_DECLARATION_INPUT_MODE
+                    )
+                    continue
                 adapter_lanes.add(lane)
 
     assert adapter_lanes == composer_lanes
     assert {operation for operation, _version in composer_lanes} == {
-        "audio.import",
         "object.create",
         "object.createPlugin",
         "object.set",

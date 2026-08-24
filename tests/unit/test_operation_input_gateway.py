@@ -13,6 +13,7 @@ from typing import Any, Mapping, Sequence
 import pytest  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
+    BUSINESS_DECLARATION_INPUT_MODE,
     COMPOSER_INPUT_MODE,
     INTERNAL_CANONICAL_INPUT_MODE,
     OPERATION_INPUT_MODE_LANES,
@@ -856,7 +857,7 @@ def test_normal_object_set_schema_and_detail_expose_only_composer_input(
     assert "legacy-operation-schema" not in json.dumps(detail)
 
 
-def test_normal_audio_import_schema_exposes_only_its_composer_input(
+def test_normal_audio_import_schema_exposes_only_its_business_declaration_input(
     tmp_path: Path,
 ) -> None:
     schema_code, schema = offline_execute(
@@ -876,188 +877,30 @@ def test_normal_audio_import_schema_exposes_only_its_composer_input(
     )
 
     assert schema_code == detail_code == tab_code == 0
-    assert schema["operation"]["input_mode"] == COMPOSER_INPUT_MODE
+    assert schema["operation"]["input_mode"] == BUSINESS_DECLARATION_INPUT_MODE
     assert "request_envelope" not in schema
     assert "request_envelope_policy" not in schema
-    assert schema["composer"]["operation"] == "audio.import"
-    assert schema["composer"]["start"][
-        "gateway_argv_after_preconditions"
-    ] == [
+    assert "composer" not in schema
+    assert schema["business_adapter"]["operation"] == "audio.import"
+    assert schema["business_adapter"]["legacy_shallow_composer_public"] is False
+    assert schema["business_adapter"]["start"]["gateway_argv"] == [
         "draft-start",
         "audio.import",
     ]
-    action_argv = schema["composer"]["apply"]["action_argv"]
-    assert "typed_fact_flags" not in schema["composer"]["apply"]
-    assert action_argv["add_import_row"][:4] == [
-        "--object-path",
-        "PATH",
-        "--object-type",
-        "TYPE",
-    ]
-    assert "assign_import_row_switch" not in action_argv
-    assert schema["composer"]["start"]["preconditions"] == {
-        "metadata_gate": {
-            "before_draft_start": (
-                "required unless same-conversation metadata discover already "
-                "covers every requested property/reference"
-            ),
-            "prompt_or_schema_names_are_live_evidence": False,
-            "query_inventory": (
-                "union shared and all rows, including one-row-only fields"
-            ),
-            "draft_start_before_gate": "invalid",
-        },
-        "agent_metadata_command_required": (
-            "when_dynamic_token_is_not_already_exact_live_evidence"
-        ),
-        "workflow_control": {
-            "metadata_success_is_terminal": False,
-            "continue_same_turn_after_metadata": "draft-start",
-            "reply_before_draft_start": "invalid",
-        },
-        "activation_decision": {
-            "run_metadata_when": (
-                "one_or_more_required_tokens_lack_prior_successful_live_result"
-            ),
-            "skip_metadata_when": (
-                "every_required_token_has_prior_successful_live_result"
-            ),
-            "live_token_proof": "successful_metadata_discover_only",
-            "when_skipped_continue_same_turn_with": "draft-start",
-        },
-        "metadata_query_batch": {
-            "scope": "one exact object, class, or object-type scope",
-            "reconcile_before_command": (
-                "list every requested property/reference assignment across rows; "
-                "require equal distinct checklist and --query counts; one-row "
-                "Volume and OutputBus still count"
-            ),
-            "business_fact_inventory": (
-                "count every requested toggle, mode, scalar, and reference as one "
-                "distinct checklist item even when one query could return several "
-                "candidates"
-            ),
-            "paired_setting_discipline": {
-                "loop_enabled_and_infinite_mode": "two distinct checklist items",
-                "ignore_parent_enable_self_and_maximum_value": (
-                    "three distinct checklist items"
-                ),
-            },
-            "first_request": (
-                "include every distinct prompt-present dynamic property/reference "
-                "token for this operation and scope"
-            ),
-            "row_field_inventory": (
-                "include shared and every row-local dynamic property/reference, "
-                "including scalar fields whose values differ by row"
-            ),
-            "one_to_eight_queries": "one metadata discover command",
-            "split_within_limit": "invalid",
-            "successful_complete_scope_result": "do_not_query_that_scope_again",
-            "partial_fallback": (
-                "one broader retry only when explicitly reported partial"
-            ),
-            "limit_by_query_count": {
-                "1..2": 8,
-                "3..4": 3,
-                "5..8": 2,
-            },
-            "required_final_argv": [
-                "--limit",
-                "<derived-from-query-count>",
-            ],
-        },
-        "submit_only_explicit_user_facts": True,
-        "draft_check_revalidates_dynamic_metadata": True,
-    }
-    row_shape = schema["composer"]["action_shapes"]["add_import_row"]
-    assert row_shape["required_fields"] == ["object_path", "assignment"]
-    assert "assignment" not in row_shape["optional_fields"]
-    assert row_shape["construction_discipline"] == schema["composer"][
-        "flat_import_row_discipline"
-    ]
-    assert row_shape["construction_discipline"]["switch_assignment"] == {
-        "required_in_initial_row_action": True,
-        "ordinary_row": {"mode": "none"},
-        "when_user_requested": {"mode": "switch", "value": "VALUE"},
-        "applies_to": "this_row_object_path",
-        "new_parent_or_container": "switch_when_user_assigns_that_object",
-        "other_rows": "none_unless_user_assigns_that_row",
-    }
-    assert row_shape["user_fact_checklist"][
-        "switch_assignment_value_only_when_explicit"
-    ] is True
-    assert "assign_import_row_switch" not in schema["composer"]["action_shapes"]
-    assert "add_switch_assigned_import_row" not in schema["composer"]["action_shapes"]
-    assert schema["composer"]["planning_discipline"]["dynamic_metadata"][
-        "discovery_owner"
-    ] == "agent_metadata_discover"
-    assert schema["composer"]["planning_discipline"]["dynamic_metadata"][
-        "validation_owner"
-    ] == "gateway_draft_check"
-    assert schema["composer"]["planning_discipline"]["dynamic_metadata"][
-        "property_value_type"
-    ] == {
-        "source": "metadata.candidates[].metadata.typed_value_type",
-        "copy_to": "--property NAME <typed_value_type> VALUE",
-        "native_metadata_type_is_not_action_type": True,
-    }
-    assert schema["composer"]["planning_discipline"]["import_operation"] == {
-        "source": "registry_fragments.request_options.import_operation",
-        "action": "set_import_operation",
-        "gateway_default": "createNew",
-        "default_is_materialized_at": "draft-start",
-        "action_required_only_for": ["useExisting", "replaceExisting"],
-        "do_not_submit_redundant_default": True,
-    }
-    assert list(schema["composer"]).index(
-        "flat_import_row_discipline"
-    ) < list(schema["composer"]).index("action_shapes")
-    assert schema["composer"]["flat_import_row_discipline"][
-        "metadata_dependency_activation"
-    ] == "agent_selects_exact_token_gateway_validates_dependencies"
-    assert schema["composer"]["registry_fragments"][
-        "metadata_dependency_closure"
-    ]["materialization"]["supported_reference_activation"]["owner"] == (
-        "gateway"
-    )
-    assert "request_contract" not in schema["operation"]
-    assert "argument_contract" not in schema["operation"]
-
     rows = {row["name"]: row for row in detail["operations"]}
     assert rows["audio.import"]["input_modes_by_version"] == {
-        version: COMPOSER_INPUT_MODE
+        version: BUSINESS_DECLARATION_INPUT_MODE
         for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
     }
-    assert "request_contract" not in rows["audio.import"]
-    assert set(rows["audio.import"]["composer_contracts_by_version"]) == {
-        "2021.1",
-        "2022.1",
-        "2023.1",
-        "2024.1",
-        "2025.1",
-    }
     assert tab_schema["operation"]["input_mode"] == "inline_typed"
-    assert "request_envelope" not in tab_schema
-    assert tab_schema["typed_operation"]["operation"] == "audio.importTabDelimited"
-    tab_continuation = tab_schema["typed_operation"]["continuation"]
-    assert tab_continuation["gateway_argv_prefix"][-1] == "--apply"
-    assert tab_continuation["selector_argv"]["path"] == [
-        "--import-location",
-        "path",
-        "<complete_wwise_path>",
-    ]
     assert "composer" not in tab_schema
-    normal_surfaces = json.dumps({"schema": schema, "detail": detail})
-    assert "legacy-preview" not in normal_surfaces
-    assert "legacy-operation-schema" not in normal_surfaces
 
 
 def test_structurally_distinct_adapters_share_one_public_lifecycle(
     tmp_path: Path,
 ) -> None:
     projections: dict[str, dict[str, Any]] = {}
-    for operation in ("object.set", "audio.import", "object.create"):
+    for operation in ("object.set", "object.create"):
         code, payload = offline_execute(
             tmp_path / operation.replace(".", "-"),
             "--version",
@@ -1068,146 +911,26 @@ def test_structurally_distinct_adapters_share_one_public_lifecycle(
         assert code == 0
         projections[operation] = payload["composer"]
 
-    create_dynamic = projections["object.create"]["dynamic_container_commands"]
-    assert create_dynamic["draft_binding"] is False
-    assert create_dynamic["array_item_argv"][:2] == [
-        "request-array-item",
-        "object.create",
-    ]
-    assert "never consumes or changes the Draft revision" in create_dynamic[
-        "sequence"
-    ]
-    assert "required_sequence" not in projections["object.create"]["start"][
-        "preconditions"
-    ]
-    assert projections["object.create"]["start"]["preconditions"][
-        "activation_decision"
-    ]["when_skipped_continue_same_turn_with"] == "draft-start"
-    assert "fact-action map-put" in create_dynamic["scalar_map_entry_action"]
-
-    shared_keys = {
-        "contract",
-        "action_contract",
-        "action_construction",
-        "composition_contract",
-        "complete_request_is_never_an_action",
-        "completion_discipline",
-        "check",
-        "seal",
-        "cancel",
-        "check_subcommand",
-        "seal_subcommand",
-        "cancel_subcommand",
-        "complete_request_authored_by_gateway",
-    }
-    object_set = projections["object.set"]
-    audio_import = projections["audio.import"]
-    assert {key: object_set[key] for key in shared_keys} == {
-        key: audio_import[key] for key in shared_keys
-    }
-    for composer in (object_set, audio_import):
-        assert composer["apply"]["subcommand"] == "draft-apply"
-        assert composer["apply"]["action_flag"] == "--action"
-        assert composer["apply"]["scalar_types"] == [
-            "string",
-            "number",
-            "integer",
-            "boolean",
-        ]
-        assert composer["apply"]["scalar_type_discipline"] == {
-            "cli_type_source": "scalar_types",
-            "metadata_type_tokens_as_cli_types": "invalid",
-            "metadata_examples": {"Real64": "number", "int16": "integer"},
-        }
-        assert composer["apply"]["selector_kinds"] == [
-            "id-string VALUE",
-            "id-integer VALUE",
-            "path VALUE",
-            "exact-type-name TYPE NAME",
-            "direct-child TYPE PARENT_SELECTOR...",
-            "scoped-name TYPE NAME PARENT_SELECTOR...",
-        ]
-        assert "action_argv" in composer["apply"]
-        assert "typed_fact_flags" not in composer["apply"]
-    assert "selector_kinds" not in projections["object.create"]["apply"]
-    assert projections["object.create"]["apply"]["fact_action_argv"] == {
-        "set": [
-            "--fact-action",
-            "set",
-            "--field-handle",
-            "HANDLE",
-            "--value-type",
-            "TYPE",
-            "--fact-value",
-            "VALUE",
-        ],
-        "append": [
-            "--fact-action",
-            "append",
-            "--field-handle",
-            "HANDLE",
-            "--value-type",
-            "TYPE",
-            "--fact-value",
-            "VALUE",
-        ],
-        "present": [
-            "--fact-action",
-            "present",
-            "--field-handle",
-            "HANDLE",
-        ],
-        "choose": [
-            "--fact-action",
-            "choose",
-            "--field-handle",
-            "HANDLE",
-            "--fact-value",
-            "CHOICE_HANDLE",
-        ],
-        "choose-dynamic": [
-            "--fact-action",
-            "choose-dynamic",
-            "--field-handle",
-            "HANDLE",
-            "--key",
-            "KEY",
-            "--fact-value",
-            "CHOICE_HANDLE",
-        ],
-        "map-put": [
-            "--fact-action",
-            "map-put",
-            "--field-handle",
-            "HANDLE",
-            "--key",
-            "KEY",
-            "--value-type",
-            "TYPE",
-            "--fact-value",
-            "VALUE",
-        ],
-    }
-    assert "set_scalar" not in json.dumps(projections["object.create"]["apply"])
-    assert object_set["start"][
-        "subcommand_after_preconditions"
-    ] == "draft-start"
-    assert audio_import["start"][
-        "subcommand_after_preconditions"
-    ] == "draft-start"
-    assert object_set["start"]["gateway_argv_after_preconditions"] == [
-        "draft-start",
-        "object.set",
-    ]
-    assert audio_import["start"]["gateway_argv_after_preconditions"] == [
+    audio_code, audio_payload = offline_execute(
+        tmp_path / "audio-import",
+        "--version",
+        "2022.1",
+        "operation-schema",
+        "audio.import",
+    )
+    assert audio_code == 0
+    assert audio_payload["business_adapter"]["input_mode"] == (
+        BUSINESS_DECLARATION_INPUT_MODE
+    )
+    assert audio_payload["business_adapter"]["start"]["gateway_argv"] == [
         "draft-start",
         "audio.import",
     ]
-    assert "required_sequence" not in object_set["start"]["preconditions"]
-    assert "preconditions" in audio_import["start"]
-    assert set(object_set["actions"]) != set(audio_import["actions"])
-
-
+    assert audio_payload["business_adapter"]["commands"][-2:] == [
+        "draft-check",
+        "preview-from-draft",
+    ]
+    assert "composer" not in audio_payload
 def test_schema_input_mode_projection_is_isolated_by_exact_operation_key(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

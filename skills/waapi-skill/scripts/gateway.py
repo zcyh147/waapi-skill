@@ -190,6 +190,7 @@ from wwise_waapi.execution_contracts import (  # noqa: E402  # pyright: ignore[r
     PROJECT_GUARD_TRANSITION_TO_PATH,
 )
 from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    BUSINESS_DECLARATION_INPUT_MODE,
     COMPOSER_INPUT_MODE,
     INLINE_TYPED_INPUT_MODE,
     OPERATION_REQUEST_CONTRACT,
@@ -4057,7 +4058,10 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
                 f"wait-topic --event-count must be between 1 and {MAX_WAIT_EVENT_COUNT}"
             )
     elif args.command == "draft-apply":
-        parse_operation_draft_cli_actions(args)
+        # The authorized Draft binding decides whether this is a legacy typed
+        # Composer edit or a retired audio.import shallow action.  Dispatch
+        # performs that state-bound decision before parsing action grammar.
+        return
 
 
 def topic_typed_input_requested(args: argparse.Namespace) -> bool:
@@ -6861,6 +6865,11 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             args.draft_id,
             task_authority=args.task_authority,
         )
+        if inspected.operation == "audio.import":
+            raise GatewayInputError(
+                "audio.import no longer accepts shallow draft-apply actions; "
+                "use the Gateway-owned business declaration commands from draft-start"
+            )
         schema_digest = operation_draft_schema_digest(
             inspected.operation, inspected.version
         )
@@ -7272,6 +7281,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             else None
         )
         normal_composer = input_mode == COMPOSER_INPUT_MODE
+        normal_business = input_mode == BUSINESS_DECLARATION_INPUT_MODE
         normal_inline = input_mode == INLINE_TYPED_INPUT_MODE
         unsupported_version = (
             request_version is not None
@@ -7289,7 +7299,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         else:
             operation_projection = (
                 composer_operation_projection(spec, version=request_version)
-                if normal_composer or normal_inline
+                if normal_composer or normal_business or normal_inline
                 else spec.as_dict(version=request_version)
             )
         payload = {
@@ -7304,6 +7314,28 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 spec.name,
                 request_version,
             )
+        if normal_business and request_version is not None:
+            payload["business_adapter"] = {
+                **audio_import_business_contract(request_version),
+                "input_mode": BUSINESS_DECLARATION_INPUT_MODE,
+                "start": {
+                    "subcommand": "draft-start",
+                    "gateway_argv": ["draft-start", spec.name],
+                    "first_required_phase": "bind_required_business_objects",
+                },
+                "commands": [
+                    "draft-bind-object",
+                    "draft-bind-field",
+                    "draft-business-configure",
+                    "draft-declare-new",
+                    "draft-declare-existing",
+                    "draft-revise-declaration",
+                    "draft-remove-declaration",
+                    "draft-check",
+                    "preview-from-draft",
+                ],
+                "legacy_shallow_composer_public": False,
+            }
         payload["operation"] = operation_projection
         if normal_inline and request_version is not None:
             operation_projection["input_mode"] = INLINE_TYPED_INPUT_MODE

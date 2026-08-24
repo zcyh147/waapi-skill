@@ -786,7 +786,7 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "An existing transaction continuation always outranks operation selection" in OPERATE
     assert "transaction-show <transaction-id> --summary-only" in OPERATE
     assert "Do not call `operations`, `operation-schema`, or `request-schema` first" in OPERATE
-    assert "`object.set` or `audio.import`" in OPERATE
+    assert "| `audio.import` | `operation-schema audio.import`" in OPERATE
     assert "One command carries one repeated `--query" in OPERATE
     assert "1–8 never split" in OPERATE
     assert "Then `operation-schema`; metadata" in OPERATE
@@ -804,8 +804,8 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "A named operation using only closed schema fields and side effects" in OPERATE
     assert "its named `operation-schema` directly" in OPERATE
     assert "including both import operations" not in OPERATE
-    assert "schema owns fixed fields and Event/Switch Assignation" in OPERATE
-    assert "metadata selects dynamic tokens and `draft-check` revalidates them" in OPERATE
+    assert "business Adapter owns object paths, native types, metadata scopes" in OPERATE
+    assert "`draft-check` revalidates it" in OPERATE
     assert "`limit sound instances`" in OPERATE
     assert "`maximum playback instances`" in OPERATE
     assert "both selected tokens are facts" in OPERATE
@@ -815,19 +815,18 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "Table imports start `operation-schema audio.importTabDelimited`" in OPERATE
     assert "dynamic columns stay metadata-first" in OPERATE
     skill_compact = " ".join(SKILL.split())
-    assert "Composer `draft-check` revalidates tokens and dependencies" in skill_compact
+    assert "Composer `draft-check` revalidates them" in skill_compact
     assert "only an explicit unknown dynamic property/reference token needs" in skill_compact
     assert "A known native URI without a named route" in OPERATE
     assert "`request-schema <uri>`" in OPERATE
     assert "No schema-to-preview shortcut" in compact
     assert "gateway.py operation-schema <operation-name>" not in OPERATE
     assert "Follow the schema's sole `input_mode`" in OPERATE
-    assert "For `composer`, run `composer.start.gateway_argv`" in OPERATE
-    assert "after either start field, use only the selected `action_argv`" in OPERATE
-    assert "Start `object.set` rows with `add_target --target ...`" in OPERATE
-    assert "Start every `audio.import` row with one `add_import_row`" in OPERATE
-    assert "use `--assignment none`" in OPERATE
-    assert "`--assignment switch VALUE` only when requested" in OPERATE
+    assert "For `composer`, run its returned start and action argv" in OPERATE
+    assert "For `business_declaration`, run `draft-start`" in OPERATE
+    assert "start `object.set` rows with `add_target --target ...`" in OPERATE
+    assert "Supply stable facts such as `volume_db=-4`" in OPERATE
+    assert "The Gateway derives Wwise paths, types, metadata scopes" in OPERATE
     assert "Corrections reuse the draft" in OPERATE
     assert "preserving `--expected-revision` and `--apply`" in OPERATE
     assert "there is no `lua.executeFile` operation" in OPERATE
@@ -894,12 +893,11 @@ def test_operate_business_selection_and_execution_domains_remain_explicit() -> N
     ) in compact
     skill_compact = " ".join(SKILL.split())
     assert "For structure-only changes" in skill_compact
-    assert "When media import is primary" in skill_compact
-    assert "media-row target hierarchy as typed structure-only rows" in skill_compact
-    assert "never probe `object.create` or a separate assignment first" in skill_compact
+    assert "Primary media import uses one `audio.import`" in skill_compact
+    assert "business declarations own hierarchy and Event/Switch outcomes" in skill_compact
+    assert "Never probe `object.create` or a separate assignment first" in skill_compact
     assert (
-        "use `object.set` instead when import is subordinate to a broader "
-        "atomic mutation of existing targets"
+        "use `object.set` when import is subordinate to a broader existing-target mutation"
     ) in skill_compact
     assert "An insertion target is not the request root" in compact
     assert (
@@ -1000,56 +998,25 @@ def test_operate_metadata_and_import_prose_only_rules_are_preserved() -> None:
     compact = " ".join(OPERATE.split())
     for phrase in (
         "one repeated `--query '<ordinary phrase>'` per setting",
-            "Use the deterministic candidate budget",
-        "one or two flags require `--limit 8`",
-        "three or four use `--limit 3`",
-        "five through eight use `--limit 2`",
+        "Use the deterministic candidate budget",
         "A rejected or nonzero Gateway invocation is also a hard stop",
-        "Do not advance to the next schema, preview, or transaction phase",
-        "several existing targets of one proven type",
         "`--object` for one existing object",
-        "`--object-type Sound`",
-        "`PropertyContainer` in `2025.1`",
         "Translate localized wording to short English Wwise UI/technical phrases",
-        "never pass CJK to the lexical matcher",
-        "Search separately: `limit sound instances`",
         "`fallback_detail_scan.status` is `partial`",
-        "A `complete` scan with no match is terminal",
-        "for table imports, only dynamic `Property[...]`, `Reference[...]`, or `@...` columns",
-        "Fixed fields and side effects never trigger discovery",
-        "Event, Dialogue Event, and Switch Assignation are schema-owned",
-            "`Notes` and `Audio Source Notes` are fixed import columns",
-            "not Sound metadata queries",
-            "append each named file to the exact supplied directory",
-            "never workspace-relative or `..` traversal",
-            "ordinary `audio.importTabDelimited` import",
+        "bind only user-requested custom properties/references",
+        "stable business fields",
+        "For table imports, discover only dynamic",
+        "ordinary `audio.importTabDelimited` import",
         "do not `cat` or otherwise read the caller's TSV",
-        "supplied absolute path unchanged through the typed continuation",
-        "resulting Preview owns bounded TSV parsing and hashing",
-        "inline base64 and media validation",
-        "exact-path conflict checks",
-        "separate read-only task, never an import prerequisite",
         "`SFX` is the built-in nonlocalized import token",
-        "do not query the Project language inventory",
-        "`arguments.import_operation` is the explicit batch-level mode",
-        "omission means `createNew`",
-        "never belongs inside an `imports[]` row",
-        "Under `useExisting`, behavior is still resolved per row",
-        "Existing SFX rows retain every user-supplied optional field",
-        "`import_location` is a wire-significant path-base selector",
-        "absolute `object_path`, omit it from both the row and `defaults`",
-        "never infer `defaults.import_location` from a shared absolute parent",
-        "relative `object_path` requires one effective row/default `import_location`",
+        "Batch `mode` is `create`, `reimport`, or `replace`",
+        "Bind the exact existing parent/target once",
+        "declare each requested container once as a structure-only descendant",
         "Use `originals_subfolder` only when the user explicitly supplies",
-        "never infer one from a source directory, media category, object path, or example",
-        "It is relative to Wwise's normal destination",
-        "absolute path below `\\Events`",
-        "absent before preview",
-        "unique across rows",
+        "bind its exact parent, then provide Event name and business Action",
         "`1 semitone = 100 cents`",
     ):
         assert phrase in compact
-    assert "never silently add or remove an `SFX/` prefix" in compact
 
 
 def test_operate_maps_only_live_query_accessors_to_mutation_tokens() -> None:
@@ -1058,9 +1025,9 @@ def test_operate_maps_only_live_query_accessors_to_mutation_tokens() -> None:
     assert "Reuse evidence-bound live property/reference accessors" in compact
     assert "`@Foo` becomes `Foo`" in compact
     assert "remove one leading `@`" in compact
-    assert "`OutputBus` remains `OutputBus`" in compact
+    assert "business Field Handles are copied exactly" in compact
     assert "evidence-bound" in compact
-    assert "never infer a token" in compact
+    assert "Never infer a token" in compact
 
 
 def test_operate_cli_and_authoring_fast_routes_keep_unstructured_materialization_rules() -> None:

@@ -5,6 +5,7 @@ import hashlib
 from pathlib import Path
 
 from wwise_waapi.operation_registry import (
+    BUSINESS_DECLARATION_INPUT_MODE,
     COMPOSER_INPUT_MODE,
     INLINE_TYPED_INPUT_MODE,
     INTERNAL_CANONICAL_INPUT_MODE,
@@ -57,7 +58,9 @@ def test_inventory_exactly_covers_every_registry_operation_and_version_lane() ->
     for name, spec in OPERATION_SPECS.items():
         modes = {operation_input_mode(name, version) for version in spec.supported_versions}
         expected_mode = INTERNAL_CANONICAL_INPUT_MODE
-        if (
+        if name == "audio.import":
+            expected_mode = BUSINESS_DECLARATION_INPUT_MODE
+        elif (
             assignments[name][1]
             in {"wave-00-complete", "wave-02-object-graph"}
             or name == "object.create"
@@ -105,6 +108,9 @@ def test_inventory_exactly_covers_every_registry_operation_and_version_lane() ->
     ).encode("utf-8")
     assert hashlib.sha256(encoded).hexdigest() == inventory["scope"]["lane_inventory_sha256"]
     assert sum(row["input_mode"] == COMPOSER_INPUT_MODE for row in lane_rows) == inventory["scope"]["composer_version_lanes"]
+    assert sum(
+        row["input_mode"] == BUSINESS_DECLARATION_INPUT_MODE for row in lane_rows
+    ) == inventory["scope"]["business_declaration_version_lanes"]
     assert sum(row["input_mode"] == INLINE_TYPED_INPUT_MODE for row in lane_rows) == inventory["scope"]["inline_typed_version_lanes"]
     assert sum(row["input_mode"] == INTERNAL_CANONICAL_INPUT_MODE for row in lane_rows) == inventory["scope"]["internal_canonical_version_lanes"]
 

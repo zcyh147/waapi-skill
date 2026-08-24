@@ -24,7 +24,7 @@ planning; the Registry remains authoritative during implementation.
 
 | Exact operation | Versions | Current input | Closed request shape | Primary risk | Assignment |
 | --- | --- | --- | --- | --- | --- |
-| `audio.import` | 2021.1–2025.1 | Composer | imports; optional defaults/mode/source-control | nested rows, files, metadata, side effects | wave 00 complete |
+| `audio.import` | 2021.1–2025.1 | Business declaration | bound objects, semantic kinds, stable fields, custom Field Handles | Gateway-derived rows, paths, types, metadata scopes, side effects | deep cutover complete |
 | `audio.importTabDelimited` | 2021.1–2025.1 | Inline typed | file, location, language; optional mode/source-control | caller-owned serialized file | wave 05 file/Lua complete |
 | `debug.restartWaapiServers` | 2023.1–2025.1 | Inline typed (zero value) | Gateway-owned acknowledgement | expected connection loss | wave 05 debug complete |
 | `debug.setAsserts` | 2021.1–2025.1 | Inline typed | boolean enable | process-wide ref-count state | wave 05 debug complete |

@@ -3,7 +3,10 @@
   "cutover_policy": {
     "fallback": false,
     "historical_evidence": "frozen_commits_only",
-    "old_interface": "remove_in_same_change_after_parity"
+    "legacy_internal_role": "sealed_archive_compatibility_only",
+    "old_interface": "retired_from_gateway_and_agent_contracts",
+    "public_input_mode": "business_declaration",
+    "status": "deep_business_interface_public"
   },
   "destination_kinds": [
     "bound_object_handle",
@@ -14,7 +17,7 @@
     "prohibited_boundary",
     "stable_business_field"
   ],
-  "inventory_digest": "708890148eb12a31056d89836d4612baa671c3ba6028cc3e7899daae7cd98b4c",
+  "inventory_digest": "2ae5a16d86ec975b559dead8a4b1915f13be3a35c2fb5421a78f258f06a53413",
   "lanes": [
     {
       "actions": [

@@ -117,6 +117,36 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     assert "object_type" in start_next["forbidden_inputs"]
     draft_id = started["draft"]["draft_id"]
     authority = started["task_authority"]
+    record_path = (
+        tmp_path
+        / "state"
+        / "operation-drafts-v1"
+        / "records"
+        / f"{draft_id}.json"
+    )
+    before_legacy_attempt = record_path.read_bytes()
+    legacy_code, legacy = _offline(
+        tmp_path,
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+        "--facts",
+        "--action",
+        "add_import_row",
+        "--object-path",
+        r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\Rain_Bed",
+        "--object-type",
+        "Sound SFX",
+        "--assignment-mode",
+        "none",
+    )
+    assert legacy_code == 2
+    assert legacy["error_code"] == "GatewayInputError"
+    assert "no longer accepts shallow" in legacy["message"]
+    assert record_path.read_bytes() == before_legacy_attempt
     client = FakeClient(
         {
             "ak.wwise.core.getInfo": [_info()],

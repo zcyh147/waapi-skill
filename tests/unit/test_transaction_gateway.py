@@ -1670,14 +1670,10 @@ def test_operation_schema_exposes_closed_ui_command_items(
     assert item["properties"]["main_menu"]["required"] == ["base_path"]
 
 
-@pytest.mark.parametrize(
-    ("version", "expected_roots"),
-    EXPECTED_IMPORT_HIERARCHY_ROOTS.items(),
-)
-def test_audio_import_operation_schema_discloses_versioned_hierarchy_roots(
+@pytest.mark.parametrize("version", EXPECTED_IMPORT_HIERARCHY_ROOTS)
+def test_audio_import_operation_schema_keeps_native_hierarchy_mechanics_gateway_owned(
     tmp_path: Path,
     version: str,
-    expected_roots: list[str],
 ) -> None:
     exit_code, payload = execute(
         ["operation-schema", "audio.import"],
@@ -1688,70 +1684,19 @@ def test_audio_import_operation_schema_discloses_versioned_hierarchy_roots(
     assert exit_code == 0
     assert payload["offline"] is True
     assert "request_envelope" not in payload
-    fragments = payload["composer"]["registry_fragments"]
-    assert fragments["version"] == version
-    properties = fragments["row_fields"]
-    row_path_contract = properties["object_path"]["path_contract"]
-    default_path_contract = properties["object_path"]["path_contract"]
-    row_object_type = properties["object_type"]
-    default_object_type = properties["object_type"]
-    row_switch_assignment = properties["switch_assignment"]
-    default_switch_assignment = properties["switch_assignment"]
-    assert row_path_contract["contract"] == (
-        "waapi-skill.audio-import-object-path/v1"
+    assert "composer" not in payload
+    adapter = payload["business_adapter"]
+    assert adapter["version"] == version
+    assert adapter["input_mode"] == "business_declaration"
+    assert {"random-container", "sound-sfx", "sound-voice"} <= set(
+        adapter["semantic_kinds"]
     )
-    assert row_path_contract["resolved_target"] == {
-        "minimum_segments": 3,
-        "hierarchy_root_case_sensitive": True,
-        "wwise_version": version,
-        "allowed_hierarchy_roots": expected_roots,
-    }
-    assert row_path_contract["import_location_selection"] == {
-        "wire_significant": True,
-        "absolute_object_path": {
-            "ordinary_action": "omit",
-            "infer_from_common_parent": False,
-            "include_only_when_user_explicitly_requests_native_field": True,
-        },
-        "relative_object_path": {
-            "requires_effective_import_location": True,
-            "effective_sources": [
-                "$.arguments.imports[].import_location",
-                "$.arguments.defaults.import_location",
-            ],
-        },
-    }
-    assert default_path_contract == row_path_contract
-    assert row_object_type == default_object_type
-    assert "Random Container / 随机容器 -> RandomSequenceContainer" in (
-        row_object_type["description"]
+    assert {"canonical_object_path", "native_object_type", "target_parent_handle"} <= set(
+        adapter["gateway_derivations"]
     )
-    assert "never RandomContainer" in row_object_type["description"]
-    assert "Sound SFX / SFX 声音 -> Sound SFX" in row_object_type["description"]
-    assert row_switch_assignment == default_switch_assignment
-    assert "native Wwise Switch Assignation import directive" in (
-        row_switch_assignment["description"]
-    )
-    assert "exact Switch/State value name" in row_switch_assignment["description"]
-    assert "for example, Snow" in row_switch_assignment["description"]
-    assert "do not pass the value object's path" in (
-        row_switch_assignment["description"]
-    )
-    inline_audio = properties["audio_file_base64"]
-    assert inline_audio["verbatim_contract"]["contract"] == (
-        "waapi-skill.audio-file-base64-verbatim/v1"
-    )
-    assert inline_audio["verbatim_contract"][
-        "caller_provided_complete_value"
-    ] == "copy_character_for_character"
-    assert inline_audio["verbatim_contract"][
-        "on_unreliable_preservation"
-    ] == "stop_before_preview"
-    import_operation = fragments["request_options"]["import_operation"]
-    assert import_operation["default"] == "createNew"
-    assert "$.arguments.import_operation" in import_operation["description"]
-    assert "Never place it inside an imports[] row" in import_operation["description"]
-
+    assert "object_path" not in adapter["declaration_fields"]
+    assert "object_type" not in adapter["declaration_fields"]
+    assert adapter["legacy_shallow_composer_public"] is False
 
 @pytest.mark.parametrize(
     ("version", "default_work_unit_path", "actor_mixer_type"),

@@ -1717,7 +1717,7 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
             error_code="OPERATION_DRAFT_ADAPTER_UNAVAILABLE",
             details={"operation": operation, "version": version},
         ) from exc
-    if input_mode != COMPOSER_INPUT_MODE:
+    if input_mode != COMPOSER_INPUT_MODE and operation != AUDIO_IMPORT_COMPOSER_OPERATION:
         raise OperationComposerError(
             f"No Operation Composer Adapter is available for {operation!r}.",
             error_code="OPERATION_DRAFT_ADAPTER_UNAVAILABLE",
