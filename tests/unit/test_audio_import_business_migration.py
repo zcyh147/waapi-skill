@@ -11,6 +11,7 @@ from wwise_waapi.audio_import_business_migration import (
     MIGRATION_DESTINATION_KINDS,
     build_audio_import_migration_inventory,
 )
+from wwise_waapi.audio_import_business import audio_import_business_contract
 from wwise_waapi.business_declarations import SUPPORTED_WWISE_VERSIONS
 from wwise_waapi.operation_composer import operation_composer_contract
 from wwise_waapi.operation_registry import audio_import_composer_fragment_contract
@@ -105,3 +106,51 @@ def test_inventory_pins_version_delta_omission_and_safety_rules(version: str) ->
 def test_committed_inventory_resource_matches_generator_exactly() -> None:
     committed = json.loads(Path(AUDIO_IMPORT_MIGRATION_RESOURCE).read_text("utf-8"))
     assert committed == build_audio_import_migration_inventory()
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_every_migration_destination_is_owned_by_the_deep_adapter(version: str) -> None:
+    contract = audio_import_business_contract(version)
+    lane = next(
+        row
+        for row in build_audio_import_migration_inventory()["lanes"]
+        if row["version"] == version
+    )
+    owned = {
+        *contract["settings"],
+        *contract["declaration_fields"],
+        *contract["gateway_derivations"],
+        *contract["live_handles"],
+        *contract["exact_user_artifacts"],
+        "mode",
+        "add_to_source_control",
+        "check_out_from_source_control",
+        "audio_source_notes",
+        "dialogue_event_directive",
+        "event_declaration",
+        "language",
+        "notes",
+        "originals_subfolder",
+        "property_field_values",
+        "reference_field_values",
+        "switch_value",
+        "event_action",
+        "bound_event_parent_handle",
+        "inline_wav.relative_path",
+        "inline_wav.opaque_base64",
+        "target_parent_handle.form",
+        "bound_parent_expected_type",
+        "bound_parent_exact_name",
+        "bound_parent_scope_handle",
+        "batch.mode",
+        "batch.settings",
+        "batch.settings.omit",
+        "batch.explicit_defaults",
+        "batch.explicit_defaults.omit",
+        "declaration.add",
+        "declaration.revise",
+        "declaration.revise_with_omission",
+        "declaration.remove",
+    }
+    for family in ("request_options", "row_fields", "nested_fields", "actions"):
+        assert {row["destination"] for row in lane[family]} <= owned

@@ -78,6 +78,41 @@ class _ObjectIdentity:
     declaration_id: str | None = None
 
 
+def audio_import_business_contract(version: str) -> dict[str, Any]:
+    """Project the closed deep Adapter vocabulary for parity/audit tooling."""
+
+    if version not in {"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"}:
+        raise ValueError("unsupported Wwise version")
+    return {
+        "contract": AUDIO_IMPORT_BUSINESS_CONTRACT,
+        "operation": "audio.import",
+        "version": version,
+        "settings": sorted(_SETTING_FIELDS),
+        "declaration_fields": sorted(_DECLARATION_FIELDS),
+        "modes": sorted(_MODE_TO_NATIVE),
+        "event_actions": sorted(_EVENT_ACTIONS),
+        "gateway_derivations": [
+            "canonical_object_path",
+            "native_object_type",
+            "target_parent_handle",
+            "dependency_order",
+            "batch_layout",
+            "native_request",
+            "continuation",
+        ],
+        "live_handles": [
+            "bound_object_handle",
+            "field_handle",
+            "typed_field_value",
+        ],
+        "exact_user_artifacts": ["media_file", "inline_wav"],
+        "version_features": {
+            "check_out_from_source_control": version
+            in {"2023.1", "2024.1", "2025.1"},
+        },
+    }
+
+
 def compile_audio_import_business(
     session: BusinessDeclarationSession,
     *,
@@ -667,4 +702,8 @@ def _type_token(value: str) -> str:
     return re.sub(r"[^a-z0-9]", "", value.casefold())
 
 
-__all__ = ["AUDIO_IMPORT_BUSINESS_CONTRACT", "compile_audio_import_business"]
+__all__ = [
+    "AUDIO_IMPORT_BUSINESS_CONTRACT",
+    "audio_import_business_contract",
+    "compile_audio_import_business",
+]
