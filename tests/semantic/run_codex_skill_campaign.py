@@ -311,6 +311,8 @@ HEAVY_V3_PROFILE_ID = matrix.HEAVY_V3_PROFILE_ID
 MODIFICATION_POLICY_V3_PROFILE_ID = matrix.MODIFICATION_POLICY_V3_PROFILE_ID
 COMPOUND_HEAVY_V1_PROFILE_ID = matrix.COMPOUND_HEAVY_V1_PROFILE_ID
 TYPED_INPUT_PROFILE_ID = matrix.TYPED_INPUT_PROFILE_ID
+DEEP_INTERFACE_MVP_PROFILE_ID = matrix.DEEP_INTERFACE_MVP_PROFILE_ID
+AUDIO_IMPORT_BUSINESS_PROFILE_ID = matrix.AUDIO_IMPORT_BUSINESS_PROFILE_ID
 INTEGRATION_WORKFLOWS_V1_PROFILE_ID = (
     matrix.INTEGRATION_WORKFLOWS_V1_PROFILE_ID
 )
@@ -345,6 +347,8 @@ TERRA_LOCKED_V3_PROFILE_IDS = frozenset(
         MODIFICATION_POLICY_V3_PROFILE_ID,
         COMPOUND_HEAVY_V1_PROFILE_ID,
         TYPED_INPUT_PROFILE_ID,
+        DEEP_INTERFACE_MVP_PROFILE_ID,
+        AUDIO_IMPORT_BUSINESS_PROFILE_ID,
         INTEGRATION_WORKFLOWS_V1_PROFILE_ID,
         INTEGRATION_WORKFLOWS_V2_PROFILE_ID,
         INTEGRATION_PROFILE_ID,
@@ -13884,6 +13888,8 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     is_policy_v3 = args.profile == MODIFICATION_POLICY_V3_PROFILE_ID
     is_compound_v1 = args.profile == COMPOUND_HEAVY_V1_PROFILE_ID
     is_typed_input = args.profile == TYPED_INPUT_PROFILE_ID
+    is_deep_interface_mvp = args.profile == DEEP_INTERFACE_MVP_PROFILE_ID
+    is_audio_import_business = args.profile == AUDIO_IMPORT_BUSINESS_PROFILE_ID
     is_integration_v1 = args.profile == INTEGRATION_WORKFLOWS_V1_PROFILE_ID
     is_integration_v2 = args.profile == INTEGRATION_WORKFLOWS_V2_PROFILE_ID
     is_integration = args.profile == INTEGRATION_PROFILE_ID
@@ -13905,16 +13911,17 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         parser.error("--timeout and --lock-timeout must be greater than zero")
     max_pre_action_retries = (
         0
-        if args.max_pre_action_retries is None and is_typed_input
+        if args.max_pre_action_retries is None
+        and (is_typed_input or is_audio_import_business)
         else 1
         if args.max_pre_action_retries is None
         else int(args.max_pre_action_retries)
     )
     if max_pre_action_retries < 0:
         parser.error("--max-pre-action-retries must be zero or greater")
-    if is_typed_input and max_pre_action_retries != 0:
+    if (is_typed_input or is_audio_import_business) and max_pre_action_retries != 0:
         parser.error(
-            f"{TYPED_INPUT_PROFILE_ID} forbids same-root pre-action retries"
+            f"{args.profile} forbids same-root pre-action retries"
         )
     for name, values in (
         ("--case-id", args.case_id),
@@ -13941,6 +13948,16 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
             parser.error(
                 "unknown v2 --case-id values: " + ", ".join(unknown_case_ids)
             )
+    if (
+        is_deep_interface_mvp
+        or is_audio_import_business
+    ) and any(
+        version not in {"2022.1", "2025.1"} for version in args.version
+    ):
+        parser.error(
+            f"{args.profile} supports only "
+            "--version 2022.1 and 2025.1"
+        )
     if (
         is_compound_v1
         or is_integration_v1
@@ -13972,6 +13989,10 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         (
             matrix.DEFAULT_MODIFICATION_POLICY_V3_SUITE
             if is_policy_v3
+            else matrix.DEFAULT_DEEP_INTERFACE_MVP_SUITE
+            if is_deep_interface_mvp
+            else matrix.DEFAULT_AUDIO_IMPORT_BUSINESS_SUITE
+            if is_audio_import_business
             else matrix.DEFAULT_TYPED_INPUT_SUITE
             if is_typed_input
             else (

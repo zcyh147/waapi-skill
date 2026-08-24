@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from tests.semantic import run_codex_skill_matrix as matrix
+from tests.semantic import run_codex_skill_campaign as campaign
 from tests.semantic.support.codex_eval_protocol_v3 import (
     build_audio_import_composer_transaction_steps,
 )
@@ -168,3 +169,37 @@ def test_matrix_wires_the_profile_to_the_packaged_skill(
     assert [unit.unit_id for unit in matrix.load_heavy_v3_units(options)] == [
         "AIB25-WEAPONS-B"
     ]
+
+
+def test_campaign_wires_the_same_suite_and_forbids_same_root_retries(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    codex = tmp_path / "codex"
+    auth = tmp_path / "auth.json"
+    live = tmp_path / "live-environment.json"
+    for path, content in ((codex, "fixture"), (auth, "{}"), (live, "{}")):
+        path.write_text(content, encoding="utf-8")
+    monkeypatch.setattr(matrix, "resolve_codex_binary", lambda _value: codex)
+
+    options = campaign.parse_args(
+        [
+            "--campaign-root",
+            str(tmp_path / "campaign"),
+            "--profile",
+            "audio_import_business_8",
+            "--auth-json",
+            str(auth),
+            "--live-config",
+            str(live),
+            "--model",
+            "gpt-5.6-terra",
+            "--reasoning-effort",
+            "medium",
+            "--service-tier",
+            "default",
+        ]
+    )
+
+    assert options.suite_path == PROFILE
+    assert options.max_pre_action_retries == 0
