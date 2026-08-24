@@ -531,18 +531,32 @@ def build_audio_import_composer_transaction_steps(
             return existing
         bind_object_index += 1
         step_name = f"{label}.bind-object.{bind_object_index:03d}"
+        if binding_kind == "path":
+            segments = tuple(segment for segment in binding_value.split("\\") if segment)
+            if not segments or "\\" + "\\".join(segments) != binding_value:
+                raise V3ProtocolError(
+                    "audio.import business path must have canonical Wwise segments"
+                )
+            selector_arguments: tuple[Any, ...] = tuple(
+                item
+                for segment in segments
+                for item in ("--object-path-segment", segment)
+            )
+        else:
+            selector_arguments = (
+                {
+                    "id": "--object-id",
+                    "name": "--object-name",
+                }[binding_kind],
+                binding_value,
+            )
         steps.append(
             ExpectedGatewayStep(
                 name=step_name,
                 subcommand="draft-bind-object",
                 arguments=(
                     *draft_prefix(),
-                    {
-                        "id": "--object-id",
-                        "name": "--object-name",
-                        "path": "--object-path",
-                    }[binding_kind],
-                    binding_value,
+                    *selector_arguments,
                 ),
             )
         )

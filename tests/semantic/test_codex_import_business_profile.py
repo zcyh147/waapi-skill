@@ -225,7 +225,8 @@ def test_runtime_resolves_media_and_stops_every_transaction_at_preview(tmp_path:
         step for step in steps if step.subcommand == "draft-bind-object"
     ]
     assert object_bindings
-    assert all("--object-path" in step.arguments for step in object_bindings)
+    assert all("--object-path-segment" in step.arguments for step in object_bindings)
+    assert all("--object-path" not in step.arguments for step in object_bindings)
     assert all("--object-name" not in step.arguments for step in object_bindings)
     assert all(step.subcommand not in {"confirm", "execute", "verify"} for step in steps)
 

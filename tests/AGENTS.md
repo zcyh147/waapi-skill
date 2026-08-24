@@ -189,6 +189,15 @@ With PowerShell's ScheduledTasks cmdlets, pass `-LogonType Interactive` and
 in its exported XML and `Limited` in its Principal. Stop before launch if
 either attestation differs.
 
+Do not match the literal English `Active` in `quser`: its state column is
+localized. On `fusion-win11`, prove the desktop from a user-owned `console`
+row plus an `explorer.exe` in that same numeric session, or use a locale-neutral
+WTS connect-state check; otherwise stop as blocked. `Get-ScheduledTask` must
+report Principal `RunLevel=Limited`, while exported XML must report
+`LogonType=InteractiveToken`. Task Scheduler may omit the default
+`<RunLevel>LeastPrivilege</RunLevel>` element, so absence of that optional XML
+tag is not a failed Limited attestation.
+
 On native Windows, a Gateway-owned v2 `model_command` must use the fixed
 backslash task-local runner spelling. Do not emit the POSIX spelling and rely on
 Broker path normalization: Fresh Agents otherwise reconstruct the familiar

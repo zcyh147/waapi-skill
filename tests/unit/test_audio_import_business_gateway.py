@@ -241,6 +241,69 @@ def test_audio_import_business_binds_one_unique_visible_name_without_a_path(
     )
 
 
+def test_audio_import_business_binds_user_path_segments_without_model_separators(
+    tmp_path: Path,
+) -> None:
+    code, started = _offline(tmp_path, "draft-start", "audio.import")
+    assert code == 0, started
+    object_path = r"\Containers\Default Work Unit\BusinessImportRoot\Weapons"
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [_info()],
+            "ak.wwise.core.getProjectInfo": [
+                {
+                    "id": PROJECT_ID,
+                    "name": "SampleProject",
+                    "path": str(_project_path(tmp_path)),
+                }
+            ],
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": PARENT_ID,
+                            "name": "Weapons",
+                            "type": "ActorMixer",
+                            "path": object_path,
+                        }
+                    ]
+                }
+            ],
+        }
+    )
+
+    bind_code, bound = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-bind-object",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            "1",
+            "--object-path-segment",
+            "Containers",
+            "--object-path-segment",
+            "Default Work Unit",
+            "--object-path-segment",
+            "BusinessImportRoot",
+            "--object-path-segment",
+            "Weapons",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert bind_code == 0, bound
+    assert bound["bound_object"]["name"] == "Weapons"
+    assert client.calls[-1] == (
+        "ak.wwise.core.object.get",
+        {"from": {"path": [object_path]}},
+        {"return": ["id", "name", "type", "path"]},
+    )
+
+
 def test_audio_import_business_unique_name_binding_returns_bounded_candidates(
     tmp_path: Path,
 ) -> None:
@@ -314,10 +377,12 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     assert start_next["object_binding"]["by_unique_name"][
         "fixed_argv_prefix"
     ][3] == "draft-bind-object"
-    assert start_next["object_binding"]["by_exact_user_path"][
+    assert start_next["object_binding"]["by_path_segments"][
         "fixed_argv_prefix"
     ][3] == "draft-bind-object"
-    assert "complete_user_supplied_path" in start_next["object_binding"]["path_rule"]
+    assert "gateway_inserts_every_wwise_separator" in (
+        start_next["object_binding"]["path_rule"]
+    )
     assert "returned_name_type_path" in (
         start_next["object_binding"]["result_validation_rule"]
     )
@@ -612,18 +677,20 @@ def test_audio_import_business_start_discloses_only_copy_ready_object_binding(
         "fixed_argv_prefix_copy"
     )
     assert by_name["append"] == ["--object-name", "<exact-user-visible-name>"]
-    by_path = next_action["object_binding"]["by_exact_user_path"]
-    assert by_path["fixed_argv_prefix"][3] == "draft-bind-object"
-    assert by_path["fixed_argv_prefix_copy_instruction"]["source_field"] == (
+    by_segments = next_action["object_binding"]["by_path_segments"]
+    assert by_segments["fixed_argv_prefix"][3] == "draft-bind-object"
+    assert by_segments["fixed_argv_prefix_copy_instruction"]["source_field"] == (
         "fixed_argv_prefix_copy"
     )
-    assert by_path["append"] == [
-        "--object-path",
-        "<exact-complete-user-supplied-wwise-path>",
+    assert by_segments["append_repeated"] == [
+        "--object-path-segment",
+        "<one-exact-user-path-segment-without-separators>",
     ]
+    assert by_segments["segment_order"] == "root_to_leaf"
+    assert "by_exact_user_path" not in next_action["object_binding"]
     assert (
         next_action["object_binding"]["selection_rule"]
-        == "user_supplied_complete_path_requires_by_exact_user_path; "
+        == "user_supplied_complete_path_requires_by_path_segments; "
         "user_supplied_name_without_a_path_uses_by_unique_name; "
         "user_selected_guid_uses_by_id"
     )

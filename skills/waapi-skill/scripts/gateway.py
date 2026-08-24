@@ -235,6 +235,7 @@ from wwise_waapi.audio_import_business import (  # noqa: E402  # pyright: ignore
 )
 from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_BUSINESS_NAME_BYTES,
+    MAX_BUSINESS_PATH_BYTES,
     BusinessContext,
     BusinessDeclarationError,
     BusinessHandleRegistry,
@@ -462,6 +463,7 @@ ORIGINAL_FILE_REFERENCE_RETURN_FIELDS = ("id", "path", "originalFilePath")
 MAX_ORIGINAL_FILE_PATH_CANDIDATES = 64
 MAX_ORIGINAL_FILE_PATH_BYTES = 1024
 MAX_ORIGINAL_FILE_REFERENCE_PATH_BYTES = 512
+MAX_BUSINESS_OBJECT_PATH_SEGMENTS = 64
 _METADATA_SESSION_CACHE = SessionMetadataCache()
 MAX_ORIGINAL_FILE_REFERENCE_DETAILS_PER_CANDIDATE = 4
 MAX_ORIGINAL_FILE_REFERENCE_DETAILS = (
@@ -1881,6 +1883,7 @@ def build_parser() -> argparse.ArgumentParser:
     object_selector = draft_bind_object.add_mutually_exclusive_group(required=True)
     object_selector.add_argument("--object-id")
     object_selector.add_argument("--object-path")
+    object_selector.add_argument("--object-path-segment", action="append")
     object_selector.add_argument("--object-name")
 
     draft_bind_field = subparsers.add_parser(
@@ -10317,6 +10320,45 @@ def _business_context_from_live(
     )
 
 
+def _business_object_path_from_segments(values: Any) -> str:
+    if (
+        not isinstance(values, list)
+        or not 1 <= len(values) <= MAX_BUSINESS_OBJECT_PATH_SEGMENTS
+    ):
+        raise GatewayInputError(
+            "Business object path requires 1.."
+            f"{MAX_BUSINESS_OBJECT_PATH_SEGMENTS} ordered path segments."
+        )
+    segments: list[str] = []
+    for value in values:
+        if (
+            not isinstance(value, str)
+            or not value
+            or value != value.strip()
+            or len(value.encode("utf-8")) > MAX_BUSINESS_NAME_BYTES
+            or "\\" in value
+            or "/" in value
+            or '"' in value
+            or any(
+                ord(character) < 32
+                or ord(character) == 127
+                or character in {"\u2028", "\u2029"}
+                for character in value
+            )
+        ):
+            raise GatewayInputError(
+                "Each business object path segment must be one bounded literal name "
+                "without a path separator."
+            )
+        segments.append(value)
+    path = "\\" + "\\".join(segments)
+    if len(path.encode("utf-8")) > MAX_BUSINESS_PATH_BYTES:
+        raise GatewayInputError(
+            "Business object path segments exceed the fixed path byte limit."
+        )
+    return path
+
+
 def dispatch_business_object_binding(
     args: argparse.Namespace,
     *,
@@ -10356,10 +10398,13 @@ def dispatch_business_object_binding(
         connection=connection,
         version=detected_version,
     )
+    object_path = args.object_path
+    if args.object_path_segment is not None:
+        object_path = _business_object_path_from_segments(args.object_path_segment)
     if args.object_id is not None:
         selector = {"from": {"id": [args.object_id]}}
-    elif args.object_path is not None:
-        selector = {"from": {"path": [args.object_path]}}
+    elif object_path is not None:
+        selector = {"from": {"path": [object_path]}}
     else:
         object_name = args.object_name
         if (
@@ -10413,7 +10458,7 @@ def dispatch_business_object_binding(
             for field in ("name", "type", "path")
         )
         or (args.object_id is not None and str(row["id"]).upper() != args.object_id.upper())
-        or (args.object_path is not None and row["path"] != args.object_path)
+        or (object_path is not None and row["path"] != object_path)
         or (args.object_name is not None and row["name"] != args.object_name)
     ):
         raise GatewayResultShapeError(
@@ -14902,21 +14947,25 @@ def _audio_import_business_next_action_binding(
         "--object-name",
         "<exact-user-visible-name>",
     ]
-    by_exact_user_path = operation_draft_prefix_copy_binding(object_bind_prefix)
-    by_exact_user_path["append"] = [
-        "--object-path",
-        "<exact-complete-user-supplied-wwise-path>",
+    by_path_segments = operation_draft_prefix_copy_binding(object_bind_prefix)
+    by_path_segments["append_repeated"] = [
+        "--object-path-segment",
+        "<one-exact-user-path-segment-without-separators>",
     ]
+    by_path_segments["segment_order"] = "root_to_leaf"
     object_binding = {
         "by_id": by_id,
-        "by_exact_user_path": by_exact_user_path,
+        "by_path_segments": by_path_segments,
         "by_unique_name": by_unique_name,
         "selection_rule": (
-            "user_supplied_complete_path_requires_by_exact_user_path; "
+            "user_supplied_complete_path_requires_by_path_segments; "
             "user_supplied_name_without_a_path_uses_by_unique_name; "
             "user_selected_guid_uses_by_id"
         ),
-        "path_rule": "copy_the_complete_user_supplied_path_without_reconstruction",
+        "path_rule": (
+            "copy_each_nonempty_user_path_segment_root_to_leaf; gateway_inserts_"
+            "every_wwise_separator"
+        ),
         "name_rule": (
             "zero_or_multiple_name_matches_fail_closed_with_bounded_candidates"
         ),

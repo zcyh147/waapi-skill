@@ -4147,8 +4147,8 @@ def test_business_draft_setup_broker_selects_unique_binding_and_configuration(
             authority,
             "--expected-revision",
             "1",
-            "--object-path",
-            r"\Events",
+            "--object-path-segment",
+            "Events",
         )
     )
     assert selected is not None
