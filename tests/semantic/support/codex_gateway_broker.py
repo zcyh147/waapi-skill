@@ -5808,6 +5808,39 @@ def _normalize_audio_import_request_named_fields(value: Any) -> Any:
     return normalized
 
 
+def _normalize_bound_business_reference_paths(
+    value: Any,
+    *,
+    path_to_id: Mapping[str, str],
+) -> Any:
+    """Replace only exact live-bound path identities with their sealed GUIDs."""
+
+    if isinstance(value, Mapping):
+        if (
+            set(value) == {"kind", "value"}
+            and value.get("kind") == "path"
+            and isinstance(value.get("value"), str)
+            and value["value"] in path_to_id
+        ):
+            return {"kind": "id", "value": path_to_id[value["value"]]}
+        return {
+            str(key): _normalize_bound_business_reference_paths(
+                nested,
+                path_to_id=path_to_id,
+            )
+            for key, nested in value.items()
+        }
+    if isinstance(value, list):
+        return [
+            _normalize_bound_business_reference_paths(
+                nested,
+                path_to_id=path_to_id,
+            )
+            for nested in value
+        ]
+    return value
+
+
 def _normalize_audio_import_request_activation_properties(
     actual: Any,
     expected: Any,
@@ -11043,10 +11076,22 @@ class CodexGatewayBroker:
                     raise GatewayInvocationError(
                         "Business request cannot be replayed from the durable Draft"
                     ) from exc
+                handle_rows = session.handles.as_dict().get("objects", [])
+                path_to_id = {
+                    str(row["path"]): str(row["object_id"])
+                    for row in handle_rows
+                    if isinstance(row, Mapping)
+                    and isinstance(row.get("path"), str)
+                    and isinstance(row.get("object_id"), str)
+                }
+                bound_witness = _normalize_bound_business_reference_paths(
+                    preview_step.expected_operation_request,
+                    path_to_id=path_to_id,
+                )
                 if _normalize_audio_import_request_named_fields(
                     replayed
                 ) != _normalize_audio_import_request_named_fields(
-                    preview_step.expected_operation_request
+                    bound_witness
                 ):
                     raise GatewayInvocationError(
                         "Durable business declarations differ from the sealed request "

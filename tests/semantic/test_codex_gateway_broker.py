@@ -4027,6 +4027,47 @@ def test_business_declaration_field_order_is_semantic_but_duplicates_stay_invali
     )
 
 
+def test_business_request_normalizes_only_exact_live_bound_reference_paths() -> None:
+    bound_path = r"\Master-Mixer Hierarchy\Default Work Unit\Weather_Bus"
+    unknown_path = r"\Master-Mixer Hierarchy\Default Work Unit\Unknown"
+    value = {
+        "operation": "audio.import",
+        "arguments": {
+            "imports": [
+                {
+                    "object_path": bound_path,
+                    "references": [
+                        {
+                            "name": "OutputBus",
+                            "target": {"kind": "path", "value": bound_path},
+                        },
+                        {
+                            "name": "Unknown",
+                            "target": {"kind": "path", "value": unknown_path},
+                        },
+                    ],
+                }
+            ]
+        },
+    }
+
+    normalized = broker_module._normalize_bound_business_reference_paths(  # noqa: SLF001
+        value,
+        path_to_id={bound_path: "{11111111-1111-1111-1111-111111111111}"},
+    )
+
+    row = normalized["arguments"]["imports"][0]
+    assert row["object_path"] == bound_path
+    assert row["references"][0]["target"] == {
+        "kind": "id",
+        "value": "{11111111-1111-1111-1111-111111111111}",
+    }
+    assert row["references"][1]["target"] == {
+        "kind": "path",
+        "value": unknown_path,
+    }
+
+
 def test_business_draft_setup_broker_selects_unique_binding_and_configuration(
     tmp_path: Path,
 ) -> None:
