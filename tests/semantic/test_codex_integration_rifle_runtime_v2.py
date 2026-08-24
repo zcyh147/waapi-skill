@@ -876,8 +876,8 @@ def test_rifle_setup_accepts_only_dependency_valid_action_orders(
     assert canonical == (
         "tx01.operation-schema",
         "tx01.draft-start",
-        "tx01.configure",
         "tx01.bind-object.001",
+        "tx01.bind-object.002",
     )
     assert gateway_step_sequence_matches(
         canonical, canonical, groups, setup_groups

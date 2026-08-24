@@ -305,10 +305,10 @@ def test_audio_import_protocol_emits_ordered_business_steps_without_native_rows(
     assert [step.subcommand for step in steps[:9]] == [
         "operation-schema",
         "draft-start",
+        "draft-bind-object",
+        "draft-bind-object",
+        "draft-bind-object",
         "draft-business-configure",
-        "draft-bind-object",
-        "draft-bind-object",
-        "draft-bind-object",
         "draft-declare-new",
         "draft-check",
         "preview-from-draft",

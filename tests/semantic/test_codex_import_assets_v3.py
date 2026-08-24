@@ -381,7 +381,7 @@ def test_compound_direct_import_binds_defaults_row_overrides_and_inline_wav(
     assert tuple(step.name for step in protocol.steps[:3]) == (
         "tx01.operation-schema",
         "tx01.draft-start",
-        "tx01.configure",
+        "tx01.bind-object.001",
     )
     assert next(step for step in protocol.steps if step.name == "tx01.preview").subcommand == (
         "preview-from-draft"

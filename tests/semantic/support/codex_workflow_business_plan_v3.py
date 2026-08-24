@@ -536,9 +536,15 @@ def _matches_transaction_step_sequence(
     if input_mode == BUSINESS_DECLARATION_INPUT_MODE:
         if not prefixes:
             return False
-        offset = 1 if prefixes[0] == "configure" else 0
         counters = {"bind-object": [], "bind-field": [], "declare": []}
-        for prefix in prefixes[offset:]:
+        configure_seen = False
+        declaration_seen = False
+        for prefix in prefixes:
+            if prefix == "configure":
+                if configure_seen or declaration_seen:
+                    return False
+                configure_seen = True
+                continue
             family, separator, raw_index = prefix.rpartition(".")
             if (
                 not separator
@@ -547,6 +553,12 @@ def _matches_transaction_step_sequence(
                 or not raw_index.isdigit()
             ):
                 return False
+            if family in {"bind-object", "bind-field"} and (
+                configure_seen or declaration_seen
+            ):
+                return False
+            if family == "declare":
+                declaration_seen = True
             counters[family].append(int(raw_index))
         return (
             bool(counters["bind-object"])

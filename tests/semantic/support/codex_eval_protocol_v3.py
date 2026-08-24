@@ -863,6 +863,60 @@ def build_audio_import_composer_transaction_steps(
                 f"/draft/declarations/{row_index}/result_handle",
             )
 
+    # The public business continuation tells a fresh Agent to bind every exact
+    # live object before it configures or declares the import batch.  Keep the
+    # formal Broker protocol in that same Gateway-owned order.  The inverse
+    # builder discovers bindings while walking declarations, so normalize the
+    # finished setup here and rebuild only the optimistic revision chain; all
+    # object/field/declaration handle dependencies retain their named sources.
+    fixed_prefix = steps[:2]
+    mutable_business_steps = steps[2:]
+    binding_steps = [
+        step
+        for step in mutable_business_steps
+        if step.subcommand in {"draft-bind-object", "draft-bind-field"}
+    ]
+    configure_steps = [
+        step
+        for step in mutable_business_steps
+        if step.subcommand == "draft-business-configure"
+    ]
+    declaration_steps = [
+        step
+        for step in mutable_business_steps
+        if step.subcommand in {"draft-declare-new", "draft-declare-existing"}
+    ]
+    if len(binding_steps) + len(configure_steps) + len(declaration_steps) != len(
+        mutable_business_steps
+    ):
+        raise V3ProtocolError("audio.import business setup contains an unknown step")
+    ordered_business_steps = (
+        *binding_steps,
+        *configure_steps,
+        *declaration_steps,
+    )
+    resequenced_steps: list[ExpectedGatewayStep] = []
+    previous_revision_step = draft_start
+    for step in ordered_business_steps:
+        arguments = list(step.arguments)
+        if (
+            len(arguments) < 5
+            or arguments[3] != "--expected-revision"
+            or not isinstance(arguments[4], ResponseBinding)
+        ):
+            raise V3ProtocolError(
+                "audio.import business setup lacks a bound revision argument"
+            )
+        arguments[4] = ResponseBinding(
+            previous_revision_step,
+            "/draft/revision",
+        )
+        resequenced = replace(step, arguments=tuple(arguments))
+        resequenced_steps.append(resequenced)
+        previous_revision_step = resequenced.name
+    steps = [*fixed_prefix, *resequenced_steps]
+    latest_revision_step = previous_revision_step
+
     check_name = f"{label}.check"
     preview_name = f"{label}.preview"
     show_name = f"{label}.transaction-show"
