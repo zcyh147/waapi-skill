@@ -7198,6 +7198,24 @@ def _project_operation_draft_runner(
                     projected[argv_key],
                     platform_name=platform_name,
                 )
+            if "fixed_argv_prefix_copy" in nested:
+                argv = nested.get("fixed_argv_prefix")
+                instruction = nested.get("fixed_argv_prefix_copy_instruction")
+                if (
+                    not isinstance(argv, list)
+                    or nested.get("fixed_argv_prefix_copy")
+                    != _draft_copy_command(argv, platform_name=platform_name)
+                    or not isinstance(instruction, Mapping)
+                    or instruction.get("source_field")
+                    != "fixed_argv_prefix_copy"
+                ):
+                    raise GatewayInvocationError(
+                        "Gateway business Draft copy-ready prefix is not exact"
+                    )
+                projected["fixed_argv_prefix_copy"] = _draft_copy_command(
+                    projected["fixed_argv_prefix"],
+                    platform_name=platform_name,
+                )
             return projected
 
         projected = walk(binding)

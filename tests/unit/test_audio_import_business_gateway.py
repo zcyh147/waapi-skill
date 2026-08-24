@@ -307,13 +307,13 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     code, started = _offline(tmp_path, "draft-start", "audio.import")
     assert code == 0, started
     start_next = started["draft"]["next_action_binding"]
-    assert start_next["required_next_phase"] == (
-        "bind_only_handle_typed_business_objects_then_configure_and_declare"
-    )
-    assert start_next["object_binding"]["by_id"][3] == "draft-bind-object"
-    assert start_next["object_binding"]["by_unique_name"][3] == (
+    assert start_next["required_next_phase"] == "bind_existing_business_object"
+    assert start_next["object_binding"]["by_id"]["fixed_argv_prefix"][3] == (
         "draft-bind-object"
     )
+    assert start_next["object_binding"]["by_unique_name"][
+        "fixed_argv_prefix"
+    ][3] == "draft-bind-object"
     assert "final_nonempty_segment" in (
         start_next["object_binding"]["full_user_path_rule"]
     )
@@ -321,28 +321,8 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
         start_next["object_binding"]["result_validation_rule"]
     )
     assert "by_path" not in start_next["object_binding"]
-    assert "switch_value" in start_next["binding_decision"]["literal_never_bind"]
-    assert start_next["binding_decision"]["bound_object_handle_fields"] == [
-        "output_bus",
-        "event_parent",
-        "custom_reference_value",
-    ]
-    assert start_next["configure"]["reference_default_rule"] == (
-        "copy_one_bound_object_handle_never_a_path_or_name"
-    )
-    assert start_next["configure"]["default_scope"] == (
-        "every_declaration_in_the_batch_after_expansion"
-    )
-    assert "valid_for_every_target_kind" in (
-        start_next["configure"]["default_use_rule"]
-    )
-    assert start_next["configure"]["append"][0] == (
-        "[--mode replace] only_for_explicit_replacement; "
-        "create_and_reimport_derive_from_target_form"
-    )
-    assert start_next["declare_new"]["known_user_fields"] == (
-        "complete_on_first_submission"
-    )
+    assert "configure" not in start_next
+    assert "declare_new" not in start_next
     assert "draft-apply" not in json.dumps(start_next)
     assert "wwise_path_discipline" not in start_next
     assert "object_path" in start_next["forbidden_inputs"]
@@ -426,6 +406,55 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     parent_handle = bound["bound_object"]["handle"]
     assert parent_handle.startswith("boh1-")
     assert bound["draft"]["revision"] == 2
+    bound_next = bound["draft"]["next_action_binding"]
+    assert bound_next["required_next_phase"] == (
+        "complete_business_declarations_then_check"
+    )
+    assert "switch_value" in bound_next["binding_decision"]["literal_never_bind"]
+    assert bound_next["binding_decision"]["bound_object_handle_fields"] == [
+        "output_bus",
+        "event_parent",
+        "custom_reference_value",
+    ]
+    for scope_name in ("object_scope", "class_scope"):
+        scope = bound_next["field_binding"][scope_name]
+        assert scope["fixed_argv_prefix_copy_instruction"]["source_field"] == (
+            "fixed_argv_prefix_copy"
+        )
+        assert scope["fixed_argv_prefix_copy"]
+    for action_name in (
+        "configure",
+        "declare_new",
+        "declare_existing",
+        "revise",
+        "remove",
+    ):
+        action = bound_next[action_name]
+        assert action["fixed_argv_prefix_copy_instruction"]["source_field"] == (
+            "fixed_argv_prefix_copy"
+        )
+        assert action["fixed_argv_prefix_copy"]
+    assert all(
+        "--default" not in value
+        for value in bound_next["configure"]["append"]
+    )
+    explicit_defaults = bound_next["explicit_global_defaults"]
+    assert explicit_defaults["scope"] == (
+        "every_declaration_in_the_batch_after_expansion"
+    )
+    assert explicit_defaults["use_only_when"] == (
+        "user_explicitly_requests_a_Wwise_global_batch_default"
+    )
+    assert "--default <stable-field> <business-value>" in (
+        explicit_defaults["append"][0]
+    )
+    assert bound_next["configure"]["append"][0] == (
+        "[--mode replace] only_for_explicit_replacement; "
+        "create_and_reimport_derive_from_target_form"
+    )
+    assert bound_next["declare_new"]["known_user_fields"] == (
+        "complete_on_first_submission"
+    )
 
     field_client = FakeClient(
         {
@@ -555,6 +584,32 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
             {"name": "CustomGain", "value": -2.5},
         ],
     }
+
+
+def test_audio_import_business_start_discloses_only_copy_ready_object_binding(
+    tmp_path: Path,
+) -> None:
+    code, started = _offline(tmp_path, "draft-start", "audio.import")
+
+    assert code == 0, started
+    next_action = started["draft"]["next_action_binding"]
+    assert next_action["required_next_phase"] == "bind_existing_business_object"
+    assert all(
+        name not in next_action
+        for name in (
+            "field_binding",
+            "configure",
+            "declare_new",
+            "declare_existing",
+            "completion_candidate",
+        )
+    )
+    by_name = next_action["object_binding"]["by_unique_name"]
+    assert by_name["fixed_argv_prefix"][3] == "draft-bind-object"
+    assert by_name["fixed_argv_prefix_copy_instruction"]["source_field"] == (
+        "fixed_argv_prefix_copy"
+    )
+    assert by_name["append"] == ["--object-name", "<exact-user-visible-name>"]
 
 
 def test_structure_declaration_reaches_live_check_and_persists_readable_preview(

@@ -1730,6 +1730,20 @@ def test_broker_projects_every_business_draft_command_to_task_install(
     def command(subcommand: str, *suffix: str) -> list[str]:
         return ["python", candidate, "gateway.py", subcommand, *suffix]
 
+    def copy_ready_prefix(subcommand: str, *suffix: str) -> dict[str, object]:
+        argv = command(subcommand, *suffix)
+        return {
+            "fixed_argv_prefix": argv,
+            "fixed_argv_prefix_copy": (
+                encode_windows_model_argv(argv)
+                if platform_name == "nt"
+                else shlex.join(argv)
+            ),
+            "fixed_argv_prefix_copy_instruction": {
+                "source_field": "fixed_argv_prefix_copy",
+            },
+        }
+
     completion = command(
         "draft-check",
         "od1-0123456789abcdef0123456789abcdef",
@@ -1742,7 +1756,7 @@ def test_broker_projects_every_business_draft_command_to_task_install(
         "contract": "waapi-skill.business-draft-next-action/v1",
         "shell_tool_timeout_ms": 30_000,
         "object_binding": {
-            "by_id": command("draft-bind-object", "<draft>", "--object-id", "<id>"),
+            "by_id": copy_ready_prefix("draft-bind-object", "<draft>"),
             "by_path": command(
                 "draft-bind-object", "<draft>", "--object-path", "<path>"
             ),
@@ -1797,9 +1811,17 @@ def test_broker_projects_every_business_draft_command_to_task_install(
         if platform_name == "nt"
         else shlex.join(projected_completion)
     )
+    projected_binding = projected["object_binding"]["by_id"]
+    assert projected_binding["fixed_argv_prefix_copy"] == (
+        encode_windows_model_argv(projected_binding["fixed_argv_prefix"])
+        if platform_name == "nt"
+        else shlex.join(projected_binding["fixed_argv_prefix"])
+    )
 
     tampered = json.loads(json.dumps(binding))
-    tampered["object_binding"]["by_id"][1] = str(tmp_path / "other.py")
+    tampered["object_binding"]["by_id"]["fixed_argv_prefix"][1] = str(
+        tmp_path / "other.py"
+    )
     with pytest.raises(
         GatewayInvocationError,
         match="business Draft continuation is not bound",

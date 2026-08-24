@@ -46,7 +46,7 @@ DEFAULT_TIMEOUT_SECONDS = 180.0
 SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "First read SKILL.md once, standalone. "
     "Reads now; no future/pre-read reply/questions. "
-    "copy returned source_field/fixed_argv_prefix verbatim; keep quotes/runner; never reconstruct; "
+    "copy source_field/fixed_argv_prefix_copy verbatim; keep quotes/runner; never reconstruct; "
     "opaque IDs/handles/tokens/digests. Typed facts: one argv/fact; batch_size=6; "
     "final=remaining; cover every prompt field/item/map/bool. Composer: one action/call. "
     "allowed_action_argv owns TYPE; not Real64/int16. unapplied "

@@ -107,7 +107,7 @@ def _final_response_reports_preview(
         marker.translate(_REPORT_MINUS_TRANSLATION).casefold()
         for marker in markers
     )
-    if all(marker in normalized for marker in normalized_markers) and (
+    if any(marker in normalized for marker in normalized_markers) and (
         "预览" in normalized or "preview" in normalized
     ):
         return True

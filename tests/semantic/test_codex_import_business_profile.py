@@ -179,6 +179,13 @@ def test_final_preview_report_accepts_typographic_minus_without_fixed_wording() 
     )
 
 
+def test_final_preview_report_does_not_require_fixed_synonym_markers() -> None:
+    assert _final_response_reports_preview(
+        "已完成安全重导入预览：Rifle 保持对象身份；未执行项目修改。",
+        markers=("Rifle", "保留"),
+    )
+
+
 def test_final_preview_report_accepts_exact_machine_result() -> None:
     payload = {
         "operation": "audio.import",
