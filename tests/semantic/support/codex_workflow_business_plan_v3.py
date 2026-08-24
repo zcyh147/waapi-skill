@@ -21,7 +21,11 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Mapping, Sequence
 
-from wwise_waapi.operation_registry import COMPOSER_INPUT_MODE, operation_input_mode
+from wwise_waapi.operation_registry import (
+    BUSINESS_DECLARATION_INPUT_MODE,
+    COMPOSER_INPUT_MODE,
+    operation_input_mode,
+)
 
 
 WORKFLOW_BUSINESS_PLAN_SCHEMA = "waapi-skill.workflow-business-plan/v1"
@@ -503,10 +507,11 @@ def _matches_transaction_step_sequence(
     ]
     if actual == legacy:
         return True
-    if operation_input_mode(
+    input_mode = operation_input_mode(
         str(transaction.get("operation")),
         str(transaction.get("version", "2022.1")),
-    ) != COMPOSER_INPUT_MODE:
+    )
+    if input_mode not in {COMPOSER_INPUT_MODE, BUSINESS_DECLARATION_INPUT_MODE}:
         return False
     if len(actual) < 9:
         return False
@@ -528,6 +533,28 @@ def _matches_transaction_step_sequence(
     prefixes = [
         name.removeprefix(f"{transaction_id}.") for name, _kind in construction
     ]
+    if input_mode == BUSINESS_DECLARATION_INPUT_MODE:
+        if not prefixes or prefixes[0] != "configure":
+            return False
+        counters = {"bind-object": [], "bind-field": [], "declare": []}
+        for prefix in prefixes[1:]:
+            family, separator, raw_index = prefix.rpartition(".")
+            if (
+                not separator
+                or family not in counters
+                or len(raw_index) != 3
+                or not raw_index.isdigit()
+            ):
+                return False
+            counters[family].append(int(raw_index))
+        return (
+            bool(counters["bind-object"])
+            and bool(counters["declare"])
+            and all(
+                indexes == list(range(1, len(indexes) + 1))
+                for indexes in counters.values()
+            )
+        )
     action_indexes: list[int] = []
     disclosure_positions: list[int] = []
     for position, prefix in enumerate(prefixes):

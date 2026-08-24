@@ -825,7 +825,7 @@ def _serialize_step(step: ExpectedGatewayStep) -> dict[str, Any]:
             )
         else:
             raise PromptProvenanceError("protocol contains an unsupported argument")
-    return {
+    serialized = {
         "name": step.name,
         "subcommand": step.subcommand,
         "arguments": arguments,
@@ -856,10 +856,17 @@ def _serialize_step(step: ExpectedGatewayStep) -> dict[str, Any]:
             }
         ),
     }
+    if step.expected_operation_request is not None:
+        request = _json_clone(step.expected_operation_request)
+        serialized["expected_operation_request"] = {
+            "value": request,
+            "sha256": _sha256_json(request),
+        }
+    return serialized
 
 
 def _deserialize_step(value: Any) -> ExpectedGatewayStep:
-    if not isinstance(value, Mapping) or set(value) != {
+    required_fields = {
         "name",
         "subcommand",
         "arguments",
@@ -871,7 +878,12 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
         "expected_result_command",
         "terminal_execute",
         "metadata_binding",
-    }:
+    }
+    if (
+        not isinstance(value, Mapping)
+        or not required_fields.issubset(value)
+        or set(value) - required_fields - {"expected_operation_request"}
+    ):
         raise PromptProvenanceError("protocol step schema is invalid")
     raw_arguments = value.get("arguments")
     if (
@@ -906,6 +918,17 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
         )
     ):
         raise PromptProvenanceError("protocol step metadata binding is invalid")
+    raw_request_witness = value.get("expected_operation_request")
+    if raw_request_witness is not None and (
+        not isinstance(raw_request_witness, Mapping)
+        or set(raw_request_witness) != {"value", "sha256"}
+        or not isinstance(raw_request_witness.get("value"), Mapping)
+        or raw_request_witness.get("sha256")
+        != _sha256_json(raw_request_witness.get("value"))
+    ):
+        raise PromptProvenanceError(
+            "protocol step operation request witness is invalid"
+        )
     arguments: list[Any] = []
     for row in raw_arguments:
         if not isinstance(row, Mapping) or "kind" not in row:
@@ -1490,6 +1513,11 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
                         )
                     ),
                 )
+            ),
+            expected_operation_request=(
+                None
+                if raw_request_witness is None
+                else _json_clone(raw_request_witness["value"])
             ),
         )
     except (TypeError, ValueError) as exc:
@@ -2162,6 +2190,38 @@ def _audio_import_composer_row_origins(
     steps = protocol_value.get("steps")
     if not isinstance(steps, list):
         raise PromptProvenanceError("protocol steps are unavailable")
+    request_witnesses = tuple(
+        (index, step.get("expected_operation_request"))
+        for index, step in enumerate(steps)
+        if isinstance(step, Mapping)
+        and step.get("subcommand") == "preview-from-draft"
+        and step.get("expected_operation_request") is not None
+    )
+    if request_witnesses:
+        if len(request_witnesses) != 1:
+            raise PromptProvenanceError(
+                "audio.import business protocol has ambiguous request witnesses"
+            )
+        step_index, sealed = request_witnesses[0]
+        request = sealed.get("value") if isinstance(sealed, Mapping) else None
+        arguments = request.get("arguments") if isinstance(request, Mapping) else None
+        witnessed_rows = (
+            arguments.get("imports") if isinstance(arguments, Mapping) else None
+        )
+        if not isinstance(witnessed_rows, list) or not _json_equal(
+            witnessed_rows, rows
+        ):
+            raise PromptProvenanceError(
+                "audio.import visible rows differ from the sealed business request"
+            )
+        base = (
+            f"/steps/{step_index}/expected_operation_request/value/arguments/imports"
+        )
+        return {
+            f"/{row_index}{pointer}": f"{base}/{row_index}{pointer}"
+            for row_index, row in enumerate(witnessed_rows)
+            for pointer, _leaf in _walk_leaves(row)
+        }
     action_rows: list[tuple[str, str, Mapping[str, Any]]] = []
     assignment_edits: dict[str, tuple[str, Mapping[str, Any]]] = {}
     for step_index, step in enumerate(steps):

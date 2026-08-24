@@ -2044,10 +2044,10 @@ def test_prepare_compound_import_uses_two_stage_reference_and_metadata_binding(
     )
 
     assert calls == ["references", "metadata-bind", "runtime"]
-    assert prepared.protocol.turn_prefix_counts == (6, 10)
+    assert prepared.protocol.turn_prefix_counts == (8, 12)
     assert sum(
         step.subcommand == "metadata" for step in prepared.protocol.steps
-    ) == 1
+    ) == 0
     assert next(
         step for step in prepared.protocol.steps if step.name == "tx01.preview"
     ).subcommand == "preview-from-draft"

@@ -2285,76 +2285,34 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
         ),
         equivalence="audio_import_v1",
     )
-    action_containers = [
-        step.arguments[-1]
-        for step in protocol.steps
-        if step.subcommand == "draft-apply"
+    field_bindings = [
+        step for step in protocol.steps if step.subcommand == "draft-bind-field"
     ]
-    metadata_arguments = [
-        action
-        for container in action_containers
-        for action in (
-            container.actions
-            if isinstance(container, DraftTypedActionBatchArgument)
-            else (container,)
-        )
-        if isinstance(action, DraftTypedActionArgument)
-        and action.metadata_binding is not None
-    ]
-    assert len(metadata_arguments) == 2
-    assert all(
-        argument.metadata_binding.step == "metadata.discover"
-        for argument in metadata_arguments
-    )
-    assert sum(step.subcommand == "metadata" for step in protocol.steps) == 1
+    assert len(field_bindings) == 1
+    assert {
+        step.arguments[step.arguments.index("--token") + 1]
+        for step in field_bindings
+    } == {"OverrideOutput"}
+    assert all(step.subcommand != "metadata" for step in protocol.steps)
+    assert all(step.subcommand != "draft-apply" for step in protocol.steps)
     serialized = serialize_protocol(protocol)
-    serialized_action_rows = [
-        action
+    serialized_preview = next(
+        step
         for step in serialized["steps"]
-        if step["subcommand"] == "draft-apply"
-        for action in (
-            step["arguments"][-1]["actions"]
-            if step["arguments"][-1].get("kind") == "draft_typed_action_batch"
-            else (step["arguments"][-1],)
-        )
-    ]
-    serialized_metadata_rows = [
-        row for row in serialized_action_rows if row.get("metadata_binding") is not None
-    ]
-    assert len(serialized_metadata_rows) == 2
-    assert all(
-        row["metadata_binding"]["step"] == "metadata.discover"
-        for row in serialized_metadata_rows
+        if step["subcommand"] == "preview-from-draft"
     )
-    serialized_row_step, serialized_row_argument = next(
-        (step, action)
-        for step in serialized["steps"]
-        if step["subcommand"] == "draft-apply"
-        for action in (
-            step["arguments"][-1]["actions"]
-            if step["arguments"][-1].get("kind") == "draft_typed_action_batch"
-            else (step["arguments"][-1],)
-        )
-        if action["value"].get("action")
-        == "add_import_row"
-    )
-    serialized_row = serialized_row_argument["value"]
-    assert "switch_assignment" not in serialized_row
-    assert serialized_row["assignment"] == {"mode": "switch", "value": "Rain"}
-    assert serialized_row_argument["response_bindings"] == []
+    assert serialized_preview["expected_operation_request"]["value"]["arguments"][
+        "imports"
+    ][0]["switch_assignment"] == "Rain"
     assert deserialize_protocol(serialized) == protocol
-    gateway_authored_request = {
-        **request,
-        "arguments": {
-            **request["arguments"],
-            "import_operation": "createNew",
-        },
-    }
+    gateway_authored_request = request
     origins = _audio_import_composer_row_origins(
         serialized,
         gateway_authored_request["arguments"]["imports"],
     )
-    assert origins["/0/switch_assignment"].endswith("/value/assignment/value")
+    assert origins["/0/switch_assignment"].endswith(
+        "/expected_operation_request/value/arguments/imports/0/switch_assignment"
+    )
     assert _protocol_requests(serialized, version="2022.1") == (
         ("/composer/tx01.preview", gateway_authored_request),
     )
@@ -2370,18 +2328,14 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
         protocol=protocol,
     )
     payload = json.loads(evidence.path.read_text(encoding="utf-8"))
-    assignment_row = next(
-        action
+    preview_row = next(
+        step
         for step in payload["protocol"]["value"]["steps"]
-        if step["subcommand"] == "draft-apply"
-        for action in (
-            step["arguments"][-1]["actions"]
-            if step["arguments"][-1].get("kind") == "draft_typed_action_batch"
-            else (step["arguments"][-1],)
-        )
-        if action["value"].get("action") == "add_import_row"
+        if step["subcommand"] == "preview-from-draft"
     )
-    assignment_row["value"]["assignment"] = {"mode": "switch"}
+    preview_row["expected_operation_request"]["value"]["arguments"]["imports"][0][
+        "switch_assignment"
+    ] = "Drifted"
     payload["protocol"]["sha256"] = hashlib.sha256(
         json.dumps(
             payload["protocol"]["value"],
@@ -2395,7 +2349,7 @@ def test_audio_import_metadata_equivalence_is_round_tripped_and_manifest_sealed(
 
     with pytest.raises(
         PromptProvenanceError,
-        match="Typed Draft batch protocol argument is invalid",
+        match="protocol step operation request witness is invalid",
     ):
         _read_again(
             evidence.path,

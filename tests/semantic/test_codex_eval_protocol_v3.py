@@ -292,7 +292,7 @@ def _typed_draft_action_arguments(
     return actions
 
 
-def test_audio_import_composer_emits_ordered_typed_actions_without_full_json() -> None:
+def test_audio_import_protocol_emits_ordered_business_steps_without_native_rows() -> None:
     metadata = DraftActionMetadataBinding(
         step="tx01.metadata",
         object_type="Sound",
@@ -303,20 +303,23 @@ def test_audio_import_composer_emits_ordered_typed_actions_without_full_json() -
         label="tx01",
         metadata_binding=metadata,
     )
-    action_arguments = _typed_draft_action_arguments(steps)
-
-    assert all(isinstance(value, DraftTypedActionArgument) for value in action_arguments)
-    assert [value.operation for value in action_arguments] == ["audio.import"] * 5
-    assert [value.expected["action"] for value in action_arguments] == [
-        "set_import_option",
-        "set_import_default",
-        "set_import_default",
-        "set_import_default",
-        "add_import_row",
+    assert [step.subcommand for step in steps[:9]] == [
+        "operation-schema",
+        "draft-start",
+        "draft-business-configure",
+        "draft-bind-object",
+        "draft-bind-object",
+        "draft-bind-object",
+        "draft-declare-new",
+        "draft-check",
+        "preview-from-draft",
     ]
-    assert action_arguments[3].metadata_binding == metadata
-    assert action_arguments[4].metadata_binding == metadata
-    assert action_arguments[4].expected["assignment"] == {"mode": "none"}
+    declaration = next(step for step in steps if step.subcommand == "draft-declare-new")
+    assert "--field" in declaration.arguments
+    assert "volume_db" in declaration.arguments
+    assert "output_bus" in declaration.arguments
+    assert "--event-parent-handle" in declaration.arguments
+    assert all(step.subcommand != "draft-apply" for step in steps)
     assert next(step for step in steps if step.name == "tx01.preview").subcommand == (
         "preview-from-draft"
     )
@@ -326,36 +329,30 @@ def test_audio_import_composer_emits_ordered_typed_actions_without_full_json() -
     )
 
 
-def test_audio_import_switch_assignment_is_part_of_the_initial_row_action() -> None:
+def test_audio_import_switch_assignment_is_part_of_the_business_declaration() -> None:
     request = _audio_import_request()
     switch_assignment = "Snow"
     request["arguments"]["imports"][0]["switch_assignment"] = switch_assignment  # type: ignore[index]
 
-    action_arguments = _typed_draft_action_arguments(
-        build_audio_import_composer_transaction_steps(
-            request,
-            label="tx01",
+    declaration = next(
+        step
+        for step in build_audio_import_composer_transaction_steps(
+            request, label="tx01"
         )
+        if step.subcommand == "draft-declare-new"
     )
-
-    row = action_arguments[-1]
-    assert row.expected["action"] == "add_import_row"
-    assert row.expected["assignment"] == {
-        "mode": "switch",
-        "value": switch_assignment,
-    }
-    assert row.response_bindings == ()
+    switch_index = declaration.arguments.index("switch_value")
+    assert declaration.arguments[switch_index + 1] == switch_assignment
 
     request["arguments"]["imports"][0].pop("switch_assignment")  # type: ignore[index]
-    ordinary_row = _typed_draft_action_arguments(
-        build_audio_import_composer_transaction_steps(
-            request,
-            label="tx01",
+    ordinary = next(
+        step
+        for step in build_audio_import_composer_transaction_steps(
+            request, label="tx01"
         )
-    )[-1]
-    assert ordinary_row.expected["action"] == "add_import_row"
-    assert ordinary_row.expected["assignment"] == {"mode": "none"}
-    assert ordinary_row.response_bindings == ()
+        if step.subcommand == "draft-declare-new"
+    )
+    assert "switch_value" not in ordinary.arguments
 
 
 def test_audio_import_archive_replay_preserves_the_removed_assigned_row_action() -> None:
@@ -728,13 +725,12 @@ def test_commutative_composer_setup_groups_are_narrow_and_cannot_cross_turns() -
         )
 
 
-def test_non_object_transaction_request_uses_typed_composer_actions() -> None:
+def test_audio_import_transaction_request_uses_business_declaration_steps() -> None:
     protocol = build_transaction_protocol([_audio_import_request()])
 
-    actions = tuple(_typed_draft_action_arguments(protocol.steps))
-    assert actions
-    assert all(isinstance(value, DraftTypedActionArgument) for value in actions)
-    assert all(value.operation == "audio.import" for value in actions)
+    assert any(step.subcommand == "draft-declare-new" for step in protocol.steps)
+    assert any(step.subcommand == "draft-bind-object" for step in protocol.steps)
+    assert all(step.subcommand != "draft-apply" for step in protocol.steps)
     assert all("--request-json" not in step.arguments for step in protocol.steps)
 
 
@@ -1063,28 +1059,16 @@ def test_metadata_transaction_protocol_selects_closed_audio_import_equivalence()
         required_tokens=("IsLoopingEnabled",),
         equivalence="audio_import_v1",
     )
-    action_arguments = _typed_draft_action_arguments(protocol.steps)
-
-    assert protocol.turn_prefix_counts == (6, 10)
+    assert protocol.turn_prefix_counts == (8, 12)
     assert tuple(step.subcommand for step in protocol.steps[:2]) == (
         "operation-schema",
-        "metadata",
+        "draft-start",
     )
-    assert [argument.expected["action"] for argument in action_arguments] == [
-        "set_import_default",
-        "add_import_row",
-    ]
-    assert all(
-        isinstance(argument, DraftTypedActionArgument)
-        and argument.operation == "audio.import"
-        for argument in action_arguments
-    )
-    assert action_arguments[0].metadata_binding is not None
-    assert action_arguments[1].metadata_binding is None
-    assert sum(step.subcommand == "metadata" for step in protocol.steps) == 1
-    assert protocol.commutative_read_only_step_groups == (
-        ("tx01.operation-schema", "metadata.discover"),
-    )
+    assert any(step.subcommand == "draft-bind-field" for step in protocol.steps)
+    assert any(step.subcommand == "draft-declare-new" for step in protocol.steps)
+    assert all(step.subcommand != "metadata" for step in protocol.steps)
+    assert all(step.subcommand != "draft-apply" for step in protocol.steps)
+    assert protocol.commutative_read_only_step_groups == ()
     assert "preview" not in {
         step.subcommand for step in protocol.steps
     }
@@ -1093,7 +1077,7 @@ def test_metadata_transaction_protocol_selects_closed_audio_import_equivalence()
     }
 
 
-def test_audio_import_protocol_batches_the_first_six_independent_actions() -> None:
+def test_audio_import_protocol_serializes_bound_existing_declarations() -> None:
     request = _audio_import_request()
     request["arguments"]["imports"] = [
         {
@@ -1109,19 +1093,13 @@ def test_audio_import_protocol_batches_the_first_six_independent_actions() -> No
     request["arguments"]["import_operation"] = "useExisting"
 
     steps = build_audio_import_composer_transaction_steps(request, label="tx01")
-    actions = tuple(step for step in steps if step.subcommand == "draft-apply")
-
-    assert len(actions) == 1
-    batch = actions[0].arguments[-1]
-    assert isinstance(batch, DraftTypedActionBatchArgument)
-    assert [action.expected["action"] for action in batch.actions] == [
-        "set_import_operation",
-        "add_import_row",
-        "add_import_row",
-        "add_import_row",
-        "add_import_row",
-        "add_import_row",
-    ]
+    assert sum(step.subcommand == "draft-bind-object" for step in steps) == 5
+    declarations = tuple(
+        step for step in steps if step.subcommand == "draft-declare-existing"
+    )
+    assert len(declarations) == 5
+    assert all("--object-handle" in step.arguments for step in declarations)
+    assert all(step.subcommand != "draft-apply" for step in steps)
 
 
 def test_metadata_transaction_protocol_selects_closed_tab_import_equivalence() -> None:

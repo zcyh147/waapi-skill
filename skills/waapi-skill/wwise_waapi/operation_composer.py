@@ -16,6 +16,7 @@ from typing import Any, Callable, Mapping, Sequence
 
 from .canonical import canonical_json_bytes, canonical_sha256
 from .business_declaration_state import BusinessDeclarationSession
+from .audio_import_business import audio_import_business_contract
 from .builders.common import SemanticValidationError
 from .metadata_discovery import metadata_candidate_limit_contract
 from .operation_registry import (
@@ -2088,7 +2089,16 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
 
 
 def operation_composer_digest(operation: str, version: str) -> str:
-    return canonical_sha256(operation_composer_contract(operation, version))
+    composer = operation_composer_contract(operation, version)
+    if operation != AUDIO_IMPORT_COMPOSER_OPERATION:
+        return canonical_sha256(composer)
+    return canonical_sha256(
+        {
+            "contract": "waapi-skill.audio-import-draft-binding/v1",
+            "business_adapter": audio_import_business_contract(version),
+            "sealed_archive_compatibility": composer,
+        }
+    )
 
 
 def _typed_contract_is_flat(contract: Any) -> bool:

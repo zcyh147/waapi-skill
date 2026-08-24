@@ -43,6 +43,7 @@ from wwise_waapi.operation_composer import (
     new_composition,
 )
 from wwise_waapi.operation_registry import (
+    BUSINESS_DECLARATION_INPUT_MODE,
     COMPOSER_INPUT_MODE,
     INLINE_TYPED_INPUT_MODE,
     OperationContractError,
@@ -450,17 +451,19 @@ def build_audio_import_composer_transaction_steps(
     label: str,
     metadata_binding: DraftActionMetadataBinding | None = None,
 ) -> tuple[ExpectedGatewayStep, ...]:
-    """Translate one closed audio.import request into typed Draft actions."""
+    """Translate one canonical audio.import request into deep business Draft steps."""
 
+    del metadata_binding  # live Field Handles replace the retired metadata-first action seam
     normalized = _validate_operation_request(request)
     if normalized["operation"] != "audio.import":
-        raise V3ProtocolError("Composer transaction builder requires audio.import")
+        raise V3ProtocolError("business transaction builder requires audio.import")
     if not isinstance(label, str) or not re.fullmatch(r"tx[0-9]{2}", label):
-        raise V3ProtocolError("Composer transaction label must be txNN")
+        raise V3ProtocolError("business transaction label must be txNN")
+    version = str(normalized["version"])
     arguments = normalized["arguments"]
     imports = arguments.get("imports")
     if not isinstance(imports, list) or not imports:
-        raise V3ProtocolError("audio.import Composer request requires import rows")
+        raise V3ProtocolError("audio.import business request requires import rows")
     allowed_request_fields = {
         "imports",
         "defaults",
@@ -469,132 +472,10 @@ def build_audio_import_composer_transaction_steps(
         "auto_check_out_to_source_control",
     }
     if set(arguments) - allowed_request_fields:
-        raise V3ProtocolError("audio.import Composer request fields are not supported")
-
-    action_specs: list[
-        tuple[
-            dict[str, Any],
-            DraftActionMetadataBinding | None,
-            tuple[DraftActionResponseBinding, ...],
-        ]
-    ] = []
-    initial_composition = new_composition(
-        "audio.import",
-        normalized["version"],
-    )
-    gateway_owned_options = initial_composition["request_options"]
-    for option_name in (
-        "import_operation",
-        "auto_add_to_source_control",
-        "auto_check_out_to_source_control",
-    ):
-        if option_name in arguments:
-            if arguments[option_name] == gateway_owned_options.get(option_name):
-                continue
-            action_specs.append(
-                (
-                    {
-                        "contract": OPERATION_DRAFT_ACTION_CONTRACT,
-                        **(
-                            {
-                                "action": "set_import_operation",
-                                "mode": arguments[option_name],
-                            }
-                            if option_name == "import_operation"
-                            else {
-                                "action": "set_import_option",
-                                "name": option_name,
-                                "value": arguments[option_name],
-                            }
-                        ),
-                    },
-                    None,
-                    (),
-                )
-            )
+        raise V3ProtocolError("audio.import business request fields are not supported")
     defaults = arguments.get("defaults", {})
     if not isinstance(defaults, Mapping):
-        raise V3ProtocolError("audio.import Composer defaults must be an object")
-    for name, value in defaults.items():
-        action = {
-            "contract": OPERATION_DRAFT_ACTION_CONTRACT,
-            "action": "set_import_default",
-            "name": name,
-            "value": value,
-        }
-        action_specs.append(
-            (
-                action,
-                metadata_binding
-                if name in {"properties", "references"}
-                else None,
-                (),
-            )
-        )
-    for raw_row in imports:
-        if not isinstance(raw_row, Mapping):
-            raise V3ProtocolError("audio.import Composer row must be an object")
-        row_fields = dict(raw_row)
-        switch_assignment = row_fields.pop("switch_assignment", None)
-        action = {
-            "contract": OPERATION_DRAFT_ACTION_CONTRACT,
-            "action": "add_import_row",
-            "assignment": (
-                {"mode": "none"}
-                if switch_assignment is None
-                else {"mode": "switch", "value": switch_assignment}
-            ),
-            **row_fields,
-        }
-        action_specs.append(
-            (
-                action,
-                metadata_binding
-                if any(name in raw_row for name in ("properties", "references"))
-                else None,
-                (),
-            )
-        )
-
-    try:
-        materialized = _materialize_audio_import_composer_action_entries(
-            tuple(
-                (
-                    f"{label}.action.{index:03d}",
-                    action,
-                    response_bindings,
-                )
-                for index, (action, _metadata, response_bindings) in enumerate(
-                    action_specs,
-                    start=1,
-                )
-            ),
-            version=normalized["version"],
-        )
-    except (OperationComposerError, StopIteration) as exc:
-        raise V3ProtocolError(
-            "Composer transaction builder requires one valid audio.import request"
-        ) from exc
-    try:
-        canonical_request = parse_operation_request(
-            normalized,
-            expected_version=normalized["version"],
-        ).as_dict()
-    except OperationContractError as exc:
-        raise V3ProtocolError(
-            "Composer transaction builder requires one valid audio.import request"
-        ) from exc
-    canonical_arguments = dict(canonical_request["arguments"])
-    for name, value in gateway_owned_options.items():
-        canonical_arguments.setdefault(name, value)
-    canonical_request = {
-        **canonical_request,
-        "arguments": canonical_arguments,
-    }
-    if materialized != canonical_request:
-        raise V3ProtocolError(
-            "audio.import typed actions do not reproduce the sealed request"
-        )
+        raise V3ProtocolError("audio.import business defaults must be an object")
 
     steps: list[ExpectedGatewayStep] = [
         ExpectedGatewayStep(
@@ -608,40 +489,358 @@ def build_audio_import_composer_transaction_steps(
             arguments=("audio.import",),
         ),
     ]
-    latest_revision_step = f"{label}.draft-start"
-    for offset in range(0, len(action_specs), MAX_TYPED_ACTIONS_PER_APPLY):
-        batch = tuple(action_specs[offset : offset + MAX_TYPED_ACTIONS_PER_APPLY])
-        action_name = f"{label}.action.{offset // MAX_TYPED_ACTIONS_PER_APPLY + 1:03d}"
-        action_arguments = tuple(
-            DraftTypedActionArgument(
-                expected=action,
-                response_bindings=response_bindings,
-                operation="audio.import",
-                metadata_binding=action_metadata,
-            )
-            for action, action_metadata, response_bindings in batch
+    draft_start = f"{label}.draft-start"
+    latest_revision_step = draft_start
+    object_bindings: dict[tuple[str, str], ResponseBinding] = {}
+    field_bindings: dict[tuple[str, str, str], ResponseBinding] = {}
+    planned_by_path: dict[str, ResponseBinding] = {}
+    bind_object_index = 0
+    bind_field_index = 0
+
+    def draft_prefix() -> tuple[Any, ...]:
+        return (
+            ResponseBinding(draft_start, "/draft/draft_id"),
+            "--task-authority",
+            ResponseBinding(draft_start, "/task_authority"),
+            "--expected-revision",
+            ResponseBinding(latest_revision_step, "/draft/revision"),
         )
+
+    def bind_object(selector: Mapping[str, Any]) -> ResponseBinding:
+        nonlocal bind_object_index, latest_revision_step
+        kind = selector.get("kind")
+        value = selector.get("value")
+        if kind not in {"id", "path"} or not isinstance(value, str) or not value:
+            raise V3ProtocolError("audio.import business identity must be exact id or path")
+        key = (str(kind), value)
+        existing = object_bindings.get(key)
+        if existing is not None:
+            return existing
+        bind_object_index += 1
+        step_name = f"{label}.bind-object.{bind_object_index:03d}"
         steps.append(
             ExpectedGatewayStep(
-                name=action_name,
-                subcommand="draft-apply",
+                name=step_name,
+                subcommand="draft-bind-object",
                 arguments=(
-                    ResponseBinding(f"{label}.draft-start", "/draft/draft_id"),
-                    "--task-authority",
-                    ResponseBinding(f"{label}.draft-start", "/task_authority"),
-                    "--expected-revision",
-                    ResponseBinding(latest_revision_step, "/draft/revision"),
-                    "--compact",
-                    "--facts",
-                    (
-                        action_arguments[0]
-                        if len(action_arguments) == 1
-                        else DraftTypedActionBatchArgument(action_arguments)
-                    ),
+                    *draft_prefix(),
+                    "--object-id" if kind == "id" else "--object-path",
+                    value,
                 ),
             )
         )
-        latest_revision_step = action_name
+        latest_revision_step = step_name
+        binding = ResponseBinding(step_name, "/bound_object/handle")
+        object_bindings[key] = binding
+        return binding
+
+    def bind_field(
+        *,
+        token: str,
+        object_handle: ResponseBinding | None,
+        class_name: str,
+    ) -> ResponseBinding:
+        nonlocal bind_field_index, latest_revision_step
+        scope_kind = "object" if object_handle is not None else "class"
+        scope_identity = (
+            f"{object_handle.step}:{object_handle.pointer}"
+            if object_handle is not None
+            else class_name
+        )
+        key = (scope_kind, scope_identity, token)
+        existing = field_bindings.get(key)
+        if existing is not None:
+            return existing
+        bind_field_index += 1
+        step_name = f"{label}.bind-field.{bind_field_index:03d}"
+        scope_arguments: tuple[Any, ...] = (
+            ("--object-handle", object_handle)
+            if object_handle is not None
+            else ("--class-name", class_name)
+        )
+        steps.append(
+            ExpectedGatewayStep(
+                name=step_name,
+                subcommand="draft-bind-field",
+                arguments=(
+                    *draft_prefix(),
+                    *scope_arguments,
+                    "--token",
+                    token,
+                ),
+            )
+        )
+        latest_revision_step = step_name
+        binding = ResponseBinding(step_name, "/bound_field/handle")
+        field_bindings[key] = binding
+        return binding
+
+    native_mode = arguments.get("import_operation", "createNew")
+    mode = {
+        "createNew": "create",
+        "useExisting": "reimport",
+        "replaceExisting": "replace",
+    }.get(native_mode)
+    if mode is None:
+        raise V3ProtocolError("audio.import business mode is unsupported")
+    configure_arguments: list[Any] = [*draft_prefix(), "--mode", mode]
+    if "auto_add_to_source_control" in arguments:
+        configure_arguments.append(
+            "--add-to-source-control"
+            if arguments["auto_add_to_source_control"] is True
+            else "--no-add-to-source-control"
+        )
+    if "auto_check_out_to_source_control" in arguments:
+        configure_arguments.append(
+            "--check-out-from-source-control"
+            if arguments["auto_check_out_to_source_control"] is True
+            else "--no-check-out-from-source-control"
+        )
+    configure_name = f"{label}.configure"
+    steps.append(
+        ExpectedGatewayStep(
+            name=configure_name,
+            subcommand="draft-business-configure",
+            arguments=tuple(configure_arguments),
+        )
+    )
+    latest_revision_step = configure_name
+
+    def value_text(value: Any) -> str:
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            if isinstance(value, float) and not math.isfinite(value):
+                raise V3ProtocolError("audio.import business value must be finite")
+            return json.dumps(value, ensure_ascii=False, allow_nan=False)
+        if isinstance(value, str):
+            return value
+        raise V3ProtocolError("audio.import business value type is unsupported")
+
+    def resolved_path(fields: Mapping[str, Any]) -> str:
+        path = fields.get("object_path")
+        if not isinstance(path, str) or not path:
+            raise V3ProtocolError("audio.import business row requires object_path")
+        if path.startswith("\\"):
+            return path
+        location = fields.get("import_location")
+        if not isinstance(location, Mapping) or location.get("kind") != "path":
+            raise V3ProtocolError("relative audio.import path requires exact import_location")
+        base = location.get("value")
+        if not isinstance(base, str) or not base.startswith("\\"):
+            raise V3ProtocolError("audio.import import_location path is invalid")
+        return base.rstrip("\\") + "\\" + path.lstrip("\\")
+
+    def split_target(path: str) -> tuple[str, str, str | None]:
+        parent, separator, leaf = path.rpartition("\\")
+        if not separator or not parent or not leaf:
+            raise V3ProtocolError("audio.import target path has no bindable parent")
+        typed_segment: str | None = None
+        if leaf.startswith("<") and ">" in leaf:
+            typed_segment, leaf = leaf[1:].split(">", 1)
+        if not leaf:
+            raise V3ProtocolError("audio.import target name is empty")
+        return parent, leaf, typed_segment
+
+    def semantic_kind(
+        *,
+        object_type: Any,
+        typed_segment: str | None,
+        language: Any,
+    ) -> str:
+        token = str(typed_segment or object_type or "").casefold().replace(" ", "")
+        if token in {"sound", "soundsfx"}:
+            return "sound-sfx" if str(language).casefold() == "sfx" else "sound-voice"
+        if token == "soundvoice":
+            return "sound-voice"
+        mapping = {
+            "actormixer": "actor-mixer",
+            "blendcontainer": "blend-container",
+            "musicplaylistcontainer": "music-playlist-container",
+            "musicranseqcntr": "music-playlist-container",
+            "musicsegment": "music-segment",
+            "musicswitchcontainer": "music-switch-container",
+            "musictrack": "music-track",
+            "randomcontainer": "random-container",
+            "sequencecontainer": "sequence-container",
+            "randomsequencecontainer": "random-container",
+            "switchcontainer": "switch-container",
+            "folder": "virtual-folder",
+            "virtualfolder": "virtual-folder",
+        }
+        result = mapping.get(token)
+        if result is None:
+            raise V3ProtocolError(
+                f"audio.import business object type {object_type!r} is unsupported"
+            )
+        return result
+
+    for row_index, raw_row in enumerate(imports):
+        if not isinstance(raw_row, Mapping):
+            raise V3ProtocolError("audio.import business row must be an object")
+        fields = {**dict(defaults), **dict(raw_row)}
+        for collection_name in ("properties", "references"):
+            raw_collection = fields.get(collection_name, [])
+            if not isinstance(raw_collection, list) or not all(
+                isinstance(item, Mapping) and isinstance(item.get("name"), str)
+                for item in raw_collection
+            ):
+                raise V3ProtocolError(
+                    "business transaction builder requires one valid audio.import request"
+                )
+            names = [str(item["name"]) for item in raw_collection]
+            if len(names) != len(set(names)):
+                raise V3ProtocolError(
+                    "business transaction builder requires one valid audio.import request"
+                )
+        target_path = resolved_path(fields)
+        parent_path, name, typed_segment = split_target(target_path)
+        object_type = fields.get("object_type")
+        language = fields.get("import_language")
+        kind = semantic_kind(
+            object_type=object_type,
+            typed_segment=typed_segment,
+            language=language,
+        )
+        existing_target_handle: ResponseBinding | None = None
+        if mode in {"reimport", "replace"}:
+            existing_target_handle = bind_object({"kind": "path", "value": target_path})
+            target_arguments: list[Any] = [
+                "--object-handle",
+                existing_target_handle,
+            ]
+            subcommand = "draft-declare-existing"
+        else:
+            parent_handle = planned_by_path.get(parent_path)
+            if parent_handle is None:
+                parent_handle = bind_object({"kind": "path", "value": parent_path})
+            target_arguments = [
+                "--parent-handle",
+                parent_handle,
+                "--name",
+                name,
+                "--kind",
+                kind,
+            ]
+            subcommand = "draft-declare-new"
+
+        business_fields: list[tuple[str, Any]] = []
+        direct_mapping = (
+            ("audio_file", "media_file"),
+            ("audio_file_base64", "inline_wav"),
+            ("import_language", "language"),
+            ("originals_subfolder", "originals_subfolder"),
+            ("notes", "notes"),
+            ("audio_source_notes", "audio_source_notes"),
+            ("dialogue_event", "dialogue_event_directive"),
+            ("switch_assignment", "switch_value"),
+        )
+        for native_name, business_name in direct_mapping:
+            if native_name in fields:
+                business_fields.append((business_name, fields[native_name]))
+
+        properties = fields.get("properties", [])
+        if not isinstance(properties, list):
+            raise V3ProtocolError("audio.import properties must be an array")
+        property_rows = [dict(item) for item in properties if isinstance(item, Mapping)]
+        if len(property_rows) != len(properties):
+            raise V3ProtocolError("audio.import property row must be an object")
+        property_by_name = {str(item.get("name")): item.get("value") for item in property_rows}
+        if "Volume" in property_by_name:
+            business_fields.append(("volume_db", property_by_name.pop("Volume")))
+        loop_enabled = property_by_name.get("IsLoopingEnabled")
+        loop_infinite = property_by_name.get("IsLoopingInfinite")
+        if loop_enabled is True and loop_infinite is True:
+            property_by_name.pop("IsLoopingEnabled")
+            property_by_name.pop("IsLoopingInfinite")
+            business_fields.append(("loop", "infinite"))
+
+        references = fields.get("references", [])
+        if not isinstance(references, list):
+            raise V3ProtocolError("audio.import references must be an array")
+        reference_rows = [dict(item) for item in references if isinstance(item, Mapping)]
+        if len(reference_rows) != len(references):
+            raise V3ProtocolError("audio.import reference row must be an object")
+        dynamic_values: list[tuple[ResponseBinding, Any]] = []
+        metadata_class = "Sound" if kind in {"sound-sfx", "sound-voice"} else str(object_type)
+        for token, value in property_by_name.items():
+            field_handle = bind_field(
+                token=token,
+                object_handle=existing_target_handle,
+                class_name=metadata_class,
+            )
+            dynamic_values.append((field_handle, value))
+        for item in reference_rows:
+            token = item.get("name")
+            target = item.get("target")
+            if not isinstance(token, str) or not isinstance(target, Mapping):
+                raise V3ProtocolError("audio.import reference is incomplete")
+            target_handle = bind_object(target)
+            if token == "OutputBus":
+                business_fields.append(("output_bus", target_handle))
+            else:
+                field_handle = bind_field(
+                    token=token,
+                    object_handle=existing_target_handle,
+                    class_name=metadata_class,
+                )
+                dynamic_values.append((field_handle, target_handle))
+
+        event_arguments: list[Any] = []
+        event = fields.get("event")
+        if event is not None:
+            if not isinstance(event, Mapping):
+                raise V3ProtocolError("audio.import event must be an object")
+            event_path = event.get("path")
+            event_action = event.get("action", "Play")
+            if not isinstance(event_path, str) or not isinstance(event_action, str):
+                raise V3ProtocolError("audio.import event is incomplete")
+            event_parent, event_name, _typed = split_target(event_path)
+            event_parent_handle = bind_object(
+                {"kind": "path", "value": event_parent}
+            )
+            event_arguments = [
+                "--event-parent-handle",
+                event_parent_handle,
+                "--event-name",
+                event_name,
+                "--event-action",
+                event_action,
+            ]
+
+        declaration_name = f"{label}.declare.{row_index + 1:03d}"
+        declaration_arguments: list[Any] = [
+            *draft_prefix(),
+            "--declaration-id",
+            f"row-{row_index + 1:03d}",
+            *target_arguments,
+        ]
+        for field_name, field_value in business_fields:
+            declaration_arguments.extend(
+                ("--field", field_name, field_value if isinstance(field_value, ResponseBinding) else value_text(field_value))
+            )
+        for field_handle, field_value in dynamic_values:
+            declaration_arguments.extend(
+                (
+                    "--field-value",
+                    field_handle,
+                    field_value if isinstance(field_value, ResponseBinding) else value_text(field_value),
+                )
+            )
+        declaration_arguments.extend(event_arguments)
+        steps.append(
+            ExpectedGatewayStep(
+                name=declaration_name,
+                subcommand=subcommand,
+                arguments=tuple(declaration_arguments),
+            )
+        )
+        latest_revision_step = declaration_name
+        if mode == "create":
+            planned_by_path[target_path] = ResponseBinding(
+                declaration_name,
+                f"/draft/declarations/{row_index}/result_handle",
+            )
 
     check_name = f"{label}.check"
     preview_name = f"{label}.preview"
@@ -653,25 +852,20 @@ def build_audio_import_composer_transaction_steps(
             ExpectedGatewayStep(
                 name=check_name,
                 subcommand="draft-check",
-                arguments=(
-                    ResponseBinding(f"{label}.draft-start", "/draft/draft_id"),
-                    "--task-authority",
-                    ResponseBinding(f"{label}.draft-start", "/task_authority"),
-                    "--expected-revision",
-                    ResponseBinding(latest_revision_step, "/draft/revision"),
-                ),
+                arguments=(*draft_prefix(),),
             ),
             ExpectedGatewayStep(
                 name=preview_name,
                 subcommand="preview-from-draft",
                 arguments=(
-                    ResponseBinding(f"{label}.draft-start", "/draft/draft_id"),
+                    ResponseBinding(draft_start, "/draft/draft_id"),
                     "--task-authority",
-                    ResponseBinding(f"{label}.draft-start", "/task_authority"),
+                    ResponseBinding(draft_start, "/task_authority"),
                     "--expected-revision",
                     ResponseBinding(check_name, "/draft/revision"),
                     "--apply",
                 ),
+                expected_operation_request=normalized,
             ),
             ExpectedGatewayStep(
                 name=show_name,
@@ -788,52 +982,21 @@ def materialize_audio_import_composer_protocol_request(
         raise V3ProtocolError(
             "audio.import Composer protocol topology is invalid"
         )
-    start_index = starts[0][0]
-    preview_index = previews[0][0]
-    action_entries: list[
-        tuple[
-            str,
-            Mapping[str, Any],
-            tuple[DraftActionResponseBinding, ...],
-        ]
-    ] = []
-    for step in protocol.steps[start_index + 1 : preview_index]:
-        if step.subcommand != "draft-apply":
-            continue
-        argument = step.arguments[-1] if step.arguments else None
-        action_arguments = (
-            (argument,)
-            if isinstance(argument, DraftTypedActionArgument)
-            else (
-                argument.actions
-                if isinstance(argument, DraftTypedActionBatchArgument)
-                else ()
-            )
-        )
-        if not action_arguments or any(
-            action.operation != "audio.import" or action.query_identity_bindings
-            for action in action_arguments
-        ):
-            raise V3ProtocolError(
-                "audio.import Composer protocol contains a dynamic action"
-            )
-        action_entries.extend(
-            (
-                f"{step.name}.{index:03d}",
-                action.expected,
-                action.response_bindings,
-            )
-            for index, action in enumerate(action_arguments, start=1)
+    preview = previews[0][1]
+    witness = preview.expected_operation_request
+    if witness is None:
+        raise V3ProtocolError(
+            "audio.import business protocol lacks its sealed request witness"
         )
     try:
-        return _materialize_audio_import_composer_action_entries(
-            tuple(action_entries),
-            version=version,
-        )
-    except (OperationComposerError, StopIteration) as exc:
+        normalized = _validate_operation_request(witness)
+    except V3ProtocolError:
+        raise
+    if normalized["version"] != version or normalized["operation"] != "audio.import":
         raise V3ProtocolError(
-            "audio.import Composer protocol cannot materialize its request"
-        ) from exc
+            "audio.import business protocol witness differs from its version binding"
+        )
+    return normalized
 
 
 def materialize_typed_transaction_protocol_requests(
@@ -1153,11 +1316,10 @@ def build_audio_import_composer_protocol(
             metadata_binding=metadata_binding,
         )
     )
+    # Deep audio.import binds custom fields inside the Draft. Retained
+    # metadata parameters are accepted only for sealed scenario compatibility.
+    del metadata_step, schema_first
     commutative_groups: tuple[tuple[str, str], ...] = ()
-    if metadata_step is not None:
-        metadata_index = 1 if schema_first else 0
-        steps.insert(metadata_index, metadata_step)
-        commutative_groups = ((steps[0].name, steps[1].name),)
     preview_indexes = tuple(
         index
         for index, step in enumerate(steps, start=1)
@@ -2047,13 +2209,19 @@ def build_transaction_protocol(
                     ),
                 )
             )
-        elif input_mode == COMPOSER_INPUT_MODE:
+        elif input_mode in {
+            COMPOSER_INPUT_MODE,
+            BUSINESS_DECLARATION_INPUT_MODE,
+        }:
             if operation == "object.set":
                 operation_steps = build_object_set_composer_transaction_steps(
                     request,
                     label=label,
                 )
-            elif operation == "audio.import":
+            elif (
+                input_mode == BUSINESS_DECLARATION_INPUT_MODE
+                and operation == "audio.import"
+            ):
                 operation_steps = build_audio_import_composer_transaction_steps(
                     request,
                     label=label,
@@ -2340,17 +2508,7 @@ def build_metadata_transaction_protocol(
             raise V3ProtocolError(
                 "audio.import Composer metadata protocol requires one request"
             )
-        return build_audio_import_composer_protocol(
-            requests[0],
-            metadata_binding=DraftActionMetadataBinding(
-                step=metadata_step_name,
-                object_type=object_type,
-                required_tokens=tuple(tokens),
-                expected_projection=projection,
-            ),
-            metadata_step=metadata_step,
-            schema_first=True,
-        )
+        return build_audio_import_composer_protocol(requests[0])
     base = build_transaction_protocol(requests)
     if not any(
         step.subcommand in {"typed-operation", "preview-from-draft"}

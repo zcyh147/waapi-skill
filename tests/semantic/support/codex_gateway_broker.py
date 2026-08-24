@@ -1665,12 +1665,47 @@ class ExpectedGatewayStep:
     metadata_binding: DraftActionMetadataBinding | None = None
     commutative_option_pairs: bool = False
     commutative_boolean_flags: tuple[str, ...] = ()
+    expected_operation_request: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if not self.name or not self.name.strip():
             raise ValueError("ExpectedGatewayStep.name must be non-empty")
         if not self.subcommand or not self.subcommand.strip():
             raise ValueError("ExpectedGatewayStep.subcommand must be non-empty")
+        if self.expected_operation_request is not None:
+            if self.subcommand != "preview-from-draft":
+                raise ValueError(
+                    "ExpectedGatewayStep operation request witness is limited to "
+                    "preview-from-draft"
+                )
+            try:
+                normalized_request = json.loads(
+                    _canonical_json_bytes(
+                        dict(self.expected_operation_request)
+                    ).decode("utf-8")
+                )
+            except (RecursionError, TypeError, UnicodeError, ValueError) as exc:
+                raise ValueError(
+                    "ExpectedGatewayStep operation request witness must be strict JSON"
+                ) from exc
+            if not isinstance(normalized_request, Mapping):
+                raise ValueError(
+                    "ExpectedGatewayStep operation request witness must be an object"
+                )
+            if (
+                normalized_request.get("contract")
+                != "waapi-skill.operation-request/v1"
+                or normalized_request.get("operation") != "audio.import"
+            ):
+                raise ValueError(
+                    "ExpectedGatewayStep operation request witness is limited to "
+                    "canonical audio.import requests"
+                )
+            object.__setattr__(
+                self,
+                "expected_operation_request",
+                MappingProxyType(normalized_request),
+            )
         if self.metadata_binding is not None and not isinstance(
             self.metadata_binding, DraftActionMetadataBinding
         ):
@@ -2084,6 +2119,13 @@ _DRAFT_SUBCOMMANDS = frozenset(
         "draft-start",
         "draft-inspect",
         "draft-apply",
+        "draft-bind-object",
+        "draft-bind-field",
+        "draft-business-configure",
+        "draft-declare-new",
+        "draft-declare-existing",
+        "draft-revise-declaration",
+        "draft-remove-declaration",
         "draft-check",
         "draft-cancel",
         "preview-from-draft",
@@ -3038,7 +3080,7 @@ def validate_operation_draft_protocol_steps(
             or revision_binding.step != latest_revision_step
             or indexes.get(revision_binding.step, len(steps)) >= index
             or steps[indexes[revision_binding.step]].subcommand
-            not in {"draft-start", "draft-apply", "draft-check", "draft-inspect"}
+            not in _DRAFT_SUBCOMMANDS - {"draft-cancel", "preview-from-draft"}
         ):
             raise ValueError(
                 f"{step.subcommand} expected revision must come from one prior Draft response"
@@ -10571,6 +10613,19 @@ class CodexGatewayBroker:
         self,
         preview_step: ExpectedGatewayStep,
     ) -> Mapping[str, Any]:
+        if preview_step.expected_operation_request is not None:
+            preview_index = self._execution_steps.index(preview_step)
+            prior_starts = tuple(
+                step
+                for step in self._execution_steps[:preview_index]
+                if step.subcommand == "draft-start"
+            )
+            if not prior_starts or prior_starts[-1].arguments != ("audio.import",):
+                raise GatewayInvocationError(
+                    "Business request witness is missing its flow-local audio.import "
+                    "draft-start"
+                )
+            return preview_step.expected_operation_request
         sealed_request = self._offline_replay_preview_requests.get(preview_step.name)
         if sealed_request is not None:
             return sealed_request

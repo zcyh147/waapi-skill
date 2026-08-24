@@ -22,8 +22,6 @@ from tests.semantic.support.codex_integration_fixture_tree_v2 import (
     wwise_fixture_tree_sha256,
 )
 from tests.semantic.support.codex_gateway_broker import (
-    DraftTypedActionArgument,
-    DraftTypedActionBatchArgument,
     CodexGatewayBroker,
     GatewayInvocationError,
     InlineTypedOperationArgument,
@@ -604,8 +602,8 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
         in confirmation_prompt
     )
     assert "逐字保留其中每个反斜杠分隔符" in confirmation_prompt
-    assert prepared.protocol.turn_prefix_counts == (5, 11, 15)
-    assert len(prepared.protocol.steps) == 15
+    assert prepared.protocol.turn_prefix_counts == (11, 17, 21)
+    assert len(prepared.protocol.steps) == 21
     assert [
         (step.name, step.subcommand)
         for step in prepared.protocol.steps[:2]
@@ -644,19 +642,17 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
     )
     assert import_preview_step.subcommand == "preview-from-draft"
     assert "--request-json" not in import_preview_step.arguments
-    import_action_containers = [
-        step.arguments[-1]
+    import_declarations = [
+        step
         for step in prepared.protocol.steps
-        if step.name.startswith("tx01.action.")
+        if step.name.startswith("tx01.declare.")
     ]
-    assert len(import_action_containers) == 1
-    assert isinstance(import_action_containers[0], DraftTypedActionBatchArgument)
-    import_actions = list(import_action_containers[0].actions)
-    assert len(import_actions) == 5
+    assert len(import_declarations) == 5
     assert all(
-        isinstance(argument, DraftTypedActionArgument)
-        and argument.operation == "audio.import"
-        for argument in import_actions
+        step.subcommand == "draft-declare-new" for step in import_declarations
+    )
+    assert all(
+        step.subcommand != "draft-apply" for step in prepared.protocol.steps
     )
     imports = import_request["arguments"]["imports"]
     assert len(imports) == 5
@@ -692,27 +688,15 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
         },
     }
 
-    expected_actions: list[dict[str, object]] = []
-    for row in imports:
-        switch_assignment = row.get("switch_assignment")
-        expected_actions.append(
-            {
-                "contract": "waapi-skill.operation-draft-action/v1",
-                "action": "add_import_row",
-                "assignment": (
-                    {"mode": "none"}
-                    if switch_assignment is None
-                    else {"mode": "switch", "value": switch_assignment}
-                ),
-                **{
-                    key: value
-                    for key, value in row.items()
-                    if key != "switch_assignment"
-                },
-            }
-        )
-    assert [argument.expected for argument in import_actions] == expected_actions
-    assert all(argument.response_bindings == () for argument in import_actions)
+    assert _plain(import_preview_step.expected_operation_request) == _plain(
+        import_request
+    )
+    assert ("--name", "Snow", "--kind", "random-container") == tuple(
+        import_declarations[0].arguments[9:13]
+    )
+    assert "switch_value" in import_declarations[0].arguments
+    assert all("sound-sfx" in step.arguments for step in import_declarations[1:])
+    assert all("media_file" in step.arguments for step in import_declarations[1:])
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
@@ -861,7 +845,7 @@ def test_observer_preserves_exact_terminal_indeterminate_execute(
         },
     )
 
-    assert case.prepared.protocol.turn_prefix_counts == (5, 11, 15)
+    assert case.prepared.protocol.turn_prefix_counts == (11, 17, 21)
     assert case.prepared.operation_requests[0]["arguments"]["imports"][0][
         "switch_assignment"
     ] == "Snow"

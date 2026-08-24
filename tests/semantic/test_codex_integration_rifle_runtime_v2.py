@@ -21,8 +21,6 @@ from tests.semantic.support.codex_integration_fixture_tree_v2 import (
 )
 from tests.semantic.support.codex_integration_rifle_runtime_v2 import (
     IMPORT_API,
-    METADATA_QUERIES,
-    METADATA_TOKENS,
     RIFLE_CANONICAL_STATE_FIELDS,
     RIFLE_COMMUTATIVE_COMPOSER_SETUP_STEP_GROUPS,
     RIFLE_COMMUTATIVE_READ_ONLY_STEP_GROUPS,
@@ -30,8 +28,6 @@ from tests.semantic.support.codex_integration_rifle_runtime_v2 import (
     prepare_rifle_integration_runtime,
 )
 from tests.semantic.support.codex_gateway_broker import (
-    DraftTypedActionArgument,
-    DraftTypedActionBatchArgument,
     gateway_step_sequence_matches,
 )
 from tests.semantic.support.codex_integration_workflows_v2 import (
@@ -731,9 +727,8 @@ def test_prepares_exact_gateway_checked_use_existing_batch(
             },
         }
     ]
-    assert tuple(step.name for step in prepared.protocol.steps[:3]) == (
+    assert tuple(step.name for step in prepared.protocol.steps[:2]) == (
         "tx01.operation-schema",
-        "metadata.discover",
         "tx01.draft-start",
     )
     assert tuple(step.name for step in prepared.protocol.steps[-5:]) == (
@@ -743,19 +738,10 @@ def test_prepares_exact_gateway_checked_use_existing_batch(
         "tx01.execute",
         "tx01.verify",
     )
-    assert prepared.protocol.turn_prefix_counts == (6, 10)
-    assert prepared.protocol.commutative_read_only_step_groups == (
-        ("tx01.operation-schema", "metadata.discover"),
-    )
-    assert prepared.protocol.commutative_composer_setup_step_groups == (
-        (
-            "metadata.discover",
-            "tx01.draft-start",
-        ),
-    )
-    assert METADATA_QUERIES == ("volume", "output bus")
-    assert METADATA_TOKENS == ("Volume", "OutputBus")
-    assert sum(step.subcommand == "metadata" for step in prepared.protocol.steps) == 1
+    assert prepared.protocol.turn_prefix_counts == (14, 18)
+    assert prepared.protocol.commutative_read_only_step_groups == ()
+    assert prepared.protocol.commutative_composer_setup_step_groups == ()
+    assert all(step.subcommand != "metadata" for step in prepared.protocol.steps)
     assert prepared.expected_dispatches[0].api == IMPORT_API
     assert prepared.expected_dispatches[0].count == 1
     assert len(prepared.before_snapshot.objects) == 10
@@ -765,45 +751,37 @@ def test_prepares_exact_gateway_checked_use_existing_batch(
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-def test_rifle_composer_preserves_every_exact_import_row(
+def test_rifle_business_protocol_preserves_every_exact_import_row(
     tmp_path: Path,
     version: str,
 ) -> None:
     prepared, _fake, _runtime = _prepared(tmp_path, version=version)
-    action_containers = [
-        step.arguments[-1]
+    declarations = [
+        step
         for step in prepared.protocol.steps
-        if step.name.startswith("tx01.action.")
+        if step.name.startswith("tx01.declare.")
     ]
-    assert len(action_containers) == 1
-    assert isinstance(action_containers[0], DraftTypedActionBatchArgument)
-    action_arguments = list(action_containers[0].actions)
-    assert len(action_arguments) == 5
-    assert all(
-        isinstance(argument, DraftTypedActionArgument)
-        and argument.operation == "audio.import"
-        for argument in action_arguments
+    assert len(declarations) == 4
+    assert all(step.subcommand == "draft-declare-existing" for step in declarations)
+    assert all(step.subcommand != "draft-apply" for step in prepared.protocol.steps)
+    configure = next(
+        step for step in prepared.protocol.steps if step.name == "tx01.configure"
     )
-    assert action_arguments[0].expected == {
-        "contract": "waapi-skill.operation-draft-action/v1",
-        "action": "set_import_operation",
-        "mode": "useExisting",
-    }
+    assert configure.arguments[-2:] == ("--mode", "reimport")
     rows = _plain(prepared.operation_request)["arguments"]["imports"]
-    assert [argument.expected for argument in action_arguments[1:]] == [
-        {
-            "contract": "waapi-skill.operation-draft-action/v1",
-            "action": "add_import_row",
-            "assignment": {"mode": "none"},
-            **row,
-        }
-        for row in rows
-    ]
-    assert all(
-        argument.metadata_binding is None for argument in action_arguments[:-1]
+    for declaration, row in zip(declarations, rows, strict=True):
+        assert "media_file" in declaration.arguments
+        assert row["audio_file"] in declaration.arguments
+        assert "language" in declaration.arguments
+        assert row["import_language"] in declaration.arguments
+    assert "volume_db" in declarations[-1].arguments
+    assert "output_bus" in declarations[-1].arguments
+    preview = next(
+        step for step in prepared.protocol.steps if step.name == "tx01.preview"
     )
-    assert action_arguments[-1].metadata_binding is not None
-    assert action_arguments[-1].metadata_binding.step == "metadata.discover"
+    assert _plain(preview.expected_operation_request) == _plain(
+        prepared.operation_request
+    )
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
@@ -897,30 +875,25 @@ def test_rifle_setup_accepts_only_dependency_valid_action_orders(
 
     assert canonical == (
         "tx01.operation-schema",
-        "metadata.discover",
         "tx01.draft-start",
-        "tx01.action.001",
+        "tx01.configure",
+        "tx01.bind-object.001",
     )
     assert gateway_step_sequence_matches(
         canonical, canonical, groups, setup_groups
     )
     assert not gateway_step_sequence_matches(
         canonical,
-        ("tx01.draft-start", "metadata.discover", "tx01.operation-schema", *canonical[3:]),
+        (canonical[1], canonical[0], *canonical[2:]),
         groups,
         setup_groups,
     )
     assert not gateway_step_sequence_matches(
         canonical, canonical[:-1], groups, setup_groups
     )
-    assert gateway_step_sequence_matches(
+    assert not gateway_step_sequence_matches(
         canonical,
-        (
-            "tx01.operation-schema",
-            "tx01.draft-start",
-            "metadata.discover",
-            "tx01.action.001",
-        ),
+        (canonical[0], canonical[1], canonical[3], canonical[2]),
         groups,
         setup_groups,
     )
@@ -934,15 +907,8 @@ def test_rifle_canonical_setup_round_trips_prompt_provenance(
     prepared, _fake, _runtime = _prepared(tmp_path, version=version)
     serialized = serialize_protocol(prepared.protocol)
 
-    assert serialized["commutative_read_only_step_groups"] == [
-        ["tx01.operation-schema", "metadata.discover"]
-    ]
-    assert serialized["commutative_composer_setup_step_groups"] == [
-        [
-            "metadata.discover",
-            "tx01.draft-start",
-        ]
-    ]
+    assert "commutative_read_only_step_groups" not in serialized
+    assert "commutative_composer_setup_step_groups" not in serialized
     assert deserialize_protocol(serialized) == prepared.protocol
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])

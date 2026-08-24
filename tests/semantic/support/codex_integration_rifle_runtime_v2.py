@@ -37,15 +37,11 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     OPERATION_REQUEST_CONTRACT,
     V3GatewayProtocol,
     build_audio_import_composer_transaction_steps,
-    metadata_candidate_limit,
 )
 from tests.semantic.support.codex_gateway_broker import (
-    DraftActionMetadataBinding,
     ExpectedGatewayStep,
-    MetadataQueryArgument,
     gateway_step_prefix_matches,
     gateway_step_sequence_matches,
-    project_required_metadata_tokens,
 )
 from tests.semantic.support.codex_integration_workflows_v2 import (
     BaselineManifest,
@@ -72,15 +68,8 @@ OBJECT_GET_API = "ak.wwise.core.object.get"
 IMPORT_API = "ak.wwise.core.audio.import"
 METADATA_QUERIES = ("volume", "output bus")
 METADATA_TOKENS = ("Volume", "OutputBus")
-RIFLE_COMMUTATIVE_READ_ONLY_STEP_GROUPS = (
-    ("tx01.operation-schema", "metadata.discover"),
-)
-RIFLE_COMMUTATIVE_COMPOSER_SETUP_STEP_GROUPS = (
-    (
-        "metadata.discover",
-        "tx01.draft-start",
-    ),
-)
+RIFLE_COMMUTATIVE_READ_ONLY_STEP_GROUPS: tuple[tuple[str, ...], ...] = ()
+RIFLE_COMMUTATIVE_COMPOSER_SETUP_STEP_GROUPS: tuple[tuple[str, ...], ...] = ()
 
 _GUID_RE = re.compile(
     r"^\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
@@ -493,43 +482,12 @@ def prepare_rifle_integration_runtime(
         backend=backend,
     )
     try:
-        before, visible_values, operation_request, metadata_result = (
+        before, visible_values, operation_request, _metadata_result = (
             session.prepare()
         )
-        projection = project_required_metadata_tokens(
-            metadata_result,
-            object_type="Sound",
-            required_tokens=METADATA_TOKENS,
-        )
-        metadata_arguments: list[Any] = [
-            "discover",
-            "--object-type",
-            "Sound",
-        ]
-        for query in METADATA_QUERIES:
-            metadata_arguments.extend(("--query", MetadataQueryArgument(query)))
-        metadata_arguments.extend(
-            ("--limit", str(metadata_candidate_limit(METADATA_QUERIES)))
-        )
-        metadata_step = ExpectedGatewayStep(
-            name="metadata.discover",
-            subcommand="metadata",
-            arguments=tuple(metadata_arguments),
-        )
-        composer_steps = build_audio_import_composer_transaction_steps(
+        steps = build_audio_import_composer_transaction_steps(
             operation_request,
             label="tx01",
-            metadata_binding=DraftActionMetadataBinding(
-                step=metadata_step.name,
-                object_type="Sound",
-                required_tokens=METADATA_TOKENS,
-                expected_projection=projection,
-            ),
-        )
-        steps = (
-            composer_steps[0],
-            metadata_step,
-            *composer_steps[1:],
         )
         protocol = V3GatewayProtocol(
             steps=steps,
@@ -837,7 +795,7 @@ class _RifleSession:
             != RIFLE_COMMUTATIVE_COMPOSER_SETUP_STEP_GROUPS
         ):
             raise RifleIntegrationRuntimeError(
-                "Rifle protocol is not one metadata-bound transaction"
+                "Rifle protocol is not one business-declaration transaction"
             )
         self.protocol = protocol
 
