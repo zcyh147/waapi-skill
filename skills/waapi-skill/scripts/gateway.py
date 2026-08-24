@@ -1825,6 +1825,19 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         metavar=("FIELD", "VALUE"),
     )
+    draft_business_configure.add_argument(
+        "--default-field-value",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("FIELD_HANDLE", "VALUE"),
+    )
+    draft_business_configure.add_argument("--default-event-parent-handle")
+    draft_business_configure.add_argument("--default-event-name")
+    draft_business_configure.add_argument(
+        "--default-event-action",
+        choices=("Play", "Stop", "Pause", "Resume", "Break", "Seek"),
+    )
 
     draft_declare_new = subparsers.add_parser(
         "draft-declare-new",
@@ -10253,7 +10266,14 @@ def dispatch_offline_business_draft_update(
         )
     session = BusinessDeclarationSession.from_dict(raw_session)
     if args.command == "draft-business-configure":
-        defaults = _parse_audio_import_business_fields(session, args.default)
+        defaults = _parse_audio_import_business_fields(
+            session,
+            args.default,
+            field_value_pairs=args.default_field_value,
+            event_parent_handle=args.default_event_parent_handle,
+            event_name=args.default_event_name,
+            event_action=args.default_event_action,
+        )
         settings: dict[str, Any] = {"mode": args.mode}
         if args.add_to_source_control is not None:
             settings["add_to_source_control"] = args.add_to_source_control
@@ -14906,6 +14926,7 @@ def _audio_import_business_next_action_binding(
                 "[--add-to-source-control|--no-add-to-source-control]",
                 "[--check-out-from-source-control|--no-check-out-from-source-control]",
                 "[--default <stable-field> <business-value>]...",
+                "[--default-field-value <bound-field-handle> <business-value>]...",
             ],
         },
         "declare_new": {

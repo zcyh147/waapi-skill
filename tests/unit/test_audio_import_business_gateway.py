@@ -318,6 +318,9 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
         "--mode",
         "create",
         "--add-to-source-control",
+        "--default-field-value",
+        field_handle,
+        "-2.5",
     )
     assert config_code == 0, configured
     declare_code, declared = _offline(
@@ -348,9 +351,6 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
         "--field",
         "loop",
         "infinite",
-        "--field-value",
-        field_handle,
-        "-2.5",
     )
     assert declare_code == 0, declared
     assert declared["draft"]["revision"] == 5
@@ -359,7 +359,6 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
         "loop": "infinite",
         "media_file": str(media),
         "volume_db": -4.0,
-        "field_values": {field_handle: -2.5},
     }
 
     store = OperationDraftStore(tmp_path / "state")
