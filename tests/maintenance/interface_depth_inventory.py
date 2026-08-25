@@ -35,16 +35,22 @@ def _load(path: Path) -> dict[str, Any]:
     return value
 
 
+def _public_operation_contract(
+    name: str, spec: Any, version: str
+) -> dict[str, Any]:
+    return (
+        audio_import_business_contract(version)
+        if name == "audio.import"
+        else spec.as_dict(version=version)
+    )
+
+
 def _operation_contract_rows() -> list[dict[str, Any]]:
     return [
         {
             "operation": name,
             "version": version,
-            "contract": (
-                audio_import_business_contract(version)
-                if name == "audio.import"
-                else spec.as_dict(version=version)
-            ),
+            "contract": _public_operation_contract(name, spec, version),
         }
         for name, spec in sorted(OPERATION_SPECS.items())
         for version in spec.supported_versions
@@ -535,11 +541,7 @@ def build_interface_depth_inventory() -> dict[str, Any]:
                 name, spec, version, policy
             )
             leaked_mechanics = list(assignment["leaked_mechanics"])
-            public_contract = (
-                audio_import_business_contract(version)
-                if name == "audio.import"
-                else spec.as_dict(version=version)
-            )
+            public_contract = _public_operation_contract(name, spec, version)
             operation_rows.append(
                 {
                     "operation": name,
