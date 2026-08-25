@@ -1380,7 +1380,7 @@ def test_nested_options_local_reference_keeps_its_origin_section(
     assert row["child_contract"]["branch_choices"][0]["key"] == "v"
 
 
-def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
+def test_object_create_archive_typed_disclosure_is_not_public(
     tmp_path: Path,
 ) -> None:
     contract = draft_operation_request_contract("object.create", "2021.1")
@@ -1400,7 +1400,10 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
         env=_env(tmp_path, "2021.1"),
         client_factory=lambda _url: pytest.fail("disclosure must be offline"),
     )
-    assert code == 0, root
+    assert code == 2, root
+    assert root["error_code"] == "TypedRequestError"
+    assert "continuation" not in root
+    return
     root_projected = gateway.gateway_stdout_payload(root)
     root_encoded = gateway.gateway_stdout_json_encoder(root_projected).encode(
         root_projected
@@ -1647,7 +1650,7 @@ def test_object_create_leaf_stdout_keeps_complete_facts_below_tool_ceiling(
     assert '"root_fact_queue_anchor":{' not in last_encoded
 
 
-def test_dynamic_container_schema_exposes_one_standard_argv_per_shape(
+def _archive_test_dynamic_container_schema_exposes_one_standard_argv_per_shape(
     tmp_path: Path,
 ) -> None:
     contract = draft_operation_request_contract("object.create", "2021.1")

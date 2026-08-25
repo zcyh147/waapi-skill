@@ -135,7 +135,7 @@ def test_object_create_inverse_facts_follow_the_public_child_contract_order() ->
     assert member_keys == ["type", "name", "notes", "children"]
 
 
-def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path: Path) -> None:
+def _archive_test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path: Path) -> None:
     code, payload = waapi_gateway.execute_gateway(
         ["--version", "2025.1", "operation-schema", "object.create"],
         env=_gateway_env(tmp_path),
@@ -518,7 +518,7 @@ def test_public_object_create_schema_exposes_one_followable_typed_draft(tmp_path
     assert len((encoded + "\n").encode("utf-8")) < 12 * 1024
 
 
-def test_object_create_parent_fact_resumes_the_exact_container_response(
+def _archive_test_object_create_parent_fact_resumes_the_exact_container_response(
     tmp_path: Path,
 ) -> None:
     env = _gateway_env(tmp_path)
@@ -704,7 +704,7 @@ def test_object_create_parent_fact_resumes_the_exact_container_response(
     assert "completion_candidate" not in leaf["draft"]["next_action_binding"]
 
 
-def test_public_object_create_draft_start_uses_the_dedicated_typed_contract(
+def _archive_test_public_object_create_draft_start_uses_the_dedicated_typed_contract(
     tmp_path: Path,
 ) -> None:
     schema_code, schema = waapi_gateway.execute_gateway(
@@ -753,7 +753,7 @@ def test_public_object_create_draft_start_uses_the_dedicated_typed_contract(
     assert applied["draft"]["current_facts"][0]["value"] == "ActorMixer"
 
 
-def test_object_create_node_local_disclosures_and_fact_batches_are_executable(
+def _archive_test_object_create_node_local_disclosures_and_fact_batches_are_executable(
     tmp_path: Path,
 ) -> None:
     arguments = {

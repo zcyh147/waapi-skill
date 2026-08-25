@@ -264,7 +264,33 @@ def _continuation_error(
                             return "business declaration Adapter is incomplete"
                     else:
                         declaration = contract.get("declaration")
-                        if (
+                        if operation in {
+                            "object.create",
+                            "object.createPlugin",
+                            "object.set",
+                            "object.setRTPC",
+                        }:
+                            required_groups = {
+                                "object.create": ("target_fields",),
+                                "object.createPlugin": ("required_fields",),
+                                "object.set": (
+                                    "existing_required_fields",
+                                    "new_required_fields",
+                                ),
+                                "object.setRTPC": ("required_fields",),
+                            }[operation]
+                            if (
+                                not isinstance(declaration, Mapping)
+                                or any(
+                                    not declaration.get(key)
+                                    for key in required_groups
+                                )
+                                or contract.get("legacy_shallow_composer_public")
+                                is not False
+                                or not contract.get("gateway_derivations")
+                            ):
+                                return "business declaration Adapter is incomplete"
+                        elif (
                             not isinstance(declaration, Mapping)
                             or not declaration.get("required_fields")
                             or not isinstance(

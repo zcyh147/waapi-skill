@@ -9,7 +9,7 @@ import sys
 from collections import Counter, defaultdict
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from wwise_waapi.canonical import canonical_sha256, strict_json_copy
 from wwise_waapi.operation_registry import (
@@ -841,7 +841,15 @@ def _operation_model_values(
     if operation_input_mode(name, version) == "business_declaration":
         if name == "audio.import":
             return _audio_import_model_values(version)
-        declaration = operation_business_contract(name, version)["declaration"]
+        business_contract = operation_business_contract(name, version)
+        if name in {
+            "object.create",
+            "object.createPlugin",
+            "object.set",
+            "object.setRTPC",
+        }:
+            return _object_graph_model_values(name, business_contract)
+        declaration = business_contract["declaration"]
         required = set(declaration["required_fields"])
         return [
             {
@@ -886,6 +894,166 @@ def _operation_model_values(
                     policy=policy,
                 )
             )
+    return rows
+
+
+def _object_graph_model_values(
+    name: str,
+    contract: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    """Project every public #78 business value without restoring native shapes."""
+
+    rows: list[dict[str, Any]] = []
+
+    def add(
+        path: tuple[str, ...],
+        *,
+        field_name: str,
+        value_type: str,
+        required: bool,
+        ownership: str = "stable_business_declaration",
+        shape: str = "scalar",
+    ) -> None:
+        rows.append(
+            {
+                "path": list(path),
+                "name": field_name,
+                "shape": shape,
+                "required": required,
+                "value_ownership": ownership,
+                "transport_ownership": "gateway_derivation",
+                "schema_sha256": canonical_sha256(
+                    {
+                        "field": field_name,
+                        "type": value_type,
+                        "shape": shape,
+                        "ownership": ownership,
+                    }
+                ),
+            }
+        )
+
+    handle_fields = {
+        "control_input_handle",
+        "field_handle",
+        "object_handle",
+        "parent_handle",
+        "plugin_type_handle",
+        "replace_owner_handle",
+    }
+
+    def add_fields(
+        prefix: tuple[str, ...],
+        fields: Sequence[str],
+        *,
+        required: set[str],
+        field_types: Mapping[str, Any],
+    ) -> None:
+        for field_name in fields:
+            value_type = str(field_types.get(field_name, "business_value"))
+            ownership = (
+                "live_bound_handle"
+                if field_name in handle_fields or field_name == "field_values"
+                else "stable_business_declaration"
+            )
+            add(
+                (*prefix, field_name),
+                field_name=field_name,
+                value_type=value_type,
+                required=field_name in required,
+                ownership=ownership,
+                shape="map" if field_name == "field_values" else "scalar",
+            )
+
+    declaration = contract["declaration"]
+    if name == "object.create":
+        required = set(declaration["target_fields"])
+        add_fields(
+            ("declaration", "new"),
+            declaration["target_fields"],
+            required=required,
+            field_types={
+                "parent_handle": "bound_object_handle",
+                "name": "string",
+                "kind": "semantic_kind_or_bound_type_handle",
+            },
+        )
+        stable = list(declaration["stable_fields"])
+        add_fields(
+            ("declaration", "new"),
+            [*stable, "field_values"],
+            required=set(),
+            field_types={**declaration["stable_fields"], "field_values": "map"},
+        )
+    elif name == "object.createPlugin":
+        required = set(declaration["required_fields"])
+        fields = [*declaration["required_fields"], *declaration["optional_fields"]]
+        add_fields(
+            ("declaration", "plugin"),
+            fields,
+            required=required,
+            field_types=declaration["field_value_types"],
+        )
+    elif name == "object.setRTPC":
+        required = set(declaration["required_fields"])
+        fields = [*declaration["required_fields"], *declaration["optional_fields"]]
+        add_fields(
+            ("declaration", "rtpc"),
+            fields,
+            required=required,
+            field_types={"curve_points": "ordered_curve_points"},
+        )
+        for point_field in declaration["point_fields"]:
+            add(
+                ("declaration", "rtpc", "curve_points", "*", point_field),
+                field_name=point_field,
+                value_type=("number" if point_field in {"x", "y"} else "curve_shape"),
+                required=True,
+            )
+    else:
+        existing_required = set(declaration["existing_required_fields"])
+        add_fields(
+            ("declaration", "existing"),
+            [*declaration["existing_required_fields"], *declaration["optional_fields"]],
+            required=existing_required,
+            field_types=declaration["field_value_types"],
+        )
+        new_required = set(declaration["new_required_fields"])
+        add_fields(
+            ("declaration", "new"),
+            [*declaration["new_required_fields"], *declaration["optional_fields"]],
+            required=new_required,
+            field_types=declaration["field_value_types"],
+        )
+        media = contract["media_declaration"]
+        for source in media["source_forms"]:
+            add(
+                ("media", source),
+                field_name=source,
+                value_type="exact_media_artifact",
+                required=False,
+                ownership="exact_user_artifact",
+            )
+        for field_name in media["optional_fields"]:
+            add(
+                ("media", field_name),
+                field_name=field_name,
+                value_type="business_value",
+                required=False,
+            )
+
+    for setting in contract.get("settings", {}):
+        add(
+            ("settings", setting),
+            field_name=setting,
+            value_type="business_setting",
+            required=False,
+            ownership=(
+                "live_bound_handle"
+                if setting == "replace_owner_handle"
+                else "stable_business_declaration"
+            ),
+        )
     return rows
 
 

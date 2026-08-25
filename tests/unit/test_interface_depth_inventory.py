@@ -204,22 +204,23 @@ def test_nested_operation_values_and_exact_paths_are_explicitly_classified() -> 
         row for row in inventory["operation_lanes"]
         if row["operation"] == "object.create" and row["version"] == "2025.1"
     )
-    create_values = _model_values(inventory, object_create)
-    assert any(
-        value["path"][-3:] == ["properties", "[]", "name"]
-        and value["value_ownership"] == "live_bound_handle"
-        for value in create_values
+    create_values = {
+        tuple(value["path"]): value["value_ownership"]
+        for value in _model_values(inventory, object_create)
+    }
+    assert create_values[("declaration", "new", "parent_handle")] == (
+        "live_bound_handle"
     )
-    assert any(
-        "<oneOf:" in segment
-        for value in create_values
-        for segment in value["path"]
+    assert create_values[("declaration", "new", "kind")] == (
+        "stable_business_declaration"
     )
-    assert any(
-        value["path"] == ["arguments", "replace_owned_root"]
-        and value["value_ownership"] != "exact_user_artifact"
-        for value in create_values
+    assert create_values[("declaration", "new", "field_values")] == (
+        "live_bound_handle"
     )
+    assert create_values[("settings", "replace_owner_handle")] == (
+        "live_bound_handle"
+    )
+    assert not any("object_path" in path for path in create_values)
 
     ui_open = next(
         row for row in inventory["native_lanes"]
