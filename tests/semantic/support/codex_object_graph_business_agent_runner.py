@@ -100,6 +100,7 @@ def prepare_object_graph_business_runtime(
                 "process_path": str(runtime_root / "WwiseConsole"),
                 "project_path": str(project_path),
                 "objects": [dict(unit.parent)],
+                "types": ["ActorMixer", "Sound"],
                 "fields": [],
             },
             ensure_ascii=False,

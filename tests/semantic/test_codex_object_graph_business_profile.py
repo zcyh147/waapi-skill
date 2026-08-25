@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -69,6 +70,8 @@ def test_unit_declares_named_business_graph_before_one_preview(tmp_path: Path) -
     assert "IsLoopingEnabled" not in encoded
     assert runtime.parent_path in runtime.prompt
     assert str(unit.parent["id"]) not in runtime.prompt
+    fixture = json.loads(runtime.fixture_path.read_text(encoding="utf-8"))
+    assert fixture["types"] == ["ActorMixer", "Sound"]
     assert steps[-1].expected_operation_request == runtime.request
 
 
