@@ -58,7 +58,6 @@ from tests.semantic.support.codex_eval_protocol import (  # noqa: E402  # pyrigh
 )
 from tests.semantic.support.codex_eval_suite import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     BOUNDARY_CASE_IDS,
-    BUSINESS_LIFECYCLE_CASE_IDS,
     CASE_IDS,
     PROFILE_IDS,
     SUPPORTED_VERSIONS,
@@ -415,7 +414,6 @@ class PreviewPairState:
     seal: PreviewTransactionSeal
     transaction_id: str
     artifact_hash: str
-    request: Mapping[str, Any]
 
 
 @dataclass(frozen=True, slots=True)
@@ -1835,7 +1833,7 @@ def run_live_preview_phase(
                 observation.result.final_response,
                 preview,
                 str(session.case.operation),
-                _expected_preview_request(session, values, preview),
+                session.render_request(values),
             ),
         }
         if session.case.id == "M2":
@@ -1862,14 +1860,11 @@ def run_live_preview_phase(
         postprocess_stage = "preview-request-binding"
         preview = broker_payload(execution.broker_evidence, "preview")
         preview_summary = preview.get("preview_summary")
-        expected_request = _expected_preview_request(session, values, preview)
-        preview_request = preview_summary.get("request") if isinstance(preview_summary, Mapping) else None
-        if (
-            not isinstance(expected_request, Mapping)
-            or not isinstance(preview_summary, Mapping)
-            or not strict_json_equal(preview_request, expected_request)
+        expected_request = session.render_request(values)
+        if not isinstance(preview_summary, Mapping) or not strict_json_equal(
+            preview_summary.get("request"), expected_request
         ):
-            raise FixtureContractError("trusted preview evidence did not preserve the exact sealed request")
+            raise FixtureContractError("trusted preview evidence did not preserve the exact rendered request")
         postprocess_stage = "preview-seal-create"
         seal = create_preview_seal(execution.state_directory, transaction_id)
         postprocess_stage = "preview-seal-verify"
@@ -1900,68 +1895,8 @@ def run_live_preview_phase(
             seal=seal,
             transaction_id=transaction_id,
             artifact_hash=artifact_hash,
-            request=dict(expected_request),
         ),
     )
-
-
-def _expected_preview_request(
-    session: EvalSession,
-    values: Mapping[str, str],
-    preview: Mapping[str, Any],
-) -> Mapping[str, Any]:
-    rendered = session.render_request(values)
-    if session.case.id not in BUSINESS_LIFECYCLE_CASE_IDS:
-        return rendered
-    summary = preview.get("preview_summary")
-    request = summary.get("request") if isinstance(summary, Mapping) else None
-    if (
-        not isinstance(request, Mapping)
-        or not _business_preview_request_matches_rendered(rendered, request)
-    ):
-        raise FixtureContractError(
-            "business Preview request differs from the closed rendered intent"
-        )
-    return dict(request)
-
-
-def _business_preview_request_matches_rendered(
-    rendered: Mapping[str, Any],
-    actual: Mapping[str, Any],
-) -> bool:
-    if set(actual) != set(rendered) or any(
-        actual.get(key) != rendered.get(key)
-        for key in ("contract", "version", "operation")
-    ):
-        return False
-    rendered_arguments = rendered.get("arguments")
-    actual_arguments = actual.get("arguments")
-    if (
-        not isinstance(rendered_arguments, Mapping)
-        or not isinstance(actual_arguments, Mapping)
-        or set(actual_arguments) != set(rendered_arguments)
-    ):
-        return False
-    for name, rendered_value in rendered_arguments.items():
-        actual_value = actual_arguments.get(name)
-        if name not in {"object", "parent"}:
-            if not strict_json_equal(actual_value, rendered_value):
-                return False
-            continue
-        if strict_json_equal(actual_value, rendered_value):
-            continue
-        if (
-            not isinstance(rendered_value, Mapping)
-            or rendered_value.get("kind") != "path"
-            or not isinstance(rendered_value.get("value"), str)
-            or not isinstance(actual_value, Mapping)
-            or set(actual_value) != {"kind", "value"}
-            or actual_value.get("kind") != "id"
-            or not isinstance(actual_value.get("value"), str)
-            or not actual_value.get("value")
-        ):
-            return False
-    return True
 
 
 def run_live_confirm_phase(
@@ -2051,7 +1986,7 @@ def run_live_confirm_phase(
         "transaction_id": pair.transaction_id,
         "preview_hash": pair.artifact_hash,
     }
-    expected_request = pair.request
+    expected_request = session.render_request(values)
 
     def oracle_factory(observation: PhaseRunObservation) -> Mapping[str, Any]:
         after = bundle.snapshot(session.case.id)

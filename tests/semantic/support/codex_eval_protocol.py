@@ -11,12 +11,11 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import Any
 
 from .codex_eval_suite import (
     BOUNDARY_CASE_IDS,
-    BUSINESS_LIFECYCLE_CASE_IDS,
     OPERATION_REQUEST_CONTRACT,
     SUPPORTED_VERSIONS,
     EvalSession,
@@ -27,7 +26,6 @@ from .codex_gateway_broker import (
     ResponseBinding,
     SemanticJsonArgument,
 )
-from .codex_eval_protocol_v3 import build_transaction_protocol
 
 
 _CONFIRM_RUNTIME_FIELDS = frozenset({"transaction_id", "preview_hash"})
@@ -469,8 +467,6 @@ def build_expected_gateway_steps(
         )
     elif session.case.id in BOUNDARY_CASE_IDS:
         steps = (_operation_schema_step(route),)
-    elif session.case.id in BUSINESS_LIFECYCLE_CASE_IDS:
-        steps = _business_lifecycle_preview_steps(session, values)
     else:
         steps = (
             _operation_schema_step(route),
@@ -478,41 +474,12 @@ def build_expected_gateway_steps(
         )
 
     actual_subcommands = tuple(step.subcommand for step in steps)
-    if (
-        session.case.id not in BUSINESS_LIFECYCLE_CASE_IDS
-        and actual_subcommands != session.gateway_steps
-    ):
+    if actual_subcommands != session.gateway_steps:
         raise EvalProtocolError(
             f"session {session.session_id!r} gateway_steps {session.gateway_steps!r} "
             f"do not match generated subcommands {actual_subcommands!r}"
         )
     return steps
-
-
-def _business_lifecycle_preview_steps(
-    session: EvalSession,
-    values: Mapping[str, Any],
-) -> tuple[ExpectedGatewayStep, ...]:
-    """Expand a frozen v2 lifecycle intent through the current public protocol."""
-
-    try:
-        request = session.render_request(values)
-        protocol = build_transaction_protocol((request,))
-    except (EvalSuiteError, ValueError) as exc:
-        raise EvalProtocolError(
-            f"cannot build current business lifecycle protocol: {exc}"
-        ) from exc
-    selected: list[ExpectedGatewayStep] = []
-    for step in protocol.steps:
-        selected.append(
-            replace(
-                step,
-                name="preview" if step.name == "tx01.preview" else step.name,
-            )
-        )
-        if step.name == "tx01.preview":
-            return tuple(selected)
-    raise EvalProtocolError("business lifecycle protocol has no immutable Preview")
 
 
 def _validate_session(session: EvalSession) -> _CaseRoute:
