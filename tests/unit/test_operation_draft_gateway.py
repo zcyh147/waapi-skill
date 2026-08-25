@@ -278,7 +278,10 @@ def test_public_draft_start_rejects_invalid_registry_bindings_before_state_write
 ) -> None:
     for arguments, error_code in (
         (("draft-start", "missing.operation"), "UNKNOWN_OPERATION"),
-        (("draft-start", "object.copy"), "OPERATION_DRAFT_ADAPTER_UNAVAILABLE"),
+        (
+            ("draft-start", "object.setProperty"),
+            "OPERATION_DRAFT_ADAPTER_UNAVAILABLE",
+        ),
     ):
         exit_code, payload = execute(tmp_path, *arguments)
 

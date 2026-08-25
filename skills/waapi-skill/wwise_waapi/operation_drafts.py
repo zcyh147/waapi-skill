@@ -44,8 +44,7 @@ from .operation_composer import (
     new_composition,
 )
 from .operation_registry import (
-    BUSINESS_DECLARATION_INPUT_MODE,
-    operation_input_mode,
+    operation_uses_business_declaration,
 )
 from .transactions import validate_transaction_id
 
@@ -812,9 +811,9 @@ class OperationDraftStore:
                 schema_digest=schema_digest,
                 composer_digest=composer_digest,
             )
-            if (
-                operation_input_mode(record.operation, record.version)
-                != BUSINESS_DECLARATION_INPUT_MODE
+            if not operation_uses_business_declaration(
+                record.operation,
+                record.version,
             ):
                 raise OperationDraftInvalidTransition(
                     "This Operation Draft does not expose a Business Declaration Adapter."
@@ -2154,9 +2153,9 @@ def _materialize_draft_composition(
     allow_cleaned_file_evidence: bool = False,
 ) -> Mapping[str, Any]:
     raw_business_session = composition.get("business_session")
-    if raw_business_session is not None and (
-        operation_input_mode(operation, version)
-        == BUSINESS_DECLARATION_INPUT_MODE
+    if raw_business_session is not None and operation_uses_business_declaration(
+        operation,
+        version,
     ):
         try:
             session = BusinessDeclarationSession.from_dict(raw_business_session)

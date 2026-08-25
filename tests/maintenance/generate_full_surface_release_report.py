@@ -243,16 +243,36 @@ def _continuation_error(
                     ):
                         return "Composer continuation does not start one Draft"
                 elif mode == gateway.BUSINESS_DECLARATION_INPUT_MODE:
-                    if operation != "audio.import":
-                        return "business declaration mode lacks a reviewed Adapter"
-                    contract = gateway.audio_import_business_contract(version)
+                    contract = gateway.operation_business_contract(
+                        operation,
+                        version,
+                    )
+                    start = contract.get("start")
                     if (
                         contract.get("operation") != operation
                         or contract.get("version") != version
-                        or not contract.get("semantic_kinds")
-                        or not contract.get("declaration_fields")
+                        or not isinstance(start, Mapping)
+                        or start.get("gateway_argv")
+                        != ["draft-start", operation]
                     ):
                         return "business declaration Adapter is incomplete"
+                    if operation == "audio.import":
+                        if (
+                            not contract.get("semantic_kinds")
+                            or not contract.get("declaration_fields")
+                        ):
+                            return "business declaration Adapter is incomplete"
+                    else:
+                        declaration = contract.get("declaration")
+                        if (
+                            not isinstance(declaration, Mapping)
+                            or not declaration.get("required_fields")
+                            or not isinstance(
+                                declaration.get("field_types"),
+                                Mapping,
+                            )
+                        ):
+                            return "business declaration Adapter is incomplete"
                 elif mode == gateway.INLINE_TYPED_INPUT_MODE:
                     contract = gateway.inline_operation_contract(operation, version)
                     if contract["continuation"]["subcommand"] != "typed-operation":

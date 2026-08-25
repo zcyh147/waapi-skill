@@ -205,6 +205,7 @@ from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[re
     describe_operation,
     list_operation_specs,
     operation_input_mode,
+    operation_uses_business_declaration,
     operation_request_schema_digest,
     parse_operation_request,
     prepare_object_set_composer_check,
@@ -6883,9 +6884,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             args.draft_id,
             task_authority=args.task_authority,
         )
-        if (
-            operation_input_mode(inspected.operation, inspected.version)
-            == BUSINESS_DECLARATION_INPUT_MODE
+        if operation_uses_business_declaration(
+            inspected.operation,
+            inspected.version,
         ):
             raise GatewayInputError(
                 f"{inspected.operation} no longer accepts shallow draft-apply actions; "
@@ -10045,12 +10046,9 @@ def dispatch_operation_draft_check(
         if materialized.record.composition is not None
         else None
     )
-    if raw_business_session is not None and (
-        operation_input_mode(
-            canonical_request.operation,
-            canonical_request.version,
-        )
-        == BUSINESS_DECLARATION_INPUT_MODE
+    if raw_business_session is not None and operation_uses_business_declaration(
+        canonical_request.operation,
+        canonical_request.version,
     ):
         business_session = BusinessDeclarationSession.from_dict(raw_business_session)
         bound_objects = tuple(
@@ -10264,9 +10262,9 @@ def dispatch_offline_business_draft_update(
         args.draft_id,
         task_authority=args.task_authority,
     )
-    if (
-        operation_input_mode(inspected.operation, inspected.version)
-        != BUSINESS_DECLARATION_INPUT_MODE
+    if not operation_uses_business_declaration(
+        inspected.operation,
+        inspected.version,
     ):
         raise GatewayInputError("This Draft has no Business Declaration Adapter")
     raw_session = (
@@ -10492,9 +10490,9 @@ def _open_business_binding(
     state_dir = resolve_transaction_state_directory(args, env=env)
     store = OperationDraftStore(state_dir)
     record = store.inspect(args.draft_id, task_authority=args.task_authority)
-    if (
-        operation_input_mode(record.operation, record.version)
-        != BUSINESS_DECLARATION_INPUT_MODE
+    if not operation_uses_business_declaration(
+        record.operation,
+        record.version,
     ):
         raise GatewayInputError("This Draft has no Business Declaration Adapter")
     if record.version != detected_version:
@@ -15109,6 +15107,19 @@ def _business_next_action_binding(
         "waapi_args",
         "waapi_options",
     ]
+    business_contract = operation_business_contract(
+        record.operation,
+        record.version,
+    )
+    if record.operation != "audio.import":
+        object_binding = {
+            **object_binding,
+            "use_only_for": business_contract["binding"]["roles"],
+            "role_assignment": (
+                "bind_each_required_role_then_copy_its_returned_handle_into_"
+                "the_same_named_declaration_field"
+            ),
+        }
     if session is None:
         return {
             "contract": "waapi-skill.business-draft-next-action/v1",
@@ -15117,10 +15128,7 @@ def _business_next_action_binding(
                 "agent": "natural_language_to_closed_high_level_business_facts",
                 "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
             },
-            "business_contract": operation_business_contract(
-                record.operation,
-                record.version,
-            ),
+            "business_contract": business_contract,
             "object_binding": object_binding,
             "forbidden_inputs": forbidden_inputs,
             "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
@@ -15128,10 +15136,6 @@ def _business_next_action_binding(
             "precompute_or_increment_revision": False,
         }
     if record.operation != "audio.import":
-        business_contract = operation_business_contract(
-            record.operation,
-            record.version,
-        )
         if session.declarations:
             return {
                 "contract": "waapi-skill.business-draft-next-action/v1",
@@ -15148,7 +15152,12 @@ def _business_next_action_binding(
             }
         return {
             "contract": "waapi-skill.business-draft-next-action/v1",
-            "required_next_phase": "declare_complete_object_change",
+            "required_next_phase": (
+                "bind_remaining_business_objects_then_declare_complete_object_change"
+                if len(session.handles.as_dict()["objects"])
+                < len(business_contract["binding"]["roles"])
+                else "declare_complete_object_change"
+            ),
             "responsibility_split": {
                 "agent": "natural_language_to_closed_high_level_business_facts",
                 "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
@@ -15859,9 +15868,9 @@ def operation_draft_payload(
                 projection["allowed_actions"].extend(
                     ["check", "preview-from-draft"]
                 )
-            if command == "draft-check" and (
-                operation_input_mode(record.operation, record.version)
-                != BUSINESS_DECLARATION_INPUT_MODE
+            if command == "draft-check" and not operation_uses_business_declaration(
+                record.operation,
+                record.version,
             ):
                 current_facts = projection.pop("current_facts")
                 if not isinstance(current_facts, list):
@@ -15997,8 +16006,10 @@ def operation_draft_payload(
     }
     if (
         record.state is OperationDraftState.EDITABLE
-        and operation_input_mode(record.operation, record.version)
-        == BUSINESS_DECLARATION_INPUT_MODE
+        and operation_uses_business_declaration(
+            record.operation,
+            record.version,
+        )
     ):
         draft["next_action_binding"] = _business_next_action_binding(
             record,

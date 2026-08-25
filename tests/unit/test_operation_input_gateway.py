@@ -1039,6 +1039,7 @@ def test_object_set_name_draft_start_returns_only_business_continuation(
     assert binding["object_binding"]["result"] == (
         "copy_the_returned_bound_object.handle"
     )
+    assert binding["object_binding"]["use_only_for"] == ["object"]
     assert "draft-apply" not in json.dumps(binding)
     assert "typed-operation" not in json.dumps(binding)
 

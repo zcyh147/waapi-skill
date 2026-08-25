@@ -20,12 +20,12 @@ from .builders.common import SemanticValidationError
 from .metadata_discovery import metadata_candidate_limit_contract
 from .operation_registry import (
     audio_import_business_contract,
-    BUSINESS_DECLARATION_INPUT_MODE,
     COMPOSER_INPUT_MODE,
     OperationContractError,
     object_set_composer_fragment_contract,
     operation_business_contract,
     operation_input_mode,
+    operation_uses_business_declaration,
     parse_operation_request,
     validate_object_set_composer_fragment,
 )
@@ -1466,7 +1466,7 @@ def operation_composer_digest(operation: str, version: str) -> str:
                 "business_adapter": audio_import_business_contract(version),
             }
         )
-    if operation_input_mode(operation, version) == BUSINESS_DECLARATION_INPUT_MODE:
+    if operation_uses_business_declaration(operation, version):
         return canonical_sha256(
             {
                 "contract": "waapi-skill.business-draft-binding/v1",
@@ -2072,7 +2072,7 @@ def _apply_generic_typed_action(
 
 
 def new_composition(operation: str, version: str) -> dict[str, Any]:
-    if operation_input_mode(operation, version) == BUSINESS_DECLARATION_INPUT_MODE:
+    if operation_uses_business_declaration(operation, version):
         operation_business_contract(operation, version)
         return {"contract": OPERATION_COMPOSITION_CONTRACT}
     contract = operation_composer_contract(operation, version)
@@ -2989,7 +2989,7 @@ def composition_projection(
                 "cancel",
             ],
         }
-    if operation_input_mode(operation, version) == BUSINESS_DECLARATION_INPUT_MODE:
+    if operation_uses_business_declaration(operation, version):
         return _audio_import_business_composition_projection(
             normalized,
             operation=operation,
@@ -3155,7 +3155,7 @@ def _normalize_composition(
     operation: str,
     version: str,
 ) -> dict[str, Any]:
-    if operation_input_mode(operation, version) == BUSINESS_DECLARATION_INPUT_MODE:
+    if operation_uses_business_declaration(operation, version):
         return _normalize_audio_import_business_composition(
             composition,
             operation=operation,

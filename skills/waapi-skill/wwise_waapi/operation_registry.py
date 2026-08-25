@@ -3636,6 +3636,15 @@ def operation_input_mode(name: str, version: str) -> str:
     return _operation_input_mode_index(OPERATION_INPUT_MODE_LANES)[(name, version)]
 
 
+def operation_uses_business_declaration(name: str, version: str) -> bool:
+    """Return false for native URI Drafts outside the named-operation Registry."""
+
+    spec = OPERATION_SPECS.get(name)
+    if spec is None or version not in spec.supported_versions:
+        return False
+    return operation_input_mode(name, version) == BUSINESS_DECLARATION_INPUT_MODE
+
+
 def audio_import_business_contract(version: str) -> dict[str, Any]:
     """Publish Registry-owned audio.import business shape and safety metadata."""
 
@@ -20791,6 +20800,7 @@ __all__ = [
     "list_operation_specs",
     "operation_input_mode",
     "operation_input_modes_by_version",
+    "operation_uses_business_declaration",
     "operation_business_contract",
     "operation_request_machine_contract",
     "operation_request_schema_digest",
