@@ -16,6 +16,7 @@ from typing import Any
 
 from .codex_eval_suite import (
     BOUNDARY_CASE_IDS,
+    BUSINESS_LIFECYCLE_CASE_IDS,
     OPERATION_REQUEST_CONTRACT,
     SUPPORTED_VERSIONS,
     EvalSession,
@@ -30,7 +31,6 @@ from .codex_eval_protocol_v3 import build_transaction_protocol
 
 
 _CONFIRM_RUNTIME_FIELDS = frozenset({"transaction_id", "preview_hash"})
-_BUSINESS_LIFECYCLE_CASE_IDS = frozenset({"M1", "M2", "M4", "M5"})
 
 
 class EvalProtocolError(ValueError):
@@ -469,7 +469,7 @@ def build_expected_gateway_steps(
         )
     elif session.case.id in BOUNDARY_CASE_IDS:
         steps = (_operation_schema_step(route),)
-    elif session.case.id in _BUSINESS_LIFECYCLE_CASE_IDS:
+    elif session.case.id in BUSINESS_LIFECYCLE_CASE_IDS:
         steps = _business_lifecycle_preview_steps(session, values)
     else:
         steps = (
@@ -479,7 +479,7 @@ def build_expected_gateway_steps(
 
     actual_subcommands = tuple(step.subcommand for step in steps)
     if (
-        session.case.id not in _BUSINESS_LIFECYCLE_CASE_IDS
+        session.case.id not in BUSINESS_LIFECYCLE_CASE_IDS
         and actual_subcommands != session.gateway_steps
     ):
         raise EvalProtocolError(

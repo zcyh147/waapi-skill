@@ -98,6 +98,7 @@ PROFILE_SESSION_COUNTS: Mapping[str, int] = {
 }
 PROFILE_IDS = tuple(PROFILE_SESSION_COUNTS)
 BOUNDARY_CASE_IDS = frozenset({"B1", "B2", "B3", "B4", "B5", "B6", "B7"})
+BUSINESS_LIFECYCLE_CASE_IDS = frozenset({"M1", "M2", "M4", "M5"})
 RUNTIME_TEMPLATE_VARIABLES = frozenset({"transaction_id", "preview_hash"})
 GATEWAY_STEP_IDS = frozenset(
     {

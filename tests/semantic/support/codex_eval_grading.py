@@ -17,6 +17,7 @@ from typing import Any, Mapping, Sequence
 from .codex_eval_results import parse_waapi_result_line
 from .codex_eval_suite import (
     BOUNDARY_CASE_IDS,
+    BUSINESS_LIFECYCLE_CASE_IDS,
     GATEWAY_RESULT_CONTRACT,
     SUPPORTED_VERSIONS,
     EvalSession,
@@ -552,26 +553,42 @@ def _broker_integrity(
     payload_commands = _payload_commands(
         tuple(record.payload for record in records if isinstance(record.payload, Mapping))
     )
+    if (
+        session.case.id in BUSINESS_LIFECYCLE_CASE_IDS
+        and session.phase != "confirm"
+    ):
+        expected_step_names = (
+            "tx01.operation-schema",
+            "tx01.draft-start",
+            "tx01.bind-object",
+            "tx01.declare-object-change",
+            "tx01.check",
+            "preview",
+        )
+        expected_commands = _BUSINESS_LIFECYCLE_PREVIEW_COMMANDS
+    else:
+        expected_step_names = session.gateway_steps
+        expected_commands = session.gateway_steps
     expected_runner = str(_absolute_lexical(skill_source / "scripts" / "run.py"))
     return (
         exact_gateway_commands
         and evidence.passed
         and evidence.complete
-        and evidence.expected_step_names == session.gateway_steps
-        and evidence.consumed_step_names == session.gateway_steps
+        and evidence.expected_step_names == expected_step_names
+        and evidence.consumed_step_names == expected_step_names
         and evidence.runner_path == expected_runner
-        and len(records) == len(session.gateway_steps)
+        and len(records) == len(expected_step_names)
         and tuple(record.sequence for record in records) == tuple(range(1, len(records) + 1))
-        and tuple(record.step_name for record in records) == session.gateway_steps
+        and tuple(record.step_name for record in records) == expected_step_names
         and all(record.authenticated and record.accepted and record.succeeded for record in records)
         and all(
             isinstance(record.payload, Mapping)
             and record.payload.get("contract") == GATEWAY_RESULT_CONTRACT
             and record.payload.get("ok") is True
             and record.payload.get("command") == expected_command
-            for record, expected_command in zip(records, session.gateway_steps)
+            for record, expected_command in zip(records, expected_commands)
         )
-        and payload_commands == session.gateway_steps
+        and payload_commands == expected_commands
         and reconciliation.passed
         and not reconciliation.errors
         and reconciliation.observed_command_count == len(records)

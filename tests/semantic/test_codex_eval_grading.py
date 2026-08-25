@@ -15,6 +15,7 @@ from tests.semantic.support.codex_eval_grading import (
 )
 from tests.semantic.support.codex_eval_suite import (
     BOUNDARY_CASE_IDS,
+    BUSINESS_LIFECYCLE_CASE_IDS,
     SUPPORTED_VERSIONS,
     EvalSession,
     load_eval_suite,
@@ -159,6 +160,42 @@ def _payloads(session: EvalSession) -> tuple[dict[str, object], ...]:
                 "executed": False,
                 "request": request,
             }
+            preview_payload = {
+                "contract": "waapi-skill.gateway-result/v1",
+                "ok": True,
+                "status": "awaiting_confirmation",
+                "command": (
+                    "preview-from-draft"
+                    if session.case.id in BUSINESS_LIFECYCLE_CASE_IDS
+                    else "preview"
+                ),
+                "offline": False,
+                "transaction_id": transaction_id,
+                "artifact_hash": artifact_hash,
+                "state": "awaiting_confirmation",
+                "executed": False,
+                "verified": False,
+                "preview_summary": {"request": request},
+                "agent_result": agent_result,
+            }
+            if session.case.id in BUSINESS_LIFECYCLE_CASE_IDS:
+                return tuple(
+                    {
+                        "contract": "waapi-skill.gateway-result/v1",
+                        "ok": True,
+                        "status": "ok",
+                        "command": command,
+                        "offline": command
+                        in {"operation-schema", "draft-start"},
+                    }
+                    for command in (
+                        "operation-schema",
+                        "draft-start",
+                        "draft-bind-object",
+                        "draft-declare-object-change",
+                        "draft-check",
+                    )
+                ) + (preview_payload,)
             return (
                 {
                     "contract": "waapi-skill.gateway-result/v1",
@@ -167,20 +204,7 @@ def _payloads(session: EvalSession) -> tuple[dict[str, object], ...]:
                     "command": "operation-schema",
                     "offline": True,
                 },
-                {
-                    "contract": "waapi-skill.gateway-result/v1",
-                    "ok": True,
-                    "status": "awaiting_confirmation",
-                    "command": "preview",
-                    "offline": False,
-                    "transaction_id": transaction_id,
-                    "artifact_hash": artifact_hash,
-                    "state": "awaiting_confirmation",
-                    "executed": False,
-                    "verified": False,
-                    "preview_summary": {"request": request},
-                    "agent_result": agent_result,
-                },
+                preview_payload,
             )
         if session.gateway_steps == ("transaction-show", "confirm", "execute", "verify"):
             return (
@@ -404,17 +428,40 @@ def _make_bundle(
         _command_record(("cat", str(skill / relative)), (skill / relative).read_text(encoding="utf-8"))
         for relative in reads
     ]
+    if (
+        session.case.id in BUSINESS_LIFECYCLE_CASE_IDS
+        and session.phase != "confirm"
+    ):
+        step_names = (
+            "tx01.operation-schema",
+            "tx01.draft-start",
+            "tx01.bind-object",
+            "tx01.declare-object-change",
+            "tx01.check",
+            "preview",
+        )
+        gateway_commands = (
+            "operation-schema",
+            "draft-start",
+            "draft-bind-object",
+            "draft-declare-object-change",
+            "draft-check",
+            "preview-from-draft",
+        )
+    else:
+        step_names = session.gateway_steps
+        gateway_commands = session.gateway_steps
     command_records.extend(
         _command_record(
             ("python", str(runner), "gateway.py", command),
             json.dumps(payload),
         )
-        for command, payload in zip(session.gateway_steps, payloads)
+        for command, payload in zip(gateway_commands, payloads)
     )
     command_facts = classify_commands(
         command_records,
         skill_source=skill,
-        expected_gateway_subcommands=session.gateway_steps,
+        expected_gateway_subcommands=gateway_commands,
     )
 
     prompt = CodexPromptAudit(
@@ -485,12 +532,17 @@ def _make_bundle(
         skill_tree_unchanged=True,
     )
     records = tuple(
-        _broker_record(index, command, runner, payload)
-        for index, (command, payload) in enumerate(zip(session.gateway_steps, payloads), start=1)
+        replace(
+            _broker_record(index, command, runner, payload),
+            step_name=step_name,
+        )
+        for index, (step_name, command, payload) in enumerate(
+            zip(step_names, gateway_commands, payloads), start=1
+        )
     )
     evidence = GatewayBrokerEvidence(
-        expected_step_names=session.gateway_steps,
-        consumed_step_names=session.gateway_steps,
+        expected_step_names=step_names,
+        consumed_step_names=step_names,
         records=records,
         state_directory=str(state),
         evidence_directory=str(evidence_dir),
@@ -554,7 +606,7 @@ def test_transaction_grader_rejects_tampered_gateway_agent_result(
     session = _session("M1", phase)
     result, evidence, reconciliation, paths = _make_bundle(tmp_path, session)
     records = list(evidence.records)
-    target_index = 1 if phase == "preview" else 3
+    target_index = -1 if phase == "preview" else 3
     tampered_payload = json.loads(json.dumps(records[target_index].payload, ensure_ascii=False))
     tampered_payload["agent_result"]["artifact_hash"] = "f" * 64
     records[target_index] = replace(
