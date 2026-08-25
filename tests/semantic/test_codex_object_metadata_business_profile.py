@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+from tests.semantic import run_codex_skill_campaign as campaign
 from tests.semantic import run_codex_skill_matrix as matrix
 from tests.semantic.support.codex_object_metadata_business_agent_runner import (
     build_preview_only_metadata_steps,
@@ -85,3 +86,7 @@ def test_profile_filters_and_matrix_descriptor_are_exact() -> None:
         )
     )
     assert tuple(unit.unit_id for unit in units) == UNIT_IDS
+    assert matrix.OBJECT_METADATA_BUSINESS_PROFILE_ID in campaign.TERRA_LOCKED_V3_PROFILE_IDS
+    assert campaign.BUSINESS_AGENT_OUTCOME_CONTRACTS[
+        matrix.OBJECT_METADATA_BUSINESS_PROFILE_ID
+    ] == "waapi-skill.object-metadata-business-agent-outcome/v1"

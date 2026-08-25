@@ -33,6 +33,8 @@ class ObjectMetadataBusinessRuntime:
     source_id: str
     target_id: str
     field_meaning: str
+    source_path: str
+    target_path: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,6 +112,8 @@ def prepare_object_metadata_business_runtime(
         source_id=str(unit.source["id"]),
         target_id=str(unit.target["id"]),
         field_meaning=unit.field_meaning,
+        source_path=str(unit.source["path"]),
+        target_path=str(unit.target["path"]),
     )
 
 
@@ -118,6 +122,8 @@ def build_preview_only_metadata_steps(runtime: ObjectMetadataBusinessRuntime) ->
         runtime.request,
         label="tx01",
         field_meaning=runtime.field_meaning,
+        object_selector={"kind": "path", "value": runtime.source_path},
+        target_selector={"kind": "path", "value": runtime.target_path},
     )
 
 

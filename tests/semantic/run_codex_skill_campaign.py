@@ -317,6 +317,9 @@ COMPOUND_HEAVY_V1_PROFILE_ID = matrix.COMPOUND_HEAVY_V1_PROFILE_ID
 TYPED_INPUT_PROFILE_ID = matrix.TYPED_INPUT_PROFILE_ID
 DEEP_INTERFACE_MVP_PROFILE_ID = matrix.DEEP_INTERFACE_MVP_PROFILE_ID
 AUDIO_IMPORT_BUSINESS_PROFILE_ID = matrix.AUDIO_IMPORT_BUSINESS_PROFILE_ID
+OFFLINE_BUSINESS_AGENT_PROFILE_IDS = frozenset(
+    matrix.OFFLINE_BUSINESS_AGENT_PROFILES
+)
 INTEGRATION_WORKFLOWS_V1_PROFILE_ID = (
     matrix.INTEGRATION_WORKFLOWS_V1_PROFILE_ID
 )
@@ -352,7 +355,7 @@ TERRA_LOCKED_V3_PROFILE_IDS = frozenset(
         COMPOUND_HEAVY_V1_PROFILE_ID,
         TYPED_INPUT_PROFILE_ID,
         DEEP_INTERFACE_MVP_PROFILE_ID,
-        AUDIO_IMPORT_BUSINESS_PROFILE_ID,
+        *OFFLINE_BUSINESS_AGENT_PROFILE_IDS,
         INTEGRATION_WORKFLOWS_V1_PROFILE_ID,
         INTEGRATION_WORKFLOWS_V2_PROFILE_ID,
         INTEGRATION_PROFILE_ID,
@@ -376,6 +379,15 @@ HEAVY_V3_CLI_OUTCOME_CONTRACT = "waapi-skill.codex-heavy-cli-run/v3"
 AUDIO_IMPORT_BUSINESS_OUTCOME_CONTRACT = (
     "waapi-skill.audio-import-business-agent-outcome/v1"
 )
+BUSINESS_AGENT_OUTCOME_CONTRACTS = {
+    matrix.AUDIO_IMPORT_BUSINESS_PROFILE_ID: AUDIO_IMPORT_BUSINESS_OUTCOME_CONTRACT,
+    matrix.OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID: (
+        "waapi-skill.object-lifecycle-business-agent-outcome/v1"
+    ),
+    matrix.OBJECT_METADATA_BUSINESS_PROFILE_ID: (
+        "waapi-skill.object-metadata-business-agent-outcome/v1"
+    ),
+}
 HEAVY_V3_PROJECT_LIFECYCLE_CONTRACT = (
     "waapi-skill.codex-semantic-scenario-lifecycle/v3"
 )
@@ -756,7 +768,7 @@ def run_campaign(options: CampaignOptions) -> int:
     windows_path_budget = None
     if (
         not options.verify_only
-        and options.profile != AUDIO_IMPORT_BUSINESS_PROFILE_ID
+        and options.profile not in OFFLINE_BUSINESS_AGENT_PROFILE_IDS
     ):
         try:
             windows_path_budget = _require_standard_windows_path_budget(
@@ -2120,11 +2132,14 @@ def _heavy_v3_live_input_fingerprints(
 
     if not unit_rows:
         raise CampaignEvidenceError("heavy live-input fingerprint requires selected units")
-    if options.profile == AUDIO_IMPORT_BUSINESS_PROFILE_ID:
+    if options.profile in OFFLINE_BUSINESS_AGENT_PROFILE_IDS:
         versions = sorted({str(row.get("version")) for row in unit_rows})
-        if any(version not in {"2022.1", "2025.1"} for version in versions):
+        supported = matrix.OFFLINE_BUSINESS_AGENT_PROFILES[
+            options.profile
+        ].supported_versions
+        if any(version not in supported for version in versions):
             raise CampaignEvidenceError(
-                "audio import business profile has an invalid fixture version"
+                "business Agent profile has an invalid fixture version"
             )
         return {
             "mode": "deterministic-waapi-read-shim",
@@ -2908,9 +2923,10 @@ def _validate_heavy_v3_live_preflight(
         raise CampaignEvidenceError("heavy matrix live preflight must be an object")
     state = summary.get("preflight")
     if state == "passed":
-        if expected_profile == AUDIO_IMPORT_BUSINESS_PROFILE_ID:
+        if expected_profile in OFFLINE_BUSINESS_AGENT_PROFILE_IDS:
+            descriptor = matrix.OFFLINE_BUSINESS_AGENT_PROFILES[expected_profile]
             expected = {
-                "contract": "waapi-skill.audio-import-business-preflight/v1",
+                "contract": descriptor.preflight_contract,
                 "ok": True,
                 "mode": "offline-production-gateway",
                 "wwise_started": False,
@@ -2918,7 +2934,7 @@ def _validate_heavy_v3_live_preflight(
             }
             if dict(payload) != expected:
                 raise CampaignEvidenceError(
-                    "audio import business preflight evidence is malformed"
+                    "business Agent preflight evidence is malformed"
                 )
             return
         required = {
@@ -3036,7 +3052,7 @@ def _validate_heavy_v3_matrix_case(
     if outcome != runner_outcome:
         raise CampaignEvidenceError("heavy outcome file differs from matrix-case")
     if value.get("runner") == "agent":
-        _validate_audio_import_business_agent_outcome(
+        _validate_business_agent_outcome(
             outcome,
             matrix_case=value,
             expected_unit=expected_unit,
@@ -3061,7 +3077,10 @@ def _validate_heavy_v3_matrix_case(
     for key in ("scenario_id", "version", "status", "reason", "scenario_root"):
         if outcome.get(key) != value.get(key):
             raise CampaignEvidenceError(f"heavy runner outcome mismatch for {key}")
-    expected_contract = _heavy_v3_outcome_contract(str(value["runner"]))
+    expected_contract = _heavy_v3_outcome_contract(
+        str(value["runner"]),
+        profile=options.profile,
+    )
     if outcome.get("contract") != expected_contract:
         raise CampaignEvidenceError("heavy runner outcome contract mismatch")
     if not isinstance(outcome.get("checks"), Mapping):
@@ -3102,7 +3121,7 @@ def _validate_heavy_v3_matrix_case(
             )
 
 
-def _validate_audio_import_business_agent_outcome(
+def _validate_business_agent_outcome(
     outcome: Mapping[str, Any],
     *,
     matrix_case: Mapping[str, Any],
@@ -3126,17 +3145,17 @@ def _validate_audio_import_business_agent_outcome(
     }
     if set(outcome) != expected_keys:
         raise CampaignEvidenceError(
-            "audio import business Agent outcome schema is not closed"
+            "business Agent outcome schema is not closed"
         )
     for key in ("scenario_id", "version", "status", "reason"):
         if outcome.get(key) != matrix_case.get(key):
             raise CampaignEvidenceError(
-                f"audio import business Agent outcome mismatch for {key}"
+                f"business Agent outcome mismatch for {key}"
             )
     gates = outcome.get("gates")
     transaction_count = getattr(expected_unit, "transaction_count", None)
     if (
-        outcome.get("contract") != AUDIO_IMPORT_BUSINESS_OUTCOME_CONTRACT
+        outcome.get("contract") != BUSINESS_AGENT_OUTCOME_CONTRACTS.get(options.profile)
         or not isinstance(gates, Mapping)
         or not gates
         or any(type(value) is not bool for value in gates.values())
@@ -3149,7 +3168,7 @@ def _validate_audio_import_business_agent_outcome(
         or not isinstance(outcome.get("final_response"), str)
     ):
         raise CampaignEvidenceError(
-            "audio import business Agent outcome facts are malformed"
+            "business Agent outcome facts are malformed"
         )
     if outcome.get("status") == "PASS" and (
         not isinstance(outcome.get("thread_id"), str)
@@ -3157,12 +3176,12 @@ def _validate_audio_import_business_agent_outcome(
         or not all(gates.values())
     ):
         raise CampaignEvidenceError(
-            "audio import business PASS lacks a fresh thread or passing gates"
+            "business Agent PASS lacks a fresh thread or passing gates"
         )
 
     evidence_root = _require_real_directory(
         scenario_root / "evidence",
-        label="audio import business Agent evidence root",
+        label="business Agent evidence root",
     )
     nested_outcome = load_strict_regular_json(evidence_root / "outcome.json")
     reconciliation = load_strict_regular_json(
@@ -3172,7 +3191,7 @@ def _validate_audio_import_business_agent_outcome(
     load_strict_regular_json(evidence_root / "codex-result-facts.json")
     if nested_outcome != outcome:
         raise CampaignEvidenceError(
-            "audio import business nested outcome differs from scenario outcome"
+            "business Agent nested outcome differs from scenario outcome"
         )
     if outcome.get("status") == "PASS" and (
         reconciliation.get("passed") is not True
@@ -3182,15 +3201,167 @@ def _validate_audio_import_business_agent_outcome(
         or outcome.get("command_count") != len(broker["records"])
     ):
         raise CampaignEvidenceError(
-            "audio import business PASS lacks complete Broker reconciliation"
+            "business Agent PASS lacks complete Broker reconciliation"
         )
     if outcome.get("status") == "PASS":
-        _validate_audio_import_business_agent_protocol(
-            broker,
-            expected_unit=expected_unit,
-            scenario_root=scenario_root,
-            protocol_manifest_revision=options.protocol_manifest_revision,
+        if options.profile == AUDIO_IMPORT_BUSINESS_PROFILE_ID:
+            _validate_audio_import_business_agent_protocol(
+                broker,
+                expected_unit=expected_unit,
+                scenario_root=scenario_root,
+                protocol_manifest_revision=options.protocol_manifest_revision,
+            )
+        else:
+            _validate_bound_business_agent_protocol(
+                broker,
+                expected_unit=expected_unit,
+                profile=options.profile,
+            )
+
+
+def _validate_audio_import_business_agent_outcome(
+    outcome: Mapping[str, Any],
+    *,
+    matrix_case: Mapping[str, Any],
+    expected_unit: Any,
+    scenario_root: Path,
+    options: CampaignOptions,
+) -> None:
+    """Compatibility name retained for focused audio-import evidence tests."""
+
+    _validate_business_agent_outcome(
+        outcome,
+        matrix_case=matrix_case,
+        expected_unit=expected_unit,
+        scenario_root=scenario_root,
+        options=options,
+    )
+
+
+def _validate_bound_business_agent_protocol(
+    broker: Mapping[str, Any],
+    *,
+    expected_unit: Any,
+    profile: str,
+) -> None:
+    """Rebuild one non-import Business Agent protocol from frozen suite facts."""
+
+    if profile == matrix.OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_object_lifecycle_business_agent_runner import (
+            build_preview_only_lifecycle_steps,
         )
+
+        arguments: dict[str, Any] = {
+            "object": {"kind": "path", "value": str(expected_unit.object["path"])}
+        }
+        if expected_unit.value is not None:
+            arguments["value"] = expected_unit.value
+        request = {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": expected_unit.version,
+            "operation": expected_unit.operation,
+            "arguments": arguments,
+        }
+        steps = build_preview_only_lifecycle_steps(request)
+        preview_request = _bind_business_request_paths(
+            steps[-1].expected_operation_request,
+            objects=(expected_unit.object,),
+        )
+    elif profile == matrix.OBJECT_METADATA_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_eval_protocol_v3 import (
+            build_object_metadata_business_transaction_steps,
+        )
+
+        request = {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": expected_unit.version,
+            "operation": expected_unit.operation,
+            "arguments": {
+                "object": {"kind": "id", "value": str(expected_unit.source["id"])},
+                "reference": expected_unit.native_reference,
+                "target": {"kind": "id", "value": str(expected_unit.target["id"])},
+            },
+        }
+        steps = build_object_metadata_business_transaction_steps(
+            request,
+            label="tx01",
+            field_meaning=expected_unit.field_meaning,
+            object_selector={
+                "kind": "path",
+                "value": str(expected_unit.source["path"]),
+            },
+            target_selector={
+                "kind": "path",
+                "value": str(expected_unit.target["path"]),
+            },
+        )
+        preview_request = request
+    else:
+        raise CampaignEvidenceError("unknown bound Business Agent profile")
+
+    expected_names = tuple(step.name for step in steps)
+    consumed_names = broker.get("consumed_step_names")
+    records = broker.get("records")
+    if (
+        broker.get("expected_step_names") != list(expected_names)
+        or consumed_names != list(expected_names)
+        or not isinstance(records, list)
+        or len(records) != len(expected_names)
+    ):
+        raise CampaignEvidenceError("bound Business Agent Broker topology drifted")
+    by_name = {
+        str(record.get("step_name")): record
+        for record in records
+        if isinstance(record, Mapping)
+    }
+    if len(by_name) != len(expected_names):
+        raise CampaignEvidenceError("bound Business Agent Broker step identity drifted")
+    for step in steps:
+        record = by_name.get(step.name)
+        arguments = record.get("gateway_arguments") if isinstance(record, Mapping) else None
+        if (
+            not isinstance(record, Mapping)
+            or record.get("accepted") is not True
+            or record.get("authenticated") is not True
+            or record.get("succeeded") is not True
+            or record.get("exit_code") != 0
+            or not isinstance(arguments, list)
+            or arguments[:1] != [step.subcommand]
+        ):
+            raise CampaignEvidenceError("bound Business Agent Broker record is not successful")
+        if step.subcommand == "preview-from-draft":
+            payload = record.get("payload")
+            agent_result = payload.get("agent_result") if isinstance(payload, Mapping) else None
+            observed_request = (
+                agent_result.get("request")
+                if isinstance(agent_result, Mapping)
+                else None
+            )
+            if observed_request != preview_request:
+                raise CampaignEvidenceError("bound Business Agent Preview request drifted")
+
+
+def _bind_business_request_paths(
+    value: Any,
+    *,
+    objects: Sequence[Mapping[str, Any]],
+) -> Any:
+    path_to_id = {
+        str(row["path"]): str(row["id"])
+        for row in objects
+        if isinstance(row.get("path"), str) and isinstance(row.get("id"), str)
+    }
+
+    def visit(item: Any) -> Any:
+        if isinstance(item, Mapping):
+            if item.get("kind") == "path" and item.get("value") in path_to_id:
+                return {"kind": "id", "value": path_to_id[str(item["value"])]}
+            return {str(key): visit(child) for key, child in item.items()}
+        if isinstance(item, list):
+            return [visit(child) for child in item]
+        return item
+
+    return visit(value)
 
 
 def _validate_audio_import_business_agent_protocol(
@@ -13533,13 +13704,16 @@ def _load_strict_regular_text(path: Path, *, limit_bytes: int = 8 * 1024 * 1024)
         raise CampaignEvidenceError(f"child text is not UTF-8: {source}") from exc
 
 
-def _heavy_v3_outcome_contract(runner: str) -> str:
+def _heavy_v3_outcome_contract(runner: str, *, profile: str | None = None) -> str:
     if runner == "project":
         return HEAVY_V3_PROJECT_OUTCOME_CONTRACT
     if runner == "cli":
         return HEAVY_V3_CLI_OUTCOME_CONTRACT
     if runner == "agent":
-        return AUDIO_IMPORT_BUSINESS_OUTCOME_CONTRACT
+        contract = BUSINESS_AGENT_OUTCOME_CONTRACTS.get(str(profile))
+        if contract is None:
+            raise CampaignEvidenceError("unknown business Agent outcome contract")
+        return contract
     raise CampaignEvidenceError(f"unknown heavy runner lane: {runner}")
 
 
@@ -14270,7 +14444,7 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     is_compound_v1 = args.profile == COMPOUND_HEAVY_V1_PROFILE_ID
     is_typed_input = args.profile == TYPED_INPUT_PROFILE_ID
     is_deep_interface_mvp = args.profile == DEEP_INTERFACE_MVP_PROFILE_ID
-    is_audio_import_business = args.profile == AUDIO_IMPORT_BUSINESS_PROFILE_ID
+    business_agent_profile = matrix.OFFLINE_BUSINESS_AGENT_PROFILES.get(args.profile)
     is_integration_v1 = args.profile == INTEGRATION_WORKFLOWS_V1_PROFILE_ID
     is_integration_v2 = args.profile == INTEGRATION_WORKFLOWS_V2_PROFILE_ID
     is_integration = args.profile == INTEGRATION_PROFILE_ID
@@ -14293,14 +14467,14 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     max_pre_action_retries = (
         0
         if args.max_pre_action_retries is None
-        and (is_typed_input or is_audio_import_business)
+        and (is_typed_input or business_agent_profile is not None)
         else 1
         if args.max_pre_action_retries is None
         else int(args.max_pre_action_retries)
     )
     if max_pre_action_retries < 0:
         parser.error("--max-pre-action-retries must be zero or greater")
-    if (is_typed_input or is_audio_import_business) and max_pre_action_retries != 0:
+    if (is_typed_input or business_agent_profile is not None) and max_pre_action_retries != 0:
         parser.error(
             f"{args.profile} forbids same-root pre-action retries"
         )
@@ -14329,15 +14503,20 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
             parser.error(
                 "unknown v2 --case-id values: " + ", ".join(unknown_case_ids)
             )
-    if (
-        is_deep_interface_mvp
-        or is_audio_import_business
-    ) and any(
+    if is_deep_interface_mvp and any(
         version not in {"2022.1", "2025.1"} for version in args.version
     ):
         parser.error(
             f"{args.profile} supports only "
             "--version 2022.1 and 2025.1"
+        )
+    if business_agent_profile is not None and any(
+        version not in business_agent_profile.supported_versions
+        for version in args.version
+    ):
+        parser.error(
+            f"{args.profile} supports only --version "
+            + " and ".join(sorted(business_agent_profile.supported_versions))
         )
     if (
         is_compound_v1
@@ -14372,8 +14551,8 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
             if is_policy_v3
             else matrix.DEFAULT_DEEP_INTERFACE_MVP_SUITE
             if is_deep_interface_mvp
-            else matrix.DEFAULT_AUDIO_IMPORT_BUSINESS_SUITE
-            if is_audio_import_business
+            else business_agent_profile.suite_path
+            if business_agent_profile is not None
             else matrix.DEFAULT_TYPED_INPUT_SUITE
             if is_typed_input
             else (

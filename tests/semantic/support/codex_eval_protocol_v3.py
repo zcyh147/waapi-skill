@@ -1198,6 +1198,8 @@ def build_object_metadata_business_transaction_steps(
     *,
     label: str,
     field_meaning: str | None = None,
+    object_selector: Mapping[str, Any] | None = None,
+    target_selector: Mapping[str, Any] | None = None,
 ) -> tuple[ExpectedGatewayStep, ...]:
     """Translate one canonical field edit into bound business Draft steps."""
 
@@ -1287,10 +1289,16 @@ def build_object_metadata_business_transaction_steps(
         latest_revision_step = step_name
         return ResponseBinding(step_name, "/bound_object/handle")
 
-    source_handle = bind_object(arguments.get("object"), role="object")
+    source_handle = bind_object(
+        arguments.get("object") if object_selector is None else object_selector,
+        role="object",
+    )
     target_handle: ResponseBinding | None = None
     if operation == "object.setReference" and arguments.get("target") is not None:
-        target_handle = bind_object(arguments.get("target"), role="target")
+        target_handle = bind_object(
+            arguments.get("target") if target_selector is None else target_selector,
+            role="target",
+        )
 
     discover_name = f"{label}.discover-field"
     discover_arguments: list[Any] = [
