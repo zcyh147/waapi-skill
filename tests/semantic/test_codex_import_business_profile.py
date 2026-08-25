@@ -686,6 +686,7 @@ def test_campaign_validates_the_profile_specific_agent_outcome(tmp_path: Path) -
         expected_unit=unit,
         scenario_root=tmp_path,
         options=SimpleNamespace(
+            profile=campaign.AUDIO_IMPORT_BUSINESS_PROFILE_ID,
             protocol_manifest_revision=(
                 campaign.AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION
             )

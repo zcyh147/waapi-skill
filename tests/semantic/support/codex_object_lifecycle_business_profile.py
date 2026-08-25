@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import hashlib
-import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Sequence
+
+from tests.semantic.support.codex_business_profile_contract import (
+    load_closed_business_profile_source,
+    select_closed_business_profile_units,
+)
 
 
 PROFILE_CONTRACT = "waapi-skill.object-lifecycle-business-profile/v1"
@@ -75,52 +79,38 @@ def load_object_lifecycle_business_profile(
     unit_ids: Sequence[str] = (),
     versions: Sequence[str] = (),
 ) -> ObjectLifecycleBusinessProfile:
-    profile_path = Path(path).expanduser().resolve(strict=True)
-    raw = json.loads(profile_path.read_text(encoding="utf-8"))
-    if not isinstance(raw, Mapping) or set(raw) != {
-        "contract", "profile_id", "model", "units"
-    }:
-        raise ObjectLifecycleBusinessProfileError("object lifecycle profile is not closed")
-    if raw.get("contract") != PROFILE_CONTRACT or raw.get("profile_id") != PROFILE_ID:
-        raise ObjectLifecycleBusinessProfileError("object lifecycle profile identity drifted")
-    if raw.get("model") != {
-        "name": MODEL,
-        "reasoning_effort": REASONING_EFFORT,
-        "service_tier": SERVICE_TIER,
-        "memory": "disabled",
-    }:
-        raise ObjectLifecycleBusinessProfileError("object lifecycle model settings drifted")
-    rows = raw.get("units")
-    if not isinstance(rows, list) or len(rows) != 3:
-        raise ObjectLifecycleBusinessProfileError("object lifecycle profile requires three units")
+    source = load_closed_business_profile_source(
+        path,
+        contract=PROFILE_CONTRACT,
+        profile_id=PROFILE_ID,
+        model=MODEL,
+        reasoning_effort=REASONING_EFFORT,
+        service_tier=SERVICE_TIER,
+        expected_unit_count=3,
+        error_type=ObjectLifecycleBusinessProfileError,
+        subject="object lifecycle",
+    )
     parsed = tuple(
         _parse_unit(row, expected_id=unit_id, expected_operation=operation)
-        for row, unit_id, operation in zip(rows, UNIT_IDS, OPERATIONS, strict=True)
-    )
-    selected_ids = tuple(dict.fromkeys(str(value) for value in unit_ids))
-    selected_versions = tuple(dict.fromkeys(str(value) for value in versions))
-    if len(selected_ids) != len(tuple(unit_ids)) or len(selected_versions) != len(tuple(versions)):
-        raise ObjectLifecycleBusinessProfileError("object lifecycle filters must be unique")
-    unknown = sorted(set(selected_ids) - set(UNIT_IDS))
-    if unknown:
-        raise ObjectLifecycleBusinessProfileError(
-            "unknown object lifecycle units: " + ", ".join(unknown)
+        for row, unit_id, operation in zip(
+            source.units,
+            UNIT_IDS,
+            OPERATIONS,
+            strict=True,
         )
-    if any(version != "2022.1" for version in selected_versions):
-        raise ObjectLifecycleBusinessProfileError(
-            "object lifecycle profile supports only 2022.1"
-        )
-    units = tuple(
-        unit
-        for unit in parsed
-        if (not selected_ids or unit.unit_id in selected_ids)
-        and (not selected_versions or unit.version in selected_versions)
     )
-    if not units:
-        raise ObjectLifecycleBusinessProfileError("no object lifecycle units matched")
+    units = select_closed_business_profile_units(
+        parsed,
+        unit_ids=unit_ids,
+        versions=versions,
+        known_unit_ids=UNIT_IDS,
+        supported_versions=("2022.1",),
+        error_type=ObjectLifecycleBusinessProfileError,
+        subject="object lifecycle",
+    )
     return ObjectLifecycleBusinessProfile(
-        path=profile_path,
-        definition_sha256=hashlib.sha256(profile_path.read_bytes()).hexdigest(),
+        path=source.path,
+        definition_sha256=source.definition_sha256,
         units=units,
     )
 

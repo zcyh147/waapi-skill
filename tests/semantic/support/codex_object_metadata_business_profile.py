@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import hashlib
-import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Sequence
+
+from tests.semantic.support.codex_business_profile_contract import (
+    load_closed_business_profile_source,
+    select_closed_business_profile_units,
+)
 
 
 PROFILE_CONTRACT = "waapi-skill.object-metadata-business-profile/v1"
@@ -78,49 +82,30 @@ def load_object_metadata_business_profile(
     unit_ids: Sequence[str] = (),
     versions: Sequence[str] = (),
 ) -> ObjectMetadataBusinessProfile:
-    profile_path = Path(path).expanduser().resolve(strict=True)
-    raw = json.loads(profile_path.read_text(encoding="utf-8"))
-    if not isinstance(raw, Mapping) or set(raw) != {
-        "contract", "profile_id", "model", "units"
-    }:
-        raise ObjectMetadataBusinessProfileError("object metadata profile is not closed")
-    if raw.get("contract") != PROFILE_CONTRACT or raw.get("profile_id") != PROFILE_ID:
-        raise ObjectMetadataBusinessProfileError("object metadata profile identity drifted")
-    if raw.get("model") != {
-        "name": MODEL,
-        "reasoning_effort": REASONING_EFFORT,
-        "service_tier": SERVICE_TIER,
-        "memory": "disabled",
-    }:
-        raise ObjectMetadataBusinessProfileError("object metadata model settings drifted")
-    rows = raw.get("units")
-    if not isinstance(rows, list) or len(rows) != 1:
-        raise ObjectMetadataBusinessProfileError("object metadata profile requires one unit")
-    parsed = (_parse_unit(rows[0]),)
-    selected_ids = tuple(dict.fromkeys(str(value) for value in unit_ids))
-    selected_versions = tuple(dict.fromkeys(str(value) for value in versions))
-    if len(selected_ids) != len(tuple(unit_ids)) or len(selected_versions) != len(tuple(versions)):
-        raise ObjectMetadataBusinessProfileError("object metadata filters must be unique")
-    unknown = sorted(set(selected_ids) - set(UNIT_IDS))
-    if unknown:
-        raise ObjectMetadataBusinessProfileError(
-            "unknown object metadata units: " + ", ".join(unknown)
-        )
-    if any(version != "2022.1" for version in selected_versions):
-        raise ObjectMetadataBusinessProfileError(
-            "object metadata profile supports only 2022.1"
-        )
-    units = tuple(
-        unit
-        for unit in parsed
-        if (not selected_ids or unit.unit_id in selected_ids)
-        and (not selected_versions or unit.version in selected_versions)
+    source = load_closed_business_profile_source(
+        path,
+        contract=PROFILE_CONTRACT,
+        profile_id=PROFILE_ID,
+        model=MODEL,
+        reasoning_effort=REASONING_EFFORT,
+        service_tier=SERVICE_TIER,
+        expected_unit_count=1,
+        error_type=ObjectMetadataBusinessProfileError,
+        subject="object metadata",
     )
-    if not units:
-        raise ObjectMetadataBusinessProfileError("no object metadata units matched")
+    parsed = (_parse_unit(source.units[0]),)
+    units = select_closed_business_profile_units(
+        parsed,
+        unit_ids=unit_ids,
+        versions=versions,
+        known_unit_ids=UNIT_IDS,
+        supported_versions=("2022.1",),
+        error_type=ObjectMetadataBusinessProfileError,
+        subject="object metadata",
+    )
     return ObjectMetadataBusinessProfile(
-        path=profile_path,
-        definition_sha256=hashlib.sha256(profile_path.read_bytes()).hexdigest(),
+        path=source.path,
+        definition_sha256=source.definition_sha256,
         units=units,
     )
 

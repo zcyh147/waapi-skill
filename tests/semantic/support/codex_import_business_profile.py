@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import hashlib
-import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Sequence
+
+from tests.semantic.support.codex_business_profile_contract import (
+    load_closed_business_profile_source,
+    select_closed_business_profile_units,
+)
 
 
 PROFILE_CONTRACT = "waapi-skill.audio-import-business-profile/v2"
@@ -87,49 +91,39 @@ def load_import_business_profile(
     unit_ids: Sequence[str] = (),
     versions: Sequence[str] = (),
 ) -> ImportBusinessProfile:
-    profile_path = Path(path).expanduser().resolve(strict=True)
-    raw = json.loads(profile_path.read_text(encoding="utf-8"))
-    if not isinstance(raw, Mapping) or set(raw) != {
-        "contract", "profile_id", "model", "units"
-    }:
-        raise ImportBusinessProfileError("audio import business profile is not closed")
-    if raw.get("contract") != PROFILE_CONTRACT or raw.get("profile_id") != PROFILE_ID:
-        raise ImportBusinessProfileError("audio import business profile identity drifted")
-    if raw.get("model") != {
-        "name": MODEL,
-        "reasoning_effort": REASONING_EFFORT,
-        "service_tier": SERVICE_TIER,
-        "memory": "disabled",
-    }:
-        raise ImportBusinessProfileError("audio import business model settings drifted")
-    raw_units = raw.get("units")
-    if not isinstance(raw_units, list) or len(raw_units) != 4:
-        raise ImportBusinessProfileError("audio import business profile requires four cases")
+    source = load_closed_business_profile_source(
+        path,
+        contract=PROFILE_CONTRACT,
+        profile_id=PROFILE_ID,
+        model=MODEL,
+        reasoning_effort=REASONING_EFFORT,
+        service_tier=SERVICE_TIER,
+        expected_unit_count=4,
+        error_type=ImportBusinessProfileError,
+        subject="audio import business",
+    )
     parsed = tuple(
         unit
-        for value, case_id, family in zip(raw_units, CASE_IDS, CASE_FAMILIES, strict=True)
+        for value, case_id, family in zip(
+            source.units,
+            CASE_IDS,
+            CASE_FAMILIES,
+            strict=True,
+        )
         for unit in _parse_case(value, expected_id=case_id, expected_family=family)
     )
-    selected_ids = tuple(dict.fromkeys(str(value) for value in unit_ids))
-    selected_versions = tuple(dict.fromkeys(str(value) for value in versions))
-    if len(selected_ids) != len(tuple(unit_ids)) or len(selected_versions) != len(tuple(versions)):
-        raise ImportBusinessProfileError("audio import business filters must be unique")
-    unknown = sorted(set(selected_ids) - set(UNIT_IDS))
-    if unknown:
-        raise ImportBusinessProfileError("unknown audio import business units: " + ", ".join(unknown))
-    if any(value not in {"2022.1", "2025.1"} for value in selected_versions):
-        raise ImportBusinessProfileError("audio import business profile supports only 2022.1 and 2025.1")
-    units = tuple(
-        unit
-        for unit in parsed
-        if (not selected_ids or unit.unit_id in selected_ids)
-        and (not selected_versions or unit.version in selected_versions)
+    units = select_closed_business_profile_units(
+        parsed,
+        unit_ids=unit_ids,
+        versions=versions,
+        known_unit_ids=UNIT_IDS,
+        supported_versions=("2022.1", "2025.1"),
+        error_type=ImportBusinessProfileError,
+        subject="audio import business",
     )
-    if not units:
-        raise ImportBusinessProfileError("no audio import business units matched")
     return ImportBusinessProfile(
-        path=profile_path,
-        definition_sha256=hashlib.sha256(profile_path.read_bytes()).hexdigest(),
+        path=source.path,
+        definition_sha256=source.definition_sha256,
         units=units,
     )
 

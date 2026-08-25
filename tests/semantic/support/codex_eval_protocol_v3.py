@@ -110,6 +110,89 @@ class V3ProtocolError(ValueError):
     """A materialized scenario cannot form an exact broker allow-list."""
 
 
+@dataclass(slots=True)
+class _BusinessDraftSteps:
+    """Own the shared mutable-revision grammar for business Draft protocols."""
+
+    label: str
+    steps: list[ExpectedGatewayStep]
+    draft_start: str
+    latest_revision_step: str
+
+    @classmethod
+    def start(cls, *, operation: str, label: str) -> _BusinessDraftSteps:
+        draft_start = f"{label}.draft-start"
+        return cls(
+            label=label,
+            steps=[
+                ExpectedGatewayStep(
+                    name=f"{label}.operation-schema",
+                    subcommand="operation-schema",
+                    arguments=(operation,),
+                ),
+                ExpectedGatewayStep(
+                    name=draft_start,
+                    subcommand="draft-start",
+                    arguments=(operation,),
+                ),
+            ],
+            draft_start=draft_start,
+            latest_revision_step=draft_start,
+        )
+
+    def prefix(self) -> tuple[Any, ...]:
+        return (
+            ResponseBinding(self.draft_start, "/draft/draft_id"),
+            "--task-authority",
+            ResponseBinding(self.draft_start, "/task_authority"),
+            "--expected-revision",
+            ResponseBinding(self.latest_revision_step, "/draft/revision"),
+        )
+
+    def advance(self, step_name: str) -> None:
+        self.latest_revision_step = step_name
+
+    def bind_object(
+        self,
+        selector: Any,
+        *,
+        step_name: str,
+        error_subject: str,
+    ) -> ResponseBinding:
+        if not isinstance(selector, Mapping):
+            raise V3ProtocolError(
+                f"{error_subject} identity must be exact id or path"
+            )
+        kind = selector.get("kind")
+        value = selector.get("value")
+        if kind not in {"id", "path"} or not isinstance(value, str) or not value:
+            raise V3ProtocolError(
+                f"{error_subject} identity must be exact id or path"
+            )
+        if kind == "path":
+            segments = tuple(segment for segment in value.split("\\") if segment)
+            if not segments or "\\" + "\\".join(segments) != value:
+                raise V3ProtocolError(
+                    f"{error_subject} path must have canonical Wwise segments"
+                )
+            selector_arguments: tuple[Any, ...] = tuple(
+                item
+                for segment in segments
+                for item in ("--object-path-segment", segment)
+            )
+        else:
+            selector_arguments = ("--object-id", value)
+        self.steps.append(
+            ExpectedGatewayStep(
+                name=step_name,
+                subcommand="draft-bind-object",
+                arguments=(*self.prefix(), *selector_arguments),
+            )
+        )
+        self.advance(step_name)
+        return ResponseBinding(step_name, "/bound_object/handle")
+
+
 def build_object_set_composer_transaction_steps(
     request: Mapping[str, Any],
     *,
@@ -477,37 +560,16 @@ def build_audio_import_composer_transaction_steps(
     if not isinstance(defaults, Mapping):
         raise V3ProtocolError("audio.import business defaults must be an object")
 
-    steps: list[ExpectedGatewayStep] = [
-        ExpectedGatewayStep(
-            name=f"{label}.operation-schema",
-            subcommand="operation-schema",
-            arguments=("audio.import",),
-        ),
-        ExpectedGatewayStep(
-            name=f"{label}.draft-start",
-            subcommand="draft-start",
-            arguments=("audio.import",),
-        ),
-    ]
-    draft_start = f"{label}.draft-start"
-    latest_revision_step = draft_start
+    draft = _BusinessDraftSteps.start(operation="audio.import", label=label)
+    steps = draft.steps
     object_bindings: dict[tuple[str, str], ResponseBinding] = {}
     field_bindings: dict[tuple[str, str, str], ResponseBinding] = {}
     planned_by_path: dict[str, ResponseBinding] = {}
     bind_object_index = 0
     bind_field_index = 0
 
-    def draft_prefix() -> tuple[Any, ...]:
-        return (
-            ResponseBinding(draft_start, "/draft/draft_id"),
-            "--task-authority",
-            ResponseBinding(draft_start, "/task_authority"),
-            "--expected-revision",
-            ResponseBinding(latest_revision_step, "/draft/revision"),
-        )
-
     def bind_object(selector: Mapping[str, Any]) -> ResponseBinding:
-        nonlocal bind_object_index, latest_revision_step
+        nonlocal bind_object_index
         kind = selector.get("kind")
         value = selector.get("value")
         if kind not in {"id", "path"} or not isinstance(value, str) or not value:
@@ -520,31 +582,11 @@ def build_audio_import_composer_transaction_steps(
             return existing
         bind_object_index += 1
         step_name = f"{label}.bind-object.{bind_object_index:03d}"
-        if binding_kind == "path":
-            segments = tuple(segment for segment in binding_value.split("\\") if segment)
-            if not segments or "\\" + "\\".join(segments) != binding_value:
-                raise V3ProtocolError(
-                    "audio.import business path must have canonical Wwise segments"
-                )
-            selector_arguments: tuple[Any, ...] = tuple(
-                item
-                for segment in segments
-                for item in ("--object-path-segment", segment)
-            )
-        else:
-            selector_arguments = ("--object-id", binding_value)
-        steps.append(
-            ExpectedGatewayStep(
-                name=step_name,
-                subcommand="draft-bind-object",
-                arguments=(
-                    *draft_prefix(),
-                    *selector_arguments,
-                ),
-            )
+        binding = draft.bind_object(
+            selector,
+            step_name=step_name,
+            error_subject="audio.import business",
         )
-        latest_revision_step = step_name
-        binding = ResponseBinding(step_name, "/bound_object/handle")
         object_bindings[key] = binding
         return binding
 
@@ -554,7 +596,7 @@ def build_audio_import_composer_transaction_steps(
         object_handle: ResponseBinding | None,
         class_name: str,
     ) -> ResponseBinding:
-        nonlocal bind_field_index, latest_revision_step
+        nonlocal bind_field_index
         scope_kind = "object" if object_handle is not None else "class"
         scope_identity = (
             f"{object_handle.step}:{object_handle.pointer}"
@@ -577,14 +619,14 @@ def build_audio_import_composer_transaction_steps(
                 name=step_name,
                 subcommand="draft-bind-field",
                 arguments=(
-                    *draft_prefix(),
+                    *draft.prefix(),
                     *scope_arguments,
                     "--token",
                     token,
                 ),
             )
         )
-        latest_revision_step = step_name
+        draft.advance(step_name)
         binding = ResponseBinding(step_name, "/bound_field/handle")
         field_bindings[key] = binding
         return binding
@@ -594,7 +636,7 @@ def build_audio_import_composer_transaction_steps(
         raise V3ProtocolError("audio.import business mode is unsupported")
     mode = "replace" if native_mode == "replaceExisting" else None
     existing_target_form = native_mode in {"useExisting", "replaceExisting"}
-    configure_arguments: list[Any] = [*draft_prefix()]
+    configure_arguments: list[Any] = [*draft.prefix()]
     if mode is not None:
         configure_arguments.extend(("--mode", mode))
     if "auto_add_to_source_control" in arguments:
@@ -610,7 +652,7 @@ def build_audio_import_composer_transaction_steps(
             else "--no-check-out-from-source-control"
         )
     configure_name: str | None = None
-    if len(configure_arguments) > len(draft_prefix()):
+    if len(configure_arguments) > len(draft.prefix()):
         configure_name = f"{label}.configure"
         steps.append(
             ExpectedGatewayStep(
@@ -619,7 +661,7 @@ def build_audio_import_composer_transaction_steps(
                 arguments=tuple(configure_arguments),
             )
         )
-        latest_revision_step = configure_name
+        draft.advance(configure_name)
 
     def value_text(value: Any) -> str:
         if isinstance(value, bool):
@@ -853,7 +895,7 @@ def build_audio_import_composer_transaction_steps(
 
         declaration_name = f"{label}.declare.{row_index + 1:03d}"
         declaration_arguments: list[Any] = [
-            *draft_prefix(),
+            *draft.prefix(),
             "--declaration-id",
             f"row-{row_index + 1:03d}",
             *target_arguments,
@@ -883,7 +925,7 @@ def build_audio_import_composer_transaction_steps(
                 ),
             )
         )
-        latest_revision_step = declaration_name
+        draft.advance(declaration_name)
         if not existing_target_form:
             planned_by_path[target_path] = ResponseBinding(
                 declaration_name,
@@ -923,7 +965,7 @@ def build_audio_import_composer_transaction_steps(
         *declaration_steps,
     )
     resequenced_steps: list[ExpectedGatewayStep] = []
-    previous_revision_step = draft_start
+    previous_revision_step = draft.draft_start
     for step in ordered_business_steps:
         arguments = list(step.arguments)
         if (
@@ -942,7 +984,8 @@ def build_audio_import_composer_transaction_steps(
         resequenced_steps.append(resequenced)
         previous_revision_step = resequenced.name
     steps = [*fixed_prefix, *resequenced_steps]
-    latest_revision_step = previous_revision_step
+    draft.steps = steps
+    draft.advance(previous_revision_step)
 
     check_name = f"{label}.check"
     preview_name = f"{label}.preview"
@@ -954,15 +997,15 @@ def build_audio_import_composer_transaction_steps(
             ExpectedGatewayStep(
                 name=check_name,
                 subcommand="draft-check",
-                arguments=(*draft_prefix(),),
+                arguments=(*draft.prefix(),),
             ),
             ExpectedGatewayStep(
                 name=preview_name,
                 subcommand="preview-from-draft",
                 arguments=(
-                    ResponseBinding(draft_start, "/draft/draft_id"),
+                    ResponseBinding(draft.draft_start, "/draft/draft_id"),
                     "--task-authority",
-                    ResponseBinding(draft_start, "/task_authority"),
+                    ResponseBinding(draft.draft_start, "/task_authority"),
                     "--expected-revision",
                     ResponseBinding(check_name, "/draft/revision"),
                 ),
@@ -1063,61 +1106,16 @@ def build_object_lifecycle_business_transaction_steps(
         ) from exc
     canonical_arguments = parsed.arguments
 
-    steps: list[ExpectedGatewayStep] = [
-        ExpectedGatewayStep(
-            name=f"{label}.operation-schema",
-            subcommand="operation-schema",
-            arguments=(operation,),
-        ),
-        ExpectedGatewayStep(
-            name=f"{label}.draft-start",
-            subcommand="draft-start",
-            arguments=(operation,),
-        ),
-    ]
-    draft_start = f"{label}.draft-start"
-    latest_revision_step = draft_start
-
-    def draft_prefix() -> tuple[Any, ...]:
-        return (
-            ResponseBinding(draft_start, "/draft/draft_id"),
-            "--task-authority",
-            ResponseBinding(draft_start, "/task_authority"),
-            "--expected-revision",
-            ResponseBinding(latest_revision_step, "/draft/revision"),
-        )
+    draft = _BusinessDraftSteps.start(operation=operation, label=label)
+    steps = draft.steps
 
     def bind_object(selector: Mapping[str, Any], *, role: str) -> ResponseBinding:
-        nonlocal latest_revision_step
-        kind = selector.get("kind")
-        value = selector.get("value")
-        if kind not in {"id", "path"} or not isinstance(value, str) or not value:
-            raise V3ProtocolError(
-                "object lifecycle business identity must be exact id or path"
-            )
-        if kind == "path":
-            segments = tuple(segment for segment in value.split("\\") if segment)
-            if not segments or "\\" + "\\".join(segments) != value:
-                raise V3ProtocolError(
-                    "object lifecycle business path must have canonical Wwise segments"
-                )
-            selector_arguments: tuple[Any, ...] = tuple(
-                item
-                for segment in segments
-                for item in ("--object-path-segment", segment)
-            )
-        else:
-            selector_arguments = ("--object-id", value)
         step_name = f"{label}.bind-{role}"
-        steps.append(
-            ExpectedGatewayStep(
-                name=step_name,
-                subcommand="draft-bind-object",
-                arguments=(*draft_prefix(), *selector_arguments),
-            )
+        return draft.bind_object(
+            selector,
+            step_name=step_name,
+            error_subject="object lifecycle business",
         )
-        latest_revision_step = step_name
-        return ResponseBinding(step_name, "/bound_object/handle")
 
     object_selector = canonical_arguments.get("object")
     if not isinstance(object_selector, Mapping):
@@ -1133,7 +1131,7 @@ def build_object_lifecycle_business_transaction_steps(
         parent_handle = bind_object(parent_selector, role="parent")
 
     declaration_arguments: list[Any] = [
-        *draft_prefix(),
+        *draft.prefix(),
         "--object-handle",
         object_handle,
     ]
@@ -1172,21 +1170,21 @@ def build_object_lifecycle_business_transaction_steps(
             arguments=tuple(declaration_arguments),
         )
     )
-    latest_revision_step = declaration_name
+    draft.advance(declaration_name)
     check_name = f"{label}.check"
     steps.append(
         ExpectedGatewayStep(
             name=check_name,
             subcommand="draft-check",
-            arguments=draft_prefix(),
+            arguments=draft.prefix(),
         )
     )
-    latest_revision_step = check_name
+    draft.advance(check_name)
     steps.append(
         ExpectedGatewayStep(
             name=f"{label}.preview",
             subcommand="preview-from-draft",
-            arguments=draft_prefix(),
+            arguments=draft.prefix(),
             expected_operation_request=normalized,
         )
     )
@@ -1230,65 +1228,20 @@ def build_object_metadata_business_transaction_steps(
     if not isinstance(discovery_meaning, str) or not discovery_meaning.strip():
         raise V3ProtocolError("object metadata business field meaning is invalid")
 
-    steps: list[ExpectedGatewayStep] = [
-        ExpectedGatewayStep(
-            name=f"{label}.operation-schema",
-            subcommand="operation-schema",
-            arguments=(operation,),
-        ),
-        ExpectedGatewayStep(
-            name=f"{label}.draft-start",
-            subcommand="draft-start",
-            arguments=(operation,),
-        ),
-    ]
-    draft_start = f"{label}.draft-start"
-    latest_revision_step = draft_start
-
-    def draft_prefix() -> tuple[Any, ...]:
-        return (
-            ResponseBinding(draft_start, "/draft/draft_id"),
-            "--task-authority",
-            ResponseBinding(draft_start, "/task_authority"),
-            "--expected-revision",
-            ResponseBinding(latest_revision_step, "/draft/revision"),
-        )
+    draft = _BusinessDraftSteps.start(operation=operation, label=label)
+    steps = draft.steps
 
     def bind_object(selector: Any, *, role: str) -> ResponseBinding:
-        nonlocal latest_revision_step
         if not isinstance(selector, Mapping):
             raise V3ProtocolError(
                 f"object metadata business request lacks {role} identity"
             )
-        kind = selector.get("kind")
-        value = selector.get("value")
-        if kind not in {"id", "path"} or not isinstance(value, str) or not value:
-            raise V3ProtocolError(
-                "object metadata business identity must be exact id or path"
-            )
-        if kind == "path":
-            segments = tuple(segment for segment in value.split("\\") if segment)
-            if not segments or "\\" + "\\".join(segments) != value:
-                raise V3ProtocolError(
-                    "object metadata business path must have canonical segments"
-                )
-            selector_arguments: tuple[Any, ...] = tuple(
-                item
-                for segment in segments
-                for item in ("--object-path-segment", segment)
-            )
-        else:
-            selector_arguments = ("--object-id", value)
         step_name = f"{label}.bind-{role}"
-        steps.append(
-            ExpectedGatewayStep(
-                name=step_name,
-                subcommand="draft-bind-object",
-                arguments=(*draft_prefix(), *selector_arguments),
-            )
+        return draft.bind_object(
+            selector,
+            step_name=step_name,
+            error_subject="object metadata business",
         )
-        latest_revision_step = step_name
-        return ResponseBinding(step_name, "/bound_object/handle")
 
     source_handle = bind_object(
         arguments.get("object") if object_selector is None else object_selector,
@@ -1307,7 +1260,7 @@ def build_object_metadata_business_transaction_steps(
 
     discover_name = f"{label}.discover-field"
     discover_arguments: list[Any] = [
-        *draft_prefix(),
+        *draft.prefix(),
         "--object-handle",
         source_handle,
         "--meaning",
@@ -1322,7 +1275,7 @@ def build_object_metadata_business_transaction_steps(
             arguments=tuple(discover_arguments),
         )
     )
-    latest_revision_step = discover_name
+    draft.advance(discover_name)
     field_handle = ResponseBinding(discover_name, "/field_candidates/0/handle")
     if (
         operation == "object.setReference"
@@ -1334,7 +1287,7 @@ def build_object_metadata_business_transaction_steps(
             role="target",
         )
     declaration_arguments: list[Any] = [
-        *draft_prefix(),
+        *draft.prefix(),
         "--object-handle",
         source_handle,
         "--field-handle",
@@ -1374,21 +1327,21 @@ def build_object_metadata_business_transaction_steps(
             arguments=tuple(declaration_arguments),
         )
     )
-    latest_revision_step = declaration_name
+    draft.advance(declaration_name)
     check_name = f"{label}.check"
     steps.append(
         ExpectedGatewayStep(
             name=check_name,
             subcommand="draft-check",
-            arguments=draft_prefix(),
+            arguments=draft.prefix(),
         )
     )
-    latest_revision_step = check_name
+    draft.advance(check_name)
     steps.append(
         ExpectedGatewayStep(
             name=f"{label}.preview",
             subcommand="preview-from-draft",
-            arguments=draft_prefix(),
+            arguments=draft.prefix(),
             expected_operation_request=normalized,
         )
     )
@@ -2447,6 +2400,7 @@ def build_transaction_protocol(
     refusal: StructuredRefusal | None = None,
     terminal_execute: bool = False,
     request_equivalences: Sequence[str] | None = None,
+    object_metadata_field_meanings: Sequence[str | None] | None = None,
 ) -> V3GatewayProtocol:
     """Build one or more separately confirmed immutable transactions.
 
@@ -2494,11 +2448,23 @@ def build_transaction_protocol(
                 raise V3ProtocolError(
                     "request equivalence is not reviewed for the operation"
                 )
+    if object_metadata_field_meanings is None:
+        metadata_meanings: tuple[str | None, ...] = (None,) * len(normalized)
+    else:
+        metadata_meanings = tuple(object_metadata_field_meanings)
+        if len(metadata_meanings) != len(normalized) or any(
+            value is not None
+            and (not isinstance(value, str) or not value.strip())
+            for value in metadata_meanings
+        ):
+            raise V3ProtocolError(
+                "object metadata meanings must match the transaction request count"
+            )
 
     steps: list[ExpectedGatewayStep] = []
     prefixes: list[int] = []
-    for index, (request, request_equivalence) in enumerate(
-        zip(normalized, equivalences, strict=True),
+    for index, (request, request_equivalence, metadata_meaning) in enumerate(
+        zip(normalized, equivalences, metadata_meanings, strict=True),
         start=1,
     ):
         label = f"tx{index:02d}"
@@ -2676,6 +2642,7 @@ def build_transaction_protocol(
                 operation_steps = build_object_metadata_business_transaction_steps(
                     request,
                     label=label,
+                    field_meaning=metadata_meaning,
                 )
             else:
                 operation_steps = _build_generic_typed_draft_transaction_steps(
@@ -2960,6 +2927,19 @@ def build_metadata_transaction_protocol(
                 "audio.import Composer metadata protocol requires one request"
             )
         return build_audio_import_composer_protocol(requests[0])
+    metadata_business = all(
+        request.get("operation") in OBJECT_METADATA_BUSINESS_OPERATIONS
+        for request in requests
+    )
+    if metadata_business:
+        if len(requests) != 1 or len(queries) != 1 or len(tokens) != 1:
+            raise V3ProtocolError(
+                "object metadata business discovery requires one request and meaning"
+            )
+        return build_transaction_protocol(
+            requests,
+            object_metadata_field_meanings=(str(queries[0]),),
+        )
     base = build_transaction_protocol(requests)
     if not any(
         step.subcommand in {"typed-operation", "preview-from-draft"}
