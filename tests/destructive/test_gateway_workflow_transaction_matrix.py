@@ -1497,9 +1497,6 @@ def test_object_graph_business_draft_executes_weather_graph_plugin_bulk_set_and_
                 "--field",
                 "plugin_type_handle",
                 plugin_type_handle,
-                "--field",
-                "language",
-                "SFX",
             ],
             live=False,
         )

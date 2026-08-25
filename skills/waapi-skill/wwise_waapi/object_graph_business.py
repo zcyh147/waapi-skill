@@ -846,6 +846,23 @@ def _materialize_create_plugin(
                 field="language",
                 action="provide one exact Wwise Source language",
             )
+        if (
+            target.object_type.casefold() == "sound"
+            and target.semantic_kind != "sound-voice"
+        ):
+            raise _repair(
+                session,
+                "PLUGIN_LANGUAGE_UNAVAILABLE",
+                field="language",
+                action="omit language for a Source on a Sound SFX",
+            )
+        if language.casefold() == "sfx":
+            raise _repair(
+                session,
+                "PLUGIN_LANGUAGE_INVALID",
+                field="language",
+                action="provide one exact non-SFX Project language for a Sound Voice",
+            )
         plugin["language"] = language
     dynamic = fields.get("field_values", {})
     if not isinstance(dynamic, Mapping):

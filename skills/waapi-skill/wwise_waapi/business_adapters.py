@@ -296,6 +296,11 @@ _OBJECT_GRAPH_DEFINITION = {
     "requires_wwise_path_discipline": True,
 }
 
+_OBJECT_PLUGIN_DEFINITION = {
+    **_OBJECT_GRAPH_DEFINITION,
+    "requires_sound_subtype": True,
+}
+
 _OBJECT_RTPC_DEFINITION = {
     "family": "object-creation-graph",
     "contract_builder": _object_graph_contract,
@@ -364,7 +369,7 @@ _BUSINESS_ADAPTERS = {
     "audio.import": _bind_adapter("audio.import", _AUDIO_IMPORT_DEFINITION),
     "object.create": _bind_adapter("object.create", _OBJECT_GRAPH_DEFINITION),
     "object.createPlugin": _bind_adapter(
-        "object.createPlugin", _OBJECT_GRAPH_DEFINITION
+        "object.createPlugin", _OBJECT_PLUGIN_DEFINITION
     ),
     "object.setRTPC": _bind_adapter(
         "object.setRTPC", _OBJECT_RTPC_DEFINITION

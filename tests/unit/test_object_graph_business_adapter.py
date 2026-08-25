@@ -209,6 +209,7 @@ def test_create_plugin_compiles_role_type_and_properties_from_handles(
         name="Rain",
         object_type="Sound",
         path=r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+        semantic_kind="sound-voice",
     )
     plugin_type = session.handles.bind_type(
         class_id=123_456,
@@ -230,7 +231,7 @@ def test_create_plugin_compiles_role_type_and_properties_from_handles(
         target=ExistingObjectTarget(target.handle),
         fields={
             "field_values": {frequency.handle: 440},
-            "language": "SFX",
+            "language": "English(US)",
             "notes": "Weather tone",
             "platform": "Windows",
             "plugin_name": "Rain Tone",
@@ -252,7 +253,7 @@ def test_create_plugin_compiles_role_type_and_properties_from_handles(
             "class_id": 123_456,
             "notes": "Weather tone",
             "platform": "Windows",
-            "language": "SFX",
+            "language": "English(US)",
             "properties": [{"name": "Frequency", "value": 440.0}],
         },
     }
@@ -767,6 +768,41 @@ def test_create_plugin_rejects_type_handle_from_the_wrong_role() -> None:
 
     assert captured.value.error_code == "TYPE_HANDLE_ROLE_MISMATCH"
     assert captured.value.repair["expected_role"] == "effect"
+
+
+def test_create_plugin_rejects_language_for_sound_sfx_before_preview() -> None:
+    session, _parent_handle = _session("2025.1")
+    target = session.handles.bind_object(
+        object_id="{33333333-3333-3333-3333-333333333333}",
+        name="Rain",
+        object_type="Sound",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+        semantic_kind="sound-sfx",
+    )
+    plugin_type = session.handles.bind_type(
+        class_id=123_456,
+        name="Wwise Tone Generator",
+        type_category="Source",
+        catalog_digest="c" * 64,
+    )
+    session = session.with_existing_declaration(
+        declaration_id="source",
+        target=ExistingObjectTarget(target.handle),
+        fields={
+            "language": "SFX",
+            "plugin_name": "Rain Tone",
+            "plugin_role": "source",
+            "plugin_type_handle": plugin_type.handle,
+        },
+    )
+
+    with pytest.raises(BusinessDeclarationError) as captured:
+        business_adapter("object.createPlugin").materialize(session)
+
+    assert captured.value.error_code == "PLUGIN_LANGUAGE_UNAVAILABLE"
+    assert captured.value.repair["action"] == (
+        "omit language for a Source on a Sound SFX"
+    )
 
 
 def test_create_plugin_preserves_hostile_notes_but_rejects_reserved_name() -> None:
