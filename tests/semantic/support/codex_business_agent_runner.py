@@ -78,6 +78,7 @@ def run_business_agent_unit(
             "WWISE_VERSION": unit.version,
             "WWISE_WAAPI_HOST": "127.0.0.1",
             "WWISE_WAAPI_PORT": "31337",
+            "PYTHONDONTWRITEBYTECODE": "1",
         }
     )
     broker = CodexGatewayBroker(
