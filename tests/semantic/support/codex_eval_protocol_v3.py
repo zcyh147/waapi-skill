@@ -1197,6 +1197,7 @@ def build_object_metadata_business_transaction_steps(
     request: Mapping[str, Any],
     *,
     label: str,
+    field_meaning: str | None = None,
 ) -> tuple[ExpectedGatewayStep, ...]:
     """Translate one canonical field edit into bound business Draft steps."""
 
@@ -1222,6 +1223,9 @@ def build_object_metadata_business_transaction_steps(
     )
     if not isinstance(field_name, str) or not field_name:
         raise V3ProtocolError("object metadata business request lacks field meaning")
+    discovery_meaning = field_name if field_meaning is None else field_meaning
+    if not isinstance(discovery_meaning, str) or not discovery_meaning.strip():
+        raise V3ProtocolError("object metadata business field meaning is invalid")
 
     steps: list[ExpectedGatewayStep] = [
         ExpectedGatewayStep(
@@ -1294,7 +1298,7 @@ def build_object_metadata_business_transaction_steps(
         "--object-handle",
         source_handle,
         "--meaning",
-        field_name,
+        discovery_meaning,
     ]
     if "platform" in arguments:
         discover_arguments.extend(("--platform", str(arguments["platform"])))
