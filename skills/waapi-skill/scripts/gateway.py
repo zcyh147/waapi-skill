@@ -248,6 +248,7 @@ from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore
     revalidate_live_field,
     revalidate_live_objects,
     revalidate_live_types,
+    resolve_semantic_kind,
 )
 from wwise_waapi.operation_composer import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_TYPED_ACTIONS_PER_APPLY,
@@ -349,6 +350,7 @@ OFFLINE_COMMANDS = frozenset(
         "draft-business-configure",
         "draft-declare-field-change",
         "draft-declare-object-change",
+        "draft-declare-rtpc",
         "draft-declare-existing",
         "draft-declare-new",
         "draft-remove-declaration",
@@ -1804,6 +1806,16 @@ def build_parser() -> argparse.ArgumentParser:
     draft_business_configure.add_argument(
         "--mode", choices=("create", "reimport", "replace")
     )
+    draft_business_configure.add_argument(
+        "--name-conflict",
+        choices=("fail", "rename", "merge", "replace"),
+    )
+    draft_business_configure.add_argument("--replace-owner-handle")
+    draft_business_configure.add_argument("--platform")
+    draft_business_configure.add_argument(
+        "--list-behavior",
+        choices=("append", "replace-all"),
+    )
     source_control = draft_business_configure.add_mutually_exclusive_group()
     source_control.add_argument(
         "--add-to-source-control",
@@ -1908,6 +1920,31 @@ def build_parser() -> argparse.ArgumentParser:
     outcome.add_argument("--clear-reference", action="store_true")
     outcome.add_argument("--link-state", choices=("linked", "unlinked"))
 
+    draft_declare_rtpc = subparsers.add_parser(
+        "draft-declare-rtpc",
+        help=(
+            "Declare one bound RTPC property, Control Input, and ordered "
+            "business curve"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_rtpc)
+    draft_declare_rtpc.add_argument("--object-handle", required=True)
+    draft_declare_rtpc.add_argument("--field-handle", required=True)
+    draft_declare_rtpc.add_argument("--control-input-handle", required=True)
+    draft_declare_rtpc.add_argument(
+        "--point",
+        action="append",
+        nargs=3,
+        required=True,
+        metavar=("X", "Y", "WWISE_SHAPE"),
+    )
+    draft_declare_rtpc.add_argument(
+        "--mode",
+        choices=("add-only", "add-or-update"),
+        default="add-or-update",
+    )
+    draft_declare_rtpc.add_argument("--notes")
+
     draft_declare_new = subparsers.add_parser(
         "draft-declare-new",
         help="Declare one new Wwise descendant using only high-level business facts",
@@ -1965,7 +2002,12 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     _add_business_draft_binding_arguments(draft_discover_fields)
-    draft_discover_fields.add_argument("--object-handle", required=True)
+    discovery_scope = draft_discover_fields.add_mutually_exclusive_group(
+        required=True
+    )
+    discovery_scope.add_argument("--object-handle")
+    discovery_scope.add_argument("--type-handle")
+    discovery_scope.add_argument("--semantic-kind")
     draft_discover_fields.add_argument(
         "--meaning",
         action="append",
@@ -6979,6 +7021,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         "draft-business-configure",
         "draft-declare-field-change",
         "draft-declare-object-change",
+        "draft-declare-rtpc",
         "draft-declare-existing",
         "draft-declare-new",
         "draft-remove-declaration",
@@ -10356,6 +10399,52 @@ def _parse_audio_import_business_fields(
     return fields
 
 
+def _parse_object_graph_business_fields(
+    session: BusinessDeclarationSession,
+    operation: str,
+    pairs: Sequence[Sequence[str]],
+    *,
+    field_value_pairs: Sequence[Sequence[str]] = (),
+) -> dict[str, Any]:
+    declaration = operation_business_contract(operation, session.context.wwise_version)[
+        "declaration"
+    ]
+    raw_field_types = declaration.get("field_value_types")
+    if not isinstance(raw_field_types, Mapping):
+        raise GatewayInputError("object graph business field contract is invalid")
+    fields: dict[str, Any] = {}
+    for pair in pairs:
+        if len(pair) != 2:
+            raise GatewayInputError("business --field requires FIELD VALUE")
+        name, raw = pair
+        value_type = raw_field_types.get(name)
+        if not isinstance(value_type, str):
+            raise GatewayInputError(
+                f"Unknown object graph business field {name!r}; use a disclosed stable field"
+            )
+        if name in fields:
+            raise GatewayInputError(f"Business field {name!r} was supplied twice")
+        fields[name] = _parse_business_value(value_type, raw, field=name)
+    if field_value_pairs:
+        dynamic: dict[str, Any] = {}
+        for pair in field_value_pairs:
+            if len(pair) != 2:
+                raise GatewayInputError(
+                    "business --field-value requires FIELD_HANDLE VALUE"
+                )
+            handle, raw = pair
+            if handle in dynamic:
+                raise GatewayInputError("One Field Handle was supplied twice")
+            bound = session.handles.bound_field(handle)
+            dynamic[handle] = _parse_business_value(
+                bound.value_type,
+                raw,
+                field="bound business field",
+            )
+        fields["field_values"] = dynamic
+    return fields
+
+
 def dispatch_offline_business_draft_update(
     args: argparse.Namespace,
     *,
@@ -10416,6 +10505,47 @@ def dispatch_offline_business_draft_update(
             return candidate
 
         event_type = "declaration.added"
+    elif args.command == "draft-declare-rtpc":
+        points: list[dict[str, Any]] = []
+        for index, (raw_x, raw_y, shape) in enumerate(args.point):
+            try:
+                x = float(raw_x)
+                y = float(raw_y)
+            except ValueError as exc:
+                raise GatewayInputError(
+                    f"RTPC point {index} requires finite numeric X and Y values"
+                ) from exc
+            if not math.isfinite(x) or not math.isfinite(y):
+                raise GatewayInputError(
+                    f"RTPC point {index} requires finite numeric X and Y values"
+                )
+            points.append(
+                {
+                    "x": int(x) if x.is_integer() else x,
+                    "y": int(y) if y.is_integer() else y,
+                    "shape": shape,
+                }
+            )
+        fields = {
+            "control_input_handle": args.control_input_handle,
+            "curve_points": points,
+            "field_handle": args.field_handle,
+            "mode": args.mode,
+            **({} if args.notes is None else {"notes": args.notes}),
+        }
+
+        def update(
+            current: BusinessDeclarationSession,
+        ) -> BusinessDeclarationSession:
+            candidate = current.with_existing_declaration(
+                declaration_id="rtpc",
+                target=ExistingObjectTarget(args.object_handle),
+                fields=fields,
+            )
+            adapter.materialize(candidate)
+            return candidate
+
+        event_type = "declaration.added"
     elif args.command == "draft-declare-object-change":
         fields = {
             name: value
@@ -10446,53 +10576,97 @@ def dispatch_offline_business_draft_update(
 
         event_type = "declaration.added"
     elif args.command == "draft-business-configure":
-        defaults = _parse_audio_import_business_fields(
-            session,
-            args.default,
-            field_value_pairs=args.default_field_value,
-            event_parent_handle=args.default_event_parent_handle,
-            event_name=args.default_event_name,
-            event_action=args.default_event_action,
-        )
         settings: dict[str, Any] = {}
-        if args.mode is not None:
-            settings["mode"] = args.mode
-        if args.add_to_source_control is not None:
-            settings["add_to_source_control"] = args.add_to_source_control
-        if args.check_out_from_source_control is not None:
-            settings["check_out_from_source_control"] = (
-                args.check_out_from_source_control
+        if adapter.family == "object-creation-graph":
+            names = (
+                (
+                    "add_to_source_control",
+                    "list_behavior",
+                    "name_conflict",
+                )
+                if inspected.operation == "object.set"
+                else (
+                    "add_to_source_control",
+                    "name_conflict",
+                    "platform",
+                    "replace_owner_handle",
+                )
             )
-        if defaults:
-            settings["defaults"] = defaults
+            for name in names:
+                value = getattr(args, name)
+                if value is not None:
+                    settings[name] = value
+        else:
+            defaults = _parse_audio_import_business_fields(
+                session,
+                args.default,
+                field_value_pairs=args.default_field_value,
+                event_parent_handle=args.default_event_parent_handle,
+                event_name=args.default_event_name,
+                event_action=args.default_event_action,
+            )
+            if args.mode is not None:
+                settings["mode"] = args.mode
+            if args.add_to_source_control is not None:
+                settings["add_to_source_control"] = args.add_to_source_control
+            if args.check_out_from_source_control is not None:
+                settings["check_out_from_source_control"] = (
+                    args.check_out_from_source_control
+                )
+            if defaults:
+                settings["defaults"] = defaults
         if not settings:
             raise GatewayInputError(
                 "Business configuration requires at least one explicit batch setting"
             )
-        update = lambda current: current.with_settings(settings)
+        def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+            candidate = current.with_settings(settings)
+            if adapter.family == "object-creation-graph" and candidate.declarations:
+                adapter.materialize(candidate)
+            return candidate
+
         event_type = "settings.revised"
     elif args.command == "draft-remove-declaration":
-        update = lambda current: current.remove_declaration(args.declaration_id)
+        def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+            candidate = current.remove_declaration(args.declaration_id)
+            if adapter.family == "object-creation-graph":
+                adapter.materialize(candidate)
+            return candidate
+
         event_type = "declaration.removed"
     else:
-        fields = _parse_audio_import_business_fields(
-            session,
-            args.field,
-            field_value_pairs=args.field_value,
-            event_parent_handle=args.event_parent_handle,
-            event_name=args.event_name,
-            event_action=args.event_action,
+        fields = (
+            _parse_object_graph_business_fields(
+                session,
+                inspected.operation,
+                args.field,
+                field_value_pairs=args.field_value,
+            )
+            if adapter.family == "object-creation-graph"
+            else _parse_audio_import_business_fields(
+                session,
+                args.field,
+                field_value_pairs=args.field_value,
+                event_parent_handle=args.event_parent_handle,
+                event_name=args.event_name,
+                event_action=args.event_action,
+            )
         )
         if args.command == "draft-declare-new":
-            update = lambda current: current.with_new_declaration(
-                declaration_id=args.declaration_id,
-                target=NewDescendantTarget(
-                    parent_handle=args.parent_handle,
-                    name=args.name,
-                    kind=args.kind,
-                ),
-                fields=fields,
-            )
+            def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+                candidate = current.with_new_declaration(
+                    declaration_id=args.declaration_id,
+                    target=NewDescendantTarget(
+                        parent_handle=args.parent_handle,
+                        name=args.name,
+                        kind=args.kind,
+                    ),
+                    fields=fields,
+                )
+                if adapter.family == "object-creation-graph":
+                    adapter.materialize(candidate)
+                return candidate
+
             event_type = "declaration.added"
         elif args.command == "draft-declare-existing":
             update = lambda current: current.with_existing_declaration(
@@ -10502,10 +10676,15 @@ def dispatch_offline_business_draft_update(
             )
             event_type = "declaration.added"
         else:
-            update = lambda current: current.revise_declaration(
-                declaration_id=args.declaration_id,
-                fields=fields,
-            )
+            def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+                candidate = current.revise_declaration(
+                    declaration_id=args.declaration_id,
+                    fields=fields,
+                )
+                if adapter.family == "object-creation-graph":
+                    adapter.materialize(candidate)
+                return candidate
+
             event_type = "declaration.revised"
     schema_digest = operation_draft_schema_digest(
         inspected.operation,
@@ -10946,7 +11125,33 @@ def dispatch_business_field_discovery(
         raise OperationDraftBindingDrift(
             "Live project or Wwise build differs from the business declaration binding."
         )
-    source = session.handles.resolve_object(args.object_handle)
+    source = None
+    if args.object_handle is not None:
+        source = session.handles.resolve_object(args.object_handle)
+        scope_kind = "object"
+        scope_value: str | int = source.object_id
+        discovery_scope = {"object": source.object_id}
+    elif args.type_handle is not None:
+        bound_type = session.handles.resolve_type(args.type_handle)
+        scope_kind = "class"
+        scope_value = bound_type.class_id
+        discovery_scope = {"class_id": bound_type.class_id}
+    else:
+        kind = resolve_semantic_kind(
+            args.semantic_kind,
+            version=detected_version,
+        )
+        scope_kind = "class"
+        scope_value = kind.metadata_object_type
+        discovery_scope = {"object_type": kind.metadata_object_type}
+    if (
+        binding.record.operation
+        in {"object.setLinked", "object.setProperty", "object.setReference", "object.setRTPC"}
+        and source is None
+    ):
+        raise GatewayInputError(
+            f"{binding.record.operation} field discovery requires its exact bound object"
+        )
     if binding.record.operation == "object.setLinked" and args.platform is None:
         raise GatewayInputError(
             "object.setLinked field discovery requires one explicit platform"
@@ -10962,7 +11167,7 @@ def dispatch_business_field_discovery(
     discovery = discover_metadata(
         read_call=read_call,
         queries=tuple(args.meanings),
-        object=source.object_id,
+        **discovery_scope,
         limit=MAX_METADATA_DISCOVERY_LIMIT,
     )
     eligible: list[Mapping[str, Any]] = []
@@ -10976,6 +11181,26 @@ def dispatch_business_field_discovery(
             accepted = kind == "property" and value_type is not None
         elif binding.record.operation == "object.setReference":
             accepted = kind == "reference"
+        elif binding.record.operation == "object.setRTPC":
+            supports = metadata.get("supports")
+            rtpc = supports.get("rtpc") if isinstance(supports, Mapping) else None
+            accepted = (
+                kind == "property"
+                and value_type in {"number", "integer"}
+                and rtpc not in {None, False, "", "None", "none"}
+            )
+        elif binding.record.operation == "object.set":
+            accepted = (
+                (kind == "property" and value_type is not None)
+                or kind == "reference"
+            )
+        elif binding.record.operation == "object.createPlugin":
+            accepted = kind == "property" and value_type is not None
+        elif binding.record.operation == "object.create":
+            accepted = (
+                (kind == "property" and value_type is not None)
+                or kind == "reference"
+            )
         else:
             supports = metadata.get("supports")
             accepted = (
@@ -11003,8 +11228,8 @@ def dispatch_business_field_discovery(
                     bind_live_field(
                         handles,
                         read_call=read_call,
-                        scope_kind="object",
-                        scope_value=source.object_id,
+                        scope_kind=scope_kind,
+                        scope_value=scope_value,
                         token=str(candidate["name"]),
                         platform=args.platform,
                     )
@@ -15566,6 +15791,7 @@ def _business_next_action_binding(
         "draft-declare-field-change",
         *binding,
     ]
+    declare_rtpc_prefix = [*base, "draft-declare-rtpc", *binding]
     revise_prefix = [*base, "draft-revise-declaration", *binding]
     remove_prefix = [*base, "draft-remove-declaration", *binding]
     check = [*base, "draft-check", *binding]
@@ -15642,6 +15868,184 @@ def _business_next_action_binding(
     if adapter.supports_type_discovery:
         type_discover_prefix = [*base, "draft-discover-types", *binding]
         declaration_prefix = [*base, "draft-declare-new", *binding]
+        if record.operation == "object.createPlugin":
+            shared = {
+                "contract": "waapi-skill.business-draft-next-action/v1",
+                "responsibility_split": {
+                    "agent": "natural_language_to_closed_high_level_business_facts",
+                    "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
+                },
+                "business_contract": business_contract,
+                "object_binding": object_binding,
+                "forbidden_inputs": [
+                    *forbidden_inputs,
+                    "plugin_class_id",
+                    "plugin_property_token",
+                    "native_plugin_topology",
+                ],
+                "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+                "then_read_next_response": True,
+                "precompute_or_increment_revision": False,
+            }
+            if session.declarations:
+                return {
+                    **shared,
+                    "required_next_phase": "check_complete_business_declaration",
+                    "check": {
+                        **operation_draft_prefix_copy_binding(check),
+                        "append": [],
+                    },
+                }
+            type_discovery = {
+                **operation_draft_prefix_copy_binding(type_discover_prefix),
+                "role_decision": {
+                    "source": [
+                        "--meaning",
+                        "<user-facing-plugin-name>",
+                        "--role",
+                        "source",
+                    ],
+                    "effect": [
+                        "--meaning",
+                        "<user-facing-plugin-name>",
+                        "--role",
+                        "effect",
+                    ],
+                },
+                "result": "copy_one_returned_type_candidate.handle",
+            }
+            field_discovery = {
+                **operation_draft_prefix_copy_binding(field_discover_prefix),
+                "append": [
+                    "--type-handle",
+                    "<selected-plugin-type-handle>",
+                    "--meaning",
+                    "<user-facing-plugin-property-meaning>",
+                ],
+                "use_only_when": "the_user_requested_plugin_properties",
+                "token_input": "forbidden",
+            }
+            declaration = {
+                **operation_draft_prefix_copy_binding(declare_existing_prefix),
+                "append": [
+                    "--declaration-id",
+                    "plugin",
+                    "--object-handle",
+                    "<bound-plugin-owner-handle>",
+                    "--field",
+                    "plugin_role",
+                    "<source-or-effect>",
+                    "--field",
+                    "plugin_name",
+                    "<requested-plugin-object-name>",
+                    "--field",
+                    "plugin_type_handle",
+                    "<selected-plugin-type-handle>",
+                    "[--field notes <exact-user-notes>]",
+                    "[--field platform <exact-user-platform>]",
+                    "[--field language <exact-source-language>]",
+                    "[--field-value <bound-property-handle> <business-value>]...",
+                ],
+            }
+            return {
+                **shared,
+                "required_next_phase": (
+                    "declare_plugin_or_discover_requested_properties"
+                    if session.handles.as_dict()["types"]
+                    else "discover_plugin_type"
+                ),
+                "type_discovery": type_discovery,
+                "field_discovery": field_discovery,
+                "declaration": declaration,
+            }
+        if record.operation == "object.set":
+            shared = {
+                "contract": "waapi-skill.business-draft-next-action/v1",
+                "responsibility_split": {
+                    "agent": "natural_language_to_closed_high_level_business_facts",
+                    "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
+                },
+                "business_contract": business_contract,
+                "object_binding": object_binding,
+                "forbidden_inputs": [
+                    *forbidden_inputs,
+                    "property_token",
+                    "reference_token",
+                    "target_row",
+                    "batch_layout",
+                    "recursive_request_fragment",
+                ],
+                "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+                "then_read_next_response": True,
+                "precompute_or_increment_revision": False,
+            }
+            return {
+                **shared,
+                "required_next_phase": (
+                    "declare_remaining_object_outcomes_or_check_complete_batch"
+                    if session.declarations
+                    else "declare_existing_or_new_object_outcome"
+                ),
+                "field_discovery": {
+                    **operation_draft_prefix_copy_binding(field_discover_prefix),
+                    "append": [
+                        "--object-handle",
+                        "<bound-existing-target-handle>",
+                        "--meaning",
+                        "<user-facing-field-meaning>",
+                    ],
+                    "token_input": "forbidden",
+                },
+                "type_discovery": {
+                    **operation_draft_prefix_copy_binding(type_discover_prefix),
+                    "append": [
+                        "--meaning",
+                        "<user-facing-long-tail-child-kind>",
+                        "--role",
+                        "object",
+                    ],
+                    "use_when": "new_kind_is_not_one_disclosed_stable_semantic_kind",
+                },
+                "declare_existing": {
+                    **operation_draft_prefix_copy_binding(declare_existing_prefix),
+                    "append": [
+                        "--declaration-id",
+                        "<task-local-id>",
+                        "--object-handle",
+                        "<bound-existing-target-handle>",
+                        "[--field <stable-business-field> <business-value>]...",
+                        "[--field-value <bound-field-handle> <business-value>]...",
+                    ],
+                },
+                "declare_new": {
+                    **operation_draft_prefix_copy_binding(declare_new_prefix),
+                    "append": [
+                        "--declaration-id",
+                        "<task-local-id>",
+                        "--parent-handle",
+                        "<bound-or-planned-parent-handle>",
+                        "--name",
+                        "<requested-child-name>",
+                        "--kind",
+                        "<stable-semantic-kind-or-selected-type-handle>",
+                        "[--field <stable-business-field> <business-value>]...",
+                        "[--field-value <bound-field-handle> <business-value>]...",
+                    ],
+                },
+                "configure": {
+                    **operation_draft_prefix_copy_binding(configure_prefix),
+                    "append": [
+                        "[--name-conflict fail|rename|merge]",
+                        "[--add-to-source-control|--no-add-to-source-control]",
+                    ],
+                },
+                "completion_candidate": {
+                    "condition": "all_user_requested_object_outcomes_are_declared",
+                    "fixed_full_argv": check,
+                    "copy_command": operation_draft_copy_command(check),
+                    "is_next_command_when_condition_true": bool(session.declarations),
+                },
+            }
         shared = {
             "contract": "waapi-skill.business-draft-next-action/v1",
             "responsibility_split": {
@@ -15747,6 +16151,86 @@ def _business_next_action_binding(
             "precompute_or_increment_revision": False,
         }
     if adapter.supports_field_discovery:
+        if record.operation == "object.setRTPC":
+            handle_state = session.handles.as_dict()
+            bound_objects = handle_state["objects"]
+            bound_fields = handle_state["fields"]
+            shared = {
+                "contract": "waapi-skill.business-draft-next-action/v1",
+                "responsibility_split": {
+                    "agent": "natural_language_to_closed_high_level_business_facts",
+                    "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
+                },
+                "business_contract": business_contract,
+                "forbidden_inputs": [
+                    *forbidden_inputs,
+                    "property_token",
+                    "rtpc_list_row",
+                    "native_curve_fragment",
+                ],
+                "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+                "then_read_next_response": True,
+                "precompute_or_increment_revision": False,
+            }
+            if session.declarations:
+                return {
+                    **shared,
+                    "required_next_phase": "check_complete_business_declaration",
+                    "check": {
+                        **operation_draft_prefix_copy_binding(check),
+                        "append": [],
+                    },
+                }
+            if not bound_fields:
+                discovery = {
+                    **operation_draft_prefix_copy_binding(field_discover_prefix),
+                    "append": [
+                        "--object-handle",
+                        "<bound-rtpc-owner-handle>",
+                        "--meaning",
+                        "<user-facing-rtpc-property-meaning>",
+                    ],
+                    "result": "copy_one_returned_property_candidate.handle",
+                    "token_input": "forbidden",
+                }
+                return {
+                    **shared,
+                    "required_next_phase": "discover_rtpc_property_for_bound_object",
+                    "field_discovery": discovery,
+                    "object_binding": object_binding,
+                }
+            if len(bound_objects) < 2:
+                return {
+                    **shared,
+                    "required_next_phase": "bind_rtpc_control_input",
+                    "object_binding": {
+                        **object_binding,
+                        "use_only_for": ["control_input"],
+                    },
+                }
+            return {
+                **shared,
+                "required_next_phase": "declare_complete_rtpc_curve",
+                "declaration": {
+                    **operation_draft_prefix_copy_binding(declare_rtpc_prefix),
+                    "append": [
+                        "--object-handle",
+                        "<bound-rtpc-owner-handle>",
+                        "--field-handle",
+                        "<selected-property-handle>",
+                        "--control-input-handle",
+                        "<bound-control-input-handle>",
+                        "--point",
+                        "<x>",
+                        "<y>",
+                        "<Wwise-shape>",
+                        "[--point <x> <y> <Wwise-shape>]...",
+                        "[--mode add-only|add-or-update]",
+                        "[--notes <exact-user-notes>]",
+                    ],
+                    "submit_once": True,
+                },
+            }
         if session.declarations:
             return {
                 "contract": "waapi-skill.business-draft-next-action/v1",

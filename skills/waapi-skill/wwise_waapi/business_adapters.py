@@ -264,15 +264,24 @@ _OBJECT_GRAPH_DEFINITION = {
     "materializer": _materialize_object_graph,
     "update_commands": frozenset(
         {
+            "draft-business-configure",
             "draft-declare-new",
+            "draft-declare-existing",
             "draft-remove-declaration",
             "draft-revise-declaration",
         }
     ),
-    "initial_projection_actions": ("bind-object", "inspect", "cancel"),
+    "initial_projection_actions": (
+        "bind-object",
+        "configure",
+        "inspect",
+        "cancel",
+    ),
     "active_projection_actions": (
         "bind-object",
+        "configure",
         "declare-new",
+        "declare-existing",
         "revise-declaration",
         "remove-declaration",
         "check",
@@ -281,9 +290,59 @@ _OBJECT_GRAPH_DEFINITION = {
     ),
     "requires_sound_subtype": False,
     "supports_field_binding": True,
+    "supports_field_discovery": True,
     "supports_type_discovery": True,
     "auto_apply_preview": True,
     "requires_wwise_path_discipline": True,
+}
+
+_OBJECT_RTPC_DEFINITION = {
+    "family": "object-creation-graph",
+    "contract_builder": _object_graph_contract,
+    "materializer": _materialize_object_graph,
+    "update_commands": frozenset({"draft-declare-rtpc"}),
+    "initial_projection_actions": ("bind-object", "inspect", "cancel"),
+    "active_projection_actions": (
+        "bind-object",
+        "discover-fields",
+        "declare-rtpc",
+        "check",
+        "inspect",
+        "cancel",
+    ),
+    "supports_field_discovery": True,
+    "auto_apply_preview": True,
+}
+
+_OBJECT_SET_BUSINESS_DEFINITION = {
+    "family": "object-creation-graph",
+    "contract_builder": _object_graph_contract,
+    "materializer": _materialize_object_graph,
+    "update_commands": frozenset(
+        {
+            "draft-business-configure",
+            "draft-declare-existing",
+            "draft-declare-new",
+            "draft-remove-declaration",
+            "draft-revise-declaration",
+        }
+    ),
+    "initial_projection_actions": ("bind-object", "inspect", "cancel"),
+    "active_projection_actions": (
+        "bind-object",
+        "discover-fields",
+        "discover-types",
+        "declare-existing",
+        "declare-new",
+        "revise-declaration",
+        "remove-declaration",
+        "check",
+        "inspect",
+        "cancel",
+    ),
+    "supports_field_discovery": True,
+    "supports_type_discovery": True,
+    "auto_apply_preview": True,
 }
 
 
@@ -302,6 +361,13 @@ def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdap
 _BUSINESS_ADAPTERS = {
     "audio.import": _bind_adapter("audio.import", _AUDIO_IMPORT_DEFINITION),
     "object.create": _bind_adapter("object.create", _OBJECT_GRAPH_DEFINITION),
+    "object.createPlugin": _bind_adapter(
+        "object.createPlugin", _OBJECT_GRAPH_DEFINITION
+    ),
+    "object.setRTPC": _bind_adapter(
+        "object.setRTPC", _OBJECT_RTPC_DEFINITION
+    ),
+    "object.set": _bind_adapter("object.set", _OBJECT_SET_BUSINESS_DEFINITION),
     **{
         operation: _bind_adapter(operation, _OBJECT_LIFECYCLE_DEFINITION)
         for operation in (

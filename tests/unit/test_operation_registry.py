@@ -147,13 +147,13 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                     "object.setProperty",
                     "object.setReference",
                     "object.create",
+                    "object.createPlugin",
+                    "object.setRTPC",
+                    "object.set",
                 }
             else COMPOSER_INPUT_MODE
             if name
                 in {
-                    "object.createPlugin",
-                "object.set",
-                "object.setRTPC",
                 "soundbank.convertExternalSources",
                 "soundbank.generate",
                 "soundbank.setInclusions",
@@ -272,8 +272,14 @@ def test_input_mode_selection_is_isolated_by_exact_operation_not_shared_native_u
     monkeypatch.setattr(registry, "OPERATION_INPUT_MODE_LANES", migrated)
 
     assert operation_input_mode("object.set", "2022.1") == COMPOSER_INPUT_MODE
-    assert operation_input_mode("object.setRTPC", "2022.1") == COMPOSER_INPUT_MODE
-    assert operation_input_mode("object.createPlugin", "2022.1") == COMPOSER_INPUT_MODE
+    assert (
+        operation_input_mode("object.setRTPC", "2022.1")
+        == BUSINESS_DECLARATION_INPUT_MODE
+    )
+    assert (
+        operation_input_mode("object.createPlugin", "2022.1")
+        == BUSINESS_DECLARATION_INPUT_MODE
+    )
     assert operation_input_mode("lua.executeCoreInline", "2025.1") == COMPOSER_INPUT_MODE
     assert operation_input_mode("lua.executeCoreFile", "2025.1") == COMPOSER_INPUT_MODE
     assert {

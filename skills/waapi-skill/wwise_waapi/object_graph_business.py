@@ -11,6 +11,7 @@ from .business_declaration_state import (
 )
 from .business_declarations import (
     BusinessDeclarationError,
+    ExistingObjectTarget,
     NewDescendantTarget,
     business_repair,
     resolve_semantic_kind,
@@ -36,6 +37,29 @@ _CREATE_SETTINGS = frozenset(
         "name_conflict",
         "platform",
         "replace_owner_handle",
+    }
+)
+_RTPC_FIELDS = frozenset(
+    {
+        "control_input_handle",
+        "curve_points",
+        "field_handle",
+        "mode",
+        "notes",
+    }
+)
+_RTPC_SHAPES = frozenset(
+    {
+        "Constant",
+        "Linear",
+        "Log3",
+        "Log2",
+        "Log1",
+        "InvertedSCurve",
+        "SCurve",
+        "Exp1",
+        "Exp2",
+        "Exp3",
     }
 )
 
@@ -381,6 +405,564 @@ def _materialize_create(
     ).as_dict()
 
 
+def _materialize_create_plugin(
+    session: BusinessDeclarationSession,
+) -> dict[str, Any]:
+    if len(session.declarations) != 1:
+        raise _repair(
+            session,
+            "DECLARATION_COUNT_INVALID",
+            field="declarations",
+            count=len(session.declarations),
+            action="declare exactly one plug-in creation outcome",
+        )
+    declaration = session.declarations[0]
+    if not isinstance(declaration.target, ExistingObjectTarget):
+        raise _repair(
+            session,
+            "TARGET_FORM_INVALID",
+            field="object_handle",
+            action="bind the exact plug-in owner object",
+        )
+    fields = dict(declaration.fields)
+    required = {"plugin_name", "plugin_role", "plugin_type_handle"}
+    optional = {"field_values", "language", "notes", "platform"}
+    missing = sorted(required - set(fields))
+    unexpected = sorted(set(fields) - required - optional)
+    if missing:
+        raise _repair(
+            session,
+            "REQUIRED_FIELD_MISSING",
+            field=missing[0],
+            missing=missing,
+            action="submit one complete plug-in business declaration",
+        )
+    if unexpected:
+        raise _repair(
+            session,
+            "OBJECT_GRAPH_FIELD_UNAVAILABLE",
+            field=unexpected[0],
+            action="use only the disclosed plug-in business fields",
+        )
+    role = fields["plugin_role"]
+    if role not in {"source", "effect"}:
+        raise _repair(
+            session,
+            "FIELD_VALUE_UNAVAILABLE",
+            field="plugin_role",
+            choices=["source", "effect"],
+            action="choose the requested Wwise plug-in role",
+        )
+    type_handle = session.handles.resolve_type(fields["plugin_type_handle"])
+    accepted_categories = (
+        {"source"} if role == "source" else {"effect", "audiodevice"}
+    )
+    if type_handle.type_category.casefold() not in accepted_categories:
+        raise _repair(
+            session,
+            "TYPE_HANDLE_ROLE_MISMATCH",
+            field="plugin_type_handle",
+            rejected_handle=type_handle.handle,
+            expected_role=role,
+            action="discover a plug-in type for the exact requested role",
+        )
+    plugin_name = fields["plugin_name"]
+    if not isinstance(plugin_name, str) or not plugin_name:
+        raise _repair(
+            session,
+            "FIELD_VALUE_TYPE_MISMATCH",
+            field="plugin_name",
+            action="provide one non-empty plug-in display name",
+        )
+    target = session.handles.resolve_object(declaration.target.object_handle)
+    plugin: dict[str, Any] = {
+        "kind": role,
+        "name": plugin_name,
+        "class_id": type_handle.class_id,
+    }
+    for name in ("notes", "platform"):
+        value = fields.get(name)
+        if value is not None:
+            if not isinstance(value, str):
+                raise _repair(
+                    session,
+                    "FIELD_VALUE_TYPE_MISMATCH",
+                    field=name,
+                    action=f"provide one exact {name} string",
+                )
+            plugin[name] = value
+    language = fields.get("language")
+    if language is not None:
+        if role != "source":
+            raise _repair(
+                session,
+                "BUSINESS_FIELD_UNAVAILABLE",
+                field="language",
+                action="omit language for an Effect plug-in",
+            )
+        if not isinstance(language, str) or not language:
+            raise _repair(
+                session,
+                "FIELD_VALUE_TYPE_MISMATCH",
+                field="language",
+                action="provide one exact Wwise Source language",
+            )
+        plugin["language"] = language
+    dynamic = fields.get("field_values", {})
+    if not isinstance(dynamic, Mapping):
+        raise _repair(
+            session,
+            "FIELD_VALUE_TYPE_MISMATCH",
+            field="field_values",
+            action="provide one bounded Field Handle to business value map",
+        )
+    properties: list[dict[str, Any]] = []
+    for handle, business_value in dynamic.items():
+        field = session.handles.bound_field(handle)
+        if (
+            field.scope_kind != "class"
+            or field.scope_value not in {type_handle.class_id, type_handle.name}
+            or field.field_kind != "property"
+        ):
+            raise _repair(
+                session,
+                "FIELD_HANDLE_SCOPE_MISMATCH",
+                field="field_values",
+                rejected_handle=field.handle,
+                action="discover the property for the selected plug-in type",
+            )
+        properties.append(
+            {
+                "name": field.token,
+                "value": session.handles.validate_field_value(
+                    field,
+                    business_value,
+                ),
+            }
+        )
+    if properties:
+        plugin["properties"] = properties
+    return parse_operation_request(
+        {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": session.context.wwise_version,
+            "operation": "object.createPlugin",
+            "arguments": {
+                "target": {"kind": "id", "value": target.object_id},
+                "plugin": plugin,
+            },
+        },
+        expected_version=session.context.wwise_version,
+    ).as_dict()
+
+
+def _compile_existing_set_fields(
+    session: BusinessDeclarationSession,
+    declaration: BusinessDeclaration,
+) -> dict[str, Any]:
+    assert isinstance(declaration.target, ExistingObjectTarget)
+    source = session.handles.resolve_object(declaration.target.object_handle)
+    fields = dict(declaration.fields)
+    allowed = {*_CREATE_FIELDS, "new_name"}
+    unexpected = sorted(set(fields) - allowed)
+    if unexpected:
+        raise _repair(
+            session,
+            "OBJECT_GRAPH_FIELD_UNAVAILABLE",
+            field=unexpected[0],
+            action="use one disclosed bulk object business field",
+        )
+    stable_fields = {
+        name: value
+        for name, value in fields.items()
+        if name not in {"field_values", "new_name"}
+    }
+    stable_declaration = BusinessDeclaration(
+        declaration_id=declaration.declaration_id,
+        result_handle=declaration.result_handle,
+        target=declaration.target,
+        fields=stable_fields,
+    )
+    compiled = _compile_create_fields(session, stable_declaration)
+    if "new_name" in fields:
+        new_name = fields["new_name"]
+        if not isinstance(new_name, str) or not new_name:
+            raise _repair(
+                session,
+                "FIELD_VALUE_TYPE_MISMATCH",
+                field="new_name",
+                action="provide one non-empty new object name",
+            )
+        compiled["name"] = new_name
+    properties = list(compiled.pop("properties", []))
+    references = list(compiled.pop("references", []))
+    used_tokens = {row["name"] for row in (*properties, *references)}
+    platforms: set[str | int] = set()
+    dynamic = fields.get("field_values", {})
+    if not isinstance(dynamic, Mapping):
+        raise _repair(
+            session,
+            "FIELD_VALUE_TYPE_MISMATCH",
+            field="field_values",
+            action="provide one bounded Field Handle to business value map",
+        )
+    for handle, business_value in dynamic.items():
+        field = session.handles.bound_field(handle)
+        if (
+            field.scope_kind != "object"
+            or str(field.scope_value).upper() != source.object_id.upper()
+        ):
+            raise _repair(
+                session,
+                "FIELD_HANDLE_SCOPE_MISMATCH",
+                field="field_values",
+                rejected_handle=field.handle,
+                action="discover each field for its exact bulk-set target",
+            )
+        if field.token in used_tokens:
+            raise _repair(
+                session,
+                "OBJECT_GRAPH_FIELD_CONFLICT",
+                field="field_values",
+                action="set one business meaning through one field only",
+            )
+        used_tokens.add(field.token)
+        if field.platform is not None:
+            platforms.add(field.platform)
+        normalized = session.handles.validate_field_value(field, business_value)
+        if field.field_kind == "property":
+            properties.append({"name": field.token, "value": normalized})
+        else:
+            target = session.handles.resolve_object(normalized)
+            references.append(
+                {
+                    "name": field.token,
+                    "target": {"kind": "id", "value": target.object_id},
+                }
+            )
+    if len(platforms) > 1:
+        raise _repair(
+            session,
+            "OBJECT_SET_PLATFORM_CONFLICT",
+            field="field_values",
+            platforms=sorted(str(value) for value in platforms),
+            action="use one platform view per exact object in this atomic batch",
+        )
+    if platforms:
+        compiled["platform"] = next(iter(platforms))
+    if properties:
+        compiled["properties"] = properties
+    if references:
+        compiled["references"] = references
+    return compiled
+
+
+def _materialize_set(
+    session: BusinessDeclarationSession,
+) -> dict[str, Any]:
+    if not session.declarations:
+        raise _repair(
+            session,
+            "BUSINESS_DECLARATION_INCOMPLETE",
+            field="declarations",
+            action="declare at least one bulk object outcome",
+        )
+    new_by_result = {
+        row.result_handle: row
+        for row in session.declarations
+        if isinstance(row.target, NewDescendantTarget)
+    }
+    planned_children: dict[str, list[BusinessDeclaration]] = {}
+    root_new: list[BusinessDeclaration] = []
+    for row in new_by_result.values():
+        assert isinstance(row.target, NewDescendantTarget)
+        if row.target.parent_handle in new_by_result:
+            planned_children.setdefault(row.target.parent_handle, []).append(row)
+        else:
+            root_new.append(row)
+
+    def compile_node(row: BusinessDeclaration) -> dict[str, Any]:
+        assert isinstance(row.target, NewDescendantTarget)
+        node = {
+            "type": _create_type(session, row.target.kind),
+            "name": row.target.name,
+            **_compile_create_fields(session, row),
+        }
+        descendants = planned_children.get(row.result_handle, [])
+        if descendants:
+            node["children"] = [compile_node(child) for child in descendants]
+        return node
+
+    rows: list[dict[str, Any]] = []
+    rows_by_handle: dict[str, dict[str, Any]] = {}
+    for declaration in session.declarations:
+        if not isinstance(declaration.target, ExistingObjectTarget):
+            continue
+        handle = declaration.target.object_handle
+        if handle in rows_by_handle:
+            raise _repair(
+                session,
+                "OBJECT_SET_TARGET_DUPLICATE",
+                field="object_handle",
+                action="combine one exact object's outcomes in one declaration",
+            )
+        source = session.handles.resolve_object(handle)
+        row = {
+            "object": {"kind": "id", "value": source.object_id},
+            **_compile_existing_set_fields(session, declaration),
+        }
+        rows_by_handle[handle] = row
+        rows.append(row)
+    for declaration in root_new:
+        assert isinstance(declaration.target, NewDescendantTarget)
+        parent_handle = declaration.target.parent_handle
+        parent = session.handles.resolve_object(parent_handle)
+        row = rows_by_handle.get(parent_handle)
+        if row is None:
+            row = {"object": {"kind": "id", "value": parent.object_id}}
+            rows_by_handle[parent_handle] = row
+            rows.append(row)
+        node = compile_node(declaration)
+        parent_token = "".join(
+            character
+            for character in parent.object_type.casefold()
+            if character.isalnum()
+        )
+        child_token = "".join(
+            character
+            for character in str(node["type"]).casefold()
+            if character.isalnum()
+        )
+        specialized = {
+            ("stategroup", "state"): "States",
+            ("switchgroup", "switch"): "Switches",
+        }.get((parent_token, child_token))
+        if specialized is None:
+            row.setdefault("children", []).append(node)
+        else:
+            lists = row.setdefault("lists", [])
+            existing = next(
+                (item for item in lists if item["name"] == specialized),
+                None,
+            )
+            if existing is None:
+                existing = {"name": specialized, "objects": []}
+                lists.append(existing)
+            existing["objects"].append(node)
+    for row in rows:
+        if set(row) == {"object"}:
+            raise _repair(
+                session,
+                "BUSINESS_DECLARATION_INCOMPLETE",
+                field="declarations",
+                action="give every exact target at least one requested outcome",
+            )
+    settings = dict(session.settings)
+    allowed_settings = {"add_to_source_control", "list_behavior", "name_conflict"}
+    unexpected_settings = sorted(set(settings) - allowed_settings)
+    if unexpected_settings:
+        raise _repair(
+            session,
+            "OBJECT_GRAPH_SETTING_UNAVAILABLE",
+            field=unexpected_settings[0],
+            action="use one disclosed object.set batch setting",
+        )
+    arguments: dict[str, Any] = {"objects": rows}
+    conflict = settings.get("name_conflict", "fail")
+    if conflict not in {"fail", "rename", "merge"}:
+        raise _repair(
+            session,
+            "FIELD_VALUE_UNAVAILABLE",
+            field="name_conflict",
+            choices=["fail", "rename", "merge"],
+            action="choose one disclosed child collision outcome",
+        )
+    if conflict != "fail":
+        arguments["on_name_conflict"] = conflict
+    list_behavior = settings.get("list_behavior", "append")
+    if list_behavior not in {"append", "replace-all"}:
+        raise _repair(
+            session,
+            "FIELD_VALUE_UNAVAILABLE",
+            field="list_behavior",
+            choices=["append", "replace-all"],
+            action="choose one disclosed object-list outcome",
+        )
+    if list_behavior == "replace-all":
+        arguments["list_mode"] = "replaceAll"
+    add_to_source = settings.get("add_to_source_control")
+    if add_to_source is not None:
+        if type(add_to_source) is not bool:
+            raise _repair(
+                session,
+                "FIELD_VALUE_TYPE_MISMATCH",
+                field="add_to_source_control",
+                action="provide true or false",
+            )
+        if add_to_source:
+            arguments["auto_add_to_source_control"] = True
+    return parse_operation_request(
+        {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": session.context.wwise_version,
+            "operation": "object.set",
+            "arguments": arguments,
+        },
+        expected_version=session.context.wwise_version,
+    ).as_dict()
+
+
+def _materialize_set_rtpc(
+    session: BusinessDeclarationSession,
+) -> dict[str, Any]:
+    if len(session.declarations) != 1:
+        raise _repair(
+            session,
+            "DECLARATION_COUNT_INVALID",
+            field="declarations",
+            count=len(session.declarations),
+            action="declare exactly one RTPC curve outcome",
+        )
+    declaration = session.declarations[0]
+    if not isinstance(declaration.target, ExistingObjectTarget):
+        raise _repair(
+            session,
+            "TARGET_FORM_INVALID",
+            field="object_handle",
+            action="bind the exact RTPC owner object",
+        )
+    fields = dict(declaration.fields)
+    required = {"control_input_handle", "curve_points", "field_handle"}
+    optional = {"mode", "notes"}
+    missing = sorted(required - set(fields))
+    unexpected = sorted(set(fields) - required - optional)
+    if missing:
+        raise _repair(
+            session,
+            "REQUIRED_FIELD_MISSING",
+            field=missing[0],
+            missing=missing,
+            action="submit one complete RTPC business declaration",
+        )
+    if unexpected:
+        raise _repair(
+            session,
+            "OBJECT_GRAPH_FIELD_UNAVAILABLE",
+            field=unexpected[0],
+            action="use only the disclosed RTPC business fields",
+        )
+    target = session.handles.resolve_object(declaration.target.object_handle)
+    control = session.handles.resolve_object(fields["control_input_handle"])
+    control_token = "".join(
+        character
+        for character in control.object_type.casefold()
+        if character.isalnum()
+    )
+    if control_token not in {
+        "gameparameter",
+        "midiparameter",
+        "modulatorlfo",
+        "modulatorenvelope",
+        "modulatortime",
+    }:
+        raise _repair(
+            session,
+            "CONTROL_INPUT_TYPE_MISMATCH",
+            field="control_input_handle",
+            actual_type=control.object_type,
+            action="choose a bound Game Parameter, MIDI parameter, or Modulator",
+        )
+    field = session.handles.bound_field(fields["field_handle"])
+    if (
+        field.scope_kind != "object"
+        or str(field.scope_value).upper() != target.object_id.upper()
+        or field.field_kind != "property"
+    ):
+        raise _repair(
+            session,
+            "FIELD_HANDLE_SCOPE_MISMATCH",
+            field="field_handle",
+            rejected_handle=field.handle,
+            action="discover the RTPC property for the exact owner object",
+        )
+    raw_points = fields["curve_points"]
+    if (
+        not isinstance(raw_points, list)
+        or not 1 <= len(raw_points) <= 256
+    ):
+        raise _repair(
+            session,
+            "RTPC_POINT_LIMIT_INVALID",
+            field="curve_points",
+            valid_range={"minimum": 1, "maximum": 256},
+            action="provide a bounded non-empty curve",
+        )
+    points: list[dict[str, Any]] = []
+    for index, raw in enumerate(raw_points):
+        if not isinstance(raw, Mapping) or set(raw) != {"x", "y", "shape"}:
+            raise _repair(
+                session,
+                "RTPC_POINT_INVALID",
+                field=f"curve_points[{index}]",
+                action="provide x, y, and one disclosed Wwise curve shape",
+            )
+        x = raw["x"]
+        y = raw["y"]
+        shape = raw["shape"]
+        if (
+            isinstance(x, bool)
+            or not isinstance(x, (int, float))
+            or not math.isfinite(float(x))
+            or isinstance(y, bool)
+            or not isinstance(y, (int, float))
+            or not math.isfinite(float(y))
+            or shape not in _RTPC_SHAPES
+        ):
+            raise _repair(
+                session,
+                "RTPC_POINT_INVALID",
+                field=f"curve_points[{index}]",
+                choices=sorted(_RTPC_SHAPES),
+                action="provide finite x/y values and one disclosed Wwise shape",
+            )
+        points.append({"x": x, "y": y, "shape": shape})
+    mode = fields.get("mode", "add-or-update")
+    if mode not in {"add-only", "add-or-update"}:
+        raise _repair(
+            session,
+            "FIELD_VALUE_UNAVAILABLE",
+            field="mode",
+            choices=["add-only", "add-or-update"],
+            action="choose whether an exact existing curve may be updated",
+        )
+    arguments: dict[str, Any] = {
+        "object": {"kind": "id", "value": target.object_id},
+        "property": field.token,
+        "control_input": {"kind": "id", "value": control.object_id},
+        "points": points,
+        "mode": "add" if mode == "add-only" else "add_or_replace",
+    }
+    notes = fields.get("notes")
+    if notes is not None:
+        if not isinstance(notes, str):
+            raise _repair(
+                session,
+                "FIELD_VALUE_TYPE_MISMATCH",
+                field="notes",
+                action="provide exact RTPC notes or omit them",
+            )
+        arguments["notes"] = notes
+    return parse_operation_request(
+        {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": session.context.wwise_version,
+            "operation": "object.setRTPC",
+            "arguments": arguments,
+        },
+        expected_version=session.context.wwise_version,
+    ).as_dict()
+
+
 def materialize_object_graph_business_request(
     operation: str,
     session: BusinessDeclarationSession,
@@ -392,6 +974,12 @@ def materialize_object_graph_business_request(
     object_graph_business_contract_data(operation, session.context.wwise_version)
     if operation == "object.create":
         return _materialize_create(session)
+    if operation == "object.createPlugin":
+        return _materialize_create_plugin(session)
+    if operation == "object.setRTPC":
+        return _materialize_set_rtpc(session)
+    if operation == "object.set":
+        return _materialize_set(session)
     raise ValueError("object graph business operation is not migrated yet")
 
 
