@@ -60,9 +60,6 @@ INLINE_OPERATIONS = frozenset(
 )
 DRAFT_TYPED_OPERATIONS = frozenset(
     {
-        "object.create",
-        "object.createPlugin",
-        "object.setRTPC",
         "soundbank.convertExternalSources",
         "soundbank.generate",
         "soundbank.setInclusions",
@@ -72,6 +69,13 @@ DRAFT_TYPED_OPERATIONS = frozenset(
         "lua.executeCoreFile",
         "lua.executeCoreInline",
         "waapi.undoGroup",
+    }
+)
+LEGACY_OBJECT_GRAPH_TYPED_OPERATIONS = frozenset(
+    {
+        "object.create",
+        "object.createPlugin",
+        "object.setRTPC",
     }
 )
 _MAX_SELECTOR_DEPTH = 8
@@ -916,7 +920,7 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
 def draft_operation_request_contract(operation: str, version: str) -> TypedRequestContract:
     """Compile one complex dedicated operation through the shared Typed Core."""
 
-    if operation not in DRAFT_TYPED_OPERATIONS:
+    if operation not in DRAFT_TYPED_OPERATIONS | LEGACY_OBJECT_GRAPH_TYPED_OPERATIONS:
         raise TypedOperationInputError(f"No typed Draft adapter exists for {operation!r}")
     machine = operation_request_machine_contract(operation, version)
     # Registry owns semantic leaf truth. Project its intentionally
@@ -1118,6 +1122,7 @@ __all__ = [
     "INLINE_OPERATION_CONTRACT",
     "INLINE_OPERATIONS",
     "DRAFT_TYPED_OPERATIONS",
+    "LEGACY_OBJECT_GRAPH_TYPED_OPERATIONS",
     "INLINE_TYPED_INPUT_MODE",
     "MAX_INLINE_OPERATION_REQUEST_BYTES",
     "MAX_INLINE_OPERATION_VALUE_BYTES",

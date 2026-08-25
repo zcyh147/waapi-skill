@@ -68,6 +68,10 @@ def test_inventory_exactly_covers_every_registry_operation_and_version_lane() ->
             "object.setLinked",
             "object.setProperty",
             "object.setReference",
+            "object.create",
+            "object.createPlugin",
+            "object.set",
+            "object.setRTPC",
         }:
             expected_mode = BUSINESS_DECLARATION_INPUT_MODE
         elif (

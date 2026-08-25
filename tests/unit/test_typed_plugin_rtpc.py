@@ -14,7 +14,11 @@ from wwise_waapi.operation_composer import (
     materialize_operation_request,
 )
 from wwise_waapi.operation_registry import parse_operation_request
-from wwise_waapi.typed_operations import draft_operation_request_contract
+from wwise_waapi.typed_operations import (
+    DRAFT_TYPED_OPERATIONS,
+    LEGACY_OBJECT_GRAPH_TYPED_OPERATIONS,
+    draft_operation_request_contract,
+)
 from wwise_waapi.typed_requests import (
     MAX_TYPED_ARRAY_ITEMS,
     MAX_TYPED_REQUEST_FACTS,
@@ -211,12 +215,14 @@ def _composition(contract, facts: list[TypedRequestFact]) -> dict[str, object]:
 
 @pytest.mark.parametrize("version", VERSIONS)
 @pytest.mark.parametrize("operation", ("object.createPlugin", "object.setRTPC"))
-def test_plugin_and_rtpc_compile_as_exact_named_typed_drafts(
+def test_plugin_and_rtpc_typed_schemas_are_archive_only(
     version: str, operation: str
 ) -> None:
     contract = draft_operation_request_contract(operation, version)
     assert contract.uri == operation
     assert contract.as_gateway_payload()["input_shape"] == "draft"
+    assert operation in LEGACY_OBJECT_GRAPH_TYPED_OPERATIONS
+    assert operation not in DRAFT_TYPED_OPERATIONS
 
 
 @pytest.mark.parametrize(

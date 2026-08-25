@@ -35,16 +35,16 @@ planning; the Registry remains authoritative during implementation.
 | `lua.executeCoreFile` | 2023.1–2025.1 | Composer | source file/root/authority; optional typed args | exact user code in Authoring | wave 05 file/Lua complete |
 | `lua.executeCoreInline` | 2025.1 | Composer | source text/root/authority; optional typed args | Agent composition forbidden | wave 05 file/Lua complete |
 | `object.copy` | 2021.1–2025.1 | Business declaration | object and parent | returned GUID and parent/path verification | wave 02 object lifecycle complete |
-| `object.create` | 2021.1–2025.1 | Composer | parent/type/name; recursive options | recursive bounds and replace ownership | wave 02 object lifecycle complete |
-| `object.createPlugin` | 2022.1–2025.1 | Composer | target and exact class | versioned topology on shared URI | wave 02 complete |
+| `object.create` | 2021.1–2025.1 | Business declaration | bound parent, named descendants, stable fields, discovered types | recursive bounds and replace ownership | named graph deep cutover |
+| `object.createPlugin` | 2022.1–2025.1 | Business declaration | bound target, plug-in role, discovered type and fields | versioned topology on shared URI | named graph deep cutover |
 | `object.delete` | 2021.1–2025.1 | Business declaration | object; optional checkout | protected object and GUID absence | wave 02 object lifecycle complete |
 | `object.move` | 2021.1–2025.1 | Business declaration | object and parent | stable GUID and parent/path verification | wave 02 object lifecycle complete |
-| `object.set` | 2022.1–2025.1 | Composer | ordered bounded object batch | recursive mixed fields/references | wave 00 complete |
+| `object.set` | 2022.1–2025.1 | Business declaration | bound targets, named descendants, stable fields, discovered types/fields | recursive mixed fields/references | named graph deep cutover |
 | `object.setLinked` | 2023.1–2025.1 | Business declaration | object handle, live field handle, platform-sealed link state | dedicated link semantics | wave 01 deep cutover complete |
 | `object.setName` | 2021.1–2025.1 | Business declaration | object and name | same-GUID path transition | wave 01 complete |
 | `object.setNotes` | 2021.1–2025.1 | Business declaration | object and exact text | empty text versus omission | wave 01 complete |
 | `object.setProperty` | 2021.1–2025.1 | Business declaration | object handle, live field handle, business scalar | live metadata and typed readback | wave 01 deep cutover complete |
-| `object.setRTPC` | 2022.1–2025.1 | Composer | object/property/control input/points | dedicated curve on shared URI | wave 02 complete |
+| `object.setRTPC` | 2022.1–2025.1 | Business declaration | bound object/control input, discovered property, business curve points | dedicated curve on shared URI | named graph deep cutover |
 | `object.setReference` | 2021.1–2025.1 | Business declaration | object/field/target handles or explicit clear | metadata and exact null clearing | wave 01 deep cutover complete |
 | `soundbank.convertExternalSources` | 2022.1–2025.1 | Composer | sources and I/O root | proven files and isolated artifacts | wave 04 complete |
 | `soundbank.generate` | 2021.1–2025.1 | Composer | banks/platforms/languages/output root | host paths and artifacts | wave 04 complete |
