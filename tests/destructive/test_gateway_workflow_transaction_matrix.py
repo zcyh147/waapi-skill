@@ -954,6 +954,193 @@ def _complete_transaction(
     }
 
 
+def _complete_object_lifecycle_business_transaction(
+    runtime: _WorkflowSandboxRuntime,
+    *,
+    operation: str,
+    object_id: str,
+    parent_id: str | None = None,
+    new_name: str | None = None,
+    notes: str | None = None,
+    name_conflict: str | None = None,
+) -> dict[str, Mapping[str, Any]]:
+    schema = runtime.gateway(["operation-schema", operation], live=False)
+    assert schema["operation"]["input_mode"] == "business_declaration", schema
+    assert schema["business_adapter"]["operation"] == operation, schema
+    started = runtime.gateway(["draft-start", operation], live=False)
+    draft = started["draft"]
+    draft_id = draft["draft_id"]
+    authority = started["task_authority"]
+
+    def bind(role_id: str, revision: int) -> tuple[str, int]:
+        bound = runtime.gateway(
+            [
+                "draft-bind-object",
+                draft_id,
+                "--task-authority",
+                authority,
+                "--expected-revision",
+                str(revision),
+                "--object-id",
+                role_id,
+            ],
+            live=True,
+        )
+        return bound["bound_object"]["handle"], bound["draft"]["revision"]
+
+    object_handle, revision = bind(object_id, draft["revision"])
+    parent_handle: str | None = None
+    if parent_id is not None:
+        parent_handle, revision = bind(parent_id, revision)
+    declaration = [
+        "draft-declare-object-change",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        str(revision),
+        "--object-handle",
+        object_handle,
+    ]
+    if parent_handle is not None:
+        declaration.extend(["--parent-handle", parent_handle])
+    if new_name is not None:
+        declaration.extend(["--new-name", new_name])
+    if notes is not None:
+        declaration.extend(["--notes", notes])
+    if name_conflict is not None:
+        declaration.extend(["--name-conflict", name_conflict])
+    declared = runtime.gateway(declaration, live=False)
+    checked = runtime.gateway(
+        [
+            "draft-check",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(declared["draft"]["revision"]),
+        ],
+        live=True,
+    )
+    preview = runtime.gateway(
+        [
+            "preview-from-draft",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(checked["draft"]["revision"]),
+            "--apply",
+            "--ttl",
+            "300",
+        ],
+        live=True,
+    )
+    assert preview["state"] == TransactionState.AWAITING_CONFIRMATION.value, preview
+    assert preview["executed"] is False, preview
+    transaction_id = preview["transaction_id"]
+    shown = runtime.gateway(
+        ["transaction-show", transaction_id, "--summary-only"],
+        live=False,
+    )
+    token = shown["confirmation"]["token"]
+    runtime.gateway(
+        ["confirm", transaction_id, "--confirmation-token", token],
+        live=False,
+    )
+    executed = runtime.gateway(["execute", transaction_id], live=True)
+    verified = runtime.gateway(["verify", transaction_id], live=True)
+    assert executed["state"] == TransactionState.EXECUTED_UNVERIFIED.value, executed
+    assert verified["state"] == TransactionState.VERIFIED.value, verified
+    assert verified["verification"]["operation"] == operation, verified
+    assert verified["verification"]["business_state_verified"] is True, verified
+    return {"preview": preview, "execute": executed, "verify": verified}
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_object_lifecycle_business_draft_executes_all_five_verifiers(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    runtime = workflow_sandbox_runtime
+    parent_root = CONTAINERS_PARENT if runtime.version == "2025.1" else ACTOR_MIXER_PARENT
+    suffix = uuid.uuid4().hex[:12]
+    source_parent: str | None = None
+    destination_parent: str | None = None
+    source_id: str | None = None
+    copied_id: str | None = None
+    try:
+        source_parent = _create_object(
+            runtime,
+            parent=parent_root,
+            object_type="ActorMixer",
+            name=f"WAAPI_BUSINESS_SOURCE_PARENT_{suffix}",
+        )
+        destination_parent = _create_object(
+            runtime,
+            parent=parent_root,
+            object_type="ActorMixer",
+            name=f"WAAPI_BUSINESS_DEST_PARENT_{suffix}",
+        )
+        source_id = _create_object(
+            runtime,
+            parent=source_parent,
+            object_type="ActorMixer",
+            name=f"WAAPI_BUSINESS_SOURCE_{suffix}",
+        )
+        renamed = f"WAAPI_BUSINESS_RENAMED_{suffix}"
+        notes = f"business Draft notes {runtime.version} {suffix}"
+        _complete_object_lifecycle_business_transaction(
+            runtime,
+            operation="object.setName",
+            object_id=source_id,
+            new_name=renamed,
+        )
+        _complete_object_lifecycle_business_transaction(
+            runtime,
+            operation="object.setNotes",
+            object_id=source_id,
+            notes=notes,
+        )
+        copied = _complete_object_lifecycle_business_transaction(
+            runtime,
+            operation="object.copy",
+            object_id=source_id,
+            parent_id=destination_parent,
+            name_conflict="rename",
+        )
+        copied_id = _created_object_id(copied["execute"])
+        _complete_object_lifecycle_business_transaction(
+            runtime,
+            operation="object.move",
+            object_id=source_id,
+            parent_id=destination_parent,
+            name_conflict="rename",
+        )
+        _complete_object_lifecycle_business_transaction(
+            runtime,
+            operation="object.delete",
+            object_id=copied_id,
+        )
+        copied_id = None
+        runtime.category_results.append(
+            {
+                "category": "object-lifecycle-business",
+                "status": "PASS",
+                "verifier_strength": "five_operation_business_draft_full_chain",
+            }
+        )
+    finally:
+        for object_id in (
+            copied_id,
+            source_id,
+            destination_parent,
+            source_parent,
+        ):
+            if object_id is not None:
+                _delete_if_present_via_transaction(runtime, object_id)
+
+
 def _save_legacy_sandbox_project(runtime: _WorkflowSandboxRuntime) -> None:
     """Make Wwise 2021.1's on-disk language list authoritative for import."""
 
