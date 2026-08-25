@@ -28,6 +28,13 @@ The program gate forces `WWISE_LIVE=0`, `WWISE_DESTRUCTIVE=0`, and `WWISE_STRICT
 
 Extra arguments after `--` may be pytest flags or filters such as `-q`, `-ra`, `--collect-only`, or `-k expression`. Additional test paths, node ids, `.py` files, and `--pyargs` are rejected so the fixed program-only collection cannot be widened accidentally.
 
+Run formal gates directly so their process exit status remains authoritative.
+Do not pipe `ci/test.sh` or `ci/test.bat` through `tee` unless the invoking
+shell has an explicit fail-closed pipeline policy and the pytest-side status is
+checked. Without `pipefail`, a pytest failure or `KeyboardInterrupt` can be
+masked by `tee` returning zero; such a run is invalid evidence even when its
+outer command reports success.
+
 For the structured object-query lane, this gate proves the versioned
 `waapi-skill.object-query/v1` request/schema contract, deterministic Python
 compilation, exact fake dispatch, and fail-closed rejection. It does not prove
@@ -162,6 +169,15 @@ campaign completed, and they must not be reused as coverage totals for a newer
 suite. A partial, quota-blocked, prerequisite-blocked, or interrupted campaign
 is incomplete even if its selected profile is named `formal_98` or
 `full_cross_version_168`.
+
+The frozen v2 prompts and historical digests do not guarantee that their shared
+fixture bootstrap still matches the current public Gateway vocabulary. If a
+selected v2 root is blocked before Codex starts because runner-owned setup calls
+a retired Gateway command, freeze that root as zero semantic PASS and preserve
+its lifecycle evidence. Do not retry the root, edit `evals-v2.json`, or count
+the runner failure as an Agent result. Use a current executable profile when
+one owns the changed routing, or satisfy an issue's explicit `real or Agent`
+evidence boundary with the proportional real-host lane.
 
 ### Native-Windows Fresh Agent isolation
 
