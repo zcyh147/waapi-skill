@@ -244,6 +244,12 @@ commands without Wwise or project changes. The earlier roots
 verify-only because the Agents invented operation aliases rejected by the
 Broker before Gateway dispatch. This is focused routing evidence, not public
 `integration` acceptance or real-host execution credit.
+After the entry Skill was compacted, exact packaged-Skill candidate
+`b544197fb6b7455814fbb2079043a5a354daca59` repeated the same PASS plus
+identical verify-only in macOS root `imac-sab-b544197-r1` and native-Windows
+root `iwin-sab-b544197-r1`. Both roots retained sealed attempt manifests,
+started no Wwise process, executed no mutation, removed their temporary launch
+resources, and ended with zero scoped residual processes.
 
 The production business-declaration `audio.import` cutover has a later,
 single-candidate Fresh Agent result. Exact packaged-Skill candidate

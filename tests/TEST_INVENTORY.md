@@ -189,6 +189,13 @@ FAILs: the Agents invented `switchContainer.assign` and
 first operation command before Gateway dispatch. Temporary LaunchAgent and
 Windows Scheduled Task resources were removed, and both hosts reported zero
 scoped residual processes.
+After the entry Skill was compacted without changing Switch routing, exact
+packaged-Skill candidate `b544197fb6b7455814fbb2079043a5a354daca59`
+repeated the same one-unit PASS plus identical verify-only in macOS root
+`imac-sab-b544197-r1` and native-Windows root `iwin-sab-b544197-r1`.
+Both current roots retained their sealed attempt manifest, started no Wwise
+process, created no project mutation, removed their temporary launch resources,
+and ended with zero scoped residual processes.
 
 The Authoring UI resource collection made 35 read-only calls in total. Its
 command inventories are build/project/plugin/add-on snapshots, not runtime

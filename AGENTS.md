@@ -511,6 +511,12 @@ frozen FAILs because the Agents invented operation aliases; the Broker rejected
 them before Gateway or Wwise dispatch. No Fresh root executed a mutation, all
 temporary launch resources were removed, and scoped residual-process checks
 were empty.
+After the entry Skill was compacted, exact packaged-Skill candidate
+`b544197fb6b7455814fbb2079043a5a354daca59` repeated the same one-unit PASS
+plus identical verify-only in macOS root `imac-sab-b544197-r1` and
+native-Windows root `iwin-sab-b544197-r1`. Both roots retained sealed attempt
+manifests, started no Wwise process, executed no mutation, removed their
+temporary launch resources, and ended with zero scoped residual processes.
 
 The completed 2026-07-31 macOS integration evidence is cumulative across frozen
 campaign roots, not one final-candidate 6/6 run. The initial `a12` root passed
