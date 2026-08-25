@@ -498,6 +498,20 @@ recorded source hash/mtime stayed unchanged; PASS sandboxes were removed, FAIL
 sandboxes were sealed/quarantined, and scoped residual-process checks were
 empty.
 
+For Switch assignments, runtime candidate
+`d05f1ecdc3b33fca83866e75669c65039877edd6` passed the final macOS and
+native-Windows Program gates, macOS Non-live, and the closed add/remove
+workflow on native Windows Wwise 2022.1/2025.1. Route-only candidate
+`d45f75f5e75190d5b4e607a02aee2dcf38e73ab9` then passed macOS Program and
+the same real workflow on macOS 2022.1/2025.1. Fresh roots
+`imac-sab-d45f75f-r2` and `iwin-sab-d45f75f-r2` each passed the one-unit
+`switch_assignment_business_1` profile plus identical
+`--resume --verify-only`. Earlier `d05f1ec` roots on both hosts remain
+frozen FAILs because the Agents invented operation aliases; the Broker rejected
+them before Gateway or Wwise dispatch. No Fresh root executed a mutation, all
+temporary launch resources were removed, and scoped residual-process checks
+were empty.
+
 The completed 2026-07-31 macOS integration evidence is cumulative across frozen
 campaign roots, not one final-candidate 6/6 run. The initial `a12` root passed
 both Alarm and Harbor workflows on both versions and failed both Weather
