@@ -79,6 +79,9 @@ PROMPT_MATERIALIZATION_RECEIPT_CONTRACT = (
     "waapi-skill.codex-semantic-prompt-materialization/v3"
 )
 PROMPT_MATERIALIZATION_RECEIPT_FILE = "prompt-materialization.json"
+AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION = (
+    "audio-import-derived-sfx-language/v1"
+)
 MAX_PROVENANCE_BYTES = 8 * 1024 * 1024
 MAX_PROOF_FILES = 8192
 MAX_PROOF_BYTES = 512 * 1024 * 1024
@@ -285,6 +288,7 @@ def read_prompt_provenance(
     expected_prompts: Sequence[str] | None = None,
     expected_protocol: V3GatewayProtocol | None = None,
     require_paths: bool,
+    protocol_manifest_revision: str | None = None,
 ) -> PromptProvenanceEvidence:
     """Read once, reject links/duplicates, and rederive every prompt input."""
 
@@ -296,8 +300,16 @@ def read_prompt_provenance(
         expected_prompts=expected_prompts,
         expected_protocol=expected_protocol,
         require_paths=require_paths,
-        protocol_decoder=deserialize_protocol,
-        protocol_canonicalizer=_canonicalize_legacy_protocol_manifest,
+        protocol_decoder=lambda value: deserialize_protocol(
+            _canonicalize_legacy_protocol_manifest(
+                value,
+                protocol_manifest_revision=protocol_manifest_revision,
+            )
+        ),
+        protocol_canonicalizer=lambda value: _canonicalize_legacy_protocol_manifest(
+            value,
+            protocol_manifest_revision=protocol_manifest_revision,
+        ),
         protocol_request_materializer=lambda value: _protocol_requests(
             value,
             version=version,
@@ -523,18 +535,108 @@ def serialize_protocol(protocol: V3GatewayProtocol) -> dict[str, Any]:
 
 def _canonicalize_legacy_protocol_manifest(
     value: Mapping[str, Any],
+    *,
+    protocol_manifest_revision: str | None = None,
 ) -> dict[str, Any]:
-    """Upgrade the one reviewed v1 metadata-bound additive field in memory."""
+    """Upgrade reviewed additive protocol fields without rewriting evidence."""
+
+    if protocol_manifest_revision not in {
+        None,
+        AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION,
+    }:
+        raise PromptProvenanceError("protocol manifest revision is unsupported")
 
     canonical = _json_clone(value)
-    for step in canonical.get("steps", []):
+    steps = canonical.get("steps", [])
+    if not isinstance(steps, list):
+        return canonical
+    missing_sfx_policy_indexes: set[int] = set()
+    for index, step in enumerate(steps):
+        if not isinstance(step, dict):
+            continue
+        if "allow_explicit_derived_sfx_language" not in step:
+            missing_sfx_policy_indexes.add(index)
+        step.setdefault("allow_explicit_derived_sfx_language", False)
         for argument in step.get("arguments", []):
             if (
                 argument.get("kind") == "metadata_bound_json"
                 and "gateway_derived_reference_activations" not in argument
             ):
                 argument["gateway_derived_reference_activations"] = []
+    if protocol_manifest_revision == AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION:
+        _restore_audio_import_derived_sfx_policy(
+            steps,
+            missing_policy_indexes=missing_sfx_policy_indexes,
+        )
     return canonical
+
+
+def _restore_audio_import_derived_sfx_policy(
+    steps: list[Any],
+    *,
+    missing_policy_indexes: set[int],
+) -> None:
+    """Restore the exact policy omitted by the reviewed 3ebbf5f harness."""
+
+    declarations = [
+        (index, step)
+        for index, step in enumerate(steps)
+        if isinstance(step, dict)
+        and step.get("subcommand")
+        in {"draft-declare-new", "draft-declare-existing"}
+    ]
+    preview_requests = [
+        step.get("expected_operation_request", {}).get("value")
+        for step in steps
+        if isinstance(step, dict)
+        and step.get("subcommand") == "preview-from-draft"
+        and isinstance(step.get("expected_operation_request"), Mapping)
+    ]
+    audio_requests = [
+        request
+        for request in preview_requests
+        if isinstance(request, Mapping)
+        and request.get("operation") == "audio.import"
+    ]
+    if len(audio_requests) != 1:
+        raise PromptProvenanceError(
+            "derived SFX protocol revision lacks one audio.import witness"
+        )
+    arguments = audio_requests[0].get("arguments")
+    imports = arguments.get("imports") if isinstance(arguments, Mapping) else None
+    defaults = (
+        arguments.get("defaults", {}) if isinstance(arguments, Mapping) else None
+    )
+    if (
+        not isinstance(imports, list)
+        or not isinstance(defaults, Mapping)
+        or len(imports) != len(declarations)
+    ):
+        raise PromptProvenanceError(
+            "derived SFX protocol revision has mismatched declarations"
+        )
+    for (index, declaration), raw_row in zip(declarations, imports, strict=True):
+        if not isinstance(raw_row, Mapping):
+            raise PromptProvenanceError(
+                "derived SFX protocol revision has an invalid import row"
+            )
+        row = {**dict(defaults), **dict(raw_row)}
+        object_type = str(row.get("object_type", ""))
+        object_path = str(row.get("object_path", ""))
+        typed_segment = ""
+        if object_path.endswith(">") and "<" in object_path.rsplit("\\", 1)[-1]:
+            typed_segment = object_path.rsplit("<", 1)[-1][:-1]
+        type_token = (typed_segment or object_type).casefold().replace(" ", "").replace(
+            "-",
+            "",
+        )
+        language = row.get("import_language")
+        if index in missing_policy_indexes:
+            declaration["allow_explicit_derived_sfx_language"] = (
+                type_token in {"sound", "soundsfx"}
+                and isinstance(language, str)
+                and language.casefold() == "sfx"
+            )
 
 
 def deserialize_protocol(value: Mapping[str, Any]) -> V3GatewayProtocol:
@@ -3711,6 +3813,7 @@ def _sha256_regular_file(path: Path) -> str:
 
 
 __all__ = [
+    "AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION",
     "HEAVY_APIS",
     "MAX_PROVENANCE_BYTES",
     "PROMPT_MATERIALIZATION_RECEIPT_CONTRACT",

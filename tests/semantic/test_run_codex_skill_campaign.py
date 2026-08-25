@@ -48,6 +48,35 @@ def test_typed_input_profile_uses_a_bounded_long_form_turn_budget(
     assert options.max_pre_action_retries == 0
 
 
+@pytest.mark.parametrize(
+    "semantic_tree_sha256",
+    [
+        "b152de8c55f8cb1085321da3ec877507627352acb10bed43e2ba7dbfae8b37df",
+        "5100e2c672d2461fe0ce96dba4b0cf1536a43d48e100ad2ac3fc5dbc0203efdb",
+    ],
+)
+def test_reviewed_audio_import_harness_selects_sfx_protocol_revision(
+    semantic_tree_sha256: str,
+) -> None:
+    effective = {
+        "selection": {"profile": matrix.AUDIO_IMPORT_BUSINESS_PROFILE_ID},
+        "harness": {"semantic_tree_sha256": semantic_tree_sha256},
+    }
+
+    assert campaign._sealed_protocol_manifest_revision(effective) == (
+        campaign.AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION
+    )
+
+
+def test_unreviewed_harness_does_not_select_protocol_revision() -> None:
+    effective = {
+        "selection": {"profile": matrix.AUDIO_IMPORT_BUSINESS_PROFILE_ID},
+        "harness": {"semantic_tree_sha256": "0" * 64},
+    }
+
+    assert campaign._sealed_protocol_manifest_revision(effective) is None
+
+
 
 def _options(
     tmp_path: Path,

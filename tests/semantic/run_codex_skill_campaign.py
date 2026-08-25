@@ -207,6 +207,7 @@ from tests.semantic.support.codex_object_runtime_v3 import (  # noqa: E402
     bounded_result_disclosure,
 )
 from tests.semantic.support.codex_prompt_provenance_v3 import (  # noqa: E402
+    AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION,
     PROMPT_MATERIALIZATION_RECEIPT_CONTRACT,
     PROMPT_MATERIALIZATION_RECEIPT_FILE,
     PROMPT_PROVENANCE_FILE,
@@ -391,6 +392,12 @@ HEAVY_V3_PROMPT_MATERIALIZATION_CONTRACT = (
 )
 HEAVY_V3_PROMPT_MATERIALIZATION_FILE = PROMPT_MATERIALIZATION_RECEIPT_FILE
 HEAVY_V3_PROMPT_PROVENANCE_FILE = PROMPT_PROVENANCE_FILE
+_DERIVED_SFX_PROTOCOL_HARNESS_SHA256 = frozenset(
+    {
+        "b152de8c55f8cb1085321da3ec877507627352acb10bed43e2ba7dbfae8b37df",
+        "5100e2c672d2461fe0ce96dba4b0cf1536a43d48e100ad2ac3fc5dbc0203efdb",
+    }
+)
 HEAVY_V3_ORACLE_CONTRACT = "waapi-skill.heavy-oracle/v2"
 HEAVY_V3_LIVE_PREFLIGHT_CONTRACT = "waapi-skill.codex-semantic-live-preflight/v1"
 HEAVY_V3_MIGRATION_API = "ak.wwise.cli.migrate"
@@ -458,6 +465,7 @@ class CampaignOptions:
     lock_timeout_seconds: float
     max_pre_action_retries: int
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None
+    protocol_manifest_revision: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1011,6 +1019,7 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
     validation_options = replace(
         options,
         windows_powershell_core_host=sealed_windows_host,
+        protocol_manifest_revision=_sealed_protocol_manifest_revision(effective),
     )
 
     root = prepare_campaign_root(options)
@@ -1643,6 +1652,31 @@ def _sealed_windows_powershell_core_host(
         raise CampaignEvidenceError(
             "Windows PowerShell Core host fingerprint is malformed"
         ) from exc
+
+
+def _sealed_protocol_manifest_revision(
+    effective: Mapping[str, Any],
+) -> str | None:
+    """Select only reviewed archive migrations from immutable campaign identity."""
+
+    selection = effective.get("selection")
+    harness = effective.get("harness")
+    if (
+        effective.get("synthetic") is True
+        and selection is None
+        and harness is None
+    ):
+        return None
+    if not isinstance(selection, Mapping) or not isinstance(harness, Mapping):
+        raise CampaignEvidenceError("campaign protocol revision identity is malformed")
+    profile = selection.get("profile")
+    semantic_sha256 = harness.get("semantic_tree_sha256")
+    if (
+        profile == AUDIO_IMPORT_BUSINESS_PROFILE_ID
+        and semantic_sha256 in _DERIVED_SFX_PROTOCOL_HARNESS_SHA256
+    ):
+        return AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION
+    return None
 
 
 def _assert_codex_shell_frozen(
@@ -3036,6 +3070,7 @@ def _validate_heavy_v3_matrix_case(
                 outcome,
                 expected_unit=expected_unit,
                 scenario_root=scenario_root,
+                options=options,
             )
 
 
@@ -3169,6 +3204,7 @@ def _validate_heavy_v3_failure_prompt_plan(
     *,
     expected_unit: Any,
     scenario_root: Path,
+    options: CampaignOptions,
 ) -> HeavyV3PromptEvidence:
     """Re-read the immutable prompt/common/typed plan chain for a failed case."""
 
@@ -3208,6 +3244,7 @@ def _validate_heavy_v3_failure_prompt_plan(
         scenario_root=scenario_root,
         expected_unit=expected_unit,
         expected_sha256=receipt_sha256,
+        protocol_manifest_revision=options.protocol_manifest_revision,
     )
 
 
@@ -3447,6 +3484,7 @@ def _validate_heavy_v3_retryable_task_failure(
         expected_sha256=str(
             artifact_sha256[HEAVY_V3_PROMPT_MATERIALIZATION_FILE]
         ),
+        protocol_manifest_revision=options.protocol_manifest_revision,
     )
     expected_prompts = prompt_evidence.prompts
     protocol = prompt_evidence.provenance.protocol
@@ -4728,6 +4766,7 @@ def _validate_heavy_v3_prompt_materialization(
     scenario_root: Path,
     expected_unit: Any,
     expected_sha256: str,
+    protocol_manifest_revision: str | None = None,
 ) -> HeavyV3PromptEvidence:
     """Validate provenance -> receipt -> archived turn binding."""
 
@@ -4816,6 +4855,7 @@ def _validate_heavy_v3_prompt_materialization(
                 version=str(getattr(expected_unit, "version", "")),
                 scenario_root=scenario_root,
                 require_paths=False,
+                protocol_manifest_revision=protocol_manifest_revision,
             )
         )
     except Exception as exc:
@@ -4988,6 +5028,7 @@ def _validate_heavy_v3_task_result(
         scenario_root=scenario_root,
         expected_unit=expected_unit,
         expected_sha256=str(value["prompt_materialization_sha256"]),
+        protocol_manifest_revision=options.protocol_manifest_revision,
     )
     protocol = prompt_evidence.provenance.protocol
     is_composer_protocol = any(

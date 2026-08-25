@@ -282,11 +282,16 @@ seal candidate `9a4de16`; Windows rows seal harness-only Git candidate
 source hash and tree metadata remain equal before and after, the sandbox is
 deleted, lifecycle cleanup completes, and residual processes are empty.
 Authoring UI remains explicitly blocked because all configured hosts are
-WwiseConsole. The final development gates passed five focused protocol
-round-trip nodes, Program `3583 passed / 2 skipped`, and Non-live
-`8620 passed / 107 skipped / 27 deselected`. A later harness-only archive
-change preserves the derived-SFX equivalence field while defaulting it to
-false for older sealed protocols, so historical evidence remains replayable.
+WwiseConsole. The final development gates passed the focused protocol and
+campaign archive nodes, Program `3583 passed / 2 skipped`, and Non-live
+`8625 passed / 107 skipped / 27 deselected`. A later harness-only archive
+change defaults the absent additive field to false. Only the exact
+`audio_import_business_8` profile plus either reviewed macOS/Windows
+`3ebbf5f` semantic-tree hash selects the
+`audio-import-derived-sfx-language/v1` migration; it reconstructs true rows
+from the sealed `audio.import` request witness. Full-reader tests cover both
+the older false case and the candidate-bound true case, preserving historical
+replay without broadening current Broker behavior.
 
 The legacy internal `integration_workflows_cross_version_6` component is
 defined by `tests/semantic/data/integration-workflows-v1/profile.json`. It

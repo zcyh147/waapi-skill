@@ -51,6 +51,7 @@ from tests.semantic.support.codex_integration_workflows_v1 import (
     load_integration_workflows_profile,
 )
 from tests.semantic.support.codex_prompt_provenance_v3 import (
+    AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION,
     PROMPT_MATERIALIZATION_RECEIPT_CONTRACT,
     PROMPT_PROVENANCE_FILE,
     PromptProvenanceError,
@@ -1785,6 +1786,91 @@ def test_protocol_strict_round_trip_preserves_all_argument_kinds() -> None:
             "exact_values": [r"\Events\Default Work Unit\Alarm\Play"],
         },
     ]
+
+
+def test_full_reader_migrates_absent_false_protocol_policy(tmp_path: Path) -> None:
+    root = _scenario_root(tmp_path)
+    scenario = _scenario(api="ak.wwise.core.object.get")
+    protocol = _direct_protocol(scenario.api)
+    evidence = _write(scenario=scenario, root=root, protocol=protocol)
+    payload = json.loads(evidence.path.read_text(encoding="utf-8"))
+    protocol_value = payload["protocol"]["value"]
+    for step in protocol_value["steps"]:
+        step.pop("allow_explicit_derived_sfx_language")
+    payload["protocol"]["sha256"] = hashlib.sha256(
+        json.dumps(
+            protocol_value,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    _rewrite_payload(evidence.path, payload)
+
+    restored = read_prompt_provenance(
+        evidence.path,
+        scenario=scenario,
+        version=VERSION,
+        scenario_root=root,
+        expected_protocol=protocol,
+        require_paths=False,
+    )
+
+    assert restored.protocol == protocol
+
+
+def test_full_reader_uses_reviewed_revision_for_3ebbf5f_sfx_policy(
+    tmp_path: Path,
+) -> None:
+    root = _scenario_root(tmp_path)
+    scenario, protocol, values = _audio_import_case(root)
+    evidence = _write(
+        scenario=scenario,
+        root=root,
+        protocol=protocol,
+        visible_values=values,
+    )
+    payload = json.loads(evidence.path.read_text(encoding="utf-8"))
+    protocol_value = payload["protocol"]["value"]
+    for step in protocol_value["steps"]:
+        step.pop("allow_explicit_derived_sfx_language")
+    payload["protocol"]["sha256"] = hashlib.sha256(
+        json.dumps(
+            protocol_value,
+            ensure_ascii=False,
+            allow_nan=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    _rewrite_payload(evidence.path, payload)
+
+    with pytest.raises(
+        PromptProvenanceError,
+        match="in-memory protocol differs from sealed provenance",
+    ):
+        _read_again(
+            evidence.path,
+            scenario=scenario,
+            root=root,
+            protocol=protocol,
+            visible_values=values,
+            require_paths=False,
+        )
+
+    restored = read_prompt_provenance(
+        evidence.path,
+        scenario=scenario,
+        version=VERSION,
+        scenario_root=root,
+        expected_prompts=_prompts(scenario, values),
+        expected_protocol=protocol,
+        require_paths=False,
+        protocol_manifest_revision=AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION,
+    )
+
+    assert restored.protocol == protocol
 
 
 def test_typed_draft_action_protocol_round_trips_dynamic_handle_bindings() -> None:
