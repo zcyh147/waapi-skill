@@ -550,6 +550,16 @@ def _matches_transaction_step_sequence(
                     "declare-field-change",
                 ],
             )
+        if transaction.get("operation") in {
+            "switchContainer.addAssignment",
+            "switchContainer.removeAssignment",
+        }:
+            return prefixes == [
+                "bind-switch-container",
+                "bind-child",
+                "bind-state-or-switch",
+                "declare-switch-assignment",
+            ]
         counters = {"bind-object": [], "bind-field": [], "declare": []}
         configure_seen = False
         declaration_seen = False

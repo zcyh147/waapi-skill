@@ -14,6 +14,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_metadata_transaction_protocol,
     build_object_lifecycle_business_transaction_steps,
     build_object_metadata_business_transaction_steps,
+    build_switch_assignment_business_transaction_steps,
     build_object_set_composer_transaction_steps,
     build_schema_query_transaction_protocol,
     build_transaction_protocol,
@@ -58,6 +59,49 @@ def _request(index: int = 1) -> dict[str, object]:
             "source_authority": LUA_SOURCE_AUTHORITY,
         },
     }
+
+
+def test_switch_assignment_business_steps_bind_three_paths_before_declaration() -> None:
+    container = r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps"
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "switchContainer.removeAssignment",
+        "arguments": {
+            "switch_container": {"kind": "path", "value": container},
+            "child": {"kind": "path", "value": container + r"\Mud"},
+            "state_or_switch": {
+                "kind": "path",
+                "value": r"\Switches\Default Work Unit\Surface\Mud",
+            },
+        },
+    }
+
+    steps = build_switch_assignment_business_transaction_steps(
+        request,
+        label="tx01",
+    )
+
+    assert [step.subcommand for step in steps] == [
+        "operation-schema",
+        "draft-start",
+        "draft-bind-object",
+        "draft-bind-object",
+        "draft-bind-object",
+        "draft-declare-switch-assignment",
+        "draft-check",
+        "preview-from-draft",
+    ]
+    declare = steps[5]
+    assert declare.arguments[-6:] == (
+        "--switch-container-handle",
+        ResponseBinding("tx01.bind-switch-container", "/bound_object/handle"),
+        "--child-handle",
+        ResponseBinding("tx01.bind-child", "/bound_object/handle"),
+        "--state-or-switch-handle",
+        ResponseBinding("tx01.bind-state-or-switch", "/bound_object/handle"),
+    )
+    assert steps[-1].expected_operation_request == request
 
 
 def _archive_test_object_create_top_level_facts_precede_dynamic_container_disclosure() -> None:

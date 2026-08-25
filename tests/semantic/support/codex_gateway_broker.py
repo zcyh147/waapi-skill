@@ -2139,6 +2139,7 @@ _DRAFT_SUBCOMMANDS = frozenset(
         "draft-business-configure",
         "draft-declare-field-change",
         "draft-declare-object-change",
+        "draft-declare-switch-assignment",
         "draft-discover-fields",
         "draft-declare-new",
         "draft-declare-existing",
@@ -2165,6 +2166,7 @@ _BUSINESS_DRAFT_REVISION_SUBCOMMANDS = frozenset(
         "draft-business-configure",
         "draft-declare-field-change",
         "draft-declare-object-change",
+        "draft-declare-switch-assignment",
         "draft-discover-fields",
         "draft-declare-new",
         "draft-declare-existing",
@@ -3014,6 +3016,16 @@ def validate_operation_draft_protocol_steps(
         raise ValueError(
             "draft-start must follow the exact matching operation-schema"
         )
+    for step in steps:
+        if (
+            step.subcommand == "preview-from-draft"
+            and step.expected_operation_request is not None
+            and step.expected_operation_request.get("operation")
+            != draft_operation
+        ):
+            raise ValueError(
+                "Business request witness must match its exact draft-start"
+            )
     for step in steps:
         if step.subcommand not in {"preview", "legacy-preview"}:
             continue

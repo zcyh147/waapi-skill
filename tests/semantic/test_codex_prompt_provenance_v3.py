@@ -2083,7 +2083,7 @@ def test_soundbank_generate_equivalence_round_trips_and_rejects_wrong_route() ->
         _protocol_requests(wrong_route, version=VERSION)
 
 
-def test_switch_remove_equivalence_round_trips_and_rejects_wrong_route() -> None:
+def test_switch_remove_business_draft_round_trips_and_rejects_wrong_route() -> None:
     container_path = r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps"
     group_path = r"\Switches\Default Work Unit\Surface"
     request = _operation_request(
@@ -2091,24 +2091,33 @@ def test_switch_remove_equivalence_round_trips_and_rejects_wrong_route() -> None
         {
             "switch_container": {"kind": "path", "value": container_path},
             "child": {
-                "kind": "scoped-name",
-                "name": "Mud",
-                "type": "RandomSequenceContainer",
-                "parent": {"kind": "path", "value": container_path},
+                "kind": "path",
+                "value": container_path + r"\Mud",
             },
             "state_or_switch": {
-                "kind": "scoped-name",
-                "name": "Mud",
-                "type": "Switch",
-                "parent": {"kind": "path", "value": group_path},
+                "kind": "path",
+                "value": group_path + r"\Mud",
             },
         },
     )
     protocol = build_transaction_protocol((request,))
     serialized = serialize_protocol(protocol)
-    argument = serialized["steps"][1]["arguments"][-1]
 
-    assert argument["kind"] == "inline_typed_operation"
+    assert [step["subcommand"] for step in serialized["steps"][:8]] == [
+        "operation-schema",
+        "draft-start",
+        "draft-bind-object",
+        "draft-bind-object",
+        "draft-bind-object",
+        "draft-declare-switch-assignment",
+        "draft-check",
+        "preview-from-draft",
+    ]
+    assert all(
+        argument.get("kind") != "inline_typed_operation"
+        for step in serialized["steps"]
+        for argument in step["arguments"]
+    )
     assert deserialize_protocol(serialized) == protocol
     assert serialize_protocol(deserialize_protocol(serialized)) == serialized
     assert _protocol_requests(serialized, version=VERSION) == (
@@ -2116,18 +2125,18 @@ def test_switch_remove_equivalence_round_trips_and_rejects_wrong_route() -> None
     )
 
     wrong_route = json.loads(json.dumps(serialized))
-    wrong_argument = wrong_route["steps"][1]["arguments"][-1]
-    wrong_argument["value"]["operation"] = "switchContainer.addAssignment"
-    wrong_argument["sha256"] = hashlib.sha256(
+    witness = wrong_route["steps"][7]["expected_operation_request"]
+    witness["value"]["operation"] = "switchContainer.addAssignment"
+    witness["sha256"] = hashlib.sha256(
         json.dumps(
-            wrong_argument["value"],
+            witness["value"],
             ensure_ascii=False,
             allow_nan=False,
             sort_keys=True,
             separators=(",", ":"),
         ).encode("utf-8")
     ).hexdigest()
-    with pytest.raises(PromptProvenanceError, match="inline typed operation"):
+    with pytest.raises((PromptProvenanceError, ValueError)):
         _protocol_requests(wrong_route, version=VERSION)
 
 

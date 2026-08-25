@@ -1060,6 +1060,13 @@ OBJECT_METADATA_BUSINESS_OPERATIONS = frozenset(
     }
 )
 
+SWITCH_ASSIGNMENT_BUSINESS_OPERATIONS = frozenset(
+    {
+        "switchContainer.addAssignment",
+        "switchContainer.removeAssignment",
+    }
+)
+
 OBJECT_GRAPH_BUSINESS_OPERATIONS = frozenset({"object.create"})
 
 
@@ -1326,6 +1333,85 @@ def build_object_lifecycle_business_transaction_steps(
             name=declaration_name,
             subcommand="draft-declare-object-change",
             arguments=tuple(declaration_arguments),
+        )
+    )
+    draft.advance(declaration_name)
+    check_name = f"{label}.check"
+    steps.append(
+        ExpectedGatewayStep(
+            name=check_name,
+            subcommand="draft-check",
+            arguments=draft.prefix(),
+        )
+    )
+    draft.advance(check_name)
+    steps.append(
+        ExpectedGatewayStep(
+            name=f"{label}.preview",
+            subcommand="preview-from-draft",
+            arguments=draft.prefix(),
+            expected_operation_request=normalized,
+        )
+    )
+    return tuple(steps)
+
+
+def build_switch_assignment_business_transaction_steps(
+    request: Mapping[str, Any],
+    *,
+    label: str,
+) -> tuple[ExpectedGatewayStep, ...]:
+    """Translate one exact relationship outcome into bound business Draft steps."""
+
+    normalized = _validate_operation_request(request)
+    operation = str(normalized["operation"])
+    if operation not in SWITCH_ASSIGNMENT_BUSINESS_OPERATIONS:
+        raise V3ProtocolError(
+            "Switch assignment business builder requires one reviewed operation"
+        )
+    if not isinstance(label, str) or not re.fullmatch(r"tx[0-9]{2}", label):
+        raise V3ProtocolError("business transaction label must be txNN")
+    try:
+        parsed = parse_operation_request(normalized)
+    except OperationContractError as exc:
+        raise V3ProtocolError(
+            f"Switch assignment business request is invalid: {exc}"
+        ) from exc
+    arguments = parsed.arguments
+    if set(arguments) != {
+        "switch_container",
+        "child",
+        "state_or_switch",
+    }:
+        raise V3ProtocolError(
+            "Switch assignment business request fields are not closed"
+        )
+
+    draft = _BusinessDraftSteps.start(operation=operation, label=label)
+    steps = draft.steps
+    handles: dict[str, ResponseBinding] = {}
+    for role in ("switch_container", "child", "state_or_switch"):
+        step_name = f"{label}.bind-{role.replace('_', '-')}"
+        handles[role] = draft.bind_object(
+            arguments[role],
+            step_name=step_name,
+            error_subject=f"Switch assignment {role}",
+        )
+
+    declaration_name = f"{label}.declare-switch-assignment"
+    steps.append(
+        ExpectedGatewayStep(
+            name=declaration_name,
+            subcommand="draft-declare-switch-assignment",
+            arguments=(
+                *draft.prefix(),
+                "--switch-container-handle",
+                handles["switch_container"],
+                "--child-handle",
+                handles["child"],
+                "--state-or-switch-handle",
+                handles["state_or_switch"],
+            ),
         )
     )
     draft.advance(declaration_name)
@@ -1746,6 +1832,23 @@ def materialize_typed_transaction_protocol_requests(
                     (terminal_index - segment_start + 1,),
                 ),
                 version=version,
+            )
+        elif (
+            protocol.steps[terminal_index].expected_operation_request
+            is not None
+        ):
+            request = json.loads(
+                json.dumps(
+                    dict(
+                        protocol.steps[
+                            terminal_index
+                        ].expected_operation_request
+                    ),
+                    ensure_ascii=False,
+                    allow_nan=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
             )
         else:
             composition = new_composition(operation, version)
@@ -2802,6 +2905,14 @@ def build_transaction_protocol(
                     label=label,
                     field_meaning=metadata_meaning,
                 )
+            elif (
+                input_mode == BUSINESS_DECLARATION_INPUT_MODE
+                and operation in SWITCH_ASSIGNMENT_BUSINESS_OPERATIONS
+            ):
+                operation_steps = build_switch_assignment_business_transaction_steps(
+                    request,
+                    label=label,
+                )
             else:
                 operation_steps = _build_generic_typed_draft_transaction_steps(
                     request,
@@ -3631,6 +3742,7 @@ __all__ = [
     "OBJECT_LIFECYCLE_BUSINESS_OPERATIONS",
     "build_object_lifecycle_business_transaction_steps",
     "build_object_metadata_business_transaction_steps",
+    "build_switch_assignment_business_transaction_steps",
     "build_object_graph_business_transaction_steps",
     "build_object_set_composer_transaction_steps",
     "build_modification_policy_protocol",

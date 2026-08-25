@@ -159,19 +159,12 @@ def _protocol(unit: WorkflowUnit) -> V3GatewayProtocol:
         return {
             "switch_container": switch_container,
             "child": {
-                "kind": "scoped-name",
-                "name": "Mud",
-                "type": "RandomSequenceContainer",
-                "parent": switch_container,
+                "kind": "path",
+                "value": switch_container["value"] + r"\Mud",
             },
             "state_or_switch": {
-                "kind": "scoped-name",
-                "name": "Mud",
-                "type": "Switch",
-                "parent": {
-                    "kind": "path",
-                    "value": r"\Switches\Fixture\Surface",
-                },
+                "kind": "path",
+                "value": r"\Switches\Fixture\Surface\Mud",
             },
         }
 

@@ -1504,8 +1504,9 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
         "business_declaration"
     }
     assert "argument_contract" not in detailed["object.create"]
-    assert "constraints" in detailed["object.create"]
-    assert "identity_contract" in detailed["object.create"]
+    assert "constraints" not in detailed["object.create"]
+    assert "identity_contract" not in detailed["object.create"]
+    assert "business_contracts_by_version" in detailed["object.create"]
     assert "composer_contracts_by_version" not in detailed["object.create"]
 
     exit_code, schema = execute(["operation-schema", "object.setNotes"], tmp_path=tmp_path)
@@ -1517,7 +1518,7 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
     assert schema["operation"]["input_mode"] == "business_declaration"
     assert "required_arguments" not in schema["operation"]
     assert "argument_contract" not in schema["operation"]
-    assert "identity_contract" in schema["operation"]
+    assert "identity_contract" not in schema["operation"]
     assert schema["operation"]["selection_guidance"]["use_when"] == [
         "Exactly one existing object receives only a notes change."
     ]
@@ -1753,10 +1754,7 @@ def test_object_create_operation_schema_discloses_versioned_business_graph_contr
     assert "recursive_object_tree" in adapter["gateway_derivations"]
     assert adapter["legacy_shallow_composer_public"] is False
     assert "composer" not in payload
-    assert any(
-        "32 children per parent" in item
-        for item in payload["operation"]["constraints"]
-    )
+    assert "constraints" not in payload["operation"]
     assert default_work_unit_path
     assert actor_mixer_type
 

@@ -4104,6 +4104,7 @@ def _compile_integration_workflow_plan(
         "draft-bind-field": "operation_compose",
         "draft-discover-fields": "operation_compose",
         "draft-declare-field-change": "operation_compose",
+        "draft-declare-switch-assignment": "operation_compose",
         "draft-business-configure": "operation_compose",
         "draft-declare-new": "operation_compose",
         "draft-declare-existing": "operation_compose",

@@ -1126,22 +1126,12 @@ class _FootstepsSession:
                         "value": visible_values["footsteps_container_path"],
                     },
                     "child": {
-                        "kind": "scoped-name",
-                        "name": remove_child_path.rsplit("\\", 1)[-1],
-                        "type": str(remove_child.type),
-                        "parent": {
-                            "kind": "path",
-                            "value": visible_values["footsteps_container_path"],
-                        },
+                        "kind": "path",
+                        "value": remove_child_path,
                     },
                     "state_or_switch": {
-                        "kind": "scoped-name",
-                        "name": remove_value_path.rsplit("\\", 1)[-1],
-                        "type": str(remove_value.type),
-                        "parent": {
-                            "kind": "path",
-                            "value": visible_values["surface_group_path"],
-                        },
+                        "kind": "path",
+                        "value": remove_value_path,
                     },
                 },
             }

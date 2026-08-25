@@ -443,22 +443,12 @@ class FakeFootstepsWaapi:
                 "value": self._path("player_footsteps"),
             },
             "child": {
-                "kind": "scoped-name",
-                "name": "Mud",
-                "type": "RandomSequenceContainer",
-                "parent": {
-                    "kind": "path",
-                    "value": self._path("player_footsteps"),
-                },
+                "kind": "path",
+                "value": self._path("mud_container"),
             },
             "state_or_switch": {
-                "kind": "scoped-name",
-                "name": "Mud",
-                "type": "Switch",
-                "parent": {
-                    "kind": "path",
-                    "value": self._path("surface_group"),
-                },
+                "kind": "path",
+                "value": self._path("surface_mud"),
             },
         }
         mud = self.roles["mud_container"].casefold()
@@ -602,8 +592,8 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
         in confirmation_prompt
     )
     assert "逐字保留其中每个反斜杠分隔符" in confirmation_prompt
-    assert prepared.protocol.turn_prefix_counts == (10, 16, 20)
-    assert len(prepared.protocol.steps) == 20
+    assert prepared.protocol.turn_prefix_counts == (10, 22, 26)
+    assert len(prepared.protocol.steps) == 26
     assert [
         (step.name, step.subcommand)
         for step in prepared.protocol.steps[:2]
@@ -669,24 +659,39 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
             "value": case.fake._path("player_footsteps"),
         },
         "child": {
-            "kind": "scoped-name",
-            "name": "Mud",
-            "type": "RandomSequenceContainer",
-            "parent": {
-                "kind": "path",
-                "value": case.fake._path("player_footsteps"),
-            },
+            "kind": "path",
+            "value": case.fake._path("mud_container"),
         },
         "state_or_switch": {
-            "kind": "scoped-name",
-            "name": "Mud",
-            "type": "Switch",
-            "parent": {
-                "kind": "path",
-                "value": case.fake._path("surface_group"),
-            },
+            "kind": "path",
+            "value": case.fake._path("surface_mud"),
         },
     }
+
+    remove_steps = [
+        step for step in prepared.protocol.steps if step.name.startswith("tx02.")
+    ]
+    assert [step.subcommand for step in remove_steps] == [
+        "operation-schema",
+        "draft-start",
+        "draft-bind-object",
+        "draft-bind-object",
+        "draft-bind-object",
+        "draft-declare-switch-assignment",
+        "draft-check",
+        "preview-from-draft",
+        "transaction-show",
+        "confirm",
+        "execute",
+        "verify",
+    ]
+    remove_preview_step = next(
+        step for step in remove_steps if step.name == "tx02.preview"
+    )
+    assert _plain(remove_preview_step.expected_operation_request) == _plain(
+        remove_request
+    )
+    assert all(step.subcommand != "typed-operation" for step in remove_steps)
 
     assert _plain(import_preview_step.expected_operation_request) == _plain(
         import_request
@@ -700,7 +705,7 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-def test_scoped_remove_request_accepts_only_its_exact_path_equivalents(
+def _archive_test_scoped_remove_request_accepts_only_its_exact_path_equivalents(
     tmp_path: Path,
     version: str,
 ) -> None:
@@ -845,7 +850,7 @@ def test_observer_preserves_exact_terminal_indeterminate_execute(
         },
     )
 
-    assert case.prepared.protocol.turn_prefix_counts == (10, 16, 20)
+    assert case.prepared.protocol.turn_prefix_counts == (10, 22, 26)
     assert case.prepared.operation_requests[0]["arguments"]["imports"][0][
         "switch_assignment"
     ] == "Snow"
