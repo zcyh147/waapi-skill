@@ -391,7 +391,7 @@ def test_audio_import_switch_assignment_is_part_of_the_business_declaration() ->
         )
         if step.subcommand == "draft-declare-new"
     )
-    switch_index = declaration.arguments.index("switch_value")
+    switch_index = declaration.arguments.index("--switch-value")
     assert declaration.arguments[switch_index + 1] == switch_assignment
 
     request["arguments"]["imports"][0].pop("switch_assignment")  # type: ignore[index]
@@ -402,7 +402,7 @@ def test_audio_import_switch_assignment_is_part_of_the_business_declaration() ->
         )
         if step.subcommand == "draft-declare-new"
     )
-    assert "switch_value" not in ordinary.arguments
+    assert "--switch-value" not in ordinary.arguments
 
 
 def test_audio_import_business_builder_rejects_unreviewed_request_fields() -> None:

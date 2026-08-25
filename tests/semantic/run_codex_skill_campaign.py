@@ -390,6 +390,9 @@ BUSINESS_AGENT_OUTCOME_CONTRACTS = {
     matrix.OBJECT_GRAPH_BUSINESS_PROFILE_ID: (
         "waapi-skill.object-graph-business-agent-outcome/v1"
     ),
+    matrix.SWITCH_ASSIGNMENT_BUSINESS_PROFILE_ID: (
+        "waapi-skill.switch-assignment-business-agent-outcome/v1"
+    ),
 }
 HEAVY_V3_PROJECT_LIFECYCLE_CONTRACT = (
     "waapi-skill.codex-semantic-scenario-lifecycle/v3"
@@ -3319,6 +3322,35 @@ def _validate_bound_business_agent_protocol(
             },
         )
         preview_request = request
+    elif profile == matrix.SWITCH_ASSIGNMENT_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_eval_protocol_v3 import (
+            build_switch_assignment_business_transaction_steps,
+        )
+
+        request = {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": expected_unit.version,
+            "operation": expected_unit.operation,
+            "arguments": {
+                role: {
+                    "kind": "path",
+                    "value": str(expected_unit.objects[role]["path"]),
+                }
+                for role in (
+                    "switch_container",
+                    "child",
+                    "state_or_switch",
+                )
+            },
+        }
+        steps = build_switch_assignment_business_transaction_steps(
+            request,
+            label="tx01",
+        )
+        preview_request = _bind_business_request_paths(
+            steps[-1].expected_operation_request,
+            objects=tuple(expected_unit.objects.values()),
+        )
     else:
         raise CampaignEvidenceError("unknown bound Business Agent profile")
 

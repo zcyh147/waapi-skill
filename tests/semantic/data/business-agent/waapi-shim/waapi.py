@@ -187,8 +187,14 @@ class WaapiClient:
                     value["parent"] = row["parent"]
                 if "notes" in row:
                     value["notes"] = row["notes"]
+                if "SwitchGroupOrStateGroup" in row:
+                    value["SwitchGroupOrStateGroup"] = row[
+                        "SwitchGroupOrStateGroup"
+                    ]
                 if row.get("type") == "Sound":
                     value["@IsVoice"] = bool(row.get("is_voice", False))
                 result.append(value)
             return {"return": result}
+        if uri == "ak.wwise.core.switchContainer.getAssignments":
+            return {"return": list(self.fixture.get("assignments", []))}
         raise WaapiRequestFailed(f"unexpected fixture call: {uri}")

@@ -902,9 +902,15 @@ def build_audio_import_composer_transaction_steps(
             *target_arguments,
         ]
         for field_name, field_value in business_fields:
-            declaration_arguments.extend(
-                ("--field", field_name, field_value if isinstance(field_value, ResponseBinding) else value_text(field_value))
+            rendered_value = (
+                field_value
+                if isinstance(field_value, ResponseBinding)
+                else value_text(field_value)
             )
+            if field_name == "switch_value":
+                declaration_arguments.extend(("--switch-value", rendered_value))
+            else:
+                declaration_arguments.extend(("--field", field_name, rendered_value))
         for field_handle, field_value in dynamic_values:
             declaration_arguments.extend(
                 (

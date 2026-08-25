@@ -1,0 +1,50 @@
+{
+  "contract": "waapi-skill.switch-assignment-business-profile/v1",
+  "profile_id": "switch_assignment_business_1",
+  "model": {
+    "name": "gpt-5.6-terra",
+    "reasoning_effort": "medium",
+    "service_tier": "default",
+    "memory": "disabled"
+  },
+  "units": [
+    {
+      "unit_id": "SAB22-ADD-SNOW",
+      "operation": "switchContainer.addAssignment",
+      "api": "ak.wwise.core.switchContainer.addAssignment",
+      "version": "2022.1",
+      "prompt": "请把 Switch Container {switch_container_path} 的现有直接子对象 {child_path} 分配给 Switch {state_or_switch_path}。只生成这一次关系修改的预览，不要执行。",
+      "objects": {
+        "switch_container": {
+          "id": "{11111111-1111-1111-1111-111111111111}",
+          "name": "Player_Footsteps",
+          "type": "SwitchContainer",
+          "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Player_Footsteps",
+          "parent": "{AAAAAAAA-0000-0000-0000-000000000001}"
+        },
+        "child": {
+          "id": "{22222222-2222-2222-2222-222222222222}",
+          "name": "Snow_Step",
+          "type": "Sound",
+          "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Player_Footsteps\\Snow_Step",
+          "parent": "{11111111-1111-1111-1111-111111111111}"
+        },
+        "group": {
+          "id": "{33333333-3333-3333-3333-333333333333}",
+          "name": "Surface",
+          "type": "SwitchGroup",
+          "path": "\\Switches\\Default Work Unit\\Surface",
+          "parent": "{AAAAAAAA-0000-0000-0000-000000000002}"
+        },
+        "state_or_switch": {
+          "id": "{44444444-4444-4444-4444-444444444444}",
+          "name": "Snow",
+          "type": "Switch",
+          "path": "\\Switches\\Default Work Unit\\Surface\\Snow",
+          "parent": "{33333333-3333-3333-3333-333333333333}"
+        }
+      },
+      "final_markers": ["Player_Footsteps", "Snow_Step", "Snow"]
+    }
+  ]
+}

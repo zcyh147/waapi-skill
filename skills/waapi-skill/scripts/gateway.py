@@ -706,6 +706,13 @@ def _add_business_declaration_arguments(
         metavar=("FIELD_HANDLE", "VALUE"),
         help="Set one live-bound custom property or reference by opaque handle",
     )
+    parser.add_argument(
+        "--switch-value",
+        help=(
+            "Assign this import declaration to one exact user-requested Switch "
+            "value without encoding it as a generic field pair"
+        ),
+    )
     parser.add_argument("--event-parent-handle")
     parser.add_argument("--event-name")
     parser.add_argument(
@@ -10401,6 +10408,7 @@ def _parse_audio_import_business_fields(
     session: BusinessDeclarationSession,
     pairs: Sequence[Sequence[str]],
     *,
+    switch_value: str | None = None,
     field_value_pairs: Sequence[Sequence[str]] = (),
     event_parent_handle: str | None = None,
     event_name: str | None = None,
@@ -10413,7 +10421,10 @@ def _parse_audio_import_business_fields(
         raise GatewayInputError("audio import business field contract is invalid")
     field_types = dict(raw_field_types)
     fields: dict[str, Any] = {}
-    for pair in pairs:
+    literal_pairs = [*pairs]
+    if switch_value is not None:
+        literal_pairs.append(("switch_value", switch_value))
+    for pair in literal_pairs:
         if len(pair) != 2:
             raise GatewayInputError("business --field requires FIELD VALUE")
         name, raw = pair
@@ -10814,6 +10825,7 @@ def dispatch_offline_business_draft_update(
             else _parse_audio_import_business_fields(
                 session,
                 args.field,
+                switch_value=args.switch_value,
                 field_value_pairs=args.field_value,
                 event_parent_handle=args.event_parent_handle,
                 event_name=args.event_name,
@@ -16760,6 +16772,7 @@ def _business_next_action_binding(
                 "<child-name>",
                 "--kind",
                 "<semantic-kind>",
+                "[--switch-value <exact-user-requested-switch-value>]",
                 "[--field <stable-field> <business-value>]...",
                 "[--field-value <bound-field-handle> <business-value>]...",
             ],
@@ -16773,6 +16786,7 @@ def _business_next_action_binding(
                 "<task-local-id>",
                 "--object-handle",
                 "<bound-object-handle>",
+                "[--switch-value <exact-user-requested-switch-value>]",
                 "[--field <stable-field> <business-value>]...",
                 "[--field-value <bound-field-handle> <business-value>]...",
             ],

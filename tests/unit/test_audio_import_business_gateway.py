@@ -395,6 +395,12 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     assert bound_next["declare_new"]["known_user_fields"] == (
         "complete_on_first_submission"
     )
+    assert "[--switch-value <exact-user-requested-switch-value>]" in (
+        bound_next["declare_new"]["append"]
+    )
+    assert "[--switch-value <exact-user-requested-switch-value>]" in (
+        bound_next["declare_existing"]["append"]
+    )
 
     field_client = FakeClient(
         {
@@ -562,6 +568,79 @@ def test_audio_import_business_start_discloses_only_copy_ready_object_binding(
         "user_supplied_name_without_a_path_requires_query_then_by_id; "
         "user_selected_guid_uses_by_id"
     )
+
+
+def test_audio_import_switch_value_is_a_first_class_business_argument(
+    tmp_path: Path,
+) -> None:
+    code, started = _offline(tmp_path, "draft-start", "audio.import")
+    assert code == 0, started
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [_info()],
+            "ak.wwise.core.getProjectInfo": [
+                {
+                    "id": PROJECT_ID,
+                    "name": "SampleProject",
+                    "path": str(_project_path(tmp_path)),
+                }
+            ],
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": PARENT_ID,
+                            "name": "Player_Footsteps",
+                            "type": "SwitchContainer",
+                            "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Player_Footsteps",
+                        }
+                    ]
+                }
+            ],
+        }
+    )
+    bind_code, bound = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-bind-object",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            "1",
+            "--object-id",
+            PARENT_ID,
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+    assert bind_code == 0, bound
+
+    declare_code, declared = _offline(
+        tmp_path,
+        "draft-declare-new",
+        started["draft"]["draft_id"],
+        "--task-authority",
+        started["task_authority"],
+        "--expected-revision",
+        "2",
+        "--declaration-id",
+        "snow",
+        "--parent-handle",
+        bound["bound_object"]["handle"],
+        "--name",
+        "Snow",
+        "--kind",
+        "random-container",
+        "--switch-value",
+        "Snow",
+    )
+
+    assert declare_code == 0, declared
+    assert declared["draft"]["declarations"][0]["fields"] == {
+        "switch_value": "Snow"
+    }
 
 
 def test_structure_declaration_reaches_live_check_and_persists_readable_preview(

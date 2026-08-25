@@ -264,6 +264,11 @@ and digest exist.
 Launch long macOS campaigns as a one-shot user LaunchAgent. Its temporary
 plist must use the exact Skill-local Python campaign argv, the clean candidate
 worktree as `WorkingDirectory`, `RunAtLoad=true`, and `KeepAlive=false`.
+Put the Skill-local Python executable and complete campaign argv directly in
+`ProgramArguments`; do not route the job through a temporary shell script under
+`Documents`. A background `/bin/bash` can be denied that script by macOS TCC
+before the campaign creates a root, even when the interactive Codex process can
+read the same repository.
 Validate the plist, bootstrap it in `gui/$(id -u)`, and require exactly one run
 and exit code zero. Do not use `launchctl submit`: its generated job can relaunch
 the same immutable root after a successful run. After completion, require the

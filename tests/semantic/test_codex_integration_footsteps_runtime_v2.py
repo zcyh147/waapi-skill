@@ -699,7 +699,11 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
     assert ("--name", "Snow", "--kind", "random-container") == tuple(
         import_declarations[0].arguments[9:13]
     )
-    assert "switch_value" in import_declarations[0].arguments
+    assert (
+        "--switch-value",
+        "Snow",
+    ) == tuple(import_declarations[0].arguments[-2:])
+    assert "switch_value" not in import_declarations[0].arguments
     assert all("sound-sfx" in step.arguments for step in import_declarations[1:])
     assert all("media_file" in step.arguments for step in import_declarations[1:])
 
