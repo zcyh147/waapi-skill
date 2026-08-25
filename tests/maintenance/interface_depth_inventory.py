@@ -8,7 +8,11 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from wwise_waapi.canonical import canonical_sha256, strict_json_copy
-from wwise_waapi.operation_registry import OPERATION_SPECS, operation_input_mode
+from wwise_waapi.operation_registry import (
+    OPERATION_SPECS,
+    audio_import_business_contract,
+    operation_input_mode,
+)
 from wwise_waapi.typed_requests import TypedRequestError, request_contract
 from wwise_waapi.typed_topics import topic_match_contract, topic_options_contract
 
@@ -36,7 +40,11 @@ def _operation_contract_rows() -> list[dict[str, Any]]:
         {
             "operation": name,
             "version": version,
-            "contract": spec.as_dict(version=version),
+            "contract": (
+                audio_import_business_contract(version)
+                if name == "audio.import"
+                else spec.as_dict(version=version)
+            ),
         }
         for name, spec in sorted(OPERATION_SPECS.items())
         for version in spec.supported_versions
@@ -153,17 +161,40 @@ def _native_assignment(
     )
 
 
-def _field_ownership(
-    field: Mapping[str, Any], policy: Mapping[str, Any]
-) -> str:
+def _name_ownership(
+    name: str,
+    policy: Mapping[str, Any],
+    *,
+    uri: str | None = None,
+) -> str | None:
     rules = policy["field_ownership_rules"]
-    name = str(field["name"]).replace("-", "_").lower()
-    if name in rules["exact_artifact_names"]:
+    normalized = name.replace("-", "_").lower()
+    if normalized in rules["reviewed_adapter_names"]:
+        return "reviewed_adapter"
+    if normalized in rules["exact_artifact_names"]:
         return "exact_user_artifact"
-    if name in rules["bounded_expression_names"]:
+    if any(normalized.endswith(suffix) for suffix in rules["exact_artifact_suffixes"]):
+        return "exact_user_artifact"
+    if normalized == "path":
+        if uri is not None and any(
+            uri.startswith(prefix) for prefix in rules["filesystem_path_uris"]
+        ):
+            return "exact_user_artifact"
+        return "reviewed_adapter"
+    if normalized in rules["bounded_expression_names"]:
         return "bounded_domain_expression"
-    if name in rules["live_bound_names"]:
+    if normalized in rules["live_bound_names"]:
         return "live_bound_handle"
+    return None
+
+
+def _field_ownership(
+    field: Mapping[str, Any], policy: Mapping[str, Any], *, uri: str
+) -> str:
+    named = _name_ownership(str(field["name"]), policy, uri=uri)
+    if named is not None:
+        return named
+    rules = policy["field_ownership_rules"]
     if field["shape"] in rules["gateway_structure_shapes"]:
         return "reviewed_adapter"
     return "stable_business_declaration"
@@ -193,54 +224,269 @@ def _typed_field_rows(
                     "name": field["name"],
                     "shape": field["shape"],
                     "required": field["required"],
-                    "value_ownership": _field_ownership(field, policy),
+                    "value_ownership": _field_ownership(
+                        field, policy, uri=lane["uri"]
+                    ),
                     "transport_ownership": "gateway_derivation",
                 }
             )
     return rows
 
 
-def _operation_argument_ownership(
-    operation: str, argument: str, policy: Mapping[str, Any]
+def _schema_shape(schema: Mapping[str, Any]) -> str:
+    if isinstance(schema.get("oneOf"), list) or isinstance(schema.get("anyOf"), list):
+        return "branch"
+    schema_type = schema.get("type")
+    if schema_type == "array":
+        return "array"
+    if schema_type == "object":
+        if schema.get("additionalProperties") is True or isinstance(
+            schema.get("additionalProperties"), Mapping
+        ) or isinstance(schema.get("patternProperties"), Mapping):
+            return "map"
+        return "object"
+    return "scalar"
+
+
+def _schema_value_ownership(
+    name: str,
+    schema: Mapping[str, Any],
+    *,
+    shape: str,
+    uri: str,
+    policy: Mapping[str, Any],
 ) -> str:
-    if argument == "acknowledge":
+    normalized = name.replace("-", "_").lower()
+    if normalized == "acknowledge":
         return "gateway_derivation"
-    normalized = argument.replace("-", "_").lower()
-    rules = policy["field_ownership_rules"]
-    if normalized in rules["exact_artifact_names"] or normalized in {
-        "io_root",
-        "source_authority",
-    }:
+    if any(
+        schema.get(key) is True
+        for key in (
+            "absoluteRegularFile",
+            "absoluteExistingDirectory",
+            "absoluteWritableFile",
+        )
+    ):
         return "exact_user_artifact"
-    if normalized in rules["bounded_expression_names"]:
-        return "bounded_domain_expression"
-    if normalized in rules["live_bound_names"]:
+    named = _name_ownership(name, policy, uri=uri)
+    if named is not None:
+        return named
+    description = str(schema.get("description", "")).lower()
+    if "mutation token" in description or "property metadata" in description:
         return "live_bound_handle"
+    if "exact wwise" in description and "token" in description:
+        return "reviewed_adapter"
     if normalized in {
         "calls",
         "children",
         "commands",
         "control_input",
         "inclusions",
+        "kind",
         "objects",
         "plugin",
         "points",
         "type",
     }:
         return "reviewed_adapter"
+    if shape in policy["field_ownership_rules"]["gateway_structure_shapes"] or shape == "object":
+        return "reviewed_adapter"
     return "stable_business_declaration"
 
 
-def _encode_model_value(value: Mapping[str, Any]) -> str:
-    """Keep the exhaustive generated inventory compact without losing a field."""
+def _walk_operation_schema(
+    schema: Mapping[str, Any],
+    *,
+    path: tuple[str, ...],
+    name: str,
+    required: bool,
+    uri: str,
+    policy: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    shape = _schema_shape(schema)
+    rows = [
+        {
+            "path": list(path),
+            "name": name,
+            "shape": shape,
+            "required": required,
+            "value_ownership": _schema_value_ownership(
+                name,
+                schema,
+                shape=shape,
+                uri=uri,
+                policy=policy,
+            ),
+            "transport_ownership": "gateway_derivation",
+            "schema_sha256": canonical_sha256(schema),
+        }
+    ]
+    for keyword in ("oneOf", "anyOf"):
+        branches = schema.get(keyword)
+        if isinstance(branches, list):
+            for index, branch in enumerate(branches):
+                if isinstance(branch, Mapping):
+                    rows.extend(
+                        _walk_operation_schema(
+                            branch,
+                            path=(*path, f"<{keyword}:{index}>"),
+                            name=name,
+                            required=required,
+                            uri=uri,
+                            policy=policy,
+                        )
+                    )
+    properties = schema.get("properties")
+    if isinstance(properties, Mapping):
+        required_names = set(schema.get("required", []))
+        for child_name, child in sorted(properties.items()):
+            if isinstance(child, Mapping):
+                rows.extend(
+                    _walk_operation_schema(
+                        child,
+                        path=(*path, child_name),
+                        name=child_name,
+                        required=child_name in required_names,
+                        uri=uri,
+                        policy=policy,
+                    )
+                )
+    items = schema.get("items")
+    if isinstance(items, Mapping):
+        rows.extend(
+            _walk_operation_schema(
+                items,
+                path=(*path, "[]"),
+                name=name,
+                required=required,
+                uri=uri,
+                policy=policy,
+            )
+        )
+    pattern_properties = schema.get("patternProperties")
+    if isinstance(pattern_properties, Mapping):
+        for pattern, child in sorted(pattern_properties.items()):
+            if isinstance(child, Mapping):
+                rows.extend(
+                    _walk_operation_schema(
+                        child,
+                        path=(*path, f"<pattern:{pattern}>"),
+                        name=f"pattern:{pattern}",
+                        required=False,
+                        uri=uri,
+                        policy=policy,
+                    )
+                )
+    additional = schema.get("additionalProperties")
+    if isinstance(additional, Mapping):
+        rows.extend(
+            _walk_operation_schema(
+                additional,
+                path=(*path, "<additional>"),
+                name="additional",
+                required=False,
+                uri=uri,
+                policy=policy,
+            )
+        )
+    return rows
 
-    return json.dumps(
-        value,
-        ensure_ascii=False,
-        allow_nan=False,
-        separators=(",", ":"),
-        sort_keys=True,
-    )
+
+def _audio_import_model_values(version: str) -> list[dict[str, Any]]:
+    contract = audio_import_business_contract(version)
+    exact = set(contract["exact_user_artifacts"])
+    live = set(contract["live_handles"])
+    live.update(contract["field_transport"]["bound_object_handle_fields"])
+    live.add(contract["field_transport"]["bound_field_handle_container"])
+    rows: list[dict[str, Any]] = []
+    for channel, names in (
+        ("settings", contract["settings"]),
+        ("declaration", contract["declaration_fields"]),
+    ):
+        for name in names:
+            ownership = (
+                "exact_user_artifact"
+                if name in exact
+                else "live_bound_handle"
+                if name in live
+                else "stable_business_declaration"
+            )
+            rows.append(
+                {
+                    "path": [channel, name],
+                    "name": name,
+                    "shape": "scalar",
+                    "required": False,
+                    "value_ownership": ownership,
+                    "transport_ownership": "gateway_derivation",
+                    "schema_sha256": canonical_sha256(
+                        {
+                            "channel": channel,
+                            "name": name,
+                            "value_type": contract["field_value_types"].get(name),
+                        }
+                    ),
+                }
+            )
+    for name in ("semantic_kind", "mode", "event_action"):
+        source = {
+            "semantic_kind": contract["semantic_kinds"],
+            "mode": contract["modes"],
+            "event_action": contract["event_actions"],
+        }[name]
+        rows.append(
+            {
+                "path": ["business_choice", name],
+                "name": name,
+                "shape": "scalar",
+                "required": name in {"semantic_kind", "mode"},
+                "value_ownership": "stable_business_declaration",
+                "transport_ownership": "gateway_derivation",
+                "schema_sha256": canonical_sha256(source),
+            }
+        )
+    return rows
+
+
+def _operation_model_values(
+    name: str,
+    spec: Any,
+    version: str,
+    policy: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    if name == "audio.import":
+        return _audio_import_model_values(version)
+    contract = spec.as_dict(version=version)["argument_contract"]
+    properties = contract.get("properties")
+    if not isinstance(properties, Mapping):
+        return []
+    required_names = set(contract.get("required", []))
+    rows: list[dict[str, Any]] = []
+    for argument, schema in sorted(properties.items()):
+        if isinstance(schema, Mapping):
+            rows.extend(
+                _walk_operation_schema(
+                    schema,
+                    path=("arguments", argument),
+                    name=argument,
+                    required=argument in required_names,
+                    uri=spec.uri,
+                    policy=policy,
+                )
+            )
+    return rows
+
+
+def _mechanic_states(
+    policy: Mapping[str, Any], leaked: list[str]
+) -> dict[str, str]:
+    leaked_set = set(leaked)
+    return {
+        mechanic: (
+            "model_owned_leak" if mechanic in leaked_set else "gateway_owned"
+        )
+        for mechanic in policy["mechanic_owners"]
+    }
 
 
 def build_interface_depth_inventory() -> dict[str, Any]:
@@ -259,6 +505,7 @@ def build_interface_depth_inventory() -> dict[str, Any]:
         assignment = _native_assignment(
             policy, lane, dedicated_uris=dedicated_uris
         )
+        leaked_mechanics = list(assignment["leaked_mechanics"])
         native_rows.append(
             {
                 "version": lane["version"],
@@ -272,7 +519,9 @@ def build_interface_depth_inventory() -> dict[str, Any]:
                 "classification": assignment["id"],
                 "disposition": assignment["disposition"],
                 "owner_issue": assignment["owner_issue"],
-                "leaked_mechanics": assignment["leaked_mechanics"],
+                "leaked_mechanics": leaked_mechanics,
+                "mechanic_states": _mechanic_states(policy, leaked_mechanics),
+                "audit_evidence": assignment.get("audit_evidence"),
                 "fields": _typed_field_rows(lane, policy),
                 "continuation_commands": lane["execution_policy"]["gateway_commands"],
             }
@@ -282,17 +531,15 @@ def build_interface_depth_inventory() -> dict[str, Any]:
     for name, spec in sorted(OPERATION_SPECS.items()):
         assignment = assignments[name]
         for version in spec.supported_versions:
-            arguments = [
-                {
-                    "name": argument,
-                    "required": argument in spec.required_arguments,
-                    "value_ownership": _operation_argument_ownership(
-                        name, argument, policy
-                    ),
-                    "transport_ownership": "gateway_derivation",
-                }
-                for argument in (*spec.required_arguments, *spec.optional_arguments)
-            ]
+            arguments = _operation_model_values(
+                name, spec, version, policy
+            )
+            leaked_mechanics = list(assignment["leaked_mechanics"])
+            public_contract = (
+                audio_import_business_contract(version)
+                if name == "audio.import"
+                else spec.as_dict(version=version)
+            )
             operation_rows.append(
                 {
                     "operation": name,
@@ -302,15 +549,19 @@ def build_interface_depth_inventory() -> dict[str, Any]:
                     "classification": assignment["id"],
                     "disposition": assignment["disposition"],
                     "owner_issue": assignment["owner_issue"],
-                    "leaked_mechanics": assignment["leaked_mechanics"],
+                    "leaked_mechanics": leaked_mechanics,
+                    "mechanic_states": _mechanic_states(
+                        policy, leaked_mechanics
+                    ),
+                    "audit_evidence": assignment.get("audit_evidence"),
                     "arguments": arguments,
-                    "contract_sha256": canonical_sha256(spec.as_dict(version=version)),
+                    "contract_sha256": canonical_sha256(public_contract),
                 }
             )
 
     field_contracts: dict[str, list[dict[str, Any]]] = {}
     for row in native_rows:
-        fields = [_encode_model_value(value) for value in row.pop("fields")]
+        fields = row.pop("fields")
         digest = canonical_sha256(fields)
         existing = field_contracts.setdefault(digest, fields)
         if existing != fields:
@@ -318,7 +569,7 @@ def build_interface_depth_inventory() -> dict[str, Any]:
         row["field_contract_sha256"] = digest
     argument_contracts: dict[str, list[dict[str, Any]]] = {}
     for row in operation_rows:
-        arguments = [_encode_model_value(value) for value in row.pop("arguments")]
+        arguments = row.pop("arguments")
         digest = canonical_sha256(arguments)
         existing = argument_contracts.setdefault(digest, arguments)
         if existing != arguments:
@@ -455,12 +706,33 @@ def render_interface_depth_inventory(inventory: Mapping[str, Any]) -> str:
             f"| [`{family['id']}`](https://github.com/zcyh147/waapi-skill/issues/{family['github_issue']}) | #{owner} | {family['row_count']} | "
             f"{', '.join(versions)} | {len(names)} | `{family['rows_sha256']}` |"
         )
+    reviewed_groups: dict[tuple[str, str, str], int] = Counter()
+    for row in (*inventory["native_lanes"], *inventory["operation_lanes"]):
+        if row["disposition"] == "migration_required":
+            continue
+        key = (
+            row["classification"],
+            row["disposition"],
+            row["audit_evidence"],
+        )
+        reviewed_groups[key] += 1
     lines.extend(
         [
             "",
             "## Already-deep and boundary evidence",
             "",
-            "Named operations classified `already_deep` already accept closed business selectors/scalars or exact user artifacts without a model-authored construction plan. `audio.import` is the proved business-declaration reference Adapter. Generic rows behind a dedicated operation are a prohibited bypass boundary; the internal `waapi.call` representation is not public. Pure fixed commands and zero-input native lanes have no model-authored native request structure.",
+            "| Classification | Disposition | Exact lanes | Audit evidence |",
+            "| --- | --- | ---: | --- |",
+        ]
+    )
+    for (classification, disposition, evidence), count in sorted(
+        reviewed_groups.items()
+    ):
+        lines.append(
+            f"| `{classification}` | `{disposition}` | {count} | {evidence} |"
+        )
+    lines.extend(
+        [
             "",
             "Generated tests seal the native surface digest, every operation/version contract, and every public continuation. A new lane, field, version delta, or continuation therefore fails until this review policy and generated inventory are intentionally updated.",
             "",

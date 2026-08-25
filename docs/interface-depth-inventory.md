@@ -6,7 +6,7 @@ This report is generated from the exact five-version public surface and the revi
 
 - Native function/Topic lanes: **824**
 - Named-operation lanes: **153**
-- Migration families: **15**
+- Migration families: **17**
 - Unowned migration rows: **0**
 
 Every exact row, version, schema digest, continuation command, field ownership, disposition, and owner is recorded in `interface-depth-inventory.json`.
@@ -37,16 +37,24 @@ Business scalar values remain visible. Native paths, metadata scope, property/re
 | [`generic-host-ui-debug-waapi`](https://github.com/zcyh147/waapi-skill/issues/90) | #57 | 17 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 6 | `defe5e45b8e2d225ff58c0d2903acf1c7cca078770799783054180a63b8afdc2` |
 | [`generic-soundengine-runtime`](https://github.com/zcyh147/waapi-skill/issues/88) | #57 | 124 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 26 | `5075fdcc32810059d6a3fee10499ff6823eea0be4c300dfb717bede6697c6ced` |
 | [`generic-topics`](https://github.com/zcyh147/waapi-skill/issues/91) | #57 | 154 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 33 | `48f62fffb957f2ed581bee75cb11ddd6624411b77fc307813d1984b5ce015982` |
-| [`named-authoring-ui-registration`](https://github.com/zcyh147/waapi-skill/issues/81) | #56 | 10 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 2 | `7cd800c227390e0494e8e20ff1a96742599091a02f53e3fda9eb27ba4961e221` |
+| [`named-authoring-ui-registration`](https://github.com/zcyh147/waapi-skill/issues/81) | #56 | 20 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 4 | `1b3b5a4a221d4ace2fcb897c15fc3f0076aea91a7c363831c02c043ef1942b52` |
 | [`named-compound-undo`](https://github.com/zcyh147/waapi-skill/issues/83) | #56 | 5 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 1 | `a2d96ad477515f9533aff9f9dc5950b2f043100faf32cdf5d77b3abb1b3a4e85` |
-| [`named-dangerous-debug-controls`](https://github.com/zcyh147/waapi-skill/issues/82) | #56 | 13 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 3 | `ddd48cfeb2bdc04bbdaa438d9605640b583fb4ddde5956847736b7e7abb6dfb0` |
+| [`named-dangerous-debug-controls`](https://github.com/zcyh147/waapi-skill/issues/82) | #56 | 23 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 5 | `cf601f60fc5cddb76dd2468d16730b2929fed354bbadfee899a071f36c0777c8` |
 | [`named-exact-artifact-code`](https://github.com/zcyh147/waapi-skill/issues/80) | #56 | 12 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 4 | `bc7b0e8add73f09f4eec32a7bc31e2ceb3ff04ca04673f77874ae91bfb8f33f1` |
 | [`named-object-creation-graph`](https://github.com/zcyh147/waapi-skill/issues/78) | #56 | 17 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 4 | `a1eef3587d862bfd6a34a26da9c8856e0366354995186a3792eed7148fb12622` |
+| [`named-object-lifecycle`](https://github.com/zcyh147/waapi-skill/issues/92) | #56 | 25 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 5 | `52c47092182513819e3cb0a46128079ed3ac071a4302d357eacfb8e9b540d016` |
 | [`named-object-metadata-fields`](https://github.com/zcyh147/waapi-skill/issues/77) | #56 | 13 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 3 | `d9ac4123421b0686fd97518ac1ee7aae487266869f7f03a7c6146c2421e7aebd` |
-| [`named-soundbank-planning`](https://github.com/zcyh147/waapi-skill/issues/79) | #56 | 14 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 3 | `353e5de69a0a831633bffcf74794f10ddca298177df144e2c693bff2411bc750` |
+| [`named-soundbank-planning`](https://github.com/zcyh147/waapi-skill/issues/79) | #56 | 18 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 4 | `c2e8f35304ea5f9cd60a34bd066c5eca3469dafcd0db39d75640fd95ccd72abc` |
+| [`named-switch-assignments`](https://github.com/zcyh147/waapi-skill/issues/93) | #56 | 10 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 2 | `533beb07dfc66c994fe2a25b68f786b522fdce299b37c6c67d9a66c2683ddd23` |
 
 ## Already-deep and boundary evidence
 
-Named operations classified `already_deep` already accept closed business selectors/scalars or exact user artifacts without a model-authored construction plan. `audio.import` is the proved business-declaration reference Adapter. Generic rows behind a dedicated operation are a prohibited bypass boundary; the internal `waapi.call` representation is not public. Pure fixed commands and zero-input native lanes have no model-authored native request structure.
+| Classification | Disposition | Exact lanes | Audit evidence |
+| --- | --- | ---: | --- |
+| `generic-dedicated-route-boundary` | `prohibited_boundary` | 139 | request-schema rejects these exact URI lanes before construction and directs callers to the Registry-selected dedicated operation, preventing a weaker generic bypass. |
+| `generic-fixed-command-audited-deep` | `already_deep` | 49 | The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior. |
+| `generic-zero-input-audited-deep` | `already_deep` | 63 | The reflected request accepts no model-authored values; the Gateway owns the complete zero-input envelope, authorization/effect policy, dispatch, result bound, and any project guard. |
+| `named-audio-import-audited-deep` | `already_deep` | 5 | The public audio-import-business/v1 contract exposes semantic kinds and stable declaration values, binds objects and fields live, derives native paths/types/order/batches/continuation, preserves media artifacts exactly, and has complete #54 five-version Program plus macOS/Windows Fresh and real-host evidence. |
+| `named-internal-canonical-boundary` | `prohibited_boundary` | 5 | waapi.call is an internal canonical transaction representation, absent from normal operation discovery, and cannot accept a model-authored native request document. |
 
 Generated tests seal the native surface digest, every operation/version contract, and every public continuation. A new lane, field, version delta, or continuation therefore fails until this review policy and generated inventory are intentionally updated.
