@@ -1059,6 +1059,150 @@ OBJECT_METADATA_BUSINESS_OPERATIONS = frozenset(
     }
 )
 
+OBJECT_GRAPH_BUSINESS_OPERATIONS = frozenset({"object.create"})
+
+
+def build_object_graph_business_transaction_steps(
+    request: Mapping[str, Any],
+    *,
+    label: str,
+    parent_selector: Mapping[str, Any] | None = None,
+) -> tuple[ExpectedGatewayStep, ...]:
+    """Translate one named Weather-style graph into Business Draft steps."""
+
+    normalized = _validate_operation_request(request)
+    if normalized["operation"] not in OBJECT_GRAPH_BUSINESS_OPERATIONS:
+        raise V3ProtocolError(
+            "object graph business builder requires object.create"
+        )
+    if not isinstance(label, str) or not re.fullmatch(r"tx[0-9]{2}", label):
+        raise V3ProtocolError("business transaction label must be txNN")
+    try:
+        parsed = parse_operation_request(normalized)
+    except OperationContractError as exc:
+        raise V3ProtocolError(
+            f"object graph business request is invalid: {exc}"
+        ) from exc
+    arguments = parsed.arguments
+    if (
+        arguments.get("type") != "ActorMixer"
+        or not isinstance(arguments.get("name"), str)
+        or set(arguments) != {"parent", "type", "name", "children"}
+    ):
+        raise V3ProtocolError(
+            "object graph business profile requires one named ActorMixer root"
+        )
+    children = arguments.get("children")
+    if not isinstance(children, list) or not children:
+        raise V3ProtocolError(
+            "object graph business profile requires named Sound children"
+        )
+
+    draft = _BusinessDraftSteps.start(operation="object.create", label=label)
+    steps = draft.steps
+    selector = arguments.get("parent") if parent_selector is None else parent_selector
+    parent_handle = draft.bind_object(
+        selector,
+        step_name=f"{label}.bind-parent",
+        error_subject="object graph business parent",
+    )
+    root_name = f"{label}.declare-root"
+    steps.append(
+        ExpectedGatewayStep(
+            name=root_name,
+            subcommand="draft-declare-new",
+            arguments=(
+                *draft.prefix(),
+                "--declaration-id",
+                "weather",
+                "--parent-handle",
+                parent_handle,
+                "--name",
+                str(arguments["name"]),
+                "--kind",
+                "actor-mixer",
+            ),
+        )
+    )
+    draft.advance(root_name)
+    root_handle = ResponseBinding(root_name, "/draft/declarations/0/result_handle")
+
+    for index, child in enumerate(children, start=1):
+        if not isinstance(child, Mapping) or set(child) != {
+            "type",
+            "name",
+            "properties",
+        }:
+            raise V3ProtocolError(
+                "object graph business child shape is not closed"
+            )
+        properties = child.get("properties")
+        if child.get("type") != "Sound" or not isinstance(properties, list):
+            raise V3ProtocolError(
+                "object graph business profile requires Sound SFX children"
+            )
+        property_map = {
+            row.get("name"): row.get("value")
+            for row in properties
+            if isinstance(row, Mapping) and set(row) == {"name", "value"}
+        }
+        if (
+            len(property_map) != len(properties)
+            or property_map.get("IsLoopingEnabled") is not True
+            or property_map.get("IsLoopingInfinite") is not True
+            or isinstance(property_map.get("Volume"), bool)
+            or not isinstance(property_map.get("Volume"), (int, float))
+            or set(property_map)
+            != {"IsLoopingEnabled", "IsLoopingInfinite", "Volume"}
+        ):
+            raise V3ProtocolError(
+                "object graph business Sound requires Infinite loop and volume_db"
+            )
+        step_name = f"{label}.declare-sound-{index:02d}"
+        steps.append(
+            ExpectedGatewayStep(
+                name=step_name,
+                subcommand="draft-declare-new",
+                arguments=(
+                    *draft.prefix(),
+                    "--declaration-id",
+                    f"sound-{index:02d}",
+                    "--parent-handle",
+                    root_handle,
+                    "--name",
+                    str(child["name"]),
+                    "--kind",
+                    "sound-sfx",
+                    "--field",
+                    "loop",
+                    "infinite",
+                    "--field",
+                    "volume_db",
+                    json.dumps(property_map["Volume"], allow_nan=False),
+                ),
+            )
+        )
+        draft.advance(step_name)
+
+    check_name = f"{label}.check"
+    steps.append(
+        ExpectedGatewayStep(
+            name=check_name,
+            subcommand="draft-check",
+            arguments=draft.prefix(),
+        )
+    )
+    draft.advance(check_name)
+    steps.append(
+        ExpectedGatewayStep(
+            name=f"{label}.preview",
+            subcommand="preview-from-draft",
+            arguments=draft.prefix(),
+            expected_operation_request=normalized,
+        )
+    )
+    return tuple(steps)
+
 
 def build_object_lifecycle_business_transaction_steps(
     request: Mapping[str, Any],
@@ -3473,6 +3617,7 @@ __all__ = [
     "OBJECT_LIFECYCLE_BUSINESS_OPERATIONS",
     "build_object_lifecycle_business_transaction_steps",
     "build_object_metadata_business_transaction_steps",
+    "build_object_graph_business_transaction_steps",
     "build_object_set_composer_transaction_steps",
     "build_modification_policy_protocol",
     "build_metadata_transaction_protocol",

@@ -387,6 +387,9 @@ BUSINESS_AGENT_OUTCOME_CONTRACTS = {
     matrix.OBJECT_METADATA_BUSINESS_PROFILE_ID: (
         "waapi-skill.object-metadata-business-agent-outcome/v1"
     ),
+    matrix.OBJECT_GRAPH_BUSINESS_PROFILE_ID: (
+        "waapi-skill.object-graph-business-agent-outcome/v1"
+    ),
 }
 HEAVY_V3_PROJECT_LIFECYCLE_CONTRACT = (
     "waapi-skill.codex-semantic-scenario-lifecycle/v3"
@@ -3296,6 +3299,24 @@ def _validate_bound_business_agent_protocol(
                 "value": str(expected_unit.target["path"]),
             },
             discover_before_target=True,
+        )
+        preview_request = request
+    elif profile == matrix.OBJECT_GRAPH_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_eval_protocol_v3 import (
+            build_object_graph_business_transaction_steps,
+        )
+        from tests.semantic.support.codex_object_graph_business_agent_runner import (
+            object_graph_business_request,
+        )
+
+        request = object_graph_business_request(expected_unit)
+        steps = build_object_graph_business_transaction_steps(
+            request,
+            label="tx01",
+            parent_selector={
+                "kind": "path",
+                "value": str(expected_unit.parent["path"]),
+            },
         )
         preview_request = request
     else:

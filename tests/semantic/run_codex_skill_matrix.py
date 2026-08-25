@@ -151,6 +151,14 @@ DEFAULT_OBJECT_METADATA_BUSINESS_SUITE = (
     / "object-metadata-business"
     / "profile.json"
 )
+DEFAULT_OBJECT_GRAPH_BUSINESS_SUITE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "object-graph-business"
+    / "profile.json"
+)
 DEFAULT_DEEP_INTERFACE_MVP_SKILL = (
     REPO_ROOT / "tests" / "semantic" / "data" / "deep-interface-mvp" / "skill"
 )
@@ -199,6 +207,9 @@ DEFAULT_OBJECT_LIFECYCLE_BUSINESS_ITERATION_ROOT = (
 )
 DEFAULT_OBJECT_METADATA_BUSINESS_ITERATION_ROOT = (
     SKILL_ROOT.parent / "waapi-skill-workspace" / "object-metadata-business-1"
+)
+DEFAULT_OBJECT_GRAPH_BUSINESS_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "object-graph-business-1"
 )
 DEFAULT_INTEGRATION_WORKFLOWS_V1_ITERATION_ROOT = (
     SKILL_ROOT.parent
@@ -250,6 +261,7 @@ DEEP_INTERFACE_MVP_PROFILE_ID = "deep_interface_mvp_8"
 AUDIO_IMPORT_BUSINESS_PROFILE_ID = "audio_import_business_8"
 OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID = "object_lifecycle_business_3"
 OBJECT_METADATA_BUSINESS_PROFILE_ID = "object_metadata_business_1"
+OBJECT_GRAPH_BUSINESS_PROFILE_ID = "object_graph_business_1"
 INTEGRATION_WORKFLOWS_V1_PROFILE_ID = "integration_workflows_cross_version_6"
 INTEGRATION_WORKFLOWS_V2_PROFILE_ID = "integration_workflows_v2_cross_version_6"
 INTEGRATION_PROFILE_ID = "integration"
@@ -310,6 +322,21 @@ OFFLINE_BUSINESS_AGENT_PROFILES = {
         options_name="ObjectMetadataBusinessAgentOptions",
         run_name="run_object_metadata_business_agent_unit",
     ),
+    OBJECT_GRAPH_BUSINESS_PROFILE_ID: OfflineBusinessAgentProfileDescriptor(
+        suite_path=DEFAULT_OBJECT_GRAPH_BUSINESS_SUITE,
+        iteration_root=DEFAULT_OBJECT_GRAPH_BUSINESS_ITERATION_ROOT,
+        supported_versions=frozenset({"2022.1"}),
+        preflight_contract="waapi-skill.object-graph-business-preflight/v1",
+        profile_module=(
+            "tests.semantic.support.codex_object_graph_business_profile"
+        ),
+        loader_name="load_object_graph_business_profile",
+        runner_module=(
+            "tests.semantic.support.codex_object_graph_business_agent_runner"
+        ),
+        options_name="ObjectGraphBusinessAgentOptions",
+        run_name="run_object_graph_business_agent_unit",
+    ),
 }
 SEMANTIC_BOOTSTRAP_PROFILE_IDS = frozenset(
     {TYPED_INPUT_PROFILE_ID, INTEGRATION_PROFILE_ID}
@@ -327,6 +354,7 @@ EXECUTABLE_V3_PROFILE_IDS = frozenset(
         AUDIO_IMPORT_BUSINESS_PROFILE_ID,
         OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID,
         OBJECT_METADATA_BUSINESS_PROFILE_ID,
+        OBJECT_GRAPH_BUSINESS_PROFILE_ID,
         INTEGRATION_WORKFLOWS_V1_PROFILE_ID,
         INTEGRATION_WORKFLOWS_V2_PROFILE_ID,
         INTEGRATION_PROFILE_ID,

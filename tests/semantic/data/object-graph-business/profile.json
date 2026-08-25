@@ -1,0 +1,31 @@
+{
+  "contract": "waapi-skill.object-graph-business-profile/v1",
+  "profile_id": "object_graph_business_1",
+  "model": {
+    "name": "gpt-5.6-terra",
+    "reasoning_effort": "medium",
+    "service_tier": "default",
+    "memory": "disabled"
+  },
+  "units": [
+    {
+      "unit_id": "OGB22-WEATHER-GRAPH",
+      "operation": "object.create",
+      "api": "ak.wwise.core.object.create",
+      "version": "2022.1",
+      "prompt": "请在 Wwise 的 {parent_path} 下创建一个 Weather Actor Mixer；在里面放 Rain 和 Wind 两个 SFX 声音，都无限循环，音量分别设为 -4 dB 和 -6 dB。先只给我变更预览，不要执行。",
+      "parent": {
+        "id": "{11111111-1111-1111-1111-111111111111}",
+        "name": "Default Work Unit",
+        "type": "WorkUnit",
+        "path": "\\Actor-Mixer Hierarchy\\Default Work Unit"
+      },
+      "root_name": "Weather",
+      "sounds": [
+        {"name": "Rain", "loop": "infinite", "volume_db": -4},
+        {"name": "Wind", "loop": "infinite", "volume_db": -6}
+      ],
+      "final_markers": ["Weather", "Rain", "Wind", "-4", "-6"]
+    }
+  ]
+}
