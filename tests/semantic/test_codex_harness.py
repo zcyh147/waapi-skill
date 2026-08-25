@@ -1037,6 +1037,53 @@ def gateway_command(skill: Path, arguments: str) -> str:
     )
 
 
+@pytest.mark.parametrize(
+    "subcommand",
+    (
+        "draft-add-media",
+        "draft-bind-field",
+        "draft-bind-object",
+        "draft-business-configure",
+        "draft-clear-object-list",
+        "draft-declare-existing",
+        "draft-declare-field-change",
+        "draft-declare-new",
+        "draft-declare-object-change",
+        "draft-declare-rtpc",
+        "draft-declare-switch-assignment",
+        "draft-discover-fields",
+        "draft-discover-types",
+        "draft-remove-declaration",
+        "draft-revise-declaration",
+    ),
+)
+def test_business_draft_gateway_subcommands_are_classified(
+    tmp_path: Path,
+    subcommand: str,
+) -> None:
+    skill = tmp_path / "waapi-skill"
+    (skill / "scripts").mkdir(parents=True)
+    (skill / "scripts" / "run.py").write_text("# runner\n", encoding="utf-8")
+    command = gateway_command(skill, f"{subcommand} placeholder")
+    record = completed_record(
+        command,
+        {
+            "contract": "waapi-skill.gateway-result/v1",
+            "command": subcommand,
+            "ok": True,
+        },
+    )
+
+    facts = classify_commands(
+        (record,),
+        skill_source=skill,
+        expected_gateway_subcommands=(subcommand,),
+    )
+
+    assert facts.gateway_subcommands == (subcommand,)
+    assert facts.unexpected_commands == ()
+
+
 def recorded_argv_command(*argv: str) -> str:
     """Render synthetic Codex argv with its platform-neutral JSONL grammar."""
 
