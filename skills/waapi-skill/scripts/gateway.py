@@ -350,6 +350,7 @@ OFFLINE_COMMANDS = frozenset(
         "draft-apply",
         "draft-add-media",
         "draft-business-configure",
+        "draft-clear-object-list",
         "draft-declare-field-change",
         "draft-declare-object-change",
         "draft-declare-rtpc",
@@ -1978,6 +1979,18 @@ def build_parser() -> argparse.ArgumentParser:
     draft_add_media.add_argument("--kind")
     draft_add_media.add_argument("--language")
     draft_add_media.add_argument("--originals-subfolder")
+
+    draft_clear_object_list = subparsers.add_parser(
+        "draft-clear-object-list",
+        help=(
+            "Declare one exact Wwise object-list clear through a bound owner "
+            "without accepting an empty native list row"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_clear_object_list)
+    draft_clear_object_list.add_argument("--declaration-id", required=True)
+    draft_clear_object_list.add_argument("--object-handle", required=True)
+    draft_clear_object_list.add_argument("--list-name", required=True)
 
     draft_revise_declaration = subparsers.add_parser(
         "draft-revise-declaration",
@@ -7038,6 +7051,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
     if args.command in {
         "draft-add-media",
         "draft-business-configure",
+        "draft-clear-object-list",
         "draft-declare-field-change",
         "draft-declare-object-change",
         "draft-declare-rtpc",
@@ -10535,6 +10549,58 @@ def dispatch_offline_business_draft_update(
             return candidate
 
         event_type = "declaration.revised"
+    elif args.command == "draft-clear-object-list":
+        existing = [
+            row
+            for row in session.declarations
+            if row.declaration_id == args.declaration_id
+        ]
+        if len(existing) > 1:  # pragma: no cover - session invariant
+            raise RuntimeError("business declaration id is not unique")
+
+        def update(
+            current: BusinessDeclarationSession,
+        ) -> BusinessDeclarationSession:
+            matches = [
+                row
+                for row in current.declarations
+                if row.declaration_id == args.declaration_id
+            ]
+            if not matches:
+                candidate = current.with_existing_declaration(
+                    declaration_id=args.declaration_id,
+                    target=ExistingObjectTarget(args.object_handle),
+                    fields={
+                        "clear_object_lists": [args.list_name],
+                        "list_behavior": "replace-all",
+                    },
+                )
+            else:
+                row = matches[0]
+                if (
+                    not isinstance(row.target, ExistingObjectTarget)
+                    or row.target.object_handle != args.object_handle
+                ):
+                    raise business_repair(
+                        "DECLARATION_TARGET_MISMATCH",
+                        field="object_handle",
+                        draft_revision=current.revision,
+                        action="reuse this declaration id only for its exact bound owner",
+                    )
+                fields = dict(row.fields)
+                raw_names = fields.get("clear_object_lists", [])
+                if not isinstance(raw_names, list):  # pragma: no cover
+                    raise RuntimeError("clear_object_lists state must be a list")
+                fields["clear_object_lists"] = [*raw_names, args.list_name]
+                fields["list_behavior"] = "replace-all"
+                candidate = current.revise_declaration(
+                    declaration_id=args.declaration_id,
+                    fields=fields,
+                )
+            adapter.materialize(candidate)
+            return candidate
+
+        event_type = "declaration.revised" if existing else "declaration.added"
     elif args.command == "draft-declare-field-change":
         bound_field = session.handles.bound_field(args.field_handle)
         fields: dict[str, Any] = {"field_handle": args.field_handle}
@@ -15849,6 +15915,11 @@ def _business_next_action_binding(
     declare_new_prefix = [*base, "draft-declare-new", *binding]
     declare_existing_prefix = [*base, "draft-declare-existing", *binding]
     add_media_prefix = [*base, "draft-add-media", *binding]
+    clear_object_list_prefix = [
+        *base,
+        "draft-clear-object-list",
+        *binding,
+    ]
     declare_object_change_prefix = [
         *base,
         "draft-declare-object-change",
@@ -16106,6 +16177,23 @@ def _business_next_action_binding(
                         "[--name-conflict fail|rename|merge]",
                         "[--add-to-source-control|--no-add-to-source-control]",
                     ],
+                },
+                "clear_object_list": {
+                    **operation_draft_prefix_copy_binding(
+                        clear_object_list_prefix
+                    ),
+                    "append": [
+                        "--declaration-id",
+                        "<task-local-existing-target-id>",
+                        "--object-handle",
+                        "<bound-existing-target-handle>",
+                        "--list-name",
+                        "<exact-user-owned-wwise-object-list-name>",
+                    ],
+                    "list_name_input": (
+                        "exact_user_owned_wwise_object_list_name_without_at_prefix"
+                    ),
+                    "effect": "replace_all_with_empty_list",
                 },
                 **(
                     {

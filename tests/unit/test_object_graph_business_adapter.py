@@ -34,8 +34,14 @@ def _session(version: str = "2022.1") -> tuple[BusinessDeclarationSession, str]:
     return session, parent.handle
 
 
-def test_object_create_compiles_named_hierarchy_without_native_types_or_paths() -> None:
-    session, parent_handle = _session()
+@pytest.mark.parametrize(
+    "version",
+    ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
+)
+def test_object_create_compiles_named_hierarchy_without_native_types_or_paths(
+    version: str,
+) -> None:
+    session, parent_handle = _session(version)
     session = session.with_new_declaration(
         declaration_id="weather",
         target=NewDescendantTarget(
@@ -60,7 +66,7 @@ def test_object_create_compiles_named_hierarchy_without_native_types_or_paths() 
 
     assert request == {
         "contract": "waapi-skill.operation-request/v1",
-        "version": "2022.1",
+        "version": version,
         "operation": "object.create",
         "arguments": {
             "parent": {"kind": "id", "value": PARENT_ID},
@@ -718,6 +724,88 @@ def test_object_set_subordinate_media_is_version_repaired_before_native_parse() 
 
     assert captured.value.error_code == "OBJECT_SET_IMPORT_UNAVAILABLE"
     assert captured.value.repair["choices"] == ["2023.1", "2024.1", "2025.1"]
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+def test_object_set_compiles_named_object_list_with_per_target_replace(
+    version: str,
+) -> None:
+    session, parent_handle = _session(version)
+    session = session.with_new_declaration(
+        declaration_id="custom-list-member",
+        target=NewDescendantTarget(
+            parent_handle=parent_handle,
+            name="Rain Layer",
+            kind="sound-sfx",
+        ),
+        fields={
+            "list_behavior": "replace-all",
+            "object_list": "CustomList",
+            "volume_db": -4,
+        },
+    )
+
+    request = business_adapter("object.set").materialize(session)
+
+    assert request["arguments"] == {
+        "objects": [
+            {
+                "object": {"kind": "id", "value": PARENT_ID},
+                "list_mode": "replaceAll",
+                "lists": [
+                    {
+                        "name": "CustomList",
+                        "objects": [
+                            {
+                                "type": "Sound",
+                                "name": "Rain Layer",
+                                "properties": [{"name": "Volume", "value": -4.0}],
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+
+
+def test_object_set_compiles_explicit_empty_list_clear() -> None:
+    session, parent_handle = _session("2025.1")
+    session = session.with_existing_declaration(
+        declaration_id="clear-custom-list",
+        target=ExistingObjectTarget(parent_handle),
+        fields={
+            "clear_object_lists": ["CustomList"],
+            "list_behavior": "replace-all",
+        },
+    )
+
+    request = business_adapter("object.set").materialize(session)
+
+    assert request["arguments"]["objects"] == [
+        {
+            "object": {"kind": "id", "value": PARENT_ID},
+            "list_mode": "replaceAll",
+            "lists": [{"name": "CustomList", "objects": []}],
+        }
+    ]
+
+
+def test_object_set_rejects_empty_list_clear_without_replace_all() -> None:
+    session, parent_handle = _session("2025.1")
+    session = session.with_existing_declaration(
+        declaration_id="invalid-clear",
+        target=ExistingObjectTarget(parent_handle),
+        fields={
+            "clear_object_lists": ["CustomList"],
+            "list_behavior": "append",
+        },
+    )
+
+    with pytest.raises(BusinessDeclarationError) as captured:
+        business_adapter("object.set").materialize(session)
+
+    assert captured.value.error_code == "OBJECT_SET_EMPTY_LIST_REQUIRES_REPLACE"
 
 
 def test_object_create_rejects_voice_outcome_that_native_route_cannot_express() -> None:

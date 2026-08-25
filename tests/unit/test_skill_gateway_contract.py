@@ -255,18 +255,18 @@ def test_metadata_order_follows_the_disclosed_input_mode() -> None:
     )
 
     assert "never exact live metadata evidence" in operate
-    assert "`composer.start.preconditions` contains `metadata_gate`" in operate
-    assert "covering every requested dynamic token before `draft-start`" in operate
-    assert "For `business_declaration`, start the Draft first" in operate
-    assert "use its live binding command instead" in operate
-    assert "binds a custom token through the business Draft's live `draft-bind-field`" in operate
+    assert "remaining Composer lane's returned start preconditions" in operate
+    assert "For every `business_declaration` lane, start the Draft first" in operate
+    assert "returned live binding or discovery command" in operate
+    assert "For `object.create`, `object.set`, and direct `audio.import`" in operate
+    assert "opaque handle are the only value authority" in operate
     assert "For `object.setProperty`, `object.setReference`, and `object.setLinked`" in operate
     assert "read the schema, start, bind the target, then run returned `draft-discover-fields`" in operate
     assert "Copy one handle; never a token, scope, or type" in operate
     assert "No match stops; ambiguity needs one behavior question" in operate
     assert "common fields such as volume, infinite looping, output bus" in operate
-    assert "reconcile the union against every requested property/reference" in operate
-    assert "an assigned `Volume` and `OutputBus` each require a query" in operate
+    assert "Bind the exact existing owner or the disclosed new-object type first" in operate
+    assert "Submit only business values against those handles" in operate
 
 
 def test_normal_change_prose_stays_business_facing() -> None:

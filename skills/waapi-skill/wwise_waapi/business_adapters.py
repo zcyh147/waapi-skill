@@ -327,6 +327,7 @@ _OBJECT_SET_BUSINESS_DEFINITION = {
         {
             "draft-add-media",
             "draft-business-configure",
+            "draft-clear-object-list",
             "draft-declare-existing",
             "draft-declare-new",
             "draft-remove-declaration",
@@ -337,6 +338,7 @@ _OBJECT_SET_BUSINESS_DEFINITION = {
     "active_projection_actions": (
         "add-media",
         "bind-object",
+        "clear-object-list",
         "discover-fields",
         "discover-types",
         "declare-existing",

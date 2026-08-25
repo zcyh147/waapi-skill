@@ -780,3 +780,182 @@ def test_gateway_adds_subordinate_media_without_model_authored_json(
             }
         ]
     }
+
+
+def test_gateway_declares_named_object_list_without_native_row_json(
+    tmp_path: Path,
+) -> None:
+    start_code, started = _offline(tmp_path, "draft-start", "object.set")
+    assert start_code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    client = _live_client(
+        tmp_path,
+        {
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": PARENT_ID,
+                            "name": "Default Work Unit",
+                            "type": "WorkUnit",
+                            "path": r"\Actor-Mixer Hierarchy\Default Work Unit",
+                        }
+                    ]
+                }
+            ]
+        },
+    )
+    bind_code, bound = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-bind-object",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "1",
+            "--object-id",
+            PARENT_ID,
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+    assert bind_code == 0, bound
+
+    declare_code, declared = _offline(
+        tmp_path,
+        "draft-declare-new",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "2",
+        "--declaration-id",
+        "custom-list-member",
+        "--parent-handle",
+        bound["bound_object"]["handle"],
+        "--name",
+        "Rain Layer",
+        "--kind",
+        "sound-sfx",
+        "--field",
+        "object_list",
+        "CustomList",
+        "--field",
+        "list_behavior",
+        "replace-all",
+    )
+    assert declare_code == 0, declared
+    assert (
+        declared["draft"]["next_action_binding"]["clear_object_list"][
+            "list_name_input"
+        ]
+        == "exact_user_owned_wwise_object_list_name_without_at_prefix"
+    )
+
+    materialized = OperationDraftStore(tmp_path / "state").materialize_request(
+        draft_id,
+        task_authority=authority,
+        expected_revision=3,
+        schema_digest=gateway.operation_draft_schema_digest(
+            "object.set",
+            "2025.1",
+        ),
+        composer_digest=operation_composer_digest(
+            "object.set",
+            "2025.1",
+        ),
+    )
+    assert materialized.request["arguments"]["objects"][0]["lists"] == [
+        {
+            "name": "CustomList",
+            "objects": [{"type": "Sound", "name": "Rain Layer"}],
+        }
+    ]
+    assert (
+        materialized.request["arguments"]["objects"][0]["list_mode"]
+        == "replaceAll"
+    )
+
+
+def test_gateway_clears_named_object_list_without_empty_native_dsl(
+    tmp_path: Path,
+) -> None:
+    start_code, started = _offline(tmp_path, "draft-start", "object.set")
+    assert start_code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    client = _live_client(
+        tmp_path,
+        {
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": PARENT_ID,
+                            "name": "Default Work Unit",
+                            "type": "WorkUnit",
+                            "path": r"\Actor-Mixer Hierarchy\Default Work Unit",
+                        }
+                    ]
+                }
+            ]
+        },
+    )
+    bind_code, bound = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-bind-object",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "1",
+            "--object-id",
+            PARENT_ID,
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+    assert bind_code == 0, bound
+
+    clear_code, cleared = _offline(
+        tmp_path,
+        "draft-clear-object-list",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "2",
+        "--declaration-id",
+        "clear-custom-list",
+        "--object-handle",
+        bound["bound_object"]["handle"],
+        "--list-name",
+        "CustomList",
+    )
+
+    assert clear_code == 0, cleared
+    materialized = OperationDraftStore(tmp_path / "state").materialize_request(
+        draft_id,
+        task_authority=authority,
+        expected_revision=3,
+        schema_digest=gateway.operation_draft_schema_digest(
+            "object.set",
+            "2025.1",
+        ),
+        composer_digest=operation_composer_digest(
+            "object.set",
+            "2025.1",
+        ),
+    )
+    assert materialized.request["arguments"]["objects"] == [
+        {
+            "object": {"kind": "id", "value": PARENT_ID},
+            "list_mode": "replaceAll",
+            "lists": [{"name": "CustomList", "objects": []}],
+        }
+    ]

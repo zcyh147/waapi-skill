@@ -195,11 +195,13 @@ def object_graph_business_contract_data(
                 "optional_fields": [
                     "field_values",
                     "language",
+                    "list_behavior",
                     "loop",
                     "max_instances",
                     "media_files",
                     "new_name",
                     "notes",
+                    "object_list",
                     "output_bus",
                     "override_parent_instance_limit",
                     "platform",
@@ -208,9 +210,25 @@ def object_graph_business_contract_data(
                 "field_value_types": {
                     **OBJECT_CREATE_BUSINESS_VALUE_TYPES,
                     "language": "string",
+                    "list_behavior": "string",
                     "new_name": "string",
+                    "object_list": "string",
                     "platform": "string",
                 },
+            },
+            "object_list_declaration": {
+                "member_fields": {
+                    "object_list": "exact_user_owned_wwise_object_list_name",
+                    "list_behavior": ["append", "replace-all"],
+                },
+                "clear_subcommand": "draft-clear-object-list",
+                "clear_fields": [
+                    "declaration_id",
+                    "object_handle",
+                    "list_name",
+                ],
+                "native_at_prefix": "forbidden",
+                "empty_clear_requires": "replace-all",
             },
             "media_declaration": {
                 "subcommand": "draft-add-media",
@@ -237,6 +255,8 @@ def object_graph_business_contract_data(
                 "platform_views",
                 "dependency_order",
                 "batch_layout",
+                "object_list_rows",
+                "per_target_list_mode",
                 "native_request",
                 "preview_change_intent",
                 "continuation",

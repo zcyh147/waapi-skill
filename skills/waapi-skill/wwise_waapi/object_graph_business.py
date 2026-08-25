@@ -23,6 +23,7 @@ from .operation_object import (
     DEFAULT_MAX_FIELDS_PER_NODE,
     DEFAULT_MAX_NAME_LENGTH,
     DEFAULT_MAX_NODES,
+    normalize_object_list_name,
 )
 from .operation_plugin import (
     MAX_PLUGIN_NAME_LENGTH,
@@ -51,7 +52,15 @@ _CREATE_SETTINGS = frozenset(
         "replace_owner_handle",
     }
 )
-_SET_NODE_EXTENSION_FIELDS = frozenset({"language", "media_files", "platform"})
+_SET_NODE_EXTENSION_FIELDS = frozenset(
+    {
+        "language",
+        "list_behavior",
+        "media_files",
+        "object_list",
+        "platform",
+    }
+)
 _RTPC_FIELDS = frozenset(
     {
         "control_input_handle",
@@ -285,7 +294,7 @@ def _compile_object_set_import(
 def _compile_set_new_node(
     session: BusinessDeclarationSession,
     declaration: BusinessDeclaration,
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], str | None, str | None]:
     assert isinstance(declaration.target, NewDescendantTarget)
     fields = dict(declaration.fields)
     extension_fields = {
@@ -344,7 +353,57 @@ def _compile_set_new_node(
             session,
             extension_fields["media_files"],
         )
-    return node
+    object_list = extension_fields.get("object_list")
+    if object_list is not None:
+        try:
+            object_list = normalize_object_list_name(
+                object_list,
+                request_path="$.business.object_list",
+            )
+        except Exception as exc:
+            raise _repair(
+                session,
+                "OBJECT_SET_LIST_NAME_INVALID",
+                field="object_list",
+                action="provide one exact Wwise object-list name without an @ prefix",
+            ) from exc
+    list_behavior = extension_fields.get("list_behavior")
+    if list_behavior is not None and list_behavior not in {"append", "replace-all"}:
+        raise _repair(
+            session,
+            "FIELD_VALUE_UNAVAILABLE",
+            field="list_behavior",
+            choices=["append", "replace-all"],
+            action="choose one disclosed per-target object-list outcome",
+        )
+    if list_behavior is not None and object_list is None:
+        raise _repair(
+            session,
+            "OBJECT_SET_LIST_NAME_REQUIRED",
+            field="object_list",
+            action="name the exact object list governed by this per-target outcome",
+        )
+    return node, object_list, list_behavior
+
+
+def _apply_row_list_behavior(
+    session: BusinessDeclarationSession,
+    row: dict[str, Any],
+    behavior: str | None,
+) -> None:
+    if behavior is None:
+        return
+    native = "append" if behavior == "append" else "replaceAll"
+    existing = row.get("list_mode")
+    if existing is not None and existing != native:
+        raise _repair(
+            session,
+            "OBJECT_SET_LIST_BEHAVIOR_CONFLICT",
+            field="list_behavior",
+            choices=["append", "replace-all"],
+            action="use one per-target list behavior for every list on that object",
+        )
+    row["list_mode"] = native
 
 
 def _repair(
@@ -928,7 +987,14 @@ def _compile_existing_set_fields(
     assert isinstance(declaration.target, ExistingObjectTarget)
     source = session.handles.resolve_object(declaration.target.object_handle)
     fields = dict(declaration.fields)
-    allowed = {*_CREATE_FIELDS, "media_files", "new_name", "platform"}
+    allowed = {
+        *_CREATE_FIELDS,
+        "clear_object_lists",
+        "list_behavior",
+        "media_files",
+        "new_name",
+        "platform",
+    }
     unexpected = sorted(set(fields) - allowed)
     if unexpected:
         raise _repair(
@@ -940,7 +1006,15 @@ def _compile_existing_set_fields(
     stable_fields = {
         name: value
         for name, value in fields.items()
-        if name not in {"field_values", "media_files", "new_name", "platform"}
+        if name
+        not in {
+            "clear_object_lists",
+            "field_values",
+            "list_behavior",
+            "media_files",
+            "new_name",
+            "platform",
+        }
     }
     stable_declaration = BusinessDeclaration(
         declaration_id=declaration.declaration_id,
@@ -973,6 +1047,68 @@ def _compile_existing_set_fields(
         compiled["import"] = _compile_object_set_import(
             session,
             fields["media_files"],
+        )
+    list_behavior = fields.get("list_behavior")
+    if list_behavior is not None and list_behavior not in {"append", "replace-all"}:
+        raise _repair(
+            session,
+            "FIELD_VALUE_UNAVAILABLE",
+            field="list_behavior",
+            choices=["append", "replace-all"],
+            action="choose one disclosed per-target object-list outcome",
+        )
+    raw_clears = fields.get("clear_object_lists")
+    if raw_clears is not None:
+        if (
+            not isinstance(raw_clears, list)
+            or not 1 <= len(raw_clears) <= DEFAULT_MAX_CHILDREN_PER_NODE
+        ):
+            raise _repair(
+                session,
+                "OBJECT_SET_LIST_CLEAR_LIMIT_INVALID",
+                field="clear_object_lists",
+                valid_range={
+                    "minimum": 1,
+                    "maximum": DEFAULT_MAX_CHILDREN_PER_NODE,
+                },
+                action="provide one bounded non-empty exact object-list name set",
+            )
+        if list_behavior != "replace-all":
+            raise _repair(
+                session,
+                "OBJECT_SET_EMPTY_LIST_REQUIRES_REPLACE",
+                field="list_behavior",
+                action="choose replace-all before clearing an exact object list",
+            )
+        names: list[str] = []
+        for index, value in enumerate(raw_clears):
+            try:
+                name = normalize_object_list_name(
+                    value,
+                    request_path=f"$.business.clear_object_lists[{index}]",
+                )
+            except Exception as exc:
+                raise _repair(
+                    session,
+                    "OBJECT_SET_LIST_NAME_INVALID",
+                    field="clear_object_lists",
+                    action="provide exact Wwise object-list names without @ prefixes",
+                ) from exc
+            if name.casefold() in {item.casefold() for item in names}:
+                raise _repair(
+                    session,
+                    "OBJECT_SET_LIST_DUPLICATE",
+                    field="clear_object_lists",
+                    action="name each exact object list once",
+                )
+            names.append(name)
+        compiled["lists"] = [
+            {"name": name, "objects": []}
+            for name in names
+        ]
+    if list_behavior is not None:
+        compiled["list_mode"] = (
+            "append" if list_behavior == "append" else "replaceAll"
         )
     properties = list(compiled.pop("properties", []))
     references = list(compiled.pop("references", []))
@@ -1079,9 +1215,20 @@ def _materialize_set(
         else:
             root_new.append(row)
 
-    def compile_node(row: BusinessDeclaration) -> dict[str, Any]:
+    def compile_node(
+        row: BusinessDeclaration,
+        *,
+        allow_object_list: bool,
+    ) -> tuple[dict[str, Any], str | None, str | None]:
         assert isinstance(row.target, NewDescendantTarget)
-        node = _compile_set_new_node(session, row)
+        node, object_list, list_behavior = _compile_set_new_node(session, row)
+        if not allow_object_list and object_list is not None:
+            raise _repair(
+                session,
+                "OBJECT_SET_NESTED_LIST_UNAVAILABLE",
+                field="object_list",
+                action="put object-list roots directly under one bound existing owner",
+            )
         descendants = planned_children.get(row.result_handle, [])
         if descendants:
             for child in descendants:
@@ -1091,8 +1238,11 @@ def _materialize_set(
                     parent_type=node["type"],
                     child_type=_create_type(session, child.target.kind),
                 )
-            node["children"] = [compile_node(child) for child in descendants]
-        return node
+            node["children"] = [
+                compile_node(child, allow_object_list=False)[0]
+                for child in descendants
+            ]
+        return node, object_list, list_behavior
 
     rows: list[dict[str, Any]] = []
     rows_by_handle: dict[str, dict[str, Any]] = {}
@@ -1123,7 +1273,10 @@ def _materialize_set(
             row = {"object": {"kind": "id", "value": parent.object_id}}
             rows_by_handle[parent_handle] = row
             rows.append(row)
-        node = compile_node(declaration)
+        node, object_list, list_behavior = compile_node(
+            declaration,
+            allow_object_list=True,
+        )
         parent_token = "".join(
             character
             for character in parent.object_type.casefold()
@@ -1139,20 +1292,30 @@ def _materialize_set(
             parent_type=parent_token,
             child_type=child_token,
         )
-        if specialized is None:
+        if specialized is not None and object_list not in {None, specialized}:
+            raise _repair(
+                session,
+                "OBJECT_GRAPH_RELATIONSHIP_INVALID",
+                field="object_list",
+                choices=[specialized],
+                action="use the canonical Wwise Game Sync list for this value kind",
+            )
+        effective_list = object_list or specialized
+        if effective_list is None:
             row.setdefault("children", []).append(node)
         else:
+            _apply_row_list_behavior(session, row, list_behavior)
             lists = row.setdefault("lists", [])
             existing = next(
-                (item for item in lists if item["name"] == specialized),
+                (item for item in lists if item["name"] == effective_list),
                 None,
             )
             if existing is None:
-                existing = {"name": specialized, "objects": []}
+                existing = {"name": effective_list, "objects": []}
                 lists.append(existing)
             existing["objects"].append(node)
     for row in rows:
-        if set(row) == {"object"}:
+        if set(row) <= {"object", "list_mode"}:
             raise _repair(
                 session,
                 "BUSINESS_DECLARATION_INCOMPLETE",
