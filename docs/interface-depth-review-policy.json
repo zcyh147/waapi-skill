@@ -60,10 +60,11 @@
     },
     {
       "id": "named-object-lifecycle",
-      "disposition": "migration_required",
-      "owner_issue": 56,
+      "disposition": "already_deep",
+      "owner_issue": null,
       "operations": ["object.copy", "object.delete", "object.move", "object.setName", "object.setNotes"],
-      "leaked_mechanics": ["native_object_path", "wire_type", "request_fragment"]
+      "leaked_mechanics": [],
+      "audit_evidence": "The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence."
     },
     {
       "id": "named-object-metadata-fields",
@@ -212,15 +213,6 @@
     }
   ],
   "ticket_blueprints": {
-    "named-object-lifecycle": {
-      "title": "Migrate simple object lifecycle and scalar edits to the unified business compiler",
-      "parent_issue": 56,
-      "blocked_by_family": null,
-      "public_behavior": "Keep copy, delete, move, rename, and notes requests short: expose only closed object identities, parent identity where needed, conflict policy, and scalar outcomes; route every supported version through the production business-declaration compiler.",
-      "deterministic_tests": "Five-version business schemas, identity repair and stale cases, hostile names/notes, copy/move/delete verifier parity, generic non-bypass, and proof that no legacy inline_typed normal input remains.",
-      "removal_boundary": "Delete the old inline_typed entry for these operations after parity while preserving existing Preview, authorization, drift checks, execute-at-most-once, and readback.",
-      "proportional_evidence": "Representative copy, move, delete, rename, and notes mutations on 2022.1 and 2025.1 on both hosts; Fresh Agent only for changed identity closure or routing."
-    },
     "named-object-metadata-fields": {
       "title": "Compile named object property and reference edits from bound business fields",
       "parent_issue": 56,
@@ -376,7 +368,6 @@
     }
   },
   "ticket_issue_numbers": {
-    "named-object-lifecycle": 92,
     "named-object-metadata-fields": 77,
     "named-object-creation-graph": 78,
     "named-switch-assignments": 93,

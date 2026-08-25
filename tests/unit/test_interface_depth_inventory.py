@@ -320,7 +320,7 @@ def test_every_migration_row_has_exactly_one_rollup_and_ticket_family() -> None:
     assert {family["github_issue"] for family in inventory["ticket_families"]} == {
         *range(77, 94),
         96,
-    }
+    } - {92}
     assert all(
         row["owner_issue"] in {56, 57}
         for row in (*inventory["native_lanes"], *inventory["operation_lanes"])
@@ -332,12 +332,21 @@ def test_every_migration_row_has_exactly_one_rollup_and_ticket_family() -> None:
 def test_every_supported_named_operation_uses_or_migrates_to_the_business_path() -> None:
     inventory = _inventory()
     assert inventory["summary"]["operation_dispositions"] == {
-        "already_deep": 5,
-        "migration_required": 143,
+        "already_deep": 30,
+        "migration_required": 118,
         "prohibited_boundary": 5,
     }
     for row in inventory["operation_lanes"]:
         if row["operation"] == "audio.import":
+            assert row["disposition"] == "already_deep"
+            assert row["input_mode"] == "business_declaration"
+        elif row["operation"] in {
+            "object.copy",
+            "object.delete",
+            "object.move",
+            "object.setName",
+            "object.setNotes",
+        }:
             assert row["disposition"] == "already_deep"
             assert row["input_mode"] == "business_declaration"
         elif row["operation"] == "waapi.call":
