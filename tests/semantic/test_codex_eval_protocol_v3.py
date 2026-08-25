@@ -775,7 +775,8 @@ def test_object_lifecycle_protocol_uses_business_declarations(
     ]
     assert all(step.subcommand != "draft-apply" for step in steps)
     assert all("--request-json" not in step.arguments for step in steps)
-    assert any(step.name == "tx01.preview" for step in steps)
+    preview = next(step for step in steps if step.name == "tx01.preview")
+    assert preview.expected_operation_request == request
 
 
 def test_transaction_protocol_routes_object_lifecycle_around_generic_typed_facts() -> None:

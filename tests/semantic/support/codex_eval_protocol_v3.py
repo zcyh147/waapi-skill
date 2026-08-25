@@ -1179,6 +1179,7 @@ def build_object_lifecycle_business_transaction_steps(
             name=f"{label}.preview",
             subcommand="preview-from-draft",
             arguments=(*draft_prefix(), "--apply"),
+            expected_operation_request=normalized,
         )
     )
     return tuple(steps)

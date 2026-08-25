@@ -53,8 +53,9 @@ from wwise_waapi.operation_composer import (
 )
 from wwise_waapi.operation_drafts import OperationDraftStore
 from wwise_waapi.business_declaration_state import BusinessDeclarationSession
-from wwise_waapi.audio_import_business import (
-    materialize_audio_import_business_request,
+from wwise_waapi.business_adapters import (
+    business_adapter,
+    business_adapter_operations,
 )
 from wwise_waapi.operation_registry import (
     OperationContractError,
@@ -1701,11 +1702,12 @@ class ExpectedGatewayStep:
             if (
                 normalized_request.get("contract")
                 != "waapi-skill.operation-request/v1"
-                or normalized_request.get("operation") != "audio.import"
+                or normalized_request.get("operation")
+                not in business_adapter_operations()
             ):
                 raise ValueError(
                     "ExpectedGatewayStep operation request witness is limited to "
-                    "canonical audio.import requests"
+                    "canonical Business Adapter requests"
                 )
             object.__setattr__(
                 self,
@@ -11061,15 +11063,25 @@ class CodexGatewayBroker:
         preview_step: ExpectedGatewayStep,
     ) -> Mapping[str, Any]:
         if preview_step.expected_operation_request is not None:
+            expected_operation = preview_step.expected_operation_request.get(
+                "operation"
+            )
+            if not isinstance(expected_operation, str) or not expected_operation:
+                raise GatewayInvocationError(
+                    "Business request witness has no exact operation"
+                )
             preview_index = self._execution_steps.index(preview_step)
             prior_starts = tuple(
                 step
                 for step in self._execution_steps[:preview_index]
                 if step.subcommand == "draft-start"
             )
-            if not prior_starts or prior_starts[-1].arguments != ("audio.import",):
+            if (
+                not prior_starts
+                or prior_starts[-1].arguments != (expected_operation,)
+            ):
                 raise GatewayInvocationError(
-                    "Business request witness is missing its flow-local audio.import "
+                    "Business request witness is missing its exact flow-local "
                     "draft-start"
                 )
             if (self.skill_source / "wwise_waapi").is_dir():
@@ -11104,7 +11116,9 @@ class CodexGatewayBroker:
                         else None
                     )
                     session = BusinessDeclarationSession.from_dict(raw_session)
-                    replayed = materialize_audio_import_business_request(session)
+                    replayed = business_adapter(expected_operation).materialize(
+                        session
+                    )
                 except Exception as exc:
                     raise GatewayInvocationError(
                         "Business request cannot be replayed from the durable Draft"
