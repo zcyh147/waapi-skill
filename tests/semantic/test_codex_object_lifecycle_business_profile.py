@@ -89,6 +89,12 @@ def test_matrix_exposes_current_profile_through_the_existing_fresh_lane() -> Non
         matrix.OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID
         in matrix.EXECUTABLE_V3_PROFILE_IDS
     )
+    descriptor = matrix.OFFLINE_BUSINESS_AGENT_PROFILES[
+        matrix.OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID
+    ]
+    assert descriptor.suite_path == PROFILE
+    assert descriptor.supported_versions == {"2022.1"}
+    assert descriptor.run_name == "run_object_lifecycle_business_agent_unit"
     units = matrix.load_heavy_v3_units(
         SimpleNamespace(
             profile=matrix.OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID,

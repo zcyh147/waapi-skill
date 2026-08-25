@@ -9,19 +9,15 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from tests.semantic.support.codex_business_agent_runner import (
+    BusinessAgentOptions,
+    BusinessAgentRunSpec,
+    run_business_agent_unit,
+)
 from tests.semantic.support.codex_eval_protocol_v3 import (
     build_audio_import_composer_transaction_steps,
 )
-from tests.semantic.support.codex_gateway_broker import CodexGatewayBroker
-from tests.semantic.support.codex_harness import (
-    CodexCliTask,
-    CodexHarnessConfig,
-    WindowsPowerShellCoreHost,
-    prepare_workspace_skill_install,
-    semantic_task_developer_instructions,
-)
 from tests.semantic.support.codex_import_business_profile import ImportBusinessUnit
-from tests.semantic.support.codex_task_runner_v3 import _gateway_candidate_argvs
 
 
 OUTCOME_CONTRACT = "waapi-skill.audio-import-business-agent-outcome/v1"
@@ -44,16 +40,7 @@ _REPORT_MINUS_TRANSLATION = str.maketrans(
 )
 
 
-@dataclass(frozen=True, slots=True)
-class ImportBusinessAgentOptions:
-    skill_source: Path
-    codex_binary: Path
-    auth_json: Path
-    model: str
-    reasoning_effort: str
-    service_tier: str
-    timeout_seconds: float
-    windows_powershell_core_host: WindowsPowerShellCoreHost | None = None
+ImportBusinessAgentOptions = BusinessAgentOptions
 
 
 @dataclass(frozen=True, slots=True)
@@ -239,132 +226,41 @@ def run_import_business_agent_unit(
     scenario_root: Path,
     options: ImportBusinessAgentOptions,
 ) -> ImportBusinessAgentOutcome:
-    root = Path(scenario_root).expanduser().resolve(strict=False)
-    evidence = root / "evidence"
-    task_root = evidence / "codex-task"
-    workspace = task_root / "agent-workspace"
-    evidence.mkdir(parents=True, exist_ok=False)
-    skill_install = prepare_workspace_skill_install(workspace, options.skill_source)
-    runtime = prepare_import_business_runtime(unit, task_root / "runtime")
-    steps = build_preview_only_business_steps(runtime.requests)
-    runner_environment = dict(os.environ)
-    runner_environment.update(
-        {
-            "PYTHONPATH": os.pathsep.join(
-                (
-                    str(WAAPI_SHIM_ROOT),
-                    str(REPO_ROOT),
-                    str(REPO_ROOT / "skills/waapi-skill"),
-                )
+    return run_business_agent_unit(
+        unit,
+        scenario_root=scenario_root,
+        options=options,
+        spec=BusinessAgentRunSpec(
+            fixture_env=FIXTURE_ENV,
+            waapi_shim_root=WAAPI_SHIM_ROOT,
+            prepare_runtime=prepare_import_business_runtime,
+            build_steps=lambda runtime: build_preview_only_business_steps(
+                runtime.requests
             ),
-            FIXTURE_ENV: str(runtime.fixture_path),
-            "WWISE_VERSION": unit.version,
-            "WWISE_WAAPI_HOST": "127.0.0.1",
-            "WWISE_WAAPI_PORT": "31337",
-        }
+            transaction_count=lambda runtime: len(runtime.requests),
+            preview_gates=_audio_preview_gates,
+            outcome_factory=ImportBusinessAgentOutcome,
+        ),
     )
-    broker = CodexGatewayBroker(
-        skill_source=options.skill_source,
-        invocation_skill_source=skill_install,
-        expected_steps=steps,
-        expected_wwise_version=unit.version,
-        project_modification_policy="ask_before_changes",
-        runner_environment=runner_environment,
-        working_root=task_root / "broker",
-        transport="tcp",
-        runner_timeout_seconds=max(120.0, options.timeout_seconds),
-    )
-    developer_instructions = semantic_task_developer_instructions(
-        options.skill_source / "scripts" / "run.py",
-        task_skill_source=skill_install,
-        expected_skill_reads=(("SKILL.md", "references/waapi-operate.md"),),
-    )
-    config = CodexHarnessConfig(
-        workspace=workspace,
-        skill_source=options.skill_source,
-        codex_binary=options.codex_binary,
-        windows_powershell_core_host=options.windows_powershell_core_host,
-        auth_json=options.auth_json,
-        model=options.model,
-        reasoning_effort=options.reasoning_effort,
-        service_tier=options.service_tier,
-        timeout_seconds=options.timeout_seconds,
-        expected_gateway_subcommands=tuple(step.subcommand for step in steps),
-        expected_wwise_version=unit.version,
-        sandbox_mode="workspace-write",
-        allow_output_write=False,
-        network_access=True,
-        developer_instructions=developer_instructions,
-    )
-    with broker:
-        with CodexCliTask(config, extra_env=broker.model_environment_overrides()) as task:
-            result = task.run_initial(runtime.prompt, output_dir=task_root / "turn-01")
-        broker_evidence = broker.evidence()
-        argvs = _gateway_candidate_argvs(
-            result,
-            skill_source=skill_install,
-            alternate_skill_sources=(options.skill_source,),
-            expected_wwise_version=unit.version,
-        )
-        reconciliation = broker.reconcile(argvs)
 
-    facts = result.command_facts
-    preview_reported = _final_response_reports_preview(
-        result.final_response,
-        markers=unit.final_markers,
-    )
+
+def _audio_preview_gates(
+    unit: ImportBusinessUnit,
+    runtime: ImportBusinessRuntime,
+    result: Any,
+    broker_evidence: Any,
+) -> Mapping[str, bool]:
     preview_count = sum(
         record.step_name is not None and record.step_name.endswith(".preview")
         for record in broker_evidence.records
     )
-    gates = {
-        "codex_exit_zero": result.exit_status == 0 and not result.timed_out,
-        "fresh_thread": bool(result.thread_id),
-        "broker_passed": broker_evidence.passed,
-        "exact_protocol": _business_protocol_is_exact(
-            broker_evidence,
-            reconciliation,
-        ),
-        "production_skill_read": facts.skill_read
-        and set(facts.skill_read_files)
-        == {"SKILL.md", "references/waapi-operate.md"},
-        "no_unexpected_commands": len(facts.command_records)
-        == len(argvs) + len(facts.allowed_read_commands),
-        "no_inline_python": not facts.inline_python_commands,
-        "no_direct_waapi": not facts.direct_waapi_client_commands,
-        "no_workspace_changes": result.file_change_count == 0,
-        "skill_unchanged": result.skill_tree_unchanged,
+    return {
         "all_previews_reported": preview_count == len(runtime.requests)
-        and preview_reported,
-        "no_execute": all(step.subcommand != "execute" for step in steps)
-        and not any(record.gateway_arguments[:1] == ("execute",) for record in broker_evidence.records),
-    }
-    errors = [name for name, passed in gates.items() if not passed]
-    outcome = ImportBusinessAgentOutcome(
-        scenario_id=unit.unit_id,
-        version=unit.version,
-        status="PASS" if not errors else "FAIL",
-        reason="" if not errors else "failed gates: " + ", ".join(errors),
-        thread_id=result.thread_id,
-        gates=gates,
-        command_count=len(argvs),
-        transaction_count=len(runtime.requests),
-        production_gateway=True,
-        wwise_started=False,
-        final_response=result.final_response,
-    )
-    for path, payload in (
-        (evidence / "broker-evidence.json", broker_evidence.as_dict(include_output=False)),
-        (evidence / "broker-reconciliation.json", asdict(reconciliation)),
-        (evidence / "codex-result-facts.json", result.facts_dict()),
-        (evidence / "outcome.json", outcome.as_dict()),
-        (root / "outcome.json", outcome.as_dict()),
-    ):
-        path.write_text(
-            json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
-            encoding="utf-8",
+        and _final_response_reports_preview(
+            result.final_response,
+            markers=unit.final_markers,
         )
-    return outcome
+    }
 
 
 def _media_names(transactions: Sequence[Mapping[str, Any]]) -> set[str]:

@@ -183,6 +183,12 @@ DEFAULT_COMPOUND_HEAVY_V1_ITERATION_ROOT = (
 DEFAULT_TYPED_INPUT_ITERATION_ROOT = (
     SKILL_ROOT.parent / "waapi-skill-workspace" / "typed-input-cross-version-25"
 )
+DEFAULT_AUDIO_IMPORT_BUSINESS_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "audio-import-business-8"
+)
+DEFAULT_OBJECT_LIFECYCLE_BUSINESS_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "object-lifecycle-business-3"
+)
 DEFAULT_INTEGRATION_WORKFLOWS_V1_ITERATION_ROOT = (
     SKILL_ROOT.parent
     / "waapi-skill-workspace"
@@ -235,6 +241,49 @@ OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID = "object_lifecycle_business_3"
 INTEGRATION_WORKFLOWS_V1_PROFILE_ID = "integration_workflows_cross_version_6"
 INTEGRATION_WORKFLOWS_V2_PROFILE_ID = "integration_workflows_v2_cross_version_6"
 INTEGRATION_PROFILE_ID = "integration"
+
+
+@dataclass(frozen=True, slots=True)
+class OfflineBusinessAgentProfileDescriptor:
+    suite_path: Path
+    iteration_root: Path
+    supported_versions: frozenset[str]
+    preflight_contract: str
+    profile_module: str
+    loader_name: str
+    runner_module: str
+    options_name: str
+    run_name: str
+
+
+OFFLINE_BUSINESS_AGENT_PROFILES = {
+    AUDIO_IMPORT_BUSINESS_PROFILE_ID: OfflineBusinessAgentProfileDescriptor(
+        suite_path=DEFAULT_AUDIO_IMPORT_BUSINESS_SUITE,
+        iteration_root=DEFAULT_AUDIO_IMPORT_BUSINESS_ITERATION_ROOT,
+        supported_versions=frozenset({"2022.1", "2025.1"}),
+        preflight_contract="waapi-skill.audio-import-business-preflight/v1",
+        profile_module="tests.semantic.support.codex_import_business_profile",
+        loader_name="load_import_business_profile",
+        runner_module="tests.semantic.support.codex_import_business_agent_runner",
+        options_name="ImportBusinessAgentOptions",
+        run_name="run_import_business_agent_unit",
+    ),
+    OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID: OfflineBusinessAgentProfileDescriptor(
+        suite_path=DEFAULT_OBJECT_LIFECYCLE_BUSINESS_SUITE,
+        iteration_root=DEFAULT_OBJECT_LIFECYCLE_BUSINESS_ITERATION_ROOT,
+        supported_versions=frozenset({"2022.1"}),
+        preflight_contract="waapi-skill.object-lifecycle-business-preflight/v1",
+        profile_module=(
+            "tests.semantic.support.codex_object_lifecycle_business_profile"
+        ),
+        loader_name="load_object_lifecycle_business_profile",
+        runner_module=(
+            "tests.semantic.support.codex_object_lifecycle_business_agent_runner"
+        ),
+        options_name="ObjectLifecycleBusinessAgentOptions",
+        run_name="run_object_lifecycle_business_agent_unit",
+    ),
+}
 SEMANTIC_BOOTSTRAP_PROFILE_IDS = frozenset(
     {TYPED_INPUT_PROFILE_ID, INTEGRATION_PROFILE_ID}
 )
@@ -452,21 +501,11 @@ def load_heavy_v3_units(options: RunnerOptions) -> tuple[Any, ...]:
             versions=options.versions,
         )
         return tuple(profile.units)
-    if options.profile == AUDIO_IMPORT_BUSINESS_PROFILE_ID:
-        business_module = importlib.import_module(
-            "tests.semantic.support.codex_import_business_profile"
-        )
-        profile = business_module.load_import_business_profile(
-            options.suite_path,
-            unit_ids=options.case_ids,
-            versions=options.versions,
-        )
-        return tuple(profile.units)
-    if options.profile == OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID:
-        lifecycle_module = importlib.import_module(
-            "tests.semantic.support.codex_object_lifecycle_business_profile"
-        )
-        profile = lifecycle_module.load_object_lifecycle_business_profile(
+    business_profile = OFFLINE_BUSINESS_AGENT_PROFILES.get(options.profile)
+    if business_profile is not None:
+        profile_module = importlib.import_module(business_profile.profile_module)
+        loader = getattr(profile_module, business_profile.loader_name)
+        profile = loader(
             options.suite_path,
             unit_ids=options.case_ids,
             versions=options.versions,
@@ -598,8 +637,7 @@ def run_heavy_v3_matrix(
         raise HeavyV3MatrixError("V3 heavy execution does not accept pair filters")
     is_offline_semantic = options.profile in {
         DEEP_INTERFACE_MVP_PROFILE_ID,
-        AUDIO_IMPORT_BUSINESS_PROFILE_ID,
-        OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID,
+        *OFFLINE_BUSINESS_AGENT_PROFILES,
     }
     if options.offline_only and not is_offline_semantic:
         raise HeavyV3MatrixError("V3 heavy execution is real-Wwise only")
@@ -610,27 +648,19 @@ def run_heavy_v3_matrix(
         (
             lambda: {
                 "contract": (
-                    "waapi-skill.audio-import-business-preflight/v1"
-                    if options.profile == AUDIO_IMPORT_BUSINESS_PROFILE_ID
-                    else "waapi-skill.object-lifecycle-business-preflight/v1"
-                    if options.profile == OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID
+                    OFFLINE_BUSINESS_AGENT_PROFILES[options.profile].preflight_contract
+                    if options.profile in OFFLINE_BUSINESS_AGENT_PROFILES
                     else "waapi-skill.deep-interface-mvp-preflight/v1"
                 ),
                 "ok": True,
                 "mode": (
                     "offline-production-gateway"
-                    if options.profile in {
-                        AUDIO_IMPORT_BUSINESS_PROFILE_ID,
-                        OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID,
-                    }
+                    if options.profile in OFFLINE_BUSINESS_AGENT_PROFILES
                     else "offline-test-only"
                 ),
                 "wwise_started": False,
                 "production_gateway": (
-                    options.profile in {
-                        AUDIO_IMPORT_BUSINESS_PROFILE_ID,
-                        OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID,
-                    }
+                    options.profile in OFFLINE_BUSINESS_AGENT_PROFILES
                 ),
             }
         )
@@ -832,11 +862,12 @@ def run_heavy_v3_unit(
             scenario_root=scenario_root,
             options=runner_options,
         )
-    if options.profile == AUDIO_IMPORT_BUSINESS_PROFILE_ID:
-        runner_module = importlib.import_module(
-            "tests.semantic.support.codex_import_business_agent_runner"
-        )
-        runner_options = runner_module.ImportBusinessAgentOptions(
+    business_profile = OFFLINE_BUSINESS_AGENT_PROFILES.get(options.profile)
+    if business_profile is not None:
+        runner_module = importlib.import_module(business_profile.runner_module)
+        options_type = getattr(runner_module, business_profile.options_name)
+        runner = getattr(runner_module, business_profile.run_name)
+        runner_options = options_type(
             skill_source=options.skill_source,
             codex_binary=options.codex_binary,
             auth_json=options.auth_json,
@@ -846,26 +877,7 @@ def run_heavy_v3_unit(
             timeout_seconds=options.timeout_seconds,
             windows_powershell_core_host=options.windows_powershell_core_host,
         )
-        return runner_module.run_import_business_agent_unit(
-            unit,
-            scenario_root=scenario_root,
-            options=runner_options,
-        )
-    if options.profile == OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID:
-        runner_module = importlib.import_module(
-            "tests.semantic.support.codex_object_lifecycle_business_agent_runner"
-        )
-        runner_options = runner_module.ObjectLifecycleBusinessAgentOptions(
-            skill_source=options.skill_source,
-            codex_binary=options.codex_binary,
-            auth_json=options.auth_json,
-            model=options.model,
-            reasoning_effort=options.reasoning_effort,
-            service_tier=options.service_tier,
-            timeout_seconds=options.timeout_seconds,
-            windows_powershell_core_host=options.windows_powershell_core_host,
-        )
-        return runner_module.run_object_lifecycle_business_agent_unit(
+        return runner(
             unit,
             scenario_root=scenario_root,
             options=runner_options,
@@ -3651,10 +3663,7 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     is_compound_v1 = args.profile == COMPOUND_HEAVY_V1_PROFILE_ID
     is_typed_input = args.profile == TYPED_INPUT_PROFILE_ID
     is_deep_interface_mvp = args.profile == DEEP_INTERFACE_MVP_PROFILE_ID
-    is_audio_import_business = args.profile == AUDIO_IMPORT_BUSINESS_PROFILE_ID
-    is_object_lifecycle_business = (
-        args.profile == OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID
-    )
+    business_agent_profile = OFFLINE_BUSINESS_AGENT_PROFILES.get(args.profile)
     is_integration_v1 = args.profile == INTEGRATION_WORKFLOWS_V1_PROFILE_ID
     is_integration_v2 = args.profile == INTEGRATION_WORKFLOWS_V2_PROFILE_ID
     is_integration = args.profile == INTEGRATION_PROFILE_ID
@@ -3673,8 +3682,7 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         is_policy_v3
         or is_typed_input
         or is_deep_interface_mvp
-        or is_audio_import_business
-        or is_object_lifecycle_business
+        or business_agent_profile is not None
         or is_compound_v1
         or is_integration_v1
         or is_integration_v2
@@ -3708,19 +3716,20 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         parser.error(
             f"{MODIFICATION_POLICY_V3_PROFILE_ID} supports only --version 2022.1"
         )
-    if (is_deep_interface_mvp or is_audio_import_business) and any(
+    if is_deep_interface_mvp and any(
         version not in {"2022.1", "2025.1"} for version in args.version
     ):
         parser.error(
             f"{args.profile} supports only "
             "--version 2022.1 and 2025.1"
         )
-    if is_object_lifecycle_business and any(
-        version != "2022.1" for version in args.version
+    if business_agent_profile is not None and any(
+        version not in business_agent_profile.supported_versions
+        for version in args.version
     ):
         parser.error(
-            f"{OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID} supports only "
-            "--version 2022.1"
+            f"{args.profile} supports only --version "
+            + " and ".join(sorted(business_agent_profile.supported_versions))
         )
     if (
         is_compound_v1
@@ -3755,10 +3764,8 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
             if is_policy_v3
             else DEFAULT_DEEP_INTERFACE_MVP_SUITE
             if is_deep_interface_mvp
-            else DEFAULT_AUDIO_IMPORT_BUSINESS_SUITE
-            if is_audio_import_business
-            else DEFAULT_OBJECT_LIFECYCLE_BUSINESS_SUITE
-            if is_object_lifecycle_business
+            else business_agent_profile.suite_path
+            if business_agent_profile is not None
             else DEFAULT_TYPED_INPUT_SUITE
             if is_typed_input
             else (
@@ -3788,18 +3795,8 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
                 / "deep-interface-mvp-8"
             )
             if is_deep_interface_mvp
-            else (
-                SKILL_ROOT.parent
-                / "waapi-skill-workspace"
-                / "audio-import-business-8"
-            )
-            if is_audio_import_business
-            else (
-                SKILL_ROOT.parent
-                / "waapi-skill-workspace"
-                / "object-lifecycle-business-3"
-            )
-            if is_object_lifecycle_business
+            else business_agent_profile.iteration_root
+            if business_agent_profile is not None
             else DEFAULT_TYPED_INPUT_ITERATION_ROOT
             if is_typed_input
             else (
