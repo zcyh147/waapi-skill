@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import argparse
+import importlib.util
 import json
+import sys
 from collections import Counter, defaultdict
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -30,6 +34,7 @@ SURFACE_PATH = (
     / "skills/waapi-skill/resources/manifest/typed-request-surface.json"
 )
 CONTRACT = "waapi-skill.interface-depth-inventory/v1"
+GATEWAY_PATH = REPO_ROOT / "skills/waapi-skill/scripts/gateway.py"
 
 
 def _load(path: Path) -> dict[str, Any]:
@@ -61,6 +66,116 @@ def _operation_contract_rows() -> list[dict[str, Any]]:
     ]
 
 
+@lru_cache(maxsize=1)
+def _gateway_subparsers() -> Mapping[str, argparse.ArgumentParser]:
+    """Load the actual public CLI parser used by fixed Gateway commands."""
+
+    module_name = "_waapi_skill_interface_depth_gateway"
+    spec = importlib.util.spec_from_file_location(module_name, GATEWAY_PATH)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("cannot load the packaged Gateway parser")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    parser = module.build_parser()
+    subparsers = next(
+        (
+            action.choices
+            for action in parser._actions
+            if isinstance(action, argparse._SubParsersAction)
+        ),
+        None,
+    )
+    if not isinstance(subparsers, Mapping):
+        raise RuntimeError("Gateway parser has no public subcommand registry")
+    return subparsers
+
+
+def _json_default(value: Any) -> Any:
+    if value is argparse.SUPPRESS:
+        return "<SUPPRESS>"
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, (list, tuple)):
+        return [_json_default(item) for item in value]
+    return f"<{type(value).__name__}>"
+
+
+def _gateway_command_contract(command_spec: str) -> dict[str, Any]:
+    """Project one fixed command's actual argparse fields deterministically."""
+
+    tokens = command_spec.split()
+    parser = _gateway_subparsers().get(tokens[0])
+    if parser is None:
+        raise RuntimeError(f"unknown fixed Gateway command {command_spec!r}")
+    fixed_positionals = iter(tokens[1:])
+    parameters: list[dict[str, Any]] = []
+    for action in parser._actions:
+        if action.dest == "help":
+            continue
+        if not action.option_strings:
+            fixed_value = next(fixed_positionals, None)
+            if fixed_value is not None:
+                continue
+        long_options = sorted(
+            option for option in action.option_strings if option.startswith("--")
+        )
+        name = (
+            long_options[0][2:]
+            if long_options
+            else str(action.dest).replace("_", "-")
+        )
+        choices = (
+            sorted(str(choice) for choice in action.choices)
+            if action.choices is not None
+            else None
+        )
+        parameters.append(
+            {
+                "name": name,
+                "dest": action.dest,
+                "option_strings": sorted(action.option_strings),
+                "action": type(action).__name__,
+                "required": bool(action.required),
+                "nargs": action.nargs,
+                "choices": choices,
+                "type": (
+                    getattr(action.type, "__name__", str(action.type))
+                    if action.type is not None
+                    else None
+                ),
+                "default": _json_default(action.default),
+            }
+        )
+    try:
+        unexpected = next(fixed_positionals)
+    except StopIteration:
+        unexpected = None
+    if unexpected is not None:
+        raise RuntimeError(
+            f"fixed Gateway command {command_spec!r} has excess bound tokens"
+        )
+    return {
+        "command": command_spec,
+        "parameters": parameters,
+    }
+
+
+def _fixed_command_contracts(lane: Mapping[str, Any]) -> list[dict[str, Any]]:
+    if lane["execution_policy"]["route"] != "fixed_command":
+        return []
+    return [
+        _gateway_command_contract(command)
+        for command in lane["execution_policy"]["gateway_commands"]
+    ]
+
+
+def _fixed_command_has_model_values(lane: Mapping[str, Any]) -> bool:
+    return any(
+        contract["parameters"] for contract in _fixed_command_contracts(lane)
+    )
+
+
 def _public_continuation_rows(
     surface: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
@@ -72,6 +187,9 @@ def _public_continuation_rows(
             "uri": lane["uri"],
             "gateway_commands": lane["execution_policy"]["gateway_commands"],
         }
+        fixed_contracts = _fixed_command_contracts(lane)
+        if fixed_contracts:
+            row["fixed_command_contracts"] = fixed_contracts
         if lane["item_type"] == "topic":
             row["typed"] = {
                 "options": topic_options_contract(
@@ -155,6 +273,12 @@ def _matches(
     ):
         return False
     if (
+        "fixed_command_model_values" in match
+        and _fixed_command_has_model_values(lane)
+        is not match["fixed_command_model_values"]
+    ):
+        return False
+    if (
         "construction_shapes" in match
         and lane["construction_shape"] not in match["construction_shapes"]
     ):
@@ -194,6 +318,10 @@ def _name_ownership(
     if normalized in rules["reviewed_adapter_names"]:
         return "reviewed_adapter"
     if normalized in rules["exact_artifact_names"]:
+        return "exact_user_artifact"
+    if normalized in rules["filesystem_artifact_names"] and uri is not None and any(
+        uri.startswith(prefix) for prefix in rules["filesystem_path_uris"]
+    ):
         return "exact_user_artifact"
     if any(normalized.endswith(suffix) for suffix in rules["exact_artifact_suffixes"]):
         return "exact_user_artifact"
@@ -250,14 +378,60 @@ def _typed_field_rows(
             ]
         )
     rows: list[dict[str, Any]] = []
+    for command in _fixed_command_contracts(lane):
+        for parameter in command["parameters"]:
+            normalized = parameter["name"].replace("-", "_")
+            if normalized in {
+                "advanced_return",
+                "api",
+                "choice_handle",
+                "map_handle",
+                "array_handle",
+                "member_key",
+                "parent_schema_token",
+                "return_field",
+                "schema_digest",
+                "shape",
+                "typed_append",
+                "typed_choose",
+                "typed_choose_dynamic",
+                "typed_map_correct",
+                "typed_map_put",
+                "typed_map_remove",
+                "typed_present",
+                "typed_schema_digest",
+                "typed_set",
+            }:
+                ownership = "gateway_derivation"
+            else:
+                ownership = _name_ownership(
+                    parameter["name"], policy, uri=lane["uri"]
+                ) or "stable_business_declaration"
+            rows.append(
+                {
+                    "channel": f"fixed.{command['command']}",
+                    "path": ["fixed_command", command["command"], parameter["name"]],
+                    "name": parameter["name"],
+                    "shape": (
+                        "array"
+                        if parameter["action"] == "_AppendAction"
+                        or parameter["nargs"] in {"*", "+"}
+                        or isinstance(parameter["nargs"], int)
+                        and parameter["nargs"] > 1
+                        else "scalar"
+                    ),
+                    "required": parameter["required"],
+                    "value_ownership": ownership,
+                    "transport_ownership": "gateway_derivation",
+                }
+            )
     for channel, contract in contracts:
         for field in contract.as_gateway_payload().get("fields", []):
             ownership = _field_ownership(field, policy, uri=lane["uri"])
-            if channel == "query.advanced" and field["name"] in {
-                "waql",
-                "return",
-            }:
+            if channel == "query.advanced" and field["name"] == "waql":
                 ownership = "bounded_domain_expression"
+            elif channel.startswith("query.") and field["name"] == "return":
+                ownership = "gateway_derivation"
             rows.append(
                 {
                     "channel": channel,
@@ -506,10 +680,22 @@ def _audio_import_model_values(version: str) -> list[dict[str, Any]]:
                 ownership="live_bound_handle",
             )
             add(
-                (*path, "<typed_business_value>"),
-                name="typed_business_value",
+                (*path, "<value_variant>"),
+                name="value_variant",
+                shape="branch",
+                ownership="gateway_derivation",
+            )
+            add(
+                (*path, "<value_variant>", "scalar_business_value"),
+                name="scalar_business_value",
                 shape="scalar",
                 ownership="stable_business_declaration",
+            )
+            add(
+                (*path, "<value_variant>", "reference_object_handle"),
+                name="reference_object_handle",
+                shape="scalar",
+                ownership="live_bound_handle",
             )
             return
         ownership = (

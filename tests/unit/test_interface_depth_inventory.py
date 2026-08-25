@@ -124,6 +124,8 @@ def test_nested_operation_values_and_exact_paths_are_explicitly_classified() -> 
     assert audio_values[("settings", "defaults", "event", "parent_handle")] == "live_bound_handle"
     assert audio_values[("settings", "defaults", "event", "name")] == "stable_business_declaration"
     assert audio_values[("declaration", "field_values", "<field_handle>")] == "live_bound_handle"
+    assert audio_values[("declaration", "field_values", "<value_variant>", "scalar_business_value")] == "stable_business_declaration"
+    assert audio_values[("declaration", "field_values", "<value_variant>", "reference_object_handle")] == "live_bound_handle"
     assert not any("object_path" in path for path in audio_values)
 
     object_create = next(
@@ -173,6 +175,12 @@ def test_nested_operation_values_and_exact_paths_are_explicitly_classified() -> 
     query_values = _model_values(inventory, object_get)
     assert any(
         value["channel"] == "query.structured"
+        for value in query_values
+    )
+    assert any(
+        value["channel"] == "query.structured"
+        and value["name"] == "source"
+        and value["value_ownership"] == "reviewed_adapter"
         for value in query_values
     )
     assert any(

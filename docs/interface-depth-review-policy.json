@@ -364,7 +364,8 @@
     "generic-topics": 91
   },
   "field_ownership_rules": {
-    "exact_artifact_names": ["audio_file", "files", "import_file", "io_root", "lua_code", "project", "script_file", "source", "source_file", "sources", "tab_delimited_import_file"],
+    "exact_artifact_names": ["audio_file", "files", "import_file", "io_root", "lua_code", "project", "script_file", "source_file", "sources", "tab_delimited_import_file"],
+    "filesystem_artifact_names": ["source"],
     "exact_artifact_suffixes": ["_directory", "_file", "_path"],
     "filesystem_path_uris": ["ak.wwise.cli.", "ak.wwise.console.", "ak.wwise.debug.generateToneWAV", "ak.wwise.ui.captureScreen", "ak.wwise.ui.project."],
     "bounded_expression_names": ["transform", "waql", "wa_args"],
