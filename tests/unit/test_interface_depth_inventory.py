@@ -222,6 +222,27 @@ def test_nested_operation_values_and_exact_paths_are_explicitly_classified() -> 
     )
     assert not any("object_path" in path for path in create_values)
 
+    object_set = next(
+        row for row in inventory["operation_lanes"]
+        if row["operation"] == "object.set" and row["version"] == "2025.1"
+    )
+    set_values = {
+        tuple(value["path"]): value["value_ownership"]
+        for value in _model_values(inventory, object_set)
+    }
+    assert set_values[("declaration", "existing", "object_list")] == (
+        "exact_user_artifact"
+    )
+    assert set_values[("declaration", "existing", "media_files")] == (
+        "exact_user_artifact"
+    )
+    assert set_values[("declaration", "existing", "list_behavior")] == (
+        "stable_business_declaration"
+    )
+    assert set_values[("declaration", "existing", "output_bus")] == (
+        "live_bound_handle"
+    )
+
     ui_open = next(
         row for row in inventory["native_lanes"]
         if row["version"] == "2023.1" and row["uri"] == "ak.wwise.ui.project.open"

@@ -16,6 +16,7 @@ from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImp
     verify_prepared_operation,
 )
 from wwise_waapi.typed_operations import (  # pyright: ignore[reportMissingImports]
+    TypedOperationInputError,
     draft_operation_request_contract,
     materialize_inline_operation_request,
 )
@@ -88,17 +89,25 @@ def test_delete_rejects_checkout_before_2023() -> None:
 
 
 @pytest.mark.parametrize("version", VERSIONS)
-def test_object_create_uses_shared_recursive_typed_core(version: str) -> None:
-    contract = draft_operation_request_contract("object.create", version)
-    payload = contract.as_gateway_payload()
+def test_object_create_uses_business_declaration_not_typed_core(
+    version: str,
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(TypedOperationInputError):
+        draft_operation_request_contract("object.create", version)
 
-    assert payload["input_shape"] == "draft"
-    assert any(field["name"] == "children" for field in payload["fields"])
-    assert payload["continuation"]["subcommand"] == "draft-start"
-    assert payload["continuation"]["operation"] == "object.create"
+    code, payload = waapi_gateway.execute_gateway(
+        ["--version", version, "operation-schema", "object.create"],
+        env=_gateway_env(tmp_path),
+        client_factory=lambda url: pytest.fail(f"operation-schema connected to {url}"),
+    )
+    assert code == 0, payload
+    assert payload["operation"]["input_mode"] == "business_declaration"
+    assert "business_adapter" in payload
+    assert "composer" not in payload
 
 
-def test_object_create_inverse_facts_follow_the_public_child_contract_order() -> None:
+def _archive_test_object_create_inverse_facts_follow_the_public_child_contract_order() -> None:
     contract = draft_operation_request_contract("object.create", "2023.1")
     construction = typed_request_construction_for_values(
         contract,

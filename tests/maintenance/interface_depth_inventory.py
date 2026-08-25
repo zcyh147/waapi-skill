@@ -937,10 +937,12 @@ def _object_graph_model_values(
         "control_input_handle",
         "field_handle",
         "object_handle",
+        "output_bus",
         "parent_handle",
         "plugin_type_handle",
         "replace_owner_handle",
     }
+    exact_artifact_fields = {"media_files", "object_list"}
 
     def add_fields(
         prefix: tuple[str, ...],
@@ -952,7 +954,9 @@ def _object_graph_model_values(
         for field_name in fields:
             value_type = str(field_types.get(field_name, "business_value"))
             ownership = (
-                "live_bound_handle"
+                "exact_user_artifact"
+                if field_name in exact_artifact_fields
+                else "live_bound_handle"
                 if field_name in handle_fields or field_name == "field_values"
                 else "stable_business_declaration"
             )
@@ -962,7 +966,13 @@ def _object_graph_model_values(
                 value_type=value_type,
                 required=field_name in required,
                 ownership=ownership,
-                shape="map" if field_name == "field_values" else "scalar",
+                shape=(
+                    "map"
+                    if field_name == "field_values"
+                    else "array"
+                    if field_name == "media_files"
+                    else "scalar"
+                ),
             )
 
     declaration = contract["declaration"]

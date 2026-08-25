@@ -100,10 +100,10 @@ def test_dynamic_draft_guidance_distinguishes_complete_json_from_incomplete_cons
     ) in compact
     assert "Follow `next_command_decision`" in compact
     assert "only an exact `business_value_pointer` authorizes it" in compact
-    assert "schema alone never does" in compact
-    assert "never reuse handles" in compact
-    assert "return to the outermost response; parent fact before children" in compact
-    assert "`completion_candidate`" in compact
+    assert "A business Draft instead follows its returned required phase" in compact
+    assert "completion candidate" in compact
+    assert "Copy handles into the same named role" in compact
+    assert "Corrections reuse the draft" in compact
     assert "never `draft-apply --action check`" in compact
 
 
@@ -786,8 +786,8 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "transaction-show <transaction-id> --summary-only" in OPERATE
     assert "Do not call `operations`, `operation-schema`, or `request-schema` first" in OPERATE
     assert "| `audio.import` | `operation-schema audio.import`" in OPERATE
-    assert "One command carries one repeated `--query" in OPERATE
-    assert "1–8 never split" in OPERATE
+    assert "discover dynamic fields through returned Draft commands" in OPERATE
+    assert "submit only disclosed high-level fields" in OPERATE
     assert "Then `operation-schema`; metadata" in OPERATE
     assert "pre-Preview same-name-root type/path only" in OPERATE
     assert "not parent/sibling or later verification" in compact
@@ -804,11 +804,9 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "its named `operation-schema` directly" in OPERATE
     assert "including both import operations" not in OPERATE
     assert "business Adapter owns object paths, native types, metadata scopes" in OPERATE
-    assert "`draft-check` revalidates it" in OPERATE
-    assert "`limit sound instances`" in OPERATE
-    assert "`maximum playback instances`" in OPERATE
-    assert "both selected tokens are facts" in OPERATE
-    assert "one is also a dependency" in OPERATE
+    assert "`draft-check` revalidates them" in OPERATE
+    assert "Run the returned discovery once" in OPERATE
+    assert "Gateway validates restrictions and activates proven dependencies" in OPERATE
     assert "`WAAPI_TYPED_CONTAINER_RESPONSE_END`" in OPERATE
     assert "then continue from that response" in OPERATE
     assert "Table imports start `operation-schema audio.importTabDelimited`" in OPERATE
@@ -821,9 +819,9 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "No schema-to-preview shortcut" in compact
     assert "gateway.py operation-schema <operation-name>" not in OPERATE
     assert "Follow the schema's sole `input_mode`" in OPERATE
-    assert "For `composer`, run its returned start and action argv" in OPERATE
+    assert "For `composer`, run only its returned start and action argv" in OPERATE
     assert "For `business_declaration`, run `draft-start`" in OPERATE
-    assert "start `object.set` rows with `add_target --target ...`" in OPERATE
+    assert "Bind exact owners, parents, and references" in OPERATE
     assert "Supply stable facts such as `volume_db=-4`" in OPERATE
     assert "The Gateway derives Wwise paths, types, metadata scopes" in OPERATE
     assert "Corrections reuse the draft" in OPERATE
@@ -870,21 +868,15 @@ def test_operate_business_selection_and_execution_domains_remain_explicit() -> N
     assert "When media import is primary" in compact
     assert "replace media on existing Sounds" in compact
     assert "create a Sound in the same batch" in compact
-    assert "`object.set` cannot author media import" in compact
-    assert (
-        "directly described rows include a new target-container hierarchy or "
-        "a same-row Event/Switch Assignation"
-    ) in compact
+    assert "`object.set` is never a preliminary schema for that outcome" in compact
+    assert "New target-container hierarchy and same-row Event/Switch outcomes" in compact
     assert "use one `audio.import`" in compact
-    assert "typed structure-only row" in compact
+    assert "structure-only descendant" in compact
     assert (
         "never probe `object.create` or a separate assignment first"
         in compact
     )
-    assert (
-        "keep `object.set` when import is subordinate to a broader atomic "
-        "mutation of existing targets"
-    ) in compact
+    assert "`object.set` may carry media only when import is subordinate" in compact
     assert "independent Switch assignment between existing objects" in compact
     assert "same-row import side effect" in compact
     assert (
@@ -931,8 +923,8 @@ def test_operate_business_selection_and_execution_domains_remain_explicit() -> N
         "Then open `operation-schema object.create`"
     )
     assert (
-        "`object.set` instead uses its returned target base, live token discovery, "
-        "and Composer validation"
+        "`object.set` instead binds the exact target and uses returned field/type "
+        "discovery plus business-Draft validation"
     ) in compact
     assert "Do not insert `project-default-work-units`" in compact
 
@@ -997,12 +989,10 @@ def test_operate_uses_one_bank_scoped_replace_for_a_complete_inclusion_post_stat
 def test_operate_metadata_and_import_prose_only_rules_are_preserved() -> None:
     compact = " ".join(OPERATE.split())
     for phrase in (
-        "one repeated `--query '<ordinary phrase>'` per setting",
-        "Use the deterministic candidate budget",
         "A rejected or nonzero Gateway invocation is also a hard stop",
-        "`--object` for one existing object",
-        "Translate localized wording to short English Wwise UI/technical phrases",
         "`fallback_detail_scan.status` is `partial`",
+        "Run the returned discovery once with short English Wwise UI/technical meanings",
+        "Copy one returned opaque handle per requested field",
         "bind only user-requested custom properties/references",
         "stable business fields",
         "For table imports, discover only dynamic",
@@ -1022,12 +1012,11 @@ def test_operate_metadata_and_import_prose_only_rules_are_preserved() -> None:
 def test_operate_maps_only_live_query_accessors_to_mutation_tokens() -> None:
     compact = " ".join(OPERATE.split())
 
-    assert "Reuse evidence-bound live property/reference accessors" in compact
-    assert "`@Foo` becomes `Foo`" in compact
-    assert "remove one leading `@`" in compact
-    assert "business Field Handles are copied exactly" in compact
-    assert "evidence-bound" in compact
-    assert "Never infer a token" in compact
+    assert "Returned Field Handles are copied exactly" in compact
+    assert "never infer or type a property/reference token" in compact
+    assert "Prompt/schema text, cached schemas, and Wwise knowledge" in compact
+    assert "Copy one returned opaque handle per requested field" in compact
+    assert "`draft-check` revalidates scope, token, dependencies, and value" in compact
 
 
 def test_operate_cli_and_authoring_fast_routes_keep_unstructured_materialization_rules() -> None:

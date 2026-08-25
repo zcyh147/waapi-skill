@@ -10,6 +10,7 @@ import pytest
 
 from wwise_waapi.schema_inventory import load_definition_graph
 from wwise_waapi.operation_composer import draft_operation_request_contract
+from wwise_waapi.typed_operations import TypedOperationInputError
 from wwise_waapi.typed_requests import (
     compile_typed_request_contract,
     request_contract,
@@ -1383,26 +1384,23 @@ def test_nested_options_local_reference_keeps_its_origin_section(
 def test_object_create_archive_typed_disclosure_is_not_public(
     tmp_path: Path,
 ) -> None:
-    contract = draft_operation_request_contract("object.create", "2021.1")
-    children = next(
-        field
-        for field in contract.fields
-        if field.path == ("children",) and field.shape == "array"
-    )
+    with pytest.raises(TypedOperationInputError):
+        draft_operation_request_contract("object.create", "2021.1")
 
     code, root = gateway.execute_gateway(
         [
-            "--version", "2021.1", "request-array-item", "object.create",
-            "--schema-digest", contract.schema_digest,
-            "--array-handle", children.handle,
-            "--index", "0", "--shape", "object",
+            "--version",
+            "2021.1",
+            "operation-schema",
+            "object.create",
         ],
         env=_env(tmp_path, "2021.1"),
         client_factory=lambda _url: pytest.fail("disclosure must be offline"),
     )
-    assert code == 2, root
-    assert root["error_code"] == "TypedRequestError"
-    assert "continuation" not in root
+    assert code == 0, root
+    assert root["operation"]["input_mode"] == "business_declaration"
+    assert "business_adapter" in root
+    assert "composer" not in root
     return
     root_projected = gateway.gateway_stdout_payload(root)
     root_encoded = gateway.gateway_stdout_json_encoder(root_projected).encode(
