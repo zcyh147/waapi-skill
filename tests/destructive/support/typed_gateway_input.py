@@ -31,6 +31,175 @@ from wwise_waapi.typed_requests import (
 
 
 GatewayCall = Callable[[Sequence[str]], Mapping[str, Any]]
+OBJECT_LIFECYCLE_BUSINESS_OPERATIONS = frozenset(
+    {
+        "object.copy",
+        "object.delete",
+        "object.move",
+        "object.setName",
+        "object.setNotes",
+    }
+)
+
+
+def create_object_lifecycle_business_preview(
+    gateway: GatewayCall,
+    *,
+    operation: str,
+    object_id: str,
+    parent_id: str | None = None,
+    new_name: str | None = None,
+    notes: str | None = None,
+    name_conflict: str | None = None,
+) -> dict[str, Any]:
+    """Follow one object-lifecycle Business Draft through immutable Preview."""
+
+    if operation not in OBJECT_LIFECYCLE_BUSINESS_OPERATIONS:
+        raise ValueError("operation has no object-lifecycle Business Adapter")
+    fields = {
+        "parent_id": parent_id,
+        "new_name": new_name,
+        "notes": notes,
+        "name_conflict": name_conflict,
+    }
+    required = {
+        "object.copy": {"parent_id"},
+        "object.delete": set(),
+        "object.move": {"parent_id"},
+        "object.setName": {"new_name"},
+        "object.setNotes": {"notes"},
+    }[operation]
+    allowed = {
+        "object.copy": {"parent_id", "name_conflict"},
+        "object.delete": set(),
+        "object.move": {"parent_id", "name_conflict"},
+        "object.setName": {"new_name"},
+        "object.setNotes": {"notes"},
+    }[operation]
+    supplied = {name for name, value in fields.items() if value is not None}
+    if not required.issubset(supplied) or supplied - allowed:
+        raise ValueError("business fields do not match the object lifecycle operation")
+
+    schema = dict(gateway(["operation-schema", operation]))
+    operation_contract = schema.get("operation")
+    adapter = schema.get("business_adapter")
+    if (
+        not isinstance(operation_contract, Mapping)
+        or operation_contract.get("input_mode") != "business_declaration"
+        or not isinstance(adapter, Mapping)
+        or adapter.get("operation") != operation
+    ):
+        raise AssertionError("operation-schema did not disclose the exact Business Adapter")
+    started = dict(gateway(["draft-start", operation]))
+    draft = started.get("draft")
+    authority = started.get("task_authority")
+    if not isinstance(draft, Mapping) or not isinstance(authority, str):
+        raise AssertionError("draft-start did not return Draft authority")
+    draft_id = draft.get("draft_id")
+    revision = draft.get("revision")
+    if not isinstance(draft_id, str) or not isinstance(revision, int):
+        raise AssertionError("draft-start did not return Draft identity and revision")
+
+    def bind(bound_object_id: str, expected_revision: int) -> tuple[str, int]:
+        payload = dict(
+            gateway(
+                [
+                    "draft-bind-object",
+                    draft_id,
+                    "--task-authority",
+                    authority,
+                    "--expected-revision",
+                    str(expected_revision),
+                    "--object-id",
+                    bound_object_id,
+                ]
+            )
+        )
+        bound_object = payload.get("bound_object")
+        updated_draft = payload.get("draft")
+        handle = (
+            bound_object.get("handle")
+            if isinstance(bound_object, Mapping)
+            else None
+        )
+        updated_revision = (
+            updated_draft.get("revision")
+            if isinstance(updated_draft, Mapping)
+            else None
+        )
+        if not isinstance(handle, str) or not isinstance(updated_revision, int):
+            raise AssertionError("draft-bind-object did not return handle and revision")
+        return handle, updated_revision
+
+    object_handle, revision = bind(object_id, revision)
+    parent_handle: str | None = None
+    if parent_id is not None:
+        parent_handle, revision = bind(parent_id, revision)
+    declaration = [
+        "draft-declare-object-change",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        str(revision),
+        "--object-handle",
+        object_handle,
+    ]
+    for flag, value in (
+        ("--parent-handle", parent_handle),
+        ("--new-name", new_name),
+        ("--notes", notes),
+        ("--name-conflict", name_conflict),
+    ):
+        if value is not None:
+            declaration.extend((flag, value))
+    declared = dict(gateway(declaration))
+    declared_draft = declared.get("draft")
+    revision = (
+        declared_draft.get("revision")
+        if isinstance(declared_draft, Mapping)
+        else None
+    )
+    if not isinstance(revision, int):
+        raise AssertionError("business declaration did not return its revision")
+    checked = dict(
+        gateway(
+            [
+                "draft-check",
+                draft_id,
+                "--task-authority",
+                authority,
+                "--expected-revision",
+                str(revision),
+            ]
+        )
+    )
+    checked_draft = checked.get("draft")
+    revision = (
+        checked_draft.get("revision")
+        if isinstance(checked_draft, Mapping)
+        else None
+    )
+    if not isinstance(revision, int):
+        raise AssertionError("draft-check did not return its checked revision")
+    preview = dict(
+        gateway(
+            [
+                "preview-from-draft",
+                draft_id,
+                "--task-authority",
+                authority,
+                "--expected-revision",
+                str(revision),
+                "--apply",
+                "--ttl",
+                "300",
+            ]
+        )
+    )
+    if preview.get("state") != "awaiting_confirmation" or preview.get("executed") is not False:
+        raise AssertionError("Business Draft did not produce one immutable Preview")
+    return preview
 
 
 def create_typed_transaction_preview(
@@ -506,4 +675,8 @@ def typed_wait_topic_command(
     return (step.subcommand, *_render_step_arguments(step, {}))
 
 
-__all__ = ["create_typed_transaction_preview", "typed_wait_topic_command"]
+__all__ = [
+    "create_object_lifecycle_business_preview",
+    "create_typed_transaction_preview",
+    "typed_wait_topic_command",
+]

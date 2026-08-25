@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+
 import pytest
 
+from tests.destructive.support.typed_gateway_input import (
+    create_object_lifecycle_business_preview,
+)
 from wwise_waapi.business_adapters import (
     business_adapter,
     business_adapter_operations,
@@ -59,6 +64,102 @@ def test_every_business_input_lane_has_exactly_one_registered_adapter() -> None:
         for lane in OPERATION_INPUT_MODE_LANES
         if lane.input_mode == BUSINESS_DECLARATION_INPUT_MODE
     }
+
+
+def test_object_lifecycle_adapter_rejects_audio_only_cleaned_file_replay() -> None:
+    session, object_handle, _parent_handle = _session()
+    session = session.with_existing_declaration(
+        declaration_id="change",
+        target=ExistingObjectTarget(object_handle),
+        fields={"notes": "closed"},
+    )
+
+    with pytest.raises(ValueError, match="cleaned file evidence"):
+        business_adapter("object.setNotes").materialize(
+            session,
+            allow_cleaned_file_evidence=True,
+        )
+
+
+@pytest.mark.parametrize(
+    ("operation", "business_fields", "expected_declaration_suffix"),
+    [
+        ("object.delete", {}, []),
+        ("object.setName", {"new_name": "Renamed"}, ["--new-name", "Renamed"]),
+        ("object.setNotes", {"notes": "line 1\nline 2"}, ["--notes", "line 1\nline 2"]),
+        (
+            "object.copy",
+            {"parent_id": PARENT_ID, "name_conflict": "rename"},
+            ["--parent-handle", "boh-parent", "--name-conflict", "rename"],
+        ),
+        (
+            "object.move",
+            {"parent_id": PARENT_ID, "name_conflict": "fail"},
+            ["--parent-handle", "boh-parent", "--name-conflict", "fail"],
+        ),
+    ],
+)
+def test_destructive_helper_constructs_business_preview_for_every_lifecycle_operation(
+    operation: str,
+    business_fields: dict[str, str],
+    expected_declaration_suffix: list[str],
+) -> None:
+    commands: list[list[str]] = []
+
+    def gateway(command: Sequence[str]) -> Mapping[str, object]:
+        argv = list(command)
+        commands.append(argv)
+        if argv[0] == "operation-schema":
+            return {
+                "operation": {"input_mode": "business_declaration"},
+                "business_adapter": {"operation": operation},
+            }
+        if argv[0] == "draft-start":
+            return {
+                "task_authority": "da1-" + "1" * 40,
+                "draft": {"draft_id": "od1-test", "revision": 0},
+            }
+        if argv[0] == "draft-bind-object":
+            handle = "boh-source" if argv[-1] == OBJECT_ID else "boh-parent"
+            return {
+                "bound_object": {"handle": handle},
+                "draft": {"revision": len([row for row in commands if row[0] == "draft-bind-object"])},
+            }
+        if argv[0] == "draft-declare-object-change":
+            return {"draft": {"revision": int(argv[argv.index("--expected-revision") + 1]) + 1}}
+        if argv[0] == "draft-check":
+            return {"draft": {"revision": int(argv[-1])}}
+        if argv[0] == "preview-from-draft":
+            return {
+                "state": "awaiting_confirmation",
+                "executed": False,
+                "transaction_id": "tx1-test",
+            }
+        raise AssertionError(argv)
+
+    preview = create_object_lifecycle_business_preview(
+        gateway,
+        operation=operation,
+        object_id=OBJECT_ID,
+        **business_fields,
+    )
+
+    assert preview["transaction_id"] == "tx1-test"
+    assert commands[0] == ["operation-schema", operation]
+    assert commands[1] == ["draft-start", operation]
+    assert commands[-3] == [
+        "draft-declare-object-change",
+        "od1-test",
+        "--task-authority",
+        "da1-" + "1" * 40,
+        "--expected-revision",
+        "2" if "parent_id" in business_fields else "1",
+        "--object-handle",
+        "boh-source",
+        *expected_declaration_suffix,
+    ]
+    assert commands[-2][0] == "draft-check"
+    assert commands[-1][0] == "preview-from-draft"
 
 
 def _session(

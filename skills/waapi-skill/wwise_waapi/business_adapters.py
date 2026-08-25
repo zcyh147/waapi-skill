@@ -14,7 +14,7 @@ from .object_lifecycle_business_contracts import (
 
 ContractBuilder = Callable[[str, str], dict[str, Any]]
 Materializer = Callable[
-    [str, BusinessDeclarationSession, bool],
+    [str, BusinessDeclarationSession],
     Mapping[str, Any],
 ]
 PreviewCompiler = Callable[
@@ -36,7 +36,6 @@ def _object_lifecycle_contract(operation: str, version: str) -> dict[str, Any]:
 def _materialize_audio_import(
     operation: str,
     session: BusinessDeclarationSession,
-    allow_cleaned_file_evidence: bool,
 ) -> Mapping[str, Any]:
     if operation != "audio.import":  # pragma: no cover - registry invariant
         raise ValueError("audio-import Adapter received the wrong operation")
@@ -44,14 +43,27 @@ def _materialize_audio_import(
 
     return materialize_audio_import_business_request(
         session,
-        allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+        allow_cleaned_file_evidence=False,
+    )
+
+
+def _materialize_audio_import_with_cleaned_file_evidence(
+    operation: str,
+    session: BusinessDeclarationSession,
+) -> Mapping[str, Any]:
+    if operation != "audio.import":  # pragma: no cover - registry invariant
+        raise ValueError("audio-import Adapter received the wrong operation")
+    from .audio_import_business import materialize_audio_import_business_request
+
+    return materialize_audio_import_business_request(
+        session,
+        allow_cleaned_file_evidence=True,
     )
 
 
 def _materialize_object_lifecycle(
     operation: str,
     session: BusinessDeclarationSession,
-    _allow_cleaned_file_evidence: bool,
 ) -> Mapping[str, Any]:
     from .object_lifecycle_business import (
         materialize_object_lifecycle_business_request,
@@ -83,6 +95,7 @@ class BusinessAdapter:
     update_commands: frozenset[str]
     initial_projection_actions: tuple[str, ...]
     active_projection_actions: tuple[str, ...]
+    _cleaned_file_evidence_materializer: Materializer | None = None
     _preview_compiler: PreviewCompiler | None = None
     requires_sound_subtype: bool = False
     supports_field_binding: bool = False
@@ -99,11 +112,13 @@ class BusinessAdapter:
         *,
         allow_cleaned_file_evidence: bool = False,
     ) -> Mapping[str, Any]:
-        return self._materializer(
-            self.operation,
-            session,
-            allow_cleaned_file_evidence,
-        )
+        if allow_cleaned_file_evidence:
+            if self._cleaned_file_evidence_materializer is None:
+                raise ValueError(
+                    f"{self.operation} does not accept cleaned file evidence"
+                )
+            return self._cleaned_file_evidence_materializer(self.operation, session)
+        return self._materializer(self.operation, session)
 
     def accepts_update_command(self, command: str) -> bool:
         return command in self.update_commands
@@ -130,6 +145,9 @@ _AUDIO_IMPORT_DEFINITION = {
     "family": "audio-import",
     "contract_builder": _audio_import_contract,
     "materializer": _materialize_audio_import,
+    "cleaned_file_evidence_materializer": (
+        _materialize_audio_import_with_cleaned_file_evidence
+    ),
     "update_commands": frozenset(
         {
             "draft-business-configure",
@@ -190,6 +208,10 @@ def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdap
     values = dict(definition)
     values["_contract_builder"] = values.pop("contract_builder")
     values["_materializer"] = values.pop("materializer")
+    values["_cleaned_file_evidence_materializer"] = values.pop(
+        "cleaned_file_evidence_materializer",
+        None,
+    )
     values["_preview_compiler"] = values.pop("preview_compiler", None)
     return BusinessAdapter(operation=operation, **values)
 

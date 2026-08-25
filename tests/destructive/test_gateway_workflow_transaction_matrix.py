@@ -47,6 +47,7 @@ from tests.destructive.support.workflow_evidence import (  # pyright: ignore[rep
     validate_switch_assignment_business_evidence,
 )
 from tests.destructive.support.typed_gateway_input import (  # pyright: ignore[reportMissingImports]  # noqa: E402
+    create_object_lifecycle_business_preview,
     create_typed_transaction_preview,
 )
 from wwise_waapi.headless import HeadlessLifecycle  # pyright: ignore[reportMissingImports]  # noqa: E402
@@ -964,80 +965,19 @@ def _complete_object_lifecycle_business_transaction(
     notes: str | None = None,
     name_conflict: str | None = None,
 ) -> dict[str, Mapping[str, Any]]:
-    schema = runtime.gateway(["operation-schema", operation], live=False)
-    assert schema["operation"]["input_mode"] == "business_declaration", schema
-    assert schema["business_adapter"]["operation"] == operation, schema
-    started = runtime.gateway(["draft-start", operation], live=False)
-    draft = started["draft"]
-    draft_id = draft["draft_id"]
-    authority = started["task_authority"]
-
-    def bind(role_id: str, revision: int) -> tuple[str, int]:
-        bound = runtime.gateway(
-            [
-                "draft-bind-object",
-                draft_id,
-                "--task-authority",
-                authority,
-                "--expected-revision",
-                str(revision),
-                "--object-id",
-                role_id,
-            ],
-            live=True,
-        )
-        return bound["bound_object"]["handle"], bound["draft"]["revision"]
-
-    object_handle, revision = bind(object_id, draft["revision"])
-    parent_handle: str | None = None
-    if parent_id is not None:
-        parent_handle, revision = bind(parent_id, revision)
-    declaration = [
-        "draft-declare-object-change",
-        draft_id,
-        "--task-authority",
-        authority,
-        "--expected-revision",
-        str(revision),
-        "--object-handle",
-        object_handle,
-    ]
-    if parent_handle is not None:
-        declaration.extend(["--parent-handle", parent_handle])
-    if new_name is not None:
-        declaration.extend(["--new-name", new_name])
-    if notes is not None:
-        declaration.extend(["--notes", notes])
-    if name_conflict is not None:
-        declaration.extend(["--name-conflict", name_conflict])
-    declared = runtime.gateway(declaration, live=False)
-    checked = runtime.gateway(
-        [
-            "draft-check",
-            draft_id,
-            "--task-authority",
-            authority,
-            "--expected-revision",
-            str(declared["draft"]["revision"]),
-        ],
-        live=True,
+    preview = create_object_lifecycle_business_preview(
+        lambda command: runtime.gateway(
+            command,
+            live=command[0]
+            in {"draft-bind-object", "draft-check", "preview-from-draft"},
+        ),
+        operation=operation,
+        object_id=object_id,
+        parent_id=parent_id,
+        new_name=new_name,
+        notes=notes,
+        name_conflict=name_conflict,
     )
-    preview = runtime.gateway(
-        [
-            "preview-from-draft",
-            draft_id,
-            "--task-authority",
-            authority,
-            "--expected-revision",
-            str(checked["draft"]["revision"]),
-            "--apply",
-            "--ttl",
-            "300",
-        ],
-        live=True,
-    )
-    assert preview["state"] == TransactionState.AWAITING_CONFIRMATION.value, preview
-    assert preview["executed"] is False, preview
     transaction_id = preview["transaction_id"]
     shown = runtime.gateway(
         ["transaction-show", transaction_id, "--summary-only"],

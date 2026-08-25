@@ -35,6 +35,7 @@ from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[repor
     shutdown_sandboxed_wwise,
 )
 from tests.destructive.support.typed_gateway_input import (  # pyright: ignore[reportMissingImports]
+    create_object_lifecycle_business_preview,
     create_typed_transaction_preview,
     typed_wait_topic_command,
 )
@@ -759,14 +760,35 @@ def _complete_transaction(
         "operation": operation,
         "arguments": dict(arguments),
     }
-    preview = create_typed_transaction_preview(
-        lambda command: runtime.gateway(
-            command,
-            live=command[0]
-            in {"draft-check", "preview-from-draft", "typed-call", "typed-operation"},
-        ),
-        request,
-    )
+    if operation in {"object.delete", "object.setName", "object.setNotes"}:
+        object_identity = arguments.get("object")
+        assert isinstance(object_identity, Mapping), arguments
+        assert object_identity.get("kind") == "id", arguments
+        object_id = object_identity.get("value")
+        assert isinstance(object_id, str) and object_id, arguments
+        scalar_value = arguments.get("value")
+        if operation != "object.delete":
+            assert isinstance(scalar_value, str), arguments
+        preview = create_object_lifecycle_business_preview(
+            lambda command: runtime.gateway(
+                command,
+                live=command[0]
+                in {"draft-bind-object", "draft-check", "preview-from-draft"},
+            ),
+            operation=operation,
+            object_id=object_id,
+            new_name=scalar_value if operation == "object.setName" else None,
+            notes=scalar_value if operation == "object.setNotes" else None,
+        )
+    else:
+        preview = create_typed_transaction_preview(
+            lambda command: runtime.gateway(
+                command,
+                live=command[0]
+                in {"draft-check", "preview-from-draft", "typed-call", "typed-operation"},
+            ),
+            request,
+        )
     assert preview["status"] == TransactionState.AWAITING_CONFIRMATION.value
     assert preview["state"] == TransactionState.AWAITING_CONFIRMATION.value
     assert preview["preview_summary"]["request"] == request
