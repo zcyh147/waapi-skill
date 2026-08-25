@@ -507,7 +507,7 @@ def _business_lifecycle_preview_steps(
         selected.append(
             replace(
                 step,
-                name="preview" if step.name == "tx01.preview" else step.subcommand,
+                name="preview" if step.name == "tx01.preview" else step.name,
             )
         )
         if step.name == "tx01.preview":

@@ -14,6 +14,7 @@ from tests.semantic.support.codex_eval_suite import EvalSession, load_eval_suite
 from tests.semantic.support.codex_gateway_broker import (
     ResponseBinding,
     SemanticJsonArgument,
+    validate_operation_draft_protocol_steps,
 )
 
 
@@ -165,12 +166,11 @@ def test_all_cases_and_every_phase_generate_exact_subcommand_order(
     }
     steps = build_expected_gateway_steps(session, values)
 
-    expected_names = (
-        (*expected[:-1], "preview")
-        if case_id in {"M1", "M2", "M4", "M5"} and phase != "confirm"
-        else expected
-    )
-    assert tuple(step.name for step in steps) == expected_names
+    if case_id in {"M1", "M2", "M4", "M5"} and phase != "confirm":
+        assert steps[-1].name == "preview"
+        assert all(step.name.startswith("tx01.") for step in steps[:-1])
+    else:
+        assert tuple(step.name for step in steps) == expected
     assert tuple(step.subcommand for step in steps) == expected
     if case_id not in {"M1", "M2", "M4", "M5"} or phase == "confirm":
         assert tuple(step.subcommand for step in steps) == session.gateway_steps
@@ -190,6 +190,7 @@ def test_migrated_lifecycle_cases_have_no_legacy_preview_ingress(case_id: str) -
     assert steps[-1].subcommand == "preview-from-draft"
     assert all(step.subcommand != "preview" for step in steps)
     assert all("--request-json" not in step.arguments for step in steps)
+    validate_operation_draft_protocol_steps(steps)
 
 
 def test_q1_uses_exact_path_and_fixed_identity_return_fields() -> None:
