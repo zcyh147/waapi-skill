@@ -1471,17 +1471,13 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
     assert catalog["ok"] is True
     assert catalog["offline"] is True
     operations = {item["name"]: item for item in catalog["operations"]}
-    assert set(operations["object.create"]) == {
-        "name",
-        "uri",
-        "family",
-        "summary",
-        "implemented",
-        "boundary",
-        "supported_versions",
-        "required_arguments",
-        "optional_arguments",
-    }
+    assert operations["object.create"]["input_mode"] == "business_declaration"
+    assert operations["object.create"]["next_command"] == [
+        "operation-schema",
+        "object.create",
+    ]
+    assert "required_arguments" not in operations["object.create"]
+    assert "optional_arguments" not in operations["object.create"]
     assert operations["object.create"]["implemented"] is True
     assert operations["object.copy"]["implemented"] is True
     assert operations["object.copy"]["input_mode"] == "business_declaration"
@@ -1505,18 +1501,12 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
     assert exit_code == 0
     detailed = {item["name"]: item for item in detail_catalog["operations"]}
     assert set(detailed["object.create"]["input_modes_by_version"].values()) == {
-        "composer"
+        "business_declaration"
     }
     assert "argument_contract" not in detailed["object.create"]
     assert "constraints" in detailed["object.create"]
     assert "identity_contract" in detailed["object.create"]
-    assert set(detailed["object.create"]["composer_contracts_by_version"]) == {
-        "2021.1",
-        "2022.1",
-        "2023.1",
-        "2024.1",
-        "2025.1",
-    }
+    assert "composer_contracts_by_version" not in detailed["object.create"]
 
     exit_code, schema = execute(["operation-schema", "object.setNotes"], tmp_path=tmp_path)
 
@@ -1736,7 +1726,7 @@ def test_audio_import_operation_schema_keeps_native_hierarchy_mechanics_gateway_
         ("2025.1", r"\Containers\Default Work Unit", "PropertyContainer"),
     ),
 )
-def test_object_create_operation_schema_discloses_versioned_parent_and_merge_contracts(
+def test_object_create_operation_schema_discloses_versioned_business_graph_contract(
     tmp_path: Path,
     version: str,
     default_work_unit_path: str,
@@ -1749,23 +1739,24 @@ def test_object_create_operation_schema_discloses_versioned_parent_and_merge_con
     )
 
     assert exit_code == 0
-    assert payload["operation"]["input_mode"] == "composer"
-    assert payload["composer"]["operation"] == "object.create"
-    assert payload["composer"]["version"] == version
-    root_fields = [
-        field
-        for field in _composer_fields(payload)
-        if len(field["path"]) == 2
-    ]
-    assert any(field["path"] == ["args", "parent"] for field in root_fields)
-    assert next(field for field in root_fields if field["path"] == ["args", "children"])["shape"] == "array"
-    assert any("32 children per parent" in item for item in payload["operation"]["constraints"])
-    assert next(field for field in root_fields if field["path"] == ["args", "on_name_conflict"])["enum"] == [
+    assert payload["operation"]["input_mode"] == "business_declaration"
+    adapter = payload["business_adapter"]
+    assert adapter["operation"] == "object.create"
+    assert adapter["version"] == version
+    assert adapter["settings"]["name_conflict"] == [
         "fail",
         "rename",
         "merge",
         "replace",
     ]
+    assert "native_object_type" in adapter["gateway_derivations"]
+    assert "recursive_object_tree" in adapter["gateway_derivations"]
+    assert adapter["legacy_shallow_composer_public"] is False
+    assert "composer" not in payload
+    assert any(
+        "32 children per parent" in item
+        for item in payload["operation"]["constraints"]
+    )
     assert default_work_unit_path
     assert actor_mixer_type
 
@@ -1791,7 +1782,7 @@ def test_object_create_operation_schema_discloses_versioned_parent_and_merge_con
         ("2025.1", r"\Containers\Default Work Unit", "PropertyContainer"),
     ),
 )
-def test_object_set_operation_schema_discloses_versioned_target_and_metadata_scope(
+def test_object_set_operation_schema_owns_target_and_metadata_scope(
     tmp_path: Path,
     version: str,
     default_work_unit_path: str,
@@ -1804,26 +1795,23 @@ def test_object_set_operation_schema_discloses_versioned_target_and_metadata_sco
     )
 
     assert exit_code == 0
-    fragments = payload["composer"]["registry_fragments"]
-    contract = fragments["default_container_target_contract"]
-    assert contract["resolved_target"] == {
-        "wwise_version": version,
-        "default_container_work_unit_path": default_work_unit_path,
+    assert payload["operation"]["input_mode"] == "business_declaration"
+    adapter = payload["business_adapter"]
+    assert adapter["version"] == version
+    assert adapter["binding"] == {
+        "existing_targets": "bound_object_handles",
+        "new_descendants": "bound_or_planned_parent_handles",
+        "fields": "live_discovered_field_handles",
+        "long_tail_types": "live_discovered_type_handles",
     }
-    assert contract["dynamic_actor_mixer_metadata_scope"][
-        "actor_mixer_object_type"
-    ] == actor_mixer_type
-    assert contract["dynamic_actor_mixer_metadata_scope"]["kind"] == "object_type"
-    assert contract["forbidden_intermediate_routes"] == [
-        "project-default-work-units"
-    ]
-    on_name_conflict = fragments["request_options"]["on_name_conflict"]
-    assert on_name_conflict["default"] == "fail"
-    assert "Omission defaults to fail" in on_name_conflict["description"]
-
+    assert adapter["settings"]["name_conflict"] == ["fail", "rename", "merge"]
+    assert adapter["legacy_shallow_composer_public"] is False
+    assert "composer" not in payload
+    assert default_work_unit_path
+    assert actor_mixer_type
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-def test_object_set_schema_maps_live_query_accessors_to_canonical_mutation_tokens(
+def test_object_set_schema_keeps_metadata_tokens_gateway_owned(
     tmp_path: Path,
     version: str,
 ) -> None:
@@ -1834,28 +1822,13 @@ def test_object_set_schema_maps_live_query_accessors_to_canonical_mutation_token
     )
 
     assert exit_code == 0
-    fragments = payload["composer"]["registry_fragments"]
-    property_name = fragments["scalar_property"]["properties"]["name"]
-    reference_name = fragments["reference"]["properties"]["name"]
-
-    assert property_name["pattern"] == r"^[:_a-zA-Z0-9]+$"
-    assert property_name["live_query_accessor_mapping"] == {
-        "source": "successful_live_query_in_this_conversation",
-        "query": "@Foo",
-        "mutation": "Foo",
-        "transform": "remove_exactly_one_leading_at",
-        "guessing": False,
-    }
-    assert "submit Foo by removing exactly one leading @" in property_name["description"]
-    assert reference_name["live_query_accessor_mapping"] == {
-        "source": "successful_live_query_in_this_conversation",
-        "query": "OutputBus",
-        "mutation": "OutputBus",
-        "transform": "copy_exactly",
-        "guessing": False,
-    }
-    assert "OutputBus remains OutputBus" in reference_name["description"]
-
+    adapter = payload["business_adapter"]
+    assert adapter["binding"]["fields"] == "live_discovered_field_handles"
+    assert "metadata_tokens" in adapter["gateway_derivations"]
+    encoded = json.dumps(payload)
+    assert "live_query_accessor_mapping" not in encoded
+    assert "scalar_property" not in encoded
+    assert "registry_fragments" not in encoded
 
 @pytest.mark.parametrize(
     "version",

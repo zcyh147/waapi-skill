@@ -580,3 +580,195 @@ def test_gateway_compiles_object_create_settings_and_stable_fields(
         ],
         "auto_add_to_source_control": True,
     }
+
+
+def test_gateway_rejects_invalid_existing_declaration_before_revision(
+    tmp_path: Path,
+) -> None:
+    start_code, started = _offline(tmp_path, "draft-start", "object.set")
+    assert start_code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    target_client = _live_client(
+        tmp_path,
+        {
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": PARENT_ID,
+                            "name": "Rain",
+                            "type": "Sound",
+                            "path": (
+                                r"\Actor-Mixer Hierarchy\Default Work Unit\Rain"
+                            ),
+                        }
+                    ]
+                }
+            ]
+        },
+    )
+    bind_code, bound = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-bind-object",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "1",
+            "--object-id",
+            PARENT_ID,
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: target_client,
+    )
+    assert bind_code == 0, bound
+    revision = bound["draft"]["revision"]
+
+    rejected_code, rejected = _offline(
+        tmp_path,
+        "draft-declare-existing",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        str(revision),
+        "--declaration-id",
+        "rain",
+        "--object-handle",
+        bound["bound_object"]["handle"],
+        "--field",
+        "output_bus",
+        "bobj1-does-not-exist",
+    )
+
+    assert rejected_code == 2, rejected
+    assert rejected["error_code"] == "OBJECT_HANDLE_NOT_AVAILABLE"
+    inspected = OperationDraftStore(tmp_path / "state").inspect(
+        draft_id,
+        task_authority=authority,
+    )
+    assert inspected.revision == revision
+    assert inspected.composition["business_session"]["declarations"] == []
+
+
+def test_gateway_adds_subordinate_media_without_model_authored_json(
+    tmp_path: Path,
+) -> None:
+    start_code, started = _offline(tmp_path, "draft-start", "object.set")
+    assert start_code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    client = _live_client(
+        tmp_path,
+        {
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": PARENT_ID,
+                            "name": "Default Work Unit",
+                            "type": "WorkUnit",
+                            "path": r"\Actor-Mixer Hierarchy\Default Work Unit",
+                        }
+                    ]
+                }
+            ]
+        },
+    )
+    bind_code, bound = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-bind-object",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "1",
+            "--object-id",
+            PARENT_ID,
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+    assert bind_code == 0, bound
+    parent_handle = bound["bound_object"]["handle"]
+
+    declare_code, declared = _offline(
+        tmp_path,
+        "draft-declare-new",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "2",
+        "--declaration-id",
+        "voice",
+        "--parent-handle",
+        parent_handle,
+        "--name",
+        "Storm Warning",
+        "--kind",
+        "sound-voice",
+        "--field",
+        "language",
+        "English(US)",
+        "--field",
+        "platform",
+        "Windows",
+    )
+    assert declare_code == 0, declared
+    media_binding = declared["draft"]["next_action_binding"]["add_media"]
+    assert media_binding["native_import_fragment_input"] == "forbidden"
+
+    media_code, added = _offline(
+        tmp_path,
+        "draft-add-media",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "3",
+        "--declaration-id",
+        "voice",
+        "--inline-wav",
+        "StormWarning.wav|UklGRgAAAAAA",
+        "--kind",
+        "sound-voice",
+        "--language",
+        "English(US)",
+        "--originals-subfolder",
+        "Weather/Warnings",
+    )
+    assert media_code == 0, added
+    serialized_session = json.dumps(added["draft"])
+    assert '"import"' not in serialized_session
+    assert "media_files" in serialized_session
+
+    materialized = OperationDraftStore(tmp_path / "state").materialize_request(
+        draft_id,
+        task_authority=authority,
+        expected_revision=4,
+        schema_digest=gateway.operation_draft_schema_digest(
+            "object.set",
+            "2025.1",
+        ),
+        composer_digest=operation_composer_digest(
+            "object.set",
+            "2025.1",
+        ),
+    )
+    child = materialized.request["arguments"]["objects"][0]["children"][0]
+    assert child["import"] == {
+        "files": [
+            {
+                "audio_file_base64": "StormWarning.wav|UklGRgAAAAAA",
+                "originals_subfolder": "Weather/Warnings",
+                "language": "English(US)",
+                "object_type": "Sound",
+            }
+        ]
+    }

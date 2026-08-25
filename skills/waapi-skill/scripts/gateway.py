@@ -245,6 +245,7 @@ from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore
     ExistingObjectTarget,
     NewDescendantTarget,
     bind_live_field,
+    business_repair,
     revalidate_live_field,
     revalidate_live_objects,
     revalidate_live_types,
@@ -347,6 +348,7 @@ OFFLINE_COMMANDS = frozenset(
         "config-set",
         "draft-start",
         "draft-apply",
+        "draft-add-media",
         "draft-business-configure",
         "draft-declare-field-change",
         "draft-declare-object-change",
@@ -1960,6 +1962,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_business_declaration_arguments(draft_declare_existing)
     draft_declare_existing.add_argument("--object-handle", required=True)
+
+    draft_add_media = subparsers.add_parser(
+        "draft-add-media",
+        help=(
+            "Append one exact media artifact to an existing high-level object.set "
+            "declaration without accepting a native import fragment"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_add_media)
+    draft_add_media.add_argument("--declaration-id", required=True)
+    media_source = draft_add_media.add_mutually_exclusive_group(required=True)
+    media_source.add_argument("--media-file")
+    media_source.add_argument("--inline-wav")
+    draft_add_media.add_argument("--kind")
+    draft_add_media.add_argument("--language")
+    draft_add_media.add_argument("--originals-subfolder")
 
     draft_revise_declaration = subparsers.add_parser(
         "draft-revise-declaration",
@@ -7018,6 +7036,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             task_authority=args.task_authority,
         )
     if args.command in {
+        "draft-add-media",
         "draft-business-configure",
         "draft-declare-field-change",
         "draft-declare-object-change",
@@ -10475,7 +10494,48 @@ def dispatch_offline_business_draft_update(
             "Bind one exact live project object before adding business declarations"
         )
     session = BusinessDeclarationSession.from_dict(raw_session)
-    if args.command == "draft-declare-field-change":
+    if args.command == "draft-add-media":
+        media_row = {
+            name: value
+            for name, value in (
+                ("media_file", args.media_file),
+                ("inline_wav", args.inline_wav),
+                ("kind", args.kind),
+                ("language", args.language),
+                ("originals_subfolder", args.originals_subfolder),
+            )
+            if value is not None
+        }
+
+        def update(
+            current: BusinessDeclarationSession,
+        ) -> BusinessDeclarationSession:
+            matches = [
+                row
+                for row in current.declarations
+                if row.declaration_id == args.declaration_id
+            ]
+            if len(matches) != 1:
+                raise business_repair(
+                    "DECLARATION_NOT_AVAILABLE",
+                    field="declaration_id",
+                    draft_revision=current.revision,
+                    action="use one declaration id from the current task",
+                )
+            fields = dict(matches[0].fields)
+            raw_media = fields.get("media_files", [])
+            if not isinstance(raw_media, list):  # pragma: no cover - state invariant
+                raise RuntimeError("business media_files state must be a list")
+            fields["media_files"] = [*raw_media, media_row]
+            candidate = current.revise_declaration(
+                declaration_id=args.declaration_id,
+                fields=fields,
+            )
+            adapter.materialize(candidate)
+            return candidate
+
+        event_type = "declaration.revised"
+    elif args.command == "draft-declare-field-change":
         bound_field = session.handles.bound_field(args.field_handle)
         fields: dict[str, Any] = {"field_handle": args.field_handle}
         if args.business_value is not None:
@@ -10669,11 +10729,16 @@ def dispatch_offline_business_draft_update(
 
             event_type = "declaration.added"
         elif args.command == "draft-declare-existing":
-            update = lambda current: current.with_existing_declaration(
-                declaration_id=args.declaration_id,
-                target=ExistingObjectTarget(args.object_handle),
-                fields=fields,
-            )
+            def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+                candidate = current.with_existing_declaration(
+                    declaration_id=args.declaration_id,
+                    target=ExistingObjectTarget(args.object_handle),
+                    fields=fields,
+                )
+                if adapter.family == "object-creation-graph":
+                    adapter.materialize(candidate)
+                return candidate
+
             event_type = "declaration.added"
         else:
             def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
@@ -15781,6 +15846,7 @@ def _business_next_action_binding(
     configure_prefix = [*base, "draft-business-configure", *binding]
     declare_new_prefix = [*base, "draft-declare-new", *binding]
     declare_existing_prefix = [*base, "draft-declare-existing", *binding]
+    add_media_prefix = [*base, "draft-add-media", *binding]
     declare_object_change_prefix = [
         *base,
         "draft-declare-object-change",
@@ -16039,6 +16105,30 @@ def _business_next_action_binding(
                         "[--add-to-source-control|--no-add-to-source-control]",
                     ],
                 },
+                **(
+                    {
+                        "add_media": {
+                            **operation_draft_prefix_copy_binding(add_media_prefix),
+                            "append": [
+                                "--declaration-id",
+                                "<existing-task-local-declaration-id>",
+                                "--media-file",
+                                "<exact-user-media-path>",
+                                "or",
+                                "--inline-wav",
+                                "<exact-user-inline-wav>",
+                                "[--kind <stable-semantic-kind-or-selected-type-handle>]",
+                                "[--language <exact-project-language>]",
+                                "[--originals-subfolder <exact-relative-subfolder>]",
+                            ],
+                            "supported_versions": ["2023.1", "2024.1", "2025.1"],
+                            "native_import_fragment_input": "forbidden",
+                            "repeat_for_each_media_artifact": True,
+                        }
+                    }
+                    if record.version in {"2023.1", "2024.1", "2025.1"}
+                    else {}
+                ),
                 "completion_candidate": {
                     "condition": "all_user_requested_object_outcomes_are_declared",
                     "fixed_full_argv": check,

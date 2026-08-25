@@ -70,7 +70,7 @@ def execute(
     )
 
 
-def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
+def test_public_business_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
     tmp_path: Path,
 ) -> None:
     start_code, started = execute(tmp_path, "draft-start", "object.set")
@@ -83,119 +83,24 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
     task_authority = started["task_authority"]
     assert DRAFT_ID_RE.fullmatch(draft_id)
     assert TASK_AUTHORITY_RE.fullmatch(task_authority)
-    draft_apply_prefix = [
-        "python",
-        str(waapi_gateway.GATEWAY_RUNNER_PATH),
-        "gateway.py",
-        "draft-apply",
-        draft_id,
-        "--task-authority",
-        task_authority,
-        "--expected-revision",
-        "1",
-        "--compact",
-        "--facts",
-    ]
-    assert started["draft"] == {
-        "contract": "waapi-skill.operation-draft/v1",
-        "draft_id": draft_id,
-        "lifecycle_state": "editable",
-        "revision": 1,
-        "next_action_binding": {
-            "contract": "waapi-skill.operation-draft-next-action/v1",
-            "shell_tool_timeout_ms": 30_000,
-            "allowed_action_argv": {
-                "set_request_option": ["--option", "NAME", "TYPE", "VALUE"],
-                "clear_request_option": ["--option", "NAME"],
-                "add_target": [
-                    "--target", "SELECTOR_KIND", "SELECTOR_VALUES...",
-                    "[--name VALUE]", "[--notes VALUE]", "[--platform VALUE]",
-                    "[--list-mode VALUE]", "[--on-name-conflict VALUE]",
-                    "[--property NAME TYPE VALUE]...",
-                    "[--reference NAME SELECTOR_KIND SELECTOR_VALUES...]...",
-                ],
-            },
-            "action_argv_discipline": {
-                "source": "allowed_action_argv[action-name]",
-                "copy_placeholder_positions_exactly": True,
-                "insert_type_only_where_template_contains_TYPE": True,
-            },
-            "draft_id": draft_id,
-            "expected_revision": 1,
-            "one_atomic_action_batch_only": True,
-            "minimum_actions": 1,
-            "maximum_actions": 6,
-            "then_read_next_response": True,
-            "precompute_or_increment_revision": False,
-            "fixed_argv_prefix": draft_apply_prefix,
-            "fixed_argv_prefix_copy": (
-                waapi_gateway.operation_draft_copy_command(draft_apply_prefix)
-            ),
-            "fixed_argv_prefix_copy_instruction": {
-                "contract": (
-                    "waapi-skill.operation-draft-command-copy-instruction/v1"
-                ),
-                "source_field": "fixed_argv_prefix_copy",
-                "action": (
-                    "copy_verbatim_then_append_complete_typed_action_groups"
-                ),
-                "forbidden_transformations": [
-                    "reconstruct",
-                    "shorten",
-                    "normalize",
-                    "substitute_path_segments",
-                    "select_another_field",
-                ],
-                "opaque_token_guard": {
-                    "task_authority": {
-                        "prefix": "da1-",
-                        "hex_characters_after_prefix": 40,
-                        "truncate_to_32_hex_characters": "invalid",
-                    }
-                },
-            },
-            "append_every_next_complete_handle_ready_typed_action_until_limit_or_new_handle_dependency": [
-                "--action",
-                "<action-name>",
-                "<typed-fact-arguments>",
-            ],
-            "replace_only": [
-                "<action-name>",
-                "<typed-fact-arguments>",
-            ],
-            "copy_all_other_values_exactly": True,
-        },
-        "binding": {
-            "operation": "object.set",
-            "version": "2022.1",
-            "schema_digest": (
-                "2b6d3903c5b3e11618c3eaf0a3d5a26aa0045db26750320f3a8ce8c7da004cee"
-            ),
-        },
-        "created_at": started["draft"]["created_at"],
-        "updated_at": started["draft"]["updated_at"],
-        "expires_at": started["draft"]["expires_at"],
-        "current_facts": [],
-        "request_options": {},
-        "missing_fields": ["target"],
-        "missing_fields_status": "incomplete",
-        "allowed_actions": [
-            "set_request_option",
-            "clear_request_option",
-            "add_target",
-        ],
-        "allowed_lifecycle_commands": ["draft-inspect", "draft-cancel"],
-        "check": None,
-        "seal": None,
-        "agent_control": {
-            "terminal": False,
-            "required_outcome_before_reply": "preview_or_structured_refusal",
-            "next": "follow_next_action_binding",
-            "reply_or_claim_preview_now": "invalid",
-        },
+
+    draft = started["draft"]
+    assert draft["lifecycle_state"] == "editable"
+    assert draft["revision"] == 1
+    assert draft["binding"]["operation"] == "object.set"
+    assert draft["binding"]["version"] == "2022.1"
+    assert draft["business_revision"] == 0
+    assert draft["declarations"] == []
+    assert draft["missing_fields"] == ["business_declaration"]
+    assert draft["allowed_actions"] == ["bind-object"]
+    binding = draft["next_action_binding"]
+    assert binding["contract"] == "waapi-skill.business-draft-next-action/v1"
+    assert binding["required_next_phase"] == "bind_existing_business_object"
+    assert binding["responsibility_split"] == {
+        "agent": "natural_language_to_closed_high_level_business_facts",
+        "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
     }
-    assert started["draft"]["created_at"] == started["draft"]["updated_at"]
-    assert started["draft"]["expires_at"] > started["draft"]["created_at"]
+    assert "draft-apply" not in json.dumps(binding)
     assert task_authority not in json.dumps(started["session_context"])
 
     inspect_code, inspected = execute(
@@ -207,23 +112,12 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
     )
 
     assert inspect_code == 0
-    inspected_draft = dict(inspected["draft"])
-    inspected_binding = inspected_draft.pop("next_action_binding")
-    started_draft = dict(started["draft"])
-    started_draft.pop("next_action_binding")
-    started_draft.pop("agent_control")
-    assert "agent_control" not in inspected_draft
-    assert inspected_draft == started_draft
-    assert inspected_binding["fixed_argv_prefix"][6] == (
-        "<task-authority-from-draft-start>"
-    )
-    assert inspected_binding["replace_only"] == [
-        "<task-authority-from-draft-start>",
-        "<action-name>",
-        "<typed-fact-arguments>",
-    ]
     assert "task_authority" not in inspected
     assert task_authority not in json.dumps(inspected)
+    inspected_binding = inspected["draft"]["next_action_binding"]
+    assert "<task-authority-from-draft-start>" in json.dumps(inspected_binding)
+    assert inspected["draft"]["binding"] == draft["binding"]
+    assert inspected["draft"]["declarations"] == []
 
     cancel_code, cancelled = execute(
         tmp_path,
@@ -238,13 +132,11 @@ def test_public_draft_lifecycle_is_offline_task_bound_and_cross_invocation(
     assert cancel_code == 0
     assert cancelled["draft"]["lifecycle_state"] == "cancelled"
     assert cancelled["draft"]["revision"] == 2
-    assert cancelled["draft"]["current_facts"] == []
+    assert cancelled["draft"]["declarations"] == []
     assert cancelled["draft"]["missing_fields"] == []
     assert cancelled["draft"]["allowed_actions"] == []
     assert "task_authority" not in cancelled
     assert not (tmp_path / "state" / "transactions").exists()
-
-
 def test_public_draft_denial_is_non_enumerable_and_does_not_echo_authority(
     tmp_path: Path,
 ) -> None:

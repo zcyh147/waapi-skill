@@ -372,7 +372,7 @@ def test_every_metadata_field_lane_exposes_only_business_handles(
         assert "--token" not in json.dumps(payload)
 
 
-def test_generic_draft_start_requires_first_fact_batch_before_disclosure(
+def test_business_draft_start_discloses_binding_before_declaration(
     tmp_path: Path,
 ) -> None:
     schema_code, schema = offline_execute(
@@ -382,28 +382,13 @@ def test_generic_draft_start_requires_first_fact_batch_before_disclosure(
         version="2021.1",
     )
     assert schema_code == 0, schema
-    schema = json.loads(
-        waapi_gateway.gateway_stdout_json_encoder(schema).encode(schema)
-    )
-    branch_table = schema["composer"]["top_level_fact_plan"][
-        "branch_choice_handle_table"
+    assert schema["operation"]["input_mode"] == BUSINESS_DECLARATION_INPUT_MODE
+    assert schema["business_adapter"]["start"]["gateway_argv"] == [
+        "draft-start",
+        "object.create",
     ]
-    assert branch_table["columns"] == [
-        "field_handle",
-        "constant_field",
-        "choices",
-    ]
-    assert branch_table["rows"][0] == [
-        "trh1-04ddc827227ba0c5ff771edd",
-        "kind",
-        [
-            ["id", "trh1-a5081819643837eefc0e55fb"],
-            ["path", "trh1-29073152c568e1f82b5621b7"],
-            ["exact-type-name", "trh1-022ff465c2cb2094f5442531"],
-            ["direct-child", "trh1-9b6f1d5e8be362bdbfda1cf8"],
-            ["scoped-name", "trh1-059c99da4210b53a0d7a5c4c"],
-        ],
-    ]
+    assert "composer" not in schema
+
     code, payload = offline_execute(
         tmp_path,
         "--state-dir",
@@ -414,144 +399,26 @@ def test_generic_draft_start_requires_first_fact_batch_before_disclosure(
     )
 
     assert code == 0, payload
-    binding = payload["draft"]["next_action_binding"]
-    assert binding["required_next_phase"] == "typed_fact_batch"
-    assert binding["fact_order_source"] == (
-        "/operation-schema/composer/construction_order"
-    )
-    assert binding["first_batch_rule"] == (
-        "submit the next 6 schema-ordered facts when available; otherwise "
-        "submit every remaining fact before disclosure"
-    )
-    assert binding["branch_choice_rule"] == (
-        "after choose, add required selected-branch constant and prompt-value "
-        "facts before the next top-level fact"
-    )
-    assert binding["selected_branch_fact_completion"] == {
-        "choose_only": "invalid",
-        "same_batch_before_next_top_level_fact": True,
-        "path_selector_exact_sequence": [
-            "choose branch handle with the path choice handle",
-            "set selected path choice kind handle to string path",
-            "set selected path choice value handle to the exact business path",
-        ],
-        "exact_type_name_selector_exact_sequence": [
-            "choose branch handle with the exact-type-name choice handle",
-            "set selected choice kind handle to string exact-type-name",
-            "set selected choice type handle to the exact business object type",
-            "set selected choice name handle to the exact business object name",
-        ],
-        "copy_handles_from_operation_schema_exactly": True,
+    draft = payload["draft"]
+    assert draft["missing_fields"] == ["business_declaration"]
+    assert draft["allowed_actions"] == ["bind-object", "configure"]
+    binding = draft["next_action_binding"]
+    assert binding["required_next_phase"] == "bind_existing_business_object"
+    assert binding["responsibility_split"] == {
+        "agent": "natural_language_to_closed_high_level_business_facts",
+        "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
     }
-    assert binding["dynamic_disclosure_before_first_fact"] == "invalid"
-    disclosures = binding["root_dynamic_disclosure_commands"]
-    assert disclosures["selection"] == (
-        "first unsubmitted business-present root in schema order"
-    )
-    assert disclosures["activation_gate"] == {
-        "source": "/draft/next_action_binding/next_phase_decision",
-        "required_selected_candidate": "dynamic_disclosure",
-        "while_remaining_top_level_fact_batch_is_selected": "do_not_execute_any_row",
-    }
-    children = next(
-        row for row in disclosures["rows"] if row["name"] == "children"
-    )
-    assert children["business_value_pointer"] == "/args/children"
-    assert children["argv_by_shape"]["object"] == [
-        "request-array-item",
-        "object.create",
-        "--schema-digest",
-        payload["draft"]["binding"]["schema_digest"],
-        "--array-handle",
-        children["field_handle"],
-        "--index",
-        "0",
-        "--shape",
-        "object",
+    assert binding["forbidden_inputs"] == [
+        "native_request",
+        "model_invented_object_path",
+        "object_type",
+        "metadata_scope",
+        "waapi_args",
+        "waapi_options",
     ]
-    expected_disclosure_argv = [
-        "python",
-        str(waapi_gateway.GATEWAY_RUNNER_PATH),
-        "gateway.py",
-        *children["argv_by_shape"]["object"],
-    ]
-    assert children["copy_command_by_shape"]["object"] == (
-        waapi_gateway.operation_draft_copy_command(expected_disclosure_argv)
-    )
-    assert children["copy_instruction"] == {
-        "contract": "waapi-skill.operation-draft-command-copy-instruction/v1",
-        "source_field": "copy_command_by_shape.object",
-        "action": "execute_verbatim_as_one_shell_tool_call",
-        "forbidden_transformations": [
-            "reconstruct",
-            "shorten",
-            "normalize",
-            "substitute_path_segments",
-            "select_another_field",
-        ],
-    }
-    assert disclosures["copy_selected_argv_exactly"] is True
-    assert disclosures["copy_selected_command_exactly"] is True
-
-    type_handle = next(
-        field.handle
-        for field in waapi_gateway.draft_operation_request_contract(
-            "object.create", "2021.1"
-        ).fields
-        if field.parent_handle is None and field.name == "type"
-    )
-    apply_code, applied = offline_execute(
-        tmp_path,
-        "--state-dir",
-        str(tmp_path / "state"),
-        "draft-apply",
-        payload["draft"]["draft_id"],
-        "--task-authority",
-        payload["task_authority"],
-        "--expected-revision",
-        "1",
-        "--compact",
-        "--facts",
-        "--action",
-        "add_typed_fact",
-        "--fact-action",
-        "set",
-        "--field-handle",
-        type_handle,
-        "--value-type",
-        "string",
-        "--fact-value",
-        "ActorMixer",
-        version="2021.1",
-    )
-    assert apply_code == 0, applied
-    assert applied["draft"]["next_action_binding"][
-        "root_dynamic_disclosure_commands"
-    ] == disclosures
-    assert applied["draft"]["next_action_binding"][
-        "prompt_fact_completion_guard"
-    ] == {
-        "schema_optional_is_not_evidence_of_prompt_absence": True,
-        "account_for_every_prompt_present_scalar_array_item_and_map_entry": True,
-        "copy_boolean_values_exactly": True,
-        "infer_or_replace_prompt_values": "invalid",
-    }
-    assert applied["draft"]["agent_control"] == {
-        "terminal": False,
-        "required_outcome_before_reply": "preview_or_structured_refusal",
-        "next": "follow_next_action_binding",
-        "reply_or_claim_preview_now": "invalid",
-    }
-    public_payload = waapi_gateway.gateway_stdout_payload(applied)
-    encoded = waapi_gateway.gateway_stdout_json_encoder(public_payload).encode(
-        public_payload
-    )
-    assert '"completion_candidate"' not in encoded
-    assert '"root_dynamic_disclosure_commands"' in encoded
-    assert '"draft-apply"' in encoded[:4096]
-
-
-def test_object_create_prioritizes_collision_policy_before_optional_containers(
+    assert "typed_fact_batch_discipline" not in binding
+    assert "draft-apply" not in json.dumps(binding)
+def test_object_create_discloses_collision_policy_as_business_setting(
     tmp_path: Path,
 ) -> None:
     code, payload = offline_execute(
@@ -562,12 +429,15 @@ def test_object_create_prioritizes_collision_policy_before_optional_containers(
     )
 
     assert code == 0, payload
-    rows = payload["composer"]["top_level_fact_plan"]["rows"]
-    names = [row[1] for row in rows]
-    assert names.index("on_name_conflict") < names.index("notes")
-    assert names.index("on_name_conflict") < names.index("properties")
-
-
+    adapter = payload["business_adapter"]
+    assert adapter["settings"]["name_conflict"] == [
+        "fail",
+        "rename",
+        "merge",
+        "replace",
+    ]
+    assert adapter["declaration"]["bound_field_handle_container"] == "field_values"
+    assert "composer" not in payload
 def test_migrated_object_change_rejects_the_legacy_typed_operation_ingress(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -751,7 +621,7 @@ def _without_route_specific_schema_fields(payload: Mapping[str, Any]) -> dict[st
     return result
 
 
-def test_normal_object_set_schema_and_detail_expose_only_composer_input(
+def test_normal_object_set_schema_and_detail_expose_only_business_input(
     tmp_path: Path,
 ) -> None:
     schema_code, schema = offline_execute(
@@ -764,198 +634,34 @@ def test_normal_object_set_schema_and_detail_expose_only_composer_input(
     detail_code, detail = offline_execute(tmp_path, "operations", "--detail")
 
     assert schema_code == detail_code == 0
-    assert schema["operation"]["input_mode"] == COMPOSER_INPUT_MODE
-    assert "input_modes_by_version" not in schema["operation"]
+    assert schema["operation"]["input_mode"] == BUSINESS_DECLARATION_INPUT_MODE
+    assert "composer" not in schema
+    adapter = schema["business_adapter"]
+    assert adapter["input_mode"] == BUSINESS_DECLARATION_INPUT_MODE
+    assert adapter["legacy_shallow_composer_public"] is False
+    assert adapter["declaration"]["subcommands"] == [
+        "draft-declare-existing",
+        "draft-declare-new",
+    ]
+    encoded = json.dumps(schema)
+    for native_term in (
+        "registry_fragments",
+        "top_level_fact_plan",
+        "property_token",
+        "waapi_args",
+        "waapi_options",
+    ):
+        assert native_term not in encoded
+
     expected_modes = {
-        "2022.1": COMPOSER_INPUT_MODE,
-        "2023.1": COMPOSER_INPUT_MODE,
-        "2024.1": COMPOSER_INPUT_MODE,
-        "2025.1": COMPOSER_INPUT_MODE,
+        "2022.1": BUSINESS_DECLARATION_INPUT_MODE,
+        "2023.1": BUSINESS_DECLARATION_INPUT_MODE,
+        "2024.1": BUSINESS_DECLARATION_INPUT_MODE,
+        "2025.1": BUSINESS_DECLARATION_INPUT_MODE,
     }
     rows = {row["name"]: row for row in detail["operations"]}
     assert rows["object.set"]["input_modes_by_version"] == expected_modes
-    assert "input_mode" not in rows["object.set"]
-    assert "request_envelope" not in schema
-    assert "request_envelope_policy" not in schema
-    assert schema["composer"]["contract"] == "waapi-skill.operation-composer/v1"
-    assert schema["composer"]["action_shapes"]["add_target"] == {
-        "fixed_fields": {
-            "contract": "waapi-skill.operation-draft-action/v1",
-            "action": "add_target",
-        },
-        "required_fields": ["selector"],
-        "optional_fields": [
-            "name",
-            "notes",
-            "platform",
-            "list_mode",
-            "on_name_conflict",
-            "properties",
-            "references",
-        ],
-    }
-    assert schema["composer"]["flat_target_row_discipline"] == {
-        "initial_action": "add_target",
-        "prior_gateway_id": "opaque_exact_copy_only",
-        "include_every_known_field": [
-            "name",
-            "notes",
-            "platform",
-            "list_mode",
-            "on_name_conflict",
-            "properties",
-            "references",
-        ],
-        "split_initial_row_across_follow_up_actions": False,
-        "follow_up_flat_actions": "corrections_only",
-        "metadata_dependency_activation": (
-            "agent_selects_only_requested_exact_tokens; Gateway validates and "
-            "activates required dependency values"
-        ),
-        "unrequested_dependency_flags_are_not_action_fields": True,
-        "reference_companion_fact_policy": {
-            "submit_reference_only_when_that_is_the_user_fact": True,
-            "reference_does_not_authorize_a_companion_property_fact": True,
-            "gateway_owns_required_reference_activation": True,
-            "output_bus_example": (
-                "OutputBus does not authorize an OverrideOutput action field"
-            ),
-        },
-        "selector_only_allowed_for": [
-            "nested_children",
-            "closed_lists",
-            "embedded_import",
-        ],
-    }
-    assert schema["composer"]["start"][
-        "subcommand_after_preconditions"
-    ] == "draft-start"
-    assert schema["composer"]["start"][
-        "gateway_argv_after_preconditions"
-    ] == [
-        "draft-start",
-        "object.set",
-    ]
-    assert "required_sequence" not in schema["composer"]["start"]["preconditions"]
-    assert schema["composer"]["start"]["preconditions"][
-        "activation_decision"
-    ]["when_skipped_continue_same_turn_with"] == "draft-start"
-    assert schema["composer"]["start"]["preconditions"][
-        "metadata_gateway_argv_template"
-    ] == [
-        "metadata",
-        "discover",
-        "--object-type",
-        "<exact-shared-target-type>",
-        "--query",
-        "<requested-field-name>",
-        "--limit",
-        "<1..8>",
-    ]
-    assert schema["composer"]["start"]["preconditions"][
-        "forbidden_scope_flags"
-    ] == ["--object"]
-    assert schema["composer"]["apply"]["gateway_argv"] == [
-        "draft-apply",
-        "<draft_id>",
-        "--task-authority",
-        "<task_authority>",
-        "--expected-revision",
-        "<revision>",
-        "--compact",
-        "--facts",
-        "--action",
-        "<action-name>",
-        "<typed-fact-arguments>",
-    ]
-    assert len(
-        json.dumps(
-            schema,
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ).encode("utf-8")
-    ) < 32 * 1024
-    assert schema["composer"]["apply"]["revision_discipline"] == {
-        "mode": "one_ordered_atomic_batch_then_read",
-        "action_count": {"minimum": 1, "maximum": 6},
-        "batch_fill": {
-            "mode": "greedy_schema_order",
-            "rule": (
-                "append the next complete handle-independent action while it "
-                "fits; execute a shorter batch only when the next action "
-                "depends on a returned handle or no action remains"
-            ),
-            "split_one_complete_action": "forbidden",
-        },
-        "repeat_complete_action_group": [
-            "--action",
-            "<action-name>",
-            "<typed-fact-arguments>",
-        ],
-        "revision_delta": "action_count",
-        "failure": "unchanged",
-        "expected_revision_source": "/draft/revision",
-        "next_action_template_source": (
-            "/draft/next_action_binding/fixed_argv_prefix"
-        ),
-        "precompute_or_increment_revision": False,
-    }
-    assert schema["composer"]["completion_discipline"] == {
-        "successful_action_response_is_complete": True,
-        "compact_projection_is_not_truncation": True,
-        "schema_required_fields_status_scope": (
-            "structural_preview_readiness_only"
-        ),
-        "construction_boundary": {
-            "phase": "preview_construction",
-            "mutation": False,
-            "complete": False,
-            "required_terminal": "preview",
-            "before": "continue_no_confirm_no_end",
-        },
-    }
-    assert schema["composer"]["check"]["gateway_argv"] == [
-        "draft-check",
-        "<draft_id>",
-        "--task-authority",
-        "<task_authority>",
-        "--expected-revision",
-        "<revision>",
-    ]
-    assert schema["composer"]["seal"]["gateway_argv"] == [
-        "preview-from-draft",
-        "<draft_id>",
-        "--task-authority",
-        "<task_authority>",
-        "--expected-revision",
-        "<revision>",
-        "--apply",
-    ]
-    assert "optional_apply_flag" not in schema["composer"]["seal"]
-    assert schema["composer"]["cancel"]["gateway_argv"] == [
-        "draft-cancel",
-        "<draft_id>",
-        "--task-authority",
-        "<task_authority>",
-        "--expected-revision",
-        "<revision>",
-    ]
-    assert schema["composer"]["seal_subcommand"] == "preview-from-draft"
-    assert "request_contract" not in schema["operation"]
-    assert "argument_contract" not in schema["operation"]
-    assert "required_arguments" not in schema["operation"]
-    assert "optional_arguments" not in schema["operation"]
-    assert "request_contract" not in rows["object.set"]
-    assert "argument_contract" not in rows["object.set"]
-    assert set(rows["object.set"]["composer_contracts_by_version"]) == set(
-        expected_modes
-    )
-    assert "legacy-preview" not in json.dumps(schema)
-    assert "legacy-operation-schema" not in json.dumps(schema)
-    assert "legacy-preview" not in json.dumps(detail)
-    assert "legacy-operation-schema" not in json.dumps(detail)
-
-
+    assert "composer_contracts_by_version" not in rows["object.set"]
 def test_normal_audio_import_schema_exposes_only_its_business_declaration_input(
     tmp_path: Path,
 ) -> None:
@@ -1541,8 +1247,7 @@ def test_object_lifecycle_draft_check_rejects_stale_bound_identity(
 def test_structurally_distinct_adapters_share_one_public_lifecycle(
     tmp_path: Path,
 ) -> None:
-    projections: dict[str, dict[str, Any]] = {}
-    for operation in ("object.set", "object.create"):
+    for operation in ("object.set", "object.create", "audio.import"):
         code, payload = offline_execute(
             tmp_path / operation.replace(".", "-"),
             "--version",
@@ -1550,36 +1255,19 @@ def test_structurally_distinct_adapters_share_one_public_lifecycle(
             "operation-schema",
             operation,
         )
-        assert code == 0
-        projections[operation] = payload["composer"]
 
-    audio_code, audio_payload = offline_execute(
-        tmp_path / "audio-import",
-        "--version",
-        "2022.1",
-        "operation-schema",
-        "audio.import",
-    )
-    assert audio_code == 0
-    assert audio_payload["business_adapter"]["input_mode"] == (
-        BUSINESS_DECLARATION_INPUT_MODE
-    )
-    assert audio_payload["business_adapter"]["start"]["gateway_argv"] == [
-        "draft-start",
-        "audio.import",
-    ]
-    assert audio_payload["business_adapter"]["commands"][-2:] == [
-        "draft-check",
-        "preview-from-draft",
-    ]
-    assert "composer" not in audio_payload
+        assert code == 0
+        adapter = payload["business_adapter"]
+        assert adapter["input_mode"] == BUSINESS_DECLARATION_INPUT_MODE
+        assert adapter["start"]["gateway_argv"] == ["draft-start", operation]
+        assert adapter["legacy_shallow_composer_public"] is False
+        assert "composer" not in payload
 def test_schema_input_mode_projection_is_isolated_by_exact_operation_key(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import wwise_waapi.operation_registry as registry
 
-    migrated_names = {"object.set"}
     monkeypatch.setattr(
         registry,
         "OPERATION_INPUT_MODE_LANES",
@@ -1589,7 +1277,7 @@ def test_schema_input_mode_projection_is_isolated_by_exact_operation_key(
                 version=lane.version,
                 input_mode=(
                     COMPOSER_INPUT_MODE
-                    if lane.operation in migrated_names
+                    if lane.operation == "object.set"
                     else lane.input_mode
                 ),
             )
@@ -1599,8 +1287,8 @@ def test_schema_input_mode_projection_is_isolated_by_exact_operation_key(
 
     cases = (
         ("object.set", "2025.1", COMPOSER_INPUT_MODE),
-        ("object.setRTPC", "2025.1", COMPOSER_INPUT_MODE),
-        ("object.createPlugin", "2025.1", COMPOSER_INPUT_MODE),
+        ("object.setRTPC", "2025.1", BUSINESS_DECLARATION_INPUT_MODE),
+        ("object.createPlugin", "2025.1", BUSINESS_DECLARATION_INPUT_MODE),
         ("lua.executeCoreInline", "2025.1", COMPOSER_INPUT_MODE),
         ("lua.executeCoreFile", "2025.1", COMPOSER_INPUT_MODE),
     )

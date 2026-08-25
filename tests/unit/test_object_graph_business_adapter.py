@@ -422,3 +422,298 @@ def test_object_set_compiles_multi_object_changes_and_new_descendants(
             },
         ]
     }
+
+
+def test_set_rtpc_rejects_curve_value_outside_bound_property_range() -> None:
+    session, _parent_handle = _session("2025.1")
+    target = session.handles.bind_object(
+        object_id="{44444444-4444-4444-4444-444444444444}",
+        name="Rain",
+        object_type="Sound",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+    )
+    control = session.handles.bind_object(
+        object_id="{55555555-5555-5555-5555-555555555555}",
+        name="Weather Intensity",
+        object_type="GameParameter",
+        path=r"\Game Parameters\Default Work Unit\Weather Intensity",
+    )
+    volume = session.handles.bind_field(
+        scope_kind="object",
+        scope_value=target.object_id,
+        token="Volume",
+        field_kind="property",
+        value_type="number",
+        restrictions={"minimum": -10.0, "maximum": 10.0},
+        metadata_digest="e" * 64,
+    )
+    session = session.with_existing_declaration(
+        declaration_id="rain-volume-rtpc",
+        target=ExistingObjectTarget(target.handle),
+        fields={
+            "control_input_handle": control.handle,
+            "curve_points": [{"x": 0, "y": -12, "shape": "Linear"}],
+            "field_handle": volume.handle,
+        },
+    )
+
+    with pytest.raises(BusinessDeclarationError) as rejected:
+        business_adapter("object.setRTPC").materialize(session)
+
+    assert rejected.value.repair["error_code"] == "FIELD_VALUE_OUT_OF_RANGE"
+
+
+def test_set_rtpc_rejects_more_than_256_business_points() -> None:
+    session, _parent_handle = _session("2025.1")
+    target = session.handles.bind_object(
+        object_id="{44444444-4444-4444-4444-444444444444}",
+        name="Rain",
+        object_type="Sound",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+    )
+    control = session.handles.bind_object(
+        object_id="{55555555-5555-5555-5555-555555555555}",
+        name="Weather Intensity",
+        object_type="GameParameter",
+        path=r"\Game Parameters\Default Work Unit\Weather Intensity",
+    )
+    volume = session.handles.bind_field(
+        scope_kind="object",
+        scope_value=target.object_id,
+        token="Volume",
+        field_kind="property",
+        value_type="number",
+        restrictions={"minimum": -200.0, "maximum": 200.0},
+        metadata_digest="e" * 64,
+    )
+    session = session.with_existing_declaration(
+        declaration_id="rain-volume-rtpc",
+        target=ExistingObjectTarget(target.handle),
+        fields={
+            "control_input_handle": control.handle,
+            "curve_points": [
+                {"x": index, "y": 0, "shape": "Linear"}
+                for index in range(257)
+            ],
+            "field_handle": volume.handle,
+        },
+    )
+
+    with pytest.raises(BusinessDeclarationError) as rejected:
+        business_adapter("object.setRTPC").materialize(session)
+
+    assert rejected.value.repair["error_code"] == "RTPC_POINT_LIMIT_INVALID"
+
+
+@pytest.mark.parametrize(
+    ("operation", "shape", "error_code"),
+    (
+        ("object.create", "depth", "OBJECT_GRAPH_DEPTH_LIMIT_EXCEEDED"),
+        ("object.create", "children", "OBJECT_GRAPH_CHILD_LIMIT_EXCEEDED"),
+        ("object.set", "nodes", "OBJECT_GRAPH_NODE_LIMIT_EXCEEDED"),
+    ),
+)
+def test_object_graph_limits_return_business_repairs(
+    operation: str,
+    shape: str,
+    error_code: str,
+) -> None:
+    session, parent_handle = _session("2025.1")
+    if shape == "depth":
+        current_parent = parent_handle
+        for index in range(9):
+            session = session.with_new_declaration(
+                declaration_id=f"depth-{index}",
+                target=NewDescendantTarget(
+                    parent_handle=current_parent,
+                    name=f"Depth {index}",
+                    kind="actor-mixer",
+                ),
+                fields={},
+            )
+            current_parent = session.declarations[-1].result_handle
+    elif shape == "children":
+        session = session.with_new_declaration(
+            declaration_id="root",
+            target=NewDescendantTarget(
+                parent_handle=parent_handle,
+                name="Root",
+                kind="actor-mixer",
+            ),
+            fields={},
+        )
+        root_handle = session.declarations[-1].result_handle
+        for index in range(33):
+            session = session.with_new_declaration(
+                declaration_id=f"child-{index}",
+                target=NewDescendantTarget(
+                    parent_handle=root_handle,
+                    name=f"Child {index}",
+                    kind="sound-sfx",
+                ),
+                fields={},
+            )
+    else:
+        for index in range(129):
+            session = session.with_new_declaration(
+                declaration_id=f"node-{index}",
+                target=NewDescendantTarget(
+                    parent_handle=parent_handle,
+                    name=f"Node {index}",
+                    kind="sound-sfx",
+                ),
+                fields={},
+            )
+
+    with pytest.raises(BusinessDeclarationError) as captured:
+        business_adapter(operation).materialize(session)
+
+    assert captured.value.error_code == error_code
+    assert captured.value.repair["draft_revision"] == session.revision
+    assert "limit" in captured.value.repair
+
+
+def test_object_graph_field_limit_counts_compiled_properties_and_references() -> None:
+    session, parent_handle = _session("2025.1")
+    fields: dict[str, float] = {}
+    for index in range(33):
+        bound = session.handles.bind_field(
+            scope_kind="class",
+            scope_value="Sound",
+            token=f"Custom{index}",
+            field_kind="property",
+            value_type="number",
+            restrictions={},
+            metadata_digest=f"{index + 1:064x}",
+        )
+        fields[bound.handle] = float(index)
+    session = session.with_new_declaration(
+        declaration_id="too-many-fields",
+        target=NewDescendantTarget(
+            parent_handle=parent_handle,
+            name="Rain",
+            kind="sound-sfx",
+        ),
+        fields={"field_values": fields},
+    )
+
+    with pytest.raises(BusinessDeclarationError) as captured:
+        business_adapter("object.create").materialize(session)
+
+    assert captured.value.error_code == "OBJECT_GRAPH_FIELD_LIMIT_EXCEEDED"
+    assert captured.value.repair["limit"] == 32
+
+
+@pytest.mark.parametrize(
+    ("parent_type", "child_kind", "expected_list"),
+    (
+        ("StateGroup", "state", "States"),
+        ("SwitchGroup", "switch", "Switches"),
+    ),
+)
+def test_object_create_derives_game_sync_list_from_bound_parent(
+    parent_type: str,
+    child_kind: str,
+    expected_list: str,
+) -> None:
+    session, _parent_handle = _session("2025.1")
+    parent = session.handles.bind_object(
+        object_id="{99999999-9999-9999-9999-999999999999}",
+        name="Weather Mode",
+        object_type=parent_type,
+        path=rf"\Game Parameters\Default Work Unit\Weather Mode",
+    )
+    child_type = session.handles.bind_type(
+        class_id=77 if child_kind == "state" else 88,
+        name=child_kind.title(),
+        type_category="WObject",
+        catalog_digest="a" * 64,
+    )
+    session = session.with_new_declaration(
+        declaration_id="value",
+        target=NewDescendantTarget(
+            parent_handle=parent.handle,
+            name="Storm",
+            kind=child_type.handle,
+        ),
+        fields={},
+    )
+
+    request = business_adapter("object.create").materialize(session)
+
+    assert request["arguments"]["list"] == expected_list
+
+
+def test_object_set_compiles_voice_language_platform_and_subordinate_media() -> None:
+    session, parent_handle = _session("2025.1")
+    session = session.with_new_declaration(
+        declaration_id="voice",
+        target=NewDescendantTarget(
+            parent_handle=parent_handle,
+            name="Storm Warning",
+            kind="sound-voice",
+        ),
+        fields={
+            "language": "English(US)",
+            "media_files": [
+                {
+                    "inline_wav": "StormWarning.wav|UklGRgAAAAAA",
+                    "kind": "sound-voice",
+                    "language": "English(US)",
+                    "originals_subfolder": "Weather/Warnings",
+                }
+            ],
+            "platform": "Windows",
+            "volume_db": -3,
+        },
+    )
+
+    request = business_adapter("object.set").materialize(session)
+
+    assert request["arguments"]["objects"] == [
+        {
+            "object": {"kind": "id", "value": PARENT_ID},
+            "children": [
+                {
+                    "type": "Sound",
+                    "name": "Storm Warning",
+                    "language": "English(US)",
+                    "platform": "Windows",
+                    "properties": [{"name": "Volume", "value": -3.0}],
+                    "import": {
+                        "files": [
+                            {
+                                "audio_file_base64": "StormWarning.wav|UklGRgAAAAAA",
+                                "originals_subfolder": "Weather/Warnings",
+                                "language": "English(US)",
+                                "object_type": "Sound",
+                            }
+                        ]
+                    },
+                }
+            ],
+        }
+    ]
+
+
+def test_object_set_subordinate_media_is_version_repaired_before_native_parse() -> None:
+    session, parent_handle = _session("2022.1")
+    session = session.with_new_declaration(
+        declaration_id="rain",
+        target=NewDescendantTarget(
+            parent_handle=parent_handle,
+            name="Rain",
+            kind="sound-sfx",
+        ),
+        fields={
+            "media_files": [
+                {"inline_wav": "Rain.wav|UklGRgAAAAAAAA"},
+            ]
+        },
+    )
+
+    with pytest.raises(BusinessDeclarationError) as captured:
+        business_adapter("object.set").materialize(session)
+
+    assert captured.value.error_code == "OBJECT_SET_IMPORT_UNAVAILABLE"
+    assert captured.value.repair["choices"] == ["2023.1", "2024.1", "2025.1"]
