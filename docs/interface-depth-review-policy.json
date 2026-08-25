@@ -68,10 +68,11 @@
     },
     {
       "id": "named-object-metadata-fields",
-      "disposition": "migration_required",
-      "owner_issue": 56,
+      "disposition": "already_deep",
+      "owner_issue": null,
       "operations": ["object.setLinked", "object.setProperty", "object.setReference"],
-      "leaked_mechanics": ["metadata_scope", "property_or_reference_token", "wire_type", "request_fragment"]
+      "leaked_mechanics": [],
+      "audit_evidence": "The public object-metadata-business/v1 Adapters accept exact object identities, short user-facing field meanings, optional platform, and business outcomes; live discovery issues opaque field handles, compiles the exact metadata scope, token, wire value, request, and staged continuation inside the Gateway, and removes normal inline_typed ingress for all 13 lanes. #77 retains five-version deterministic repair and non-bypass coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution, and a current-v3 Terra Fresh Agent Alarm reference repair PASS plus identical verify-only audit on both hosts."
     },
     {
       "id": "named-object-creation-graph",
@@ -213,15 +214,6 @@
     }
   ],
   "ticket_blueprints": {
-    "named-object-metadata-fields": {
-      "title": "Compile named object property and reference edits from bound business fields",
-      "parent_issue": 56,
-      "blocked_by_family": "named-object-lifecycle",
-      "public_behavior": "Accept an object selector, user-facing property or reference meaning, optional platform, and business value or target; resolve exact metadata scope and tokens through live-bound handles inside the Gateway.",
-      "deterministic_tests": "Five-version operation schemas, positive and repair flows, stale/wrong-scope handles, hostile values, exact-name isolation, and generic-route non-bypass.",
-      "removal_boundary": "Remove the shallow property/reference token inputs and their prompt guidance after parity; retain Preview, authorization, drift checks, execute-at-most-once, and exact readback.",
-      "proportional_evidence": "Real Alarm-style property/reference edits on 2022.1 and 2025.1 on macOS and Windows, plus one targeted Fresh Agent repair workflow."
-    },
     "named-object-creation-graph": {
       "title": "Compile object creation, plug-in graphs, bulk set, and RTPC curves from business declarations",
       "parent_issue": 56,
@@ -368,7 +360,6 @@
     }
   },
   "ticket_issue_numbers": {
-    "named-object-metadata-fields": 77,
     "named-object-creation-graph": 78,
     "named-switch-assignments": 93,
     "generic-fixed-query-metadata": 96,
