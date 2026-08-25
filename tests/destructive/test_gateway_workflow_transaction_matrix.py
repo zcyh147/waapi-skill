@@ -62,6 +62,7 @@ GATEWAY_PATH = REPO_ROOT / "skills" / "waapi-skill" / "scripts" / "gateway.py"
 ACTOR_MIXER_PARENT = r"\Actor-Mixer Hierarchy\Default Work Unit"
 CONTAINERS_PARENT = r"\Containers\Default Work Unit"
 SOUNDBANK_PARENT = r"\SoundBanks\Default Work Unit"
+MASTER_BUS_PARENT = r"\Master-Mixer Hierarchy\Default Work Unit\Master Audio Bus"
 SWITCH_PARENT = r"\Switches\Default Work Unit"
 STATE_GROUP_PARENT = r"\States\Dynamic Dialogue\ObjectiveStatus"
 SWITCH_GROUP_REFERENCE = "SwitchGroupOrStateGroup"
@@ -1051,32 +1052,6 @@ def _complete_object_metadata_business_transaction(
     return {"preview": preview, "execute": executed, "verify": verified}
 
 
-def _exact_object_id_by_path(
-    runtime: _WorkflowSandboxRuntime,
-    path: str,
-) -> str:
-    result = runtime.gateway(
-        [
-            "query-object",
-            "--path",
-            path,
-            "--return-field",
-            "id",
-            "--return-field",
-            "name",
-            "--return-field",
-            "type",
-            "--return-field",
-            "path",
-        ],
-        live=True,
-    )
-    assert result["count"] == 1, result
-    row = result["objects"][0]
-    assert row["path"] == path, row
-    return _required_string(row, "id")
-
-
 @pytest.mark.live
 @pytest.mark.destructive
 def test_object_lifecycle_business_draft_executes_all_five_verifiers(
@@ -1169,50 +1144,51 @@ def test_object_metadata_business_draft_executes_field_verifiers(
     runtime = workflow_sandbox_runtime
     if runtime.version not in {"2022.1", "2025.1"}:
         pytest.skip("object metadata business evidence targets 2022.1 and 2025.1")
-    sound_id = _exact_object_id_by_path(
-        runtime,
-        r"\Actor-Mixer Hierarchy\Default Work Unit\IntegrationLab\Alarm\Generator_Alarm",
-    )
-    target_bus_id = _exact_object_id_by_path(
-        runtime,
-        r"\Master-Mixer Hierarchy\Default Work Unit\Master Audio Bus\SFX_Machinery",
-    )
-    original_bus_id = _exact_object_id_by_path(
-        runtime,
-        r"\Master-Mixer Hierarchy\Default Work Unit\Master Audio Bus\Diagnostic_Dead_Bus",
-    )
-    property_changed = False
-    reference_changed = False
-    link_changed = False
+    suffix = uuid.uuid4().hex[:12]
+    source_id: str | None = None
+    target_bus_id: str | None = None
     try:
+        source_id = _create_object(
+            runtime,
+            parent=(
+                CONTAINERS_PARENT
+                if runtime.version == "2025.1"
+                else ACTOR_MIXER_PARENT
+            ),
+            object_type="ActorMixer",
+            name=f"WAAPI_METADATA_SOURCE_{suffix}",
+        )
+        target_bus_id = _create_object(
+            runtime,
+            parent=MASTER_BUS_PARENT,
+            object_type="Bus",
+            name=f"WAAPI_METADATA_BUS_{suffix}",
+        )
         _complete_object_metadata_business_transaction(
             runtime,
             operation="object.setProperty",
-            object_id=sound_id,
+            object_id=source_id,
             field_name="Volume",
             value=-3.25,
             platform="Windows",
         )
-        property_changed = True
         _complete_object_metadata_business_transaction(
             runtime,
             operation="object.setReference",
-            object_id=sound_id,
+            object_id=source_id,
             field_name="OutputBus",
             target_id=target_bus_id,
             platform="Windows",
         )
-        reference_changed = True
         if runtime.version == "2025.1":
             _complete_object_metadata_business_transaction(
                 runtime,
                 operation="object.setLinked",
-                object_id=sound_id,
+                object_id=source_id,
                 field_name="Volume",
                 platform="Windows",
                 linked=False,
             )
-            link_changed = True
         runtime.category_results.append(
             {
                 "category": "object-metadata-business",
@@ -1225,33 +1201,9 @@ def test_object_metadata_business_draft_executes_field_verifiers(
             }
         )
     finally:
-        if link_changed:
-            _complete_object_metadata_business_transaction(
-                runtime,
-                operation="object.setLinked",
-                object_id=sound_id,
-                field_name="Volume",
-                platform="Windows",
-                linked=True,
-            )
-        if reference_changed:
-            _complete_object_metadata_business_transaction(
-                runtime,
-                operation="object.setReference",
-                object_id=sound_id,
-                field_name="OutputBus",
-                target_id=original_bus_id,
-                platform="Windows",
-            )
-        if property_changed:
-            _complete_object_metadata_business_transaction(
-                runtime,
-                operation="object.setProperty",
-                object_id=sound_id,
-                field_name="Volume",
-                value=0.0,
-                platform="Windows",
-            )
+        for object_id in (source_id, target_bus_id):
+            if object_id is not None:
+                _delete_if_present_via_transaction(runtime, object_id)
 
 
 def _save_legacy_sandbox_project(runtime: _WorkflowSandboxRuntime) -> None:
