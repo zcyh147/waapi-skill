@@ -1203,10 +1203,10 @@ def _delete_if_present_via_transaction(runtime: _WorkflowSandboxRuntime, object_
     if before["count"] == 0:
         return
     assert before["count"] == 1, before
-    _complete_transaction(
+    _complete_object_lifecycle_business_transaction(
         runtime,
         operation="object.delete",
-        arguments={"object": {"kind": "id", "value": object_id}},
+        object_id=object_id,
     )
     after = runtime.gateway(
         ["query-object", "--object-id", object_id, "--return-field", "id"],
