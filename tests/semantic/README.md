@@ -301,6 +301,25 @@ declarations, and the final GUID-bound Preview request. Its end-to-end
 `validate_heavy_v3_child_run` regression proves the selected legacy revision
 is consumed and that an unknown revision or harness hash blocks the unit.
 
+The final #78 object-graph candidate
+`1eeabb9878f18c554bdbd70f940f805e31b70570` has one complete current-v3
+Weather Fresh Agent PASS per host. macOS root
+`imac-object-graph-1eeabb9-r6` and native-Windows root
+`iwin-object-graph-1eeabb9-r6` each passed the single
+`object_graph_business_1` unit and then passed an identical
+`--resume --verify-only` audit. Both fresh memory-off Terra tasks stopped at
+one immutable Preview, reconciled 8/8 Broker records, executed nothing, and
+passed the business-facts-only, no-bypass, Skill-integrity, and workspace
+gates. The macOS LaunchAgent ran exactly once with exit 0; Windows ran as the
+active desktop user through an `InteractiveToken` / `Limited` temporary task
+with result 0. Both launchers were deleted and independent scoped-process
+checks were empty. Earlier r1-r4 blocked, semantic-failure, or integrity roots
+remain frozen without promotion. Separately, the same Git candidate passed the
+Weather graph, plug-in, bulk-set, and RTPC destructive proof on Wwise 2022.1
+and 2025.1 on both hosts. Every category row records equal source hash and tree
+metadata before and after, deleted sandbox, cleaned lifecycle, and no residual
+process; configured WwiseConsole hosts grant no Authoring-UI credit.
+
 The legacy internal `integration_workflows_cross_version_6` component is
 defined by `tests/semantic/data/integration-workflows-v1/profile.json`. It
 supplies Weather, Alarm, and Harbor once per version: six tasks, 20 user turns,
