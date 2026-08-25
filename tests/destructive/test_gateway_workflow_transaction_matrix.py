@@ -48,6 +48,7 @@ from tests.destructive.support.workflow_evidence import (  # pyright: ignore[rep
 )
 from tests.semantic.support.typed_gateway_input import (  # pyright: ignore[reportMissingImports]  # noqa: E402
     create_object_lifecycle_business_preview,
+    create_object_metadata_business_preview,
     create_typed_transaction_preview,
 )
 from wwise_waapi.headless import HeadlessLifecycle  # pyright: ignore[reportMissingImports]  # noqa: E402
@@ -998,6 +999,84 @@ def _complete_object_lifecycle_business_transaction(
     return {"preview": preview, "execute": executed, "verify": verified}
 
 
+def _complete_object_metadata_business_transaction(
+    runtime: _WorkflowSandboxRuntime,
+    *,
+    operation: str,
+    object_id: str,
+    field_name: str,
+    value: Any = None,
+    target_id: str | None = None,
+    clear_reference: bool = False,
+    platform: str | None = None,
+    linked: bool | None = None,
+) -> dict[str, Mapping[str, Any]]:
+    preview = create_object_metadata_business_preview(
+        lambda command: runtime.gateway(
+            command,
+            live=command[0]
+            in {
+                "draft-bind-object",
+                "draft-discover-fields",
+                "draft-check",
+                "preview-from-draft",
+            },
+        ),
+        version=runtime.version,
+        operation=operation,
+        object_id=object_id,
+        field_name=field_name,
+        value=value,
+        target_id=target_id,
+        clear_reference=clear_reference,
+        platform=platform,
+        linked=linked,
+    )
+    transaction_id = preview["transaction_id"]
+    shown = runtime.gateway(
+        ["transaction-show", transaction_id, "--summary-only"],
+        live=False,
+    )
+    token = shown["confirmation"]["token"]
+    runtime.gateway(
+        ["confirm", transaction_id, "--confirmation-token", token],
+        live=False,
+    )
+    executed = runtime.gateway(["execute", transaction_id], live=True)
+    verified = runtime.gateway(["verify", transaction_id], live=True)
+    assert executed["state"] == TransactionState.EXECUTED_UNVERIFIED.value, executed
+    assert verified["state"] == TransactionState.VERIFIED.value, verified
+    assert verified["verification"]["operation"] == operation, verified
+    assert verified["verification"]["business_state_verified"] is True, verified
+    return {"preview": preview, "execute": executed, "verify": verified}
+
+
+def _exact_object_id_by_path(
+    runtime: _WorkflowSandboxRuntime,
+    path: str,
+) -> str:
+    result = runtime.gateway(
+        [
+            "query-object",
+            "--path",
+            path,
+            "--return-field",
+            "id",
+            "--return-field",
+            "name",
+            "--return-field",
+            "type",
+            "--return-field",
+            "path",
+        ],
+        live=True,
+    )
+    assert result["count"] == 1, result
+    row = result["objects"][0]
+    assert row["path"] == path, row
+    return _required_string(row, "id")
+
+
 @pytest.mark.live
 @pytest.mark.destructive
 def test_object_lifecycle_business_draft_executes_all_five_verifiers(
@@ -1080,6 +1159,99 @@ def test_object_lifecycle_business_draft_executes_all_five_verifiers(
         ):
             if object_id is not None:
                 _delete_if_present_via_transaction(runtime, object_id)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_object_metadata_business_draft_executes_field_verifiers(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    runtime = workflow_sandbox_runtime
+    if runtime.version not in {"2022.1", "2025.1"}:
+        pytest.skip("object metadata business evidence targets 2022.1 and 2025.1")
+    sound_id = _exact_object_id_by_path(
+        runtime,
+        r"\Actor-Mixer Hierarchy\Default Work Unit\IntegrationLab\Alarm\Generator_Alarm",
+    )
+    target_bus_id = _exact_object_id_by_path(
+        runtime,
+        r"\Master-Mixer Hierarchy\Default Work Unit\Master Audio Bus\SFX_Machinery",
+    )
+    original_bus_id = _exact_object_id_by_path(
+        runtime,
+        r"\Master-Mixer Hierarchy\Default Work Unit\Master Audio Bus\Diagnostic_Dead_Bus",
+    )
+    property_changed = False
+    reference_changed = False
+    link_changed = False
+    try:
+        _complete_object_metadata_business_transaction(
+            runtime,
+            operation="object.setProperty",
+            object_id=sound_id,
+            field_name="Volume",
+            value=-3.25,
+            platform="Windows",
+        )
+        property_changed = True
+        _complete_object_metadata_business_transaction(
+            runtime,
+            operation="object.setReference",
+            object_id=sound_id,
+            field_name="OutputBus",
+            target_id=target_bus_id,
+            platform="Windows",
+        )
+        reference_changed = True
+        if runtime.version == "2025.1":
+            _complete_object_metadata_business_transaction(
+                runtime,
+                operation="object.setLinked",
+                object_id=sound_id,
+                field_name="Volume",
+                platform="Windows",
+                linked=False,
+            )
+            link_changed = True
+        runtime.category_results.append(
+            {
+                "category": "object-metadata-business",
+                "status": "PASS",
+                "verifier_strength": (
+                    "property_reference_and_platform_link_business_full_chain"
+                    if runtime.version == "2025.1"
+                    else "property_and_reference_business_full_chain"
+                ),
+            }
+        )
+    finally:
+        if link_changed:
+            _complete_object_metadata_business_transaction(
+                runtime,
+                operation="object.setLinked",
+                object_id=sound_id,
+                field_name="Volume",
+                platform="Windows",
+                linked=True,
+            )
+        if reference_changed:
+            _complete_object_metadata_business_transaction(
+                runtime,
+                operation="object.setReference",
+                object_id=sound_id,
+                field_name="OutputBus",
+                target_id=original_bus_id,
+                platform="Windows",
+            )
+        if property_changed:
+            _complete_object_metadata_business_transaction(
+                runtime,
+                operation="object.setProperty",
+                object_id=sound_id,
+                field_name="Volume",
+                value=0.0,
+                platform="Windows",
+            )
 
 
 def _save_legacy_sandbox_project(runtime: _WorkflowSandboxRuntime) -> None:

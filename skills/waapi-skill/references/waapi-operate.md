@@ -114,6 +114,8 @@ For example, `object.setRTPC` authors a curve while `ak.soundengine.setRTPCValue
 
 Users speak naturally; never ask them for internal property/reference names. When an exact token is not already visible from live metadata:
 
+For `object.setProperty`, `object.setReference`, and `object.setLinked`, read the schema, start, bind the target, then run returned `draft-discover-fields` with a short English meaning and an explicit platform only when requested or required. Copy one handle; never a token, scope, or type. No match stops; ambiguity needs one behavior question.
+
 For `object.create` and `object.set`, read the named schema first, then discover only requested dynamic property/reference tokens lacking exact live evidence. Composer `draft-check` revalidates tokens and dependency closure. Direct `audio.import` instead binds a custom token through the business Draft's live `draft-bind-field`; its returned type, restrictions, and handle are the only value authority, and `draft-check` revalidates them.
 
 Prompt/schema text, cached schemas, and Wwise knowledge are never exact live metadata evidence. When `composer.start.preconditions` contains `metadata_gate`, complete one successful `metadata discover` covering every requested dynamic token before `draft-start`; only a visible successful live result satisfies it. For `business_declaration`, start the Draft first and use its live binding command instead.
@@ -182,10 +184,7 @@ For exact `ak.wwise.core.audio.convert` in `2024.1`/`2025.1`, run `request-schem
 
 ## Closed input, preview, and policy
 
-The schema owns fields, identities, constraints, versions, and paths. Unknown fields fail. Runtime identity evidence, metadata records, dispatcher args/options, and raw `@Property` members are not model inputs.
-
-Every normal input is typed. Use only the continuation from `operation-schema` or `request-schema`; there is no caller-authored request document. Never ask for confirmation while typed composition or Preview creation is still incomplete. A complete `awaiting_confirmation` Preview is the decision. Under `ask_before_changes`, `--apply` creates it without execution; omit it only for design work.
-In ordinary use omit `--state-dir`: the Gateway owns the external runtime state root. Pass it only when a trusted caller explicitly supplied an absolute override, then reuse that path unchanged.
+Unknown fields fail. Use only the returned continuation; there is no caller-authored request document. Never ask for confirmation while typed composition or Preview creation is still incomplete. Under `ask_before_changes`, `--apply` previews without execution; design work omits it. The Gateway owns the external runtime state root: omit `--state-dir` unless a trusted caller supplied an absolute override.
 
 A rejected or incomplete preview is a hard same-turn boundary. Do not repair JSON, change an operation, or retry preview in that turn. A changed target/value requires a new preview.
 

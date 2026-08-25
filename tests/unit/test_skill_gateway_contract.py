@@ -260,6 +260,10 @@ def test_metadata_order_follows_the_disclosed_input_mode() -> None:
     assert "For `business_declaration`, start the Draft first" in operate
     assert "use its live binding command instead" in operate
     assert "binds a custom token through the business Draft's live `draft-bind-field`" in operate
+    assert "For `object.setProperty`, `object.setReference`, and `object.setLinked`" in operate
+    assert "execute its `draft-discover-fields` prefix" in operate
+    assert "never supply or reconstruct a native token" in operate
+    assert "copy only the chosen handle into `draft-declare-field-change`" in operate
     assert "common fields such as volume, infinite looping, output bus" in operate
     assert "reconcile the union against every requested property/reference" in operate
     assert "an assigned `Volume` and `OutputBus` each require a query" in operate

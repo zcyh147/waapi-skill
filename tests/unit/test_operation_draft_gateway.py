@@ -276,17 +276,10 @@ def test_public_draft_denial_is_non_enumerable_and_does_not_echo_authority(
 def test_public_draft_start_rejects_invalid_registry_bindings_before_state_write(
     tmp_path: Path,
 ) -> None:
-    for arguments, error_code in (
-        (("draft-start", "missing.operation"), "UNKNOWN_OPERATION"),
-        (
-            ("draft-start", "object.setProperty"),
-            "OPERATION_DRAFT_ADAPTER_UNAVAILABLE",
-        ),
-    ):
-        exit_code, payload = execute(tmp_path, *arguments)
+    exit_code, payload = execute(tmp_path, "draft-start", "missing.operation")
 
-        assert exit_code == 2
-        assert payload["error_code"] == error_code
+    assert exit_code == 2
+    assert payload["error_code"] == "UNKNOWN_OPERATION"
 
     assert not (tmp_path / "state").exists()
 

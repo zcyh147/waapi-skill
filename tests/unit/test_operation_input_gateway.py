@@ -269,7 +269,7 @@ def offline_execute(
     )
 
 
-def test_inline_operation_schema_exposes_one_typed_continuation(tmp_path: Path) -> None:
+def test_metadata_operation_schema_exposes_one_business_continuation(tmp_path: Path) -> None:
     code, payload = offline_execute(
         tmp_path,
         "--version",
@@ -280,9 +280,14 @@ def test_inline_operation_schema_exposes_one_typed_continuation(tmp_path: Path) 
 
     assert code == 0
     assert "request_envelope" not in payload
-    assert payload["operation"]["input_mode"] == "inline_typed"
-    assert payload["typed_operation"]["continuation"]["subcommand"] == "typed-operation"
-    assert "request-json" not in json.dumps(payload["typed_operation"])
+    assert payload["operation"]["input_mode"] == BUSINESS_DECLARATION_INPUT_MODE
+    assert "typed_operation" not in payload
+    adapter = payload["business_adapter"]
+    assert adapter["contract"] == "waapi-skill.object-metadata-business/v1"
+    assert adapter["field_discovery"]["subcommand"] == "draft-discover-fields"
+    assert adapter["field_discovery"]["input"] == "user_facing_meaning"
+    assert adapter["declaration"]["subcommand"] == "draft-declare-field-change"
+    assert "--token" not in json.dumps(adapter)
 
 
 def test_inline_mutation_continuation_requires_exact_prefix_before_business_fields(
@@ -310,7 +315,7 @@ def test_inline_mutation_continuation_requires_exact_prefix_before_business_fiel
     assert continuation["gateway_argv_prefix"][-1] == "--apply"
 
 
-def test_inline_metadata_dependency_selects_exact_guid_for_one_existing_object(
+def test_metadata_business_contract_binds_field_to_exact_target_object(
     tmp_path: Path,
 ) -> None:
     code, payload = offline_execute(
@@ -322,23 +327,49 @@ def test_inline_metadata_dependency_selects_exact_guid_for_one_existing_object(
     )
 
     assert code == 0, payload
-    dependency = payload["typed_operation"]["metadata_dependency"]
-    assert dependency["scope_selection"] == {
-        "one_existing_object": {
-            "flag": "--object",
-            "value": "canonical_guid_from_prior_exact_read",
-            "object_type_flag": "invalid",
-        },
-        "multiple_existing_objects_one_proven_type": {
-            "flag": "--object-type",
-            "value": "exact_shared_object_type",
-        },
-        "new_or_imported_object_type": {
-            "flag": "--object-type",
-            "value": "exact_object_type",
-        },
-        "path_value_for_object_flag": "invalid",
-    }
+    discovery = payload["business_adapter"]["field_discovery"]
+    assert discovery["scope"] == "bound_target_object"
+    assert discovery["result"] == "copy_one_gateway_returned_field_handle"
+    assert discovery["platform"] == "optional_and_sealed_into_handle"
+
+
+@pytest.mark.parametrize(
+    ("operation", "versions"),
+    [
+        (
+            "object.setProperty",
+            ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
+        ),
+        (
+            "object.setReference",
+            ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
+        ),
+        ("object.setLinked", ("2023.1", "2024.1", "2025.1")),
+    ],
+)
+def test_every_metadata_field_lane_exposes_only_business_handles(
+    tmp_path: Path,
+    operation: str,
+    versions: tuple[str, ...],
+) -> None:
+    for version in versions:
+        code, payload = offline_execute(
+            tmp_path / f"{operation}-{version}",
+            "--version",
+            version,
+            "operation-schema",
+            operation,
+            version=version,
+        )
+
+        assert code == 0, payload
+        assert payload["operation"]["input_mode"] == (
+            BUSINESS_DECLARATION_INPUT_MODE
+        )
+        assert payload["business_adapter"]["version"] == version
+        assert "typed_operation" not in payload
+        assert "argument_contract" not in payload["operation"]
+        assert "--token" not in json.dumps(payload)
 
 
 def test_generic_draft_start_requires_first_fact_batch_before_disclosure(

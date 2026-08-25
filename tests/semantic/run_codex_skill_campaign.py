@@ -6999,6 +6999,8 @@ def _validate_integration_workflow_business_plan(
             "draft-business-configure": "operation_compose",
             "draft-bind-object": "operation_compose",
             "draft-bind-field": "operation_compose",
+            "draft-discover-fields": "operation_compose",
+            "draft-declare-field-change": "operation_compose",
             "draft-declare-new": "operation_compose",
             "draft-declare-existing": "operation_compose",
             "draft-revise-declaration": "operation_compose",

@@ -143,6 +143,9 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                 "object.move",
                 "object.setName",
                 "object.setNotes",
+                "object.setLinked",
+                "object.setProperty",
+                "object.setReference",
             }
             else COMPOSER_INPUT_MODE
             if name
@@ -168,9 +171,6 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                     "debug.setAutomationMode",
                     "debug.testAssert",
                     "debug.testCrash",
-                    "object.setLinked",
-                "object.setProperty",
-                "object.setReference",
                     "switchContainer.addAssignment",
                     "switchContainer.removeAssignment",
                     "soundbank.processDefinitionFiles",

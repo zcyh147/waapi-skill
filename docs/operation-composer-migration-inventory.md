@@ -40,12 +40,12 @@ planning; the Registry remains authoritative during implementation.
 | `object.delete` | 2021.1–2025.1 | Business declaration | object; optional checkout | protected object and GUID absence | wave 02 object lifecycle complete |
 | `object.move` | 2021.1–2025.1 | Business declaration | object and parent | stable GUID and parent/path verification | wave 02 object lifecycle complete |
 | `object.set` | 2022.1–2025.1 | Composer | ordered bounded object batch | recursive mixed fields/references | wave 00 complete |
-| `object.setLinked` | 2023.1–2025.1 | Inline typed | object/property/platform/link state | dedicated link semantics | wave 01 complete |
+| `object.setLinked` | 2023.1–2025.1 | Business declaration | object handle, live field handle, platform-sealed link state | dedicated link semantics | wave 01 deep cutover complete |
 | `object.setName` | 2021.1–2025.1 | Business declaration | object and name | same-GUID path transition | wave 01 complete |
 | `object.setNotes` | 2021.1–2025.1 | Business declaration | object and exact text | empty text versus omission | wave 01 complete |
-| `object.setProperty` | 2021.1–2025.1 | Inline typed | object/property/value/platform | live metadata and typed readback | wave 01 complete |
+| `object.setProperty` | 2021.1–2025.1 | Business declaration | object handle, live field handle, business scalar | live metadata and typed readback | wave 01 deep cutover complete |
 | `object.setRTPC` | 2022.1–2025.1 | Composer | object/property/control input/points | dedicated curve on shared URI | wave 02 complete |
-| `object.setReference` | 2021.1–2025.1 | Inline typed | object/reference/nullable target/platform | metadata and exact null clearing | wave 01 complete |
+| `object.setReference` | 2021.1–2025.1 | Business declaration | object/field/target handles or explicit clear | metadata and exact null clearing | wave 01 deep cutover complete |
 | `soundbank.convertExternalSources` | 2022.1–2025.1 | Composer | sources and I/O root | proven files and isolated artifacts | wave 04 complete |
 | `soundbank.generate` | 2021.1–2025.1 | Composer | banks/platforms/languages/output root | host paths and artifacts | wave 04 complete |
 | `soundbank.processDefinitionFiles` | 2022.1–2025.1 | Inline typed | definition files and I/O root | derived identities/inclusions | wave 04 complete |

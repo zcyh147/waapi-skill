@@ -10,6 +10,9 @@ from .business_declaration_state import BusinessDeclarationSession
 from .object_lifecycle_business_contracts import (
     object_lifecycle_business_contract_data,
 )
+from .object_metadata_business_contracts import (
+    object_metadata_business_contract_data,
+)
 
 
 ContractBuilder = Callable[[str, str], dict[str, Any]]
@@ -31,6 +34,10 @@ def _audio_import_contract(operation: str, version: str) -> dict[str, Any]:
 
 def _object_lifecycle_contract(operation: str, version: str) -> dict[str, Any]:
     return object_lifecycle_business_contract_data(operation, version)
+
+
+def _object_metadata_contract(operation: str, version: str) -> dict[str, Any]:
+    return object_metadata_business_contract_data(operation, version)
 
 
 def _materialize_audio_import(
@@ -72,6 +79,17 @@ def _materialize_object_lifecycle(
     return materialize_object_lifecycle_business_request(operation, session)
 
 
+def _materialize_object_metadata(
+    operation: str,
+    session: BusinessDeclarationSession,
+) -> Mapping[str, Any]:
+    from .object_metadata_business import (
+        materialize_object_metadata_business_request,
+    )
+
+    return materialize_object_metadata_business_request(operation, session)
+
+
 def _compile_audio_import_preview(
     session: BusinessDeclarationSession,
     build_continuation: Callable[..., Mapping[str, Any]],
@@ -99,6 +117,7 @@ class BusinessAdapter:
     _preview_compiler: PreviewCompiler | None = None
     requires_sound_subtype: bool = False
     supports_field_binding: bool = False
+    supports_field_discovery: bool = False
     auto_apply_preview: bool = False
     records_business_preview: bool = False
     requires_wwise_path_discipline: bool = False
@@ -204,6 +223,26 @@ _OBJECT_LIFECYCLE_DEFINITION = {
     "auto_apply_preview": True,
 }
 
+_OBJECT_METADATA_DEFINITION = {
+    "family": "object-metadata-fields",
+    "contract_builder": _object_metadata_contract,
+    "materializer": _materialize_object_metadata,
+    "update_commands": frozenset({"draft-declare-field-change"}),
+    "initial_projection_actions": ("bind-object", "inspect", "cancel"),
+    "active_projection_actions": (
+        "bind-object",
+        "discover-fields",
+        "declare-field-change",
+        "check",
+        "inspect",
+        "cancel",
+    ),
+    "requires_sound_subtype": False,
+    "supports_field_binding": False,
+    "supports_field_discovery": True,
+    "auto_apply_preview": True,
+}
+
 
 def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdapter:
     values = dict(definition)
@@ -227,6 +266,14 @@ _BUSINESS_ADAPTERS = {
             "object.move",
             "object.setName",
             "object.setNotes",
+        )
+    },
+    **{
+        operation: _bind_adapter(operation, _OBJECT_METADATA_DEFINITION)
+        for operation in (
+            "object.setLinked",
+            "object.setProperty",
+            "object.setReference",
         )
     },
 }

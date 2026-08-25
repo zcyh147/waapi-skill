@@ -81,6 +81,7 @@ from wwise_waapi.metadata_discovery import (  # noqa: E402  # pyright: ignore[re
     MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS,
     discover_metadata,
     metadata_candidate_limit_contract,
+    metadata_typed_value_type,
 )
 from wwise_waapi.host_paths import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     HostPathError,
@@ -345,6 +346,7 @@ OFFLINE_COMMANDS = frozenset(
         "draft-start",
         "draft-apply",
         "draft-business-configure",
+        "draft-declare-field-change",
         "draft-declare-object-change",
         "draft-declare-existing",
         "draft-declare-new",
@@ -1889,6 +1891,22 @@ def build_parser() -> argparse.ArgumentParser:
         check_out_from_source_control=None,
     )
 
+    draft_declare_field_change = subparsers.add_parser(
+        "draft-declare-field-change",
+        help=(
+            "Declare one bound property, reference, or platform-link business "
+            "outcome without naming its native Wwise token"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_field_change)
+    draft_declare_field_change.add_argument("--object-handle", required=True)
+    draft_declare_field_change.add_argument("--field-handle", required=True)
+    outcome = draft_declare_field_change.add_mutually_exclusive_group(required=True)
+    outcome.add_argument("--business-value")
+    outcome.add_argument("--target-handle")
+    outcome.add_argument("--clear-reference", action="store_true")
+    outcome.add_argument("--link-state", choices=("linked", "unlinked"))
+
     draft_declare_new = subparsers.add_parser(
         "draft-declare-new",
         help="Declare one new Wwise descendant using only high-level business facts",
@@ -1938,6 +1956,23 @@ def build_parser() -> argparse.ArgumentParser:
     field_scope.add_argument("--class-name")
     draft_bind_field.add_argument("--token", required=True)
     draft_bind_field.add_argument("--platform")
+
+    draft_discover_fields = subparsers.add_parser(
+        "draft-discover-fields",
+        help=(
+            "Resolve user-facing field meaning into bounded live candidate handles"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_discover_fields)
+    draft_discover_fields.add_argument("--object-handle", required=True)
+    draft_discover_fields.add_argument(
+        "--meaning",
+        action="append",
+        dest="meanings",
+        required=True,
+        metavar="SEARCH_PHRASE",
+    )
+    draft_discover_fields.add_argument("--platform")
     draft_apply.add_argument(
         "--facts",
         nargs=argparse.REMAINDER,
@@ -6914,6 +6949,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         )
     if args.command in {
         "draft-business-configure",
+        "draft-declare-field-change",
         "draft-declare-object-change",
         "draft-declare-existing",
         "draft-declare-new",
@@ -8246,6 +8282,16 @@ def dispatch_command(
         )
     if args.command == "draft-bind-field":
         return dispatch_business_field_binding(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
+    if args.command == "draft-discover-fields":
+        return dispatch_business_field_discovery(
             args,
             env=env,
             connection=connection,
@@ -10058,7 +10104,7 @@ def dispatch_operation_draft_check(
             bound_objects,
             read_call=read_call,
         )
-        if adapter.supports_field_binding:
+        if adapter.supports_field_binding or adapter.supports_field_discovery:
             for row in business_session.handles.as_dict()["fields"]:
                 bound_field = business_session.handles.bound_field(row["handle"])
                 revalidate_live_field(
@@ -10286,7 +10332,37 @@ def dispatch_offline_business_draft_update(
             "Bind one exact live project object before adding business declarations"
         )
     session = BusinessDeclarationSession.from_dict(raw_session)
-    if args.command == "draft-declare-object-change":
+    if args.command == "draft-declare-field-change":
+        bound_field = session.handles.bound_field(args.field_handle)
+        fields: dict[str, Any] = {"field_handle": args.field_handle}
+        if args.business_value is not None:
+            fields["business_value"] = _parse_business_value(
+                bound_field.value_type,
+                args.business_value,
+                field="business_value",
+            )
+        elif args.target_handle is not None:
+            fields["reference_outcome"] = args.target_handle
+        elif args.clear_reference:
+            fields["reference_outcome"] = "clear"
+        elif args.link_state is not None:
+            fields["link_state"] = args.link_state
+        else:  # pragma: no cover - argparse requires one outcome
+            raise GatewayInputError("Field change requires one business outcome")
+
+        def update(
+            current: BusinessDeclarationSession,
+        ) -> BusinessDeclarationSession:
+            candidate = current.with_existing_declaration(
+                declaration_id="change",
+                target=ExistingObjectTarget(args.object_handle),
+                fields=fields,
+            )
+            adapter.materialize(candidate)
+            return candidate
+
+        event_type = "declaration.added"
+    elif args.command == "draft-declare-object-change":
         fields = {
             name: value
             for name, value in (
@@ -10774,6 +10850,184 @@ def dispatch_business_field_binding(
                 "platform": bound.platform,
                 "restrictions": dict(bound.restrictions),
             },
+        }
+    )
+    return payload
+
+
+def dispatch_business_field_discovery(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Bind bounded live candidates without accepting a model-authored token."""
+
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if not adapter.supports_field_discovery:
+        raise GatewayInputError(
+            f"Business field discovery is unavailable for {binding.record.operation}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    if raw_session is None:
+        raise GatewayInputError("Bind the exact target object before field discovery")
+    session = BusinessDeclarationSession.from_dict(raw_session)
+    if binding.context != session.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the business declaration binding."
+        )
+    source = session.handles.resolve_object(args.object_handle)
+    if binding.record.operation == "object.setLinked" and args.platform is None:
+        raise GatewayInputError(
+            "object.setLinked field discovery requires one explicit platform"
+        )
+    read_call = metadata_cached_read_call(
+        binding.read_call,
+        connection=connection,
+        version=detected_version,
+        live_info=live_info,
+        project=binding.project,
+        state_dir=binding.state_dir,
+    )
+    discovery = discover_metadata(
+        read_call=read_call,
+        queries=tuple(args.meanings),
+        object=source.object_id,
+        limit=MAX_METADATA_DISCOVERY_LIMIT,
+    )
+    eligible: list[Mapping[str, Any]] = []
+    for candidate in discovery.candidates:
+        kind = candidate.get("kind")
+        metadata = candidate.get("metadata")
+        if not isinstance(metadata, Mapping):
+            continue
+        value_type = metadata_typed_value_type(str(metadata.get("type", "")))
+        if binding.record.operation == "object.setProperty":
+            accepted = kind == "property" and value_type is not None
+        elif binding.record.operation == "object.setReference":
+            accepted = kind == "reference"
+        else:
+            supports = metadata.get("supports")
+            accepted = (
+                kind in {"property", "reference"}
+                and (kind == "reference" or value_type is not None)
+                and isinstance(supports, Mapping)
+                and supports.get("unlink") is True
+            )
+        if accepted:
+            eligible.append(candidate)
+    if not eligible:
+        raise GatewayInputError(
+            "Live field discovery found no candidate compatible with this operation"
+        )
+
+    captured: list[Any] = []
+    rejected: list[Mapping[str, Any]] = []
+
+    def bind(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        handles = BusinessHandleRegistry.from_dict(current.handles.as_dict())
+        for candidate in eligible:
+            try:
+                captured.append(
+                    bind_live_field(
+                        handles,
+                        read_call=read_call,
+                        scope_kind="object",
+                        scope_value=source.object_id,
+                        token=str(candidate["name"]),
+                        platform=args.platform,
+                    )
+                )
+            except BusinessDeclarationError as exc:
+                rejected.append(
+                    {
+                        "error_code": exc.error_code,
+                        "field_kind": candidate.get("kind"),
+                    }
+                )
+        if not captured:
+            raise GatewayInputError(
+                "Every compatible live field candidate failed bounded binding"
+            )
+        return current.with_handle_registry(handles)
+
+    schema_digest = operation_draft_schema_digest(
+        binding.record.operation,
+        detected_version,
+    )
+    composer_digest = operation_composer_digest(
+        binding.record.operation,
+        detected_version,
+    )
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+        context=binding.context,
+        update=bind,
+        event_type="handles.bound",
+    )
+    metadata_by_name = {
+        str(candidate["name"]): candidate
+        for candidate in eligible
+    }
+    field_candidates: list[dict[str, Any]] = []
+    for bound in captured:
+        candidate = metadata_by_name[bound.token]
+        metadata = candidate.get("metadata")
+        display = metadata.get("display") if isinstance(metadata, Mapping) else None
+        label = (
+            display.get("name")
+            if isinstance(display, Mapping)
+            and isinstance(display.get("name"), str)
+            and display["name"].strip()
+            else bound.token
+        )
+        field_candidates.append(
+            {
+                "handle": bound.handle,
+                "label": label,
+                "field_kind": bound.field_kind,
+                "value_type": bound.value_type,
+                "platform": bound.platform,
+                "restrictions": dict(bound.restrictions),
+                "matched_meanings": list(candidate.get("matched_queries", [])),
+            }
+        )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+            "field_candidates": field_candidates,
+            "candidate_count": len(field_candidates),
+            "rejected_candidate_count": len(rejected),
+            "selection_required": True,
+            "selection_rule": "copy_one_returned_field_candidate.handle",
         }
     )
     return payload
@@ -15066,12 +15320,18 @@ def _business_next_action_binding(
         }
     object_bind_prefix = [*base, "draft-bind-object", *binding]
     field_bind_prefix = [*base, "draft-bind-field", *binding]
+    field_discover_prefix = [*base, "draft-discover-fields", *binding]
     configure_prefix = [*base, "draft-business-configure", *binding]
     declare_new_prefix = [*base, "draft-declare-new", *binding]
     declare_existing_prefix = [*base, "draft-declare-existing", *binding]
     declare_object_change_prefix = [
         *base,
         "draft-declare-object-change",
+        *binding,
+    ]
+    declare_field_change_prefix = [
+        *base,
+        "draft-declare-field-change",
         *binding,
     ]
     revise_prefix = [*base, "draft-revise-declaration", *binding]
@@ -15123,7 +15383,7 @@ def _business_next_action_binding(
         record.operation,
         record.version,
     )
-    if not adapter.supports_field_binding:
+    if not (adapter.supports_field_binding or adapter.supports_field_discovery):
         object_binding = {
             **object_binding,
             "use_only_for": business_contract["binding"]["roles"],
@@ -15147,7 +15407,7 @@ def _business_next_action_binding(
             "then_read_next_response": True,
             "precompute_or_increment_revision": False,
         }
-    if not adapter.supports_field_binding:
+    if not (adapter.supports_field_binding or adapter.supports_field_discovery):
         if session.declarations:
             return {
                 "contract": "waapi-skill.business-draft-next-action/v1",
@@ -15184,6 +15444,63 @@ def _business_next_action_binding(
                 "submit_once": True,
             },
             "forbidden_inputs": forbidden_inputs,
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+    if adapter.supports_field_discovery:
+        if session.declarations:
+            return {
+                "contract": "waapi-skill.business-draft-next-action/v1",
+                "required_next_phase": "check_complete_business_declaration",
+                "business_contract": business_contract,
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+                "forbidden_inputs": forbidden_inputs,
+                "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+                "then_read_next_response": True,
+                "precompute_or_increment_revision": False,
+            }
+        return {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "required_next_phase": (
+                "bind_target_objects_then_discover_field_and_declare_outcome"
+            ),
+            "responsibility_split": {
+                "agent": "natural_language_to_closed_high_level_business_facts",
+                "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
+            },
+            "business_contract": business_contract,
+            "object_binding": object_binding,
+            "field_discovery": {
+                **operation_draft_prefix_copy_binding(field_discover_prefix),
+                "append": [
+                    "--object-handle",
+                    "<bound-target-object-handle>",
+                    "--meaning",
+                    "<user-facing-field-meaning>",
+                    "[--platform <exact-user-requested-platform>]",
+                ],
+                "result": "copy_one_returned_field_candidate.handle",
+                "token_input": "forbidden",
+                "refine_only_when": "returned_candidates_do_not_identify_user_intent",
+            },
+            "declaration": {
+                **operation_draft_prefix_copy_binding(
+                    declare_field_change_prefix
+                ),
+                "append_fields": business_contract["declaration"],
+                "submit_once": True,
+            },
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "property_token",
+                "reference_token",
+                "field_scope",
+                "field_wire_type",
+            ],
             "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
             "then_read_next_response": True,
             "precompute_or_increment_revision": False,

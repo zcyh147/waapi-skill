@@ -13,6 +13,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_direct_protocol,
     build_metadata_transaction_protocol,
     build_object_lifecycle_business_transaction_steps,
+    build_object_metadata_business_transaction_steps,
     build_object_set_composer_transaction_steps,
     build_schema_query_transaction_protocol,
     build_transaction_protocol,
@@ -812,6 +813,98 @@ def test_object_lifecycle_business_builder_rejects_native_or_unknown_fields() ->
 
     with pytest.raises(V3ProtocolError, match="fields are not supported"):
         build_object_lifecycle_business_transaction_steps(request, label="tx01")
+
+
+@pytest.mark.parametrize(
+    ("operation", "arguments", "outcome_flag"),
+    [
+        (
+            "object.setProperty",
+            {
+                "object": {"kind": "id", "value": "{object}"},
+                "property": "Volume",
+                "value": -4.0,
+                "platform": "Windows",
+            },
+            "--business-value",
+        ),
+        (
+            "object.setReference",
+            {
+                "object": {"kind": "id", "value": "{object}"},
+                "reference": "OutputBus",
+                "target": {"kind": "id", "value": "{target}"},
+            },
+            "--target-handle",
+        ),
+        (
+            "object.setLinked",
+            {
+                "object": {"kind": "id", "value": "{object}"},
+                "property": "Volume",
+                "platform": "Windows",
+                "linked": False,
+            },
+            "--link-state",
+        ),
+    ],
+)
+def test_object_metadata_protocol_uses_meaning_and_opaque_field_handle(
+    operation: str,
+    arguments: dict[str, object],
+    outcome_flag: str,
+) -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2025.1",
+        "operation": operation,
+        "arguments": arguments,
+    }
+
+    steps = build_object_metadata_business_transaction_steps(
+        request,
+        label="tx01",
+    )
+
+    discover = next(
+        step for step in steps if step.subcommand == "draft-discover-fields"
+    )
+    declare = next(
+        step for step in steps if step.subcommand == "draft-declare-field-change"
+    )
+    assert "--meaning" in discover.arguments
+    assert "--token" not in discover.arguments
+    assert outcome_flag in declare.arguments
+    assert [step.subcommand for step in steps][-3:] == [
+        "draft-declare-field-change",
+        "draft-check",
+        "preview-from-draft",
+    ]
+    assert all(step.subcommand != "draft-apply" for step in steps)
+    assert next(step for step in steps if step.name == "tx01.preview").expected_operation_request == request
+
+
+def test_transaction_protocol_routes_object_metadata_around_typed_ingress() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.setReference",
+        "arguments": {
+            "object": {"kind": "id", "value": "{object}"},
+            "reference": "OutputBus",
+            "target": None,
+        },
+    }
+
+    protocol = build_transaction_protocol((request,))
+
+    assert any(
+        step.subcommand == "draft-discover-fields" for step in protocol.steps
+    )
+    assert any(
+        step.subcommand == "draft-declare-field-change" for step in protocol.steps
+    )
+    assert all(step.subcommand != "typed-operation" for step in protocol.steps)
 
 
 def test_soundbank_generate_transaction_uses_typed_draft_facts() -> None:

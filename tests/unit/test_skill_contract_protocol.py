@@ -270,9 +270,8 @@ def test_operate_identity_preflight_stays_in_the_operate_reference_lane() -> Non
     assert "preserved sibling" in operate_compact
     assert "post-execution verification does not" in operate_compact
     assert (
-        "After that preflight, `object.create` runs `operation-schema`, then one "
-        "`metadata discover` containing every same-scope prompt-present dynamic "
-        "property/reference token (1–8; never split), then `draft-start`"
+        "After that preflight, `object.create` runs `operation-schema`, one "
+        "`metadata discover` for its 1–8 dynamic fields, then `draft-start`"
     ) in operate_compact
     assert operate_compact.index(
         "Finish any user-requested exact path/type preflight"
@@ -815,7 +814,7 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "Table imports start `operation-schema audio.importTabDelimited`" in OPERATE
     assert "dynamic columns stay metadata-first" in OPERATE
     skill_compact = " ".join(SKILL.split())
-    assert "Composer `draft-check` revalidates them" in skill_compact
+    assert "`object.set` batches and revalidates its dynamic fields" in skill_compact
     assert "only an explicit unknown dynamic property/reference token needs" in skill_compact
     assert "A known native URI without a named route" in OPERATE
     assert "`request-schema <uri>`" in OPERATE

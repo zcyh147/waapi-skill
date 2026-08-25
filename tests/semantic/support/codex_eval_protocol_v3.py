@@ -1008,6 +1008,14 @@ OBJECT_LIFECYCLE_BUSINESS_OPERATIONS = frozenset(
     }
 )
 
+OBJECT_METADATA_BUSINESS_OPERATIONS = frozenset(
+    {
+        "object.setLinked",
+        "object.setProperty",
+        "object.setReference",
+    }
+)
+
 
 def build_object_lifecycle_business_transaction_steps(
     request: Mapping[str, Any],
@@ -1161,6 +1169,182 @@ def build_object_lifecycle_business_transaction_steps(
         ExpectedGatewayStep(
             name=declaration_name,
             subcommand="draft-declare-object-change",
+            arguments=tuple(declaration_arguments),
+        )
+    )
+    latest_revision_step = declaration_name
+    check_name = f"{label}.check"
+    steps.append(
+        ExpectedGatewayStep(
+            name=check_name,
+            subcommand="draft-check",
+            arguments=draft_prefix(),
+        )
+    )
+    latest_revision_step = check_name
+    steps.append(
+        ExpectedGatewayStep(
+            name=f"{label}.preview",
+            subcommand="preview-from-draft",
+            arguments=draft_prefix(),
+            expected_operation_request=normalized,
+        )
+    )
+    return tuple(steps)
+
+
+def build_object_metadata_business_transaction_steps(
+    request: Mapping[str, Any],
+    *,
+    label: str,
+) -> tuple[ExpectedGatewayStep, ...]:
+    """Translate one canonical field edit into bound business Draft steps."""
+
+    normalized = _validate_operation_request(request)
+    operation = str(normalized["operation"])
+    if operation not in OBJECT_METADATA_BUSINESS_OPERATIONS:
+        raise V3ProtocolError(
+            "object metadata business builder requires one reviewed operation"
+        )
+    if not isinstance(label, str) or not re.fullmatch(r"tx[0-9]{2}", label):
+        raise V3ProtocolError("business transaction label must be txNN")
+    try:
+        parsed = parse_operation_request(normalized)
+    except OperationContractError as exc:
+        raise V3ProtocolError(
+            f"object metadata business request is invalid: {exc}"
+        ) from exc
+    arguments = parsed.arguments
+    field_name = (
+        arguments.get("reference")
+        if operation == "object.setReference"
+        else arguments.get("property")
+    )
+    if not isinstance(field_name, str) or not field_name:
+        raise V3ProtocolError("object metadata business request lacks field meaning")
+
+    steps: list[ExpectedGatewayStep] = [
+        ExpectedGatewayStep(
+            name=f"{label}.operation-schema",
+            subcommand="operation-schema",
+            arguments=(operation,),
+        ),
+        ExpectedGatewayStep(
+            name=f"{label}.draft-start",
+            subcommand="draft-start",
+            arguments=(operation,),
+        ),
+    ]
+    draft_start = f"{label}.draft-start"
+    latest_revision_step = draft_start
+
+    def draft_prefix() -> tuple[Any, ...]:
+        return (
+            ResponseBinding(draft_start, "/draft/draft_id"),
+            "--task-authority",
+            ResponseBinding(draft_start, "/task_authority"),
+            "--expected-revision",
+            ResponseBinding(latest_revision_step, "/draft/revision"),
+        )
+
+    def bind_object(selector: Any, *, role: str) -> ResponseBinding:
+        nonlocal latest_revision_step
+        if not isinstance(selector, Mapping):
+            raise V3ProtocolError(
+                f"object metadata business request lacks {role} identity"
+            )
+        kind = selector.get("kind")
+        value = selector.get("value")
+        if kind not in {"id", "path"} or not isinstance(value, str) or not value:
+            raise V3ProtocolError(
+                "object metadata business identity must be exact id or path"
+            )
+        if kind == "path":
+            segments = tuple(segment for segment in value.split("\\") if segment)
+            if not segments or "\\" + "\\".join(segments) != value:
+                raise V3ProtocolError(
+                    "object metadata business path must have canonical segments"
+                )
+            selector_arguments: tuple[Any, ...] = tuple(
+                item
+                for segment in segments
+                for item in ("--object-path-segment", segment)
+            )
+        else:
+            selector_arguments = ("--object-id", value)
+        step_name = f"{label}.bind-{role}"
+        steps.append(
+            ExpectedGatewayStep(
+                name=step_name,
+                subcommand="draft-bind-object",
+                arguments=(*draft_prefix(), *selector_arguments),
+            )
+        )
+        latest_revision_step = step_name
+        return ResponseBinding(step_name, "/bound_object/handle")
+
+    source_handle = bind_object(arguments.get("object"), role="object")
+    target_handle: ResponseBinding | None = None
+    if operation == "object.setReference" and arguments.get("target") is not None:
+        target_handle = bind_object(arguments.get("target"), role="target")
+
+    discover_name = f"{label}.discover-field"
+    discover_arguments: list[Any] = [
+        *draft_prefix(),
+        "--object-handle",
+        source_handle,
+        "--meaning",
+        field_name,
+    ]
+    if "platform" in arguments:
+        discover_arguments.extend(("--platform", str(arguments["platform"])))
+    steps.append(
+        ExpectedGatewayStep(
+            name=discover_name,
+            subcommand="draft-discover-fields",
+            arguments=tuple(discover_arguments),
+        )
+    )
+    latest_revision_step = discover_name
+    field_handle = ResponseBinding(discover_name, "/field_candidates/0/handle")
+    declaration_arguments: list[Any] = [
+        *draft_prefix(),
+        "--object-handle",
+        source_handle,
+        "--field-handle",
+        field_handle,
+    ]
+    if operation == "object.setProperty":
+        value = arguments.get("value")
+        if isinstance(value, bool):
+            value_text = "true" if value else "false"
+        elif isinstance(value, (int, float)) and not isinstance(value, bool):
+            value_text = json.dumps(value, ensure_ascii=False, allow_nan=False)
+        elif isinstance(value, str):
+            value_text = value
+        else:
+            raise V3ProtocolError(
+                "object metadata business property value is unsupported"
+            )
+        declaration_arguments.extend(("--business-value", value_text))
+    elif operation == "object.setReference":
+        declaration_arguments.extend(
+            ("--target-handle", target_handle)
+            if target_handle is not None
+            else ("--clear-reference",)
+        )
+    else:
+        declaration_arguments.extend(
+            (
+                "--link-state",
+                "linked" if arguments.get("linked") is True else "unlinked",
+            )
+        )
+    declaration_name = f"{label}.declare-field-change"
+    steps.append(
+        ExpectedGatewayStep(
+            name=declaration_name,
+            subcommand="draft-declare-field-change",
             arguments=tuple(declaration_arguments),
         )
     )
@@ -2459,6 +2643,14 @@ def build_transaction_protocol(
                     request,
                     label=label,
                 )
+            elif (
+                input_mode == BUSINESS_DECLARATION_INPUT_MODE
+                and operation in OBJECT_METADATA_BUSINESS_OPERATIONS
+            ):
+                operation_steps = build_object_metadata_business_transaction_steps(
+                    request,
+                    label=label,
+                )
             else:
                 operation_steps = _build_generic_typed_draft_transaction_steps(
                     request,
@@ -3274,6 +3466,7 @@ __all__ = [
     "build_audio_import_composer_transaction_steps",
     "OBJECT_LIFECYCLE_BUSINESS_OPERATIONS",
     "build_object_lifecycle_business_transaction_steps",
+    "build_object_metadata_business_transaction_steps",
     "build_object_set_composer_transaction_steps",
     "build_modification_policy_protocol",
     "build_metadata_transaction_protocol",

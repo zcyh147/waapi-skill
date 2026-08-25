@@ -356,12 +356,17 @@ python scripts/run.py gateway.py execute <transaction-id>
 python scripts/run.py gateway.py verify <transaction-id>
 ```
 
-`object.copy`, `object.delete`, `object.move`, `object.setName`, and
-`object.setNotes` use this business-declaration Draft path. The caller binds
+`object.copy`, `object.delete`, `object.move`, `object.setName`,
+`object.setNotes`, `object.setProperty`, `object.setReference`, and
+`object.setLinked` use this business-declaration Draft path. The caller binds
 exact object roles and supplies only the outcome fields disclosed by the
 version-aware `operation-schema`; the Gateway constructs the canonical identity
-selectors and native request fields. Follow the returned binding, declaration,
-check, and Preview commands rather than reconstructing them.
+selectors and native request fields. Property, reference, and platform-link
+edits search by user-facing field meaning after binding the object; the Gateway
+returns bounded live candidate labels with opaque Field Handles and seals the
+exact token, scope, type, restrictions, and optional platform internally.
+Follow the returned binding, discovery, declaration, check, and Preview commands
+rather than reconstructing them.
 
 Run each returned phase separately and use only the complete field named by
 `next_command.copy_instruction.source_field` rather than rebuilding it. The `transaction-show`

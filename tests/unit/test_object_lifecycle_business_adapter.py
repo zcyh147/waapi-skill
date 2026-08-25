@@ -55,8 +55,11 @@ def test_business_adapter_registry_selects_one_family_at_one_seam() -> None:
     assert business_adapter("object.move").accepts_update_command(
         "draft-declare-object-change"
     ) is True
-    with pytest.raises(KeyError):
-        business_adapter("object.setProperty")
+    assert business_adapter("object.setProperty").family == (
+        "object-metadata-fields"
+    )
+    assert business_adapter("object.setProperty").supports_field_discovery is True
+    assert business_adapter("object.setProperty").supports_field_binding is False
 
 
 def test_every_business_input_lane_has_exactly_one_registered_adapter() -> None:

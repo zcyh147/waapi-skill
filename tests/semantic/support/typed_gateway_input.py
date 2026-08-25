@@ -114,6 +114,70 @@ def create_object_lifecycle_business_preview(
     )
 
 
+def create_object_metadata_business_preview(
+    gateway: GatewayCall,
+    *,
+    version: str,
+    operation: str,
+    object_id: str,
+    field_name: str,
+    value: Any = None,
+    target_id: str | None = None,
+    clear_reference: bool = False,
+    platform: str | None = None,
+    linked: bool | None = None,
+) -> dict[str, Any]:
+    """Exercise the public field-discovery Business Draft through Preview."""
+
+    if operation not in {
+        "object.setLinked",
+        "object.setProperty",
+        "object.setReference",
+    }:
+        raise ValueError("operation has no object-metadata Business Adapter")
+    arguments: dict[str, Any] = {
+        "object": {"kind": "id", "value": object_id},
+    }
+    if operation == "object.setProperty":
+        if target_id is not None or clear_reference or linked is not None:
+            raise ValueError("property business fields are inconsistent")
+        arguments.update({"property": field_name, "value": value})
+    elif operation == "object.setReference":
+        if linked is not None or (target_id is None) == (not clear_reference):
+            raise ValueError("reference requires exactly one target or clear")
+        arguments.update(
+            {
+                "reference": field_name,
+                "target": (
+                    {"kind": "id", "value": target_id}
+                    if target_id is not None
+                    else None
+                ),
+            }
+        )
+    else:
+        if linked is None or platform is None or target_id is not None or clear_reference:
+            raise ValueError("link state requires platform and linked only")
+        arguments.update(
+            {
+                "property": field_name,
+                "platform": platform,
+                "linked": linked,
+            }
+        )
+    if platform is not None and operation != "object.setLinked":
+        arguments["platform"] = platform
+    return create_typed_transaction_preview(
+        gateway,
+        {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": version,
+            "operation": operation,
+            "arguments": arguments,
+        },
+    )
+
+
 def create_typed_transaction_preview(
     gateway: GatewayCall,
     request: Mapping[str, Any],
@@ -589,6 +653,7 @@ def typed_wait_topic_command(
 
 __all__ = [
     "create_object_lifecycle_business_preview",
+    "create_object_metadata_business_preview",
     "create_typed_transaction_preview",
     "typed_wait_topic_command",
 ]

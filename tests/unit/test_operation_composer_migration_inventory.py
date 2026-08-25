@@ -65,6 +65,9 @@ def test_inventory_exactly_covers_every_registry_operation_and_version_lane() ->
             "object.move",
             "object.setName",
             "object.setNotes",
+            "object.setLinked",
+            "object.setProperty",
+            "object.setReference",
         }:
             expected_mode = BUSINESS_DECLARATION_INPUT_MODE
         elif (
