@@ -1,0 +1,351 @@
+{
+  "contract": "waapi-skill.interface-depth-review-policy/v1",
+  "source_contracts": {
+    "operation_contract_sha256": "c49b14604eac275529702cfb561d7b580595eef39dc9342407e4ca1e44c6d59a",
+    "public_continuation_sha256": "9b1597e919ea06b772a8b2c81d4fa3a9288351bda032cd46fffa8b1ffbe0afe3",
+    "typed_request_surface_sha256": "6d05d64e95a6e0f7099ddd03f1da42c763e9c06f33f93cac7581c7c061a83af8"
+  },
+  "ownership_classes": {
+    "stable_business_declaration": "A prompt-derived business value remains visible in the public request.",
+    "gateway_derivation": "The Gateway deterministically derives or serializes this value or workflow mechanic.",
+    "live_bound_handle": "The Gateway issues a capability- and live-state-bound handle which the caller may only copy.",
+    "exact_user_artifact": "User-owned bytes, files, paths, tables, or source text remain exact inputs inside a Gateway envelope.",
+    "bounded_domain_expression": "An exact domain expression is accepted only by its reviewed read-only or code boundary.",
+    "reviewed_adapter": "An operation-specific Adapter must replace the current native-facing value or structure.",
+    "prohibited_boundary": "The value or route is intentionally unavailable through the public surface."
+  },
+  "mechanic_owners": {
+    "ambiguous_continuation_selection": "gateway_derivation",
+    "batch_layout": "gateway_derivation",
+    "dependency_order": "gateway_derivation",
+    "metadata_scope": "gateway_derivation",
+    "native_object_path": "gateway_derivation",
+    "property_or_reference_token": "live_bound_handle",
+    "request_fragment": "gateway_derivation",
+    "revision_arithmetic": "gateway_derivation",
+    "shell_quoting": "gateway_derivation",
+    "wire_type": "gateway_derivation"
+  },
+  "named_operation_groups": [
+    {
+      "id": "named-audio-import-audited-deep",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "operations": ["audio.import"],
+      "leaked_mechanics": []
+    },
+    {
+      "id": "named-internal-canonical-boundary",
+      "disposition": "prohibited_boundary",
+      "owner_issue": null,
+      "operations": ["waapi.call"],
+      "leaked_mechanics": []
+    },
+    {
+      "id": "named-object-lifecycle-audited-deep",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "operations": ["object.copy", "object.delete", "object.move", "object.setName", "object.setNotes"],
+      "leaked_mechanics": []
+    },
+    {
+      "id": "named-object-metadata-fields",
+      "disposition": "migration_required",
+      "owner_issue": 56,
+      "operations": ["object.setLinked", "object.setProperty", "object.setReference"],
+      "leaked_mechanics": ["metadata_scope", "property_or_reference_token", "wire_type", "request_fragment"]
+    },
+    {
+      "id": "named-object-creation-graph",
+      "disposition": "migration_required",
+      "owner_issue": 56,
+      "operations": ["object.create", "object.createPlugin", "object.set", "object.setRTPC"],
+      "leaked_mechanics": ["native_object_path", "metadata_scope", "property_or_reference_token", "wire_type", "dependency_order", "batch_layout", "revision_arithmetic", "request_fragment"]
+    },
+    {
+      "id": "named-switch-assignments-audited-deep",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "operations": ["switchContainer.addAssignment", "switchContainer.removeAssignment"],
+      "leaked_mechanics": []
+    },
+    {
+      "id": "named-soundbank-planning",
+      "disposition": "migration_required",
+      "owner_issue": 56,
+      "operations": ["soundbank.convertExternalSources", "soundbank.generate", "soundbank.setInclusions"],
+      "leaked_mechanics": ["native_object_path", "wire_type", "dependency_order", "batch_layout", "request_fragment"]
+    },
+    {
+      "id": "named-exact-file-audited-deep",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "operations": ["soundbank.processDefinitionFiles"],
+      "leaked_mechanics": []
+    },
+    {
+      "id": "named-exact-artifact-code",
+      "disposition": "migration_required",
+      "owner_issue": 56,
+      "operations": ["audio.importTabDelimited", "lua.executeCliFile", "lua.executeCoreFile", "lua.executeCoreInline"],
+      "leaked_mechanics": ["wire_type", "dependency_order", "batch_layout", "revision_arithmetic", "request_fragment"]
+    },
+    {
+      "id": "named-authoring-ui-audited-deep",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "operations": ["ui.captureScreen", "ui.commands.execute"],
+      "leaked_mechanics": []
+    },
+    {
+      "id": "named-authoring-ui-registration",
+      "disposition": "migration_required",
+      "owner_issue": 56,
+      "operations": ["ui.commands.register", "ui.commands.unregister"],
+      "leaked_mechanics": ["wire_type", "dependency_order", "batch_layout", "revision_arithmetic", "request_fragment"]
+    },
+    {
+      "id": "named-debug-booleans-audited-deep",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "operations": ["debug.setAsserts", "debug.setAutomationMode"],
+      "leaked_mechanics": []
+    },
+    {
+      "id": "named-dangerous-debug-controls",
+      "disposition": "migration_required",
+      "owner_issue": 56,
+      "operations": ["debug.restartWaapiServers", "debug.testAssert", "debug.testCrash"],
+      "leaked_mechanics": ["wire_type", "request_fragment"]
+    },
+    {
+      "id": "named-compound-undo",
+      "disposition": "migration_required",
+      "owner_issue": 56,
+      "operations": ["waapi.undoGroup"],
+      "leaked_mechanics": ["native_object_path", "wire_type", "dependency_order", "batch_layout", "revision_arithmetic", "request_fragment"]
+    }
+  ],
+  "native_lane_rules": [
+    {
+      "id": "generic-topics",
+      "disposition": "migration_required",
+      "owner_issue": 57,
+      "match": {"item_types": ["topic"]},
+      "leaked_mechanics": ["native_object_path", "wire_type", "request_fragment"]
+    },
+    {
+      "id": "generic-dedicated-route-boundary",
+      "disposition": "prohibited_boundary",
+      "owner_issue": null,
+      "match": {"dedicated_operation_uri": true},
+      "leaked_mechanics": []
+    },
+    {
+      "id": "generic-fixed-command-audited-deep",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "match": {"routes": ["fixed_command"], "gateway_commands_none": ["request-schema"]},
+      "leaked_mechanics": []
+    },
+    {
+      "id": "generic-zero-input-audited-deep",
+      "disposition": "already_deep",
+      "owner_issue": null,
+      "match": {"construction_shapes": ["zero"]},
+      "leaked_mechanics": []
+    },
+    {
+      "id": "generic-soundengine-runtime",
+      "disposition": "migration_required",
+      "owner_issue": 57,
+      "match": {"uri_prefixes": ["ak.soundengine."]},
+      "leaked_mechanics": ["wire_type", "dependency_order", "batch_layout", "request_fragment"]
+    },
+    {
+      "id": "generic-cli-console",
+      "disposition": "migration_required",
+      "owner_issue": 57,
+      "match": {"uri_prefixes": ["ak.wwise.cli.", "ak.wwise.console."]},
+      "leaked_mechanics": ["native_object_path", "wire_type", "dependency_order", "batch_layout", "request_fragment"]
+    },
+    {
+      "id": "generic-host-ui-debug-waapi",
+      "disposition": "migration_required",
+      "owner_issue": 57,
+      "match": {"uri_prefixes": ["ak.wwise.debug.", "ak.wwise.ui.", "ak.wwise.waapi."]},
+      "leaked_mechanics": ["native_object_path", "wire_type", "request_fragment"]
+    },
+    {
+      "id": "generic-core-project-object",
+      "disposition": "migration_required",
+      "owner_issue": 57,
+      "match": {"uri_prefixes": ["ak.wwise.core.audio.", "ak.wwise.core.blendContainer.", "ak.wwise.core.object.", "ak.wwise.core.project.", "ak.wwise.core.switchContainer.", "ak.wwise.core.workUnit."]},
+      "leaked_mechanics": ["native_object_path", "metadata_scope", "property_or_reference_token", "wire_type", "dependency_order", "batch_layout", "revision_arithmetic", "request_fragment"]
+    },
+    {
+      "id": "generic-core-media-build",
+      "disposition": "migration_required",
+      "owner_issue": 57,
+      "match": {"uri_prefixes": ["ak.wwise.core.audioSourcePeaks.", "ak.wwise.core.mediaPool.", "ak.wwise.core.soundbank."]},
+      "leaked_mechanics": ["native_object_path", "wire_type", "dependency_order", "batch_layout", "request_fragment"]
+    },
+    {
+      "id": "generic-core-runtime-inspection",
+      "disposition": "migration_required",
+      "owner_issue": 57,
+      "match": {"uri_prefixes": ["ak.wwise.core.log.", "ak.wwise.core.profiler.", "ak.wwise.core.remote.", "ak.wwise.core.transport."]},
+      "leaked_mechanics": ["wire_type", "request_fragment"]
+    },
+    {
+      "id": "generic-core-remaining",
+      "disposition": "migration_required",
+      "owner_issue": 57,
+      "match": {"uri_prefixes": ["ak.wwise.core."]},
+      "leaked_mechanics": ["native_object_path", "wire_type", "request_fragment"]
+    }
+  ],
+  "ticket_blueprints": {
+    "named-object-metadata-fields": {
+      "title": "Compile named object property and reference edits from bound business fields",
+      "parent_issue": 56,
+      "blocked_by_family": null,
+      "public_behavior": "Accept an object selector, user-facing property or reference meaning, optional platform, and business value or target; resolve exact metadata scope and tokens through live-bound handles inside the Gateway.",
+      "deterministic_tests": "Five-version operation schemas, positive and repair flows, stale/wrong-scope handles, hostile values, exact-name isolation, and generic-route non-bypass.",
+      "removal_boundary": "Remove the shallow property/reference token inputs and their prompt guidance after parity; retain Preview, authorization, drift checks, execute-at-most-once, and exact readback.",
+      "proportional_evidence": "Real Alarm-style property/reference edits on 2022.1 and 2025.1 on macOS and Windows, plus one targeted Fresh Agent repair workflow."
+    },
+    "named-object-creation-graph": {
+      "title": "Compile object creation, plug-in graphs, bulk set, and RTPC curves from business declarations",
+      "parent_issue": 56,
+      "blocked_by_family": "named-object-metadata-fields",
+      "public_behavior": "Accept named object outcomes, hierarchy intent, plug-in roles, business properties, references, and RTPC curve points; derive exact Wwise types, paths, metadata scopes, dependency order, batches, and revisions.",
+      "deterministic_tests": "Five-version tree and graph goldens, positive/negative/repair/stale handle cases, nested limits, exact-name isolation for the shared object.set URI, and non-bypass.",
+      "removal_boundary": "Delete the Composer action/handle vocabulary for these four operations after parity while preserving immutable Preview and existing verifiers.",
+      "proportional_evidence": "Weather-style object.create/object.setRTPC plus createPlugin and bulk-set representatives on 2022.1 and 2025.1 on both hosts; targeted Fresh Agent Weather construction."
+    },
+    "named-soundbank-planning": {
+      "title": "Compile SoundBank inclusion, generation, and external-source plans",
+      "parent_issue": 56,
+      "blocked_by_family": "named-object-creation-graph",
+      "public_behavior": "Accept SoundBank identities, inclusion intent, platforms, languages, rebuild choices, and exact source artifacts; derive native batch layout, object paths, order, and request envelopes.",
+      "deterministic_tests": "Five-version inclusion/generation/external-source goldens, empty and multi-value cases, hostile paths, limits, stale identities, isolated-I/O guards, and non-bypass.",
+      "removal_boundary": "Remove SoundBank Composer actions and native planning fields after parity; keep source-file authority, artifact verification, and project guards.",
+      "proportional_evidence": "Harbor setInclusions/generate and one external-source conversion on matching 2022.1/2025.1 macOS and Windows hosts; targeted Harbor Fresh Agent workflow."
+    },
+    "named-exact-artifact-code": {
+      "title": "Wrap tabular import and Lua artifacts in deep Gateway envelopes",
+      "parent_issue": 56,
+      "blocked_by_family": "named-soundbank-planning",
+      "public_behavior": "Keep TSV files, Lua source, paths, and bounded argument maps exact and user-owned while the Gateway derives loader fields, request ordering, limits, source authority, and serialization.",
+      "deterministic_tests": "Exact-byte preservation, five-version availability, hostile paths and Unicode, open-map bounds, reserved-key rejection, repair, stale source authority, and non-bypass.",
+      "removal_boundary": "Remove model-authored Composer handles and loader/request fragments; never rewrite exact code or artifact bytes.",
+      "proportional_evidence": "Representative tab import and each distinct Lua host/version shape, with native-Windows filesystem transport probes and targeted Fresh Agent routing only where model behavior changes."
+    },
+    "named-authoring-ui-registration": {
+      "title": "Compile Authoring UI command registration lifecycle from business descriptors",
+      "parent_issue": 56,
+      "blocked_by_family": "named-exact-artifact-code",
+      "public_behavior": "Accept bounded command descriptors and exact program/Lua handlers; derive IDs, revision/order mechanics, registration payloads, and the paired unregister plan from fresh Authoring state.",
+      "deterministic_tests": "Five-version descriptor schemas, collision/ownership/repair/stale inventory cases, exact handler preservation, lifecycle cleanup, limits, and prohibited generic bypass.",
+      "removal_boundary": "Delete registration Composer actions and caller-authored revision/request fragments; retain fresh getCommands authority and explicit Authoring-only boundaries.",
+      "proportional_evidence": "Matching real Authoring host registration/unregistration on macOS and Windows where available, plus a targeted Fresh Agent descriptor workflow."
+    },
+    "named-dangerous-debug-controls": {
+      "title": "Remove acknowledgement literals from dangerous debug host controls",
+      "parent_issue": 56,
+      "blocked_by_family": "named-authoring-ui-registration",
+      "public_behavior": "Expose zero-business-value host-control intents; the Gateway owns fixed acknowledgements, terminal journals, disconnect interpretation, and non-retry semantics.",
+      "deterministic_tests": "Exact five-version availability, explicit-confirmation-only policy, no-ack public schemas, terminal success/indeterminate/failure journals, no retry continuation, and generic non-bypass.",
+      "removal_boundary": "Remove acknowledge from public arguments and prompt guidance; preserve dangerous-operation boundaries and never add a raw escape hatch.",
+      "proportional_evidence": "Program and Non-live evidence is primary; no deliberate crash is required. Use only a reviewed matching-host representative if needed, without claiming target effects that were not exercised."
+    },
+    "named-compound-undo": {
+      "title": "Compile compound Undo Groups from ordered business operations",
+      "parent_issue": 56,
+      "blocked_by_family": "named-dangerous-debug-controls",
+      "public_behavior": "Accept a bounded ordered list of closed business-operation declarations and one display name; derive child handles, dependency order, batch/revision mechanics, begin/end/cancel calls, and one Preview.",
+      "deterministic_tests": "Five-version heterogeneous child goldens, nested-route prohibitions, limits, stale child handles, cancel/end failures, no retry, exact-name isolation, and one-outcome verification.",
+      "removal_boundary": "Delete public Composer call handles and action ordering grammar after every eligible child family has parity.",
+      "proportional_evidence": "One successful and one cancellation/failure shape on matching real hosts, then one representative macOS and Windows Fresh Agent compound workflow."
+    },
+    "generic-core-project-object": {
+      "title": "Deepen generic Core project, object, audio, blend, switch, and Work Unit routes",
+      "parent_issue": 57,
+      "blocked_by_family": null,
+      "public_behavior": "Replace raw typed field handles and native request layout with coherent business declarations for the exact audited Core project/object route rows; keep dedicated-operation bypasses closed.",
+      "deterministic_tests": "Every exact inventory row and version, positive/negative/repair/stale cases, identity and version deltas, hostile scalars, continuation completeness, and non-bypass.",
+      "removal_boundary": "Remove request-schema/typed-call model construction for these rows only after semantic parity; keep closed query and mutation safety boundaries.",
+      "proportional_evidence": "Representative real cases per distinct verifier/effect shape on 2022.1 and 2025.1 and targeted Fresh Agent evidence only for changed routing or parameter closure."
+    },
+    "generic-core-media-build": {
+      "title": "Deepen generic media peaks, media-pool, and SoundBank read routes",
+      "parent_issue": 57,
+      "blocked_by_family": "generic-core-project-object",
+      "public_behavior": "Accept media regions, pool queries, and SoundBank inclusion reads as bounded business requests; derive native selectors, projections, and request layout.",
+      "deterministic_tests": "All exact rows and version deltas, bounds, hostile numeric values, result ceilings, continuation completeness, and dedicated-route non-bypass.",
+      "removal_boundary": "Remove typed handle/wire-type construction for the audited rows while retaining direct bounded read lifecycles.",
+      "proportional_evidence": "One real representative per distinct read shape on matching versions; Fresh Agent only for routing ambiguity introduced by the new declarations."
+    },
+    "generic-core-remaining": {
+      "title": "Deepen remaining Core Game Parameter, source-control, sound-source, and Undo-member routes",
+      "parent_issue": 57,
+      "blocked_by_family": "generic-core-media-build",
+      "public_behavior": "Expose bounded business requests for parameter ranges, active sources, source-control actions, and compound-only Undo members; preserve provider and compound boundaries.",
+      "deterministic_tests": "Every exact row/version, provider and path boundaries, compound-only rejection, hostile values, continuation completeness, repair, and non-bypass.",
+      "removal_boundary": "Remove generic typed construction for these rows after parity; do not expose Undo members outside the compound compiler or arbitrary source-control escape hatches.",
+      "proportional_evidence": "Matching-host representatives for each effect/verifier family; use Fresh Agent only where route choice or business vocabulary changed."
+    },
+    "generic-core-runtime-inspection": {
+      "title": "Deepen log, profiler, remote, and transport inspection/control routes",
+      "parent_issue": 57,
+      "blocked_by_family": "generic-core-remaining",
+      "public_behavior": "Accept named capture, cursor, meter, remote, transport, and result-filter intent; derive native enums, projections, handles, and ordering while retaining direct bounded reads where applicable.",
+      "deterministic_tests": "All exact rows/versions, read versus runtime-mutation policy, cursor/meter/transport lifecycles, hostile scalars, time/result bounds, continuation completeness, and cleanup.",
+      "removal_boundary": "Remove raw request-schema construction, including the two fixed-command typed escape paths, after their business routes reach parity.",
+      "proportional_evidence": "Representative real profiler, remote, and transport lifecycles on matching hosts; Fresh Agent only for changed multi-step routing."
+    },
+    "generic-soundengine-runtime": {
+      "title": "Deepen the complete SoundEngine runtime command surface",
+      "parent_issue": 57,
+      "blocked_by_family": "generic-core-runtime-inspection",
+      "public_behavior": "Expose events, game objects, listeners, positions, RTPCs, switches, states, banks, and playback actions as stable domain values; derive native overloads, IDs, arrays, and wire types.",
+      "deterministic_tests": "All 124 exact version lanes, overload and enum mapping, hostile IDs/scalars, multi-position and aux-send bounds, command continuation, result ceilings, and non-bypass.",
+      "removal_boundary": "Delete model-authored typed handles, branch choices, native arrays, and wire types for SoundEngine rows after parity.",
+      "proportional_evidence": "Representative real calls per distinct command/result family on matching hosts; targeted Fresh Agent workflows for event/game-object/listener parameter closure."
+    },
+    "generic-cli-console": {
+      "title": "Deepen Wwise CLI and Console project/build operations",
+      "parent_issue": 57,
+      "blocked_by_family": "generic-soundengine-runtime",
+      "public_behavior": "Accept project, platform, build, migration, verification, and exact file intent; derive command-specific native options, ordering, batching, and shell-safe serialization.",
+      "deterministic_tests": "All exact rows/version deltas, option mapping, exact artifacts, hostile macOS/Windows paths, blocked custom commands, isolated-I/O policy, continuation serialization, and non-bypass.",
+      "removal_boundary": "Remove generic typed request construction and prompt-level CLI option assembly; keep prohibited custom-command boundaries and exact artifacts.",
+      "proportional_evidence": "Representative real CLI/Console operations per distinct verifier shape on both OSes, including native-Windows path/PowerShell transport; Fresh Agent for build-intent routing."
+    },
+    "generic-host-ui-debug-waapi": {
+      "title": "Deepen remaining host UI, debug validation, tone, project, and WAAPI schema routes",
+      "parent_issue": 57,
+      "blocked_by_family": "generic-cli-console",
+      "public_behavior": "Expose bounded host/project/tone/validation/schema intent while keeping exact validation targets and dangerous boundaries inside Gateway-owned envelopes.",
+      "deterministic_tests": "All exact rows and host/version deltas, Authoring requirements, bounded validateCall input, hostile paths/scalars, continuation completeness, project guards, and no arbitrary escape hatch.",
+      "removal_boundary": "Remove raw typed construction, including debug.validateCall's fixed-command typed escape, after reviewed business envelopes exist.",
+      "proportional_evidence": "Representative real Authoring/project operations and tone output on matching hosts; Fresh Agent only for changed host/routing decisions."
+    },
+    "generic-topics": {
+      "title": "Deepen every Topic subscription, match, wait, and stream continuation",
+      "parent_issue": 57,
+      "blocked_by_family": "generic-host-ui-debug-waapi",
+      "public_behavior": "Accept topic intent and stable match values; derive event schema paths, field handles, wire types, match structure, and the one complete wait/stream continuation while preserving explicit timeout choices.",
+      "deterministic_tests": "All 154 exact Topic lanes, version-delta event schemas, empty/nonempty match values, hostile scalars, timeout/no-timeout/event-count rules, size bounds, cancellation cleanup, and continuation uniqueness.",
+      "removal_boundary": "Delete model-authored topic-schema handles and native match fragments after parity; retain exact event-count, time, byte, terminal JSON, and unsubscribe boundaries.",
+      "proportional_evidence": "Representative real events for each distinct event/match family on 2022.1 and 2025.1; targeted Fresh Agent wait/stream selection and repair workflows on both hosts."
+    }
+  },
+  "field_ownership_rules": {
+    "exact_artifact_names": ["audio_file", "files", "import_file", "lua_code", "project", "script_file", "source", "source_file", "sources", "tab_delimited_import_file"],
+    "bounded_expression_names": ["transform", "waql", "wa_args"],
+    "live_bound_names": ["field", "metadata", "property", "reference"],
+    "gateway_structure_shapes": ["array", "branch", "map"]
+  }
+}
