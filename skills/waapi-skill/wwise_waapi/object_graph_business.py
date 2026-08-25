@@ -286,7 +286,7 @@ def _compile_object_set_import(
                     field=f"media_files[{index}].kind",
                     action="choose one stable semantic kind or discovered type handle",
                 )
-            compiled["object_type"] = _create_type(session, kind)
+            compiled["object_type"] = _resolve_native_object_type(session, kind)
         files.append(compiled)
     return {"files": files}
 
@@ -309,7 +309,7 @@ def _compile_set_new_node(
         fields=fields,
     )
     node = {
-        "type": _create_type(session, declaration.target.kind),
+        "type": _resolve_native_object_type(session, declaration.target.kind),
         "name": declaration.target.name,
         **_compile_create_fields(session, base),
     }
@@ -423,7 +423,7 @@ def _repair(
     )
 
 
-def _create_type(
+def _resolve_native_object_type(
     session: BusinessDeclarationSession,
     kind_name: str,
 ) -> str:
@@ -738,7 +738,7 @@ def _materialize_create(
     def compile_node(row: BusinessDeclaration) -> dict[str, Any]:
         assert isinstance(row.target, NewDescendantTarget)
         node = {
-            "type": _create_type(session, row.target.kind),
+            "type": _resolve_native_object_type(session, row.target.kind),
             "name": row.target.name,
             **_compile_create_fields(session, row),
         }
@@ -749,7 +749,10 @@ def _materialize_create(
                 _validate_specialized_relationship(
                     session,
                     parent_type=node["type"],
-                    child_type=_create_type(session, child.target.kind),
+                    child_type=_resolve_native_object_type(
+                        session,
+                        child.target.kind,
+                    ),
                 )
             node["children"] = [compile_node(child) for child in child_rows]
         return node
@@ -1236,7 +1239,10 @@ def _materialize_set(
                 _validate_specialized_relationship(
                     session,
                     parent_type=node["type"],
-                    child_type=_create_type(session, child.target.kind),
+                    child_type=_resolve_native_object_type(
+                        session,
+                        child.target.kind,
+                    ),
                 )
             node["children"] = [
                 compile_node(child, allow_object_list=False)[0]
@@ -1277,16 +1283,8 @@ def _materialize_set(
             declaration,
             allow_object_list=True,
         )
-        parent_token = "".join(
-            character
-            for character in parent.object_type.casefold()
-            if character.isalnum()
-        )
-        child_token = "".join(
-            character
-            for character in str(node["type"]).casefold()
-            if character.isalnum()
-        )
+        parent_token = _object_type_token(parent.object_type)
+        child_token = _object_type_token(node["type"])
         specialized = _validate_specialized_relationship(
             session,
             parent_type=parent_token,

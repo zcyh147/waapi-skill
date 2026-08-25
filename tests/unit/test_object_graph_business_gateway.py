@@ -121,6 +121,7 @@ def test_gateway_discovers_long_tail_type_then_compiles_only_its_handle(
 ) -> None:
     start_code, started = _offline(tmp_path, "draft-start", "object.create")
     assert start_code == 0, started
+    assert started["draft"]["allowed_actions"] == ["bind-object"]
     draft_id = started["draft"]["draft_id"]
     authority = started["task_authority"]
 
@@ -164,6 +165,23 @@ def test_gateway_discovers_long_tail_type_then_compiles_only_its_handle(
         "declare_named_object_or_discover_long_tail_kind"
     )
     assert bind_next["type_discovery"]["native_type_input"] == "forbidden"
+    assert bind_next["field_discovery"]["scope_decision"] == {
+        "stable_semantic_kind": [
+            "--semantic-kind",
+            "<disclosed-stable-semantic-kind>",
+        ],
+        "discovered_type": [
+            "--type-handle",
+            "<selected-type-handle>",
+        ],
+    }
+    assert bind_next["field_discovery"]["token_input"] == "forbidden"
+    assert bind_next["configure"]["append"] == [
+        "[--name-conflict fail|rename|merge|replace]",
+        "[--replace-owner-handle <bound-existing-owner-handle>]",
+        "[--platform <exact-user-platform>]",
+        "[--add-to-source-control|--no-add-to-source-control]",
+    ]
     assert "--token" not in json.dumps(bind_next)
 
     type_rows = [
@@ -595,6 +613,7 @@ def test_gateway_rejects_invalid_existing_declaration_before_revision(
 ) -> None:
     start_code, started = _offline(tmp_path, "draft-start", "object.set")
     assert start_code == 0, started
+    assert started["draft"]["allowed_actions"] == ["bind-object"]
     draft_id = started["draft"]["draft_id"]
     authority = started["task_authority"]
     target_client = _live_client(
@@ -704,6 +723,24 @@ def test_gateway_adds_subordinate_media_without_model_authored_json(
     )
     assert bind_code == 0, bound
     parent_handle = bound["bound_object"]["handle"]
+    set_next = bound["draft"]["next_action_binding"]
+    assert set_next["field_discovery"]["scope_decision"] == {
+        "existing_object": [
+            "--object-handle",
+            "<bound-existing-target-handle>",
+        ],
+        "stable_new_kind": [
+            "--semantic-kind",
+            "<disclosed-stable-semantic-kind>",
+        ],
+        "discovered_new_type": [
+            "--type-handle",
+            "<selected-type-handle>",
+        ],
+    }
+    assert "[--list-behavior append|replace-all]" in set_next["configure"][
+        "append"
+    ]
 
     declare_code, declared = _offline(
         tmp_path,

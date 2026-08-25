@@ -399,7 +399,7 @@ def test_business_draft_start_discloses_binding_before_declaration(
     assert code == 0, payload
     draft = payload["draft"]
     assert draft["missing_fields"] == ["business_declaration"]
-    assert draft["allowed_actions"] == ["bind-object", "configure"]
+    assert draft["allowed_actions"] == ["bind-object"]
     binding = draft["next_action_binding"]
     assert binding["required_next_phase"] == "bind_existing_business_object"
     assert binding["responsibility_split"] == {

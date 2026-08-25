@@ -273,13 +273,14 @@ _OBJECT_GRAPH_DEFINITION = {
     ),
     "initial_projection_actions": (
         "bind-object",
-        "configure",
         "inspect",
         "cancel",
     ),
     "active_projection_actions": (
         "bind-object",
         "configure",
+        "discover-fields",
+        "discover-types",
         "declare-new",
         "declare-existing",
         "revise-declaration",
@@ -339,6 +340,7 @@ _OBJECT_SET_BUSINESS_DEFINITION = {
         "add-media",
         "bind-object",
         "clear-object-list",
+        "configure",
         "discover-fields",
         "discover-types",
         "declare-existing",

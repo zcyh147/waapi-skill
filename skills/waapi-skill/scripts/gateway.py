@@ -16126,9 +16126,21 @@ def _business_next_action_binding(
                 ),
                 "field_discovery": {
                     **operation_draft_prefix_copy_binding(field_discover_prefix),
+                    "scope_decision": {
+                        "existing_object": [
+                            "--object-handle",
+                            "<bound-existing-target-handle>",
+                        ],
+                        "stable_new_kind": [
+                            "--semantic-kind",
+                            "<disclosed-stable-semantic-kind>",
+                        ],
+                        "discovered_new_type": [
+                            "--type-handle",
+                            "<selected-type-handle>",
+                        ],
+                    },
                     "append": [
-                        "--object-handle",
-                        "<bound-existing-target-handle>",
                         "--meaning",
                         "<user-facing-field-meaning>",
                     ],
@@ -16174,6 +16186,7 @@ def _business_next_action_binding(
                     **operation_draft_prefix_copy_binding(configure_prefix),
                     "append": [
                         "[--name-conflict fail|rename|merge]",
+                        "[--list-behavior append|replace-all]",
                         "[--add-to-source-control|--no-add-to-source-control]",
                     ],
                 },
@@ -16272,6 +16285,34 @@ def _business_next_action_binding(
             "task_local_id": "bounded_unique_not_business_data",
             "planned_child_result": "copy_returned_declaration.result_handle",
         }
+        field_discovery = {
+            **operation_draft_prefix_copy_binding(field_discover_prefix),
+            "scope_decision": {
+                "stable_semantic_kind": [
+                    "--semantic-kind",
+                    "<disclosed-stable-semantic-kind>",
+                ],
+                "discovered_type": [
+                    "--type-handle",
+                    "<selected-type-handle>",
+                ],
+            },
+            "append": [
+                "--meaning",
+                "<user-facing-field-meaning>",
+            ],
+            "use_only_when": "the_user_requested_custom_properties_or_references",
+            "token_input": "forbidden",
+        }
+        configure = {
+            **operation_draft_prefix_copy_binding(configure_prefix),
+            "append": [
+                "[--name-conflict fail|rename|merge|replace]",
+                "[--replace-owner-handle <bound-existing-owner-handle>]",
+                "[--platform <exact-user-platform>]",
+                "[--add-to-source-control|--no-add-to-source-control]",
+            ],
+        }
         return {
             **shared,
             "required_next_phase": (
@@ -16280,6 +16321,8 @@ def _business_next_action_binding(
                 else "declare_named_object_or_discover_long_tail_kind"
             ),
             "type_discovery": type_discovery,
+            "field_discovery": field_discovery,
+            "configure": configure,
             "declaration": declare,
             "completion_candidate": {
                 "condition": "all_user_requested_named_objects_are_declared",

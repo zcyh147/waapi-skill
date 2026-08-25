@@ -51,8 +51,8 @@ OPERATION_COMPOSER_CONTRACT = "waapi-skill.operation-composer/v1"
 AUDIO_IMPORT_COMPOSER_OPERATION = "audio.import"
 MAX_COMPOSER_ACTION_BYTES = 32 * 1024
 # Schema-derived typed Draft facts may carry one Registry-authorized 64 KiB
-# scalar plus the fixed action envelope.  This does not widen object.set's
-# bespoke action surface or audio.import's separate media-aware ceiling.
+# scalar plus the fixed action envelope. This does not widen the separate
+# media-aware audio.import ceiling.
 MAX_TYPED_COMPOSER_ACTION_BYTES = 72 * 1024
 # A field projection this large leaves too little of the fixed 32 KiB agent
 # output budget for the operation identity and the sole construction route.
@@ -1169,23 +1169,6 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                     "fact_batching",
                 }
             }
-        if operation == "object.create":
-            top_level_fact_plan = {
-                **top_level_fact_plan,
-                "branch_selection_authority": {
-                    "business_pointer": "/args/parent",
-                    "preserve_explicit_user_selector_kind_and_value": True,
-                    "when_explicit_parent_path_is_present": (
-                        "choose_path_branch_and_set_that_exact_parent_path"
-                    ),
-                    "queried_same_name_merge_target_guid_as_parent": (
-                        "forbidden_identity_proof_only"
-                    ),
-                },
-                "dynamic_disclosure_authority": (
-                    "properties,references,children in that order"
-                ),
-            }
         if operation == "soundbank.generate":
             top_level_fact_plan = {
                 **top_level_fact_plan,
@@ -1240,23 +1223,6 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
                 }
                 if compact_field_table
                 else {"typed_request_fields": field_payloads}
-            ),
-            **(
-                {
-                    "start_preconditions": {
-                        "dynamic_metadata_before_draft_start": True,
-                        "applies_when": (
-                            "unproven dynamic property/reference tokens are required"
-                        ),
-                        "workflow_control": _metadata_workflow_control(),
-                        "activation_decision": _metadata_activation_decision(),
-                        "metadata_scope": (
-                            "use --object-type for the new type, never a target path"
-                        ),
-                    }
-                }
-                if operation == "object.create"
-                else {}
             ),
             "complete_request_is_never_an_action": True,
             "completion_discipline": {
