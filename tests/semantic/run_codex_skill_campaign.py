@@ -3294,6 +3294,7 @@ def _validate_bound_business_agent_protocol(
                 "kind": "path",
                 "value": str(expected_unit.target["path"]),
             },
+            discover_before_target=True,
         )
         preview_request = request
     else:

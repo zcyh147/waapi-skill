@@ -15469,37 +15469,36 @@ def _business_next_action_binding(
                 "then_read_next_response": True,
                 "precompute_or_increment_revision": False,
             }
-        return {
-            "contract": "waapi-skill.business-draft-next-action/v1",
-            "required_next_phase": (
-                "bind_target_objects_then_discover_field_and_declare_outcome"
+        handle_state = session.handles.as_dict()
+        bound_objects = handle_state["objects"]
+        bound_fields = handle_state["fields"]
+        field_discovery = {
+            **operation_draft_prefix_copy_binding(field_discover_prefix),
+            "append": [
+                "--object-handle",
+                "<bound-target-object-handle>",
+                "--meaning",
+                "<user-facing-field-meaning>",
+                "[--platform <exact-user-requested-platform>]",
+            ],
+            "result": "copy_one_returned_field_candidate.handle",
+            "token_input": "forbidden",
+            "refine_only_when": "returned_candidates_do_not_identify_user_intent",
+        }
+        declaration = {
+            **operation_draft_prefix_copy_binding(
+                declare_field_change_prefix
             ),
+            "append_fields": business_contract["declaration"],
+            "submit_once": True,
+        }
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
             "responsibility_split": {
                 "agent": "natural_language_to_closed_high_level_business_facts",
                 "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
             },
             "business_contract": business_contract,
-            "object_binding": object_binding,
-            "field_discovery": {
-                **operation_draft_prefix_copy_binding(field_discover_prefix),
-                "append": [
-                    "--object-handle",
-                    "<bound-target-object-handle>",
-                    "--meaning",
-                    "<user-facing-field-meaning>",
-                    "[--platform <exact-user-requested-platform>]",
-                ],
-                "result": "copy_one_returned_field_candidate.handle",
-                "token_input": "forbidden",
-                "refine_only_when": "returned_candidates_do_not_identify_user_intent",
-            },
-            "declaration": {
-                **operation_draft_prefix_copy_binding(
-                    declare_field_change_prefix
-                ),
-                "append_fields": business_contract["declaration"],
-                "submit_once": True,
-            },
             "forbidden_inputs": [
                 *forbidden_inputs,
                 "property_token",
@@ -15510,6 +15509,31 @@ def _business_next_action_binding(
             "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
             "then_read_next_response": True,
             "precompute_or_increment_revision": False,
+        }
+        if not bound_fields:
+            return {
+                **shared,
+                "required_next_phase": "discover_field_for_bound_object",
+                "field_discovery": field_discovery,
+            }
+        if record.operation == "object.setReference" and len(bound_objects) < 2:
+            return {
+                **shared,
+                "required_next_phase": "choose_clear_or_bind_reference_target",
+                "decision": {
+                    "clear": "declare_with_clear_reference_now",
+                    "set_target": "bind_the_exact_reference_target_then_read_next_response",
+                },
+                "object_binding": {
+                    **object_binding,
+                    "use_only_for": ["reference_target"],
+                },
+                "declaration": declaration,
+            }
+        return {
+            **shared,
+            "required_next_phase": "declare_complete_field_change",
+            "declaration": declaration,
         }
     return {
         "contract": "waapi-skill.business-draft-next-action/v1",

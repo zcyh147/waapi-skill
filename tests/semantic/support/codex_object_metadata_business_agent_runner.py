@@ -124,6 +124,7 @@ def build_preview_only_metadata_steps(runtime: ObjectMetadataBusinessRuntime) ->
         field_meaning=runtime.field_meaning,
         object_selector={"kind": "path", "value": runtime.source_path},
         target_selector={"kind": "path", "value": runtime.target_path},
+        discover_before_target=True,
     )
 
 

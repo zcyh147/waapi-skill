@@ -48,11 +48,11 @@ def test_unit_discovers_meaning_and_copies_opaque_handle_before_preview(tmp_path
     subcommands = [step.subcommand for step in steps]
 
     assert subcommands == [
-        "operation-schema", "draft-start", "draft-bind-object", "draft-bind-object",
-        "draft-discover-fields", "draft-declare-field-change", "draft-check",
+        "operation-schema", "draft-start", "draft-bind-object", "draft-discover-fields",
+        "draft-bind-object", "draft-declare-field-change", "draft-check",
         "preview-from-draft",
     ]
-    discover = steps[4]
+    discover = steps[3]
     declare = steps[5]
     assert unit.field_meaning in discover.arguments
     assert unit.native_reference not in discover.arguments

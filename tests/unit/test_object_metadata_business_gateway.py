@@ -166,7 +166,10 @@ def test_property_draft_discovers_opaque_field_and_materializes_business_value(
     assert bind_code == 0, bound
     object_handle = bound["bound_object"]["handle"]
     next_action = bound["draft"]["next_action_binding"]
+    assert next_action["required_next_phase"] == "discover_field_for_bound_object"
     assert next_action["field_discovery"]["token_input"] == "forbidden"
+    assert "object_binding" not in next_action
+    assert "declaration" not in next_action
     assert "--token" not in json.dumps(next_action)
 
     discover_client = FakeClient(
@@ -228,6 +231,10 @@ def test_property_draft_discovers_opaque_field_and_materializes_business_value(
     assert candidate["platform"] == "Windows"
     assert candidate["handle"].startswith("bfh1-")
     assert "token" not in candidate
+    discovered_next = discovered["draft"]["next_action_binding"]
+    assert discovered_next["required_next_phase"] == "declare_complete_field_change"
+    assert "object_binding" not in discovered_next
+    assert "field_discovery" not in discovered_next
 
     declare_code, declared = _offline(
         tmp_path,
