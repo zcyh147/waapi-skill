@@ -10939,6 +10939,7 @@ def dispatch_business_field_discovery(
 
     captured: list[Any] = []
     rejected: list[Mapping[str, Any]] = []
+    rejected_errors: list[BusinessDeclarationError] = []
 
     def bind(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
         handles = BusinessHandleRegistry.from_dict(current.handles.as_dict())
@@ -10955,6 +10956,7 @@ def dispatch_business_field_discovery(
                     )
                 )
             except BusinessDeclarationError as exc:
+                rejected_errors.append(exc)
                 rejected.append(
                     {
                         "error_code": exc.error_code,
@@ -10962,9 +10964,7 @@ def dispatch_business_field_discovery(
                     }
                 )
         if not captured:
-            raise GatewayInputError(
-                "Every compatible live field candidate failed bounded binding"
-            )
+            raise rejected_errors[0]
         return current.with_handle_registry(handles)
 
     schema_digest = operation_draft_schema_digest(
