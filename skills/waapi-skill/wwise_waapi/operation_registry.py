@@ -8704,7 +8704,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
         )
         info = parse_get_property_info_result(info_payload)
         metadata["field_info"] = info.as_dict()
-        if platform is not None:
+        if platform is not None and request.operation == "object.setProperty":
             _require_platform_field_enabled(
                 read,
                 object_id=source.object,

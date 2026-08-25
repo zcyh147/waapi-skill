@@ -604,6 +604,51 @@ def test_live_field_binding_uses_exact_metadata_and_dynamic_enabled_state(
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_reference_dependencies_never_use_property_enabled_api(
+    version: str,
+) -> None:
+    registry = BusinessHandleRegistry(
+        _context(wwise_version=version, wwise_build=f"{version}.fixture"),
+        token_bytes=lambda size: b"o" * size,
+    )
+    calls: list[str] = []
+
+    def read(
+        uri: str,
+        args: dict[str, object],
+        options: dict[str, object],
+    ) -> dict[str, object]:
+        calls.append(uri)
+        if uri.endswith("getPropertyAndReferenceNames"):
+            return {"return": ["OutputBus"]}
+        if uri.endswith("getPropertyInfo"):
+            return {
+                "name": "OutputBus",
+                "type": "Reference",
+                "restriction": {
+                    "type": "reference",
+                    "restrictions": [{"type": ["Bus", "AuxBus"]}],
+                },
+                "dependencies": [{"property": "OverrideOutput"}],
+            }
+        raise AssertionError(uri)
+
+    field = bind_live_field(
+        registry,
+        read_call=read,
+        scope_kind="object",
+        scope_value=OBJECT_ID,
+        token="OutputBus",
+        platform="Windows",
+    )
+
+    assert field.field_kind == "reference"
+    assert field.platform == "Windows"
+    assert revalidate_live_field(registry, field, read_call=read) == field
+    assert not any(uri.endswith("isPropertyEnabled") for uri in calls)
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
 def test_live_field_binding_returns_exact_candidates_and_disabled_repair(
     version: str,
 ) -> None:

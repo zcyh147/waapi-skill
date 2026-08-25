@@ -916,19 +916,22 @@ def bind_live_field(
             action="use a separately reviewed Adapter for this live restriction",
         ) from exc
     dependency_fields = _dependency_field_tokens(info.dependencies)
-    if dependency_fields and scope_kind != "object":
+    enabled_dependency_fields = (
+        dependency_fields if field_kind == "property" else ()
+    )
+    if enabled_dependency_fields and scope_kind != "object":
         raise _error(
             "FIELD_OBJECT_SCOPE_REQUIRED",
             field=token,
-            dependency_fields=dependency_fields,
+            dependency_fields=enabled_dependency_fields,
             action="resolve the exact target object before checking this dependent field",
         )
-    if dependency_fields:
+    if enabled_dependency_fields:
         if platform is None:
             raise _error(
                 "FIELD_PLATFORM_REQUIRED",
                 field=token,
-                dependency_fields=dependency_fields,
+                dependency_fields=enabled_dependency_fields,
                 action="provide the explicit platform for the dynamic enabled check",
             )
         try:
@@ -953,7 +956,7 @@ def bind_live_field(
             raise _error(
                 "FIELD_DISABLED",
                 field=token,
-                dependency_fields=dependency_fields,
+                dependency_fields=enabled_dependency_fields,
                 action="satisfy the disclosed dependency state or omit this field",
             )
     metadata_digest = canonical_sha256(
@@ -1047,20 +1050,23 @@ def revalidate_live_field(
             action="refresh live metadata and use the new field handle",
         )
     dependency_fields = _dependency_field_tokens(info.dependencies)
-    if dependency_fields and field.scope_kind != "object":
+    enabled_dependency_fields = (
+        dependency_fields if field.field_kind == "property" else ()
+    )
+    if enabled_dependency_fields and field.scope_kind != "object":
         raise _error(
             "FIELD_OBJECT_SCOPE_REQUIRED",
             field=field.token,
             rejected_handle=field.handle,
-            dependency_fields=dependency_fields,
+            dependency_fields=enabled_dependency_fields,
             action="resolve an exact target object and issue a new field handle",
         )
-    if dependency_fields:
+    if enabled_dependency_fields:
         if effective_platform is None:
             raise _error(
                 "FIELD_PLATFORM_REQUIRED",
                 field=field.token,
-                dependency_fields=dependency_fields,
+                dependency_fields=enabled_dependency_fields,
                 action="provide the explicit platform for Preview revalidation",
             )
         try:
@@ -1085,7 +1091,7 @@ def revalidate_live_field(
             raise _error(
                 "FIELD_DISABLED",
                 field=field.token,
-                dependency_fields=dependency_fields,
+                dependency_fields=enabled_dependency_fields,
                 action="satisfy the disclosed dependency state or omit this field",
             )
     metadata_digest = canonical_sha256(
