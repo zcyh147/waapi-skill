@@ -1484,6 +1484,15 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
     }
     assert operations["object.create"]["implemented"] is True
     assert operations["object.copy"]["implemented"] is True
+    assert operations["object.copy"]["input_mode"] == "business_declaration"
+    assert operations["object.copy"]["next_command"] == [
+        "operation-schema",
+        "object.copy",
+    ]
+    assert "required_arguments" not in operations["object.copy"]
+    assert "optional_arguments" not in operations["object.copy"]
+    assert "required_arguments" not in operations["object.setReference"]
+    assert "optional_arguments" not in operations["object.setReference"]
     assert "argument_contract" not in operations["object.create"]
     assert operations["ui.commands.execute"]["implemented"] is True
     assert operations["ui.commands.register"]["implemented"] is True

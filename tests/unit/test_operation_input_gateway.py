@@ -1090,17 +1090,29 @@ def test_every_object_lifecycle_schema_has_one_deep_business_continuation(
 def test_operation_inventory_does_not_republish_native_fields_for_business_lanes(
     tmp_path: Path,
 ) -> None:
+    compact_code, compact = offline_execute(tmp_path, "operations")
     code, detail = offline_execute(tmp_path, "operations", "--detail")
+    assert compact_code == 0, compact
     assert code == 0, detail
+    compact_rows = {row["name"]: row for row in compact["operations"]}
     rows = {row["name"]: row for row in detail["operations"]}
 
     for operation in (
+        "audio.import",
         "object.copy",
         "object.delete",
         "object.move",
         "object.setName",
         "object.setNotes",
+        "object.setLinked",
+        "object.setProperty",
+        "object.setReference",
     ):
+        compact_row = compact_rows[operation]
+        assert compact_row["input_mode"] == BUSINESS_DECLARATION_INPUT_MODE
+        assert compact_row["next_command"] == ["operation-schema", operation]
+        assert "required_arguments" not in compact_row
+        assert "optional_arguments" not in compact_row
         row = rows[operation]
         assert set(row["input_modes_by_version"].values()) == {
             BUSINESS_DECLARATION_INPUT_MODE

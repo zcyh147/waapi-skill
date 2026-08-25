@@ -7268,13 +7268,19 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         for spec in list_operation_specs():
             if spec.name == "waapi.call":
                 continue
-            if not args.detail:
-                operations.append(spec.as_compact_dict())
-                continue
             modes = {
                 version: operation_input_mode(spec.name, version)
                 for version in spec.supported_versions
             }
+            if not args.detail:
+                projection = spec.as_compact_dict()
+                if set(modes.values()) == {BUSINESS_DECLARATION_INPUT_MODE}:
+                    projection.pop("required_arguments", None)
+                    projection.pop("optional_arguments", None)
+                    projection["input_mode"] = BUSINESS_DECLARATION_INPUT_MODE
+                    projection["next_command"] = ["operation-schema", spec.name]
+                operations.append(projection)
+                continue
             if BUSINESS_DECLARATION_INPUT_MODE in modes.values():
                 projection = composer_operation_projection(spec, version=None)
                 projection["input_modes_by_version"] = modes
