@@ -9,6 +9,7 @@ from typing import Any, Mapping, Sequence
 
 from wwise_waapi.operation_composer import operation_composer_digest
 from wwise_waapi.operation_drafts import OperationDraftStore
+from wwise_waapi.canonical import canonical_sha256
 
 
 SCRIPT_PATH = (
@@ -165,16 +166,15 @@ def test_gateway_discovers_long_tail_type_then_compiles_only_its_handle(
     assert bind_next["type_discovery"]["native_type_input"] == "forbidden"
     assert "--token" not in json.dumps(bind_next)
 
+    type_rows = [
+        {"classId": 3_276_960, "name": "Event", "type": "WObject"},
+        {"classId": 3_276_961, "name": "Action", "type": "WObject"},
+    ]
     discover_client = _live_client(
         tmp_path,
         {
             "ak.wwise.core.object.getTypes": [
-                {
-                    "return": [
-                        {"classId": 3_276_960, "name": "Event", "type": "WObject"},
-                        {"classId": 3_276_961, "name": "Action", "type": "WObject"},
-                    ]
-                }
+                {"return": type_rows}
             ]
         },
     )
@@ -208,6 +208,14 @@ def test_gateway_discovers_long_tail_type_then_compiles_only_its_handle(
     kind_handle = discovered["type_candidates"][0]["handle"]
     assert kind_handle.startswith("bth1-")
     assert "classId" not in json.dumps(discovered)
+    inspected = OperationDraftStore(tmp_path / "state").inspect(
+        draft_id,
+        task_authority=authority,
+    )
+    business_session = inspected.composition["business_session"]
+    assert business_session["handles"]["types"][0]["catalog_digest"] == (
+        canonical_sha256({"return": type_rows})
+    )
     discovered_next = discovered["draft"]["next_action_binding"]
     assert discovered_next["declaration"]["append"][7] == (
         "<stable-semantic-kind-or-selected-type-handle>"

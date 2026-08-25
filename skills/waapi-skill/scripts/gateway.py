@@ -11492,7 +11492,9 @@ def dispatch_business_type_discovery(
         raise GatewayInputError(
             "Live type discovery found no candidate compatible with this role"
         )
-    catalog_digest = canonical_sha256([row.as_dict() for row in rows])
+    catalog_digest = canonical_sha256(
+        {"return": [row.as_dict() for row in rows]}
+    )
     captured: list[Any] = []
 
     def bind(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
