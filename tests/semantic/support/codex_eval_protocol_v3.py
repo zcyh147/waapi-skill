@@ -993,6 +993,14 @@ def build_audio_import_composer_transaction_steps(
     steps = [*fixed_prefix, *resequenced_steps]
     draft.steps = steps
     draft.advance(previous_revision_step)
+    request_witness: Mapping[str, Any] = normalized
+    if native_mode == "createNew":
+        witness_arguments = dict(normalized["arguments"])
+        witness_arguments.pop("import_operation", None)
+        request_witness = {
+            **normalized,
+            "arguments": witness_arguments,
+        }
 
     check_name = f"{label}.check"
     preview_name = f"{label}.preview"
@@ -1016,7 +1024,7 @@ def build_audio_import_composer_transaction_steps(
                     "--expected-revision",
                     ResponseBinding(check_name, "/draft/revision"),
                 ),
-                expected_operation_request=normalized,
+                expected_operation_request=request_witness,
             ),
             ExpectedGatewayStep(
                 name=show_name,

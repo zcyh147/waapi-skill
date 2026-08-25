@@ -693,8 +693,10 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
     )
     assert all(step.subcommand != "typed-operation" for step in remove_steps)
 
-    assert _plain(import_preview_step.expected_operation_request) == _plain(
-        import_request
+    expected_import_witness = _plain(import_request)
+    expected_import_witness["arguments"].pop("import_operation")
+    assert _plain(import_preview_step.expected_operation_request) == (
+        expected_import_witness
     )
     assert ("--name", "Snow", "--kind", "random-container") == tuple(
         import_declarations[0].arguments[9:13]

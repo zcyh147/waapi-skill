@@ -3886,6 +3886,15 @@ def test_audio_import_business_protocol_uses_stable_fields_and_strict_revision_o
     assert all("--object-type" not in step.arguments for step in declarations)
     assert all("--object-path" not in step.arguments for step in declarations)
     assert all(step.subcommand != "draft-apply" for step in steps)
+    preview = next(
+        step for step in steps if step.subcommand == "preview-from-draft"
+    )
+    assert request["arguments"]["import_operation"] == "createNew"
+    assert preview.expected_operation_request is not None
+    assert (
+        "import_operation"
+        not in preview.expected_operation_request["arguments"]
+    )
     broker_module.validate_operation_draft_protocol_steps(steps)
 
     first_index = steps.index(declarations[0])
@@ -4763,9 +4772,14 @@ def test_draft_replay_is_scoped_to_the_preview_flow_in_multi_transaction_protoco
         step for step in audio_steps if step.subcommand == "preview-from-draft"
     )
 
+    expected_audio_witness = {
+        **audio_import,
+        "arguments": dict(audio_import["arguments"]),
+    }
+    expected_audio_witness["arguments"].pop("import_operation")
     assert broker._replay_expected_operation_draft_request(  # noqa: SLF001
         preview
-    ) == audio_import
+    ) == expected_audio_witness
 
 
 def test_broker_rejects_stale_draft_revision_before_runner_dispatch(
