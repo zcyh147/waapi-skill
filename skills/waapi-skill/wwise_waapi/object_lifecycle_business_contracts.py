@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from .business_declarations import SUPPORTED_WWISE_VERSIONS
+from .operation_import import AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS
 
 
 OBJECT_LIFECYCLE_BUSINESS_CONTRACT = (
@@ -77,7 +78,21 @@ def object_lifecycle_business_contract_data(
         raise ValueError("unsupported object lifecycle business operation")
     if version not in SUPPORTED_WWISE_VERSIONS:
         raise ValueError("unsupported Wwise version")
-    declaration = _DECLARATIONS[operation]
+    source = _DECLARATIONS[operation]
+    optional_fields = list(source["optional_fields"])
+    field_types = dict(source["field_types"])
+    source_control_available = version in AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS
+    if not source_control_available:
+        for field in (
+            "add_to_source_control",
+            "check_out_from_source_control",
+        ):
+            if field in optional_fields:
+                optional_fields.remove(field)
+            field_types.pop(field, None)
+    add_to_source_control_available = (
+        source_control_available and operation == "object.copy"
+    )
     return {
         "contract": OBJECT_LIFECYCLE_BUSINESS_CONTRACT,
         "operation": operation,
@@ -98,9 +113,9 @@ def object_lifecycle_business_contract_data(
         },
         "declaration": {
             "subcommand": "draft-declare-object-change",
-            "required_fields": list(declaration["required_fields"]),
-            "optional_fields": list(declaration["optional_fields"]),
-            "field_types": dict(declaration["field_types"]),
+            "required_fields": list(source["required_fields"]),
+            "optional_fields": optional_fields,
+            "field_types": field_types,
         },
         "gateway_derivations": [
             "closed_object_identity",
@@ -116,8 +131,8 @@ def object_lifecycle_business_contract_data(
             "object_revalidation": "exact_guid_name_type_path",
         },
         "version_features": {
-            "check_out_from_source_control": version
-            in {"2023.1", "2024.1", "2025.1"},
+            "add_to_source_control": add_to_source_control_available,
+            "check_out_from_source_control": source_control_available,
         },
     }
 

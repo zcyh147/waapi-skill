@@ -5,7 +5,11 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from .business_declaration_state import BusinessDeclarationSession
-from .business_declarations import ExistingObjectTarget, business_repair
+from .business_declarations import (
+    BusinessDeclarationError,
+    ExistingObjectTarget,
+    business_repair,
+)
 from .object_lifecycle_business_contracts import (
     object_lifecycle_business_contract_data,
 )
@@ -30,9 +34,12 @@ def _identity_for_handle(
 ) -> dict[str, str]:
     try:
         bound = session.handles.resolve_object(handle)
+    except BusinessDeclarationError as exc:
+        repair = dict(exc.repair)
+        repair["field"] = field
+        repair["action"] = "bind the exact object and copy its returned handle"
+        raise BusinessDeclarationError(repair) from exc
     except Exception as exc:
-        if hasattr(exc, "repair"):
-            raise
         raise business_repair(
             "OBJECT_HANDLE_NOT_AVAILABLE",
             field=field,

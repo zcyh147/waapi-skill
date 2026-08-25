@@ -149,6 +149,23 @@ def test_human_inventory_names_every_exact_operation_once() -> None:
     assert set(rows) == set(OPERATION_SPECS)
 
 
+def test_human_inventory_does_not_label_business_cutovers_as_inline_typed() -> None:
+    rows = {
+        line.split("|", 3)[1].strip().strip("`"): line.split("|", 4)[3].strip()
+        for line in INVENTORY_DOC_PATH.read_text(encoding="utf-8").splitlines()
+        if line.startswith("| `")
+    }
+
+    for operation in (
+        "object.copy",
+        "object.delete",
+        "object.move",
+        "object.setName",
+        "object.setNotes",
+    ):
+        assert rows[operation] == "Business declaration"
+
+
 def test_inventory_preserves_single_normal_input_and_exact_name_isolation() -> None:
     inventory = _inventory()
     assignments = _assignments(inventory)

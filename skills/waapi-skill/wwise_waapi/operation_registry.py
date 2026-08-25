@@ -23,10 +23,7 @@ from typing import Any, Callable, Mapping, NoReturn, Sequence
 from xml.etree import ElementTree as ET
 
 from .canonical import canonical_json_bytes, canonical_sha256
-from .audio_import_business_contracts import audio_import_business_contract_data
-from .object_lifecycle_business_contracts import (
-    object_lifecycle_business_contract_data,
-)
+from .business_adapters import business_adapter
 from .builders.identity import ObjectIdentity, ResolvedObject, plan_object_resolution
 from .builders.metadata import (
     GET_PROPERTY_AND_REFERENCE_NAMES_URI,
@@ -3642,7 +3639,18 @@ def operation_uses_business_declaration(name: str, version: str) -> bool:
     spec = OPERATION_SPECS.get(name)
     if spec is None or version not in spec.supported_versions:
         return False
-    return operation_input_mode(name, version) == BUSINESS_DECLARATION_INPUT_MODE
+    uses_business_declaration = (
+        operation_input_mode(name, version) == BUSINESS_DECLARATION_INPUT_MODE
+    )
+    if uses_business_declaration:
+        try:
+            business_adapter(name)
+        except KeyError as exc:  # pragma: no cover - Registry validation invariant
+            raise OperationContractError(
+                "BUSINESS_ADAPTER_UNAVAILABLE",
+                f"{name} has no reviewed Business Declaration Adapter.",
+            ) from exc
+    return uses_business_declaration
 
 
 def audio_import_business_contract(version: str) -> dict[str, Any]:
@@ -3653,7 +3661,7 @@ def audio_import_business_contract(version: str) -> dict[str, Any]:
             "OPERATION_INPUT_MODE_INVALID",
             "audio.import does not expose the business declaration input mode.",
         )
-    return audio_import_business_contract_data(version)
+    return business_adapter("audio.import").contract(version)
 
 
 def operation_business_contract(name: str, version: str) -> dict[str, Any]:
@@ -3664,9 +3672,13 @@ def operation_business_contract(name: str, version: str) -> dict[str, Any]:
             "OPERATION_INPUT_MODE_INVALID",
             f"{name} does not expose the business declaration input mode.",
         )
-    if name == "audio.import":
-        return audio_import_business_contract_data(version)
-    return object_lifecycle_business_contract_data(name, version)
+    try:
+        return business_adapter(name).contract(version)
+    except KeyError as exc:  # pragma: no cover - input-mode Registry invariant
+        raise OperationContractError(
+            "BUSINESS_ADAPTER_UNAVAILABLE",
+            f"{name} has no reviewed Business Declaration Adapter.",
+        ) from exc
 
 
 def operation_input_modes_by_version(name: str) -> dict[str, str]:

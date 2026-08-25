@@ -232,11 +232,8 @@ from wwise_waapi.operation_drafts import (  # noqa: E402  # pyright: ignore[repo
 from wwise_waapi.business_declaration_state import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     BusinessDeclarationSession,
 )
-from wwise_waapi.audio_import_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
-    compile_audio_import_business,
-)
-from wwise_waapi.object_lifecycle_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
-    materialize_object_lifecycle_business_request,
+from wwise_waapi.business_adapters import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    business_adapter,
 )
 from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_BUSINESS_NAME_BYTES,
@@ -10050,6 +10047,7 @@ def dispatch_operation_draft_check(
         canonical_request.operation,
         canonical_request.version,
     ):
+        adapter = business_adapter(canonical_request.operation)
         business_session = BusinessDeclarationSession.from_dict(raw_business_session)
         bound_objects = tuple(
             business_session.handles.resolve_object(row["handle"])
@@ -10060,7 +10058,7 @@ def dispatch_operation_draft_check(
             bound_objects,
             read_call=read_call,
         )
-        if canonical_request.operation == "audio.import":
+        if adapter.supports_field_binding:
             for row in business_session.handles.as_dict()["fields"]:
                 bound_field = business_session.handles.bound_field(row["handle"])
                 revalidate_live_field(
@@ -10087,11 +10085,11 @@ def dispatch_operation_draft_check(
                 ],
             )
 
-        if canonical_request.operation == "audio.import":
-            compiled_business = compile_audio_import_business(
-                business_session,
-                build_continuation=build_business_continuation,
-            )
+        compiled_business = adapter.compile_preview(
+            business_session,
+            build_continuation=build_business_continuation,
+        )
+        if compiled_business is not None:
             if (
                 compiled_business.request != materialized.request
                 or compiled_business.request_digest != materialized.request_digest
@@ -10158,7 +10156,13 @@ def dispatch_operation_draft_check(
         "--expected-revision",
         str(record.revision),
     ]
-    if canonical_request.operation != "audio.import":
+    if not (
+        operation_uses_business_declaration(
+            canonical_request.operation,
+            canonical_request.version,
+        )
+        and business_adapter(canonical_request.operation).auto_apply_preview
+    ):
         preview_arguments.append("--apply")
     payload["next_command"] = transaction_next_command(
         "preview-from-draft",
@@ -10267,6 +10271,11 @@ def dispatch_offline_business_draft_update(
         inspected.version,
     ):
         raise GatewayInputError("This Draft has no Business Declaration Adapter")
+    adapter = business_adapter(inspected.operation)
+    if not adapter.accepts_update_command(args.command):
+        raise GatewayInputError(
+            f"{inspected.operation} does not expose {args.command}"
+        )
     raw_session = (
         inspected.composition.get("business_session")
         if inspected.composition is not None
@@ -10278,10 +10287,6 @@ def dispatch_offline_business_draft_update(
         )
     session = BusinessDeclarationSession.from_dict(raw_session)
     if args.command == "draft-declare-object-change":
-        if inspected.operation == "audio.import":
-            raise GatewayInputError(
-                "audio.import uses its import-specific declaration commands"
-            )
         fields = {
             name: value
             for name, value in (
@@ -10306,18 +10311,11 @@ def dispatch_offline_business_draft_update(
                 target=ExistingObjectTarget(args.object_handle),
                 fields=fields,
             )
-            materialize_object_lifecycle_business_request(
-                inspected.operation,
-                candidate,
-            )
+            adapter.materialize(candidate)
             return candidate
 
         event_type = "declaration.added"
     elif args.command == "draft-business-configure":
-        if inspected.operation != "audio.import":
-            raise GatewayInputError(
-                "This object lifecycle Draft has no batch configuration"
-            )
         defaults = _parse_audio_import_business_fields(
             session,
             args.default,
@@ -10593,10 +10591,8 @@ def dispatch_business_object_binding(
             error_code="BUSINESS_OBJECT_BINDING_MISMATCH",
         )
     semantic_kind: str | None = None
-    if (
-        binding.record.operation == "audio.import"
-        and str(row["type"]).casefold() == "sound"
-    ):
+    adapter = business_adapter(binding.record.operation)
+    if adapter.requires_sound_subtype and str(row["type"]).casefold() == "sound":
         subtype_raw = binding.read_call(
             OBJECT_GET_URI,
             {"from": {"id": [str(row["id"])]}},
@@ -10692,9 +10688,10 @@ def dispatch_business_field_binding(
         live_info=live_info,
         dispatcher=dispatcher,
     )
-    if binding.record.operation != "audio.import":
+    adapter = business_adapter(binding.record.operation)
+    if not adapter.supports_field_binding:
         raise GatewayInputError(
-            "Custom field binding is available only to audio.import"
+            f"Custom field binding is unavailable for {binding.record.operation}"
         )
     raw_session = (
         binding.record.composition.get("business_session")
@@ -10739,8 +10736,14 @@ def dispatch_business_field_binding(
         captured.append(bound)
         return current.with_handle_registry(handles)
 
-    schema_digest = operation_draft_schema_digest("audio.import", detected_version)
-    composer_digest = operation_composer_digest("audio.import", detected_version)
+    schema_digest = operation_draft_schema_digest(
+        binding.record.operation,
+        detected_version,
+    )
+    composer_digest = operation_composer_digest(
+        binding.record.operation,
+        detected_version,
+    )
     record = binding.store.apply_business_update(
         args.draft_id,
         task_authority=args.task_authority,
@@ -10809,10 +10812,18 @@ def dispatch_operation_draft_preview(
                 "live_version": detected_version,
             },
         )
-    # A checked audio.import Business Draft is itself a closed request to
-    # preview a project change.  Do not make the caller restate that fact with
-    # the easily misread generic ``--apply`` transport flag.
-    if inspected.operation == "audio.import":
+    # Some checked Business Drafts are themselves closed requests to preview a
+    # project change.  Do not make the caller restate that fact with the easily
+    # misread generic ``--apply`` transport flag.
+    inspected_adapter = (
+        business_adapter(inspected.operation)
+        if operation_uses_business_declaration(
+            inspected.operation,
+            inspected.version,
+        )
+        else None
+    )
+    if inspected_adapter is not None and inspected_adapter.auto_apply_preview:
         args.apply = True
     policy = load_gateway_config(env).config.project_modification_policy
     reservation: Any | None = None
@@ -15040,9 +15051,10 @@ def _business_next_action_binding(
         if raw_session is None
         else BusinessDeclarationSession.from_dict(raw_session)
     )
+    adapter = business_adapter(record.operation)
     if record.check is not None:
         preview = [*base, "preview-from-draft", *binding]
-        if record.operation != "audio.import":
+        if not adapter.auto_apply_preview:
             preview.append("--apply")
         return {
             "contract": "waapi-skill.business-draft-next-action/v1",
@@ -15111,7 +15123,7 @@ def _business_next_action_binding(
         record.operation,
         record.version,
     )
-    if record.operation != "audio.import":
+    if not adapter.supports_field_binding:
         object_binding = {
             **object_binding,
             "use_only_for": business_contract["binding"]["roles"],
@@ -15135,7 +15147,7 @@ def _business_next_action_binding(
             "then_read_next_response": True,
             "precompute_or_increment_revision": False,
         }
-    if record.operation != "audio.import":
+    if not adapter.supports_field_binding:
         if session.declarations:
             return {
                 "contract": "waapi-skill.business-draft-next-action/v1",
@@ -15187,10 +15199,7 @@ def _business_next_action_binding(
             "agent": "natural_language_to_closed_high_level_business_facts",
             "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
         },
-        "business_contract": operation_business_contract(
-            record.operation,
-            record.version,
-        ),
+        "business_contract": business_contract,
         "object_binding": object_binding,
         "field_binding": {
             "object_scope": {
@@ -16073,7 +16082,15 @@ def operation_draft_payload(
                     "copy_placeholder_positions_exactly": True,
                     "insert_type_only_where_template_contains_TYPE": True,
                 }
-            if record.operation == "audio.import":
+            if (
+                operation_uses_business_declaration(
+                    record.operation,
+                    record.version,
+                )
+                and business_adapter(
+                    record.operation
+                ).requires_wwise_path_discipline
+            ):
                 next_action_binding["wwise_path_discipline"] = {
                     "parent_source": "exact_user_supplied_business_path",
                     "append_descendant": (

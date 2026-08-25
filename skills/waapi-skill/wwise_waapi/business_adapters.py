@@ -1,0 +1,226 @@
+"""Select one operation-local Business Declaration Adapter at one seam."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Callable, Mapping
+
+from .audio_import_business_contracts import audio_import_business_contract_data
+from .business_declaration_state import BusinessDeclarationSession
+from .object_lifecycle_business_contracts import (
+    object_lifecycle_business_contract_data,
+)
+
+
+ContractBuilder = Callable[[str, str], dict[str, Any]]
+Materializer = Callable[
+    [str, BusinessDeclarationSession, bool],
+    Mapping[str, Any],
+]
+PreviewCompiler = Callable[
+    [BusinessDeclarationSession, Callable[..., Mapping[str, Any]]],
+    Any,
+]
+
+
+def _audio_import_contract(operation: str, version: str) -> dict[str, Any]:
+    if operation != "audio.import":  # pragma: no cover - registry invariant
+        raise ValueError("audio-import Adapter received the wrong operation")
+    return audio_import_business_contract_data(version)
+
+
+def _object_lifecycle_contract(operation: str, version: str) -> dict[str, Any]:
+    return object_lifecycle_business_contract_data(operation, version)
+
+
+def _materialize_audio_import(
+    operation: str,
+    session: BusinessDeclarationSession,
+    allow_cleaned_file_evidence: bool,
+) -> Mapping[str, Any]:
+    if operation != "audio.import":  # pragma: no cover - registry invariant
+        raise ValueError("audio-import Adapter received the wrong operation")
+    from .audio_import_business import materialize_audio_import_business_request
+
+    return materialize_audio_import_business_request(
+        session,
+        allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+    )
+
+
+def _materialize_object_lifecycle(
+    operation: str,
+    session: BusinessDeclarationSession,
+    _allow_cleaned_file_evidence: bool,
+) -> Mapping[str, Any]:
+    from .object_lifecycle_business import (
+        materialize_object_lifecycle_business_request,
+    )
+
+    return materialize_object_lifecycle_business_request(operation, session)
+
+
+def _compile_audio_import_preview(
+    session: BusinessDeclarationSession,
+    build_continuation: Callable[..., Mapping[str, Any]],
+) -> Any:
+    from .audio_import_business import compile_audio_import_business
+
+    return compile_audio_import_business(
+        session,
+        build_continuation=build_continuation,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class BusinessAdapter:
+    """Operation-bound Adapter interface shared by Registry, Draft, and Gateway."""
+
+    operation: str
+    family: str
+    _contract_builder: ContractBuilder
+    _materializer: Materializer
+    update_commands: frozenset[str]
+    initial_projection_actions: tuple[str, ...]
+    active_projection_actions: tuple[str, ...]
+    _preview_compiler: PreviewCompiler | None = None
+    requires_sound_subtype: bool = False
+    supports_field_binding: bool = False
+    auto_apply_preview: bool = False
+    records_business_preview: bool = False
+    requires_wwise_path_discipline: bool = False
+
+    def contract(self, version: str) -> dict[str, Any]:
+        return self._contract_builder(self.operation, version)
+
+    def materialize(
+        self,
+        session: BusinessDeclarationSession,
+        *,
+        allow_cleaned_file_evidence: bool = False,
+    ) -> Mapping[str, Any]:
+        return self._materializer(
+            self.operation,
+            session,
+            allow_cleaned_file_evidence,
+        )
+
+    def accepts_update_command(self, command: str) -> bool:
+        return command in self.update_commands
+
+    def projection_actions(self, *, session_bound: bool) -> list[str]:
+        return list(
+            self.active_projection_actions
+            if session_bound
+            else self.initial_projection_actions
+        )
+
+    def compile_preview(
+        self,
+        session: BusinessDeclarationSession,
+        *,
+        build_continuation: Callable[..., Mapping[str, Any]],
+    ) -> Any | None:
+        if self._preview_compiler is None:
+            return None
+        return self._preview_compiler(session, build_continuation)
+
+
+_AUDIO_IMPORT_DEFINITION = {
+    "family": "audio-import",
+    "contract_builder": _audio_import_contract,
+    "materializer": _materialize_audio_import,
+    "update_commands": frozenset(
+        {
+            "draft-business-configure",
+            "draft-declare-existing",
+            "draft-declare-new",
+            "draft-remove-declaration",
+            "draft-revise-declaration",
+        }
+    ),
+    "initial_projection_actions": (
+        "bind-object",
+        "bind-field",
+        "configure",
+        "declare-new",
+        "declare-existing",
+        "inspect",
+        "cancel",
+    ),
+    "active_projection_actions": (
+        "bind-object",
+        "bind-field",
+        "configure",
+        "declare-new",
+        "declare-existing",
+        "revise-declaration",
+        "remove-declaration",
+        "check",
+        "inspect",
+        "cancel",
+    ),
+    "preview_compiler": _compile_audio_import_preview,
+    "requires_sound_subtype": True,
+    "supports_field_binding": True,
+    "auto_apply_preview": True,
+    "records_business_preview": True,
+    "requires_wwise_path_discipline": True,
+}
+
+_OBJECT_LIFECYCLE_DEFINITION = {
+    "family": "object-lifecycle",
+    "contract_builder": _object_lifecycle_contract,
+    "materializer": _materialize_object_lifecycle,
+    "update_commands": frozenset({"draft-declare-object-change"}),
+    "initial_projection_actions": ("bind-object", "inspect", "cancel"),
+    "active_projection_actions": (
+        "bind-object",
+        "declare-object-change",
+        "check",
+        "inspect",
+        "cancel",
+    ),
+    "requires_sound_subtype": False,
+    "supports_field_binding": False,
+}
+
+
+def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdapter:
+    values = dict(definition)
+    values["_contract_builder"] = values.pop("contract_builder")
+    values["_materializer"] = values.pop("materializer")
+    values["_preview_compiler"] = values.pop("preview_compiler", None)
+    return BusinessAdapter(operation=operation, **values)
+
+
+_BUSINESS_ADAPTERS = {
+    "audio.import": _bind_adapter("audio.import", _AUDIO_IMPORT_DEFINITION),
+    **{
+        operation: _bind_adapter(operation, _OBJECT_LIFECYCLE_DEFINITION)
+        for operation in (
+            "object.copy",
+            "object.delete",
+            "object.move",
+            "object.setName",
+            "object.setNotes",
+        )
+    },
+}
+
+
+def business_adapter(operation: str) -> BusinessAdapter:
+    """Return the sole reviewed Business Declaration Adapter for an operation."""
+
+    return _BUSINESS_ADAPTERS[operation]
+
+
+def business_adapter_operations() -> frozenset[str]:
+    return frozenset(_BUSINESS_ADAPTERS)
+
+
+__all__ = [
+    "BusinessAdapter",
+    "business_adapter",
+    "business_adapter_operations",
+]

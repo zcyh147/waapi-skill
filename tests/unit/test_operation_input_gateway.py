@@ -74,6 +74,69 @@ class FakeClient:
         self.disconnected = True
 
 
+class ObjectLifecycleClient:
+    """Small live-Wwise Adapter for the public Draft-to-Preview seam."""
+
+    CURRENT_PARENT_GUID = "{44444444-4444-4444-4444-444444444444}"
+
+    def __init__(self) -> None:
+        self.calls: list[
+            tuple[str, Mapping[str, Any] | None, Mapping[str, Any] | None]
+        ] = []
+        self.source = {
+            **object_row(),
+            "parent": {"id": self.CURRENT_PARENT_GUID},
+        }
+        self.parent = {
+            "id": PARENT_GUID,
+            "name": "Destination",
+            "type": "ActorMixer",
+            "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Destination",
+            "parent": {"id": self.CURRENT_PARENT_GUID},
+            "notes": "",
+        }
+
+    def call(
+        self,
+        uri: str,
+        args: Mapping[str, Any] | None = None,
+        options: Mapping[str, Any] | None = None,
+    ) -> Any:
+        self.calls.append((uri, args, options))
+        if uri == "ak.wwise.core.getInfo":
+            return live_info()
+        if uri == "ak.wwise.core.getProjectInfo":
+            return project_row()
+        if uri == "ak.wwise.core.object.getTypes":
+            return {"return": [{"classId": 1, "name": "Sound", "type": "Sound"}]}
+        if uri == "ak.wwise.core.object.get":
+            selector = dict(args or {})
+            source = selector.get("from")
+            if isinstance(source, Mapping) and isinstance(source.get("id"), list):
+                rows = []
+                for object_id in source["id"]:
+                    if str(object_id).upper() == OBJECT_GUID.upper():
+                        rows.append(dict(self.source))
+                    elif str(object_id).upper() == PARENT_GUID.upper():
+                        rows.append(dict(self.parent))
+                return {"return": rows}
+            if isinstance(source, Mapping) and isinstance(source.get("path"), list):
+                rows = []
+                for path in source["path"]:
+                    if path == self.source["path"]:
+                        rows.append(dict(self.source))
+                    elif path == self.parent["path"]:
+                        rows.append(dict(self.parent))
+                return {"return": rows}
+            if "waql" in selector:
+                return {"return": []}
+            raise AssertionError(f"Unexpected object.get selector: {selector!r}")
+        raise AssertionError(f"Unexpected WAAPI call: {uri}")
+
+    def disconnect(self) -> None:
+        return None
+
+
 def gateway_env(
     tmp_path: Path,
     *,
@@ -1212,6 +1275,222 @@ def test_object_set_name_business_draft_binds_declares_and_materializes(
     assert all(
         uri != "ak.wwise.core.object.setName"
         for uri, _args, _options in preview_live.calls
+    )
+
+
+@pytest.mark.parametrize(
+    ("operation", "declaration_tail", "verification_kind"),
+    (
+        (
+            "object.copy",
+            ("--parent-handle", "<parent>", "--name-conflict", "rename"),
+            "copied-guid-under-parent",
+        ),
+        ("object.delete", (), "guid-absent"),
+        (
+            "object.move",
+            ("--parent-handle", "<parent>", "--name-conflict", "rename"),
+            "moved-guid-under-parent",
+        ),
+        (
+            "object.setName",
+            ("--new-name", "新名称 & Rain"),
+            "same-guid-renamed",
+        ),
+        (
+            "object.setNotes",
+            ("--notes", 'line 1\n"quoted" & <tag>'),
+            "same-guid-notes",
+        ),
+    ),
+)
+def test_every_object_lifecycle_adapter_reaches_immutable_preview_with_its_verifier(
+    tmp_path: Path,
+    operation: str,
+    declaration_tail: tuple[str, ...],
+    verification_kind: str,
+) -> None:
+    state_dir = tmp_path / "state"
+    code, started = offline_execute(
+        tmp_path,
+        "--state-dir",
+        str(state_dir),
+        "--version",
+        "2022.1",
+        "draft-start",
+        operation,
+    )
+    assert code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    client = ObjectLifecycleClient()
+
+    def bind(object_id: str, expected_revision: int) -> tuple[str, dict[str, Any]]:
+        bind_code, payload = waapi_gateway.execute_gateway(
+            [
+                "--state-dir",
+                str(state_dir),
+                "draft-bind-object",
+                draft_id,
+                "--task-authority",
+                authority,
+                "--expected-revision",
+                str(expected_revision),
+                "--object-id",
+                object_id,
+            ],
+            env=gateway_env(tmp_path),
+            client_factory=lambda _url: client,
+        )
+        assert bind_code == 0, payload
+        return payload["bound_object"]["handle"], payload
+
+    object_handle, bound = bind(OBJECT_GUID, started["draft"]["revision"])
+    parent_handle: str | None = None
+    if operation in {"object.copy", "object.move"}:
+        parent_handle, bound = bind(PARENT_GUID, bound["draft"]["revision"])
+    rendered_tail = tuple(
+        parent_handle if value == "<parent>" else value
+        for value in declaration_tail
+    )
+    declare_code, declared = offline_execute(
+        tmp_path,
+        "--state-dir",
+        str(state_dir),
+        "draft-declare-object-change",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        str(bound["draft"]["revision"]),
+        "--object-handle",
+        object_handle,
+        *rendered_tail,
+    )
+    assert declare_code == 0, declared
+
+    check_code, checked = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(state_dir),
+            "draft-check",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(declared["draft"]["revision"]),
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+    assert check_code == 0, json.dumps(checked, ensure_ascii=False)
+    assert checked["draft"]["check"]["status"] == "passed"
+
+    preview_code, previewed = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(state_dir),
+            "preview-from-draft",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(checked["draft"]["revision"]),
+            "--apply",
+            "--ttl",
+            "300",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+    assert preview_code == 0, json.dumps(previewed, ensure_ascii=False)
+    assert previewed["state"] == "awaiting_confirmation"
+    assert previewed["executed"] is False
+    artifact = TransactionStore(state_dir).load_preview(
+        previewed["transaction_id"]
+    ).artifact
+    assert artifact["request"]["operation"] == operation
+    assert artifact["prepared_operation"]["verification_plan"]["kind"] == (
+        verification_kind
+    )
+    native_uri = describe_operation(operation).uri
+    assert all(uri != native_uri for uri, _args, _options in client.calls)
+
+
+def test_object_lifecycle_draft_check_rejects_stale_bound_identity(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "state"
+    code, started = offline_execute(
+        tmp_path,
+        "--state-dir",
+        str(state_dir),
+        "--version",
+        "2022.1",
+        "draft-start",
+        "object.setNotes",
+    )
+    assert code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    client = ObjectLifecycleClient()
+    bind_code, bound = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(state_dir),
+            "draft-bind-object",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(started["draft"]["revision"]),
+            "--object-id",
+            OBJECT_GUID,
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+    assert bind_code == 0, bound
+    declare_code, declared = offline_execute(
+        tmp_path,
+        "--state-dir",
+        str(state_dir),
+        "draft-declare-object-change",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        str(bound["draft"]["revision"]),
+        "--object-handle",
+        bound["bound_object"]["handle"],
+        "--notes",
+        "after",
+    )
+    assert declare_code == 0, declared
+    client.source["path"] = (
+        r"\Actor-Mixer Hierarchy\Default Work Unit\MovedElsewhere"
+    )
+
+    check_code, rejected = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(state_dir),
+            "draft-check",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            str(declared["draft"]["revision"]),
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert check_code == 2
+    assert rejected["error_code"] == "OBJECT_HANDLE_STALE"
+    assert all(
+        uri != "ak.wwise.core.object.setNotes"
+        for uri, _args, _options in client.calls
     )
 
 

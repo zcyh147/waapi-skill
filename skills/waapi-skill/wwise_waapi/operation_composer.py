@@ -17,6 +17,7 @@ from typing import Any, Callable, Mapping, Sequence
 from .canonical import canonical_json_bytes, canonical_sha256
 from .business_declaration_state import BusinessDeclarationSession
 from .builders.common import SemanticValidationError
+from .business_adapters import business_adapter
 from .metadata_discovery import metadata_candidate_limit_contract
 from .operation_registry import (
     audio_import_business_contract,
@@ -2990,7 +2991,7 @@ def composition_projection(
             ],
         }
     if operation_uses_business_declaration(operation, version):
-        return _audio_import_business_composition_projection(
+        return _business_composition_projection(
             normalized,
             operation=operation,
         )
@@ -3156,7 +3157,7 @@ def _normalize_composition(
     version: str,
 ) -> dict[str, Any]:
     if operation_uses_business_declaration(operation, version):
-        return _normalize_audio_import_business_composition(
+        return _normalize_business_composition(
             composition,
             operation=operation,
             version=version,
@@ -3345,7 +3346,7 @@ def _materialize_if_complete(
         materialize_operation_request(operation, version, composition)
 
 
-def _normalize_audio_import_business_composition(
+def _normalize_business_composition(
     composition: Mapping[str, Any],
     *,
     operation: str = AUDIO_IMPORT_COMPOSER_OPERATION,
@@ -3378,7 +3379,7 @@ def _normalize_audio_import_business_composition(
     }
 
 
-def _audio_import_business_composition_projection(
+def _business_composition_projection(
     composition: Mapping[str, Any],
     *,
     operation: str = AUDIO_IMPORT_COMPOSER_OPERATION,
@@ -3394,18 +3395,8 @@ def _audio_import_business_composition_projection(
             "detail_available": False,
             "missing_fields": ["business_declaration"],
             "missing_fields_status": "incomplete",
-            "allowed_actions": (
-                [
-                    "bind-object",
-                    "bind-field",
-                    "configure",
-                    "declare-new",
-                    "declare-existing",
-                    "inspect",
-                    "cancel",
-                ]
-                if operation == AUDIO_IMPORT_COMPOSER_OPERATION
-                else ["bind-object", "inspect", "cancel"]
+            "allowed_actions": business_adapter(operation).projection_actions(
+                session_bound=False
             ),
         }
     session = BusinessDeclarationSession.from_dict(raw_session)
@@ -3424,27 +3415,8 @@ def _audio_import_business_composition_projection(
         "missing_fields_status": (
             "incomplete" if not session.declarations else "complete"
         ),
-        "allowed_actions": (
-            [
-                "bind-object",
-                "bind-field",
-                "configure",
-                "declare-new",
-                "declare-existing",
-                "revise-declaration",
-                "remove-declaration",
-                "check",
-                "inspect",
-                "cancel",
-            ]
-            if operation == AUDIO_IMPORT_COMPOSER_OPERATION
-            else [
-                "bind-object",
-                "declare-object-change",
-                "check",
-                "inspect",
-                "cancel",
-            ]
+        "allowed_actions": business_adapter(operation).projection_actions(
+            session_bound=True
         ),
     }
 

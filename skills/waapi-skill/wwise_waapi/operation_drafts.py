@@ -29,10 +29,7 @@ from .business_declaration_state import (
     BusinessPreview,
 )
 from .business_declarations import BusinessContext, BusinessDeclarationError
-from .audio_import_business import materialize_audio_import_business_request
-from .object_lifecycle_business import (
-    materialize_object_lifecycle_business_request,
-)
+from .business_adapters import business_adapter
 from .canonical import canonical_json_bytes, canonical_sha256
 from .filesystem_security import path_is_link_or_reparse
 from .operation_composer import (
@@ -990,9 +987,10 @@ class OperationDraftStore:
                 if not isinstance(business_preview, BusinessPreview):
                     raise TypeError("business_preview must be BusinessPreview")
                 raw_session = composition.get("business_session")
-                if record.operation != "audio.import" or raw_session is None:
+                adapter = business_adapter(record.operation)
+                if not adapter.records_business_preview or raw_session is None:
                     raise OperationDraftInvalidTransition(
-                        "Only a deep audio.import Draft can record a business Preview."
+                        "This Business Draft cannot record a business Preview."
                     )
                 try:
                     session = BusinessDeclarationSession.from_dict(raw_session)
@@ -2159,16 +2157,9 @@ def _materialize_draft_composition(
     ):
         try:
             session = BusinessDeclarationSession.from_dict(raw_business_session)
-            return (
-                materialize_audio_import_business_request(
-                    session,
-                    allow_cleaned_file_evidence=allow_cleaned_file_evidence,
-                )
-                if operation == "audio.import"
-                else materialize_object_lifecycle_business_request(
-                    operation,
-                    session,
-                )
+            return business_adapter(operation).materialize(
+                session,
+                allow_cleaned_file_evidence=allow_cleaned_file_evidence,
             )
         except (TypeError, ValueError) as exc:
             raise OperationComposerError(

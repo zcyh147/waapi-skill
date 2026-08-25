@@ -34,15 +34,15 @@ planning; the Registry remains authoritative during implementation.
 | `lua.executeCliFile` | 2023.1–2025.1 | Composer | source file/root/authority; optional typed args/watchdog | exact user code and isolated I/O | wave 05 file/Lua complete |
 | `lua.executeCoreFile` | 2023.1–2025.1 | Composer | source file/root/authority; optional typed args | exact user code in Authoring | wave 05 file/Lua complete |
 | `lua.executeCoreInline` | 2025.1 | Composer | source text/root/authority; optional typed args | Agent composition forbidden | wave 05 file/Lua complete |
-| `object.copy` | 2021.1–2025.1 | Inline typed | object and parent | returned GUID and parent/path verification | wave 02 object lifecycle complete |
+| `object.copy` | 2021.1–2025.1 | Business declaration | object and parent | returned GUID and parent/path verification | wave 02 object lifecycle complete |
 | `object.create` | 2021.1–2025.1 | Composer | parent/type/name; recursive options | recursive bounds and replace ownership | wave 02 object lifecycle complete |
 | `object.createPlugin` | 2022.1–2025.1 | Composer | target and exact class | versioned topology on shared URI | wave 02 complete |
-| `object.delete` | 2021.1–2025.1 | Inline typed | object; optional checkout | protected object and GUID absence | wave 02 object lifecycle complete |
-| `object.move` | 2021.1–2025.1 | Inline typed | object and parent | stable GUID and parent/path verification | wave 02 object lifecycle complete |
+| `object.delete` | 2021.1–2025.1 | Business declaration | object; optional checkout | protected object and GUID absence | wave 02 object lifecycle complete |
+| `object.move` | 2021.1–2025.1 | Business declaration | object and parent | stable GUID and parent/path verification | wave 02 object lifecycle complete |
 | `object.set` | 2022.1–2025.1 | Composer | ordered bounded object batch | recursive mixed fields/references | wave 00 complete |
 | `object.setLinked` | 2023.1–2025.1 | Inline typed | object/property/platform/link state | dedicated link semantics | wave 01 complete |
-| `object.setName` | 2021.1–2025.1 | Inline typed | object and name | same-GUID path transition | wave 01 complete |
-| `object.setNotes` | 2021.1–2025.1 | Inline typed | object and exact text | empty text versus omission | wave 01 complete |
+| `object.setName` | 2021.1–2025.1 | Business declaration | object and name | same-GUID path transition | wave 01 complete |
+| `object.setNotes` | 2021.1–2025.1 | Business declaration | object and exact text | empty text versus omission | wave 01 complete |
 | `object.setProperty` | 2021.1–2025.1 | Inline typed | object/property/value/platform | live metadata and typed readback | wave 01 complete |
 | `object.setRTPC` | 2022.1–2025.1 | Composer | object/property/control input/points | dedicated curve on shared URI | wave 02 complete |
 | `object.setReference` | 2021.1–2025.1 | Inline typed | object/reference/nullable target/platform | metadata and exact null clearing | wave 01 complete |
@@ -75,8 +75,8 @@ business schema.
 Debug/host controls use their closed typed operations. Generic `waapi.call` is
 an internal canonical transaction representation produced only after an exact
 typed request has been validated and materialized. `object.copy` and
-`object.move` have closed typed inputs and operation-specific identity, parent,
-and path verification.
+`object.move` use closed business declarations with operation-specific
+identity, parent, and path verification.
 
 ## Single typed input decision
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from wwise_waapi.business_adapters import business_adapter
 from wwise_waapi.business_declaration_state import BusinessDeclarationSession
 from wwise_waapi.business_declarations import (
     BusinessContext,
@@ -12,11 +13,37 @@ from wwise_waapi.business_declarations import (
 from wwise_waapi.object_lifecycle_business import (
     materialize_object_lifecycle_business_request,
 )
-from wwise_waapi.operation_registry import OperationContractError
+from wwise_waapi.object_lifecycle_business_contracts import (
+    object_lifecycle_business_contract_data,
+)
 
 
 OBJECT_ID = "{11111111-1111-1111-1111-111111111111}"
 PARENT_ID = "{22222222-2222-2222-2222-222222222222}"
+
+
+def test_business_adapter_registry_selects_one_family_at_one_seam() -> None:
+    audio = business_adapter("audio.import")
+    lifecycle = {
+        business_adapter(operation).family
+        for operation in (
+            "object.copy",
+            "object.delete",
+            "object.move",
+            "object.setName",
+            "object.setNotes",
+        )
+    }
+
+    assert audio.family == "audio-import"
+    assert lifecycle == {"object-lifecycle"}
+    assert audio.accepts_update_command("draft-declare-new") is True
+    assert audio.accepts_update_command("draft-declare-object-change") is False
+    assert business_adapter("object.move").accepts_update_command(
+        "draft-declare-object-change"
+    ) is True
+    with pytest.raises(KeyError):
+        business_adapter("object.setProperty")
 
 
 def _session(
@@ -171,7 +198,72 @@ def test_missing_parent_handle_returns_one_closed_repair() -> None:
     }
 
 
-def test_version_only_source_control_field_fails_before_any_live_call() -> None:
+def test_unknown_bound_parent_handle_repairs_parent_not_source_object() -> None:
+    session, object_handle, parent_handle = _session()
+    unknown_parent_handle = parent_handle[:-1] + (
+        "0" if parent_handle[-1] != "0" else "1"
+    )
+    session = session.with_existing_declaration(
+        declaration_id="change",
+        target=ExistingObjectTarget(object_handle),
+        fields={"parent_handle": unknown_parent_handle},
+    )
+
+    with pytest.raises(BusinessDeclarationError) as captured:
+        materialize_object_lifecycle_business_request("object.move", session)
+
+    assert captured.value.error_code == "OBJECT_HANDLE_NOT_AVAILABLE"
+    assert captured.value.repair["field"] == "parent_handle"
+    assert captured.value.repair["draft_changed"] is False
+
+
+@pytest.mark.parametrize(
+    ("version", "source_control_available"),
+    [
+        ("2021.1", False),
+        ("2022.1", False),
+        ("2023.1", True),
+        ("2024.1", True),
+        ("2025.1", True),
+    ],
+)
+@pytest.mark.parametrize(
+    ("operation", "supports_add"),
+    [
+        ("object.copy", True),
+        ("object.delete", False),
+        ("object.move", False),
+    ],
+)
+def test_source_control_business_fields_are_disclosed_only_when_available(
+    version: str,
+    source_control_available: bool,
+    operation: str,
+    supports_add: bool,
+) -> None:
+    contract = object_lifecycle_business_contract_data(operation, version)
+    optional_fields = set(contract["declaration"]["optional_fields"])
+    field_types = set(contract["declaration"]["field_types"])
+
+    assert ("check_out_from_source_control" in optional_fields) is (
+        source_control_available
+    )
+    assert ("check_out_from_source_control" in field_types) is (
+        source_control_available
+    )
+    assert ("add_to_source_control" in optional_fields) is (
+        source_control_available and supports_add
+    )
+    assert ("add_to_source_control" in field_types) is (
+        source_control_available and supports_add
+    )
+    assert contract["version_features"] == {
+        "add_to_source_control": source_control_available and supports_add,
+        "check_out_from_source_control": source_control_available,
+    }
+
+
+def test_undisclosed_version_only_source_control_field_fails_before_live_call() -> None:
     session, object_handle, _parent_handle = _session("2022.1")
     session = session.with_existing_declaration(
         declaration_id="change",
@@ -179,10 +271,11 @@ def test_version_only_source_control_field_fails_before_any_live_call() -> None:
         fields={"check_out_from_source_control": True},
     )
 
-    with pytest.raises(OperationContractError) as captured:
+    with pytest.raises(BusinessDeclarationError) as captured:
         materialize_object_lifecycle_business_request("object.delete", session)
 
-    assert captured.value.error_code == "VERSION_BEHAVIOR_BOUNDARY"
+    assert captured.value.error_code == "BUSINESS_FIELD_UNAVAILABLE"
+    assert captured.value.repair["field"] == "check_out_from_source_control"
 
 
 def test_multiple_object_changes_do_not_silently_batch() -> None:

@@ -11152,6 +11152,23 @@
     {
       "model_values": [
         {
+          "name": "object_handle",
+          "path": [
+            "declaration",
+            "object_handle"
+          ],
+          "required": true,
+          "schema_sha256": "851e72276c5991cce6777b332ef35c7c9668b5d789851c6fee5f61e0a2eb422c",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        }
+      ],
+      "sha256": "98738edc167f8f45493c51077eeeb945fe76e5d0c2f76326d2377cfaeb4db8b9"
+    },
+    {
+      "model_values": [
+        {
           "name": "commands",
           "path": [
             "arguments",
@@ -20568,6 +20585,47 @@
         }
       ],
       "sha256": "e5a8965b367f00eb3be59cc5abdaf57df5f6704a4b0eabdc41da9aa7f8cf5869"
+    },
+    {
+      "model_values": [
+        {
+          "name": "object_handle",
+          "path": [
+            "declaration",
+            "object_handle"
+          ],
+          "required": true,
+          "schema_sha256": "851e72276c5991cce6777b332ef35c7c9668b5d789851c6fee5f61e0a2eb422c",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "name": "parent_handle",
+          "path": [
+            "declaration",
+            "parent_handle"
+          ],
+          "required": true,
+          "schema_sha256": "3bd0b18557a5a5a35412548c6965602d01cc4a1db6a72f2230be6ffbd922217e",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "name": "name_conflict",
+          "path": [
+            "declaration",
+            "name_conflict"
+          ],
+          "required": false,
+          "schema_sha256": "04a764f0a94dcff17b07d0b2dfd055f2fb8a2ca4ef6614239dfeb2ce8a61bbec",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "e8c12e07f4df11ab6ca3d06a299ae89e38bcb01908d3769dd499ef44ab0a84e2"
     },
     {
       "model_values": [
@@ -173413,7 +173471,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "b2fbd5ed0cc6fd823c862243d18135461fffc372b8f81f6921022753757e4a35",
+  "inventory_sha256": "61b0b30e004a2a06619f70ee8a08fb157cd74869b48fa4edff55415a7c549677",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -203476,10 +203534,10 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "cf44fbb042bee05fdc79b1eed828e620fb6802a591cfbeac950b932b2b7e6961",
+      "argument_contract_sha256": "e8c12e07f4df11ab6ca3d06a299ae89e38bcb01908d3769dd499ef44ab0a84e2",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "a25550f6e320208b976d6eaacdb7d087a5cd42399d28dd8d549347c26e8f968e",
+      "contract_sha256": "d025f45512622d971637ccdff34b830391b6a0e1b87f317d820781bb63e7d1f0",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -203505,10 +203563,10 @@
       "version": "2021.1"
     },
     {
-      "argument_contract_sha256": "cf44fbb042bee05fdc79b1eed828e620fb6802a591cfbeac950b932b2b7e6961",
+      "argument_contract_sha256": "e8c12e07f4df11ab6ca3d06a299ae89e38bcb01908d3769dd499ef44ab0a84e2",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "7e8d157249610abac494fd868fea147e8dc7b8660ae19b91649c0680a3787cf3",
+      "contract_sha256": "46c1db5156484d673c7d7319db01f4b73e20c8fd8d54148131a23b02976e95fa",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -203537,7 +203595,7 @@
       "argument_contract_sha256": "cf44fbb042bee05fdc79b1eed828e620fb6802a591cfbeac950b932b2b7e6961",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "92268d2229c881389ca5a3def9fd66c713232f75f860ded636716bc3c9eecf1d",
+      "contract_sha256": "2710017e72959408befbbfbea79ab5017dd41629a647105e2633682213beded2",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -203566,7 +203624,7 @@
       "argument_contract_sha256": "cf44fbb042bee05fdc79b1eed828e620fb6802a591cfbeac950b932b2b7e6961",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "452a0f9a943321742e734fe8ea9b9c7b645468cbc450ef68f48bba27f011c4b8",
+      "contract_sha256": "6d9f94f6bc478040950b5e48d046a41e74ba45af91984a5bb81c8d4ac03f1dbd",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -203595,7 +203653,7 @@
       "argument_contract_sha256": "cf44fbb042bee05fdc79b1eed828e620fb6802a591cfbeac950b932b2b7e6961",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "26bb3210897654b86866b59a596567db6faf0e954f2da7208e617f0ad409ba1d",
+      "contract_sha256": "622d408332bf8c66012cd1a5b572f0bcd49db0e4e8e2f17dabc4af16e145e7ba",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -203927,10 +203985,10 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "bc080127557ddc18b327d40e5efe5f19f0ce2d2fbd8e60b6d26346cf9b0d2c2f",
+      "argument_contract_sha256": "98738edc167f8f45493c51077eeeb945fe76e5d0c2f76326d2377cfaeb4db8b9",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "d19280d279e1745f8d96b234a69f9343561b9874f2ffeb479e49e1276aace449",
+      "contract_sha256": "f1af1982c40519a218d9d402dfa757951394b37707b5edf9e62d6b105d6a553e",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -203956,10 +204014,10 @@
       "version": "2021.1"
     },
     {
-      "argument_contract_sha256": "bc080127557ddc18b327d40e5efe5f19f0ce2d2fbd8e60b6d26346cf9b0d2c2f",
+      "argument_contract_sha256": "98738edc167f8f45493c51077eeeb945fe76e5d0c2f76326d2377cfaeb4db8b9",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "7c5295b2054505ed6dd3e09710a962edca7a443137911ca50e3452ce7decad9e",
+      "contract_sha256": "e18848de85485c303070cecb5fc8a4f9a8003b0d5e059fe9933fdade2ae61883",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -203988,7 +204046,7 @@
       "argument_contract_sha256": "bc080127557ddc18b327d40e5efe5f19f0ce2d2fbd8e60b6d26346cf9b0d2c2f",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "faa86f27827584cb145e07c32f44a745e9902890e5048bd794f244cf58a9daee",
+      "contract_sha256": "223245ec6080c50ccb462fff553b908f0854f75a3ee20694dd8b38ae1db61287",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -204017,7 +204075,7 @@
       "argument_contract_sha256": "bc080127557ddc18b327d40e5efe5f19f0ce2d2fbd8e60b6d26346cf9b0d2c2f",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "e96e546b60e539b5ee16e442c7b6cf9833944016c50aa8af0a4b066797eecab1",
+      "contract_sha256": "4dea18c7f011d5d18771933215aada567f9ee6e1b0799ad099addad7a5c5e133",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -204046,7 +204104,7 @@
       "argument_contract_sha256": "bc080127557ddc18b327d40e5efe5f19f0ce2d2fbd8e60b6d26346cf9b0d2c2f",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "ebf506e56ec28bd7b008840b47fde4a5fddeee89c5aee1ffeceb98a6f760a1b3",
+      "contract_sha256": "140de33cb33041fc29186e980ee14c5f422d81e3295d912b89a35a60cd4eff8a",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -204072,10 +204130,10 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "9fca6fffa8797e04628989aadf8f3cd93b18b4147ab1a8f7da2396063354d928",
+      "argument_contract_sha256": "e8c12e07f4df11ab6ca3d06a299ae89e38bcb01908d3769dd499ef44ab0a84e2",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "770d41b969382d7553753fb6dc16e9eadb5de213a85e48070df45c58a8837477",
+      "contract_sha256": "9ab89d79fbcd51f560b589cc3cbacac1ac338f54464bfb288ac7d10e3fdbbb62",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -204101,10 +204159,10 @@
       "version": "2021.1"
     },
     {
-      "argument_contract_sha256": "9fca6fffa8797e04628989aadf8f3cd93b18b4147ab1a8f7da2396063354d928",
+      "argument_contract_sha256": "e8c12e07f4df11ab6ca3d06a299ae89e38bcb01908d3769dd499ef44ab0a84e2",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "1501fdf731d13de32f7b0dfbdfdcb1c7f128bdb0d9558ab211fead2988faf3e7",
+      "contract_sha256": "ae78e3c6fd96cc1895e2e3d3e8d0b398f96eeeb8108e83ad8788c6a660210c44",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -204133,7 +204191,7 @@
       "argument_contract_sha256": "9fca6fffa8797e04628989aadf8f3cd93b18b4147ab1a8f7da2396063354d928",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "a4b8af25ab5eac5a6fdbed29826d5feec6feba38bb087ad375e127906a6031b8",
+      "contract_sha256": "b7c5719c73f9331fbc9792598fb208926c168bd41e44ea3efbf4db8e9a5977b1",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -204162,7 +204220,7 @@
       "argument_contract_sha256": "9fca6fffa8797e04628989aadf8f3cd93b18b4147ab1a8f7da2396063354d928",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "b1dcc4658ada161c5a91790ac5483c17c0777648b0384c363c980b28e02c5800",
+      "contract_sha256": "86f5729facf55781d9be068499f6cc69c0f800101e52733b0e858c2602ea6b20",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -204191,7 +204249,7 @@
       "argument_contract_sha256": "9fca6fffa8797e04628989aadf8f3cd93b18b4147ab1a8f7da2396063354d928",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "a95a27157cb772ee76f1400f389783b7b12c6a1d86c5b81ec0d1faa85997e75a",
+      "contract_sha256": "25128be192c228d2dde1a8d78d96932c9f427fab9e2e1560561ff52d63a8e956",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -204446,7 +204504,7 @@
       "argument_contract_sha256": "62b5cbaee40cb8b9ee0a00fe9bcb48188301bc441b373c9fb753fbce68f973d6",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "c7a2d49b6626c4f449dbfa6d86b598083abe2e87833001c8306be9c33baa5fc8",
+      "contract_sha256": "65845b4b19ba00ef2c75f6013e835969359056851c2df3ab3bbb38ad079d8741",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -204475,7 +204533,7 @@
       "argument_contract_sha256": "62b5cbaee40cb8b9ee0a00fe9bcb48188301bc441b373c9fb753fbce68f973d6",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "daaf5deebf0613f6126b0cc768b882ba8807dbe6ecfe0f17c3e47efcc5661abd",
+      "contract_sha256": "11097fbcb96767a29380e30dcfb3cb04920044f60b9e670c6b9649a5d591b1e3",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -204504,7 +204562,7 @@
       "argument_contract_sha256": "62b5cbaee40cb8b9ee0a00fe9bcb48188301bc441b373c9fb753fbce68f973d6",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "2a2bd2f1e10d032444a02b685406dd849dfe47d48621e7c77028f4090e17e94d",
+      "contract_sha256": "9668eab78bad921202e495ec3e03aae2d1cbdad8db34b9a86d5de2c67e8d1153",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -204533,7 +204591,7 @@
       "argument_contract_sha256": "62b5cbaee40cb8b9ee0a00fe9bcb48188301bc441b373c9fb753fbce68f973d6",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "ab99b0c7dbd5ca0d5367f6480661cda730d2c4cd728e4cf43eb14cb54876225f",
+      "contract_sha256": "f6999e8f80c2e0c080482053f18631dd72acd592184ad126c7937d8f0e743beb",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -204562,7 +204620,7 @@
       "argument_contract_sha256": "62b5cbaee40cb8b9ee0a00fe9bcb48188301bc441b373c9fb753fbce68f973d6",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "849cf1f1359d3ebd3e55ddb626ffaeea1068fe2825bdb04a6777b38b0a4f3213",
+      "contract_sha256": "ac0b6d6565c1b3e3e1608c15e15cca785e267290d13856f4adf56fd0af499a19",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -204591,7 +204649,7 @@
       "argument_contract_sha256": "3c058e2982b12bb2ae256c584deab1e6682d0e1b8fc051b841da77977fd33ddd",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "e9cc5e33ea7d606964c80e168f159c3f88d11f3dcdb42ed84a6e6821ec08f296",
+      "contract_sha256": "0b2fd838cc60e6c939d59fb48dd7d8063bf4b8e1ce9473e45320488019afcf69",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -204620,7 +204678,7 @@
       "argument_contract_sha256": "3c058e2982b12bb2ae256c584deab1e6682d0e1b8fc051b841da77977fd33ddd",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "1847ccb9c4bcd8239e9eb5ae16af04354558f37d7a044e8eeaa7a43b67774dfc",
+      "contract_sha256": "27a892b16d4e33807fd901ad2f5d2cd57b6ad5061c96ebdfc57230ff7df1584b",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -204649,7 +204707,7 @@
       "argument_contract_sha256": "3c058e2982b12bb2ae256c584deab1e6682d0e1b8fc051b841da77977fd33ddd",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "5d6f42d416a8b68d8fff33631c6749c9cb7e594330c844c71bb9603cdd847c9d",
+      "contract_sha256": "b2b18a1b9012ece3c336eec21b520abab402d08c991f3dde2b5caebfc0665a06",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -204678,7 +204736,7 @@
       "argument_contract_sha256": "3c058e2982b12bb2ae256c584deab1e6682d0e1b8fc051b841da77977fd33ddd",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "faa3f10ffbd485d42af75158bddbd65942cd12cac71381a47a189f76f57ce23d",
+      "contract_sha256": "43106d4fd11ab43e9b20902b944e787d8b0bfdb2481cd676cb8409727e5f05c4",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -204707,7 +204765,7 @@
       "argument_contract_sha256": "3c058e2982b12bb2ae256c584deab1e6682d0e1b8fc051b841da77977fd33ddd",
       "audit_evidence": null,
       "classification": "named-object-lifecycle",
-      "contract_sha256": "03a63373e552936cadef9c9963555dc06d1953e23b37afe26bd341c96749c61c",
+      "contract_sha256": "192414907f247fee90ce1ed02fe5c9679ea4d0af876f6478dba52a8ae510b68c",
       "disposition": "migration_required",
       "input_mode": "business_declaration",
       "leaked_mechanics": [
@@ -206933,7 +206991,7 @@
   },
   "source_contracts": {
     "gateway_parser_sha256": "7c23a4d7f6acf9a12dd345712819ff49796f7a4a607fd83377ac900c013b8629",
-    "operation_contract_sha256": "64b5efcb7c73cdf509e0567051fd37d14a3c15b8366633b063ddd69b3833b911",
+    "operation_contract_sha256": "0eb04d9be12f7d899551e9e245ae963e09ff8d01ac849cb9d98b4e45e22d068b",
     "public_continuation_sha256": "9804cb82e1c719e989f7d5d9d40ae0190f0535b74a856b6da4d84875d54c4afe",
     "typed_request_surface_sha256": "6d05d64e95a6e0f7099ddd03f1da42c763e9c06f33f93cac7581c7c061a83af8"
   },
