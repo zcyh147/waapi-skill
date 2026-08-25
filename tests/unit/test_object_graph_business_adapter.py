@@ -12,6 +12,7 @@ import pytest
 
 
 PARENT_ID = "{11111111-1111-1111-1111-111111111111}"
+BUS_ID = "{22222222-2222-2222-2222-222222222222}"
 
 
 def _session(version: str = "2022.1") -> tuple[BusinessDeclarationSession, str]:
@@ -127,3 +128,71 @@ def test_bound_kind_handle_fails_closed_when_live_type_row_drifts() -> None:
 
     assert captured.value.error_code == "TYPE_HANDLE_STALE"
     assert captured.value.repair["field"] == "kind_handle"
+
+
+def test_object_create_compiles_common_and_bound_fields_without_tokens() -> None:
+    session, parent_handle = _session("2025.1")
+    bus = session.handles.bind_object(
+        object_id=BUS_ID,
+        name="Weather Bus",
+        object_type="Bus",
+        path=r"\Master-Mixer Hierarchy\Default Work Unit\Weather Bus",
+    )
+    custom = session.handles.bind_field(
+        scope_kind="class",
+        scope_value="Sound",
+        token="CustomGain",
+        field_kind="property",
+        value_type="number",
+        platform="Windows",
+        restrictions={"minimum": 0.0, "maximum": 1.0},
+        metadata_digest="b" * 64,
+    )
+    session = session.with_settings(
+        {
+            "add_to_source_control": True,
+            "name_conflict": "fail",
+            "platform": "Windows",
+        }
+    )
+    session = session.with_new_declaration(
+        declaration_id="rain",
+        target=NewDescendantTarget(
+            parent_handle=parent_handle,
+            name="Rain",
+            kind="sound-sfx",
+        ),
+        fields={
+            "field_values": {custom.handle: 0.5},
+            "loop": "infinite",
+            "max_instances": 4,
+            "output_bus": bus.handle,
+            "override_parent_instance_limit": True,
+            "volume_db": -4,
+        },
+    )
+
+    request = business_adapter("object.create").materialize(session)
+
+    assert request["arguments"] == {
+        "parent": {"kind": "id", "value": PARENT_ID},
+        "type": "Sound",
+        "name": "Rain",
+        "platform": "Windows",
+        "properties": [
+            {"name": "IsLoopingEnabled", "value": True},
+            {"name": "IsLoopingInfinite", "value": True},
+            {"name": "Volume", "value": -4.0},
+            {"name": "UseMaxSoundPerInstance", "value": True},
+            {"name": "MaxSoundPerInstance", "value": 4},
+            {"name": "IgnoreParentMaxSoundInstance", "value": True},
+            {"name": "CustomGain", "value": 0.5},
+        ],
+        "references": [
+            {
+                "name": "OutputBus",
+                "target": {"kind": "id", "value": BUS_ID},
+            }
+        ],
+        "auto_add_to_source_control": True,
+    }

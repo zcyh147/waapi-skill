@@ -19,7 +19,25 @@ from .object_graph_business_contracts import object_graph_business_contract_data
 from .operation_registry import parse_operation_request
 
 
-_CREATE_FIELDS = frozenset({"loop", "notes", "volume_db"})
+_CREATE_FIELDS = frozenset(
+    {
+        "field_values",
+        "loop",
+        "max_instances",
+        "notes",
+        "output_bus",
+        "override_parent_instance_limit",
+        "volume_db",
+    }
+)
+_CREATE_SETTINGS = frozenset(
+    {
+        "add_to_source_control",
+        "name_conflict",
+        "platform",
+        "replace_owner_handle",
+    }
+)
 
 
 def _repair(
@@ -78,6 +96,7 @@ def _compile_create_fields(
             )
         compiled["notes"] = notes
     properties: list[dict[str, Any]] = []
+    references: list[dict[str, Any]] = []
     if "loop" in fields:
         if fields["loop"] != "infinite":
             raise _repair(
@@ -109,8 +128,186 @@ def _compile_create_fields(
                 action="provide a finite volume in decibels",
             )
         properties.append({"name": "Volume", "value": float(value)})
+    if "max_instances" in fields:
+        value = fields["max_instances"]
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, int)
+            or not 1 <= value <= 1_000_000
+        ):
+            raise _repair(
+                session,
+                "FIELD_VALUE_OUT_OF_RANGE",
+                field="max_instances",
+                valid_range={"minimum": 1, "maximum": 1_000_000},
+                action="provide a positive bounded instance count",
+            )
+        properties.extend(
+            [
+                {"name": "UseMaxSoundPerInstance", "value": True},
+                {"name": "MaxSoundPerInstance", "value": value},
+            ]
+        )
+    if "override_parent_instance_limit" in fields:
+        value = fields["override_parent_instance_limit"]
+        if type(value) is not bool:
+            raise _repair(
+                session,
+                "FIELD_VALUE_TYPE_MISMATCH",
+                field="override_parent_instance_limit",
+                action="provide true or false",
+            )
+        properties.append(
+            {"name": "IgnoreParentMaxSoundInstance", "value": value}
+        )
+    if "output_bus" in fields:
+        bus = session.handles.resolve_object(fields["output_bus"])
+        if bus.object_type.casefold().replace(" ", "") not in {
+            "bus",
+            "audiobus",
+            "auxbus",
+            "auxiliarybus",
+        }:
+            raise _repair(
+                session,
+                "REFERENCE_TARGET_TYPE_MISMATCH",
+                field="output_bus",
+                allowed_target_types=["Bus", "AuxBus"],
+                action="choose one exact bound output bus",
+            )
+        references.append(
+            {
+                "name": "OutputBus",
+                "target": {"kind": "id", "value": bus.object_id},
+            }
+        )
+    dynamic = fields.get("field_values", {})
+    if not isinstance(dynamic, Mapping):
+        raise _repair(
+            session,
+            "FIELD_VALUE_TYPE_MISMATCH",
+            field="field_values",
+            action="provide one bounded Field Handle to business value map",
+        )
+    if isinstance(declaration.target, NewDescendantTarget):
+        if declaration.target.kind.startswith("bth1-"):
+            bound_type = session.handles.resolve_type(declaration.target.kind)
+            valid_scopes: set[str | int] = {
+                bound_type.class_id,
+                bound_type.name,
+            }
+        else:
+            kind = resolve_semantic_kind(
+                declaration.target.kind,
+                version=session.context.wwise_version,
+            )
+            valid_scopes = {kind.metadata_object_type}
+    else:  # pragma: no cover - object.create target guard owns this
+        valid_scopes = set()
+    used_tokens = {row["name"] for row in (*properties, *references)}
+    for handle, business_value in dynamic.items():
+        field = session.handles.bound_field(handle)
+        if field.scope_kind != "class" or field.scope_value not in valid_scopes:
+            raise _repair(
+                session,
+                "FIELD_HANDLE_SCOPE_MISMATCH",
+                field="field_values",
+                rejected_handle=field.handle,
+                action="discover the field for this exact declared object kind",
+            )
+        if field.token in used_tokens:
+            raise _repair(
+                session,
+                "OBJECT_GRAPH_FIELD_CONFLICT",
+                field="field_values",
+                action="set one business meaning through one field only",
+            )
+        used_tokens.add(field.token)
+        normalized = session.handles.validate_field_value(field, business_value)
+        if field.field_kind == "property":
+            properties.append({"name": field.token, "value": normalized})
+        else:
+            target = session.handles.resolve_object(normalized)
+            references.append(
+                {
+                    "name": field.token,
+                    "target": {"kind": "id", "value": target.object_id},
+                }
+            )
     if properties:
         compiled["properties"] = properties
+    if references:
+        compiled["references"] = references
+    return compiled
+
+
+def _compile_create_settings(
+    session: BusinessDeclarationSession,
+) -> dict[str, Any]:
+    settings = dict(session.settings)
+    unexpected = sorted(set(settings) - _CREATE_SETTINGS)
+    if unexpected:
+        raise _repair(
+            session,
+            "OBJECT_GRAPH_SETTING_UNAVAILABLE",
+            field=unexpected[0],
+            choices=sorted(_CREATE_SETTINGS),
+            action="use one disclosed object graph setting",
+        )
+    compiled: dict[str, Any] = {}
+    conflict = settings.get("name_conflict", "fail")
+    if conflict not in {"fail", "rename", "merge", "replace"}:
+        raise _repair(
+            session,
+            "FIELD_VALUE_UNAVAILABLE",
+            field="name_conflict",
+            choices=["fail", "rename", "merge", "replace"],
+            action="choose the user-requested name collision outcome",
+        )
+    if conflict != "fail":
+        compiled["on_name_conflict"] = conflict
+    replace_owner = settings.get("replace_owner_handle")
+    if conflict == "replace":
+        if not isinstance(replace_owner, str):
+            raise _repair(
+                session,
+                "REPLACE_OWNERSHIP_REQUIRED",
+                field="replace_owner_handle",
+                action="bind the exact reviewed replacement owner",
+            )
+        owner = session.handles.resolve_object(replace_owner)
+        compiled["replace_owned_root"] = {
+            "kind": "id",
+            "value": owner.object_id,
+        }
+    elif replace_owner is not None:
+        raise _repair(
+            session,
+            "BUSINESS_FIELD_UNAVAILABLE",
+            field="replace_owner_handle",
+            action="omit replacement ownership unless replace was explicit",
+        )
+    add_to_source = settings.get("add_to_source_control")
+    if add_to_source is not None:
+        if type(add_to_source) is not bool:
+            raise _repair(
+                session,
+                "FIELD_VALUE_TYPE_MISMATCH",
+                field="add_to_source_control",
+                action="provide true or false",
+            )
+        if add_to_source:
+            compiled["auto_add_to_source_control"] = True
+    platform = settings.get("platform")
+    if platform is not None:
+        if not isinstance(platform, str) or not platform.strip():
+            raise _repair(
+                session,
+                "FIELD_VALUE_TYPE_MISMATCH",
+                field="platform",
+                action="provide one exact user-requested Wwise platform",
+            )
+        compiled["platform"] = platform
     return compiled
 
 
@@ -171,6 +368,7 @@ def _materialize_create(
     arguments: dict[str, Any] = {
         "parent": {"kind": "id", "value": parent.object_id},
         **root_node,
+        **_compile_create_settings(session),
     }
     return parse_operation_request(
         {
