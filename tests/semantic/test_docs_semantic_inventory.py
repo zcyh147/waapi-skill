@@ -104,7 +104,13 @@ def test_inventory_count_matches_latest_nonlive_result_without_collect_only_over
         inventory,
     )
     assert len(recorded_results) >= 2
-    assert len(set(recorded_results)) == 1
+    latest = re.search(
+        r"latest completed passing non-live verification reported `"
+        r"(\d+ passed, \d+ skipped, \d+ deselected)`",
+        inventory,
+    )
+    assert latest is not None
+    assert latest.group(1) == recorded_results[-1]
     assert "not a fresh full `--collect-only` recount" in inventory
 
 

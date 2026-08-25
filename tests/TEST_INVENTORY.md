@@ -1,6 +1,6 @@
 # Test inventory
 
-This inventory is grouped for human review. The latest non-live verification reported `8627 passed, 107 skipped, 27 deselected`; broad unit coverage is summarized by file or module instead of listing every item instance. This count is a non-live run result, not a fresh full `--collect-only` recount.
+This inventory is grouped for human review. The latest completed passing non-live verification reported `8742 passed, 107 skipped, 27 deselected`; broad unit coverage is summarized by file or module instead of listing every item instance. This count is a non-live run result, not a fresh full `--collect-only` recount.
 
 ## Runner modes and strict real behavior
 
