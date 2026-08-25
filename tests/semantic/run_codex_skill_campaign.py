@@ -3152,7 +3152,7 @@ def _validate_business_agent_outcome(
             raise CampaignEvidenceError(
                 f"business Agent outcome mismatch for {key}"
             )
-    profile = getattr(options, "profile", AUDIO_IMPORT_BUSINESS_PROFILE_ID)
+    profile = options.profile
     gates = outcome.get("gates")
     transaction_count = getattr(expected_unit, "transaction_count", None)
     if (
