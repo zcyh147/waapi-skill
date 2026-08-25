@@ -5,6 +5,8 @@ from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from tests.semantic import run_codex_skill_matrix as matrix
 from tests.semantic import run_codex_skill_campaign as campaign
 from tests.semantic.support.codex_eval_protocol_v3 import (
@@ -721,6 +723,16 @@ def test_campaign_child_validator_consumes_reviewed_agent_protocol_revision(
     live = tmp_path / "live.json"
     for path, content in ((codex, "codex"), (auth, "{}"), (live, "{}")):
         path.write_text(content, encoding="utf-8")
+    legacy_revision = campaign._sealed_protocol_manifest_revision(
+        {
+            "selection": {"profile": matrix.AUDIO_IMPORT_BUSINESS_PROFILE_ID},
+            "harness": {
+                "semantic_tree_sha256": (
+                    "b152de8c55f8cb1085321da3ec877507627352acb10bed43e2ba7dbfae8b37df"
+                )
+            },
+        }
+    )
     options = campaign.CampaignOptions(
         campaign_root=tmp_path / "campaign",
         resume=True,
@@ -741,9 +753,7 @@ def test_campaign_child_validator_consumes_reviewed_agent_protocol_revision(
         offline_only=False,
         lock_timeout_seconds=1.0,
         max_pre_action_retries=0,
-        protocol_manifest_revision=(
-            campaign.AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION
-        ),
+        protocol_manifest_revision=legacy_revision,
     )
     runner_options = matrix.RunnerOptions(
         profile=options.profile,
@@ -816,6 +826,18 @@ def test_campaign_child_validator_consumes_reviewed_agent_protocol_revision(
         returncode=0,
     )
     assert rejected.observations[0]["status"] == "BLOCKED"
-    assert "protocol manifest revision is unsupported" in (
+    assert "audio import business protocol revision is unreviewed" in (
         rejected.phase_verdicts[0].reason
     )
+    with pytest.raises(
+        campaign.CampaignEvidenceError,
+        match="historical harness hash is unreviewed",
+    ):
+        campaign._sealed_protocol_manifest_revision(
+            {
+                "selection": {
+                    "profile": matrix.AUDIO_IMPORT_BUSINESS_PROFILE_ID
+                },
+                "harness": {"semantic_tree_sha256": "0" * 64},
+            }
+        )

@@ -284,19 +284,22 @@ deleted, lifecycle cleanup completes, and residual processes are empty.
 Authoring UI remains explicitly blocked because all configured hosts are
 WwiseConsole. The final development gates passed the focused protocol and
 campaign archive nodes, Program `3583 passed / 2 skipped`, and Non-live
-`8626 passed / 107 skipped / 27 deselected`. A later harness-only archive
-change defaults the absent additive field to false. Only the exact
-`audio_import_business_8` profile plus either reviewed macOS/Windows
-`3ebbf5f` semantic-tree hash selects the
+`8627 passed / 107 skipped / 27 deselected`. New campaigns seal
+`audio-import-business-agent/current-v1` in the immutable effective config;
+only that marker selects current semantics. For historical roots, only the
+exact `audio_import_business_8` profile plus either reviewed macOS/Windows
+`3ebbf5f` semantic-tree hash selects the legacy
 `audio-import-derived-sfx-language/v1` migration; it reconstructs true rows
 from the sealed `audio.import` request witness. Full-reader tests cover both
 the older false case and the candidate-bound true case, preserving historical
-replay without broadening current Broker behavior. The profile-specific Agent
-campaign validator also rebuilds the reviewed requests from the sealed suite
+replay without broadening current Broker behavior. An unmarked unknown
+historical harness hash blocks instead of inheriting current semantics. The
+profile-specific Agent campaign validator also rebuilds the reviewed requests
+from the sealed suite
 and fixed runtime media, then independently checks Broker topology, derived-SFX
 declarations, and the final GUID-bound Preview request. Its end-to-end
-`validate_heavy_v3_child_run` regression proves the selected revision is
-consumed and that an unknown revision blocks the unit.
+`validate_heavy_v3_child_run` regression proves the selected legacy revision
+is consumed and that an unknown revision or harness hash blocks the unit.
 
 The legacy internal `integration_workflows_cross_version_6` component is
 defined by `tests/semantic/data/integration-workflows-v1/profile.json`. It

@@ -401,6 +401,9 @@ _DERIVED_SFX_PROTOCOL_HARNESS_SHA256 = frozenset(
         "5100e2c672d2461fe0ce96dba4b0cf1536a43d48e100ad2ac3fc5dbc0203efdb",
     }
 )
+_CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION = (
+    "audio-import-business-agent/current-v1"
+)
 HEAVY_V3_ORACLE_CONTRACT = "waapi-skill.heavy-oracle/v2"
 HEAVY_V3_LIVE_PREFLIGHT_CONTRACT = "waapi-skill.codex-semantic-live-preflight/v1"
 HEAVY_V3_MIGRATION_API = "ak.wwise.cli.migrate"
@@ -1674,11 +1677,23 @@ def _sealed_protocol_manifest_revision(
         raise CampaignEvidenceError("campaign protocol revision identity is malformed")
     profile = selection.get("profile")
     semantic_sha256 = harness.get("semantic_tree_sha256")
-    if (
-        profile == AUDIO_IMPORT_BUSINESS_PROFILE_ID
-        and semantic_sha256 in _DERIVED_SFX_PROTOCOL_HARNESS_SHA256
-    ):
-        return AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION
+    sealed_revision = harness.get("protocol_manifest_revision")
+    if profile == AUDIO_IMPORT_BUSINESS_PROFILE_ID:
+        if sealed_revision == _CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION:
+            return _CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION
+        if sealed_revision is not None:
+            raise CampaignEvidenceError(
+                "audio import business protocol revision is unreviewed"
+            )
+        if semantic_sha256 in _DERIVED_SFX_PROTOCOL_HARNESS_SHA256:
+            return AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION
+        raise CampaignEvidenceError(
+            "audio import business historical harness hash is unreviewed"
+        )
+    if sealed_revision is not None:
+        raise CampaignEvidenceError(
+            "non-audio-import campaign declares a protocol revision"
+        )
     return None
 
 
@@ -2018,6 +2033,15 @@ def build_heavy_v3_effective_config(
                 exclude_names=harness_excludes,
             ),
             "excluded_names": list(harness_excludes),
+            **(
+                {
+                    "protocol_manifest_revision": (
+                        _CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION
+                    )
+                }
+                if options.profile == AUDIO_IMPORT_BUSINESS_PROFILE_ID
+                else {}
+            ),
         },
         "live_config": {
             "path": str(options.live_config),
@@ -3201,7 +3225,7 @@ def _validate_audio_import_business_agent_protocol(
         ) from exc
 
     protocol_value = serialize_protocol(protocol)
-    if protocol_manifest_revision is not None:
+    if protocol_manifest_revision == AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION:
         legacy_value = json.loads(json.dumps(protocol_value))
         for step in legacy_value["steps"]:
             step.pop("allow_explicit_derived_sfx_language")
@@ -3216,6 +3240,10 @@ def _validate_audio_import_business_agent_protocol(
             raise CampaignEvidenceError(
                 "audio import business protocol revision is not exact"
             )
+    elif protocol_manifest_revision != _CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION:
+        raise CampaignEvidenceError(
+            "audio import business protocol revision is unreviewed"
+        )
 
     expected_names = tuple(step.name for step in steps)
     consumed_names = broker.get("consumed_step_names")
