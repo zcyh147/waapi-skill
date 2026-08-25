@@ -1200,7 +1200,7 @@ def build_object_metadata_business_transaction_steps(
     field_meaning: str | None = None,
     object_selector: Mapping[str, Any] | None = None,
     target_selector: Mapping[str, Any] | None = None,
-    discover_before_target: bool = False,
+    discover_before_target: bool = True,
 ) -> tuple[ExpectedGatewayStep, ...]:
     """Translate one canonical field edit into bound business Draft steps."""
 
