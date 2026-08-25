@@ -1,8 +1,8 @@
 {
   "contract": "waapi-skill.interface-depth-review-policy/v1",
   "source_contracts": {
-    "gateway_parser_sha256": "1589ceea92e158bd7d6a2118969e9ac8d2acf7adda7a6139469f51a3315ac535",
-    "operation_contract_sha256": "ab195da1d8681c2f1cdabd7beaa58bda7cf6c62a3ea96b55560dc05a099427f1",
+    "gateway_parser_sha256": "7c23a4d7f6acf9a12dd345712819ff49796f7a4a607fd83377ac900c013b8629",
+    "operation_contract_sha256": "64b5efcb7c73cdf509e0567051fd37d14a3c15b8366633b063ddd69b3833b911",
     "public_continuation_sha256": "9804cb82e1c719e989f7d5d9d40ae0190f0535b74a856b6da4d84875d54c4afe",
     "typed_request_surface_sha256": "6d05d64e95a6e0f7099ddd03f1da42c763e9c06f33f93cac7581c7c061a83af8"
   },
@@ -382,15 +382,15 @@
     "generic-topics": 91
   },
   "field_ownership_rules": {
-    "gateway_derivation_names": ["acknowledge"],
+    "gateway_derivation_names": ["acknowledge", "transform"],
     "fixed_gateway_derivation_names": ["advanced_return", "api", "array_handle", "choice_handle", "map_handle", "member_key", "parent_schema_token", "return", "return_field", "schema_digest", "select", "shape", "typed_advanced", "typed_append", "typed_choose", "typed_choose_dynamic", "typed_map_correct", "typed_map_put", "typed_map_remove", "typed_present", "typed_schema_digest", "typed_set", "typed_structured"],
     "fixed_reviewed_adapter_names": ["where"],
     "fixed_tuple_component_ownership": {"where": {"FIELD": "gateway_derivation", "OPERATOR": "gateway_derivation", "TYPE": "gateway_derivation", "VALUE": "stable_business_declaration"}},
-    "exact_artifact_names": ["audio_file", "files", "import_file", "io_root", "lua_code", "project", "script_file", "source_file", "sources", "tab_delimited_import_file"],
+    "exact_artifact_names": ["audio_file", "files", "import_file", "io_root", "lua_code", "project", "script_file", "source_file", "sources", "tab_delimited_import_file", "wa_args"],
     "filesystem_artifact_names": ["source"],
     "exact_artifact_suffixes": ["_directory", "_file", "_path"],
     "filesystem_path_uris": ["ak.wwise.cli.", "ak.wwise.console.", "ak.wwise.debug.generateToneWAV", "ak.wwise.ui.captureScreen", "ak.wwise.ui.project."],
-    "bounded_expression_names": ["transform", "waql", "wa_args"],
+    "bounded_expression_names": ["waql"],
     "live_bound_names": ["field", "metadata", "property", "reference"],
     "reviewed_adapter_names": ["calls", "children", "commands", "control_input", "import_location", "inclusions", "kind", "object_path", "object_type", "objects", "plugin", "points", "type"],
     "live_bound_description_phrases": ["mutation token", "property metadata"],

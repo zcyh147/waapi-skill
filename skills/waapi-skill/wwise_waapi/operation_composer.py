@@ -20,9 +20,11 @@ from .builders.common import SemanticValidationError
 from .metadata_discovery import metadata_candidate_limit_contract
 from .operation_registry import (
     audio_import_business_contract,
+    BUSINESS_DECLARATION_INPUT_MODE,
     COMPOSER_INPUT_MODE,
     OperationContractError,
     object_set_composer_fragment_contract,
+    operation_business_contract,
     operation_input_mode,
     parse_operation_request,
     validate_object_set_composer_fragment,
@@ -1464,6 +1466,16 @@ def operation_composer_digest(operation: str, version: str) -> str:
                 "business_adapter": audio_import_business_contract(version),
             }
         )
+    if operation_input_mode(operation, version) == BUSINESS_DECLARATION_INPUT_MODE:
+        return canonical_sha256(
+            {
+                "contract": "waapi-skill.business-draft-binding/v1",
+                "business_adapter": operation_business_contract(
+                    operation,
+                    version,
+                ),
+            }
+        )
     return canonical_sha256(operation_composer_contract(operation, version))
 
 
@@ -2060,8 +2072,8 @@ def _apply_generic_typed_action(
 
 
 def new_composition(operation: str, version: str) -> dict[str, Any]:
-    if operation == AUDIO_IMPORT_COMPOSER_OPERATION:
-        audio_import_business_contract(version)
+    if operation_input_mode(operation, version) == BUSINESS_DECLARATION_INPUT_MODE:
+        operation_business_contract(operation, version)
         return {"contract": OPERATION_COMPOSITION_CONTRACT}
     contract = operation_composer_contract(operation, version)
     if operation == "waapi.undoGroup":
@@ -2977,8 +2989,11 @@ def composition_projection(
                 "cancel",
             ],
         }
-    if operation == AUDIO_IMPORT_COMPOSER_OPERATION:
-        return _audio_import_business_composition_projection(normalized)
+    if operation_input_mode(operation, version) == BUSINESS_DECLARATION_INPUT_MODE:
+        return _audio_import_business_composition_projection(
+            normalized,
+            operation=operation,
+        )
     facts = [
         {
             "handle": target["handle"],
@@ -3140,9 +3155,10 @@ def _normalize_composition(
     operation: str,
     version: str,
 ) -> dict[str, Any]:
-    if operation == AUDIO_IMPORT_COMPOSER_OPERATION:
+    if operation_input_mode(operation, version) == BUSINESS_DECLARATION_INPUT_MODE:
         return _normalize_audio_import_business_composition(
             composition,
+            operation=operation,
             version=version,
         )
     operation_composer_contract(operation, version)
@@ -3332,15 +3348,16 @@ def _materialize_if_complete(
 def _normalize_audio_import_business_composition(
     composition: Mapping[str, Any],
     *,
+    operation: str = AUDIO_IMPORT_COMPOSER_OPERATION,
     version: str,
 ) -> dict[str, Any]:
-    """Normalize only the production Business Declaration state."""
+    """Normalize one production Business Declaration state."""
 
-    audio_import_business_contract(version)
+    operation_business_contract(operation, version)
     _require_json_object(composition, label="composition")
     if set(composition) - {"contract", "business_session"}:
         raise OperationComposerError(
-            "audio.import business composition fields are invalid."
+            f"{operation} business composition fields are invalid."
         )
     if composition.get("contract") != OPERATION_COMPOSITION_CONTRACT:
         raise OperationComposerError(
@@ -3353,7 +3370,7 @@ def _normalize_audio_import_business_composition(
         session = BusinessDeclarationSession.from_dict(raw_session).as_dict()
     except (TypeError, ValueError) as exc:
         raise OperationComposerError(
-            "audio.import business declaration state is invalid."
+            f"{operation} business declaration state is invalid."
         ) from exc
     return {
         "contract": OPERATION_COMPOSITION_CONTRACT,
@@ -3363,6 +3380,8 @@ def _normalize_audio_import_business_composition(
 
 def _audio_import_business_composition_projection(
     composition: Mapping[str, Any],
+    *,
+    operation: str = AUDIO_IMPORT_COMPOSER_OPERATION,
 ) -> dict[str, Any]:
     """Project only the current deep business state; no legacy action grammar."""
 
@@ -3375,15 +3394,19 @@ def _audio_import_business_composition_projection(
             "detail_available": False,
             "missing_fields": ["business_declaration"],
             "missing_fields_status": "incomplete",
-            "allowed_actions": [
-                "bind-object",
-                "bind-field",
-                "configure",
-                "declare-new",
-                "declare-existing",
-                "inspect",
-                "cancel",
-            ],
+            "allowed_actions": (
+                [
+                    "bind-object",
+                    "bind-field",
+                    "configure",
+                    "declare-new",
+                    "declare-existing",
+                    "inspect",
+                    "cancel",
+                ]
+                if operation == AUDIO_IMPORT_COMPOSER_OPERATION
+                else ["bind-object", "inspect", "cancel"]
+            ),
         }
     session = BusinessDeclarationSession.from_dict(raw_session)
     return {
@@ -3401,18 +3424,28 @@ def _audio_import_business_composition_projection(
         "missing_fields_status": (
             "incomplete" if not session.declarations else "complete"
         ),
-        "allowed_actions": [
-            "bind-object",
-            "bind-field",
-            "configure",
-            "declare-new",
-            "declare-existing",
-            "revise-declaration",
-            "remove-declaration",
-            "check",
-            "inspect",
-            "cancel",
-        ],
+        "allowed_actions": (
+            [
+                "bind-object",
+                "bind-field",
+                "configure",
+                "declare-new",
+                "declare-existing",
+                "revise-declaration",
+                "remove-declaration",
+                "check",
+                "inspect",
+                "cancel",
+            ]
+            if operation == AUDIO_IMPORT_COMPOSER_OPERATION
+            else [
+                "bind-object",
+                "declare-object-change",
+                "check",
+                "inspect",
+                "cancel",
+            ]
+        ),
     }
 
 

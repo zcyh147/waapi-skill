@@ -58,7 +58,14 @@ def test_inventory_exactly_covers_every_registry_operation_and_version_lane() ->
     for name, spec in OPERATION_SPECS.items():
         modes = {operation_input_mode(name, version) for version in spec.supported_versions}
         expected_mode = INTERNAL_CANONICAL_INPUT_MODE
-        if name == "audio.import":
+        if name in {
+            "audio.import",
+            "object.copy",
+            "object.delete",
+            "object.move",
+            "object.setName",
+            "object.setNotes",
+        }:
             expected_mode = BUSINESS_DECLARATION_INPUT_MODE
         elif (
             assignments[name][1]

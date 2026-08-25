@@ -15,6 +15,7 @@ from wwise_waapi.canonical import canonical_sha256, strict_json_copy
 from wwise_waapi.operation_registry import (
     OPERATION_SPECS,
     audio_import_business_contract,
+    operation_business_contract,
     operation_input_mode,
 )
 from wwise_waapi.typed_requests import TypedRequestError, request_contract
@@ -47,11 +48,9 @@ def _load(path: Path) -> dict[str, Any]:
 def _public_operation_contract(
     name: str, spec: Any, version: str
 ) -> dict[str, Any]:
-    return (
-        audio_import_business_contract(version)
-        if name == "audio.import"
-        else spec.as_dict(version=version)
-    )
+    if operation_input_mode(name, version) == "business_declaration":
+        return operation_business_contract(name, version)
+    return spec.as_dict(version=version)
 
 
 def _operation_contract_rows() -> list[dict[str, Any]]:
@@ -839,8 +838,36 @@ def _operation_model_values(
     version: str,
     policy: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
-    if name == "audio.import":
-        return _audio_import_model_values(version)
+    if operation_input_mode(name, version) == "business_declaration":
+        if name == "audio.import":
+            return _audio_import_model_values(version)
+        declaration = operation_business_contract(name, version)["declaration"]
+        required = set(declaration["required_fields"])
+        return [
+            {
+                "path": ["declaration", field_name],
+                "name": field_name,
+                "shape": "scalar",
+                "required": field_name in required,
+                "value_ownership": (
+                    "live_bound_handle"
+                    if declaration["field_types"][field_name]
+                    == "bound_object_handle"
+                    else "stable_business_declaration"
+                ),
+                "transport_ownership": "gateway_derivation",
+                "schema_sha256": canonical_sha256(
+                    {
+                        "field": field_name,
+                        "type": declaration["field_types"][field_name],
+                    }
+                ),
+            }
+            for field_name in (
+                *declaration["required_fields"],
+                *declaration["optional_fields"],
+            )
+        ]
     contract = spec.as_dict(version=version)["argument_contract"]
     properties = contract.get("properties")
     if not isinstance(properties, Mapping):

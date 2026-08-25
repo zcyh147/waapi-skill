@@ -24,6 +24,9 @@ from xml.etree import ElementTree as ET
 
 from .canonical import canonical_json_bytes, canonical_sha256
 from .audio_import_business_contracts import audio_import_business_contract_data
+from .object_lifecycle_business_contracts import (
+    object_lifecycle_business_contract_data,
+)
 from .builders.identity import ObjectIdentity, ResolvedObject, plan_object_resolution
 from .builders.metadata import (
     GET_PROPERTY_AND_REFERENCE_NAMES_URI,
@@ -3518,15 +3521,15 @@ _OPERATION_INPUT_MODE_DECLARATIONS: tuple[
     ("lua.executeCliFile", ("2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
     ("lua.executeCoreFile", ("2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
     ("lua.executeCoreInline", ("2025.1",), COMPOSER_INPUT_MODE),
-    ("object.copy", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
+    ("object.copy", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
     ("object.create", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
     ("object.createPlugin", ("2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
-    ("object.delete", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
-    ("object.move", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
+    ("object.delete", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("object.move", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
     ("object.set", ("2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
     ("object.setLinked", ("2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
-    ("object.setName", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
-    ("object.setNotes", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
+    ("object.setName", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
+    ("object.setNotes", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
     ("object.setProperty", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
     ("object.setRTPC", ("2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
     ("object.setReference", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), INLINE_TYPED_INPUT_MODE),
@@ -3642,6 +3645,19 @@ def audio_import_business_contract(version: str) -> dict[str, Any]:
             "audio.import does not expose the business declaration input mode.",
         )
     return audio_import_business_contract_data(version)
+
+
+def operation_business_contract(name: str, version: str) -> dict[str, Any]:
+    """Publish the Adapter-owned business contract for one exact lane."""
+
+    if operation_input_mode(name, version) != BUSINESS_DECLARATION_INPUT_MODE:
+        raise OperationContractError(
+            "OPERATION_INPUT_MODE_INVALID",
+            f"{name} does not expose the business declaration input mode.",
+        )
+    if name == "audio.import":
+        return audio_import_business_contract_data(version)
+    return object_lifecycle_business_contract_data(name, version)
 
 
 def operation_input_modes_by_version(name: str) -> dict[str, str]:
@@ -20775,6 +20791,7 @@ __all__ = [
     "list_operation_specs",
     "operation_input_mode",
     "operation_input_modes_by_version",
+    "operation_business_contract",
     "operation_request_machine_contract",
     "operation_request_schema_digest",
     "object_set_composer_fragment_contract",

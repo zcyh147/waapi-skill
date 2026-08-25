@@ -21,6 +21,8 @@ from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImp
     OperationInputModeLane,
     describe_operation,
 )
+from wwise_waapi.operation_composer import operation_composer_digest
+from wwise_waapi.operation_drafts import OperationDraftStore
 from wwise_waapi.transactions import (  # pyright: ignore[reportMissingImports]
     TransactionStore,
 )
@@ -472,7 +474,7 @@ def test_object_create_prioritizes_collision_policy_before_optional_containers(
     assert names.index("on_name_conflict") < names.index("properties")
 
 
-def test_typed_operation_materializes_exact_request_into_the_single_preview_ingress(
+def test_migrated_object_change_rejects_the_legacy_typed_operation_ingress(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -504,9 +506,12 @@ def test_typed_operation_materializes_exact_request_into_the_single_preview_ingr
         client_factory=lambda _url: client,
     )
 
-    assert code == 0, payload
-    assert captured == [set_notes_request() | {"arguments": {**set_notes_request()["arguments"], "value": ""}}]
-    assert payload["request"] == captured[0]
+    assert code == 2
+    assert captured == []
+    assert payload["error_code"] == "GatewayInputError"
+    assert payload["message"] == (
+        "This operation is not available through the concise typed-operation entry"
+    )
 
 
 @pytest.mark.parametrize(
@@ -905,6 +910,308 @@ def test_normal_audio_import_schema_exposes_only_its_business_declaration_input(
     }
     assert tab_schema["operation"]["input_mode"] == "inline_typed"
     assert "composer" not in tab_schema
+
+
+def test_object_set_name_schema_exposes_only_closed_business_input(
+    tmp_path: Path,
+) -> None:
+    code, schema = offline_execute(
+        tmp_path,
+        "--version",
+        "2022.1",
+        "operation-schema",
+        "object.setName",
+    )
+
+    assert code == 0
+    assert schema["operation"]["input_mode"] == BUSINESS_DECLARATION_INPUT_MODE
+    assert "typed_operation" not in schema
+    assert "composer" not in schema
+    assert "request_contract" not in schema["operation"]
+    assert "argument_contract" not in schema["operation"]
+    adapter = schema["business_adapter"]
+    assert adapter["contract"] == "waapi-skill.object-lifecycle-business/v1"
+    assert adapter["operation"] == "object.setName"
+    assert adapter["start"]["gateway_argv"] == [
+        "draft-start",
+        "object.setName",
+    ]
+    assert adapter["declaration"] == {
+        "subcommand": "draft-declare-object-change",
+        "required_fields": ["object_handle", "new_name"],
+        "optional_fields": [],
+        "field_types": {
+            "object_handle": "bound_object_handle",
+            "new_name": "string",
+        },
+    }
+    assert set(adapter["gateway_derivations"]) >= {
+        "closed_object_identity",
+        "native_request",
+        "continuation",
+    }
+    assert adapter["legacy_inline_typed_public"] is False
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize(
+    "operation",
+    (
+        "object.copy",
+        "object.delete",
+        "object.move",
+        "object.setName",
+        "object.setNotes",
+    ),
+)
+def test_every_object_lifecycle_schema_has_one_deep_business_continuation(
+    tmp_path: Path,
+    version: str,
+    operation: str,
+) -> None:
+    code, schema = offline_execute(
+        tmp_path / f"{version}-{operation}",
+        "--version",
+        version,
+        "operation-schema",
+        operation,
+        version=version,
+    )
+
+    assert code == 0, schema
+    assert schema["operation"]["input_mode"] == BUSINESS_DECLARATION_INPUT_MODE
+    assert schema["business_adapter"]["operation"] == operation
+    assert schema["business_adapter"]["version"] == version
+    assert schema["business_adapter"]["start"]["gateway_argv"] == [
+        "draft-start",
+        operation,
+    ]
+    assert "typed_operation" not in schema
+    assert "composer" not in schema
+    assert "argument_contract" not in schema["operation"]
+    assert "required_arguments" not in schema["operation"]
+    assert "optional_arguments" not in schema["operation"]
+
+
+def test_operation_inventory_does_not_republish_native_fields_for_business_lanes(
+    tmp_path: Path,
+) -> None:
+    code, detail = offline_execute(tmp_path, "operations", "--detail")
+    assert code == 0, detail
+    rows = {row["name"]: row for row in detail["operations"]}
+
+    for operation in (
+        "object.copy",
+        "object.delete",
+        "object.move",
+        "object.setName",
+        "object.setNotes",
+    ):
+        row = rows[operation]
+        assert set(row["input_modes_by_version"].values()) == {
+            BUSINESS_DECLARATION_INPUT_MODE
+        }
+        assert set(row["business_contracts_by_version"]) == set(
+            row["supported_versions"]
+        )
+        assert "argument_contract" not in row
+        assert "required_arguments" not in row
+        assert "optional_arguments" not in row
+
+
+def test_object_set_name_draft_start_returns_only_business_continuation(
+    tmp_path: Path,
+) -> None:
+    code, started = offline_execute(
+        tmp_path,
+        "--state-dir",
+        str(tmp_path / "state"),
+        "--version",
+        "2022.1",
+        "draft-start",
+        "object.setName",
+    )
+
+    assert code == 0, started
+    binding = started["draft"]["next_action_binding"]
+    assert binding["required_next_phase"] == "bind_existing_business_object"
+    assert binding["business_contract"]["operation"] == "object.setName"
+    assert binding["object_binding"]["result"] == (
+        "copy_the_returned_bound_object.handle"
+    )
+    assert "draft-apply" not in json.dumps(binding)
+    assert "typed-operation" not in json.dumps(binding)
+
+
+def test_object_set_name_business_draft_binds_declares_and_materializes(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "state"
+    code, started = offline_execute(
+        tmp_path,
+        "--state-dir",
+        str(state_dir),
+        "--version",
+        "2022.1",
+        "draft-start",
+        "object.setName",
+    )
+    assert code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    record_path = (
+        state_dir / "operation-drafts-v1" / "records" / f"{draft_id}.json"
+    )
+    before_legacy = record_path.read_bytes()
+    legacy_code, legacy = offline_execute(
+        tmp_path,
+        "--state-dir",
+        str(state_dir),
+        "draft-apply",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "1",
+    )
+    assert legacy_code == 2
+    assert "no longer accepts shallow draft-apply" in legacy["message"]
+    assert record_path.read_bytes() == before_legacy
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [live_info()],
+            "ak.wwise.core.getProjectInfo": [project_row()],
+            "ak.wwise.core.object.get": [{"return": [object_row()]}],
+        }
+    )
+
+    bind_code, bound = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(state_dir),
+            "draft-bind-object",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "1",
+            "--object-id",
+            OBJECT_GUID,
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+    assert bind_code == 0, bound
+    handle = bound["bound_object"]["handle"]
+    assert bound["draft"]["next_action_binding"]["required_next_phase"] == (
+        "declare_complete_object_change"
+    )
+
+    declare_code, declared = offline_execute(
+        tmp_path,
+        "--state-dir",
+        str(state_dir),
+        "draft-declare-object-change",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "2",
+        "--object-handle",
+        handle,
+        "--new-name",
+        "新名称 & Rain",
+    )
+    assert declare_code == 0, declared
+    assert declared["draft"]["next_action_binding"]["required_next_phase"] == (
+        "check_complete_business_declaration"
+    )
+    before_stale = record_path.read_bytes()
+    stale_code, stale = offline_execute(
+        tmp_path,
+        "--state-dir",
+        str(state_dir),
+        "draft-declare-object-change",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "2",
+        "--object-handle",
+        handle,
+        "--new-name",
+        "stale overwrite",
+    )
+    assert stale_code == 2
+    assert stale["error_code"] == "OPERATION_DRAFT_REVISION_CONFLICT"
+    assert record_path.read_bytes() == before_stale
+    materialized = OperationDraftStore(state_dir).materialize_request(
+        draft_id,
+        task_authority=authority,
+        expected_revision=3,
+        schema_digest=waapi_gateway.operation_draft_schema_digest(
+            "object.setName",
+            "2022.1",
+        ),
+        composer_digest=operation_composer_digest(
+            "object.setName",
+            "2022.1",
+        ),
+    )
+    assert materialized.request["arguments"] == {
+        "object": {"kind": "id", "value": OBJECT_GUID},
+        "value": "新名称 & Rain",
+    }
+    check_client = preview_client()
+    check_code, checked = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(state_dir),
+            "draft-check",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "3",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: check_client,
+    )
+    assert check_code == 0, json.dumps(checked, ensure_ascii=False)
+    assert checked["draft"]["check"]["status"] == "passed"
+    assert checked["draft"]["next_action_binding"]["fixed_full_argv"][-1] == (
+        "--apply"
+    )
+    preview_live = preview_client()
+    preview_code, previewed = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(state_dir),
+            "preview-from-draft",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "4",
+            "--apply",
+            "--ttl",
+            "300",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: preview_live,
+    )
+    assert preview_code == 0, json.dumps(previewed, ensure_ascii=False)
+    assert previewed["state"] == "awaiting_confirmation"
+    assert previewed["change_requested"] is True
+    assert previewed["executed"] is False
+    assert previewed["agent_result"]["request"]["arguments"] == {
+        "object": {"kind": "id", "value": OBJECT_GUID},
+        "value": "新名称 & Rain",
+    }
+    assert all(
+        uri != "ak.wwise.core.object.setName"
+        for uri, _args, _options in preview_live.calls
+    )
 
 
 def test_structurally_distinct_adapters_share_one_public_lifecycle(

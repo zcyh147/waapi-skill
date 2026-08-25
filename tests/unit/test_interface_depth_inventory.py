@@ -62,7 +62,12 @@ def test_maintenance_entrypoint_runs_directly_from_the_repository_root() -> None
     result = subprocess.run(
         [
             sys.executable,
-            "tests/maintenance/generate_interface_depth_inventory.py",
+            str(
+                REPO_ROOT
+                / "tests"
+                / "maintenance"
+                / "generate_interface_depth_inventory.py"
+            ),
             "--help",
         ],
         cwd=REPO_ROOT,
@@ -143,6 +148,26 @@ def test_stable_scalars_artifacts_expressions_and_bound_handles_remain_distinct(
     assert values["bounded_domain_expression"] > 0
     assert values["live_bound_handle"] > 0
     assert values["reviewed_adapter"] > 0
+    all_model_values = [
+        field
+        for contract in (*inventory["field_contracts"], *inventory["argument_contracts"])
+        for field in contract["model_values"]
+    ]
+    assert all(
+        field["value_ownership"] == "exact_user_artifact"
+        for field in all_model_values
+        if field["name"] == "wa_args"
+    )
+    assert all(
+        field["value_ownership"] == "gateway_derivation"
+        for field in all_model_values
+        if field["name"] == "transform"
+    )
+    assert {
+        field["name"]
+        for field in all_model_values
+        if field["value_ownership"] == "bounded_domain_expression"
+    } == {"waql"}
     argument_contracts = {
         contract["sha256"]: contract["model_values"]
         for contract in inventory["argument_contracts"]

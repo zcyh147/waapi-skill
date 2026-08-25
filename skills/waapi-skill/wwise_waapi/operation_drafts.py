@@ -30,6 +30,9 @@ from .business_declaration_state import (
 )
 from .business_declarations import BusinessContext, BusinessDeclarationError
 from .audio_import_business import materialize_audio_import_business_request
+from .object_lifecycle_business import (
+    materialize_object_lifecycle_business_request,
+)
 from .canonical import canonical_json_bytes, canonical_sha256
 from .filesystem_security import path_is_link_or_reparse
 from .operation_composer import (
@@ -39,6 +42,10 @@ from .operation_composer import (
     composition_projection,
     materialize_operation_request,
     new_composition,
+)
+from .operation_registry import (
+    BUSINESS_DECLARATION_INPUT_MODE,
+    operation_input_mode,
 )
 from .transactions import validate_transaction_id
 
@@ -805,9 +812,12 @@ class OperationDraftStore:
                 schema_digest=schema_digest,
                 composer_digest=composer_digest,
             )
-            if record.operation != "audio.import":
+            if (
+                operation_input_mode(record.operation, record.version)
+                != BUSINESS_DECLARATION_INPUT_MODE
+            ):
                 raise OperationDraftInvalidTransition(
-                    "This production Business Declaration Adapter currently supports audio.import only."
+                    "This Operation Draft does not expose a Business Declaration Adapter."
                 )
             if record.composition is None:
                 raise OperationDraftStorageCorruption(
@@ -2144,16 +2154,26 @@ def _materialize_draft_composition(
     allow_cleaned_file_evidence: bool = False,
 ) -> Mapping[str, Any]:
     raw_business_session = composition.get("business_session")
-    if operation == "audio.import" and raw_business_session is not None:
+    if raw_business_session is not None and (
+        operation_input_mode(operation, version)
+        == BUSINESS_DECLARATION_INPUT_MODE
+    ):
         try:
             session = BusinessDeclarationSession.from_dict(raw_business_session)
-            return materialize_audio_import_business_request(
-                session,
-                allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+            return (
+                materialize_audio_import_business_request(
+                    session,
+                    allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+                )
+                if operation == "audio.import"
+                else materialize_object_lifecycle_business_request(
+                    operation,
+                    session,
+                )
             )
         except (TypeError, ValueError) as exc:
             raise OperationComposerError(
-                "audio.import business declarations cannot materialize their canonical request."
+                f"{operation} business declarations cannot materialize their canonical request."
             ) from exc
     return materialize_operation_request(
         operation,

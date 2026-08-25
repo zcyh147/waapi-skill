@@ -135,7 +135,15 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
     for name, spec in specs.items():
         expected_mode = (
             BUSINESS_DECLARATION_INPUT_MODE
-            if name == "audio.import"
+            if name
+            in {
+                "audio.import",
+                "object.copy",
+                "object.delete",
+                "object.move",
+                "object.setName",
+                "object.setNotes",
+            }
             else COMPOSER_INPUT_MODE
             if name
                 in {
@@ -161,13 +169,8 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                     "debug.testAssert",
                     "debug.testCrash",
                     "object.setLinked",
-                "object.setName",
-                "object.setNotes",
                 "object.setProperty",
                 "object.setReference",
-                "object.copy",
-                    "object.delete",
-                    "object.move",
                     "switchContainer.addAssignment",
                     "switchContainer.removeAssignment",
                     "soundbank.processDefinitionFiles",

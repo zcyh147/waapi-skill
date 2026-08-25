@@ -200,6 +200,7 @@ from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[re
     OperationContractError,
     VerificationResult,
     audio_import_business_contract,
+    operation_business_contract,
     build_undo_group_execution_plan,
     describe_operation,
     list_operation_specs,
@@ -232,6 +233,9 @@ from wwise_waapi.business_declaration_state import (  # noqa: E402  # pyright: i
 )
 from wwise_waapi.audio_import_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     compile_audio_import_business,
+)
+from wwise_waapi.object_lifecycle_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    materialize_object_lifecycle_business_request,
 )
 from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_BUSINESS_NAME_BYTES,
@@ -343,6 +347,7 @@ OFFLINE_COMMANDS = frozenset(
         "draft-start",
         "draft-apply",
         "draft-business-configure",
+        "draft-declare-object-change",
         "draft-declare-existing",
         "draft-declare-new",
         "draft-remove-declaration",
@@ -1841,6 +1846,49 @@ def build_parser() -> argparse.ArgumentParser:
     draft_business_configure.add_argument(
         "--default-event-action",
         choices=("Play", "Stop", "Pause", "Resume", "Break", "Seek"),
+    )
+
+    draft_declare_object_change = subparsers.add_parser(
+        "draft-declare-object-change",
+        help=(
+            "Declare one simple existing-object business outcome using only "
+            "opaque handles and operation-specific scalar facts"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_object_change)
+    draft_declare_object_change.add_argument("--object-handle", required=True)
+    draft_declare_object_change.add_argument("--parent-handle")
+    draft_declare_object_change.add_argument("--new-name")
+    draft_declare_object_change.add_argument("--notes")
+    draft_declare_object_change.add_argument(
+        "--name-conflict",
+        choices=("fail", "rename"),
+    )
+    add_source = draft_declare_object_change.add_mutually_exclusive_group()
+    add_source.add_argument(
+        "--add-to-source-control",
+        dest="add_to_source_control",
+        action="store_true",
+    )
+    add_source.add_argument(
+        "--no-add-to-source-control",
+        dest="add_to_source_control",
+        action="store_false",
+    )
+    check_out_change = draft_declare_object_change.add_mutually_exclusive_group()
+    check_out_change.add_argument(
+        "--check-out-from-source-control",
+        dest="check_out_from_source_control",
+        action="store_true",
+    )
+    check_out_change.add_argument(
+        "--no-check-out-from-source-control",
+        dest="check_out_from_source_control",
+        action="store_false",
+    )
+    draft_declare_object_change.set_defaults(
+        add_to_source_control=None,
+        check_out_from_source_control=None,
     )
 
     draft_declare_new = subparsers.add_parser(
@@ -6835,9 +6883,12 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             args.draft_id,
             task_authority=args.task_authority,
         )
-        if inspected.operation == "audio.import":
+        if (
+            operation_input_mode(inspected.operation, inspected.version)
+            == BUSINESS_DECLARATION_INPUT_MODE
+        ):
             raise GatewayInputError(
-                "audio.import no longer accepts shallow draft-apply actions; "
+                f"{inspected.operation} no longer accepts shallow draft-apply actions; "
                 "use the Gateway-owned business declaration commands from draft-start"
             )
         schema_digest = operation_draft_schema_digest(
@@ -6865,6 +6916,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         )
     if args.command in {
         "draft-business-configure",
+        "draft-declare-object-change",
         "draft-declare-existing",
         "draft-declare-new",
         "draft-remove-declaration",
@@ -7183,6 +7235,16 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 version: operation_input_mode(spec.name, version)
                 for version in spec.supported_versions
             }
+            if BUSINESS_DECLARATION_INPUT_MODE in modes.values():
+                projection = composer_operation_projection(spec, version=None)
+                projection["input_modes_by_version"] = modes
+                projection["business_contracts_by_version"] = {
+                    version: operation_business_contract(spec.name, version)
+                    for version, mode in modes.items()
+                    if mode == BUSINESS_DECLARATION_INPUT_MODE
+                }
+                operations.append(projection)
+                continue
             if COMPOSER_INPUT_MODE not in modes.values():
                 if INLINE_TYPED_INPUT_MODE in modes.values():
                     projection = composer_operation_projection(spec, version=None)
@@ -7285,7 +7347,8 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 request_version,
             )
         if normal_business and request_version is not None:
-            payload["business_adapter"] = audio_import_business_contract(
+            payload["business_adapter"] = operation_business_contract(
+                spec.name,
                 request_version
             )
         payload["operation"] = operation_projection
@@ -9982,7 +10045,13 @@ def dispatch_operation_draft_check(
         if materialized.record.composition is not None
         else None
     )
-    if canonical_request.operation == "audio.import" and raw_business_session is not None:
+    if raw_business_session is not None and (
+        operation_input_mode(
+            canonical_request.operation,
+            canonical_request.version,
+        )
+        == BUSINESS_DECLARATION_INPUT_MODE
+    ):
         business_session = BusinessDeclarationSession.from_dict(raw_business_session)
         bound_objects = tuple(
             business_session.handles.resolve_object(row["handle"])
@@ -9993,13 +10062,14 @@ def dispatch_operation_draft_check(
             bound_objects,
             read_call=read_call,
         )
-        for row in business_session.handles.as_dict()["fields"]:
-            bound_field = business_session.handles.bound_field(row["handle"])
-            revalidate_live_field(
-                business_session.handles,
-                bound_field,
-                read_call=read_call,
-            )
+        if canonical_request.operation == "audio.import":
+            for row in business_session.handles.as_dict()["fields"]:
+                bound_field = business_session.handles.bound_field(row["handle"])
+                revalidate_live_field(
+                    business_session.handles,
+                    bound_field,
+                    read_call=read_call,
+                )
 
         def build_business_continuation(
             _request: Mapping[str, Any],
@@ -10019,17 +10089,18 @@ def dispatch_operation_draft_check(
                 ],
             )
 
-        compiled_business = compile_audio_import_business(
-            business_session,
-            build_continuation=build_business_continuation,
-        )
-        if (
-            compiled_business.request != materialized.request
-            or compiled_business.request_digest != materialized.request_digest
-        ):
-            raise OperationDraftBindingDrift(
-                "Compiled business Preview differs from the Draft canonical request."
+        if canonical_request.operation == "audio.import":
+            compiled_business = compile_audio_import_business(
+                business_session,
+                build_continuation=build_business_continuation,
             )
+            if (
+                compiled_business.request != materialized.request
+                or compiled_business.request_digest != materialized.request_digest
+            ):
+                raise OperationDraftBindingDrift(
+                    "Compiled business Preview differs from the Draft canonical request."
+                )
     if canonical_request.operation == OBJECT_SET_COMPOSER_OPERATION:
         read_call = prepare_object_set_composer_check(
             canonical_request,
@@ -10193,10 +10264,11 @@ def dispatch_offline_business_draft_update(
         args.draft_id,
         task_authority=args.task_authority,
     )
-    if inspected.operation != "audio.import":
-        raise GatewayInputError(
-            "Business declaration commands currently support audio.import only"
-        )
+    if (
+        operation_input_mode(inspected.operation, inspected.version)
+        != BUSINESS_DECLARATION_INPUT_MODE
+    ):
+        raise GatewayInputError("This Draft has no Business Declaration Adapter")
     raw_session = (
         inspected.composition.get("business_session")
         if inspected.composition is not None
@@ -10207,7 +10279,47 @@ def dispatch_offline_business_draft_update(
             "Bind one exact live project object before adding business declarations"
         )
     session = BusinessDeclarationSession.from_dict(raw_session)
-    if args.command == "draft-business-configure":
+    if args.command == "draft-declare-object-change":
+        if inspected.operation == "audio.import":
+            raise GatewayInputError(
+                "audio.import uses its import-specific declaration commands"
+            )
+        fields = {
+            name: value
+            for name, value in (
+                ("parent_handle", args.parent_handle),
+                ("new_name", args.new_name),
+                ("notes", args.notes),
+                ("name_conflict", args.name_conflict),
+                ("add_to_source_control", args.add_to_source_control),
+                (
+                    "check_out_from_source_control",
+                    args.check_out_from_source_control,
+                ),
+            )
+            if value is not None
+        }
+
+        def update(
+            current: BusinessDeclarationSession,
+        ) -> BusinessDeclarationSession:
+            candidate = current.with_existing_declaration(
+                declaration_id="change",
+                target=ExistingObjectTarget(args.object_handle),
+                fields=fields,
+            )
+            materialize_object_lifecycle_business_request(
+                inspected.operation,
+                candidate,
+            )
+            return candidate
+
+        event_type = "declaration.added"
+    elif args.command == "draft-business-configure":
+        if inspected.operation != "audio.import":
+            raise GatewayInputError(
+                "This object lifecycle Draft has no batch configuration"
+            )
         defaults = _parse_audio_import_business_fields(
             session,
             args.default,
@@ -10358,7 +10470,7 @@ def _business_object_path_from_segments(values: Any) -> str:
 
 
 @dataclass(frozen=True, slots=True)
-class _AudioImportBusinessBinding:
+class _BusinessBinding:
     state_dir: Path
     store: OperationDraftStore
     record: OperationDraftRecord
@@ -10368,7 +10480,7 @@ class _AudioImportBusinessBinding:
     read_call: Callable[[str, Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any]]
 
 
-def _open_audio_import_business_binding(
+def _open_business_binding(
     args: argparse.Namespace,
     *,
     env: Mapping[str, str],
@@ -10376,12 +10488,15 @@ def _open_audio_import_business_binding(
     detected_version: str,
     live_info: Mapping[str, Any],
     dispatcher: WwiseDispatcher,
-) -> _AudioImportBusinessBinding:
+) -> _BusinessBinding:
     state_dir = resolve_transaction_state_directory(args, env=env)
     store = OperationDraftStore(state_dir)
     record = store.inspect(args.draft_id, task_authority=args.task_authority)
-    if record.operation != "audio.import":
-        raise GatewayInputError("Business binding currently supports audio.import Drafts only")
+    if (
+        operation_input_mode(record.operation, record.version)
+        != BUSINESS_DECLARATION_INPUT_MODE
+    ):
+        raise GatewayInputError("This Draft has no Business Declaration Adapter")
     if record.version != detected_version:
         raise OperationDraftBindingDrift(
             "Operation Draft version does not match the connected Wwise version."
@@ -10398,7 +10513,7 @@ def _open_audio_import_business_binding(
         detected_version=detected_version,
         live_info=live_info,
     )
-    return _AudioImportBusinessBinding(
+    return _BusinessBinding(
         state_dir=state_dir,
         store=store,
         record=record,
@@ -10423,7 +10538,7 @@ def dispatch_business_object_binding(
     dispatcher: WwiseDispatcher,
     common: Mapping[str, Any],
 ) -> dict[str, Any]:
-    binding = _open_audio_import_business_binding(
+    binding = _open_business_binding(
         args,
         env=env,
         connection=connection,
@@ -10480,7 +10595,10 @@ def dispatch_business_object_binding(
             error_code="BUSINESS_OBJECT_BINDING_MISMATCH",
         )
     semantic_kind: str | None = None
-    if str(row["type"]).casefold() == "sound":
+    if (
+        binding.record.operation == "audio.import"
+        and str(row["type"]).casefold() == "sound"
+    ):
         subtype_raw = binding.read_call(
             OBJECT_GET_URI,
             {"from": {"id": [str(row["id"])]}},
@@ -10517,8 +10635,14 @@ def dispatch_business_object_binding(
         captured.append(bound)
         return current.with_handle_registry(handles)
 
-    schema_digest = operation_draft_schema_digest("audio.import", detected_version)
-    composer_digest = operation_composer_digest("audio.import", detected_version)
+    schema_digest = operation_draft_schema_digest(
+        binding.record.operation,
+        detected_version,
+    )
+    composer_digest = operation_composer_digest(
+        binding.record.operation,
+        detected_version,
+    )
     record = binding.store.apply_business_update(
         args.draft_id,
         task_authority=args.task_authority,
@@ -10562,7 +10686,7 @@ def dispatch_business_field_binding(
     dispatcher: WwiseDispatcher,
     common: Mapping[str, Any],
 ) -> dict[str, Any]:
-    binding = _open_audio_import_business_binding(
+    binding = _open_business_binding(
         args,
         env=env,
         connection=connection,
@@ -10570,6 +10694,10 @@ def dispatch_business_field_binding(
         live_info=live_info,
         dispatcher=dispatcher,
     )
+    if binding.record.operation != "audio.import":
+        raise GatewayInputError(
+            "Custom field binding is available only to audio.import"
+        )
     raw_session = (
         binding.record.composition.get("business_session")
         if binding.record.composition is not None
@@ -14886,7 +15014,7 @@ def _operation_draft_facts_summary(current_facts: list[Any]) -> dict[str, Any]:
     }
 
 
-def _audio_import_business_next_action_binding(
+def _business_next_action_binding(
     record: OperationDraftRecord,
     *,
     task_authority: str | None,
@@ -14916,6 +15044,8 @@ def _audio_import_business_next_action_binding(
     )
     if record.check is not None:
         preview = [*base, "preview-from-draft", *binding]
+        if record.operation != "audio.import":
+            preview.append("--apply")
         return {
             "contract": "waapi-skill.business-draft-next-action/v1",
             "required_next_phase": "preview_from_checked_business_draft",
@@ -14929,6 +15059,11 @@ def _audio_import_business_next_action_binding(
     configure_prefix = [*base, "draft-business-configure", *binding]
     declare_new_prefix = [*base, "draft-declare-new", *binding]
     declare_existing_prefix = [*base, "draft-declare-existing", *binding]
+    declare_object_change_prefix = [
+        *base,
+        "draft-declare-object-change",
+        *binding,
+    ]
     revise_prefix = [*base, "draft-revise-declaration", *binding]
     remove_prefix = [*base, "draft-remove-declaration", *binding]
     check = [*base, "draft-check", *binding]
@@ -14982,8 +15117,51 @@ def _audio_import_business_next_action_binding(
                 "agent": "natural_language_to_closed_high_level_business_facts",
                 "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
             },
-            "business_contract": audio_import_business_contract(record.version),
+            "business_contract": operation_business_contract(
+                record.operation,
+                record.version,
+            ),
             "object_binding": object_binding,
+            "forbidden_inputs": forbidden_inputs,
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+    if record.operation != "audio.import":
+        business_contract = operation_business_contract(
+            record.operation,
+            record.version,
+        )
+        if session.declarations:
+            return {
+                "contract": "waapi-skill.business-draft-next-action/v1",
+                "required_next_phase": "check_complete_business_declaration",
+                "business_contract": business_contract,
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+                "forbidden_inputs": forbidden_inputs,
+                "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+                "then_read_next_response": True,
+                "precompute_or_increment_revision": False,
+            }
+        return {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "required_next_phase": "declare_complete_object_change",
+            "responsibility_split": {
+                "agent": "natural_language_to_closed_high_level_business_facts",
+                "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
+            },
+            "business_contract": business_contract,
+            "object_binding": object_binding,
+            "declaration": {
+                **operation_draft_prefix_copy_binding(
+                    declare_object_change_prefix
+                ),
+                "append_fields": business_contract["declaration"],
+                "submit_once": True,
+            },
             "forbidden_inputs": forbidden_inputs,
             "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
             "then_read_next_response": True,
@@ -15000,7 +15178,10 @@ def _audio_import_business_next_action_binding(
             "agent": "natural_language_to_closed_high_level_business_facts",
             "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
         },
-        "business_contract": audio_import_business_contract(record.version),
+        "business_contract": operation_business_contract(
+            record.operation,
+            record.version,
+        ),
         "object_binding": object_binding,
         "field_binding": {
             "object_scope": {
@@ -15678,7 +15859,10 @@ def operation_draft_payload(
                 projection["allowed_actions"].extend(
                     ["check", "preview-from-draft"]
                 )
-            if command == "draft-check" and record.operation != "audio.import":
+            if command == "draft-check" and (
+                operation_input_mode(record.operation, record.version)
+                != BUSINESS_DECLARATION_INPUT_MODE
+            ):
                 current_facts = projection.pop("current_facts")
                 if not isinstance(current_facts, list):
                     raise GatewayInputError(
@@ -15813,9 +15997,10 @@ def operation_draft_payload(
     }
     if (
         record.state is OperationDraftState.EDITABLE
-        and record.operation == "audio.import"
+        and operation_input_mode(record.operation, record.version)
+        == BUSINESS_DECLARATION_INPUT_MODE
     ):
-        draft["next_action_binding"] = _audio_import_business_next_action_binding(
+        draft["next_action_binding"] = _business_next_action_binding(
             record,
             task_authority=task_authority,
         )
