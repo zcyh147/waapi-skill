@@ -257,6 +257,37 @@ category-evidence rows records equal source hash and tree metadata before and
 after, deleted sandbox, cleaned lifecycle, and zero residual processes.
 Configured WwiseConsole hosts explicitly block Authoring-UI credit.
 
+The post-review exact-identity repair has a later final acceptance boundary.
+Packaged-Skill candidate `9a4de1624bc11d24fe38b2e740b5a92cca3d271e`
+with semantic harness `3ebbf5fab24feacc5d3bf5adf2eddb2c949057e4`
+passed all eight units in macOS root
+`imac-aib-9a4de16-h3ebbf5f-r21-full` and native-Windows root
+`iwin-aib-9a4de16-h3ebbf5f-r22-full`; both roots then passed identical
+`--resume --verify-only`. Windows priority root
+`iwin-aib-9a4de16-h3ebbf5f-r21-rifle-a` separately passed the formerly
+failing Rifle paraphrase. The harness accepts omission of compiler-derived
+SFX language or one explicit exact `language=SFX`; it still rejects another
+language, duplication, or contradiction. Earlier macOS r18 and Windows
+r18-r20 failure roots remain frozen without verify-only because they stopped
+before Preview on a local shell start miss, corrupted Broker authority, or the
+superseded omission-only semantic rule. All full-profile tasks were fresh,
+memory-off Terra tasks and started no Wwise process or mutation. Temporary
+LaunchAgent and `InteractiveToken`/`Limited` Scheduled Task launchers were
+deleted, and scoped process checks were empty.
+
+The same packaged Skill then passed the shared real-Wwise destructive node on
+Wwise 2022.1 and 2025.1 on both macOS and native Windows. macOS category rows
+seal candidate `9a4de16`; Windows rows seal harness-only Git candidate
+`3ebbf5f`. In every row the operation-specific business categories pass,
+source hash and tree metadata remain equal before and after, the sandbox is
+deleted, lifecycle cleanup completes, and residual processes are empty.
+Authoring UI remains explicitly blocked because all configured hosts are
+WwiseConsole. The final development gates passed five focused protocol
+round-trip nodes, Program `3583 passed / 2 skipped`, and Non-live
+`8620 passed / 107 skipped / 27 deselected`. A later harness-only archive
+change preserves the derived-SFX equivalence field while defaulting it to
+false for older sealed protocols, so historical evidence remains replayable.
+
 The legacy internal `integration_workflows_cross_version_6` component is
 defined by `tests/semantic/data/integration-workflows-v1/profile.json`. It
 supplies Weather, Alarm, and Harbor once per version: six tasks, 20 user turns,
