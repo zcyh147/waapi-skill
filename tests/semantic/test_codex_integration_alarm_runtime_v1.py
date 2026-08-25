@@ -28,10 +28,7 @@ from tests.semantic.support.codex_integration_workflows_v1 import (
     load_integration_workflows_profile,
 )
 from tests.semantic.support.codex_gateway_broker import (
-    DraftActionMetadataBinding,
     ExactArgumentAlternatives,
-    InlineTypedOperationArgument,
-    MetadataTokenProjection,
     ResponseBinding,
     ResponseBindingOrExactArgument,
 )
@@ -446,7 +443,7 @@ def test_protocol_exposes_six_exact_chain_reads_then_one_standard_transaction(
     prepared, _fake = _prepared(tmp_path)
     protocol = prepared.protocol
 
-    assert protocol.turn_prefix_counts == (6, 9, 13)
+    assert protocol.turn_prefix_counts == (6, 14, 18)
     assert tuple(step.name for step in protocol.steps[:6]) == (
         "diag.event",
         "diag.action",
@@ -457,7 +454,6 @@ def test_protocol_exposes_six_exact_chain_reads_then_one_standard_transaction(
     )
     assert protocol.commutative_read_only_step_groups == (
         ("diag.source", "diag.dead_bus", "diag.target_bus"),
-        ("tx01.operation-schema", "metadata.discover"),
     )
     assert {step.subcommand for step in protocol.steps[:6]} == {"query-object"}
     assert "--take" not in protocol.steps[0].arguments
@@ -507,34 +503,30 @@ def test_protocol_exposes_six_exact_chain_reads_then_one_standard_transaction(
     )
     assert tuple(step.subcommand for step in protocol.steps[6:]) == (
         "operation-schema",
-        "metadata",
-        "typed-operation",
+        "draft-start",
+        "draft-bind-object",
+        "draft-discover-fields",
+        "draft-bind-object",
+        "draft-declare-field-change",
+        "draft-check",
+        "preview-from-draft",
         "transaction-show",
         "confirm",
         "execute",
         "verify",
     )
-    metadata = protocol.steps[7]
+    discovery = protocol.steps[9]
     sound_id = prepared.before_snapshot.by_key()["sound"].object_id
-    assert metadata.arguments == (
-        "discover",
-        "--object",
-        sound_id,
-        "--query",
-        metadata.arguments[4],
-        "--limit",
-        "8",
-    )
-    assert metadata.arguments[4].label == "output bus"
-    preview = protocol.steps[8]
-    assert preview.metadata_binding == DraftActionMetadataBinding(
-        step="metadata.discover",
-        object_type="Sound",
-        required_tokens=("OutputBus",),
-        expected_projection=(
-            MetadataTokenProjection("OutputBus", "reference", ""),
-        ),
-    )
+    source_binding = protocol.steps[8]
+    assert source_binding.arguments[-2:] == ("--object-id", sound_id)
+    assert "--meaning" in discovery.arguments
+    assert discovery.arguments[discovery.arguments.index("--meaning") + 1] == "output bus"
+    assert "--token" not in discovery.arguments
+    target_id = prepared.before_snapshot.by_key()["target_bus"].object_id
+    target_binding = protocol.steps[10]
+    assert target_binding.arguments[-2:] == ("--object-id", target_id)
+    preview = protocol.steps[13]
+    assert preview.expected_operation_request == prepared.operation_request
     assert [row.api for row in prepared.expected_dispatches] == [
         "ak.wwise.core.object.setReference",
     ]
@@ -563,9 +555,7 @@ def test_operation_request_is_bound_to_live_sound_and_target_bus_ids(
     preview_step = next(
         step for step in prepared.protocol.steps if step.name == "tx01.preview"
     )
-    preview_request = preview_step.arguments[-1]
-    assert isinstance(preview_request, InlineTypedOperationArgument)
-    assert preview_request.expected == request
+    assert preview_step.expected_operation_request == request
     with pytest.raises(TypeError):
         request["arguments"]["reference"] = "Attenuation"  # type: ignore[index]
 

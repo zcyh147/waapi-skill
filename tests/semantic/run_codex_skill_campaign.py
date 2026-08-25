@@ -3152,10 +3152,11 @@ def _validate_business_agent_outcome(
             raise CampaignEvidenceError(
                 f"business Agent outcome mismatch for {key}"
             )
+    profile = getattr(options, "profile", AUDIO_IMPORT_BUSINESS_PROFILE_ID)
     gates = outcome.get("gates")
     transaction_count = getattr(expected_unit, "transaction_count", None)
     if (
-        outcome.get("contract") != BUSINESS_AGENT_OUTCOME_CONTRACTS.get(options.profile)
+        outcome.get("contract") != BUSINESS_AGENT_OUTCOME_CONTRACTS.get(profile)
         or not isinstance(gates, Mapping)
         or not gates
         or any(type(value) is not bool for value in gates.values())
@@ -3204,7 +3205,7 @@ def _validate_business_agent_outcome(
             "business Agent PASS lacks complete Broker reconciliation"
         )
     if outcome.get("status") == "PASS":
-        if options.profile == AUDIO_IMPORT_BUSINESS_PROFILE_ID:
+        if profile == AUDIO_IMPORT_BUSINESS_PROFILE_ID:
             _validate_audio_import_business_agent_protocol(
                 broker,
                 expected_unit=expected_unit,
@@ -3215,7 +3216,7 @@ def _validate_business_agent_outcome(
             _validate_bound_business_agent_protocol(
                 broker,
                 expected_unit=expected_unit,
-                profile=options.profile,
+                profile=profile,
             )
 
 

@@ -96,7 +96,7 @@ def test_skill_docs_route_builders_through_packaged_transaction_runtime_only() -
     assert "Do not import builders or planners from inline Python" in text
     assert "SemanticPlanner" not in text
     assert "XML editing" not in text
-    assert "Every normal input is typed" in text
+    assert "Follow the schema's sole `input_mode`" in text
     assert "`next_command.copy_instruction.source_field`" in text
     assert "copying the complete string verbatim once" in text
     assert "one complete terminal `verify` result ends the transaction" in text

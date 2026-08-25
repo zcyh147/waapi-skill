@@ -536,6 +536,20 @@ def _matches_transaction_step_sequence(
     if input_mode == BUSINESS_DECLARATION_INPUT_MODE:
         if not prefixes:
             return False
+        if transaction.get("operation") in {
+            "object.setLinked",
+            "object.setProperty",
+            "object.setReference",
+        }:
+            return prefixes in (
+                ["bind-object", "discover-field", "declare-field-change"],
+                [
+                    "bind-object",
+                    "discover-field",
+                    "bind-target",
+                    "declare-field-change",
+                ],
+            )
         counters = {"bind-object": [], "bind-field": [], "declare": []}
         configure_seen = False
         declaration_seen = False
