@@ -938,7 +938,7 @@ def build_audio_import_composer_transaction_steps(
         if not existing_target_form:
             planned_by_path[target_path] = ResponseBinding(
                 declaration_name,
-                f"/draft/declarations/{row_index}/result_handle",
+                "/draft/declaration_receipt/result_handle",
             )
 
     # The public business continuation tells a fresh Agent to bind every exact

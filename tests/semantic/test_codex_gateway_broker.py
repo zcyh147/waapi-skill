@@ -3909,6 +3909,47 @@ def test_audio_import_business_protocol_uses_stable_fields_and_strict_revision_o
         broker_module.validate_operation_draft_protocol_steps(tuple(reordered))
 
 
+def test_audio_import_nested_declaration_binds_compact_parent_receipt() -> None:
+    parent = r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps\Snow"
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "imports": [
+                {
+                    "object_path": parent,
+                    "object_type": "RandomSequenceContainer",
+                },
+                {
+                    "object_path": parent + r"\Snow_Step_01",
+                    "object_type": "Sound SFX",
+                    "audio_file": native_absolute_test_path(
+                        "inputs", "snow_step_01.wav"
+                    ),
+                    "import_language": "SFX",
+                },
+            ]
+        },
+    }
+
+    steps = build_audio_import_composer_transaction_steps(request, label="tx01")
+    declarations = tuple(
+        step for step in steps if step.subcommand == "draft-declare-new"
+    )
+    bindings = tuple(
+        argument
+        for argument in declarations[1].arguments
+        if isinstance(argument, ResponseBinding)
+    )
+
+    assert ResponseBinding(
+        declarations[0].name,
+        "/draft/declaration_receipt/result_handle",
+    ) in bindings
+    assert all("/draft/declarations/" not in binding.pointer for binding in bindings)
+
+
 def test_audio_import_witness_normalizes_only_gateway_owned_type_path_segments() -> None:
     expected = {
         "contract": "waapi-skill.operation-request/v1",
