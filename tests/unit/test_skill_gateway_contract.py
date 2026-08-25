@@ -296,7 +296,7 @@ def test_public_readmes_route_users_only_through_the_packaged_gateway() -> None:
             "python scripts/run.py gateway.py status",
             "python scripts/run.py gateway.py query-object",
             "python scripts/run.py gateway.py operation-schema object.setNotes",
-            "python scripts/run.py gateway.py typed-operation object.setNotes --apply",
+            "python scripts/run.py gateway.py draft-start object.setNotes",
             "python scripts/run.py gateway.py transaction-show <transaction-id> --summary-only",
             "python scripts/run.py gateway.py confirm <transaction-id> --confirmation-token <confirmation-token>",
             "python scripts/run.py gateway.py execute <transaction-id>",
@@ -304,7 +304,7 @@ def test_public_readmes_route_users_only_through_the_packaged_gateway() -> None:
         ):
             assert command in readme
         assert "state-bound confirmation token" in readme or "与当前状态绑定的确认 token" in readme
-        assert readme.index("python scripts/run.py gateway.py typed-operation object.setNotes --apply") < readme.index(
+        assert readme.index("python scripts/run.py gateway.py draft-start object.setNotes") < readme.index(
             "python scripts/run.py gateway.py transaction-show <transaction-id> --summary-only"
         )
         assert readme.index(

@@ -1515,7 +1515,7 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
     assert schema["ok"] is True
     assert schema["offline"] is True
     assert schema["operation"]["name"] == "object.setNotes"
-    assert schema["operation"]["input_mode"] == "inline_typed"
+    assert schema["operation"]["input_mode"] == "business_declaration"
     assert "required_arguments" not in schema["operation"]
     assert "argument_contract" not in schema["operation"]
     assert "identity_contract" in schema["operation"]
@@ -1530,9 +1530,12 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
     ]
     assert "request_envelope" not in schema
     assert "request_envelope_policy" not in schema
-    assert schema["typed_operation"]["continuation"]["subcommand"] == (
-        "typed-operation"
-    )
+    assert "typed_operation" not in schema
+    assert schema["business_adapter"]["operation"] == "object.setNotes"
+    assert schema["business_adapter"]["declaration"]["required_fields"] == [
+        "object_handle",
+        "notes",
+    ]
 
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
         exit_code, versioned = execute(
@@ -1542,7 +1545,7 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
         )
         assert exit_code == 0
         assert "request_envelope" not in versioned
-        assert versioned["typed_operation"]["version"] == version
+        assert versioned["business_adapter"]["version"] == version
 
     exit_code, raw_call = execute(
         ["operation-schema", "waapi.call"],
