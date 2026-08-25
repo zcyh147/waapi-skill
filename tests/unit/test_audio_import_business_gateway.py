@@ -395,12 +395,27 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     assert bound_next["declare_new"]["known_user_fields"] == (
         "complete_on_first_submission"
     )
-    assert "[--switch-value <exact-user-requested-switch-value>]" in (
-        bound_next["declare_new"]["append"]
+    required_switch_value = (
+        "--switch-value <exact-user-requested-switch-value> "
+        "required_when_user_requests_this_declaration_be_assigned_to_a_"
+        "switch_value; omission_is_incomplete"
     )
-    assert "[--switch-value <exact-user-requested-switch-value>]" in (
-        bound_next["declare_existing"]["append"]
-    )
+    conditional_switch_rule = {
+        "argument": "--switch-value",
+        "value": "exact_user_requested_switch_value",
+        "required_when": (
+            "user_requests_this_declaration_be_assigned_to_a_switch_value"
+        ),
+        "omission": "incomplete_declaration",
+    }
+    assert required_switch_value in bound_next["declare_new"]["append"]
+    assert required_switch_value in bound_next["declare_existing"]["append"]
+    assert bound_next["declare_new"]["conditional_required_user_fields"] == {
+        "switch_assignment": conditional_switch_rule
+    }
+    assert bound_next["declare_existing"]["conditional_required_user_fields"] == {
+        "switch_assignment": conditional_switch_rule
+    }
     assert "[--switch-value <corrected-exact-user-requested-switch-value>]" in (
         bound_next["revise"]["append"]
     )

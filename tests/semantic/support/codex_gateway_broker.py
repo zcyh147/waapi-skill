@@ -5787,7 +5787,7 @@ def _normalize_typed_draft_number_value(
 
 
 def _normalize_audio_import_request_named_fields(value: Any) -> Any:
-    """Canonicalize only name-keyed fields while preserving import row order."""
+    """Canonicalize name-keyed fields and Gateway-owned typed path segments."""
 
     if not isinstance(value, Mapping) or value.get("operation") != "audio.import":
         return value
@@ -5799,6 +5799,13 @@ def _normalize_audio_import_request_named_fields(value: Any) -> Any:
         if not isinstance(owner, Mapping):
             raise ValueError(f"{path} must be an object")
         normalized_owner = dict(owner)
+        object_path = normalized_owner.get("object_path")
+        if isinstance(object_path, str):
+            normalized_owner["object_path"] = re.sub(
+                r"(?<=\\)<[^<>\\]+>",
+                "",
+                object_path,
+            )
         for field, kind in (
             ("properties", "property"),
             ("references", "reference"),

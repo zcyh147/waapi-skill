@@ -3908,6 +3908,61 @@ def test_audio_import_business_protocol_uses_stable_fields_and_strict_revision_o
         broker_module.validate_operation_draft_protocol_steps(tuple(reordered))
 
 
+def test_audio_import_witness_normalizes_only_gateway_owned_type_path_segments() -> None:
+    expected = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2025.1",
+        "operation": "audio.import",
+        "arguments": {
+            "imports": [
+                {
+                    "object_path": (
+                        r"\Containers\Default Work Unit\Player_Footsteps\Snow"
+                    ),
+                    "object_type": "RandomSequenceContainer",
+                    "switch_assignment": "Snow",
+                },
+                {
+                    "object_path": (
+                        r"\Containers\Default Work Unit\Player_Footsteps"
+                        r"\Snow\Snow_Step_01"
+                    ),
+                    "object_type": "Sound SFX",
+                    "audio_file": "/tmp/snow.wav",
+                    "import_language": "SFX",
+                },
+            ]
+        },
+    }
+    actual = {
+        **expected,
+        "arguments": {
+            "imports": [
+                {
+                    **expected["arguments"]["imports"][0],
+                    "object_path": (
+                        r"\Containers\Default Work Unit\Player_Footsteps"
+                        r"\<Random Container>Snow"
+                    ),
+                },
+                {
+                    **expected["arguments"]["imports"][1],
+                    "object_path": (
+                        r"\Containers\Default Work Unit\Player_Footsteps"
+                        r"\<Random Container>Snow\<Sound SFX>Snow_Step_01"
+                    ),
+                },
+            ]
+        },
+    }
+
+    normalize = broker_module._normalize_audio_import_request_named_fields  # noqa: SLF001
+    assert normalize(actual) == normalize(expected)
+    wrong_type = json.loads(json.dumps(actual))
+    wrong_type["arguments"]["imports"][1]["object_type"] = "Sound Voice"
+    assert normalize(wrong_type) != normalize(expected)
+
+
 def test_numbered_draft_action_sequence_matches_any_exact_permutation() -> None:
     expected = (
         "tx01.draft-start",

@@ -16791,12 +16791,24 @@ def _business_next_action_binding(
                 "<child-name>",
                 "--kind",
                 "<semantic-kind>",
-                "[--switch-value <exact-user-requested-switch-value>]",
+                "--switch-value <exact-user-requested-switch-value> "
+                "required_when_user_requests_this_declaration_be_assigned_to_a_"
+                "switch_value; omission_is_incomplete",
                 "[--field <stable-field-except-switch_value> <business-value>]...",
                 "[--field-value <bound-field-handle> <business-value>]...",
             ],
             "task_local_id": "bounded_unique_not_business_data",
             "known_user_fields": "complete_on_first_submission",
+            "conditional_required_user_fields": {
+                "switch_assignment": {
+                    "argument": "--switch-value",
+                    "value": "exact_user_requested_switch_value",
+                    "required_when": (
+                        "user_requests_this_declaration_be_assigned_to_a_switch_value"
+                    ),
+                    "omission": "incomplete_declaration",
+                }
+            },
         },
         "declare_existing": {
             **operation_draft_prefix_copy_binding(declare_existing_prefix),
@@ -16805,12 +16817,24 @@ def _business_next_action_binding(
                 "<task-local-id>",
                 "--object-handle",
                 "<bound-object-handle>",
-                "[--switch-value <exact-user-requested-switch-value>]",
+                "--switch-value <exact-user-requested-switch-value> "
+                "required_when_user_requests_this_declaration_be_assigned_to_a_"
+                "switch_value; omission_is_incomplete",
                 "[--field <stable-field-except-switch_value> <business-value>]...",
                 "[--field-value <bound-field-handle> <business-value>]...",
             ],
             "task_local_id": "bounded_unique_not_business_data",
             "known_user_fields": "complete_on_first_submission",
+            "conditional_required_user_fields": {
+                "switch_assignment": {
+                    "argument": "--switch-value",
+                    "value": "exact_user_requested_switch_value",
+                    "required_when": (
+                        "user_requests_this_declaration_be_assigned_to_a_switch_value"
+                    ),
+                    "omission": "incomplete_declaration",
+                }
+            },
         },
         "revise": {
             **operation_draft_prefix_copy_binding(revise_prefix),
