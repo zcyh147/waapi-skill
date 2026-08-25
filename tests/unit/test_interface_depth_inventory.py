@@ -120,7 +120,10 @@ def test_nested_operation_values_and_exact_paths_are_explicitly_classified() -> 
     }
     assert audio_values[("declaration", "media_file")] == "exact_user_artifact"
     assert audio_values[("declaration", "output_bus")] == "live_bound_handle"
-    assert audio_values[("business_choice", "semantic_kind")] == "stable_business_declaration"
+    assert audio_values[("target", "new", "semantic_kind")] == "stable_business_declaration"
+    assert audio_values[("settings", "defaults", "event", "parent_handle")] == "live_bound_handle"
+    assert audio_values[("settings", "defaults", "event", "name")] == "stable_business_declaration"
+    assert audio_values[("declaration", "field_values", "<field_handle>")] == "live_bound_handle"
     assert not any("object_path" in path for path in audio_values)
 
     object_create = next(
@@ -137,6 +140,11 @@ def test_nested_operation_values_and_exact_paths_are_explicitly_classified() -> 
         "<oneOf:" in segment
         for value in create_values
         for segment in value["path"]
+    )
+    assert any(
+        value["path"] == ["arguments", "replace_owned_root"]
+        and value["value_ownership"] != "exact_user_artifact"
+        for value in create_values
     )
 
     ui_open = next(
@@ -156,6 +164,22 @@ def test_nested_operation_values_and_exact_paths_are_explicitly_classified() -> 
         value["name"] in {"header-file-path", "root-output-path"}
         and value["value_ownership"] == "exact_user_artifact"
         for value in _model_values(inventory, cli_generate)
+    )
+
+    object_get = next(
+        row for row in inventory["native_lanes"]
+        if row["version"] == "2025.1" and row["uri"] == "ak.wwise.core.object.get"
+    )
+    query_values = _model_values(inventory, object_get)
+    assert any(
+        value["channel"] == "query.structured"
+        for value in query_values
+    )
+    assert any(
+        value["channel"] == "query.advanced"
+        and value["name"] == "waql"
+        and value["value_ownership"] == "bounded_domain_expression"
+        for value in query_values
     )
 
 

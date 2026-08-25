@@ -2,7 +2,7 @@
   "contract": "waapi-skill.interface-depth-review-policy/v1",
   "source_contracts": {
     "operation_contract_sha256": "ab195da1d8681c2f1cdabd7beaa58bda7cf6c62a3ea96b55560dc05a099427f1",
-    "public_continuation_sha256": "9b1597e919ea06b772a8b2c81d4fa3a9288351bda032cd46fffa8b1ffbe0afe3",
+    "public_continuation_sha256": "9f9a851ecd7313945cf7af7ee0c71816e337c217bee0588e65f187f6ae28e5a9",
     "typed_request_surface_sha256": "6d05d64e95a6e0f7099ddd03f1da42c763e9c06f33f93cac7581c7c061a83af8"
   },
   "ownership_classes": {
@@ -129,7 +129,7 @@
       "owner_issue": null,
       "match": {"routes": ["fixed_command"], "gateway_commands_none": ["request-schema"]},
       "leaked_mechanics": [],
-      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior."
+      "audit_evidence": "The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior. The object.get rows additionally inventory the preferred simple flags, the complete structured Builder contract, and the separately disclosed bounded advanced WAQL contract."
     },
     {
       "id": "generic-zero-input-audited-deep",
@@ -364,8 +364,8 @@
     "generic-topics": 91
   },
   "field_ownership_rules": {
-    "exact_artifact_names": ["audio_file", "files", "import_file", "lua_code", "project", "script_file", "source", "source_file", "sources", "tab_delimited_import_file"],
-    "exact_artifact_suffixes": ["_directory", "_file", "_path", "_root"],
+    "exact_artifact_names": ["audio_file", "files", "import_file", "io_root", "lua_code", "project", "script_file", "source", "source_file", "sources", "tab_delimited_import_file"],
+    "exact_artifact_suffixes": ["_directory", "_file", "_path"],
     "filesystem_path_uris": ["ak.wwise.cli.", "ak.wwise.console.", "ak.wwise.debug.generateToneWAV", "ak.wwise.ui.captureScreen", "ak.wwise.ui.project."],
     "bounded_expression_names": ["transform", "waql", "wa_args"],
     "live_bound_names": ["field", "metadata", "property", "reference"],

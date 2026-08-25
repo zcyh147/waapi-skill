@@ -14,6 +14,10 @@ from wwise_waapi.operation_registry import (
     operation_input_mode,
 )
 from wwise_waapi.typed_requests import TypedRequestError, request_contract
+from wwise_waapi.typed_queries import (
+    typed_query_contract,
+    typed_query_schema_payload,
+)
 from wwise_waapi.typed_topics import topic_match_contract, topic_options_contract
 
 
@@ -84,6 +88,18 @@ def _public_continuation_rows(
                 ).as_gateway_payload()
             except TypedRequestError as exc:
                 row["dedicated_boundary"] = str(exc)
+        if (
+            lane["item_type"] == "function"
+            and lane["uri"] == "ak.wwise.core.object.get"
+        ):
+            row["query_layers"] = {
+                "structured": typed_query_schema_payload(
+                    lane["version"], advanced=False
+                ),
+                "advanced": typed_query_schema_payload(
+                    lane["version"], advanced=True
+                ),
+            }
         rows.append(row)
     return rows
 
@@ -220,9 +236,28 @@ def _typed_field_rows(
             contracts = [("request", request_contract(lane["version"], lane["uri"]))]
         except TypedRequestError:
             contracts = []
+    if lane["item_type"] == "function" and lane["uri"] == "ak.wwise.core.object.get":
+        contracts.extend(
+            [
+                (
+                    "query.structured",
+                    typed_query_contract(lane["version"], advanced=False),
+                ),
+                (
+                    "query.advanced",
+                    typed_query_contract(lane["version"], advanced=True),
+                ),
+            ]
+        )
     rows: list[dict[str, Any]] = []
     for channel, contract in contracts:
         for field in contract.as_gateway_payload().get("fields", []):
+            ownership = _field_ownership(field, policy, uri=lane["uri"])
+            if channel == "query.advanced" and field["name"] in {
+                "waql",
+                "return",
+            }:
+                ownership = "bounded_domain_expression"
             rows.append(
                 {
                     "channel": channel,
@@ -230,9 +265,7 @@ def _typed_field_rows(
                     "name": field["name"],
                     "shape": field["shape"],
                     "required": field["required"],
-                    "value_ownership": _field_ownership(
-                        field, policy, uri=lane["uri"]
-                    ),
+                    "value_ownership": ownership,
                     "transport_ownership": "gateway_derivation",
                 }
             )
@@ -405,52 +438,150 @@ def _audio_import_model_values(version: str) -> list[dict[str, Any]]:
     live.update(contract["field_transport"]["bound_object_handle_fields"])
     live.add(contract["field_transport"]["bound_field_handle_container"])
     rows: list[dict[str, Any]] = []
-    for channel, names in (
-        ("settings", contract["settings"]),
-        ("declaration", contract["declaration_fields"]),
-    ):
-        for name in names:
-            ownership = (
-                "exact_user_artifact"
-                if name in exact
-                else "live_bound_handle"
-                if name in live
-                else "stable_business_declaration"
-            )
-            rows.append(
-                {
-                    "path": [channel, name],
-                    "name": name,
-                    "shape": "scalar",
-                    "required": False,
-                    "value_ownership": ownership,
-                    "transport_ownership": "gateway_derivation",
-                    "schema_sha256": canonical_sha256(
-                        {
-                            "channel": channel,
-                            "name": name,
-                            "value_type": contract["field_value_types"].get(name),
-                        }
-                    ),
-                }
-            )
-    for name in ("semantic_kind", "mode", "event_action"):
-        source = {
-            "semantic_kind": contract["semantic_kinds"],
-            "mode": contract["modes"],
-            "event_action": contract["event_actions"],
-        }[name]
+
+    def add(
+        path: tuple[str, ...],
+        *,
+        name: str,
+        shape: str,
+        ownership: str,
+        required: bool = False,
+        source: Any = None,
+    ) -> None:
         rows.append(
             {
-                "path": ["business_choice", name],
+                "path": list(path),
                 "name": name,
-                "shape": "scalar",
-                "required": name in {"semantic_kind", "mode"},
-                "value_ownership": "stable_business_declaration",
+                "shape": shape,
+                "required": required,
+                "value_ownership": ownership,
                 "transport_ownership": "gateway_derivation",
-                "schema_sha256": canonical_sha256(source),
+                "schema_sha256": canonical_sha256(
+                    {"path": list(path), "source": source}
+                ),
             }
         )
+
+    def add_business_field(prefix: tuple[str, ...], name: str) -> None:
+        path = (*prefix, name)
+        if name == "event":
+            add(
+                path,
+                name=name,
+                shape="object",
+                ownership="gateway_derivation",
+                source=contract["event_actions"],
+            )
+            add(
+                (*path, "parent_handle"),
+                name="parent_handle",
+                shape="scalar",
+                ownership="live_bound_handle",
+            )
+            add(
+                (*path, "name"),
+                name="name",
+                shape="scalar",
+                ownership="stable_business_declaration",
+            )
+            add(
+                (*path, "action"),
+                name="action",
+                shape="scalar",
+                ownership="stable_business_declaration",
+                source=contract["event_actions"],
+            )
+            return
+        if name == "field_values":
+            add(
+                path,
+                name=name,
+                shape="map",
+                ownership="gateway_derivation",
+            )
+            add(
+                (*path, "<field_handle>"),
+                name="field_handle",
+                shape="scalar",
+                ownership="live_bound_handle",
+            )
+            add(
+                (*path, "<typed_business_value>"),
+                name="typed_business_value",
+                shape="scalar",
+                ownership="stable_business_declaration",
+            )
+            return
+        ownership = (
+            "exact_user_artifact"
+            if name in exact
+            else "live_bound_handle"
+            if name in live
+            else "stable_business_declaration"
+        )
+        add(
+            path,
+            name=name,
+            shape="scalar",
+            ownership=ownership,
+            source=contract["field_value_types"].get(name),
+        )
+
+    for setting in contract["settings"]:
+        if setting == "defaults":
+            add(
+                ("settings", "defaults"),
+                name="defaults",
+                shape="map",
+                ownership="gateway_derivation",
+            )
+            for field_name in contract["declaration_fields"]:
+                add_business_field(("settings", "defaults"), field_name)
+        else:
+            add(
+                ("settings", setting),
+                name=setting,
+                shape="scalar",
+                ownership="stable_business_declaration",
+                source=(
+                    contract["modes"] if setting == "mode" else "boolean"
+                ),
+            )
+    for field_name in contract["declaration_fields"]:
+        add_business_field(("declaration",), field_name)
+
+    add(
+        ("target", "declaration_id"),
+        name="declaration_id",
+        shape="scalar",
+        ownership="gateway_derivation",
+    )
+    add(
+        ("target", "new", "parent_handle"),
+        name="parent_handle",
+        shape="scalar",
+        ownership="live_bound_handle",
+    )
+    add(
+        ("target", "new", "name"),
+        name="name",
+        shape="scalar",
+        ownership="stable_business_declaration",
+    )
+    add(
+        ("target", "new", "semantic_kind"),
+        name="semantic_kind",
+        shape="scalar",
+        ownership="stable_business_declaration",
+        required=True,
+        source=contract["semantic_kinds"],
+    )
+    add(
+        ("target", "existing", "object_handle"),
+        name="object_handle",
+        shape="scalar",
+        ownership="live_bound_handle",
+    )
     return rows
 
 
