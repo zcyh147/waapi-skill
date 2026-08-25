@@ -231,6 +231,18 @@ def _operation_argument_ownership(
     return "stable_business_declaration"
 
 
+def _encode_model_value(value: Mapping[str, Any]) -> str:
+    """Keep the exhaustive generated inventory compact without losing a field."""
+
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        allow_nan=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
 def build_interface_depth_inventory() -> dict[str, Any]:
     policy = _load(POLICY_PATH)
     surface = _load(SURFACE_PATH)
@@ -296,6 +308,23 @@ def build_interface_depth_inventory() -> dict[str, Any]:
                 }
             )
 
+    field_contracts: dict[str, list[dict[str, Any]]] = {}
+    for row in native_rows:
+        fields = [_encode_model_value(value) for value in row.pop("fields")]
+        digest = canonical_sha256(fields)
+        existing = field_contracts.setdefault(digest, fields)
+        if existing != fields:
+            raise RuntimeError("native field contract digest collision")
+        row["field_contract_sha256"] = digest
+    argument_contracts: dict[str, list[dict[str, Any]]] = {}
+    for row in operation_rows:
+        arguments = [_encode_model_value(value) for value in row.pop("arguments")]
+        digest = canonical_sha256(arguments)
+        existing = argument_contracts.setdefault(digest, arguments)
+        if existing != arguments:
+            raise RuntimeError("operation argument contract digest collision")
+        row["argument_contract_sha256"] = digest
+
     ticket_rows: dict[str, list[str]] = defaultdict(list)
     for row in native_rows:
         if row["disposition"] == "migration_required":
@@ -339,6 +368,14 @@ def build_interface_depth_inventory() -> dict[str, Any]:
                 "rows_sha256": canonical_sha256(sorted(rows)),
             }
             for ticket_id, rows in sorted(ticket_rows.items())
+        ],
+        "field_contracts": [
+            {"sha256": digest, "model_values": fields}
+            for digest, fields in sorted(field_contracts.items())
+        ],
+        "argument_contracts": [
+            {"sha256": digest, "model_values": arguments}
+            for digest, arguments in sorted(argument_contracts.items())
         ],
         "native_lanes": native_rows,
         "operation_lanes": operation_rows,

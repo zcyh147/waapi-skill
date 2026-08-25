@@ -58,7 +58,9 @@ def test_every_model_value_and_planning_mechanic_has_one_reviewed_owner() -> Non
             "prohibited_boundary",
         }
         assert set(row["leaked_mechanics"]) <= set(inventory["mechanic_owners"])
-        for field in row.get("fields", row.get("arguments", [])):
+    for contract in (*inventory["field_contracts"], *inventory["argument_contracts"]):
+        for encoded in contract["model_values"]:
+            field = json.loads(encoded)
             assert field["value_ownership"] in ownership
             assert field["transport_ownership"] == "gateway_derivation"
 
@@ -66,21 +68,27 @@ def test_every_model_value_and_planning_mechanic_has_one_reviewed_owner() -> Non
 def test_stable_scalars_artifacts_expressions_and_bound_handles_remain_distinct() -> None:
     inventory = _inventory()
     values = Counter(
-        field["value_ownership"]
-        for row in (*inventory["native_lanes"], *inventory["operation_lanes"])
-        for field in row.get("fields", row.get("arguments", []))
+        json.loads(encoded)["value_ownership"]
+        for contract in (*inventory["field_contracts"], *inventory["argument_contracts"])
+        for encoded in contract["model_values"]
     )
     assert values["stable_business_declaration"] > 0
     assert values["exact_user_artifact"] > 0
     assert values["bounded_domain_expression"] > 0
     assert values["live_bound_handle"] > 0
     assert values["reviewed_adapter"] > 0
-    assert any(
-        row["operation"] == "debug.testCrash"
-        and row["disposition"] == "migration_required"
-        and row["arguments"][0]["value_ownership"] == "gateway_derivation"
-        for row in inventory["operation_lanes"]
+    argument_contracts = {
+        contract["sha256"]: [
+            json.loads(encoded) for encoded in contract["model_values"]
+        ]
+        for contract in inventory["argument_contracts"]
+    }
+    crash = next(
+        row for row in inventory["operation_lanes"]
+        if row["operation"] == "debug.testCrash"
     )
+    assert crash["disposition"] == "migration_required"
+    assert argument_contracts[crash["argument_contract_sha256"]][0]["value_ownership"] == "gateway_derivation"
 
 
 def test_every_migration_row_has_exactly_one_rollup_and_ticket_family() -> None:
