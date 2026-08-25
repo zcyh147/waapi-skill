@@ -47,8 +47,6 @@ INLINE_OPERATIONS = frozenset(
         "object.setNotes",
         "object.setProperty",
         "object.setReference",
-        "switchContainer.addAssignment",
-        "switchContainer.removeAssignment",
         "object.delete",
         "object.copy",
         "object.move",
@@ -359,22 +357,6 @@ def materialize_inline_operation_request(
                 values["io_root"], field="io_root", allow_empty=False
             ),
         }
-    elif operation in {
-        "switchContainer.addAssignment",
-        "switchContainer.removeAssignment",
-    }:
-        _require_keys(
-            values,
-            required=frozenset(
-                {"switch_container", "child", "state_or_switch"}
-            ),
-        )
-        arguments = {
-            role: _selector(
-                values[role], operation=operation, version=version, field=role
-            )
-            for role in ("switch_container", "child", "state_or_switch")
-        }
     elif operation in {"object.setName", "object.setNotes"}:
         _require_keys(values, required=frozenset({"object", "text"}))
         arguments = {
@@ -552,13 +534,6 @@ def inline_operation_cli_arguments(request: Mapping[str, Any]) -> tuple[str, ...
         for path in arguments["files"]:
             result.extend(("--file", str(path)))
         result.extend(("--io-root", str(arguments["io_root"])))
-    elif operation in {"switchContainer.addAssignment", "switchContainer.removeAssignment"}:
-        for name, flag in (
-            ("switch_container", "--switch-container"),
-            ("child", "--child"),
-            ("state_or_switch", "--state-or-switch"),
-        ):
-            result.extend((flag, *_selector_cli_tokens(arguments[name])))
     elif operation in {"object.setName", "object.setNotes"}:
         result.extend(("--object", *_selector_cli_tokens(arguments["object"])))
         result.extend(("--text", str(arguments["value"])))
@@ -723,14 +698,6 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
         }
         else ["--enable true|false"]
         if operation in {"debug.setAsserts", "debug.setAutomationMode"}
-        else
-        [
-            "--switch-container SELECTOR",
-            "--child SELECTOR",
-            "--state-or-switch SELECTOR",
-        ]
-        if operation
-        in {"switchContainer.addAssignment", "switchContainer.removeAssignment"}
         else (
             ["--file ABSOLUTE_PATH (repeat 1-32)", "--io-root ABSOLUTE_PATH"]
             if operation == "soundbank.processDefinitionFiles"
@@ -785,8 +752,6 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
         "debug.setAutomationMode",
         "debug.testAssert",
         "debug.testCrash",
-        "switchContainer.addAssignment",
-        "switchContainer.removeAssignment",
         "soundbank.processDefinitionFiles",
         "audio.importTabDelimited",
         "ui.captureScreen",

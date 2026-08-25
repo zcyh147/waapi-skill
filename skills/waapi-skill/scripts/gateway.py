@@ -352,6 +352,7 @@ OFFLINE_COMMANDS = frozenset(
         "draft-clear-object-list",
         "draft-declare-field-change",
         "draft-declare-object-change",
+        "draft-declare-switch-assignment",
         "draft-declare-rtpc",
         "draft-declare-existing",
         "draft-declare-new",
@@ -1904,6 +1905,29 @@ def build_parser() -> argparse.ArgumentParser:
     draft_declare_object_change.set_defaults(
         add_to_source_control=None,
         check_out_from_source_control=None,
+    )
+
+    draft_declare_switch_assignment = subparsers.add_parser(
+        "draft-declare-switch-assignment",
+        help=(
+            "Declare one Switch Container child and Switch/State value "
+            "relationship using only live-bound object handles"
+        ),
+    )
+    _add_business_draft_binding_arguments(
+        draft_declare_switch_assignment
+    )
+    draft_declare_switch_assignment.add_argument(
+        "--switch-container-handle",
+        required=True,
+    )
+    draft_declare_switch_assignment.add_argument(
+        "--child-handle",
+        required=True,
+    )
+    draft_declare_switch_assignment.add_argument(
+        "--state-or-switch-handle",
+        required=True,
     )
 
     draft_declare_field_change = subparsers.add_parser(
@@ -7053,6 +7077,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         "draft-clear-object-list",
         "draft-declare-field-change",
         "draft-declare-object-change",
+        "draft-declare-switch-assignment",
         "draft-declare-rtpc",
         "draft-declare-existing",
         "draft-declare-new",
@@ -10694,6 +10719,26 @@ def dispatch_offline_business_draft_update(
             candidate = current.with_existing_declaration(
                 declaration_id="change",
                 target=ExistingObjectTarget(args.object_handle),
+                fields=fields,
+            )
+            adapter.materialize(candidate)
+            return candidate
+
+        event_type = "declaration.added"
+    elif args.command == "draft-declare-switch-assignment":
+        fields = {
+            "child_handle": args.child_handle,
+            "state_or_switch_handle": args.state_or_switch_handle,
+        }
+
+        def update(
+            current: BusinessDeclarationSession,
+        ) -> BusinessDeclarationSession:
+            candidate = current.with_existing_declaration(
+                declaration_id="assignment",
+                target=ExistingObjectTarget(
+                    args.switch_container_handle
+                ),
                 fields=fields,
             )
             adapter.materialize(candidate)
@@ -15924,6 +15969,11 @@ def _business_next_action_binding(
         "draft-declare-object-change",
         *binding,
     ]
+    declare_switch_assignment_prefix = [
+        *base,
+        "draft-declare-switch-assignment",
+        *binding,
+    ]
     declare_field_change_prefix = [
         *base,
         "draft-declare-field-change",
@@ -16002,6 +16052,71 @@ def _business_next_action_binding(
             "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
             "then_read_next_response": True,
             "precompute_or_increment_revision": False,
+        }
+    if record.operation in {
+        "switchContainer.addAssignment",
+        "switchContainer.removeAssignment",
+    }:
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": {
+                "agent": "natural_language_to_closed_high_level_business_facts",
+                "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
+            },
+            "business_contract": business_contract,
+            "object_binding": {
+                **object_binding,
+                "use_only_for": [
+                    "switch_container",
+                    "child",
+                    "state_or_switch",
+                ],
+                "role_assignment": (
+                    "bind each exact role and copy its returned handle into "
+                    "the same named declaration field"
+                ),
+            },
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "direct_child_selector",
+                "scoped_name_selector",
+                "relationship_request_fragment",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session.declarations:
+            return {
+                **shared,
+                "required_next_phase": "check_complete_business_declaration",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        bound_count = len(session.handles.as_dict()["objects"])
+        return {
+            **shared,
+            "required_next_phase": (
+                "bind_remaining_switch_assignment_roles"
+                if bound_count < 3
+                else "declare_complete_switch_assignment"
+            ),
+            "declaration": {
+                **operation_draft_prefix_copy_binding(
+                    declare_switch_assignment_prefix
+                ),
+                "append": [
+                    "--switch-container-handle",
+                    "<bound-switch-container-handle>",
+                    "--child-handle",
+                    "<bound-child-handle>",
+                    "--state-or-switch-handle",
+                    "<bound-state-or-switch-handle>",
+                ],
+                "submit_once": True,
+            },
         }
     if adapter.supports_type_discovery:
         type_discover_prefix = [*base, "draft-discover-types", *binding]

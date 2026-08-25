@@ -14,6 +14,9 @@ from .object_metadata_business_contracts import (
     object_metadata_business_contract_data,
 )
 from .object_graph_business_contracts import object_graph_business_contract_data
+from .switch_assignment_business_contracts import (
+    switch_assignment_business_contract_data,
+)
 
 
 ContractBuilder = Callable[[str, str], dict[str, Any]]
@@ -43,6 +46,13 @@ def _object_metadata_contract(operation: str, version: str) -> dict[str, Any]:
 
 def _object_graph_contract(operation: str, version: str) -> dict[str, Any]:
     return object_graph_business_contract_data(operation, version)
+
+
+def _switch_assignment_contract(
+    operation: str,
+    version: str,
+) -> dict[str, Any]:
+    return switch_assignment_business_contract_data(operation, version)
 
 
 def _materialize_audio_import(
@@ -102,6 +112,17 @@ def _materialize_object_graph(
     from .object_graph_business import materialize_object_graph_business_request
 
     return materialize_object_graph_business_request(operation, session)
+
+
+def _materialize_switch_assignment(
+    operation: str,
+    session: BusinessDeclarationSession,
+) -> Mapping[str, Any]:
+    from .switch_assignment_business import (
+        materialize_switch_assignment_business_request,
+    )
+
+    return materialize_switch_assignment_business_request(operation, session)
 
 
 def _compile_audio_import_preview(
@@ -356,6 +377,22 @@ _OBJECT_SET_BUSINESS_DEFINITION = {
     "auto_apply_preview": True,
 }
 
+_SWITCH_ASSIGNMENT_DEFINITION = {
+    "family": "switch-assignment",
+    "contract_builder": _switch_assignment_contract,
+    "materializer": _materialize_switch_assignment,
+    "update_commands": frozenset({"draft-declare-switch-assignment"}),
+    "initial_projection_actions": ("bind-object", "inspect", "cancel"),
+    "active_projection_actions": (
+        "bind-object",
+        "declare-switch-assignment",
+        "check",
+        "inspect",
+        "cancel",
+    ),
+    "auto_apply_preview": True,
+}
+
 
 def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdapter:
     values = dict(definition)
@@ -379,6 +416,14 @@ _BUSINESS_ADAPTERS = {
         "object.setRTPC", _OBJECT_RTPC_DEFINITION
     ),
     "object.set": _bind_adapter("object.set", _OBJECT_SET_BUSINESS_DEFINITION),
+    "switchContainer.addAssignment": _bind_adapter(
+        "switchContainer.addAssignment",
+        _SWITCH_ASSIGNMENT_DEFINITION,
+    ),
+    "switchContainer.removeAssignment": _bind_adapter(
+        "switchContainer.removeAssignment",
+        _SWITCH_ASSIGNMENT_DEFINITION,
+    ),
     **{
         operation: _bind_adapter(operation, _OBJECT_LIFECYCLE_DEFINITION)
         for operation in (
