@@ -10,6 +10,11 @@ from typing import Any, Mapping, Sequence
 
 import pytest
 
+# ``_archive_test_*`` functions below preserve pre-cutover Composer examples for
+# source archaeology only.  They are intentionally not collected as current
+# evidence; the executable assertions in this module prove the new public
+# non-bypass boundary and the Composer lanes that remain supported.
+
 from wwise_waapi.canonical import canonical_sha256  # pyright: ignore[reportMissingImports]
 from wwise_waapi.operation_drafts import (  # pyright: ignore[reportMissingImports]
     OperationDraftStore,
@@ -33,6 +38,8 @@ from wwise_waapi.typed_requests import (  # pyright: ignore[reportMissingImports
     expand_gateway_field_table,
 )
 from wwise_waapi.typed_operations import (  # pyright: ignore[reportMissingImports]
+    DRAFT_TYPED_OPERATIONS,
+    LEGACY_OBJECT_GRAPH_TYPED_OPERATIONS,
     draft_operation_request_contract,
 )
 
@@ -58,6 +65,28 @@ TARGET_ID = "{01234567-89AB-CDEF-0123-456789ABCDEF}"
 PARENT_ID = "{11111111-1111-1111-1111-111111111111}"
 PROJECT_ID = "{22222222-2222-2222-2222-222222222222}"
 ACTION_CONTRACT = "waapi-skill.operation-draft-action/v1"
+
+
+@pytest.mark.parametrize(
+    ("operation", "version"),
+    (
+        ("object.create", "2021.1"),
+        ("object.createPlugin", "2022.1"),
+        ("object.set", "2022.1"),
+        ("object.setRTPC", "2022.1"),
+    ),
+)
+def test_object_graph_composer_surface_is_not_executable(
+    operation: str,
+    version: str,
+) -> None:
+    assert operation_input_mode(operation, version) == BUSINESS_DECLARATION_INPUT_MODE
+    assert operation not in DRAFT_TYPED_OPERATIONS
+    with pytest.raises(OperationComposerError) as captured:
+        operation_composer_contract(operation, version)
+    assert captured.value.error_code == "OPERATION_DRAFT_ADAPTER_UNAVAILABLE"
+    if operation != "object.set":
+        assert operation in LEGACY_OBJECT_GRAPH_TYPED_OPERATIONS
 
 
 def _assert_pristine_inspected_draft(
@@ -135,7 +164,7 @@ IMPORT_ACTION_FIELDS = {
 
 
 @pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
-def test_object_set_composer_contract_covers_every_registry_field_shape(
+def _archive_test_object_set_composer_contract_covers_every_registry_field_shape(
     version: str,
 ) -> None:
     contract = operation_composer_contract("object.set", version)
@@ -185,7 +214,7 @@ def test_object_set_composer_contract_covers_every_registry_field_shape(
 
 
 @pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
-def test_object_set_composer_discloses_every_exact_typed_action_shape(
+def _archive_test_object_set_composer_discloses_every_exact_typed_action_shape(
     version: str,
 ) -> None:
     contract = operation_composer_contract("object.set", version)
@@ -300,10 +329,10 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
         version: operation_input_mode("object.set", version)
         for version in ("2022.1", "2023.1", "2024.1", "2025.1")
     } == {
-        "2022.1": COMPOSER_INPUT_MODE,
-        "2023.1": COMPOSER_INPUT_MODE,
-        "2024.1": COMPOSER_INPUT_MODE,
-        "2025.1": COMPOSER_INPUT_MODE,
+        "2022.1": BUSINESS_DECLARATION_INPUT_MODE,
+        "2023.1": BUSINESS_DECLARATION_INPUT_MODE,
+        "2024.1": BUSINESS_DECLARATION_INPUT_MODE,
+        "2025.1": BUSINESS_DECLARATION_INPUT_MODE,
     }
 
 
@@ -540,7 +569,7 @@ def complete_draft(tmp_path: Path, *, value: float = -3.0) -> tuple[str, str, st
     return draft_id, authority, handle
 
 
-def test_object_set_typed_actions_build_one_target_scalar_fact_offline(
+def _archive_test_object_set_typed_actions_build_one_target_scalar_fact_offline(
     tmp_path: Path,
 ) -> None:
     start_code, started = execute(tmp_path, "draft-start", "object.set")
@@ -675,7 +704,7 @@ def test_object_set_typed_actions_build_one_target_scalar_fact_offline(
     assert not (tmp_path / "state" / "transactions").exists()
 
 
-def test_object_set_normal_typed_argv_preserves_wire_paths_and_scalar_facts(
+def _archive_test_object_set_normal_typed_argv_preserves_wire_paths_and_scalar_facts(
     tmp_path: Path,
 ) -> None:
     start_code, started = execute(tmp_path, "draft-start", "object.set")
@@ -737,7 +766,7 @@ def test_object_set_normal_typed_argv_preserves_wire_paths_and_scalar_facts(
     ]
 
 
-def test_object_set_add_target_uses_direct_reference_flag_without_field_name(
+def _archive_test_object_set_add_target_uses_direct_reference_flag_without_field_name(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -772,7 +801,7 @@ def test_object_set_add_target_uses_direct_reference_flag_without_field_name(
     ]
 
 
-def test_normal_composer_schema_discloses_typed_argv_not_action_json(
+def _archive_test_normal_composer_schema_discloses_typed_argv_not_action_json(
     tmp_path: Path,
 ) -> None:
     code, payload = execute(
@@ -802,7 +831,7 @@ def test_normal_composer_schema_discloses_typed_argv_not_action_json(
     assert "typed-action-json" not in encoded
 
 
-def test_object_set_draft_start_repeats_exact_allowed_action_argv(
+def _archive_test_object_set_draft_start_repeats_exact_allowed_action_argv(
     tmp_path: Path,
 ) -> None:
     code, payload = execute(tmp_path, "draft-start", "object.set")
@@ -871,12 +900,6 @@ def test_metadata_preconditions_are_operation_local_in_composer_start(
     ("version", "operation", "path", "expected"),
     (
         (
-            "2021.1",
-            "object.create",
-            ["args", "on_name_conflict"],
-            {"phase": "before_dynamic_disclosure", "fact_action": "set"},
-        ),
-        (
             "2022.1",
             "soundbank.setInclusions",
             ["args", "soundbank", "kind"],
@@ -927,7 +950,7 @@ def test_public_composer_fields_bind_fact_action_before_disclosure(
     )
 
 
-def test_choose_response_discloses_the_selected_branch_constant_before_disclosure(
+def _archive_test_choose_response_discloses_the_selected_branch_constant_before_disclosure(
     tmp_path: Path,
 ) -> None:
     code, schema = execute(
@@ -1035,7 +1058,7 @@ def test_choose_response_discloses_the_selected_branch_constant_before_disclosur
     assert applied["draft"]["next_action_binding"]["shell_tool_timeout_ms"] == 30_000
 
 
-def test_public_object_set_schema_discloses_the_exact_default_container_metadata_scope(
+def _archive_test_public_object_set_schema_discloses_the_exact_default_container_metadata_scope(
     tmp_path: Path,
 ) -> None:
     code, payload = execute(
@@ -1078,7 +1101,7 @@ def test_public_object_set_schema_discloses_the_exact_default_container_metadata
     }
 
 
-def test_object_create_schema_puts_the_top_level_fact_plan_before_large_fields(
+def _archive_test_object_create_schema_puts_the_top_level_fact_plan_before_large_fields(
     tmp_path: Path,
 ) -> None:
     code, payload = execute(
@@ -1185,7 +1208,7 @@ def test_object_create_schema_puts_the_top_level_fact_plan_before_large_fields(
     assert item["continuation"]["deferred_fact"]["argv"][-1] == item["handle"]
 
 
-def test_invalid_or_mixed_typed_action_argv_is_atomic(
+def _archive_test_invalid_or_mixed_typed_action_argv_is_atomic(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -1277,7 +1300,7 @@ def test_invalid_or_mixed_typed_action_argv_is_atomic(
         ),
     ],
 )
-def test_typed_action_argv_round_trips_closed_business_facts(
+def _archive_test_typed_action_argv_round_trips_closed_business_facts(
     typed_action: Mapping[str, Any],
 ) -> None:
     argv = typed_action_cli_arguments(typed_action)
@@ -1326,7 +1349,7 @@ def test_typed_action_argv_round_trips_closed_business_facts(
         action_mapping("remove_import", owner_handle="o"),
     ],
 )
-def test_every_object_set_normal_action_round_trips_specific_flags(
+def _archive_test_every_object_set_normal_action_round_trips_specific_flags(
     typed_action: Mapping[str, Any],
 ) -> None:
     argv = typed_action_cli_arguments(typed_action)
@@ -1434,14 +1457,14 @@ def test_audio_import_generic_option_cannot_replace_dedicated_operation_action()
         ),
     ],
 )
-def test_object_set_action_specific_argv_never_requires_internal_field_names(
+def _archive_test_object_set_action_specific_argv_never_requires_internal_field_names(
     arguments: tuple[str, ...],
     expected: Mapping[str, Any],
 ) -> None:
     assert parse_typed_action_cli_arguments(arguments) == expected
 
 
-def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
+def _archive_test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -1573,7 +1596,7 @@ def test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
     ]
 
 
-def test_compact_weather_shaped_action_responses_remain_constant_size(
+def _archive_test_compact_weather_shaped_action_responses_remain_constant_size(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -1684,7 +1707,7 @@ def test_compact_weather_shaped_action_responses_remain_constant_size(
     assert len(inspected["draft"]["current_facts"]) == 5
 
 
-def test_property_correction_and_removal_are_ordered_typed_edits(
+def _archive_test_property_correction_and_removal_are_ordered_typed_edits(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -1771,7 +1794,7 @@ def test_property_correction_and_removal_are_ordered_typed_edits(
     assert "add_target" in removed_target["draft"]["allowed_actions"]
 
 
-def test_invalid_action_is_byte_atomic_and_rejects_complete_request_injection(
+def _archive_test_invalid_action_is_byte_atomic_and_rejects_complete_request_injection(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -1823,7 +1846,7 @@ def test_invalid_action_is_byte_atomic_and_rejects_complete_request_injection(
     _assert_pristine_inspected_draft(started, inspected)
 
 
-def test_invalid_target_selectors_are_registry_rejected_without_any_revision(
+def _archive_test_invalid_target_selectors_are_registry_rejected_without_any_revision(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -1868,7 +1891,7 @@ def test_invalid_target_selectors_are_registry_rejected_without_any_revision(
     _assert_pristine_inspected_draft(started, inspected)
 
 
-def test_public_facts_result_budget_rejects_before_durable_revision(
+def _archive_test_public_facts_result_budget_rejects_before_durable_revision(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -1938,7 +1961,7 @@ def test_public_facts_result_budget_rejects_before_durable_revision(
     assert record_path.read_bytes() == before
 
 
-def test_legacy_record_is_readable_but_composer_requires_recreate_without_write(
+def _archive_test_legacy_record_is_readable_but_composer_requires_recreate_without_write(
     tmp_path: Path,
 ) -> None:
     store = OperationDraftStore(tmp_path / "state")
@@ -1978,7 +2001,7 @@ def test_legacy_record_is_readable_but_composer_requires_recreate_without_write(
     assert record_path.read_bytes() == before
 
 
-def test_shared_uri_composers_are_isolated_by_exact_operation_name(
+def _archive_test_shared_uri_composers_are_isolated_by_exact_operation_name(
     tmp_path: Path,
 ) -> None:
     assert operation_input_mode("object.set", "2022.1") == COMPOSER_INPUT_MODE
@@ -1990,7 +2013,7 @@ def test_shared_uri_composers_are_isolated_by_exact_operation_name(
     assert started["draft"]["binding"]["operation"] == "object.setRTPC"
 
 
-def test_rtpc_public_composer_discloses_exact_business_mode_mapping(
+def _archive_test_rtpc_public_composer_discloses_exact_business_mode_mapping(
     tmp_path: Path,
 ) -> None:
     exit_code, payload = execute(
@@ -2063,10 +2086,6 @@ def test_registry_composer_lanes_and_real_adapters_are_one_to_one() -> None:
 
     assert adapter_lanes == composer_lanes
     assert {operation for operation, _version in composer_lanes} == {
-        "object.create",
-        "object.createPlugin",
-        "object.set",
-        "object.setRTPC",
         "soundbank.convertExternalSources",
         "soundbank.generate",
         "soundbank.setInclusions",
@@ -2091,7 +2110,7 @@ def test_soundbank_generate_composer_keeps_explicit_false_batch_controls() -> No
     }
 
 
-def test_live_check_is_bounded_durable_and_any_edit_invalidates_it(
+def _archive_test_live_check_is_bounded_durable_and_any_edit_invalidates_it(
     tmp_path: Path,
 ) -> None:
     draft_id, authority, handle = complete_draft(tmp_path)
@@ -2200,7 +2219,7 @@ def test_live_check_is_bounded_durable_and_any_edit_invalidates_it(
     assert "draft-check" in edited["draft"]["allowed_lifecycle_commands"]
 
 
-def test_live_check_reports_all_invalid_target_rows_without_writing(
+def _archive_test_live_check_reports_all_invalid_target_rows_without_writing(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -2322,7 +2341,7 @@ def test_live_check_reports_all_invalid_target_rows_without_writing(
     assert client.disconnected is True
 
 
-def test_weather_shape_keeps_multiple_targets_and_request_options_in_business_order(
+def _archive_test_weather_shape_keeps_multiple_targets_and_request_options_in_business_order(
     tmp_path: Path,
 ) -> None:
     selectors = [
@@ -2410,7 +2429,7 @@ def test_weather_shape_keeps_multiple_targets_and_request_options_in_business_or
     assert [row["handle"] for row in targeted["draft"]["current_facts"]] == handles
 
 
-def test_complete_target_row_is_atomic_when_one_inline_reference_is_invalid(
+def _archive_test_complete_target_row_is_atomic_when_one_inline_reference_is_invalid(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -2462,7 +2481,7 @@ def test_complete_target_row_is_atomic_when_one_inline_reference_is_invalid(
     ).revision == 1
 
 
-def test_target_and_recursive_child_facts_materialize_without_raw_tree_patches(
+def _archive_test_target_and_recursive_child_facts_materialize_without_raw_tree_patches(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -2553,7 +2572,7 @@ def test_target_and_recursive_child_facts_materialize_without_raw_tree_patches(
     assert final["draft"]["missing_fields"] == []
 
 
-def test_closed_object_list_members_use_handles_and_keep_insertion_order(
+def _archive_test_closed_object_list_members_use_handles_and_keep_insertion_order(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -2627,7 +2646,7 @@ def test_closed_object_list_members_use_handles_and_keep_insertion_order(
     ] == [first_handle, second_handle]
 
 
-def test_embedded_import_files_are_versioned_correctable_and_handle_addressed(
+def _archive_test_embedded_import_files_are_versioned_correctable_and_handle_addressed(
     tmp_path: Path,
 ) -> None:
     source = tmp_path / "Rain Source.wav"
@@ -2706,7 +2725,7 @@ def test_embedded_import_files_are_versioned_correctable_and_handle_addressed(
     assert final["draft"]["missing_fields"] == []
 
 
-def test_embedded_import_is_rejected_before_revision_on_wwise_2022(
+def _archive_test_embedded_import_is_rejected_before_revision_on_wwise_2022(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -2752,7 +2771,7 @@ def test_embedded_import_is_rejected_before_revision_on_wwise_2022(
     assert record_path.read_bytes() == before
 
 
-def test_invalid_options_duplicates_and_target_ceiling_are_byte_atomic(
+def _archive_test_invalid_options_duplicates_and_target_ceiling_are_byte_atomic(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -2828,7 +2847,7 @@ def test_invalid_options_duplicates_and_target_ceiling_are_byte_atomic(
     assert record_path.read_bytes() == before_limit
 
 
-def test_empty_append_list_remains_incomplete_but_replace_all_can_clear_it(
+def _archive_test_empty_append_list_remains_incomplete_but_replace_all_can_clear_it(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")
@@ -2903,7 +2922,7 @@ def test_empty_append_list_remains_incomplete_but_replace_all_can_clear_it(
     }
 
 
-def test_reference_facts_are_typed_correctable_and_keep_exact_selectors(
+def _archive_test_reference_facts_are_typed_correctable_and_keep_exact_selectors(
     tmp_path: Path,
 ) -> None:
     _code, started = execute(tmp_path, "draft-start", "object.set")

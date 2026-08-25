@@ -24,6 +24,11 @@ from .operation_object import (
     DEFAULT_MAX_NAME_LENGTH,
     DEFAULT_MAX_NODES,
 )
+from .operation_plugin import (
+    MAX_PLUGIN_NAME_LENGTH,
+    MAX_PLUGIN_NOTES_LENGTH,
+    MAX_PLUGIN_PROPERTIES,
+)
 from .operation_registry import parse_operation_request
 
 
@@ -645,6 +650,17 @@ def _materialize_create(
                 field="target",
                 action="object.create accepts only named new-object declarations",
             )
+        if row.target.kind == "sound-voice":
+            raise _repair(
+                session,
+                "OBJECT_CREATE_VOICE_UNAVAILABLE",
+                field="kind",
+                choices=["audio.import", "object.set"],
+                action=(
+                    "use audio.import for a media outcome or object.set with an "
+                    "exact Project language for a new Sound Voice"
+                ),
+            )
         parent_handle = row.target.parent_handle
         if parent_handle in declarations:
             children.setdefault(parent_handle, []).append(row)
@@ -776,12 +792,18 @@ def _materialize_create_plugin(
             action="discover a plug-in type for the exact requested role",
         )
     plugin_name = fields["plugin_name"]
-    if not isinstance(plugin_name, str) or not plugin_name:
+    if (
+        not isinstance(plugin_name, str)
+        or not plugin_name
+        or len(plugin_name) > MAX_PLUGIN_NAME_LENGTH
+        or any(character in plugin_name for character in "\\/:*?\"<>|")
+    ):
         raise _repair(
             session,
-            "FIELD_VALUE_TYPE_MISMATCH",
+            "PLUGIN_NAME_INVALID",
             field="plugin_name",
-            action="provide one non-empty plug-in display name",
+            limit=MAX_PLUGIN_NAME_LENGTH,
+            action="provide one bounded plug-in name without path syntax",
         )
     target = session.handles.resolve_object(declaration.target.object_handle)
     plugin: dict[str, Any] = {
@@ -798,6 +820,14 @@ def _materialize_create_plugin(
                     "FIELD_VALUE_TYPE_MISMATCH",
                     field=name,
                     action=f"provide one exact {name} string",
+                )
+            if name == "notes" and len(value) > MAX_PLUGIN_NOTES_LENGTH:
+                raise _repair(
+                    session,
+                    "PLUGIN_NOTES_LIMIT_EXCEEDED",
+                    field="notes",
+                    limit=MAX_PLUGIN_NOTES_LENGTH,
+                    action="provide shorter exact plug-in notes",
                 )
             plugin[name] = value
     language = fields.get("language")
@@ -848,6 +878,15 @@ def _materialize_create_plugin(
                     business_value,
                 ),
             }
+        )
+    if len(properties) > MAX_PLUGIN_PROPERTIES:
+        raise _repair(
+            session,
+            "PLUGIN_PROPERTY_LIMIT_EXCEEDED",
+            field="field_values",
+            count=len(properties),
+            limit=MAX_PLUGIN_PROPERTIES,
+            action="split plug-in property work into a bounded request",
         )
     if properties:
         plugin["properties"] = properties

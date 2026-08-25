@@ -717,3 +717,94 @@ def test_object_set_subordinate_media_is_version_repaired_before_native_parse() 
 
     assert captured.value.error_code == "OBJECT_SET_IMPORT_UNAVAILABLE"
     assert captured.value.repair["choices"] == ["2023.1", "2024.1", "2025.1"]
+
+
+def test_object_create_rejects_voice_outcome_that_native_route_cannot_express() -> None:
+    session, parent_handle = _session("2025.1")
+    session = session.with_new_declaration(
+        declaration_id="voice",
+        target=NewDescendantTarget(
+            parent_handle=parent_handle,
+            name="Storm Warning",
+            kind="sound-voice",
+        ),
+        fields={},
+    )
+
+    with pytest.raises(BusinessDeclarationError) as captured:
+        business_adapter("object.create").materialize(session)
+
+    assert captured.value.error_code == "OBJECT_CREATE_VOICE_UNAVAILABLE"
+    assert captured.value.repair["choices"] == ["audio.import", "object.set"]
+
+
+def test_create_plugin_rejects_type_handle_from_the_wrong_role() -> None:
+    session, _parent_handle = _session("2025.1")
+    target = session.handles.bind_object(
+        object_id="{33333333-3333-3333-3333-333333333333}",
+        name="Rain",
+        object_type="Sound",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+    )
+    source_type = session.handles.bind_type(
+        class_id=123_456,
+        name="Ak Tone Generator",
+        type_category="Source",
+        catalog_digest="c" * 64,
+    )
+    session = session.with_existing_declaration(
+        declaration_id="effect",
+        target=ExistingObjectTarget(target.handle),
+        fields={
+            "plugin_name": "Rain Effect",
+            "plugin_role": "effect",
+            "plugin_type_handle": source_type.handle,
+        },
+    )
+
+    with pytest.raises(BusinessDeclarationError) as captured:
+        business_adapter("object.createPlugin").materialize(session)
+
+    assert captured.value.error_code == "TYPE_HANDLE_ROLE_MISMATCH"
+    assert captured.value.repair["expected_role"] == "effect"
+
+
+def test_create_plugin_preserves_hostile_notes_but_rejects_reserved_name() -> None:
+    session, _parent_handle = _session("2025.1")
+    target = session.handles.bind_object(
+        object_id="{33333333-3333-3333-3333-333333333333}",
+        name="Rain",
+        object_type="Sound",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+    )
+    plugin_type = session.handles.bind_type(
+        class_id=123_456,
+        name="Ak Tone Generator",
+        type_category="Source",
+        catalog_digest="c" * 64,
+    )
+    hostile_notes = "line one\n'\";$()\\路径"
+    session = session.with_existing_declaration(
+        declaration_id="source",
+        target=ExistingObjectTarget(target.handle),
+        fields={
+            "notes": hostile_notes,
+            "plugin_name": "Rain Tone",
+            "plugin_role": "source",
+            "plugin_type_handle": plugin_type.handle,
+        },
+    )
+    request = business_adapter("object.createPlugin").materialize(session)
+    assert request["arguments"]["plugin"]["notes"] == hostile_notes
+
+    invalid = session.revise_declaration(
+        declaration_id="source",
+        fields={
+            "plugin_name": "Rain/Tone",
+            "plugin_role": "source",
+            "plugin_type_handle": plugin_type.handle,
+        },
+    )
+    with pytest.raises(BusinessDeclarationError) as captured:
+        business_adapter("object.createPlugin").materialize(invalid)
+    assert captured.value.error_code == "PLUGIN_NAME_INVALID"
