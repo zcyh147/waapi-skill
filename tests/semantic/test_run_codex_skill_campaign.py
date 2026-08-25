@@ -74,7 +74,27 @@ def test_unreviewed_harness_does_not_select_protocol_revision() -> None:
         "harness": {"semantic_tree_sha256": "0" * 64},
     }
 
-    assert campaign._sealed_protocol_manifest_revision(effective) is None
+    with pytest.raises(
+        CampaignEvidenceError,
+        match="historical harness hash is unreviewed",
+    ):
+        campaign._sealed_protocol_manifest_revision(effective)
+
+
+def test_current_audio_import_effective_selects_sealed_protocol_revision() -> None:
+    effective = {
+        "selection": {"profile": matrix.AUDIO_IMPORT_BUSINESS_PROFILE_ID},
+        "harness": {
+            "semantic_tree_sha256": "0" * 64,
+            "protocol_manifest_revision": (
+                campaign._CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION
+            ),
+        },
+    }
+
+    assert campaign._sealed_protocol_manifest_revision(effective) == (
+        campaign._CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION
+    )
 
 
 
