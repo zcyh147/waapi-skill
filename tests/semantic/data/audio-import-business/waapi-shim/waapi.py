@@ -179,6 +179,10 @@ class WaapiClient:
                     "type": row["type"],
                     "path": row["path"],
                 }
+                if "parent" in row:
+                    value["parent"] = row["parent"]
+                if "notes" in row:
+                    value["notes"] = row["notes"]
                 if row.get("type") == "Sound":
                     value["@IsVoice"] = bool(row.get("is_voice", False))
                 result.append(value)
