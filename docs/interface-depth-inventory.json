@@ -160319,7 +160319,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "f59fc18775262e130affc5399378ee91fecab0431bc5e68d6e455cd47775c518",
+  "inventory_sha256": "c66da7df3e712f3487eb51fe6d8a04b6bf680d95259ceddc5d5b9dd361a68003",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -192316,7 +192316,7 @@
     },
     {
       "argument_contract_sha256": "9c4b4b6f188b84b75573691d2a9cca021084ac8ef4231751d25f032f1060bf46",
-      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage and exact macOS/Windows 2022.1 and 2025.1 real-host execution, with targeted Fresh Agent routing evidence required before closure.",
+      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage; exact macOS/Windows 2022.1 and 2025.1 real-host execution and targeted Fresh Agent routing evidence remain closure gates.",
       "classification": "named-switch-assignments",
       "contract_sha256": "28d4801956c78b0974a0f139bddb0abb5f54b7510432ca0f67a0e4b53a41b6af",
       "disposition": "already_deep",
@@ -192341,7 +192341,7 @@
     },
     {
       "argument_contract_sha256": "9c4b4b6f188b84b75573691d2a9cca021084ac8ef4231751d25f032f1060bf46",
-      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage and exact macOS/Windows 2022.1 and 2025.1 real-host execution, with targeted Fresh Agent routing evidence required before closure.",
+      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage; exact macOS/Windows 2022.1 and 2025.1 real-host execution and targeted Fresh Agent routing evidence remain closure gates.",
       "classification": "named-switch-assignments",
       "contract_sha256": "64374a3a27a1b1c79ceecb00488728101b476735853040082a17b9968c30e515",
       "disposition": "already_deep",
@@ -192366,7 +192366,7 @@
     },
     {
       "argument_contract_sha256": "9c4b4b6f188b84b75573691d2a9cca021084ac8ef4231751d25f032f1060bf46",
-      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage and exact macOS/Windows 2022.1 and 2025.1 real-host execution, with targeted Fresh Agent routing evidence required before closure.",
+      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage; exact macOS/Windows 2022.1 and 2025.1 real-host execution and targeted Fresh Agent routing evidence remain closure gates.",
       "classification": "named-switch-assignments",
       "contract_sha256": "cefe94fff2be772ea7d670587180686249d555903f95e86fbc1fb5a81f3b1cc9",
       "disposition": "already_deep",
@@ -192391,7 +192391,7 @@
     },
     {
       "argument_contract_sha256": "9c4b4b6f188b84b75573691d2a9cca021084ac8ef4231751d25f032f1060bf46",
-      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage and exact macOS/Windows 2022.1 and 2025.1 real-host execution, with targeted Fresh Agent routing evidence required before closure.",
+      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage; exact macOS/Windows 2022.1 and 2025.1 real-host execution and targeted Fresh Agent routing evidence remain closure gates.",
       "classification": "named-switch-assignments",
       "contract_sha256": "2e079c37158efa6ee91d6ec3de36a8240fb68bff25fe40bbfe6709fab1fccd5a",
       "disposition": "already_deep",
@@ -192416,7 +192416,7 @@
     },
     {
       "argument_contract_sha256": "9c4b4b6f188b84b75573691d2a9cca021084ac8ef4231751d25f032f1060bf46",
-      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage and exact macOS/Windows 2022.1 and 2025.1 real-host execution, with targeted Fresh Agent routing evidence required before closure.",
+      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage; exact macOS/Windows 2022.1 and 2025.1 real-host execution and targeted Fresh Agent routing evidence remain closure gates.",
       "classification": "named-switch-assignments",
       "contract_sha256": "59112937aab44295107315a09e6b6d239b26d3923ea2588f3e39e692b03951a0",
       "disposition": "already_deep",
@@ -192441,7 +192441,7 @@
     },
     {
       "argument_contract_sha256": "9c4b4b6f188b84b75573691d2a9cca021084ac8ef4231751d25f032f1060bf46",
-      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage and exact macOS/Windows 2022.1 and 2025.1 real-host execution, with targeted Fresh Agent routing evidence required before closure.",
+      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage; exact macOS/Windows 2022.1 and 2025.1 real-host execution and targeted Fresh Agent routing evidence remain closure gates.",
       "classification": "named-switch-assignments",
       "contract_sha256": "8979f121c17a5f269ecb87196844a563956f3acbfeaa65d8e2a059c246230833",
       "disposition": "already_deep",
@@ -192466,7 +192466,7 @@
     },
     {
       "argument_contract_sha256": "9c4b4b6f188b84b75573691d2a9cca021084ac8ef4231751d25f032f1060bf46",
-      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage and exact macOS/Windows 2022.1 and 2025.1 real-host execution, with targeted Fresh Agent routing evidence required before closure.",
+      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage; exact macOS/Windows 2022.1 and 2025.1 real-host execution and targeted Fresh Agent routing evidence remain closure gates.",
       "classification": "named-switch-assignments",
       "contract_sha256": "9483119ed494ba2c4401bbd943a0bed9be5a747143d851a842d7bf60c8a9bc26",
       "disposition": "already_deep",
@@ -192491,7 +192491,7 @@
     },
     {
       "argument_contract_sha256": "9c4b4b6f188b84b75573691d2a9cca021084ac8ef4231751d25f032f1060bf46",
-      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage and exact macOS/Windows 2022.1 and 2025.1 real-host execution, with targeted Fresh Agent routing evidence required before closure.",
+      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage; exact macOS/Windows 2022.1 and 2025.1 real-host execution and targeted Fresh Agent routing evidence remain closure gates.",
       "classification": "named-switch-assignments",
       "contract_sha256": "fa0b3b2ba8f499d38c7ac464da4a126a95925e74abcd0c31faa204446eebb082",
       "disposition": "already_deep",
@@ -192516,7 +192516,7 @@
     },
     {
       "argument_contract_sha256": "9c4b4b6f188b84b75573691d2a9cca021084ac8ef4231751d25f032f1060bf46",
-      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage and exact macOS/Windows 2022.1 and 2025.1 real-host execution, with targeted Fresh Agent routing evidence required before closure.",
+      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage; exact macOS/Windows 2022.1 and 2025.1 real-host execution and targeted Fresh Agent routing evidence remain closure gates.",
       "classification": "named-switch-assignments",
       "contract_sha256": "cff2df618feb629971937ae90cf33c06f8dc9e7c7fffa623973f9fe1d6229170",
       "disposition": "already_deep",
@@ -192541,7 +192541,7 @@
     },
     {
       "argument_contract_sha256": "9c4b4b6f188b84b75573691d2a9cca021084ac8ef4231751d25f032f1060bf46",
-      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage and exact macOS/Windows 2022.1 and 2025.1 real-host execution, with targeted Fresh Agent routing evidence required before closure.",
+      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage; exact macOS/Windows 2022.1 and 2025.1 real-host execution and targeted Fresh Agent routing evidence remain closure gates.",
       "classification": "named-switch-assignments",
       "contract_sha256": "a2c8f5d44a72b5fabbb522b6aa7e70f9d0dd58d4645637af76b25c8d4322d815",
       "disposition": "already_deep",
