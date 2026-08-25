@@ -15485,11 +15485,10 @@ def _business_next_action_binding(
             "token_input": "forbidden",
             "refine_only_when": "returned_candidates_do_not_identify_user_intent",
         }
-        declaration = {
+        declaration_prefix = {
             **operation_draft_prefix_copy_binding(
                 declare_field_change_prefix
             ),
-            "append_fields": business_contract["declaration"],
             "submit_once": True,
         }
         shared = {
@@ -15517,23 +15516,62 @@ def _business_next_action_binding(
                 "field_discovery": field_discovery,
             }
         if record.operation == "object.setReference" and len(bound_objects) < 2:
+            clear_declaration = {
+                **declaration_prefix,
+                "append": [
+                    "--object-handle",
+                    "<bound-source-object-handle>",
+                    "--field-handle",
+                    "<selected-field-handle>",
+                    "--clear-reference",
+                ],
+            }
             return {
                 **shared,
                 "required_next_phase": "choose_clear_or_bind_reference_target",
                 "decision": {
-                    "clear": "declare_with_clear_reference_now",
+                    "clear": clear_declaration,
                     "set_target": "bind_the_exact_reference_target_then_read_next_response",
                 },
                 "object_binding": {
                     **object_binding,
                     "use_only_for": ["reference_target"],
                 },
-                "declaration": declaration,
             }
+        if record.operation == "object.setProperty":
+            declaration_append = [
+                "--object-handle",
+                "<bound-source-object-handle>",
+                "--field-handle",
+                "<selected-field-handle>",
+                "--business-value",
+                "<user-requested-business-value>",
+            ]
+        elif record.operation == "object.setReference":
+            declaration_append = [
+                "--object-handle",
+                "<bound-source-object-handle>",
+                "--field-handle",
+                "<selected-field-handle>",
+                "--target-handle",
+                "<bound-reference-target-handle>",
+            ]
+        else:
+            declaration_append = [
+                "--object-handle",
+                "<bound-source-object-handle>",
+                "--field-handle",
+                "<selected-field-handle>",
+                "--link-state",
+                "<linked-or-unlinked>",
+            ]
         return {
             **shared,
             "required_next_phase": "declare_complete_field_change",
-            "declaration": declaration,
+            "declaration": {
+                **declaration_prefix,
+                "append": declaration_append,
+            },
         }
     return {
         "contract": "waapi-skill.business-draft-next-action/v1",

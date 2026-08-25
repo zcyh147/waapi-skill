@@ -235,6 +235,15 @@ def test_property_draft_discovers_opaque_field_and_materializes_business_value(
     assert discovered_next["required_next_phase"] == "declare_complete_field_change"
     assert "object_binding" not in discovered_next
     assert "field_discovery" not in discovered_next
+    assert discovered_next["declaration"]["append"] == [
+        "--object-handle",
+        "<bound-source-object-handle>",
+        "--field-handle",
+        "<selected-field-handle>",
+        "--business-value",
+        "<user-requested-business-value>",
+    ]
+    assert "append_fields" not in discovered_next["declaration"]
 
     declare_code, declared = _offline(
         tmp_path,
