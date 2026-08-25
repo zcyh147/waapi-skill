@@ -1761,6 +1761,10 @@ def test_protocol_strict_round_trip_preserves_all_argument_kinds() -> None:
 
     assert restored == protocol
     assert serialize_protocol(restored) == serialized
+    legacy_serialized = json.loads(json.dumps(serialized))
+    for step in legacy_serialized["steps"]:
+        step.pop("allow_explicit_derived_sfx_language")
+    assert deserialize_protocol(legacy_serialized) == protocol
     assert serialized["steps"][0]["arguments"][1]["kind"] == (
         "semantic_json_object_operation_v1"
     )

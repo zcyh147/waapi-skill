@@ -835,6 +835,9 @@ def _serialize_step(step: ExpectedGatewayStep) -> dict[str, Any]:
         "allow_omitted_default_event_count_one": (
             step.allow_omitted_default_event_count_one
         ),
+        "allow_explicit_derived_sfx_language": (
+            step.allow_explicit_derived_sfx_language
+        ),
         "expected_error_code": step.expected_error_code,
         "expected_result_command": step.expected_result_command,
         "terminal_execute": step.terminal_execute,
@@ -882,7 +885,9 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
     if (
         not isinstance(value, Mapping)
         or not required_fields.issubset(value)
-        or set(value) - required_fields - {"expected_operation_request"}
+        or set(value)
+        - required_fields
+        - {"expected_operation_request", "allow_explicit_derived_sfx_language"}
     ):
         raise PromptProvenanceError("protocol step schema is invalid")
     raw_arguments = value.get("arguments")
@@ -893,6 +898,7 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
         or not value.get("subcommand")
         or type(value.get("allow_omitted_empty_json_objects")) is not bool
         or type(value.get("allow_omitted_default_event_count_one")) is not bool
+        or type(value.get("allow_explicit_derived_sfx_language", False)) is not bool
         or not isinstance(value.get("expected_error_code"), str)
         or not isinstance(value.get("expected_result_command"), str)
         or type(value.get("terminal_execute")) is not bool
@@ -1490,6 +1496,10 @@ def _deserialize_step(value: Any) -> ExpectedGatewayStep:
             allow_omitted_default_event_count_one=value[
                 "allow_omitted_default_event_count_one"
             ],
+            allow_explicit_derived_sfx_language=value.get(
+                "allow_explicit_derived_sfx_language",
+                False,
+            ),
             expected_error_code=value["expected_error_code"],
             expected_result_command=value["expected_result_command"],
             terminal_execute=value["terminal_execute"],
