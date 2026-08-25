@@ -31,6 +31,7 @@ from .identity_limits import MULTI_IDENTITY_READ_MAX_IDS
 from .metadata_restrictions import (
     MetadataRestrictionError,
     reference_allowed_types,
+    reference_type_token,
 )
 
 
@@ -738,8 +739,8 @@ class BusinessHandleRegistry:
             allowed = tuple(restrictions.get("allowed_target_types", ()))
             if target is None or (
                 allowed
-                and _type_token(target.object_type)
-                not in {_type_token(item) for item in allowed}
+                and reference_type_token(target.object_type)
+                not in {reference_type_token(item) for item in allowed}
             ):
                 raise _error(
                     "REFERENCE_TARGET_TYPE_MISMATCH",

@@ -66,6 +66,7 @@ from .identity_limits import MULTI_IDENTITY_READ_MAX_IDS
 from .metadata_restrictions import (
     MetadataRestrictionError,
     reference_allowed_types,
+    reference_type_token,
 )
 from .operation_import import (
     AUTO_CHECK_OUT_TO_SOURCE_CONTROL_VERSIONS,
@@ -20090,8 +20091,8 @@ def _require_reference_target_allowed(
             "Reference target readback must expose a type when live restrictions are present.",
             details={"reference": metadata.name, "target": target.as_dict()},
         )
-    target_token = _reference_type_token(target_type)
-    allowed_tokens = {_reference_type_token(value) for value in allowed_types}
+    target_token = reference_type_token(target_type)
+    allowed_tokens = {reference_type_token(value) for value in allowed_types}
     if target_token not in allowed_tokens:
         raise OperationContractError(
             "INVALID_REFERENCE_TARGET",
@@ -20153,16 +20154,6 @@ def _require_reference_clear_allowed(
                     "restriction": dict(metadata.restriction),
                 },
             )
-
-
-def _reference_type_token(value: str) -> str:
-    token = "".join(character for character in value.casefold() if character.isalnum())
-    aliases = {
-        "audiobus": "bus",
-        "auxiliarybus": "auxbus",
-        "auxbus": "auxbus",
-    }
-    return aliases.get(token, token)
 
 
 def _valid_object_id(value: Any) -> bool:

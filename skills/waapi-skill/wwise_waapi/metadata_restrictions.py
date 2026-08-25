@@ -64,4 +64,22 @@ def reference_allowed_types(restriction: Mapping[str, Any]) -> tuple[str, ...]:
     return tuple(sorted(allowed))
 
 
-__all__ = ["MetadataRestrictionError", "reference_allowed_types"]
+def reference_type_token(value: str) -> str:
+    """Normalize one reflected/live Wwise reference target type consistently."""
+
+    if not isinstance(value, str) or not value:
+        raise ValueError("reference target type must be a non-empty string")
+    token = "".join(character for character in value.casefold() if character.isalnum())
+    aliases = {
+        "audiobus": "bus",
+        "auxiliarybus": "auxbus",
+        "auxbus": "auxbus",
+    }
+    return aliases.get(token, token)
+
+
+__all__ = [
+    "MetadataRestrictionError",
+    "reference_allowed_types",
+    "reference_type_token",
+]

@@ -649,6 +649,31 @@ def test_reference_dependencies_never_use_property_enabled_api(
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
+def test_reference_handle_uses_shared_live_type_aliases(version: str) -> None:
+    registry = BusinessHandleRegistry(
+        _context(wwise_version=version, wwise_build=f"{version}.fixture"),
+        token_bytes=lambda size: b"p" * size,
+    )
+    target = registry.bind_object(
+        object_id=BUS_ID,
+        name="SFX",
+        object_type="Bus",
+        path=r"\Master-Mixer Hierarchy\Default Work Unit\SFX",
+    )
+    field = registry.bind_field(
+        scope_kind="object",
+        scope_value=OBJECT_ID,
+        token="OutputBus",
+        field_kind="reference",
+        value_type="reference",
+        restrictions={"allowed_target_types": ["Audio Bus"]},
+        metadata_digest="a" * 64,
+    )
+
+    assert registry.validate_field_value(field, target.handle) == target.handle
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
 def test_live_field_binding_returns_exact_candidates_and_disabled_repair(
     version: str,
 ) -> None:
