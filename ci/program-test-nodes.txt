@@ -67,6 +67,8 @@ tests/unit/test_operation_soundbank.py
 tests/unit/test_operation_registry.py
 tests/unit/test_operation_input_gateway.py
 tests/unit/test_object_lifecycle_business_adapter.py
+tests/unit/test_object_metadata_business_adapter.py
+tests/unit/test_object_metadata_business_gateway.py
 tests/unit/test_operation_registry_import_verifier.py
 tests/unit/test_workflow_evidence.py
 tests/unit/test_operation_verification_kind_ownership.py
