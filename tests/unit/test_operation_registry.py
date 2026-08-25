@@ -142,16 +142,16 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                 "object.delete",
                 "object.move",
                 "object.setName",
-                "object.setNotes",
-                "object.setLinked",
-                "object.setProperty",
-                "object.setReference",
-            }
+                    "object.setNotes",
+                    "object.setLinked",
+                    "object.setProperty",
+                    "object.setReference",
+                    "object.create",
+                }
             else COMPOSER_INPUT_MODE
             if name
                 in {
-                "object.create",
-                "object.createPlugin",
+                    "object.createPlugin",
                 "object.set",
                 "object.setRTPC",
                 "soundbank.convertExternalSources",

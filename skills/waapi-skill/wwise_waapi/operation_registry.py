@@ -3520,7 +3520,7 @@ _OPERATION_INPUT_MODE_DECLARATIONS: tuple[
     ("lua.executeCoreFile", ("2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
     ("lua.executeCoreInline", ("2025.1",), COMPOSER_INPUT_MODE),
     ("object.copy", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
-    ("object.create", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
+    ("object.create", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
     ("object.createPlugin", ("2022.1", "2023.1", "2024.1", "2025.1"), COMPOSER_INPUT_MODE),
     ("object.delete", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),
     ("object.move", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"), BUSINESS_DECLARATION_INPUT_MODE),

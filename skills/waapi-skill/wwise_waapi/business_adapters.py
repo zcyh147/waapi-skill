@@ -13,6 +13,7 @@ from .object_lifecycle_business_contracts import (
 from .object_metadata_business_contracts import (
     object_metadata_business_contract_data,
 )
+from .object_graph_business_contracts import object_graph_business_contract_data
 
 
 ContractBuilder = Callable[[str, str], dict[str, Any]]
@@ -38,6 +39,10 @@ def _object_lifecycle_contract(operation: str, version: str) -> dict[str, Any]:
 
 def _object_metadata_contract(operation: str, version: str) -> dict[str, Any]:
     return object_metadata_business_contract_data(operation, version)
+
+
+def _object_graph_contract(operation: str, version: str) -> dict[str, Any]:
+    return object_graph_business_contract_data(operation, version)
 
 
 def _materialize_audio_import(
@@ -90,6 +95,15 @@ def _materialize_object_metadata(
     return materialize_object_metadata_business_request(operation, session)
 
 
+def _materialize_object_graph(
+    operation: str,
+    session: BusinessDeclarationSession,
+) -> Mapping[str, Any]:
+    from .object_graph_business import materialize_object_graph_business_request
+
+    return materialize_object_graph_business_request(operation, session)
+
+
 def _compile_audio_import_preview(
     session: BusinessDeclarationSession,
     build_continuation: Callable[..., Mapping[str, Any]],
@@ -118,6 +132,7 @@ class BusinessAdapter:
     requires_sound_subtype: bool = False
     supports_field_binding: bool = False
     supports_field_discovery: bool = False
+    supports_type_discovery: bool = False
     auto_apply_preview: bool = False
     records_business_preview: bool = False
     requires_wwise_path_discipline: bool = False
@@ -243,6 +258,34 @@ _OBJECT_METADATA_DEFINITION = {
     "auto_apply_preview": True,
 }
 
+_OBJECT_GRAPH_DEFINITION = {
+    "family": "object-creation-graph",
+    "contract_builder": _object_graph_contract,
+    "materializer": _materialize_object_graph,
+    "update_commands": frozenset(
+        {
+            "draft-declare-new",
+            "draft-remove-declaration",
+            "draft-revise-declaration",
+        }
+    ),
+    "initial_projection_actions": ("bind-object", "inspect", "cancel"),
+    "active_projection_actions": (
+        "bind-object",
+        "declare-new",
+        "revise-declaration",
+        "remove-declaration",
+        "check",
+        "inspect",
+        "cancel",
+    ),
+    "requires_sound_subtype": False,
+    "supports_field_binding": True,
+    "supports_type_discovery": True,
+    "auto_apply_preview": True,
+    "requires_wwise_path_discipline": True,
+}
+
 
 def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdapter:
     values = dict(definition)
@@ -258,6 +301,7 @@ def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdap
 
 _BUSINESS_ADAPTERS = {
     "audio.import": _bind_adapter("audio.import", _AUDIO_IMPORT_DEFINITION),
+    "object.create": _bind_adapter("object.create", _OBJECT_GRAPH_DEFINITION),
     **{
         operation: _bind_adapter(operation, _OBJECT_LIFECYCLE_DEFINITION)
         for operation in (

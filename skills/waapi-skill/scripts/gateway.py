@@ -247,6 +247,7 @@ from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore
     bind_live_field,
     revalidate_live_field,
     revalidate_live_objects,
+    revalidate_live_types,
 )
 from wwise_waapi.operation_composer import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_TYPED_ACTIONS_PER_APPLY,
@@ -1973,6 +1974,27 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="SEARCH_PHRASE",
     )
     draft_discover_fields.add_argument("--platform")
+
+    draft_discover_types = subparsers.add_parser(
+        "draft-discover-types",
+        help=(
+            "Resolve a user-facing object or plug-in kind into bounded live "
+            "type handles"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_discover_types)
+    draft_discover_types.add_argument(
+        "--meaning",
+        action="append",
+        dest="meanings",
+        required=True,
+        metavar="SEARCH_PHRASE",
+    )
+    draft_discover_types.add_argument(
+        "--role",
+        choices=("object", "source", "effect"),
+        required=True,
+    )
     draft_apply.add_argument(
         "--facts",
         nargs=argparse.REMAINDER,
@@ -8312,6 +8334,16 @@ def dispatch_command(
             dispatcher=dispatcher,
             common=common,
         )
+    if args.command == "draft-discover-types":
+        return dispatch_business_type_discovery(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
     if args.command == "preview-from-draft":
         return dispatch_operation_draft_preview(
             args,
@@ -10124,6 +10156,16 @@ def dispatch_operation_draft_check(
                     bound_field,
                     read_call=read_call,
                 )
+        if adapter.supports_type_discovery:
+            bound_types = tuple(
+                business_session.handles.resolve_type(row["handle"])
+                for row in business_session.handles.as_dict()["types"]
+            )
+            revalidate_live_types(
+                business_session.handles,
+                bound_types,
+                read_call=read_call,
+            )
 
         def build_business_continuation(
             _request: Mapping[str, Any],
@@ -11040,6 +11082,184 @@ def dispatch_business_field_discovery(
             "rejected_candidate_count": len(rejected),
             "selection_required": True,
             "selection_rule": "copy_one_returned_field_candidate.handle",
+        }
+    )
+    return payload
+
+
+def dispatch_business_type_discovery(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Issue opaque handles for bounded live object or plug-in type matches."""
+
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if not adapter.supports_type_discovery:
+        raise GatewayInputError(
+            f"Business type discovery is unavailable for {binding.record.operation}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    if raw_session is None:
+        raise GatewayInputError(
+            "Bind the exact object or parent before type discovery"
+        )
+    session = BusinessDeclarationSession.from_dict(raw_session)
+    if binding.context != session.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the business declaration binding."
+        )
+    meanings = tuple(args.meanings)
+    if (
+        not 1 <= len(meanings) <= MAX_METADATA_DISCOVERY_QUERIES
+        or any(
+            not isinstance(value, str)
+            or not value.strip()
+            or len(value) > MAX_METADATA_DISCOVERY_QUERY_CHARS
+            for value in meanings
+        )
+        or sum(len(value) for value in meanings)
+        > MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS
+    ):
+        raise GatewayInputError("Business type meanings exceed their fixed bounds")
+    read_call = metadata_cached_read_call(
+        binding.read_call,
+        connection=connection,
+        version=detected_version,
+        live_info=live_info,
+        project=binding.project,
+        state_dir=binding.state_dir,
+    )
+    try:
+        rows = parse_get_types_result(read_call(CACHE_GET_TYPES_URI, {}, {}))
+    except (TypeError, ValueError) as exc:
+        raise GatewayResultShapeError(
+            "Live object type discovery returned an invalid catalog.",
+            error_code="INVALID_METADATA_RESULT",
+        ) from exc
+    role = str(args.role)
+
+    def role_matches(type_category: str) -> bool:
+        category = type_category.casefold()
+        if role == "source":
+            return category == "source"
+        if role == "effect":
+            return category == "effect"
+        return category not in {"source", "effect"}
+
+    def score(meaning: str, *, name: str, category: str) -> int:
+        query = meaning.strip().casefold()
+        candidate = name.casefold()
+        if query == candidate:
+            return 1_000
+        if query in candidate:
+            return 700 + len(query)
+        tokens = tuple(
+            token
+            for token in "".join(
+                character if character.isalnum() else " "
+                for character in query
+            ).split()
+            if token
+        )
+        searchable = f"{candidate} {category.casefold()}"
+        matched = sum(token in searchable for token in tokens)
+        return 100 * matched if matched and matched == len(tokens) else 0
+
+    ranked: list[tuple[Any, list[str], int]] = []
+    for row in rows:
+        if not role_matches(row.type):
+            continue
+        scores = {
+            meaning: score(meaning, name=row.name, category=row.type)
+            for meaning in meanings
+        }
+        matched = [meaning for meaning in meanings if scores[meaning] > 0]
+        if matched:
+            ranked.append((row, matched, sum(scores.values())))
+    ranked.sort(
+        key=lambda item: (-item[2], item[0].name.casefold(), item[0].class_id)
+    )
+    selected = ranked[:MAX_METADATA_DISCOVERY_LIMIT]
+    if not selected:
+        raise GatewayInputError(
+            "Live type discovery found no candidate compatible with this role"
+        )
+    catalog_digest = canonical_sha256([row.as_dict() for row in rows])
+    captured: list[Any] = []
+
+    def bind(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        handles = BusinessHandleRegistry.from_dict(current.handles.as_dict())
+        for row, _matched, _score in selected:
+            captured.append(
+                handles.bind_type(
+                    class_id=row.class_id,
+                    name=row.name,
+                    type_category=row.type,
+                    catalog_digest=catalog_digest,
+                )
+            )
+        return current.with_handle_registry(handles)
+
+    schema_digest = operation_draft_schema_digest(
+        binding.record.operation,
+        detected_version,
+    )
+    composer_digest = operation_composer_digest(
+        binding.record.operation,
+        detected_version,
+    )
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+        context=binding.context,
+        update=bind,
+        event_type="handles.bound",
+    )
+    candidates = [
+        {
+            "handle": bound.handle,
+            "label": bound.name,
+            "role": role,
+            "matched_meanings": list(selected[index][1]),
+        }
+        for index, bound in enumerate(captured)
+    ]
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+            "type_candidates": candidates,
+            "candidate_count": len(candidates),
+            "selection_required": True,
+            "selection_rule": "copy_one_returned_type_candidate.handle",
         }
     )
     return payload
@@ -15418,6 +15638,72 @@ def _business_next_action_binding(
             "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
             "then_read_next_response": True,
             "precompute_or_increment_revision": False,
+        }
+    if adapter.supports_type_discovery:
+        type_discover_prefix = [*base, "draft-discover-types", *binding]
+        declaration_prefix = [*base, "draft-declare-new", *binding]
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": {
+                "agent": "natural_language_to_closed_high_level_business_facts",
+                "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
+            },
+            "business_contract": business_contract,
+            "object_binding": object_binding,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "native_object_type",
+                "plugin_class_id",
+                "recursive_request_fragment",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        type_discovery = {
+            **operation_draft_prefix_copy_binding(type_discover_prefix),
+            "append": [
+                "--meaning",
+                "<user-facing-object-kind>",
+                "--role",
+                "object",
+            ],
+            "use_when": "requested_kind_is_not_one_disclosed_stable_semantic_kind",
+            "result": "copy_one_returned_type_candidate.handle",
+            "native_type_input": "forbidden",
+            "class_id_input": "forbidden",
+        }
+        declare = {
+            **operation_draft_prefix_copy_binding(declaration_prefix),
+            "append": [
+                "--declaration-id",
+                "<task-local-id>",
+                "--parent-handle",
+                "<bound-or-planned-parent-handle>",
+                "--name",
+                "<requested-object-name>",
+                "--kind",
+                "<stable-semantic-kind-or-selected-type-handle>",
+                "[--field <stable-business-field> <business-value>]...",
+            ],
+            "task_local_id": "bounded_unique_not_business_data",
+            "planned_child_result": "copy_returned_declaration.result_handle",
+        }
+        return {
+            **shared,
+            "required_next_phase": (
+                "declare_remaining_named_objects_or_check_complete_graph"
+                if session.declarations
+                else "declare_named_object_or_discover_long_tail_kind"
+            ),
+            "type_discovery": type_discovery,
+            "declaration": declare,
+            "completion_candidate": {
+                "condition": "all_user_requested_named_objects_are_declared",
+                "fixed_full_argv": check,
+                "copy_command": operation_draft_copy_command(check),
+                "is_next_command_when_condition_true": bool(session.declarations),
+            },
         }
     if not (adapter.supports_field_binding or adapter.supports_field_discovery):
         if session.declarations:

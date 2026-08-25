@@ -41,7 +41,11 @@ BUSINESS_CONTEXT_CONTRACT = "waapi-skill.business-context/v1"
 OPERATION_DRAFT_AUTHORITY_CONTRACT = "waapi-skill.operation-draft-authority/v1"
 BOUND_OBJECT_HANDLE_CONTRACT = "waapi-skill.bound-object-handle/v1"
 BOUND_FIELD_HANDLE_CONTRACT = "waapi-skill.bound-field-handle/v1"
-BUSINESS_HANDLE_REGISTRY_CONTRACT = "waapi-skill.business-handle-registry/v1"
+BOUND_TYPE_HANDLE_CONTRACT = "waapi-skill.bound-type-handle/v1"
+BUSINESS_HANDLE_REGISTRY_CONTRACT = "waapi-skill.business-handle-registry/v2"
+_LEGACY_BUSINESS_HANDLE_REGISTRY_CONTRACT = (
+    "waapi-skill.business-handle-registry/v1"
+)
 
 SUPPORTED_WWISE_VERSIONS = (
     "2021.1",
@@ -87,6 +91,7 @@ _TASK_AUTHORITY = re.compile(r"^da1-[0-9a-f]{40}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _OBJECT_HANDLE = re.compile(r"^boh1-[0-9a-f]{32}$")
 _FIELD_HANDLE = re.compile(r"^bfh1-[0-9a-f]{32}$")
+_TYPE_HANDLE = re.compile(r"^bth1-[0-9a-f]{32}$")
 _CANONICAL_GUID = re.compile(
     r"^\{[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
     r"[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\}$"
@@ -232,6 +237,17 @@ class BoundFieldHandle:
     platform: str | int | None
     restrictions: Mapping[str, Any]
     metadata_digest: str
+    binding_digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class BoundTypeHandle:
+    handle: str
+    context: BusinessContext
+    class_id: int
+    name: str
+    type_category: str
+    catalog_digest: str
     binding_digest: str
 
 
@@ -431,6 +447,7 @@ class BusinessHandleRegistry:
         self._token_bytes = token_bytes
         self._objects: dict[str, BoundObjectHandle] = {}
         self._fields: dict[str, BoundFieldHandle] = {}
+        self._types: dict[str, BoundTypeHandle] = {}
 
     def bind_object(
         self,
@@ -516,6 +533,18 @@ class BusinessHandleRegistry:
                 }
                 for row in sorted(self._fields.values(), key=lambda item: item.handle)
             ],
+            "types": [
+                {
+                    "contract": BOUND_TYPE_HANDLE_CONTRACT,
+                    "handle": row.handle,
+                    "class_id": row.class_id,
+                    "name": row.name,
+                    "type_category": row.type_category,
+                    "catalog_digest": row.catalog_digest,
+                    "binding_digest": row.binding_digest,
+                }
+                for row in sorted(self._types.values(), key=lambda item: item.handle)
+            ],
         }
 
     @classmethod
@@ -525,20 +554,26 @@ class BusinessHandleRegistry:
         *,
         token_bytes: TokenBytes = secrets.token_bytes,
     ) -> "BusinessHandleRegistry":
-        if not isinstance(payload, Mapping) or set(payload) != {
-            "contract",
-            "context",
-            "objects",
-            "fields",
-        }:
+        if not isinstance(payload, Mapping):
             raise ValueError("business handle registry fields are invalid")
-        if payload.get("contract") != BUSINESS_HANDLE_REGISTRY_CONTRACT:
+        contract = payload.get("contract")
+        expected = {"contract", "context", "objects", "fields"}
+        if contract == BUSINESS_HANDLE_REGISTRY_CONTRACT:
+            expected.add("types")
+        elif contract != _LEGACY_BUSINESS_HANDLE_REGISTRY_CONTRACT:
             raise ValueError("business handle registry contract is invalid")
+        if set(payload) != expected:
+            raise ValueError("business handle registry fields are invalid")
         context = BusinessContext.from_binding_dict(payload.get("context"))
         registry = cls(context, token_bytes=token_bytes)
         raw_objects = payload.get("objects")
         raw_fields = payload.get("fields")
-        if not isinstance(raw_objects, list) or not isinstance(raw_fields, list):
+        raw_types = payload.get("types", [])
+        if (
+            not isinstance(raw_objects, list)
+            or not isinstance(raw_fields, list)
+            or not isinstance(raw_types, list)
+        ):
             raise ValueError("business handle registry rows are invalid")
         for raw in raw_objects:
             bound = _bound_object_from_dict(raw, context=context)
@@ -550,7 +585,85 @@ class BusinessHandleRegistry:
             if bound.handle in registry._fields:
                 raise ValueError("business field handles must be unique")
             registry._fields[bound.handle] = bound
+        for raw in raw_types:
+            bound = _bound_type_from_dict(raw, context=context)
+            if bound.handle in registry._types:
+                raise ValueError("business type handles must be unique")
+            registry._types[bound.handle] = bound
         return registry
+
+    def bind_type(
+        self,
+        *,
+        class_id: int,
+        name: str,
+        type_category: str,
+        catalog_digest: str,
+    ) -> BoundTypeHandle:
+        if (
+            isinstance(class_id, bool)
+            or not isinstance(class_id, int)
+            or not 0 <= class_id <= 0xFFFFFFFF
+        ):
+            raise ValueError("class_id must be uint32")
+        normalized_name = _bounded_required_text(
+            name,
+            field="name",
+            maximum_bytes=MAX_BUSINESS_NAME_BYTES,
+        )
+        normalized_category = _bounded_required_text(
+            type_category,
+            field="type_category",
+            maximum_bytes=MAX_FIELD_TOKEN_BYTES,
+        )
+        if not isinstance(catalog_digest, str) or not _SHA256.fullmatch(
+            catalog_digest
+        ):
+            raise ValueError("catalog_digest must be a lowercase SHA-256")
+        material = {
+            "contract": BOUND_TYPE_HANDLE_CONTRACT,
+            "context": self.context.as_binding_dict(),
+            "class_id": class_id,
+            "name": normalized_name,
+            "type_category": normalized_category,
+            "catalog_digest": catalog_digest,
+        }
+        digest = canonical_sha256(material)
+        handle = self._new_handle("bth1", digest)
+        bound = BoundTypeHandle(
+            handle=handle,
+            context=self.context,
+            class_id=class_id,
+            name=normalized_name,
+            type_category=normalized_category,
+            catalog_digest=catalog_digest,
+            binding_digest=digest,
+        )
+        self._types[handle] = bound
+        return bound
+
+    def resolve_type(
+        self,
+        handle: str,
+        *,
+        context: BusinessContext | None = None,
+    ) -> BoundTypeHandle:
+        if not isinstance(handle, str) or not _TYPE_HANDLE.fullmatch(handle):
+            raise _error(
+                "TYPE_HANDLE_NOT_AVAILABLE",
+                field="kind_handle",
+                action="discover the type in this task and use its returned handle",
+            )
+        bound = self._types.get(handle)
+        if bound is None:
+            raise _error(
+                "TYPE_HANDLE_NOT_AVAILABLE",
+                field="kind_handle",
+                rejected_handle=handle,
+                action="discover the type in this task and use its returned handle",
+            )
+        self._require_context(bound.context, context or self.context, handle=handle)
+        return bound
 
     def resolve_object(
         self,
@@ -1121,6 +1234,60 @@ def revalidate_live_object(
     return revalidate_live_objects(registry, (bound,), read_call=read_call)[0]
 
 
+def revalidate_live_types(
+    registry: BusinessHandleRegistry,
+    bounds: Sequence[BoundTypeHandle],
+    *,
+    read_call: ReadCall,
+) -> tuple[BoundTypeHandle, ...]:
+    """Re-read one bounded type catalog and require every sealed row exactly."""
+
+    if not isinstance(registry, BusinessHandleRegistry):
+        raise TypeError("registry must be BusinessHandleRegistry")
+    if (
+        not isinstance(bounds, Sequence)
+        or isinstance(bounds, (str, bytes))
+        or any(not isinstance(bound, BoundTypeHandle) for bound in bounds)
+    ):
+        raise TypeError("bounds must be a sequence of BoundTypeHandle values")
+    if not bounds:
+        return ()
+    try:
+        rows = parse_get_types_result(read_call(GET_TYPES_URI, {}, {}))
+    except (TypeError, ValueError) as exc:
+        raise _error(
+            "METADATA_READBACK_INVALID",
+            field="kind_handle",
+            action="refresh live Wwise type discovery before Preview",
+        ) from exc
+    live_digest = canonical_sha256(
+        {"return": [row.as_dict() for row in rows]}
+    )
+    for bound in bounds:
+        registry.resolve_type(bound.handle)
+        matches = [
+            row
+            for row in rows
+            if row.class_id == bound.class_id
+            and row.name == bound.name
+            and row.type == bound.type_category
+        ]
+        if (
+            len(matches) != 1
+            or not hmac.compare_digest(
+                live_digest,
+                bound.catalog_digest,
+            )
+        ):
+            raise _error(
+                "TYPE_HANDLE_STALE",
+                field="kind_handle",
+                rejected_handle=bound.handle,
+                action="repeat live type discovery and use the new handle",
+            )
+    return tuple(bounds)
+
+
 def revalidate_live_objects(
     registry: BusinessHandleRegistry,
     bounds: Sequence[BoundObjectHandle],
@@ -1587,6 +1754,74 @@ def _bound_field_from_dict(
     )
 
 
+def _bound_type_from_dict(
+    payload: Any,
+    *,
+    context: BusinessContext,
+) -> BoundTypeHandle:
+    expected = {
+        "contract",
+        "handle",
+        "class_id",
+        "name",
+        "type_category",
+        "catalog_digest",
+        "binding_digest",
+    }
+    if not isinstance(payload, Mapping) or set(payload) != expected:
+        raise ValueError("bound type handle fields are invalid")
+    if payload.get("contract") != BOUND_TYPE_HANDLE_CONTRACT:
+        raise ValueError("bound type handle contract is invalid")
+    handle = payload.get("handle")
+    class_id = payload.get("class_id")
+    catalog_digest = payload.get("catalog_digest")
+    if not isinstance(handle, str) or not _TYPE_HANDLE.fullmatch(handle):
+        raise ValueError("bound type handle token is invalid")
+    if (
+        isinstance(class_id, bool)
+        or not isinstance(class_id, int)
+        or not 0 <= class_id <= 0xFFFFFFFF
+    ):
+        raise ValueError("bound type class id is invalid")
+    name = _bounded_required_text(
+        payload.get("name"), field="name", maximum_bytes=MAX_BUSINESS_NAME_BYTES
+    )
+    type_category = _bounded_required_text(
+        payload.get("type_category"),
+        field="type_category",
+        maximum_bytes=MAX_FIELD_TOKEN_BYTES,
+    )
+    if not isinstance(catalog_digest, str) or not _SHA256.fullmatch(
+        catalog_digest
+    ):
+        raise ValueError("bound type catalog digest is invalid")
+    material = {
+        "contract": BOUND_TYPE_HANDLE_CONTRACT,
+        "context": context.as_binding_dict(),
+        "class_id": class_id,
+        "name": name,
+        "type_category": type_category,
+        "catalog_digest": catalog_digest,
+    }
+    expected_digest = canonical_sha256(material)
+    digest = payload.get("binding_digest")
+    if (
+        not isinstance(digest, str)
+        or not _SHA256.fullmatch(digest)
+        or not hmac.compare_digest(digest, expected_digest)
+    ):
+        raise ValueError("bound type binding digest is invalid")
+    return BoundTypeHandle(
+        handle=handle,
+        context=context,
+        class_id=class_id,
+        name=name,
+        type_category=type_category,
+        catalog_digest=catalog_digest,
+        binding_digest=digest,
+    )
+
+
 def _normalize_restrictions(
     restrictions: Mapping[str, Any],
     *,
@@ -1810,12 +2045,14 @@ def _type_token(value: str) -> str:
 __all__ = [
     "BOUND_FIELD_HANDLE_CONTRACT",
     "BOUND_OBJECT_HANDLE_CONTRACT",
+    "BOUND_TYPE_HANDLE_CONTRACT",
     "BUSINESS_CONTEXT_CONTRACT",
     "BUSINESS_KIND_CONTRACT",
     "BUSINESS_REPAIR_CONTRACT",
     "COMMON_BUSINESS_FIELDS",
     "BoundFieldHandle",
     "BoundObjectHandle",
+    "BoundTypeHandle",
     "BusinessContext",
     "BusinessDeclarationError",
     "BusinessHandleRegistry",
@@ -1831,6 +2068,7 @@ __all__ = [
     "revalidate_live_field",
     "revalidate_live_object",
     "revalidate_live_objects",
+    "revalidate_live_types",
     "repair_at_draft_revision",
     "resolve_semantic_kind",
 ]

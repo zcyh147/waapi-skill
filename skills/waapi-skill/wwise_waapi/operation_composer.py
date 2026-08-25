@@ -2966,6 +2966,11 @@ def composition_projection(
                 "cancel",
             ],
         }
+    if operation_uses_business_declaration(operation, version):
+        return _business_composition_projection(
+            normalized,
+            operation=operation,
+        )
     if operation.startswith("ak.") or operation in DRAFT_TYPED_OPERATIONS:
         missing: list[str] = []
         try:
@@ -2990,11 +2995,6 @@ def composition_projection(
                 "cancel",
             ],
         }
-    if operation_uses_business_declaration(operation, version):
-        return _business_composition_projection(
-            normalized,
-            operation=operation,
-        )
     facts = [
         {
             "handle": target["handle"],

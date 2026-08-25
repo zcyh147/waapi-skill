@@ -647,7 +647,13 @@ def _validate_target(
                 action="provide one child name without Wwise path syntax",
             )
         try:
-            resolve_semantic_kind(target.kind, version=handles.context.wwise_version)
+            if target.kind.startswith("bth1-"):
+                handles.resolve_type(target.kind)
+            else:
+                resolve_semantic_kind(
+                    target.kind,
+                    version=handles.context.wwise_version,
+                )
         except BusinessDeclarationError as exc:
             raise repair_at_draft_revision(
                 exc,
