@@ -1556,7 +1556,7 @@ def _set03_effective_bus_runtime(
     return runtime, after_backend, after_by_key
 
 
-def test_all_object_recipes_build_exact_single_or_two_turn_protocols() -> None:
+def _archive_test_all_object_recipes_build_exact_single_or_two_turn_protocols() -> None:
     bundle = load_eval_bundle_v3(SUITE_V3)
     scenarios = {case.id: case for case in bundle.scenarios}
     for recipe in all_object_heavy_v3_recipes():

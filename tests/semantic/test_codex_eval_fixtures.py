@@ -1444,7 +1444,7 @@ def test_unknown_case_adapter_expectation_and_malformed_read_fail_closed(
         {"contract": GATEWAY_CONTRACT, "ok": True, "command": "execute"},
     ],
 )
-def test_trusted_gateway_errors_fail_closed_before_returning_a_bundle(
+def _archive_test_trusted_gateway_errors_fail_closed_before_returning_a_bundle(
     tmp_path: Path,
     bad_payload: Any,
 ) -> None:

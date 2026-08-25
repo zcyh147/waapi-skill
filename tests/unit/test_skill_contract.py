@@ -77,8 +77,9 @@ def test_operate_contract_preserves_posix_wwise_path_backslashes() -> None:
     assert "no relative/traversal" in text
 
 
-def test_operate_contract_keeps_single_object_metadata_on_the_exact_guid_scope() -> None:
+def test_operate_contract_binds_single_object_metadata_to_the_exact_owner() -> None:
     text = doc_text("references/waapi-operate.md")
 
-    assert "`--object` for one existing object means `--object <canonical-guid>`" in text
-    assert "`--object-type` is invalid for that single object" in text
+    assert "GUIDs use `by_id`" in text
+    assert "Bind the exact existing owner" in text
+    assert "fixes the metadata scope inside the Draft" in text

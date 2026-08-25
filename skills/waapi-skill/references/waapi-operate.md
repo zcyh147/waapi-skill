@@ -128,7 +128,7 @@ Prompt/schema text, cached schemas, and Wwise knowledge are never exact live met
 
 Preview remains authoritative; never inspect metadata-cache files.
 
-For direct imports, bind only user-requested custom properties/references; common fields such as volume, infinite looping, output bus, notes, Event, Dialogue Event, and Switch value use their stable business fields. For table imports, discover only dynamic `Property[...]`, `Reference[...]`, or `@...` columns.
+For business declarations, bind only user-requested custom properties/references; common outcomes such as volume, infinite looping, output bus, maximum instances, parent instance-limit override, notes, Event, Dialogue Event, and Switch value use stable business fields. For table imports, discover only dynamic `Property[...]`, `Reference[...]`, or `@...` columns.
 
 For user Lua files use `lua.executeCoreFile` in Authoring, or `lua.executeCliFile` only for explicit CLI; there is no `lua.executeFile` operation.
 

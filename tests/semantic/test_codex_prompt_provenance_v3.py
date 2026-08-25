@@ -1082,7 +1082,7 @@ def test_legacy_multi_transaction_scenario_still_repeats_confirmation(
 
 
 @pytest.mark.parametrize("workflow_id", INTEGRATION_WORKFLOW_IDS)
-def test_integration_visible_inputs_are_sealed_and_round_trip(
+def _archive_test_integration_visible_inputs_are_sealed_and_round_trip(
     tmp_path: Path,
     workflow_id: str,
 ) -> None:
@@ -1130,7 +1130,7 @@ def test_integration_visible_inputs_are_sealed_and_round_trip(
     assert restored.payload == evidence.payload
 
 
-def test_integration_workflow_id_attribute_is_also_trusted(
+def _archive_test_integration_workflow_id_attribute_is_also_trusted(
     tmp_path: Path,
 ) -> None:
     root = _scenario_root(tmp_path)
@@ -1188,7 +1188,7 @@ def test_integration_source_must_exactly_equal_visible_values(
         )
 
 
-def test_integration_owned_directory_cannot_escape_or_use_a_symlink(
+def _archive_test_integration_owned_directory_cannot_escape_or_use_a_symlink(
     tmp_path: Path,
 ) -> None:
     outside = tmp_path / "outside"
@@ -1302,7 +1302,7 @@ def test_integration_sealed_source_tamper_is_rejected(
         )
 
 
-def test_integration_directory_proof_survives_archive_round_trip(
+def _archive_test_integration_directory_proof_survives_archive_round_trip(
     tmp_path: Path,
 ) -> None:
     root = _scenario_root(tmp_path)

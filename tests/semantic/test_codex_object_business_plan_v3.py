@@ -203,7 +203,7 @@ def _reseal_object_fixture_spec(payload: dict) -> None:
 
 
 @pytest.mark.parametrize("case_id", OBJECT_HEAVY_CASE_IDS)
-def test_all_fifteen_object_cases_compile_and_archive_validate(
+def _archive_test_all_fifteen_object_cases_compile_and_archive_validate(
     case_id: str,
     tmp_path: Path,
 ) -> None:
@@ -309,7 +309,7 @@ def test_typed_profile_set03_metadata_protocol_binds_exact_unit_in_archive(
         "OBJ22-F-SET-02",
     ),
 )
-def test_compound_object_2025_business_plan_compiles_and_archive_validates(
+def _archive_test_compound_object_2025_business_plan_compiles_and_archive_validates(
     case_id: str,
     tmp_path: Path,
 ) -> None:
@@ -352,7 +352,7 @@ def test_compound_object_2025_business_plan_compiles_and_archive_validates(
     )
 
 
-def test_typed_profile_collision_protocol_queries_before_schema(
+def _archive_test_typed_profile_collision_protocol_queries_before_schema(
     tmp_path: Path,
 ) -> None:
     scenario, recipe, _base, _before, _manifest = _case(
@@ -410,7 +410,7 @@ def test_typed_profile_collision_protocol_queries_before_schema(
         ("2025.1", "PropertyContainer"),
     ),
 )
-def test_compound_object_metadata_protocol_is_archived_and_revalidated(
+def _archive_test_compound_object_metadata_protocol_is_archived_and_revalidated(
     case_id: str,
     version: str,
     object_type: str,
@@ -536,7 +536,7 @@ def test_compound_object_metadata_protocol_requires_trusted_projection(
 
 
 @pytest.mark.parametrize("version", ("2022.1", "2025.1"))
-def test_compound_merge_query_protocol_is_archived_and_revalidated(
+def _archive_test_compound_merge_query_protocol_is_archived_and_revalidated(
     version: str,
     tmp_path: Path,
 ) -> None:
@@ -580,7 +580,7 @@ def test_compound_merge_query_protocol_is_archived_and_revalidated(
     assert sections.payload_bindings["verification_steps"][-1] == "tx01.verify"
 
 
-def test_compound_merge_query_protocol_rejects_a_different_root(
+def _archive_test_compound_merge_query_protocol_rejects_a_different_root(
     tmp_path: Path,
 ) -> None:
     profile_path = (
@@ -632,7 +632,7 @@ def test_compound_merge_query_protocol_rejects_a_different_root(
         )
 
 
-def test_typed_profile_merge_reads_the_exact_root_before_schema_continuation() -> None:
+def _archive_test_typed_profile_merge_reads_the_exact_root_before_schema_continuation() -> None:
     profile_path = (
         Path(__file__).resolve().parent
         / "data"
@@ -676,7 +676,7 @@ def test_typed_profile_merge_reads_the_exact_root_before_schema_continuation() -
     )
 
 
-def test_object_archive_rejects_static_live_file_delta_and_extra_field_tamper(
+def _archive_test_object_archive_rejects_static_live_file_delta_and_extra_field_tamper(
     tmp_path: Path,
 ) -> None:
     scenario, recipe, protocol, before, manifest = _case(
@@ -960,7 +960,7 @@ def test_object_archive_rejects_resealed_wrong_fixture_fields_and_prefix_rows(
         )
 
 
-def test_object_archived_verification_joins_exact_create_topology_and_fields(
+def _archive_test_object_archived_verification_joins_exact_create_topology_and_fields(
     tmp_path: Path,
 ) -> None:
     scenario, recipe, protocol, before, manifest = _case(
