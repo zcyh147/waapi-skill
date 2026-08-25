@@ -321,7 +321,7 @@ def _query_exact_path_id(runtime: _WorkflowSandboxRuntime, path: str) -> str:
     payload = runtime.gateway(
         [
             "query-object",
-            "--object-path",
+            "--path",
             path,
             "--return-field",
             "id",
