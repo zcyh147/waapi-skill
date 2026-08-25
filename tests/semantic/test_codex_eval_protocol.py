@@ -106,10 +106,33 @@ def screening_sessions() -> tuple[EvalSession, ...]:
         ("Q4", "single", ("query-object",)),
         ("Q5", "single", ("query-object",)),
         ("C1", "single", ("capabilities",)),
-        ("M1", "preview", ("operation-schema", "preview")),
+        (
+            "M1",
+            "preview",
+            (
+                "operation-schema",
+                "draft-start",
+                "draft-bind-object",
+                "draft-declare-object-change",
+                "draft-check",
+                "preview-from-draft",
+            ),
+        ),
         ("M1", "confirm", ("transaction-show", "confirm", "execute", "verify")),
-        ("M2", "single", ("operation-schema", "preview")),
-        *((case_id, phase, expected) for case_id in ("M3", "M4", "M5", "M6", "M7") for phase, expected in (("preview", ("operation-schema", "preview")), ("confirm", ("transaction-show", "confirm", "execute", "verify")))),
+        (
+            "M2",
+            "single",
+            (
+                "operation-schema",
+                "draft-start",
+                "draft-bind-object",
+                "draft-declare-object-change",
+                "draft-check",
+                "preview-from-draft",
+            ),
+        ),
+        *((case_id, phase, expected) for case_id in ("M3", "M6", "M7") for phase, expected in (("preview", ("operation-schema", "preview")), ("confirm", ("transaction-show", "confirm", "execute", "verify")))),
+        *((case_id, phase, expected) for case_id in ("M4", "M5") for phase, expected in (("preview", ("operation-schema", "draft-start", "draft-bind-object", "draft-declare-object-change", "draft-check", "preview-from-draft")), ("confirm", ("transaction-show", "confirm", "execute", "verify")))),
         *((case_id, "single", ("operation-schema",)) for case_id in ("B1", "B2", "B3", "B4", "B5", "B6", "B7")),
         ("I1", "preview", ("operation-schema", "preview")),
         ("I1", "confirm", ("transaction-show", "confirm", "execute", "verify")),
@@ -142,9 +165,31 @@ def test_all_cases_and_every_phase_generate_exact_subcommand_order(
     }
     steps = build_expected_gateway_steps(session, values)
 
-    assert tuple(step.name for step in steps) == expected
+    expected_names = (
+        (*expected[:-1], "preview")
+        if case_id in {"M1", "M2", "M4", "M5"} and phase != "confirm"
+        else expected
+    )
+    assert tuple(step.name for step in steps) == expected_names
     assert tuple(step.subcommand for step in steps) == expected
-    assert tuple(step.subcommand for step in steps) == session.gateway_steps
+    if case_id not in {"M1", "M2", "M4", "M5"} or phase == "confirm":
+        assert tuple(step.subcommand for step in steps) == session.gateway_steps
+
+
+@pytest.mark.parametrize("case_id", ["M1", "M2", "M4", "M5"])
+def test_migrated_lifecycle_cases_have_no_legacy_preview_ingress(case_id: str) -> None:
+    session = next(
+        item
+        for item in screening_sessions()
+        if item.case.id == case_id and item.phase in {"preview", "single"}
+    )
+
+    steps = build_expected_gateway_steps(session, FIXTURES[case_id])
+
+    assert steps[-1].name == "preview"
+    assert steps[-1].subcommand == "preview-from-draft"
+    assert all(step.subcommand != "preview" for step in steps)
+    assert all("--request-json" not in step.arguments for step in steps)
 
 
 def test_q1_uses_exact_path_and_fixed_identity_return_fields() -> None:
@@ -267,7 +312,7 @@ def test_fixed_read_cases_bind_exact_packaged_arguments() -> None:
     assert reflection.allow_omitted_empty_json_objects is True
 
 
-@pytest.mark.parametrize("case_id", ["M1", "M2", "M3", "M4", "M5", "M6", "M7", "I1", "S1", "W1", "W2"])
+@pytest.mark.parametrize("case_id", ["M3", "M6", "M7", "I1", "S1", "W1", "W2"])
 def test_preview_wraps_the_exact_rendered_request_as_semantic_json(case_id: str) -> None:
     session = next(
         item
@@ -570,5 +615,5 @@ def test_forged_request_envelope_fails_closed_before_broker_configuration() -> N
         },
     )
 
-    with pytest.raises(EvalProtocolError, match="wrong operation-request contract"):
+    with pytest.raises(EvalProtocolError, match="operation request contract is invalid"):
         build_expected_gateway_steps(replace(session, case=forged_case), FIXTURES["M1"])

@@ -40,6 +40,14 @@ COMMON_GATE_IDS = frozenset(
         "runner_oracle_model_unwritable",
     }
 )
+_BUSINESS_LIFECYCLE_PREVIEW_COMMANDS = (
+    "operation-schema",
+    "draft-start",
+    "draft-bind-object",
+    "draft-declare-object-change",
+    "draft-check",
+    "preview-from-draft",
+)
 PHASE_GATE_IDS = frozenset(
     {
         "live_read_only",
@@ -355,8 +363,15 @@ def _grade_known_gate(
         )
         return passed, "oracle.oracle_matches and oracle.final_response_matches must both be exactly true"
     if gate_id == "schema_then_preview_exactly_once":
-        passed = _payload_commands(facts.payloads) == ("operation-schema", "preview")
-        return passed, "broker payload sequence must be operation-schema then preview exactly once"
+        commands = _payload_commands(facts.payloads)
+        passed = commands in {
+            ("operation-schema", "preview"),
+            _BUSINESS_LIFECYCLE_PREVIEW_COMMANDS,
+        }
+        return (
+            passed,
+            "broker payload sequence must follow the one schema-selected Preview protocol exactly once",
+        )
     if gate_id == "awaiting_confirmation":
         projection_matches = _transaction_agent_result_and_final_match(
             session,
@@ -724,8 +739,11 @@ def _transaction_agent_result_and_final_match(
     """Build the expected projection without trusting either compared copy."""
 
     commands = _payload_commands(payloads)
-    if commands == ("operation-schema", "preview"):
-        preview = payloads[1]
+    if commands in {
+        ("operation-schema", "preview"),
+        _BUSINESS_LIFECYCLE_PREVIEW_COMMANDS,
+    }:
+        preview = payloads[-1]
         summary = preview.get("preview_summary")
         request = summary.get("request") if isinstance(summary, Mapping) else None
         transaction_id = preview.get("transaction_id")
