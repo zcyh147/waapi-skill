@@ -201,6 +201,7 @@ _OBJECT_LIFECYCLE_DEFINITION = {
     ),
     "requires_sound_subtype": False,
     "supports_field_binding": False,
+    "auto_apply_preview": True,
 }
 
 
