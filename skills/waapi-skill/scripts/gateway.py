@@ -10544,6 +10544,13 @@ def dispatch_offline_business_draft_update(
         raise GatewayInputError(
             f"{inspected.operation} does not expose {args.command}"
         )
+    if (
+        getattr(args, "switch_value", None) is not None
+        and adapter.family != "audio-import"
+    ):
+        raise GatewayInputError(
+            "--switch-value is available only for audio.import business declarations"
+        )
     raw_session = (
         inspected.composition.get("business_session")
         if inspected.composition is not None

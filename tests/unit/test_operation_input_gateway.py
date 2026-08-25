@@ -417,6 +417,60 @@ def test_business_draft_start_discloses_binding_before_declaration(
     ]
     assert "typed_fact_batch_discipline" not in binding
     assert "draft-apply" not in json.dumps(binding)
+
+
+def test_object_graph_declaration_rejects_audio_only_switch_value(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "state"
+    code, started = offline_execute(
+        tmp_path,
+        "--state-dir",
+        str(state_dir),
+        "--version",
+        "2022.1",
+        "draft-start",
+        "object.create",
+    )
+    assert code == 0, started
+    record_path = (
+        state_dir
+        / "operation-drafts-v1"
+        / "records"
+        / f"{started['draft']['draft_id']}.json"
+    )
+    before = record_path.read_bytes()
+
+    rejected_code, rejected = offline_execute(
+        tmp_path,
+        "--state-dir",
+        str(state_dir),
+        "draft-declare-new",
+        started["draft"]["draft_id"],
+        "--task-authority",
+        started["task_authority"],
+        "--expected-revision",
+        "1",
+        "--declaration-id",
+        "new-child",
+        "--parent-handle",
+        "obj-unbound",
+        "--name",
+        "Snow",
+        "--kind",
+        "random-container",
+        "--switch-value",
+        "Snow",
+    )
+
+    assert rejected_code == 2
+    assert rejected["error_code"] == "GatewayInputError"
+    assert rejected["message"] == (
+        "--switch-value is available only for audio.import business declarations"
+    )
+    assert record_path.read_bytes() == before
+
+
 def test_object_create_discloses_collision_policy_as_business_setting(
     tmp_path: Path,
 ) -> None:
