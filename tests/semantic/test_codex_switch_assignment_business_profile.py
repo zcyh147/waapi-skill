@@ -98,6 +98,12 @@ def test_unit_binds_three_paths_then_declares_one_preview(tmp_path: Path) -> Non
         for role in ("switch_container", "child", "state_or_switch")
     )
     assert all(row["id"] not in runtime.prompt for row in unit.objects.values())
+    bind_steps = steps[2:5]
+    assert [step.arguments.count("--role") for step in bind_steps] == [1, 1, 1]
+    assert [
+        step.arguments[step.arguments.index("--role") + 1]
+        for step in bind_steps
+    ] == ["switch_container", "child", "state_or_switch"]
     fixture = json.loads(runtime.fixture_path.read_text(encoding="utf-8"))
     assert fixture["assignments"] == []
     assert fixture["objects"][0]["SwitchGroupOrStateGroup"] == {

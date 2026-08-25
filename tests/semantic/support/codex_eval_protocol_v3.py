@@ -159,6 +159,7 @@ class _BusinessDraftSteps:
         *,
         step_name: str,
         error_subject: str,
+        role: str | None = None,
     ) -> ResponseBinding:
         if not isinstance(selector, Mapping):
             raise V3ProtocolError(
@@ -183,11 +184,12 @@ class _BusinessDraftSteps:
             )
         else:
             selector_arguments = ("--object-id", value)
+        role_arguments: tuple[Any, ...] = () if role is None else ("--role", role)
         self.steps.append(
             ExpectedGatewayStep(
                 name=step_name,
                 subcommand="draft-bind-object",
-                arguments=(*self.prefix(), *selector_arguments),
+                arguments=(*self.prefix(), *role_arguments, *selector_arguments),
             )
         )
         self.advance(step_name)
@@ -1410,6 +1412,7 @@ def build_switch_assignment_business_transaction_steps(
             arguments[role],
             step_name=step_name,
             error_subject=f"Switch assignment {role}",
+            role=role,
         )
 
     declaration_name = f"{label}.declare-switch-assignment"
