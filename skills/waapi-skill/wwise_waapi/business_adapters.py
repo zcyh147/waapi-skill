@@ -320,6 +320,7 @@ _OBJECT_SET_BUSINESS_DEFINITION = {
     "materializer": _materialize_object_graph,
     "update_commands": frozenset(
         {
+            "draft-add-media",
             "draft-business-configure",
             "draft-declare-existing",
             "draft-declare-new",
@@ -329,6 +330,7 @@ _OBJECT_SET_BUSINESS_DEFINITION = {
     ),
     "initial_projection_actions": ("bind-object", "inspect", "cancel"),
     "active_projection_actions": (
+        "add-media",
         "bind-object",
         "discover-fields",
         "discover-types",
