@@ -42,6 +42,14 @@ PID, parent, process-group ID, and command line; terminate only the exact stale
 owned group. A run that overlapped a stale gate or a changing worktree is not
 evidence and must be restarted from a stable candidate.
 
+Do not inspect or regenerate source-derived inventories while a Program or
+Non-live pytest process is still running. Isolation tests may temporarily
+rewrite packaged Gateway or Registry files and restore them during teardown;
+an intermediate `git diff`, parser digest, continuation digest, or generated
+inventory can therefore describe only the test fixture, not the candidate.
+Wait for pytest to exit, confirm that no owned test process remains, and only
+then read the worktree or regenerate sealed artifacts.
+
 For the structured object-query lane, this gate proves the versioned
 `waapi-skill.object-query/v1` request/schema contract, deterministic Python
 compilation, exact fake dispatch, and fail-closed rejection. It does not prove

@@ -50,8 +50,8 @@ planning; the Registry remains authoritative during implementation.
 | `soundbank.generate` | 2021.1–2025.1 | Composer | banks/platforms/languages/output root | host paths and artifacts | wave 04 complete |
 | `soundbank.processDefinitionFiles` | 2022.1–2025.1 | Inline typed | definition files and I/O root | derived identities/inclusions | wave 04 complete |
 | `soundbank.setInclusions` | 2021.1–2025.1 | Composer | bank/mode/inclusions | list pre-state/replacement | wave 04 complete |
-| `switchContainer.addAssignment` | 2021.1–2025.1 | Inline typed | container/child/state-or-switch | three identities and pair readback | wave 03 complete |
-| `switchContainer.removeAssignment` | 2021.1–2025.1 | Inline typed | container/child/state-or-switch | existing-pair and absence readback | wave 03 complete |
+| `switchContainer.addAssignment` | 2021.1–2025.1 | Business declaration | bound container, child, and state-or-switch handles | Gateway-derived GUID relationship, opposite precondition, and pair readback | wave 03 deep cutover complete |
+| `switchContainer.removeAssignment` | 2021.1–2025.1 | Business declaration | bound container, child, and state-or-switch handles | Gateway-derived GUID relationship, opposite precondition, and absence readback | wave 03 deep cutover complete |
 | `ui.captureScreen` | 2021.1–2025.1 | Inline typed | optional view/channel/rectangle | Authoring and output confinement | wave 05 complete |
 | `ui.commands.execute` | 2021.1–2025.1 | Inline typed | command; optional targets/values/files | fresh command inventory | wave 05 complete |
 | `ui.commands.register` | 2021.1–2025.1 | Composer | descriptors; optional authority | ownership and registration readback | wave 05 complete |

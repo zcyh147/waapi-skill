@@ -6,7 +6,7 @@ This report is generated from the exact five-version public surface and the revi
 
 - Native function/Topic lanes: **824**
 - Named-operation lanes: **153**
-- Migration families: **15**
+- Migration families: **14**
 - Unowned migration rows: **0**
 
 Every exact row, version, schema digest, continuation command, field ownership, disposition, and owner is recorded in `interface-depth-inventory.json`.
@@ -43,7 +43,6 @@ Business scalar values remain visible. Native paths, metadata scope, property/re
 | [`named-dangerous-debug-controls`](https://github.com/zcyh147/waapi-skill/issues/82) | #56 | 23 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 5 | `cf601f60fc5cddb76dd2468d16730b2929fed354bbadfee899a071f36c0777c8` |
 | [`named-exact-artifact-code`](https://github.com/zcyh147/waapi-skill/issues/80) | #56 | 12 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 4 | `bc7b0e8add73f09f4eec32a7bc31e2ceb3ff04ca04673f77874ae91bfb8f33f1` |
 | [`named-soundbank-planning`](https://github.com/zcyh147/waapi-skill/issues/79) | #56 | 18 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 4 | `c2e8f35304ea5f9cd60a34bd066c5eca3469dafcd0db39d75640fd95ccd72abc` |
-| [`named-switch-assignments`](https://github.com/zcyh147/waapi-skill/issues/93) | #56 | 10 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 2 | `533beb07dfc66c994fe2a25b68f786b522fdce299b37c6c67d9a66c2683ddd23` |
 
 ## Already-deep and boundary evidence
 
@@ -57,5 +56,6 @@ Business scalar values remain visible. Native paths, metadata scope, property/re
 | `named-object-creation-graph` | `already_deep` | 17 | The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batching, revisions, native requests, and the one Preview continuation inside the Gateway; and retain #78 five-version deterministic, exact macOS/Windows 2022.1 and 2025.1 real-host, and current-v3 Terra Fresh Agent Weather evidence. The pre-#78 Composer action vocabulary and normal fallback are removed. |
 | `named-object-lifecycle` | `already_deep` | 25 | The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence. |
 | `named-object-metadata-fields` | `already_deep` | 13 | The public object-metadata-business/v1 Adapters accept exact object identities, short user-facing field meanings, optional platform, and business outcomes; live discovery issues opaque field handles, compiles the exact metadata scope, token, wire value, request, and staged continuation inside the Gateway, and removes normal inline_typed ingress for all 13 lanes. #77 retains five-version deterministic repair and non-bypass coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution, and a current-v3 Terra Fresh Agent Alarm reference repair PASS plus identical verify-only audit on both hosts. |
+| `named-switch-assignments` | `already_deep` | 10 | The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage and exact macOS/Windows 2022.1 and 2025.1 real-host execution, with targeted Fresh Agent routing evidence required before closure. |
 
 Generated tests seal the native surface digest, every operation/version contract, and every public continuation. A new lane, field, version delta, or continuation therefore fails until this review policy and generated inventory are intentionally updated.

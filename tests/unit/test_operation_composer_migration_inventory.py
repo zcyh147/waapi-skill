@@ -72,6 +72,8 @@ def test_inventory_exactly_covers_every_registry_operation_and_version_lane() ->
             "object.createPlugin",
             "object.set",
             "object.setRTPC",
+            "switchContainer.addAssignment",
+            "switchContainer.removeAssignment",
         }:
             expected_mode = BUSINESS_DECLARATION_INPUT_MODE
         elif (

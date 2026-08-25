@@ -58,6 +58,12 @@ def switch_assignment_business_contract_data(
                 "child_handle",
                 "state_or_switch_handle",
             ],
+            "field_types": {
+                "switch_container_handle": "bound_object_handle",
+                "child_handle": "bound_object_handle",
+                "state_or_switch_handle": "bound_object_handle",
+            },
+            "optional_fields": [],
             "outcome": outcome,
         },
         "gateway_derivations": [

@@ -4,10 +4,10 @@
     "registry_operations": 34,
     "registry_version_lanes": 153,
     "composer_version_lanes": 36,
-    "business_declaration_version_lanes": 60,
-    "inline_typed_version_lanes": 52,
+    "business_declaration_version_lanes": 70,
+    "inline_typed_version_lanes": 42,
     "internal_canonical_version_lanes": 5,
-    "lane_inventory_sha256": "45ac25b5b572520dc69224d822618b30ae354514116c8dc059ff91096c2317e2",
+    "lane_inventory_sha256": "9331c363206be0f0019f5d6e05fc041d6313a7902aafcc64bb4e0c4a55cf0aee",
     "version_rule": "Every supported version lane inherits the disposition of its exact Registry operation name.",
     "normal_input_rule": "The Operation Registry exposes one typed normal input mode per public operation and version. Internal canonical transaction representations are not model-facing operations.",
     "native_uri_rule": "A shared native URI never implies a shared migration decision. Isolation is keyed by exact operation name and version."

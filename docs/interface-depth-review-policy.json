@@ -15,9 +15,9 @@
     ]
   },
   "source_contracts": {
-    "gateway_parser_sha256": "78c3857954745d3d2863ee911fcf56904fcbddaa783c8c08164f2d6e500018d2",
-    "operation_contract_sha256": "cad3e84c0c3f27ae30686ba6268986efdd8abd2112eff17bcae10680598d14b9",
-    "public_continuation_sha256": "08eb41933e7ea2520e6fee56c7f8a45b658c681a70f4e56ae23447c87484956d",
+    "gateway_parser_sha256": "2d7b2252f9a48518ce1ee321ec8fdbbc3b16ba1dbceba4309f670b234df643e4",
+    "operation_contract_sha256": "706fd513f51ae4d76e12e65b44a94f90569258e2e8d0df83ac8352c612cc8136",
+    "public_continuation_sha256": "dec0a20f920d025dfa61c8185dfa35f06658b1e94a16e9ac6ec30a8a74891242",
     "typed_request_surface_sha256": "6d05d64e95a6e0f7099ddd03f1da42c763e9c06f33f93cac7581c7c061a83af8"
   },
   "ownership_classes": {
@@ -84,10 +84,11 @@
     },
     {
       "id": "named-switch-assignments",
-      "disposition": "migration_required",
-      "owner_issue": 56,
+      "disposition": "already_deep",
+      "owner_issue": null,
       "operations": ["switchContainer.addAssignment", "switchContainer.removeAssignment"],
-      "leaked_mechanics": ["native_object_path", "wire_type", "request_fragment"]
+      "leaked_mechanics": [],
+      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage; exact macOS/Windows 2022.1 and 2025.1 real-host execution and targeted Fresh Agent routing evidence remain closure gates."
     },
     {
       "id": "named-soundbank-planning",
@@ -215,15 +216,6 @@
     }
   ],
   "ticket_blueprints": {
-    "named-switch-assignments": {
-      "title": "Migrate Switch Container assignments to the unified business compiler",
-      "parent_issue": 56,
-      "blocked_by_family": "named-object-creation-graph",
-      "public_behavior": "Accept only Switch Container, child, and state-or-switch business identities plus the add/remove outcome; compile exact GUID relationships, preconditions, payloads, and readback through the production business-declaration path.",
-      "deterministic_tests": "Five-version add/remove schemas, identity repair and stale cases, opposite preconditions, exact relationship readback, Footsteps fixtures, non-bypass, and removal of the legacy inline_typed normal input.",
-      "removal_boundary": "Delete the old inline_typed assignment entry after parity; preserve relationship Preview, authorization, execute-once, and verifier semantics.",
-      "proportional_evidence": "Footsteps assignment add/remove on 2022.1 and 2025.1 on macOS and Windows, plus targeted Fresh Agent evidence only for changed routing or repair."
-    },
     "named-soundbank-planning": {
       "title": "Compile SoundBank inclusion, generation, and external-source plans",
       "parent_issue": 56,
@@ -352,7 +344,6 @@
     }
   },
   "ticket_issue_numbers": {
-    "named-switch-assignments": 93,
     "generic-fixed-query-metadata": 96,
     "named-soundbank-planning": 79,
     "named-exact-artifact-code": 80,
