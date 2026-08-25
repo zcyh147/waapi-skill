@@ -264,7 +264,9 @@ def test_metadata_order_follows_the_disclosed_input_mode() -> None:
     assert "read the schema, start, bind the target, then run returned `draft-discover-fields`" in operate
     assert "Copy one handle; never a token, scope, or type" in operate
     assert "No match stops; ambiguity needs one behavior question" in operate
-    assert "common fields such as volume, infinite looping, output bus" in operate
+    assert "For business declarations, bind only user-requested custom properties/references" in operate
+    assert "common outcomes such as volume, infinite looping, output bus" in operate
+    assert "use stable business fields" in operate
     assert "Bind the exact existing owner or the disclosed new-object type first" in operate
     assert "Submit only business values against those handles" in operate
 

@@ -6,7 +6,7 @@ This report is generated from the exact five-version public surface and the revi
 
 - Native function/Topic lanes: **824**
 - Named-operation lanes: **153**
-- Migration families: **16**
+- Migration families: **15**
 - Unowned migration rows: **0**
 
 Every exact row, version, schema digest, continuation command, field ownership, disposition, and owner is recorded in `interface-depth-inventory.json`.
@@ -42,7 +42,6 @@ Business scalar values remain visible. Native paths, metadata scope, property/re
 | [`named-compound-undo`](https://github.com/zcyh147/waapi-skill/issues/83) | #56 | 5 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 1 | `a2d96ad477515f9533aff9f9dc5950b2f043100faf32cdf5d77b3abb1b3a4e85` |
 | [`named-dangerous-debug-controls`](https://github.com/zcyh147/waapi-skill/issues/82) | #56 | 23 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 5 | `cf601f60fc5cddb76dd2468d16730b2929fed354bbadfee899a071f36c0777c8` |
 | [`named-exact-artifact-code`](https://github.com/zcyh147/waapi-skill/issues/80) | #56 | 12 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 4 | `bc7b0e8add73f09f4eec32a7bc31e2ceb3ff04ca04673f77874ae91bfb8f33f1` |
-| [`named-object-creation-graph`](https://github.com/zcyh147/waapi-skill/issues/78) | #56 | 17 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 4 | `a1eef3587d862bfd6a34a26da9c8856e0366354995186a3792eed7148fb12622` |
 | [`named-soundbank-planning`](https://github.com/zcyh147/waapi-skill/issues/79) | #56 | 18 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 4 | `c2e8f35304ea5f9cd60a34bd066c5eca3469dafcd0db39d75640fd95ccd72abc` |
 | [`named-switch-assignments`](https://github.com/zcyh147/waapi-skill/issues/93) | #56 | 10 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 2 | `533beb07dfc66c994fe2a25b68f786b522fdce299b37c6c67d9a66c2683ddd23` |
 
@@ -55,6 +54,7 @@ Business scalar values remain visible. Native paths, metadata scope, property/re
 | `generic-zero-input-audited-deep` | `already_deep` | 63 | The reflected request accepts no model-authored values; the Gateway owns the complete zero-input envelope, authorization/effect policy, dispatch, result bound, and any project guard. |
 | `named-audio-import-audited-deep` | `already_deep` | 5 | The public audio-import-business/v1 contract exposes semantic kinds and stable declaration values, binds objects and fields live, derives native paths/types/order/batches/continuation, preserves media artifacts exactly, and has complete #54 five-version Program plus macOS/Windows Fresh and real-host evidence. |
 | `named-internal-canonical-boundary` | `prohibited_boundary` | 5 | waapi.call is an internal canonical transaction representation, absent from normal operation discovery, and cannot accept a model-authored native request document. |
+| `named-object-creation-graph` | `already_deep` | 17 | The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batching, revisions, native requests, and the one Preview continuation inside the Gateway; and retain #78 five-version deterministic, exact macOS/Windows 2022.1 and 2025.1 real-host, and current-v3 Terra Fresh Agent Weather evidence. The pre-#78 Composer action vocabulary and normal fallback are removed. |
 | `named-object-lifecycle` | `already_deep` | 25 | The public object-lifecycle-business/v1 Adapters expose only closed object or parent identities, conflict policy, and scalar outcomes; bind natural object paths to live GUID handles; derive every native request and Preview continuation inside the Gateway; remove the normal inline_typed surface; and retain #92 five-version Program, exact macOS/Windows real-host execution, and current-v3 Fresh Agent routing evidence. |
 | `named-object-metadata-fields` | `already_deep` | 13 | The public object-metadata-business/v1 Adapters accept exact object identities, short user-facing field meanings, optional platform, and business outcomes; live discovery issues opaque field handles, compiles the exact metadata scope, token, wire value, request, and staged continuation inside the Gateway, and removes normal inline_typed ingress for all 13 lanes. #77 retains five-version deterministic repair and non-bypass coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution, and a current-v3 Terra Fresh Agent Alarm reference repair PASS plus identical verify-only audit on both hosts. |
 

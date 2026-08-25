@@ -342,7 +342,7 @@ def test_every_migration_row_has_exactly_one_rollup_and_ticket_family() -> None:
     assert {family["github_issue"] for family in inventory["ticket_families"]} == {
         *range(77, 94),
         96,
-    } - {77, 92}
+    } - {77, 78, 92}
     assert all(
         row["owner_issue"] in {56, 57}
         for row in (*inventory["native_lanes"], *inventory["operation_lanes"])
@@ -354,8 +354,8 @@ def test_every_migration_row_has_exactly_one_rollup_and_ticket_family() -> None:
 def test_every_supported_named_operation_uses_or_migrates_to_the_business_path() -> None:
     inventory = _inventory()
     assert inventory["summary"]["operation_dispositions"] == {
-        "already_deep": 43,
-        "migration_required": 105,
+        "already_deep": 60,
+        "migration_required": 88,
         "prohibited_boundary": 5,
     }
     for row in inventory["operation_lanes"]:
@@ -371,6 +371,10 @@ def test_every_supported_named_operation_uses_or_migrates_to_the_business_path()
             "object.setLinked",
             "object.setProperty",
             "object.setReference",
+            "object.create",
+            "object.createPlugin",
+            "object.set",
+            "object.setRTPC",
         }:
             assert row["disposition"] == "already_deep"
             assert row["input_mode"] == "business_declaration"

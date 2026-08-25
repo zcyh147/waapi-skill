@@ -35,6 +35,13 @@ checked. Without `pipefail`, a pytest failure or `KeyboardInterrupt` can be
 masked by `tee` returning zero; such a run is invalid evidence even when its
 outer command reports success.
 
+After interrupting `ci/test.sh`, prove that its exact `test_driver.py` / pytest
+process group exited before starting another gate. An outer PTY interrupt can
+end the command session while leaving that owned child group alive. Inspect
+PID, parent, process-group ID, and command line; terminate only the exact stale
+owned group. A run that overlapped a stale gate or a changing worktree is not
+evidence and must be restarted from a stable candidate.
+
 For the structured object-query lane, this gate proves the versioned
 `waapi-skill.object-query/v1` request/schema contract, deterministic Python
 compilation, exact fake dispatch, and fail-closed rejection. It does not prove
