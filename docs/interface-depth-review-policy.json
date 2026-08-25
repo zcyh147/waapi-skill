@@ -88,7 +88,7 @@
       "owner_issue": null,
       "operations": ["switchContainer.addAssignment", "switchContainer.removeAssignment"],
       "leaked_mechanics": [],
-      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage; exact macOS/Windows 2022.1 and 2025.1 real-host execution and targeted Fresh Agent routing evidence remain closure gates."
+      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage, exact macOS/Windows 2022.1 and 2025.1 real-host add/remove execution, and targeted Terra Fresh Agent routing plus identical verify-only evidence on both hosts."
     },
     {
       "id": "named-soundbank-planning",
