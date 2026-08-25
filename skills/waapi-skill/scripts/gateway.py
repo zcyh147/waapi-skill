@@ -17651,6 +17651,11 @@ def operation_draft_payload(
             and record.check is None
             and command in {"draft-declare-new", "draft-declare-existing"}
         ):
+            declarations = draft.get("declarations")
+            if not isinstance(declarations, list) or not declarations:
+                raise GatewayInputError(
+                    "Audio import declaration receipt is unavailable."
+                )
             next_action_binding = {
                 key: next_action_binding[key]
                 for key in (
@@ -17668,12 +17673,27 @@ def operation_draft_payload(
             next_action_binding["required_next_phase"] = (
                 "declare_remaining_business_items_or_check_complete_draft"
             )
+            draft = {
+                key: draft[key]
+                for key in (
+                    "contract",
+                    "draft_id",
+                    "lifecycle_state",
+                    "revision",
+                    "binding",
+                    "business_revision",
+                )
+                if key in draft
+            }
+            draft["declaration_receipt"] = declarations[-1]
+            draft["declarations_summary"] = {
+                "count": len(declarations),
+                "canonical_sha256": canonical_sha256(declarations),
+            }
             draft["response_integrity"] = {
                 "complete": True,
                 "truncated": False,
-                "projection": (
-                    "business_declaration_receipt_and_continuation"
-                ),
+                "projection": "business_declaration_receipt_and_continuation",
                 "compact_projection_is_not_truncation": True,
             }
         draft["next_action_binding"] = next_action_binding

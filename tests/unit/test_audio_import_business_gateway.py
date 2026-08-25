@@ -524,12 +524,17 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     )
     assert declare_code == 0, declared
     assert declared["draft"]["revision"] == 5
-    assert declared["draft"]["declarations"][0]["fields"] == {
+    assert "declarations" not in declared["draft"]
+    assert declared["draft"]["declaration_receipt"]["fields"] == {
         "language": "SFX",
         "loop": "infinite",
         "media_file": str(media),
         "volume_db": -4.0,
     }
+    assert declared["draft"]["declarations_summary"]["count"] == 1
+    assert len(
+        declared["draft"]["declarations_summary"]["canonical_sha256"]
+    ) == 64
     assert declared["draft"]["response_integrity"] == {
         "complete": True,
         "truncated": False,
@@ -562,7 +567,7 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
         json.dumps(declared, ensure_ascii=False, separators=(",", ":")).encode(
             "utf-8"
         )
-    ) <= 16_384
+    ) <= 10_000
 
     store = OperationDraftStore(tmp_path / "state")
     materialized = store.materialize_request(
@@ -694,7 +699,7 @@ def test_audio_import_switch_value_is_a_first_class_business_argument(
     )
 
     assert declare_code == 0, declared
-    assert declared["draft"]["declarations"][0]["fields"] == {
+    assert declared["draft"]["declaration_receipt"]["fields"] == {
         "switch_value": "Snow"
     }
     record_path = (

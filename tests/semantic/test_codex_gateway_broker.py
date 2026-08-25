@@ -89,6 +89,7 @@ from wwise_waapi.operation_composer import (
 )
 from wwise_waapi.canonical import canonical_sha256
 from wwise_waapi.operation_drafts import OperationDraftStore
+from wwise_waapi.operation_registry import operation_request_schema_digest
 from wwise_waapi.transactions import confirmation_token_for
 from wwise_waapi.platform_commands import (
     PlatformCommandError,
@@ -4597,6 +4598,71 @@ def _read_only_draft_evidence_fixture(
     for step, record in zip(steps, records, strict=True):
         record["step_name"] = step.name
     return broker, steps, records, state_directory
+
+
+def test_business_draft_start_seals_business_evidence_without_generic_facts(
+    tmp_path: Path,
+) -> None:
+    operation = "audio.import"
+    version = "2025.1"
+    state_directory = tmp_path / "state"
+    store = OperationDraftStore(state_directory)
+    schema_digest = operation_request_schema_digest(operation, version)
+    composer_digest = operation_composer_digest(operation, version)
+    started = store.start(
+        operation=operation,
+        version=version,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+    )
+    composition = started.record.composition
+    assert isinstance(composition, Mapping)
+    start_payload = {
+        "contract": "waapi-skill.gateway-result/v1",
+        "ok": True,
+        "status": "editable",
+        "command": "draft-start",
+        "task_authority": started.task_authority,
+        "draft": {
+            "contract": "waapi-skill.operation-draft/v1",
+            "draft_id": started.draft_id,
+            "revision": 1,
+            "lifecycle_state": "editable",
+            "binding": {
+                "operation": operation,
+                "version": version,
+                "schema_digest": schema_digest,
+            },
+            **operation_draft_public_projection(
+                composition_projection(operation, version, composition)
+            ),
+        },
+    }
+    step = ExpectedGatewayStep(
+        name="tx01.draft-start",
+        subcommand="draft-start",
+        arguments=(operation,),
+    )
+    record = {
+        "step_name": step.name,
+        "succeeded": True,
+        "gateway_arguments": ["gateway.py", "draft-start", operation],
+        "payload": start_payload,
+    }
+
+    evidence = typed_evidence_module.validate_typed_draft_evidence(
+        state_directory=state_directory,
+        steps=(step,),
+        broker_records=(record,),
+    )
+
+    assert evidence is not None
+    assert evidence["contract"] == (
+        "waapi-skill.codex-business-draft-evidence/v1"
+    )
+    assert evidence["operation"] == operation
+    assert evidence["business_session"] is None
+    assert evidence["canonical_request"] is None
 
 
 def test_read_only_draft_check_binds_direct_result_without_draft_projection(

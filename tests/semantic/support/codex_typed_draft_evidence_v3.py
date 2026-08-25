@@ -16,6 +16,8 @@ from tests.semantic.support.codex_gateway_broker import (
 from tests.semantic.support.codex_gateway_contracts import gateway_payload_contracts
 
 from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
+from wwise_waapi.business_adapters import business_adapter
+from wwise_waapi.business_declaration_state import BusinessDeclarationSession
 from wwise_waapi.operation_composer import (
     OperationComposerError,
     apply_composer_action,
@@ -35,6 +37,7 @@ from wwise_waapi.operation_drafts import (
     load_operation_draft_archive_records,
     operation_draft_authority_digest,
 )
+from wwise_waapi.operation_registry import operation_uses_business_declaration
 from wwise_waapi.transaction_cleanup import transaction_cleanup_payload
 from wwise_waapi.transactions import (
     TransactionError,
@@ -44,6 +47,9 @@ from wwise_waapi.typed_requests import request_contract
 
 
 TYPED_DRAFT_EVIDENCE_CONTRACT = "waapi-skill.codex-typed-draft-evidence/v1"
+BUSINESS_DRAFT_EVIDENCE_CONTRACT = (
+    "waapi-skill.codex-business-draft-evidence/v1"
+)
 MAX_TYPED_DRAFT_EVIDENCE_ACTIONS = 512
 MAX_TYPED_DRAFT_EVIDENCE_BYTES = 1024 * 1024
 _DRAFT_SUBCOMMANDS = frozenset(
@@ -56,6 +62,29 @@ _DRAFT_SUBCOMMANDS = frozenset(
         "preview-from-draft",
     }
 )
+_BUSINESS_DRAFT_EVENT_OPTIONS = {
+    "draft-start": frozenset({"started"}),
+    "draft-add-media": frozenset({"declaration.revised"}),
+    "draft-bind-field": frozenset({"handles.bound"}),
+    "draft-bind-object": frozenset({"handles.bound"}),
+    "draft-business-configure": frozenset({"settings.revised"}),
+    "draft-clear-object-list": frozenset(
+        {"declaration.added", "declaration.revised"}
+    ),
+    "draft-declare-existing": frozenset({"declaration.added"}),
+    "draft-declare-field-change": frozenset({"declaration.added"}),
+    "draft-declare-new": frozenset({"declaration.added"}),
+    "draft-declare-object-change": frozenset({"declaration.added"}),
+    "draft-declare-rtpc": frozenset({"declaration.added"}),
+    "draft-declare-switch-assignment": frozenset({"declaration.added"}),
+    "draft-discover-fields": frozenset({"handles.bound"}),
+    "draft-discover-types": frozenset({"handles.bound"}),
+    "draft-remove-declaration": frozenset({"declaration.removed"}),
+    "draft-revise-declaration": frozenset({"declaration.revised"}),
+    "draft-check": frozenset({"checked"}),
+    "preview-from-draft": frozenset({"seal_reserved", "sealed"}),
+    "draft-cancel": frozenset({"cancelled"}),
+}
 
 
 class TypedDraftEvidenceError(RuntimeError):
@@ -603,6 +632,161 @@ def _composer_flow_step_indexes(
     )
 
 
+def _validate_business_draft_evidence(
+    *,
+    operation: str,
+    version: str,
+    schema_digest: str,
+    draft_id: str,
+    durable: OperationDraftRecord,
+    steps: Sequence[Any],
+    payloads: Sequence[Mapping[str, Any]],
+    allow_cleaned_file_evidence: bool,
+) -> Mapping[str, Any]:
+    event_options: list[frozenset[str]] = []
+    response_revisions: list[int] = []
+    preview_payload: Mapping[str, Any] | None = None
+    for step, payload in zip(steps, payloads, strict=True):
+        options = _BUSINESS_DRAFT_EVENT_OPTIONS.get(step.subcommand)
+        if options is not None:
+            event_options.extend(
+                (options, options)
+                if step.subcommand == "preview-from-draft"
+                else (options,)
+            )
+        if step.subcommand == "preview-from-draft":
+            preview_payload = payload
+        raw_draft = payload.get("draft")
+        if not isinstance(raw_draft, Mapping):
+            continue
+        binding = _mapping(
+            raw_draft.get("binding"),
+            label=f"{step.subcommand} business Draft binding",
+        )
+        revision = raw_draft.get("revision")
+        if (
+            raw_draft.get("contract") != "waapi-skill.operation-draft/v1"
+            or raw_draft.get("draft_id") != draft_id
+            or binding
+            != {
+                "operation": operation,
+                "version": version,
+                "schema_digest": schema_digest,
+            }
+            or isinstance(revision, bool)
+            or not isinstance(revision, int)
+            or revision < 1
+        ):
+            _fail("Business Draft response does not preserve its immutable binding")
+        response_revisions.append(revision)
+        integrity = raw_draft.get("response_integrity")
+        if integrity is not None and (
+            not isinstance(integrity, Mapping)
+            or integrity.get("complete") is not True
+            or integrity.get("truncated") is not False
+        ):
+            _fail("Business Draft compact response integrity is invalid")
+
+    audit_types = tuple(str(event["event_type"]) for event in durable.audit)
+    if (
+        len(audit_types) != len(event_options)
+        or any(
+            event_type not in allowed
+            for event_type, allowed in zip(audit_types, event_options, strict=True)
+        )
+        or durable.revision != len(audit_types)
+        or any(
+            later <= earlier
+            for earlier, later in zip(
+                response_revisions,
+                response_revisions[1:],
+                strict=False,
+            )
+        )
+        or any(revision > durable.revision for revision in response_revisions)
+    ):
+        _fail("Durable Business Draft audit does not match the Broker command sequence")
+
+    if durable.composition is None:
+        _fail("Business Draft archive is missing its durable composition")
+    raw_session = durable.composition.get("business_session")
+    if raw_session is None:
+        session = None
+        canonical_request = None
+        session_summary = None
+    else:
+        if not isinstance(raw_session, Mapping):
+            _fail("Business Draft session is not an object")
+        try:
+            session = BusinessDeclarationSession.from_dict(raw_session)
+            canonical_request = business_adapter(operation).materialize(
+                session,
+                allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+            )
+        except (TypeError, ValueError) as exc:
+            raise TypedDraftEvidenceError(
+                "Business Draft declarations cannot replay their canonical request"
+            ) from exc
+        session_summary = {
+            "revision": session.revision,
+            "declaration_count": len(session.declarations),
+            "canonical_sha256": canonical_sha256(raw_session),
+        }
+
+    if durable.check is not None:
+        if (
+            canonical_request is None
+            or durable.check.get("request_digest")
+            != canonical_sha256(canonical_request)
+        ):
+            _fail("Business Draft check is not bound to its canonical request")
+    if durable.seal is not None:
+        if (
+            canonical_request is None
+            or durable.seal.get("request") != canonical_request
+            or preview_payload is None
+            or preview_payload.get("transaction_id")
+            != durable.seal.get("transaction_id")
+            or preview_payload.get("artifact_hash")
+            != durable.seal.get("artifact_hash")
+        ):
+            _fail("Business Draft Preview is not bound to its durable canonical request")
+        preview_binding: Mapping[str, Any] | None = {
+            "transaction_id": durable.seal["transaction_id"],
+            "artifact_hash": durable.seal["artifact_hash"],
+            "transaction_state": durable.seal["transaction_state"],
+        }
+    else:
+        preview_binding = None
+
+    evidence = {
+        "contract": BUSINESS_DRAFT_EVIDENCE_CONTRACT,
+        "draft_id": draft_id,
+        "operation": operation,
+        "version": version,
+        "schema_digest": schema_digest,
+        "lifecycle_state": durable.state.value,
+        "revision": durable.revision,
+        "command_count": len(steps),
+        "command_sequence": [step.subcommand for step in steps],
+        "audit_types": list(audit_types),
+        "business_session": session_summary,
+        "canonical_request": canonical_request,
+        "preview_binding": preview_binding,
+        "archive_sha256": canonical_sha256(
+            {
+                "composition": durable.composition,
+                "audit": list(durable.audit),
+                "check": durable.check,
+                "seal": durable.seal,
+            }
+        ),
+    }
+    if len(canonical_json_bytes(evidence)) > MAX_TYPED_DRAFT_EVIDENCE_BYTES:
+        _fail("Business Draft evidence exceeds its fixed archive byte ceiling")
+    return evidence
+
+
 def _validate_typed_draft_evidence(
     *,
     state_directory: Path,
@@ -700,6 +884,18 @@ def _validate_typed_draft_evidence(
         _fail("Durable Draft binding does not match draft-start evidence")
     if durable.composer_digest is None or durable.composition is None:
         _fail("Composer archive is missing its durable composition binding")
+
+    if operation_uses_business_declaration(operation, version):
+        return _validate_business_draft_evidence(
+            operation=operation,
+            version=version,
+            schema_digest=schema_digest,
+            draft_id=draft_id,
+            durable=durable,
+            steps=steps,
+            payloads=payloads,
+            allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+        )
 
     composition = new_composition(operation, version)
     read_only_draft = (
