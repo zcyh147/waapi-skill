@@ -140,18 +140,10 @@ def prepare_import_business_runtime(
     media_paths = tuple(media_root / name for name in media_names)
     for path in media_paths:
         _write_silent_wav(path)
-    media_by_name = {path.name: path for path in media_paths}
-    requests = tuple(
-        {
-            "contract": "waapi-skill.operation-request/v1",
-            "version": unit.version,
-            "operation": "audio.import",
-            "arguments": _resolve_media_tokens(
-                transaction["arguments"],
-                media_by_name,
-            ),
-        }
-        for transaction in unit.transactions
+    requests = reconstruct_import_business_requests(
+        unit,
+        runtime_root,
+        require_media_files=True,
     )
     project_path = runtime_root / "project" / "SemanticProject.wproj"
     project_path.parent.mkdir()
@@ -189,6 +181,37 @@ def prepare_import_business_runtime(
         prompt=prompt,
         requests=requests,
         media_paths=media_paths,
+    )
+
+
+def reconstruct_import_business_requests(
+    unit: ImportBusinessUnit,
+    runtime_root: Path,
+    *,
+    require_media_files: bool,
+) -> tuple[Mapping[str, Any], ...]:
+    """Rebuild exact requests from one sealed unit and its fixed runtime paths."""
+
+    media_root = Path(runtime_root) / "media"
+    media_paths = tuple(
+        media_root / name for name in sorted(_media_names(unit.transactions))
+    )
+    if require_media_files and any(
+        not path.is_file() or path.is_symlink() for path in media_paths
+    ):
+        raise ValueError("audio import business runtime media evidence is incomplete")
+    media_by_name = {path.name: path for path in media_paths}
+    return tuple(
+        {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": unit.version,
+            "operation": "audio.import",
+            "arguments": _resolve_media_tokens(
+                transaction["arguments"],
+                media_by_name,
+            ),
+        }
+        for transaction in unit.transactions
     )
 
 
@@ -383,7 +406,13 @@ def _write_silent_wav(path: Path) -> None:
 
 
 __all__ = [
-    "FIXTURE_ENV", "ImportBusinessAgentOptions", "ImportBusinessAgentOutcome",
-    "ImportBusinessRuntime", "OUTCOME_CONTRACT", "build_preview_only_business_steps",
-    "prepare_import_business_runtime", "run_import_business_agent_unit",
+    "FIXTURE_ENV",
+    "ImportBusinessAgentOptions",
+    "ImportBusinessAgentOutcome",
+    "ImportBusinessRuntime",
+    "OUTCOME_CONTRACT",
+    "build_preview_only_business_steps",
+    "prepare_import_business_runtime",
+    "reconstruct_import_business_requests",
+    "run_import_business_agent_unit",
 ]

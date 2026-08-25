@@ -211,7 +211,10 @@ from tests.semantic.support.codex_prompt_provenance_v3 import (  # noqa: E402
     PROMPT_MATERIALIZATION_RECEIPT_CONTRACT,
     PROMPT_MATERIALIZATION_RECEIPT_FILE,
     PROMPT_PROVENANCE_FILE,
+    PromptProvenanceError,
     PromptProvenanceEvidence,
+    _canonicalize_legacy_protocol_manifest,
+    deserialize_protocol,
     read_prompt_provenance,
     serialize_protocol,
 )
@@ -3014,6 +3017,7 @@ def _validate_heavy_v3_matrix_case(
             matrix_case=value,
             expected_unit=expected_unit,
             scenario_root=scenario_root,
+            options=options,
         )
         return
     expected_outcome_keys = {
@@ -3080,6 +3084,7 @@ def _validate_audio_import_business_agent_outcome(
     matrix_case: Mapping[str, Any],
     expected_unit: Any,
     scenario_root: Path,
+    options: CampaignOptions,
 ) -> None:
     expected_keys = {
         "contract",
@@ -3147,11 +3152,185 @@ def _validate_audio_import_business_agent_outcome(
         )
     if outcome.get("status") == "PASS" and (
         reconciliation.get("passed") is not True
+        or broker.get("passed") is not True
         or broker.get("complete") is not True
+        or not isinstance(broker.get("records"), list)
+        or outcome.get("command_count") != len(broker["records"])
     ):
         raise CampaignEvidenceError(
             "audio import business PASS lacks complete Broker reconciliation"
         )
+    if outcome.get("status") == "PASS":
+        _validate_audio_import_business_agent_protocol(
+            broker,
+            expected_unit=expected_unit,
+            scenario_root=scenario_root,
+            protocol_manifest_revision=options.protocol_manifest_revision,
+        )
+
+
+def _validate_audio_import_business_agent_protocol(
+    broker: Mapping[str, Any],
+    *,
+    expected_unit: Any,
+    scenario_root: Path,
+    protocol_manifest_revision: str | None,
+) -> None:
+    """Rebuild the reviewed protocol and check its sealed Broker witnesses."""
+
+    from tests.semantic.support.codex_import_business_agent_runner import (
+        build_preview_only_business_steps,
+        reconstruct_import_business_requests,
+    )
+
+    task_root = scenario_root / "evidence" / "codex-task"
+    try:
+        requests = reconstruct_import_business_requests(
+            expected_unit,
+            task_root / "runtime",
+            require_media_files=True,
+        )
+        steps = build_preview_only_business_steps(requests)
+        protocol = V3GatewayProtocol(
+            steps=steps,
+            turn_prefix_counts=(len(steps),),
+        )
+    except (OSError, TypeError, ValueError, V3ProtocolError) as exc:
+        raise CampaignEvidenceError(
+            "audio import business sealed protocol cannot be reconstructed"
+        ) from exc
+
+    protocol_value = serialize_protocol(protocol)
+    if protocol_manifest_revision is not None:
+        legacy_value = json.loads(json.dumps(protocol_value))
+        for step in legacy_value["steps"]:
+            step.pop("allow_explicit_derived_sfx_language")
+        try:
+            canonical = _canonicalize_legacy_protocol_manifest(
+                legacy_value,
+                protocol_manifest_revision=protocol_manifest_revision,
+            )
+        except PromptProvenanceError as exc:
+            raise CampaignEvidenceError(str(exc)) from exc
+        if deserialize_protocol(canonical) != protocol:
+            raise CampaignEvidenceError(
+                "audio import business protocol revision is not exact"
+            )
+
+    expected_names = tuple(step.name for step in steps)
+    consumed_names = broker.get("consumed_step_names")
+    if (
+        broker.get("expected_step_names") != list(expected_names)
+        or not isinstance(consumed_names, list)
+        or len(consumed_names) != len(expected_names)
+        or len(set(consumed_names)) != len(consumed_names)
+        or set(consumed_names) != set(expected_names)
+    ):
+        raise CampaignEvidenceError(
+            "audio import business sealed Broker topology is inconsistent"
+        )
+    records = broker.get("records")
+    if not isinstance(records, list) or len(records) != len(expected_names):
+        raise CampaignEvidenceError(
+            "audio import business sealed Broker records are incomplete"
+        )
+    by_name: dict[str, Mapping[str, Any]] = {}
+    for record in records:
+        name = record.get("step_name") if isinstance(record, Mapping) else None
+        if not isinstance(name, str) or name in by_name:
+            raise CampaignEvidenceError(
+                "audio import business sealed Broker step identity is invalid"
+            )
+        by_name[name] = record
+    for step in steps:
+        record = by_name.get(step.name)
+        arguments = record.get("gateway_arguments") if record is not None else None
+        if (
+            record is None
+            or record.get("accepted") is not True
+            or record.get("authenticated") is not True
+            or record.get("succeeded") is not True
+            or record.get("exit_code") != 0
+            or not isinstance(arguments, list)
+            or not arguments
+            or arguments[0] != step.subcommand
+        ):
+            raise CampaignEvidenceError(
+                "audio import business sealed Broker record is not successful"
+            )
+        if step.subcommand in {"draft-declare-new", "draft-declare-existing"}:
+            _validate_audio_import_business_declaration_language(step, arguments)
+        if step.subcommand == "preview-from-draft":
+            payload = record.get("payload")
+            agent_result = (
+                payload.get("agent_result")
+                if isinstance(payload, Mapping)
+                else None
+            )
+            request = (
+                agent_result.get("request")
+                if isinstance(agent_result, Mapping)
+                else None
+            )
+            expected_request = _bind_audio_import_request_paths(
+                step.expected_operation_request,
+                objects=getattr(expected_unit, "objects", ()),
+            )
+            if request != expected_request:
+                raise CampaignEvidenceError(
+                    "audio import business sealed Preview request witness drifted"
+                )
+
+
+def _validate_audio_import_business_declaration_language(
+    step: Any,
+    arguments: Sequence[Any],
+) -> None:
+    values = tuple(str(value) for value in arguments)
+    language_values = tuple(
+        values[index + 2]
+        for index, value in enumerate(values[:-2])
+        if value == "--field" and values[index + 1] == "language"
+    )
+    if len(language_values) > 1 or any(
+        value != "SFX" for value in language_values
+    ):
+        raise CampaignEvidenceError(
+            "audio import business derived SFX declaration is contradictory"
+        )
+    if language_values and not step.allow_explicit_derived_sfx_language:
+        raise CampaignEvidenceError(
+            "audio import business declaration added an unreviewed SFX language"
+        )
+
+
+def _bind_audio_import_request_paths(
+    value: Any,
+    *,
+    objects: Sequence[Any],
+) -> Any:
+    path_to_id = {
+        str(row["path"]): str(row["id"])
+        for row in objects
+        if isinstance(row, Mapping)
+        and isinstance(row.get("path"), str)
+        and isinstance(row.get("id"), str)
+    }
+
+    def visit(item: Any) -> Any:
+        if isinstance(item, Mapping):
+            if (
+                item.get("kind") == "path"
+                and isinstance(item.get("value"), str)
+                and item["value"] in path_to_id
+            ):
+                return {"kind": "id", "value": path_to_id[item["value"]]}
+            return {str(key): visit(nested) for key, nested in item.items()}
+        if isinstance(item, (list, tuple)):
+            return [visit(nested) for nested in item]
+        return item
+
+    return visit(value)
 
 
 def _validate_heavy_v3_pre_materialization_block(

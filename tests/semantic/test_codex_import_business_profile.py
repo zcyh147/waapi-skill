@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
 from tests.semantic import run_codex_skill_matrix as matrix
 from tests.semantic import run_codex_skill_campaign as campaign
 from tests.semantic.support.codex_eval_protocol_v3 import (
+    V3GatewayProtocol,
     build_audio_import_composer_transaction_steps,
 )
 from tests.semantic.support.codex_import_business_profile import (
+    ImportBusinessUnit,
     UNIT_IDS,
     load_import_business_profile,
 )
@@ -19,6 +22,7 @@ from tests.semantic.support.codex_import_business_agent_runner import (
     build_preview_only_business_steps,
     prepare_import_business_runtime,
 )
+from tests.semantic.support.codex_prompt_provenance_v3 import serialize_protocol
 from tests.semantic.support.codex_gateway_broker import (
     DraftTypedActionArgument,
     DraftTypedActionBatchArgument,
@@ -572,34 +576,102 @@ def test_campaign_uses_the_agent_lane_and_closed_offline_preflight(tmp_path: Pat
     )
 
 
-def test_campaign_validates_the_profile_specific_agent_outcome(tmp_path: Path) -> None:
-    unit = load_import_business_profile(
-        PROFILE,
-        unit_ids=("AIB25-WEAPONS-A",),
-    ).units[0]
-    evidence = tmp_path / "evidence"
-    evidence.mkdir()
+def _write_synthetic_agent_evidence(
+    scenario_root: Path,
+    unit: ImportBusinessUnit,
+    *,
+    thread_id: str,
+) -> tuple[dict[str, object], tuple[object, ...]]:
+    evidence = scenario_root / "evidence"
+    evidence.mkdir(parents=True)
+    runtime = prepare_import_business_runtime(
+        unit,
+        evidence / "codex-task" / "runtime",
+    )
+    steps = build_preview_only_business_steps(runtime.requests)
+    serialized_steps = {
+        step["name"]: step
+        for step in serialize_protocol(
+            V3GatewayProtocol(steps=steps, turn_prefix_counts=(len(steps),))
+        )["steps"]
+    }
+    records = []
+    explicit_sfx_added = False
+    for step in steps:
+        gateway_arguments = [step.subcommand]
+        if step.allow_explicit_derived_sfx_language and not explicit_sfx_added:
+            gateway_arguments.extend(("--field", "language", "SFX"))
+            explicit_sfx_added = True
+        payload = (
+            {
+                "agent_result": {
+                    "request": campaign._bind_audio_import_request_paths(
+                        serialized_steps[step.name][
+                            "expected_operation_request"
+                        ]["value"],
+                        objects=unit.objects,
+                    )
+                }
+            }
+            if step.subcommand == "preview-from-draft"
+            else {}
+        )
+        records.append(
+            {
+                "step_name": step.name,
+                "gateway_arguments": gateway_arguments,
+                "accepted": True,
+                "authenticated": True,
+                "succeeded": True,
+                "exit_code": 0,
+                "payload": payload,
+            }
+        )
+    expected_names = [step.name for step in steps]
     outcome = {
         "contract": "waapi-skill.audio-import-business-agent-outcome/v1",
         "scenario_id": unit.unit_id,
         "version": unit.version,
         "status": "PASS",
         "reason": "",
-        "thread_id": "thread-fixture",
+        "thread_id": thread_id,
         "gates": {"broker_passed": True, "exact_protocol": True},
-        "command_count": 11,
+        "command_count": len(steps),
         "transaction_count": unit.transaction_count,
         "production_gateway": True,
         "wwise_started": False,
         "final_response": "预览完成",
     }
-    for name, payload in (
-        ("outcome.json", outcome),
-        ("broker-reconciliation.json", {"passed": True}),
-        ("broker-evidence.json", {"complete": True}),
-        ("codex-result-facts.json", {}),
+    for path, payload in (
+        (evidence / "outcome.json", outcome),
+        (scenario_root / "outcome.json", outcome),
+        (evidence / "broker-reconciliation.json", {"passed": True}),
+        (
+            evidence / "broker-evidence.json",
+            {
+                "passed": True,
+                "complete": True,
+                "expected_step_names": expected_names,
+                "consumed_step_names": expected_names,
+                "records": records,
+            },
+        ),
+        (evidence / "codex-result-facts.json", {}),
     ):
-        (evidence / name).write_text(json.dumps(payload), encoding="utf-8")
+        path.write_text(json.dumps(payload), encoding="utf-8")
+    return outcome, steps
+
+
+def test_campaign_validates_the_profile_specific_agent_outcome(tmp_path: Path) -> None:
+    unit = load_import_business_profile(
+        PROFILE,
+        unit_ids=("AIB25-WEAPONS-A",),
+    ).units[0]
+    outcome, _steps = _write_synthetic_agent_evidence(
+        tmp_path,
+        unit,
+        thread_id="thread-fixture",
+    )
 
     campaign._validate_audio_import_business_agent_outcome(
         outcome,
@@ -611,4 +683,139 @@ def test_campaign_validates_the_profile_specific_agent_outcome(tmp_path: Path) -
         },
         expected_unit=unit,
         scenario_root=tmp_path,
+        options=SimpleNamespace(
+            protocol_manifest_revision=(
+                campaign.AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION
+            )
+        ),
+    )
+
+
+def test_campaign_child_validator_consumes_reviewed_agent_protocol_revision(
+    tmp_path: Path,
+) -> None:
+    unit = load_import_business_profile(
+        PROFILE,
+        unit_ids=("AIB25-WEAPONS-A",),
+    ).units[0]
+    matrix_root = tmp_path / "matrix"
+    scenario_root = matrix_root / "scenarios" / f"001-{unit.unit_id}"
+    outcome, steps = _write_synthetic_agent_evidence(
+        scenario_root,
+        unit,
+        thread_id="thread-agent-child",
+    )
+
+    row = campaign.heavy_v3_unit_row(unit, sequence=1)
+    matrix_case = {
+        "contract": matrix.HEAVY_V3_CASE_RECORD_CONTRACT,
+        **row,
+        "status": "PASS",
+        "reason": "",
+        "scenario_root": str(scenario_root.resolve()),
+        "runner_outcome": outcome,
+    }
+    matrix.write_json(scenario_root / "matrix-case.json", matrix_case)
+    codex = tmp_path / "codex"
+    auth = tmp_path / "auth.json"
+    live = tmp_path / "live.json"
+    for path, content in ((codex, "codex"), (auth, "{}"), (live, "{}")):
+        path.write_text(content, encoding="utf-8")
+    options = campaign.CampaignOptions(
+        campaign_root=tmp_path / "campaign",
+        resume=True,
+        verify_only=True,
+        profile=matrix.AUDIO_IMPORT_BUSINESS_PROFILE_ID,
+        suite_path=PROFILE,
+        skill_source=REPO_ROOT / "skills/waapi-skill",
+        codex_binary=codex,
+        auth_json=auth,
+        live_config=live,
+        model="gpt-5.6-terra",
+        reasoning_effort="medium",
+        service_tier="default",
+        timeout_seconds=240.0,
+        case_ids=(unit.unit_id,),
+        versions=(),
+        pair_ids=(),
+        offline_only=False,
+        lock_timeout_seconds=1.0,
+        max_pre_action_retries=0,
+        protocol_manifest_revision=(
+            campaign.AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION
+        ),
+    )
+    runner_options = matrix.RunnerOptions(
+        profile=options.profile,
+        iteration_root=matrix_root,
+        suite_path=options.suite_path,
+        skill_source=options.skill_source,
+        codex_binary=options.codex_binary,
+        auth_json=options.auth_json,
+        live_config=options.live_config,
+        model=options.model,
+        reasoning_effort=options.reasoning_effort,
+        service_tier=options.service_tier,
+        timeout_seconds=options.timeout_seconds,
+        case_ids=options.case_ids,
+        versions=(),
+        pair_ids=(),
+        offline_only=False,
+        overwrite=False,
+    )
+    started = "2026-08-25T00:00:00Z"
+    completed = "2026-08-25T00:01:00Z"
+    run_config = matrix._heavy_v3_run_config(
+        runner_options,
+        unit_rows=(row,),
+        records=(matrix_case,),
+        run_errors=(),
+        stop_reason="",
+        preflight_state="passed",
+        started_at=started,
+        completed_at=completed,
+    )
+    summary = matrix._heavy_v3_summary(
+        unit_rows=(row,),
+        records=(matrix_case,),
+        run_errors=(),
+        stop_reason="",
+        preflight_state="passed",
+        started_at=started,
+        completed_at=completed,
+        profile=options.profile,
+    )
+    matrix.write_json(matrix_root / "run-config.json", run_config)
+    matrix.write_json(matrix_root / "summary.json", summary)
+    matrix.write_json(
+        matrix_root / "live-preflight.json",
+        {
+            "contract": "waapi-skill.audio-import-business-preflight/v1",
+            "ok": True,
+            "mode": "offline-production-gateway",
+            "wwise_started": False,
+            "production_gateway": True,
+        },
+    )
+
+    result = campaign.validate_heavy_v3_child_run(
+        matrix_root,
+        expected_units=(unit,),
+        options=options,
+        returncode=0,
+    )
+
+    assert result.observations[0]["status"] == "PASS"
+    rejected = campaign.validate_heavy_v3_child_run(
+        matrix_root,
+        expected_units=(unit,),
+        options=replace(
+            options,
+            protocol_manifest_revision="unreviewed-revision",
+        ),
+        returncode=0,
+    )
+    assert rejected.observations[0]["status"] == "BLOCKED"
+    assert "protocol manifest revision is unsupported" in (
+        rejected.phase_verdicts[0].reason
     )
