@@ -137,6 +137,8 @@ def object_graph_business_contract_data(
                 "optional_fields": ["mode", "notes"],
                 "mode_values": ["add-only", "add-or-update"],
                 "point_fields": ["x", "y", "shape"],
+                "shape_semantics": "outgoing_segment",
+                "terminal_shape": "gateway_normalized_to_Linear",
                 "point_shapes": [
                     "Constant",
                     "Linear",

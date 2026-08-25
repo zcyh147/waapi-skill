@@ -1577,7 +1577,7 @@ def test_object_graph_business_draft_executes_weather_graph_plugin_bulk_set_and_
                 "--point",
                 "0",
                 "-12",
-                "Linear",
+                "SCurve",
                 "--point",
                 "100",
                 "0",

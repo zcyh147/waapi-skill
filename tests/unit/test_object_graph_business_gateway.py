@@ -409,7 +409,7 @@ def test_gateway_builds_rtpc_curve_from_bound_business_facts(tmp_path: Path) -> 
         "--point",
         "0",
         "-12",
-        "Linear",
+        "SCurve",
         "--point",
         "100",
         "0",
@@ -431,8 +431,8 @@ def test_gateway_builds_rtpc_curve_from_bound_business_facts(tmp_path: Path) -> 
     )
     assert materialized.request["arguments"]["property"] == "Volume"
     assert materialized.request["arguments"]["points"] == [
-        {"x": 0, "y": -12, "shape": "Linear"},
-        {"x": 100, "y": 0, "shape": "SCurve"},
+        {"x": 0, "y": -12, "shape": "SCurve"},
+        {"x": 100, "y": 0, "shape": "Linear"},
     ]
 
 

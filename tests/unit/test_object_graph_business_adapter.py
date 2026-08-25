@@ -314,7 +314,7 @@ def test_set_rtpc_compiles_bound_property_control_and_business_curve(
         },
         "points": [
             {"x": 0, "y": -12, "shape": "Linear"},
-            {"x": 100, "y": 0, "shape": "SCurve"},
+            {"x": 100, "y": 0, "shape": "Linear"},
         ],
         "notes": "Weather intensity curve",
         "mode": "add_or_replace",

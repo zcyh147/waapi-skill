@@ -1329,6 +1329,10 @@ def _materialize_set_rtpc(
             )
         session.handles.validate_field_value(field, y)
         points.append({"x": x, "y": y, "shape": shape})
+    # Wwise stores shape on the outgoing segment and canonicalizes the terminal
+    # point to Linear because it has no following segment.  Own that wire
+    # detail here so the immutable Preview and live readback remain identical.
+    points[-1] = {**points[-1], "shape": "Linear"}
     mode = fields.get("mode", "add-or-update")
     if mode not in {"add-only", "add-or-update"}:
         raise _repair(
