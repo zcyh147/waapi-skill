@@ -25,6 +25,9 @@ PROFILE = (
     / "switch-assignment-business"
     / "profile.json"
 )
+OPERATE_REFERENCE = (
+    REPO_ROOT / "skills" / "waapi-skill" / "references" / "waapi-operate.md"
+)
 
 
 def test_profile_owns_one_current_add_assignment_preview() -> None:
@@ -59,6 +62,17 @@ def test_prompt_exposes_three_business_paths_not_gateway_mechanics() -> None:
         "object_handle",
     ):
         assert forbidden not in prompt
+
+
+def test_public_routing_names_both_assignment_outcomes_exactly() -> None:
+    operate = OPERATE_REFERENCE.read_text(encoding="utf-8")
+
+    for operation in (
+        "switchContainer.addAssignment",
+        "switchContainer.removeAssignment",
+    ):
+        assert f"`{operation}`" in operate
+    assert "an invented alias" in operate
 
 
 def test_unit_binds_three_paths_then_declares_one_preview(tmp_path: Path) -> None:

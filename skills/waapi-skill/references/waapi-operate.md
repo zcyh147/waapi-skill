@@ -79,7 +79,9 @@ Existing-root status alone does not select `object.set`. One object's single ren
 | Wholly new structure-only object hierarchy whose requested root does not already exist and has no media or import-manifest intent | `object.create` | `audio.import` |
 | One existing object's single rename, notes, scalar-property, or reference edit | `object.setName`, `object.setNotes`, `object.setProperty`, or `object.setReference` | broad `object.set` |
 | Larger atomic existing-target batch: several fields/properties/references on one root; an ordinary closed object-list change; multiple roots; a root edit plus a new subtree; or insertion into a named existing descendant (not the request root) | `object.set` | `object.create` or any dedicated operation |
-| Platform link, plug-in, RTPC curve, or independent Switch assignment between existing objects | its dedicated operation | generic object mutation or a same-row import side effect |
+| Platform link, plug-in, or RTPC curve | its dedicated operation | generic object mutation |
+| Add an independent Switch assignment between existing objects | `switchContainer.addAssignment` | an invented alias, generic object mutation, or a same-row import side effect |
+| Remove an independent Switch assignment between existing objects | `switchContainer.removeAssignment` | an invented alias, generic object mutation, or a same-row import side effect |
 | Direct saved SoundBank inclusions | `soundbank.setInclusions` | Definition TSV |
 | Existing caller-owned SoundBank Definition TSV | `soundbank.processDefinitionFiles` | reconstructed direct rows |
 | Generate Bank artifacts | `soundbank.generate` | persistent inclusion editing |
