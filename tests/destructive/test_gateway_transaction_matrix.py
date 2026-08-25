@@ -407,18 +407,11 @@ def test_gateway_transaction_object_lifecycle_across_selected_version(
         CONTAINERS_PARENT if runtime.version == "2025.1" else ACTOR_MIXER_PARENT
     )
 
-    create = _complete_transaction(
+    create = _complete_business_object_create(
         runtime,
-        operation="object.create",
-        arguments={
-            "parent": {
-                "kind": "path",
-                "value": parent_path,
-            },
-            "type": "ActorMixer",
-            "name": object_name,
-            "notes": initial_notes,
-        },
+        parent_segments=_object_parent_segments(runtime.version),
+        name=object_name,
+        notes=initial_notes,
     )
     created_id = _created_object_id(create["execute"])
 
@@ -523,22 +516,11 @@ def test_gateway_wait_topic_matches_runner_owned_object_create_and_unsubscribes(
     try:
         ack = topic_wait.wait_until_subscribed()
         assert ack["topic"] == topic_uri
-        created = _complete_transaction(
+        created = _complete_business_object_create(
             runtime,
-            operation="object.create",
-            arguments={
-                "parent": {
-                    "kind": "path",
-                    "value": (
-                        CONTAINERS_PARENT
-                        if runtime.version == "2025.1"
-                        else ACTOR_MIXER_PARENT
-                    ),
-                },
-                "type": "ActorMixer",
-                "name": object_name,
-                "notes": "runner-owned packaged wait-topic probe",
-            },
+            parent_segments=_object_parent_segments(runtime.version),
+            name=object_name,
+            notes="runner-owned packaged wait-topic probe",
         )
         created_id = _created_object_id(created["execute"])
         topic = topic_wait.finish()
@@ -790,9 +772,115 @@ def _complete_transaction(
             ),
             request,
         )
+    return _finish_transaction_preview(
+        runtime,
+        operation=operation,
+        preview=preview,
+        expected_request=request,
+    )
+
+
+def _complete_business_object_create(
+    runtime: _GatewaySandboxRuntime,
+    *,
+    parent_segments: Sequence[str],
+    name: str,
+    notes: str,
+) -> dict[str, Mapping[str, Any]]:
+    started = runtime.gateway(["draft-start", "object.create"], live=False)
+    draft = started.get("draft")
+    assert isinstance(draft, Mapping), started
+    draft_id = draft.get("draft_id")
+    task_authority = started.get("task_authority")
+    revision = draft.get("revision")
+    assert isinstance(draft_id, str) and draft_id, started
+    assert isinstance(task_authority, str) and task_authority, started
+    assert isinstance(revision, int), started
+
+    def update(
+        command: str,
+        arguments: Sequence[str] = (),
+        *,
+        live: bool,
+    ) -> dict[str, Any]:
+        nonlocal revision
+        payload = runtime.gateway(
+            [
+                command,
+                draft_id,
+                "--task-authority",
+                task_authority,
+                "--expected-revision",
+                str(revision),
+                *arguments,
+            ],
+            live=live,
+        )
+        projection = payload.get("draft")
+        if isinstance(projection, Mapping):
+            next_revision = projection.get("revision")
+            assert isinstance(next_revision, int), payload
+            revision = next_revision
+        return payload
+
+    bound = update(
+        "draft-bind-object",
+        [
+            item
+            for segment in parent_segments
+            for item in ("--object-path-segment", segment)
+        ],
+        live=True,
+    )
+    bound_object = bound.get("bound_object")
+    assert isinstance(bound_object, Mapping), bound
+    parent_handle = bound_object.get("handle")
+    assert isinstance(parent_handle, str) and parent_handle, bound
+
+    update(
+        "draft-declare-new",
+        [
+            "--declaration-id",
+            "created-object",
+            "--parent-handle",
+            parent_handle,
+            "--name",
+            name,
+            "--kind",
+            "actor-mixer",
+            "--field",
+            "notes",
+            notes,
+        ],
+        live=False,
+    )
+    update("draft-check", live=True)
+    preview = update("preview-from-draft", live=True)
+    return _finish_transaction_preview(
+        runtime,
+        operation="object.create",
+        preview=preview,
+        expected_request=None,
+    )
+
+
+def _finish_transaction_preview(
+    runtime: _GatewaySandboxRuntime,
+    *,
+    operation: str,
+    preview: Mapping[str, Any],
+    expected_request: Mapping[str, Any] | None,
+) -> dict[str, Mapping[str, Any]]:
     assert preview["status"] == TransactionState.AWAITING_CONFIRMATION.value
     assert preview["state"] == TransactionState.AWAITING_CONFIRMATION.value
-    assert preview["preview_summary"]["request"] == request
+    preview_request = preview["preview_summary"]["request"]
+    assert isinstance(preview_request, Mapping), preview
+    if expected_request is not None:
+        assert preview_request == expected_request
+    else:
+        assert preview_request["contract"] == OPERATION_REQUEST_CONTRACT
+        assert preview_request["version"] == runtime.version
+        assert preview_request["operation"] == operation
     assert preview["preview_summary"]["dispatch"]["uri"].startswith("ak.wwise.")
     assert preview["executed"] is False
     assert preview["verified"] is False
@@ -845,6 +933,14 @@ def _complete_transaction(
     assert store.load(transaction_id).state is TransactionState.VERIFIED
     assert store.load_preview(transaction_id).artifact_hash == artifact_hash
     return {"preview": preview, "execute": executed, "verify": verified}
+
+
+def _object_parent_segments(version: str) -> tuple[str, str]:
+    return (
+        ("Containers", "Default Work Unit")
+        if version == "2025.1"
+        else ("Actor-Mixer Hierarchy", "Default Work Unit")
+    )
 
 
 def _created_object_id(executed: Mapping[str, Any]) -> str:
