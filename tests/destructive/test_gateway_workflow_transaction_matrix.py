@@ -151,6 +151,196 @@ class _WorkflowSandboxRuntime:
         return payload
 
 
+@dataclass(slots=True)
+class _BusinessDraft:
+    draft_id: str
+    task_authority: str
+    revision: int
+
+
+def _start_business_draft(
+    runtime: _WorkflowSandboxRuntime,
+    operation: str,
+) -> _BusinessDraft:
+    started = runtime.gateway(["draft-start", operation], live=False)
+    draft = started.get("draft")
+    assert isinstance(draft, Mapping), started
+    return _BusinessDraft(
+        draft_id=_required_string(draft, "draft_id"),
+        task_authority=_required_string(started, "task_authority"),
+        revision=int(draft["revision"]),
+    )
+
+
+def _update_business_draft(
+    runtime: _WorkflowSandboxRuntime,
+    draft: _BusinessDraft,
+    command: str,
+    arguments: Sequence[str] = (),
+    *,
+    live: bool,
+) -> dict[str, Any]:
+    payload = runtime.gateway(
+        [
+            command,
+            draft.draft_id,
+            "--task-authority",
+            draft.task_authority,
+            "--expected-revision",
+            str(draft.revision),
+            *arguments,
+        ],
+        live=live,
+    )
+    projection = payload.get("draft")
+    if isinstance(projection, Mapping):
+        draft.revision = int(projection["revision"])
+    return payload
+
+
+def _complete_business_draft(
+    runtime: _WorkflowSandboxRuntime,
+    draft: _BusinessDraft,
+) -> dict[str, Mapping[str, Any]]:
+    _update_business_draft(runtime, draft, "draft-check", live=True)
+    preview = _update_business_draft(
+        runtime,
+        draft,
+        "preview-from-draft",
+        live=True,
+    )
+    transaction_id = _required_string(preview, "transaction_id")
+    shown = runtime.gateway(
+        ["transaction-show", transaction_id, "--summary-only"],
+        live=False,
+    )
+    confirmation = shown.get("confirmation")
+    assert isinstance(confirmation, Mapping), shown
+    token = _required_string(confirmation, "token")
+    runtime.gateway(
+        ["confirm", transaction_id, "--confirmation-token", token],
+        live=False,
+    )
+    executed = runtime.gateway(["execute", transaction_id], live=True)
+    verified = runtime.gateway(["verify", transaction_id], live=True)
+    assert executed["state"] == TransactionState.EXECUTED_UNVERIFIED.value, executed
+    assert verified["state"] == TransactionState.VERIFIED.value, verified
+    assert verified["verification"]["business_state_verified"] is True, verified
+    return {"preview": preview, "execute": executed, "verify": verified}
+
+
+def _bind_business_object(
+    runtime: _WorkflowSandboxRuntime,
+    draft: _BusinessDraft,
+    *,
+    object_id: str | None = None,
+    path_segments: Sequence[str] = (),
+) -> str:
+    assert (object_id is None) != (not path_segments)
+    arguments = (
+        ["--object-id", object_id]
+        if object_id is not None
+        else [
+            item
+            for segment in path_segments
+            for item in ("--object-path-segment", segment)
+        ]
+    )
+    payload = _update_business_draft(
+        runtime,
+        draft,
+        "draft-bind-object",
+        arguments,
+        live=True,
+    )
+    bound = payload.get("bound_object")
+    assert isinstance(bound, Mapping), payload
+    return _required_string(bound, "handle")
+
+
+def _declared_result_handle(payload: Mapping[str, Any], declaration_id: str) -> str:
+    draft = payload.get("draft")
+    assert isinstance(draft, Mapping), payload
+    declarations = draft.get("declarations")
+    assert isinstance(declarations, list), draft
+    matches = [
+        row
+        for row in declarations
+        if isinstance(row, Mapping) and row.get("declaration_id") == declaration_id
+    ]
+    assert len(matches) == 1, declarations
+    return _required_string(matches[0], "result_handle")
+
+
+def _discover_business_type(
+    runtime: _WorkflowSandboxRuntime,
+    draft: _BusinessDraft,
+    *,
+    meaning: str,
+    role: str,
+    expected_label: str,
+) -> str:
+    payload = _update_business_draft(
+        runtime,
+        draft,
+        "draft-discover-types",
+        ["--meaning", meaning, "--role", role],
+        live=True,
+    )
+    candidates = payload.get("type_candidates")
+    assert isinstance(candidates, list), payload
+    matches = [
+        row
+        for row in candidates
+        if isinstance(row, Mapping) and row.get("label") == expected_label
+    ]
+    assert len(matches) == 1, candidates
+    return _required_string(matches[0], "handle")
+
+
+def _discover_business_field(
+    runtime: _WorkflowSandboxRuntime,
+    draft: _BusinessDraft,
+    *,
+    object_handle: str,
+    meaning: str,
+) -> str:
+    payload = _update_business_draft(
+        runtime,
+        draft,
+        "draft-discover-fields",
+        ["--object-handle", object_handle, "--meaning", meaning],
+        live=True,
+    )
+    candidates = payload.get("field_candidates")
+    assert isinstance(candidates, list) and candidates, payload
+    return _required_string(candidates[0], "handle")
+
+
+def _query_exact_path_id(runtime: _WorkflowSandboxRuntime, path: str) -> str:
+    payload = runtime.gateway(
+        [
+            "query-object",
+            "--object-path",
+            path,
+            "--return-field",
+            "id",
+            "--return-field",
+            "name",
+            "--return-field",
+            "type",
+            "--return-field",
+            "path",
+        ],
+        live=True,
+    )
+    rows = payload.get("objects")
+    assert payload.get("count") == 1 and isinstance(rows, list), payload
+    assert len(rows) == 1 and isinstance(rows[0], Mapping), rows
+    assert rows[0].get("path") == path, rows[0]
+    return _required_string(rows[0], "id")
+
+
 @pytest.fixture(scope="module")
 def workflow_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterator[_WorkflowSandboxRuntime]:
     env = dict(os.environ)
@@ -1198,6 +1388,222 @@ def test_object_metadata_business_draft_executes_field_verifiers(
     finally:
         if source_id is not None:
             _delete_if_present_via_transaction(runtime, source_id)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_object_graph_business_draft_executes_weather_graph_plugin_bulk_set_and_rtpc(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    runtime = workflow_sandbox_runtime
+    if runtime.version not in {"2022.1", "2025.1"}:
+        pytest.skip("object graph business evidence targets 2022.1 and 2025.1")
+
+    suffix = uuid.uuid4().hex[:12]
+    weather_name = f"WAAPI_BUSINESS_WEATHER_{suffix}"
+    rain_name = f"Rain_{suffix}"
+    wind_name = f"Wind_{suffix}"
+    root_segments = (
+        ("Containers", "Default Work Unit")
+        if runtime.version == "2025.1"
+        else ("Actor-Mixer Hierarchy", "Default Work Unit")
+    )
+    root_path = "\\" + "\\".join((*root_segments, weather_name))
+    weather_id: str | None = None
+    try:
+        create = _start_business_draft(runtime, "object.create")
+        parent_handle = _bind_business_object(
+            runtime,
+            create,
+            path_segments=root_segments,
+        )
+        declared_root = _update_business_draft(
+            runtime,
+            create,
+            "draft-declare-new",
+            [
+                "--declaration-id",
+                "weather",
+                "--parent-handle",
+                parent_handle,
+                "--name",
+                weather_name,
+                "--kind",
+                "actor-mixer",
+            ],
+            live=False,
+        )
+        weather_handle = _declared_result_handle(declared_root, "weather")
+        for declaration_id, name, volume in (
+            ("rain", rain_name, "-4"),
+            ("wind", wind_name, "-6"),
+        ):
+            _update_business_draft(
+                runtime,
+                create,
+                "draft-declare-new",
+                [
+                    "--declaration-id",
+                    declaration_id,
+                    "--parent-handle",
+                    weather_handle,
+                    "--name",
+                    name,
+                    "--kind",
+                    "sound-sfx",
+                    "--field",
+                    "loop",
+                    "infinite",
+                    "--field",
+                    "volume_db",
+                    volume,
+                ],
+                live=False,
+            )
+        created = _complete_business_draft(runtime, create)
+        weather_id = _created_object_id(created["execute"])
+
+        rain_id = _query_exact_path_id(runtime, f"{root_path}\\{rain_name}")
+        wind_id = _query_exact_path_id(runtime, f"{root_path}\\{wind_name}")
+
+        plugin = _start_business_draft(runtime, "object.createPlugin")
+        rain_plugin_handle = _bind_business_object(
+            runtime,
+            plugin,
+            object_id=rain_id,
+        )
+        plugin_type_handle = _discover_business_type(
+            runtime,
+            plugin,
+            meaning="Wwise Tone Generator",
+            role="source",
+            expected_label="Wwise Tone Generator",
+        )
+        _update_business_draft(
+            runtime,
+            plugin,
+            "draft-declare-existing",
+            [
+                "--declaration-id",
+                "weather-tone",
+                "--object-handle",
+                rain_plugin_handle,
+                "--field",
+                "plugin_role",
+                "source",
+                "--field",
+                "plugin_name",
+                f"Weather_Tone_{suffix}",
+                "--field",
+                "plugin_type_handle",
+                plugin_type_handle,
+                "--field",
+                "language",
+                "SFX",
+            ],
+            live=False,
+        )
+        _complete_business_draft(runtime, plugin)
+
+        bulk_set = _start_business_draft(runtime, "object.set")
+        rain_set_handle = _bind_business_object(
+            runtime,
+            bulk_set,
+            object_id=rain_id,
+        )
+        wind_set_handle = _bind_business_object(
+            runtime,
+            bulk_set,
+            object_id=wind_id,
+        )
+        rain_volume = _discover_business_field(
+            runtime,
+            bulk_set,
+            object_handle=rain_set_handle,
+            meaning="volume",
+        )
+        wind_volume = _discover_business_field(
+            runtime,
+            bulk_set,
+            object_handle=wind_set_handle,
+            meaning="volume",
+        )
+        for declaration_id, object_handle, field_handle, volume in (
+            ("rain", rain_set_handle, rain_volume, "-5"),
+            ("wind", wind_set_handle, wind_volume, "-7"),
+        ):
+            _update_business_draft(
+                runtime,
+                bulk_set,
+                "draft-declare-existing",
+                [
+                    "--declaration-id",
+                    declaration_id,
+                    "--object-handle",
+                    object_handle,
+                    "--field-value",
+                    field_handle,
+                    volume,
+                ],
+                live=False,
+            )
+        _complete_business_draft(runtime, bulk_set)
+
+        rtpc = _start_business_draft(runtime, "object.setRTPC")
+        rain_rtpc_handle = _bind_business_object(
+            runtime,
+            rtpc,
+            object_id=rain_id,
+        )
+        volume_handle = _discover_business_field(
+            runtime,
+            rtpc,
+            object_handle=rain_rtpc_handle,
+            meaning="volume",
+        )
+        control_handle = _bind_business_object(
+            runtime,
+            rtpc,
+            path_segments=("Game Parameters", "Ambience", "Rain_Intensity"),
+        )
+        _update_business_draft(
+            runtime,
+            rtpc,
+            "draft-declare-rtpc",
+            [
+                "--object-handle",
+                rain_rtpc_handle,
+                "--field-handle",
+                volume_handle,
+                "--control-input-handle",
+                control_handle,
+                "--point",
+                "0",
+                "-12",
+                "Linear",
+                "--point",
+                "100",
+                "0",
+                "SCurve",
+                "--notes",
+                f"Weather business RTPC {suffix}",
+            ],
+            live=False,
+        )
+        _complete_business_draft(runtime, rtpc)
+
+        runtime.category_results.append(
+            {
+                "category": "object-graph-business",
+                "status": "PASS",
+                "verifier_strength": (
+                    "recursive_create_plugin_bulk_set_rtpc_business_full_chain"
+                ),
+            }
+        )
+    finally:
+        if weather_id is not None:
+            _delete_if_present_via_transaction(runtime, weather_id)
 
 
 def _save_legacy_sandbox_project(runtime: _WorkflowSandboxRuntime) -> None:
