@@ -30,7 +30,7 @@ from tests.semantic.support.codex_gateway_broker import (
     DraftTypedActionBatchArgument,
     ExpectedGatewayStep,
 )
-from tests.destructive.support.typed_gateway_input import (
+from tests.semantic.support.typed_gateway_input import (
     _container_action,
     _require_disclosed_continuation,
     _require_nested_container_disclosure,

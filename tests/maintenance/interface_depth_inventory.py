@@ -1014,6 +1014,9 @@ def build_interface_depth_inventory() -> dict[str, Any]:
         )
     payload: dict[str, Any] = {
         "contract": CONTRACT,
+        "uniform_migration_invariant": strict_json_copy(
+            policy["uniform_migration_invariant"]
+        ),
         "source_contracts": strict_json_copy(policy["source_contracts"]),
         "ownership_classes": strict_json_copy(policy["ownership_classes"]),
         "mechanic_owners": strict_json_copy(policy["mechanic_owners"]),
@@ -1063,7 +1066,7 @@ def render_interface_depth_inventory(inventory: Mapping[str, Any]) -> str:
     lines = [
         "# Interface-depth inventory",
         "",
-        "This report is generated from the exact five-version public surface and the reviewed policy in `interface-depth-review-policy.json`. The 824-lane construction baseline proves typed request construction only; it is not evidence that every interface is deep.",
+        "This report is generated from the exact five-version public surface and the reviewed policy in `interface-depth-review-policy.json`. The 824-lane construction baseline proves typed request construction only; it is not evidence that every interface is deep. Every permitted public API and supported version lane must converge on the same Gateway-owned business/domain boundary; simplicity and prior test PASS are not migration exemptions.",
         "",
         "## Exact coverage",
         "",

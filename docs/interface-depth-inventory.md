@@ -1,6 +1,6 @@
 # Interface-depth inventory
 
-This report is generated from the exact five-version public surface and the reviewed policy in `interface-depth-review-policy.json`. The 824-lane construction baseline proves typed request construction only; it is not evidence that every interface is deep.
+This report is generated from the exact five-version public surface and the reviewed policy in `interface-depth-review-policy.json`. The 824-lane construction baseline proves typed request construction only; it is not evidence that every interface is deep. Every permitted public API and supported version lane must converge on the same Gateway-owned business/domain boundary; simplicity and prior test PASS are not migration exemptions.
 
 ## Exact coverage
 

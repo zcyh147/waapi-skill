@@ -1,9 +1,9 @@
-"""Execute the existing typed V3 construction protocol in real Gateway tests.
+"""Execute the existing typed V3 construction protocol in trusted test code.
 
 This adapter deliberately stops at the immutable Preview.  The destructive
-tests retain ownership of confirmation, execution, verification, and business
+callers retain ownership of confirmation, execution, verification, and business
 readback assertions while sharing the exact typed construction grammar used by
-the semantic Broker.
+the semantic Broker and its live fixture lifecycle.
 """
 
 from __future__ import annotations
@@ -12,8 +12,11 @@ import json
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
-from tests.semantic.support.codex_eval_protocol_v3 import build_transaction_protocol
-from tests.semantic.support.codex_eval_protocol_v3 import wait_topic_step
+from tests.semantic.support.codex_eval_protocol_v3 import (
+    OBJECT_LIFECYCLE_BUSINESS_OPERATIONS,
+    build_transaction_protocol,
+    wait_topic_step,
+)
 from tests.semantic.support.codex_gateway_broker import (
     DraftTypedActionArgument,
     DraftTypedActionBatchArgument,
@@ -31,28 +34,20 @@ from wwise_waapi.typed_requests import (
 
 
 GatewayCall = Callable[[Sequence[str]], Mapping[str, Any]]
-OBJECT_LIFECYCLE_BUSINESS_OPERATIONS = frozenset(
-    {
-        "object.copy",
-        "object.delete",
-        "object.move",
-        "object.setName",
-        "object.setNotes",
-    }
-)
-
-
 def create_object_lifecycle_business_preview(
     gateway: GatewayCall,
     *,
+    version: str,
     operation: str,
     object_id: str,
     parent_id: str | None = None,
     new_name: str | None = None,
     notes: str | None = None,
     name_conflict: str | None = None,
+    auto_add_to_source_control: bool | None = None,
+    auto_check_out_to_source_control: bool | None = None,
 ) -> dict[str, Any]:
-    """Follow one object-lifecycle Business Draft through immutable Preview."""
+    """Close test parameters and use the sole typed/business Preview executor."""
 
     if operation not in OBJECT_LIFECYCLE_BUSINESS_OPERATIONS:
         raise ValueError("operation has no object-lifecycle Business Adapter")
@@ -61,6 +56,8 @@ def create_object_lifecycle_business_preview(
         "new_name": new_name,
         "notes": notes,
         "name_conflict": name_conflict,
+        "auto_add_to_source_control": auto_add_to_source_control,
+        "auto_check_out_to_source_control": auto_check_out_to_source_control,
     }
     required = {
         "object.copy": {"parent_id"},
@@ -70,9 +67,18 @@ def create_object_lifecycle_business_preview(
         "object.setNotes": {"notes"},
     }[operation]
     allowed = {
-        "object.copy": {"parent_id", "name_conflict"},
-        "object.delete": set(),
-        "object.move": {"parent_id", "name_conflict"},
+        "object.copy": {
+            "parent_id",
+            "name_conflict",
+            "auto_add_to_source_control",
+            "auto_check_out_to_source_control",
+        },
+        "object.delete": {"auto_check_out_to_source_control"},
+        "object.move": {
+            "parent_id",
+            "name_conflict",
+            "auto_check_out_to_source_control",
+        },
         "object.setName": {"new_name"},
         "object.setNotes": {"notes"},
     }[operation]
@@ -80,126 +86,32 @@ def create_object_lifecycle_business_preview(
     if not required.issubset(supplied) or supplied - allowed:
         raise ValueError("business fields do not match the object lifecycle operation")
 
-    schema = dict(gateway(["operation-schema", operation]))
-    operation_contract = schema.get("operation")
-    adapter = schema.get("business_adapter")
-    if (
-        not isinstance(operation_contract, Mapping)
-        or operation_contract.get("input_mode") != "business_declaration"
-        or not isinstance(adapter, Mapping)
-        or adapter.get("operation") != operation
-    ):
-        raise AssertionError("operation-schema did not disclose the exact Business Adapter")
-    started = dict(gateway(["draft-start", operation]))
-    draft = started.get("draft")
-    authority = started.get("task_authority")
-    if not isinstance(draft, Mapping) or not isinstance(authority, str):
-        raise AssertionError("draft-start did not return Draft authority")
-    draft_id = draft.get("draft_id")
-    revision = draft.get("revision")
-    if not isinstance(draft_id, str) or not isinstance(revision, int):
-        raise AssertionError("draft-start did not return Draft identity and revision")
-
-    def bind(bound_object_id: str, expected_revision: int) -> tuple[str, int]:
-        payload = dict(
-            gateway(
-                [
-                    "draft-bind-object",
-                    draft_id,
-                    "--task-authority",
-                    authority,
-                    "--expected-revision",
-                    str(expected_revision),
-                    "--object-id",
-                    bound_object_id,
-                ]
-            )
-        )
-        bound_object = payload.get("bound_object")
-        updated_draft = payload.get("draft")
-        handle = (
-            bound_object.get("handle")
-            if isinstance(bound_object, Mapping)
-            else None
-        )
-        updated_revision = (
-            updated_draft.get("revision")
-            if isinstance(updated_draft, Mapping)
-            else None
-        )
-        if not isinstance(handle, str) or not isinstance(updated_revision, int):
-            raise AssertionError("draft-bind-object did not return handle and revision")
-        return handle, updated_revision
-
-    object_handle, revision = bind(object_id, revision)
-    parent_handle: str | None = None
+    arguments: dict[str, Any] = {
+        "object": {"kind": "id", "value": object_id}
+    }
     if parent_id is not None:
-        parent_handle, revision = bind(parent_id, revision)
-    declaration = [
-        "draft-declare-object-change",
-        draft_id,
-        "--task-authority",
-        authority,
-        "--expected-revision",
-        str(revision),
-        "--object-handle",
-        object_handle,
-    ]
-    for flag, value in (
-        ("--parent-handle", parent_handle),
-        ("--new-name", new_name),
-        ("--notes", notes),
-        ("--name-conflict", name_conflict),
-    ):
-        if value is not None:
-            declaration.extend((flag, value))
-    declared = dict(gateway(declaration))
-    declared_draft = declared.get("draft")
-    revision = (
-        declared_draft.get("revision")
-        if isinstance(declared_draft, Mapping)
-        else None
-    )
-    if not isinstance(revision, int):
-        raise AssertionError("business declaration did not return its revision")
-    checked = dict(
-        gateway(
-            [
-                "draft-check",
-                draft_id,
-                "--task-authority",
-                authority,
-                "--expected-revision",
-                str(revision),
-            ]
+        arguments["parent"] = {"kind": "id", "value": parent_id}
+    if new_name is not None:
+        arguments["value"] = new_name
+    if notes is not None:
+        arguments["value"] = notes
+    if name_conflict is not None:
+        arguments["on_name_conflict"] = name_conflict
+    if auto_add_to_source_control is not None:
+        arguments["auto_add_to_source_control"] = auto_add_to_source_control
+    if auto_check_out_to_source_control is not None:
+        arguments["auto_check_out_to_source_control"] = (
+            auto_check_out_to_source_control
         )
+    return create_typed_transaction_preview(
+        gateway,
+        {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": version,
+            "operation": operation,
+            "arguments": arguments,
+        },
     )
-    checked_draft = checked.get("draft")
-    revision = (
-        checked_draft.get("revision")
-        if isinstance(checked_draft, Mapping)
-        else None
-    )
-    if not isinstance(revision, int):
-        raise AssertionError("draft-check did not return its checked revision")
-    preview = dict(
-        gateway(
-            [
-                "preview-from-draft",
-                draft_id,
-                "--task-authority",
-                authority,
-                "--expected-revision",
-                str(revision),
-                "--apply",
-                "--ttl",
-                "300",
-            ]
-        )
-    )
-    if preview.get("state") != "awaiting_confirmation" or preview.get("executed") is not False:
-        raise AssertionError("Business Draft did not produce one immutable Preview")
-    return preview
 
 
 def create_typed_transaction_preview(

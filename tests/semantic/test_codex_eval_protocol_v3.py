@@ -12,6 +12,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     build_audio_import_composer_transaction_steps,
     build_direct_protocol,
     build_metadata_transaction_protocol,
+    build_object_lifecycle_business_transaction_steps,
     build_object_set_composer_transaction_steps,
     build_schema_query_transaction_protocol,
     build_transaction_protocol,
@@ -704,6 +705,112 @@ def test_audio_import_transaction_request_uses_business_declaration_steps() -> N
     assert any(step.subcommand == "draft-bind-object" for step in protocol.steps)
     assert all(step.subcommand != "draft-apply" for step in protocol.steps)
     assert all("--request-json" not in step.arguments for step in protocol.steps)
+
+
+@pytest.mark.parametrize(
+    ("operation", "arguments", "expected_flags"),
+    [
+        (
+            "object.copy",
+            {
+                "object": {"kind": "path", "value": r"\Actor-Mixer Hierarchy\Source"},
+                "parent": {"kind": "id", "value": "{parent}"},
+                "on_name_conflict": "rename",
+                "auto_add_to_source_control": False,
+                "auto_check_out_to_source_control": True,
+            },
+            {"--parent-handle", "--name-conflict", "--no-add-to-source-control", "--check-out-from-source-control"},
+        ),
+        (
+            "object.delete",
+            {
+                "object": {"kind": "id", "value": "{object}"},
+                "auto_check_out_to_source_control": False,
+            },
+            {"--no-check-out-from-source-control"},
+        ),
+        (
+            "object.move",
+            {
+                "object": {"kind": "id", "value": "{object}"},
+                "parent": {"kind": "path", "value": r"\Actor-Mixer Hierarchy\Destination"},
+                "on_name_conflict": "fail",
+            },
+            {"--parent-handle", "--name-conflict"},
+        ),
+        (
+            "object.setName",
+            {"object": {"kind": "id", "value": "{object}"}, "value": "Rain"},
+            {"--new-name"},
+        ),
+        (
+            "object.setNotes",
+            {"object": {"kind": "id", "value": "{object}"}, "value": "Wet"},
+            {"--notes"},
+        ),
+    ],
+)
+def test_object_lifecycle_protocol_uses_business_declarations(
+    operation: str,
+    arguments: dict[str, object],
+    expected_flags: set[str],
+) -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2024.1",
+        "operation": operation,
+        "arguments": arguments,
+    }
+
+    steps = build_object_lifecycle_business_transaction_steps(request, label="tx01")
+    declaration = next(
+        step for step in steps if step.subcommand == "draft-declare-object-change"
+    )
+
+    assert expected_flags.issubset(set(declaration.arguments))
+    assert [step.subcommand for step in steps][-3:] == [
+        "draft-declare-object-change",
+        "draft-check",
+        "preview-from-draft",
+    ]
+    assert all(step.subcommand != "draft-apply" for step in steps)
+    assert all("--request-json" not in step.arguments for step in steps)
+    assert any(step.name == "tx01.preview" for step in steps)
+
+
+def test_transaction_protocol_routes_object_lifecycle_around_generic_typed_facts() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.setNotes",
+        "arguments": {
+            "object": {"kind": "path", "value": r"\Actor-Mixer Hierarchy\Target"},
+            "value": "Closed business notes",
+        },
+    }
+
+    protocol = build_transaction_protocol((request,))
+
+    assert any(
+        step.subcommand == "draft-declare-object-change" for step in protocol.steps
+    )
+    assert all(step.subcommand != "draft-apply" for step in protocol.steps)
+
+
+def test_object_lifecycle_business_builder_rejects_native_or_unknown_fields() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "object.setName",
+        "arguments": {
+            "object": {"kind": "id", "value": "{object}"},
+            "value": "Rain",
+            "native_args": {},
+        },
+    }
+
+    with pytest.raises(V3ProtocolError, match="fields are not supported"):
+        build_object_lifecycle_business_transaction_steps(request, label="tx01")
 
 
 def test_soundbank_generate_transaction_uses_typed_draft_facts() -> None:

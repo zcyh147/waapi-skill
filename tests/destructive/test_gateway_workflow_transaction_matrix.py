@@ -46,7 +46,7 @@ from tests.destructive.support.workflow_evidence import (  # pyright: ignore[rep
     validate_soundbank_inclusions_business_evidence,
     validate_switch_assignment_business_evidence,
 )
-from tests.destructive.support.typed_gateway_input import (  # pyright: ignore[reportMissingImports]  # noqa: E402
+from tests.semantic.support.typed_gateway_input import (  # pyright: ignore[reportMissingImports]  # noqa: E402
     create_object_lifecycle_business_preview,
     create_typed_transaction_preview,
 )
@@ -971,6 +971,7 @@ def _complete_object_lifecycle_business_transaction(
             live=command[0]
             in {"draft-bind-object", "draft-check", "preview-from-draft"},
         ),
+        version=runtime.version,
         operation=operation,
         object_id=object_id,
         parent_id=parent_id,

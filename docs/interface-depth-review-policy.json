@@ -1,5 +1,19 @@
 {
   "contract": "waapi-skill.interface-depth-review-policy/v1",
+  "uniform_migration_invariant": {
+    "scope": "every permitted public API and every supported version lane",
+    "required_boundary": "Agent supplies only closed business values or exact user artifacts; Gateway constructs the exact versioned native request and execution plan",
+    "non_exemptions": [
+      "the API is simple",
+      "the API previously passed deterministic, real-host, or Fresh Agent tests",
+      "the current typed request is already syntactically closed"
+    ],
+    "allowed_final_dispositions": [
+      "deep business or domain declaration",
+      "Gateway-owned zero-input or fixed read contract with no leaked model-authored implementation value",
+      "explicit prohibited boundary"
+    ]
+  },
   "source_contracts": {
     "gateway_parser_sha256": "7c23a4d7f6acf9a12dd345712819ff49796f7a4a607fd83377ac900c013b8629",
     "operation_contract_sha256": "0eb04d9be12f7d899551e9e245ae963e09ff8d01ac849cb9d98b4e45e22d068b",

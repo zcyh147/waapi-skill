@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-08-24
-- Scope: deep model-facing interfaces for complex named mutations
+- Scope: every permitted model-facing WAAPI interface
 - Refines: ADR 0001 and ADR 0002
 
 ## Context
@@ -13,11 +13,22 @@ scopes, action order, batch boundaries, and partial shell serialization. Fresh
 Agent failures repeatedly reproduced those leaked implementation details even
 though the Gateway already knew how to validate or derive them.
 
+This is a surface-wide invariant, not an optimization reserved for APIs judged
+complex. An API's small argument count, an earlier deterministic or semantic
+PASS, or an already-closed wire schema proves neither business depth nor an
+acceptable model-facing boundary.
+
 ## Decision
 
 The Agent owns natural language to closed, high-level Business Declarations;
 the Gateway owns Business Declarations to the exact versioned WAAPI execution
-plan. The first reference interface is `audio.import`: it accepts one or more
+plan. Every permitted public API in every supported version lane must converge
+on this ownership split. The only terminal alternatives are a Gateway-owned
+zero-input/fixed read contract with no leaked model-authored implementation
+value, or an explicit prohibited boundary. There is no exemption for a simple
+API or one that happened to pass an earlier test.
+
+The first reference interface is `audio.import`: it accepts one or more
 semantic import declarations, identifies new targets by parent handle plus name
 and kind and existing targets by object handle, discovers long-tail fields live,
 constructs paths and wire types, orders and expands native rows, and produces
@@ -60,5 +71,5 @@ a fallback.
   Gateway compiler, not the Agent, owns its row layout.
 - New semantic Adapters require stronger up-front modeling and generated parity
   evidence, but remove repeated prompt repair from the runtime path.
-- This decision establishes the seam for later complex operations without
-  requiring every operation to share the import vocabulary.
+- Operations do not share one vocabulary, but all share the same ownership
+  boundary and the same exhaustive migration accounting.

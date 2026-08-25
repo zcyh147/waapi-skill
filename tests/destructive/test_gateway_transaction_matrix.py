@@ -34,7 +34,7 @@ from tests.destructive.support.sandbox_fixture import (  # pyright: ignore[repor
     prepare_sample_project_sandbox,
     shutdown_sandboxed_wwise,
 )
-from tests.destructive.support.typed_gateway_input import (  # pyright: ignore[reportMissingImports]
+from tests.semantic.support.typed_gateway_input import (  # pyright: ignore[reportMissingImports]
     create_object_lifecycle_business_preview,
     create_typed_transaction_preview,
     typed_wait_topic_command,
@@ -775,6 +775,7 @@ def _complete_transaction(
                 live=command[0]
                 in {"draft-bind-object", "draft-check", "preview-from-draft"},
             ),
+            version=runtime.version,
             operation=operation,
             object_id=object_id,
             new_name=scalar_value if operation == "object.setName" else None,

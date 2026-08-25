@@ -998,6 +998,192 @@ def build_audio_import_composer_transaction_steps(
     return tuple(steps)
 
 
+OBJECT_LIFECYCLE_BUSINESS_OPERATIONS = frozenset(
+    {
+        "object.copy",
+        "object.delete",
+        "object.move",
+        "object.setName",
+        "object.setNotes",
+    }
+)
+
+
+def build_object_lifecycle_business_transaction_steps(
+    request: Mapping[str, Any],
+    *,
+    label: str,
+) -> tuple[ExpectedGatewayStep, ...]:
+    """Translate one canonical object lifecycle request into Business Draft steps."""
+
+    normalized = _validate_operation_request(request)
+    operation = str(normalized["operation"])
+    if operation not in OBJECT_LIFECYCLE_BUSINESS_OPERATIONS:
+        raise V3ProtocolError(
+            "object lifecycle business builder requires one reviewed operation"
+        )
+    if not isinstance(label, str) or not re.fullmatch(r"tx[0-9]{2}", label):
+        raise V3ProtocolError("business transaction label must be txNN")
+    arguments = normalized["arguments"]
+    allowed_fields = {
+        "object.copy": {
+            "object",
+            "parent",
+            "on_name_conflict",
+            "auto_add_to_source_control",
+            "auto_check_out_to_source_control",
+        },
+        "object.delete": {"object", "auto_check_out_to_source_control"},
+        "object.move": {
+            "object",
+            "parent",
+            "on_name_conflict",
+            "auto_check_out_to_source_control",
+        },
+        "object.setName": {"object", "value"},
+        "object.setNotes": {"object", "value"},
+    }[operation]
+    if set(arguments) - allowed_fields:
+        raise V3ProtocolError(
+            "object lifecycle business request fields are not supported"
+        )
+    try:
+        parsed = parse_operation_request(normalized)
+    except OperationContractError as exc:
+        raise V3ProtocolError(
+            f"object lifecycle business request is invalid: {exc}"
+        ) from exc
+    canonical_arguments = parsed.arguments
+
+    steps: list[ExpectedGatewayStep] = [
+        ExpectedGatewayStep(
+            name=f"{label}.operation-schema",
+            subcommand="operation-schema",
+            arguments=(operation,),
+        ),
+        ExpectedGatewayStep(
+            name=f"{label}.draft-start",
+            subcommand="draft-start",
+            arguments=(operation,),
+        ),
+    ]
+    draft_start = f"{label}.draft-start"
+    latest_revision_step = draft_start
+
+    def draft_prefix() -> tuple[Any, ...]:
+        return (
+            ResponseBinding(draft_start, "/draft/draft_id"),
+            "--task-authority",
+            ResponseBinding(draft_start, "/task_authority"),
+            "--expected-revision",
+            ResponseBinding(latest_revision_step, "/draft/revision"),
+        )
+
+    def bind_object(selector: Mapping[str, Any], *, role: str) -> ResponseBinding:
+        nonlocal latest_revision_step
+        kind = selector.get("kind")
+        value = selector.get("value")
+        if kind not in {"id", "path"} or not isinstance(value, str) or not value:
+            raise V3ProtocolError(
+                "object lifecycle business identity must be exact id or path"
+            )
+        if kind == "path":
+            segments = tuple(segment for segment in value.split("\\") if segment)
+            if not segments or "\\" + "\\".join(segments) != value:
+                raise V3ProtocolError(
+                    "object lifecycle business path must have canonical Wwise segments"
+                )
+            selector_arguments: tuple[Any, ...] = tuple(
+                item
+                for segment in segments
+                for item in ("--object-path-segment", segment)
+            )
+        else:
+            selector_arguments = ("--object-id", value)
+        step_name = f"{label}.bind-{role}"
+        steps.append(
+            ExpectedGatewayStep(
+                name=step_name,
+                subcommand="draft-bind-object",
+                arguments=(*draft_prefix(), *selector_arguments),
+            )
+        )
+        latest_revision_step = step_name
+        return ResponseBinding(step_name, "/bound_object/handle")
+
+    object_selector = canonical_arguments.get("object")
+    if not isinstance(object_selector, Mapping):
+        raise V3ProtocolError("object lifecycle business request lacks object identity")
+    object_handle = bind_object(object_selector, role="object")
+    parent_handle: ResponseBinding | None = None
+    if operation in {"object.copy", "object.move"}:
+        parent_selector = canonical_arguments.get("parent")
+        if not isinstance(parent_selector, Mapping):
+            raise V3ProtocolError(
+                "object lifecycle business request lacks parent identity"
+            )
+        parent_handle = bind_object(parent_selector, role="parent")
+
+    declaration_arguments: list[Any] = [
+        *draft_prefix(),
+        "--object-handle",
+        object_handle,
+    ]
+    if parent_handle is not None:
+        declaration_arguments.extend(("--parent-handle", parent_handle))
+    value = canonical_arguments.get("value")
+    if operation == "object.setName":
+        declaration_arguments.extend(("--new-name", str(value)))
+    elif operation == "object.setNotes":
+        declaration_arguments.extend(("--notes", str(value)))
+    if "on_name_conflict" in canonical_arguments:
+        declaration_arguments.extend(
+            ("--name-conflict", str(canonical_arguments["on_name_conflict"]))
+        )
+    for field, positive, negative in (
+        (
+            "auto_add_to_source_control",
+            "--add-to-source-control",
+            "--no-add-to-source-control",
+        ),
+        (
+            "auto_check_out_to_source_control",
+            "--check-out-from-source-control",
+            "--no-check-out-from-source-control",
+        ),
+    ):
+        if field in canonical_arguments:
+            declaration_arguments.append(
+                positive if canonical_arguments[field] is True else negative
+            )
+    declaration_name = f"{label}.declare-object-change"
+    steps.append(
+        ExpectedGatewayStep(
+            name=declaration_name,
+            subcommand="draft-declare-object-change",
+            arguments=tuple(declaration_arguments),
+        )
+    )
+    latest_revision_step = declaration_name
+    check_name = f"{label}.check"
+    steps.append(
+        ExpectedGatewayStep(
+            name=check_name,
+            subcommand="draft-check",
+            arguments=draft_prefix(),
+        )
+    )
+    latest_revision_step = check_name
+    steps.append(
+        ExpectedGatewayStep(
+            name=f"{label}.preview",
+            subcommand="preview-from-draft",
+            arguments=(*draft_prefix(), "--apply"),
+        )
+    )
+    return tuple(steps)
+
+
 def materialize_audio_import_composer_protocol_request(
     protocol: V3GatewayProtocol,
     *,
@@ -2264,6 +2450,14 @@ def build_transaction_protocol(
                     request,
                     label=label,
                 )
+            elif (
+                input_mode == BUSINESS_DECLARATION_INPUT_MODE
+                and operation in OBJECT_LIFECYCLE_BUSINESS_OPERATIONS
+            ):
+                operation_steps = build_object_lifecycle_business_transaction_steps(
+                    request,
+                    label=label,
+                )
             else:
                 operation_steps = _build_generic_typed_draft_transaction_steps(
                     request,
@@ -3077,6 +3271,8 @@ __all__ = [
     "build_direct_protocol",
     "build_audio_import_composer_protocol",
     "build_audio_import_composer_transaction_steps",
+    "OBJECT_LIFECYCLE_BUSINESS_OPERATIONS",
+    "build_object_lifecycle_business_transaction_steps",
     "build_object_set_composer_transaction_steps",
     "build_modification_policy_protocol",
     "build_metadata_transaction_protocol",

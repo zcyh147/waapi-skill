@@ -173471,7 +173471,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "61b0b30e004a2a06619f70ee8a08fb157cd74869b48fa4edff55415a7c549677",
+  "inventory_sha256": "30d791abb67d873c5ef5df15cdc0f5094c08b471f54acc1f4edf3ddf5d7b2260",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -208038,5 +208038,19 @@
       "rows_sha256": "533beb07dfc66c994fe2a25b68f786b522fdce299b37c6c67d9a66c2683ddd23",
       "title": "Migrate Switch Container assignments to the unified business compiler"
     }
-  ]
+  ],
+  "uniform_migration_invariant": {
+    "allowed_final_dispositions": [
+      "deep business or domain declaration",
+      "Gateway-owned zero-input or fixed read contract with no leaked model-authored implementation value",
+      "explicit prohibited boundary"
+    ],
+    "non_exemptions": [
+      "the API is simple",
+      "the API previously passed deterministic, real-host, or Fresh Agent tests",
+      "the current typed request is already syntactically closed"
+    ],
+    "required_boundary": "Agent supplies only closed business values or exact user artifacts; Gateway constructs the exact versioned native request and execution plan",
+    "scope": "every permitted public API and every supported version lane"
+  }
 }
