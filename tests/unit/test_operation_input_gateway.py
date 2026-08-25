@@ -16,9 +16,7 @@ from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImp
     BUSINESS_DECLARATION_INPUT_MODE,
     COMPOSER_INPUT_MODE,
     INTERNAL_CANONICAL_INPUT_MODE,
-    OPERATION_INPUT_MODE_LANES,
     OPERATION_REQUEST_CONTRACT,
-    OperationInputModeLane,
     describe_operation,
 )
 from wwise_waapi.operation_composer import operation_composer_digest
@@ -1264,29 +1262,9 @@ def test_structurally_distinct_adapters_share_one_public_lifecycle(
         assert "composer" not in payload
 def test_schema_input_mode_projection_is_isolated_by_exact_operation_key(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import wwise_waapi.operation_registry as registry
-
-    monkeypatch.setattr(
-        registry,
-        "OPERATION_INPUT_MODE_LANES",
-        tuple(
-            OperationInputModeLane(
-                operation=lane.operation,
-                version=lane.version,
-                input_mode=(
-                    COMPOSER_INPUT_MODE
-                    if lane.operation == "object.set"
-                    else lane.input_mode
-                ),
-            )
-            for lane in OPERATION_INPUT_MODE_LANES
-        ),
-    )
-
     cases = (
-        ("object.set", "2025.1", COMPOSER_INPUT_MODE),
+        ("object.set", "2025.1", BUSINESS_DECLARATION_INPUT_MODE),
         ("object.setRTPC", "2025.1", BUSINESS_DECLARATION_INPUT_MODE),
         ("object.createPlugin", "2025.1", BUSINESS_DECLARATION_INPUT_MODE),
         ("lua.executeCoreInline", "2025.1", COMPOSER_INPUT_MODE),

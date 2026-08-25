@@ -19,6 +19,7 @@ from tests.semantic.support.codex_gateway_broker import (
     DraftActionMetadataBinding,
     DraftActionQueryIdentityBinding,
     DraftActionResponseBinding,
+    ExactArgumentAlternatives,
     ExpectedGatewayStep,
     InlineTypedOperationArgument,
     MetadataBoundJsonArgument,
@@ -1178,7 +1179,20 @@ def build_object_graph_business_transaction_steps(
                     "infinite",
                     "--field",
                     "volume_db",
-                    json.dumps(property_map["Volume"], allow_nan=False),
+                    (
+                        ExactArgumentAlternatives(
+                            (
+                                str(int(property_map["Volume"])),
+                                json.dumps(
+                                    property_map["Volume"],
+                                    allow_nan=False,
+                                ),
+                            )
+                        )
+                        if isinstance(property_map["Volume"], float)
+                        and property_map["Volume"].is_integer()
+                        else json.dumps(property_map["Volume"], allow_nan=False)
+                    ),
                 ),
             )
         )

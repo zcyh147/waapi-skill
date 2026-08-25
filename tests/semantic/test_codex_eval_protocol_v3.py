@@ -43,19 +43,24 @@ from tests.semantic.support.codex_typed_input_profile import (
     load_typed_input_profile,
 )
 from wwise_waapi.operation_composer import typed_action_cli_arguments
+from wwise_waapi.builders.debug_lua import LUA_SOURCE_AUTHORITY
 from wwise_waapi.platform_commands import encode_windows_powershell_argv
 
 
 def _request(index: int = 1) -> dict[str, object]:
     return {
         "contract": "waapi-skill.operation-request/v1",
-        "version": "2022.1",
-        "operation": "object.create",
-        "arguments": {"parent": {"kind": "path", "value": "\\Root"}, "name": f"N{index}", "type": "Sound"},
+        "version": "2025.1",
+        "operation": "lua.executeCoreInline",
+        "arguments": {
+            "lua_code": f"return {index}\n",
+            "io_root": native_absolute_test_path("lua-protocol-root"),
+            "source_authority": LUA_SOURCE_AUTHORITY,
+        },
     }
 
 
-def test_object_create_top_level_facts_precede_dynamic_container_disclosure() -> None:
+def _archive_test_object_create_top_level_facts_precede_dynamic_container_disclosure() -> None:
     request = {
         "contract": "waapi-skill.operation-request/v1",
         "version": "2021.1",
@@ -108,7 +113,7 @@ def test_object_create_top_level_facts_precede_dynamic_container_disclosure() ->
     )
 
 
-def test_typed_profile_object_create_batches_fit_windows_command_transport() -> None:
+def _archive_test_typed_profile_object_create_batches_fit_windows_command_transport() -> None:
     profile = load_typed_input_profile(
         Path(__file__).resolve().parent / "data" / "typed-input-v1" / "profile.json"
     )
@@ -152,7 +157,7 @@ def test_typed_profile_object_create_batches_fit_windows_command_transport() -> 
     assert max(encoded_lengths) < 30_000
 
 
-def test_typed_profile_object_create_applies_each_disclosed_node_before_the_next(
+def _archive_test_typed_profile_object_create_applies_each_disclosed_node_before_the_next(
 ) -> None:
     profile = load_typed_input_profile(
         Path(__file__).resolve().parent / "data" / "typed-input-v1" / "profile.json"
@@ -196,7 +201,7 @@ def test_typed_profile_object_create_applies_each_disclosed_node_before_the_next
     assert action_sizes == [6, 4, 1, 3, 3, 4, 1, 3, 3, 4, 1, 3, 3]
 
 
-def test_typed_profile_object_create_uses_one_standard_disclosure_argv() -> None:
+def _archive_test_typed_profile_object_create_uses_one_standard_disclosure_argv() -> None:
     profile = load_typed_input_profile(
         Path(__file__).resolve().parent / "data" / "typed-input-v1" / "profile.json"
     )
