@@ -15,7 +15,7 @@
     ]
   },
   "source_contracts": {
-    "gateway_parser_sha256": "ccd4a159f4690ec16883ff27bd2228df76fbbe3d0020615d2f4873a0a8f3532a",
+    "gateway_parser_sha256": "a577e7b756bc5a9b0e882b4dde89ff0041d5c12bf3c41d9310e1dcfac2b469a6",
     "operation_contract_sha256": "ca160a2059b64021a600e0cb9d1d09ee88580ada72a3d69544554e0352a88a3a",
     "public_continuation_sha256": "dec0a20f920d025dfa61c8185dfa35f06658b1e94a16e9ac6ec30a8a74891242",
     "typed_request_surface_sha256": "6d05d64e95a6e0f7099ddd03f1da42c763e9c06f33f93cac7581c7c061a83af8"
@@ -88,7 +88,7 @@
       "owner_issue": null,
       "operations": ["switchContainer.addAssignment", "switchContainer.removeAssignment"],
       "leaked_mechanics": [],
-      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage, exact macOS/Windows 2022.1 and 2025.1 real-host add/remove execution, and targeted Terra Fresh Agent routing plus identical verify-only evidence on both hosts."
+      "audit_evidence": "The public switch-assignment-business/v1 Adapters accept only three live-bound business identities and the operation-selected add or remove outcome; issue and enforce each exact role in one Gateway-owned continuation; derive exact GUID relationships, opposite preconditions, native payloads, immutable Preview intent, and pair readback inside the Gateway; and remove the normal inline_typed entry for all ten lanes. #93 retains five-version deterministic coverage, exact macOS/Windows 2022.1 and 2025.1 real-host add/remove execution, and targeted Terra Fresh Agent routing plus identical verify-only evidence on both hosts."
     },
     {
       "id": "named-soundbank-planning",
