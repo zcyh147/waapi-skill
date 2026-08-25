@@ -898,7 +898,7 @@ def test_metadata_preconditions_are_operation_local_in_composer_start(
         "field_handle",
         "typed_field_value",
     ]
-    assert audio_import["business_adapter"]["start"]["gateway_argv"] == [
+    assert audio_import["business_adapter"]["start"]["next_command"]["gateway_argv"] == [
         "draft-start",
         "audio.import",
     ]

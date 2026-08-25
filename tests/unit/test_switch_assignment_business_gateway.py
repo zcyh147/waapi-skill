@@ -508,6 +508,16 @@ def test_operation_schema_exposes_only_switch_assignment_business_adapter(
         "waapi-skill.switch-assignment-business/v1"
     )
     assert payload["business_adapter"]["legacy_inline_typed_public"] is False
+    start = payload["business_adapter"]["start"]
+    assert "gateway_argv" not in start
+    assert "copy_instruction" not in start
+    next_command = start["next_command"]
+    assert next_command["gateway_argv"] == ["draft-start", operation]
+    assert next_command["copy_instruction"]["source_field"] in {
+        "shell_command",
+        "model_command",
+    }
+    assert next_command[next_command["copy_instruction"]["source_field"]]
     assert "typed_operation" not in payload
     assert "identity_contract" not in payload["operation"]
     encoded = json.dumps(payload["operation"], sort_keys=True).casefold()

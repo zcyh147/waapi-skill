@@ -902,7 +902,7 @@ def test_main_prints_object_set_business_schema_as_bounded_compact_json(
     assert "request_envelope_policy" not in parsed
     assert parsed["operation"]["input_mode"] == "business_declaration"
     assert "composer" not in parsed
-    assert parsed["business_adapter"]["start"]["gateway_argv"] == [
+    assert parsed["business_adapter"]["start"]["next_command"]["gateway_argv"] == [
         "draft-start",
         "object.set",
     ]

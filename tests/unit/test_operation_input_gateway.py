@@ -382,7 +382,7 @@ def test_business_draft_start_discloses_binding_before_declaration(
     )
     assert schema_code == 0, schema
     assert schema["operation"]["input_mode"] == BUSINESS_DECLARATION_INPUT_MODE
-    assert schema["business_adapter"]["start"]["gateway_argv"] == [
+    assert schema["business_adapter"]["start"]["next_command"]["gateway_argv"] == [
         "draft-start",
         "object.create",
     ]
@@ -741,7 +741,7 @@ def test_normal_audio_import_schema_exposes_only_its_business_declaration_input(
     assert "composer" not in schema
     assert schema["business_adapter"]["operation"] == "audio.import"
     assert schema["business_adapter"]["legacy_shallow_composer_public"] is False
-    assert schema["business_adapter"]["start"]["gateway_argv"] == [
+    assert schema["business_adapter"]["start"]["next_command"]["gateway_argv"] == [
         "draft-start",
         "audio.import",
     ]
@@ -789,7 +789,7 @@ def test_object_set_name_schema_exposes_only_closed_business_input(
     adapter = schema["business_adapter"]
     assert adapter["contract"] == "waapi-skill.object-lifecycle-business/v1"
     assert adapter["operation"] == "object.setName"
-    assert adapter["start"]["gateway_argv"] == [
+    assert adapter["start"]["next_command"]["gateway_argv"] == [
         "draft-start",
         "object.setName",
     ]
@@ -839,7 +839,7 @@ def test_every_object_lifecycle_schema_has_one_deep_business_continuation(
     assert schema["operation"]["input_mode"] == BUSINESS_DECLARATION_INPUT_MODE
     assert schema["business_adapter"]["operation"] == operation
     assert schema["business_adapter"]["version"] == version
-    assert schema["business_adapter"]["start"]["gateway_argv"] == [
+    assert schema["business_adapter"]["start"]["next_command"]["gateway_argv"] == [
         "draft-start",
         operation,
     ]
@@ -1316,7 +1316,10 @@ def test_structurally_distinct_adapters_share_one_public_lifecycle(
         assert code == 0
         adapter = payload["business_adapter"]
         assert adapter["input_mode"] == BUSINESS_DECLARATION_INPUT_MODE
-        assert adapter["start"]["gateway_argv"] == ["draft-start", operation]
+        assert adapter["start"]["next_command"]["gateway_argv"] == [
+            "draft-start",
+            operation,
+        ]
         assert adapter["legacy_shallow_composer_public"] is False
         assert "composer" not in payload
 def test_schema_input_mode_projection_is_isolated_by_exact_operation_key(

@@ -7523,10 +7523,20 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 request_version,
             )
         if normal_business and request_version is not None:
-            payload["business_adapter"] = operation_business_contract(
+            business_contract = operation_business_contract(
                 spec.name,
                 request_version
             )
+            start = dict(business_contract["start"])
+            gateway_argv = start.pop("gateway_argv", None)
+            if gateway_argv is not None:
+                start.pop("copy_instruction", None)
+                start["next_command"] = transaction_next_command(
+                    "draft-start",
+                    gateway_argv,
+                )
+            business_contract["start"] = start
+            payload["business_adapter"] = business_contract
         payload["operation"] = operation_projection
         if normal_inline and request_version is not None:
             operation_projection["input_mode"] = INLINE_TYPED_INPUT_MODE

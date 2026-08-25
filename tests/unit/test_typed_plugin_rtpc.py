@@ -116,7 +116,10 @@ def test_public_schema_and_draft_start_share_one_business_operation(
     adapter = schema["business_adapter"]
     assert adapter["operation"] == operation
     assert adapter["version"] == version
-    assert adapter["start"]["gateway_argv"] == ["draft-start", operation]
+    assert adapter["start"]["next_command"]["gateway_argv"] == [
+        "draft-start",
+        operation,
+    ]
     assert adapter["legacy_shallow_composer_public"] is False
 
     start_code, started = gateway.execute_gateway(
