@@ -21,16 +21,6 @@ from tests.semantic.support.codex_import_business_profile import ImportBusinessU
 
 
 OUTCOME_CONTRACT = "waapi-skill.audio-import-business-agent-outcome/v1"
-FIXTURE_ENV = "WAAPI_AUDIO_IMPORT_BUSINESS_FIXTURE"
-REPO_ROOT = Path(__file__).resolve().parents[3]
-WAAPI_SHIM_ROOT = (
-    REPO_ROOT
-    / "tests"
-    / "semantic"
-    / "data"
-    / "audio-import-business"
-    / "waapi-shim"
-)
 _REPORT_MINUS_TRANSLATION = str.maketrans(
     {
         "\N{MINUS SIGN}": "-",
@@ -231,8 +221,6 @@ def run_import_business_agent_unit(
         scenario_root=scenario_root,
         options=options,
         spec=BusinessAgentRunSpec(
-            fixture_env=FIXTURE_ENV,
-            waapi_shim_root=WAAPI_SHIM_ROOT,
             prepare_runtime=prepare_import_business_runtime,
             build_steps=lambda runtime: build_preview_only_business_steps(
                 runtime.requests
@@ -302,7 +290,6 @@ def _write_silent_wav(path: Path) -> None:
 
 
 __all__ = [
-    "FIXTURE_ENV",
     "ImportBusinessAgentOptions",
     "ImportBusinessAgentOutcome",
     "ImportBusinessRuntime",

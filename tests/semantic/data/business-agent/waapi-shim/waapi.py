@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 
-FIXTURE_ENV = "WAAPI_AUDIO_IMPORT_BUSINESS_FIXTURE"
+FIXTURE_ENV = "WAAPI_BUSINESS_AGENT_FIXTURE"
 _BUILTIN_FIELDS = {
     "IsLoopingEnabled": {
         "name": "IsLoopingEnabled",

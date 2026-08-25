@@ -20,6 +20,10 @@ from tests.semantic.support.codex_task_runner_v3 import _gateway_candidate_argvs
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+FIXTURE_ENV = "WAAPI_BUSINESS_AGENT_FIXTURE"
+WAAPI_SHIM_ROOT = (
+    REPO_ROOT / "tests" / "semantic" / "data" / "business-agent" / "waapi-shim"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,8 +40,6 @@ class BusinessAgentOptions:
 
 @dataclass(frozen=True, slots=True)
 class BusinessAgentRunSpec:
-    fixture_env: str
-    waapi_shim_root: Path
     prepare_runtime: Callable[[Any, Path], Any]
     build_steps: Callable[[Any], Sequence[Any]]
     transaction_count: Callable[[Any], int]
@@ -67,12 +69,12 @@ def run_business_agent_unit(
         {
             "PYTHONPATH": os.pathsep.join(
                 (
-                    str(spec.waapi_shim_root),
+                    str(WAAPI_SHIM_ROOT),
                     str(REPO_ROOT),
                     str(REPO_ROOT / "skills/waapi-skill"),
                 )
             ),
-            spec.fixture_env: str(runtime.fixture_path),
+            FIXTURE_ENV: str(runtime.fixture_path),
             "WWISE_VERSION": unit.version,
             "WWISE_WAAPI_HOST": "127.0.0.1",
             "WWISE_WAAPI_PORT": "31337",

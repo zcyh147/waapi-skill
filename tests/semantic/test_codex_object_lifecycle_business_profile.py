@@ -4,6 +4,10 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from tests.semantic import run_codex_skill_matrix as matrix
+from tests.semantic.support.codex_business_agent_runner import (
+    FIXTURE_ENV,
+    WAAPI_SHIM_ROOT,
+)
 from tests.semantic.support.codex_object_lifecycle_business_agent_runner import (
     build_preview_only_lifecycle_steps,
     prepare_object_lifecycle_business_runtime,
@@ -105,3 +109,13 @@ def test_matrix_exposes_current_profile_through_the_existing_fresh_lane() -> Non
     )
 
     assert tuple(unit.unit_id for unit in units) == ("OLB22-RENAME",)
+
+
+def test_business_profiles_share_neutral_fixture_ownership() -> None:
+    assert FIXTURE_ENV == "WAAPI_BUSINESS_AGENT_FIXTURE"
+    assert "audio-import-business" not in str(WAAPI_SHIM_ROOT)
+    shim = WAAPI_SHIM_ROOT / "waapi.py"
+    assert shim.is_file()
+    assert 'FIXTURE_ENV = "WAAPI_BUSINESS_AGENT_FIXTURE"' in shim.read_text(
+        encoding="utf-8"
+    )
