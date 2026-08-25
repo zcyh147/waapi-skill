@@ -39,7 +39,6 @@ from wwise_waapi.typed_requests import (  # pyright: ignore[reportMissingImports
 )
 from wwise_waapi.typed_operations import (  # pyright: ignore[reportMissingImports]
     DRAFT_TYPED_OPERATIONS,
-    LEGACY_OBJECT_GRAPH_TYPED_OPERATIONS,
     draft_operation_request_contract,
 )
 
@@ -85,8 +84,17 @@ def test_object_graph_composer_surface_is_not_executable(
     with pytest.raises(OperationComposerError) as captured:
         operation_composer_contract(operation, version)
     assert captured.value.error_code == "OPERATION_DRAFT_ADAPTER_UNAVAILABLE"
-    if operation != "object.set":
-        assert operation in LEGACY_OBJECT_GRAPH_TYPED_OPERATIONS
+
+
+def test_object_set_composer_implementation_is_removed_from_production() -> None:
+    import wwise_waapi.operation_composer as composer
+    import wwise_waapi.operation_registry as registry
+
+    assert not hasattr(composer, "OBJECT_SET_COMPOSER_OPERATION")
+    assert not hasattr(registry, "object_set_composer_fragment_contract")
+    assert not hasattr(registry, "validate_object_set_composer_fragment")
+    assert not hasattr(registry, "prepare_object_set_composer_check")
+    assert hasattr(registry, "prepare_object_set_batch_check")
 
 
 def _assert_pristine_inspected_draft(

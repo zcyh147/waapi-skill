@@ -71,13 +71,6 @@ DRAFT_TYPED_OPERATIONS = frozenset(
         "waapi.undoGroup",
     }
 )
-LEGACY_OBJECT_GRAPH_TYPED_OPERATIONS = frozenset(
-    {
-        "object.create",
-        "object.createPlugin",
-        "object.setRTPC",
-    }
-)
 _MAX_SELECTOR_DEPTH = 8
 MAX_INLINE_OPERATION_VALUE_BYTES = 32 * 1024
 MAX_INLINE_OPERATION_REQUEST_BYTES = 64 * 1024
@@ -920,7 +913,7 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
 def draft_operation_request_contract(operation: str, version: str) -> TypedRequestContract:
     """Compile one complex dedicated operation through the shared Typed Core."""
 
-    if operation not in DRAFT_TYPED_OPERATIONS | LEGACY_OBJECT_GRAPH_TYPED_OPERATIONS:
+    if operation not in DRAFT_TYPED_OPERATIONS:
         raise TypedOperationInputError(f"No typed Draft adapter exists for {operation!r}")
     machine = operation_request_machine_contract(operation, version)
     # Registry owns semantic leaf truth. Project its intentionally
@@ -963,35 +956,6 @@ def draft_operation_request_contract(operation: str, version: str) -> TypedReque
             },
             graph=load_definition_graph(version),
         )
-    if operation != "object.create":
-        return compile_typed_request_contract(
-            version=version,
-            uri=operation,
-            schema={
-                "argsSchema": arguments,
-                "optionsSchema": {
-                    "type": "object",
-                    "properties": {},
-                    "additionalProperties": False,
-                },
-            },
-            graph=load_definition_graph(version),
-        )
-    node = {
-        "type": "object",
-        "required": ["type", "name"],
-        "additionalProperties": False,
-        "properties": {
-            "type": deepcopy(arguments["properties"]["type"]),
-            "name": {"type": "string", "minLength": 1},
-            "notes": {"type": "string"},
-            "properties": deepcopy(arguments["properties"]["properties"]),
-            "references": deepcopy(arguments["properties"]["references"]),
-            "children": {"type": "array", "items": {"$ref": "#/definitions/objectNode"}},
-        },
-    }
-    arguments["definitions"] = {"objectNode": node}
-    arguments["properties"]["children"]["items"] = {"$ref": "#/definitions/objectNode"}
     return compile_typed_request_contract(
         version=version,
         uri=operation,
@@ -1122,7 +1086,6 @@ __all__ = [
     "INLINE_OPERATION_CONTRACT",
     "INLINE_OPERATIONS",
     "DRAFT_TYPED_OPERATIONS",
-    "LEGACY_OBJECT_GRAPH_TYPED_OPERATIONS",
     "INLINE_TYPED_INPUT_MODE",
     "MAX_INLINE_OPERATION_REQUEST_BYTES",
     "MAX_INLINE_OPERATION_VALUE_BYTES",

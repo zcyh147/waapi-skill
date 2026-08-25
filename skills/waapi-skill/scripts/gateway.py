@@ -209,7 +209,7 @@ from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[re
     operation_uses_business_declaration,
     operation_request_schema_digest,
     parse_operation_request,
-    prepare_object_set_composer_check,
+    prepare_object_set_batch_check,
     validate_prepared_roles,
     verify_prepared_operation,
 )
@@ -253,7 +253,6 @@ from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore
 )
 from wwise_waapi.operation_composer import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_TYPED_ACTIONS_PER_APPLY,
-    OBJECT_SET_COMPOSER_OPERATION,
     OperationComposerError,
     composition_projection,
     operation_draft_public_projection,
@@ -10273,8 +10272,8 @@ def dispatch_operation_draft_check(
                 raise OperationDraftBindingDrift(
                     "Compiled business Preview differs from the Draft canonical request."
                 )
-    if canonical_request.operation == OBJECT_SET_COMPOSER_OPERATION:
-        read_call = prepare_object_set_composer_check(
+    if canonical_request.operation == "object.set":
+        read_call = prepare_object_set_batch_check(
             canonical_request,
             read_call=read_call,
         )
