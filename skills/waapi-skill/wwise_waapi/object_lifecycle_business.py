@@ -6,8 +6,8 @@ from typing import Any, Mapping
 
 from .business_declaration_state import BusinessDeclarationSession
 from .business_declarations import (
-    BusinessDeclarationError,
     ExistingObjectTarget,
+    bound_object_identity_for_handle,
     business_repair,
 )
 from .object_lifecycle_business_contracts import (
@@ -24,28 +24,6 @@ _NATIVE_FIELD_NAMES = {
     "auto_add_to_source_control",
     "auto_check_out_to_source_control",
 }
-
-
-def _identity_for_handle(
-    session: BusinessDeclarationSession,
-    handle: str,
-    *,
-    field: str,
-) -> dict[str, str]:
-    try:
-        bound = session.handles.resolve_object(handle)
-    except BusinessDeclarationError as exc:
-        repair = dict(exc.repair)
-        repair["field"] = field
-        repair["action"] = "bind the exact object and copy its returned handle"
-        raise BusinessDeclarationError(repair) from exc
-    except Exception as exc:
-        raise business_repair(
-            "OBJECT_HANDLE_NOT_AVAILABLE",
-            field=field,
-            action="bind the exact object and copy its returned handle",
-        ) from exc
-    return {"kind": "id", "value": bound.object_id}
 
 
 def _require_business_fields(
@@ -114,17 +92,19 @@ def materialize_object_lifecycle_business_request(
         declaration.fields,
     )
     arguments: dict[str, Any] = {
-        "object": _identity_for_handle(
-            session,
+        "object": bound_object_identity_for_handle(
+            session.handles,
             declaration.target.object_handle,
             field="object_handle",
+            action="bind the exact object and copy its returned handle",
         )
     }
     if operation in {"object.copy", "object.move"}:
-        arguments["parent"] = _identity_for_handle(
-            session,
+        arguments["parent"] = bound_object_identity_for_handle(
+            session.handles,
             fields.pop("parent_handle"),
             field="parent_handle",
+            action="bind the exact object and copy its returned handle",
         )
     if operation == "object.setName":
         arguments["value"] = fields.pop("new_name")

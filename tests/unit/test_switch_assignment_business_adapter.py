@@ -99,6 +99,18 @@ def test_every_switch_assignment_lane_compiles_three_business_handles(
     assert adapter.accepts_update_command(
         "draft-declare-switch-assignment"
     ) is True
+    role_declaration = adapter.role_declaration
+    assert role_declaration is not None
+    assert role_declaration.roles == (
+        "switch_container",
+        "child",
+        "state_or_switch",
+    )
+    assert role_declaration.required_fields == (
+        "switch_container_handle",
+        "child_handle",
+        "state_or_switch_handle",
+    )
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSIONS)
@@ -122,6 +134,12 @@ def test_switch_assignment_contract_discloses_only_three_business_roles(
             "child_handle",
             "state_or_switch_handle",
         ],
+        "field_types": {
+            "switch_container_handle": "bound_object_handle",
+            "child_handle": "bound_object_handle",
+            "state_or_switch_handle": "bound_object_handle",
+        },
+        "optional_fields": [],
         "outcome": "add" if operation.endswith("addAssignment") else "remove",
     }
     encoded = str(contract).casefold()

@@ -7,6 +7,7 @@ from typing import Any, Callable, Mapping
 
 from .audio_import_business_contracts import audio_import_business_contract_data
 from .business_declaration_state import BusinessDeclarationSession
+from .business_declarations import ExistingObjectTarget
 from .object_lifecycle_business_contracts import (
     object_lifecycle_business_contract_data,
 )
@@ -28,6 +29,36 @@ PreviewCompiler = Callable[
     [BusinessDeclarationSession, Callable[..., Mapping[str, Any]]],
     Any,
 ]
+
+
+@dataclass(frozen=True, slots=True)
+class BusinessRoleDeclaration:
+    """Adapter-owned mapping for one closed bound-role declaration command."""
+
+    command: str
+    declaration_id: str
+    target_field: str
+    value_fields: tuple[str, ...]
+    roles: tuple[str, ...]
+    continuation_argv: tuple[str, ...]
+    forbidden_inputs: tuple[str, ...] = ()
+
+    @property
+    def required_fields(self) -> tuple[str, ...]:
+        return (self.target_field, *self.value_fields)
+
+    def update(
+        self,
+        session: BusinessDeclarationSession,
+        values: Mapping[str, str],
+    ) -> BusinessDeclarationSession:
+        if set(values) != set(self.required_fields):
+            raise TypeError("role declaration values do not match its Adapter contract")
+        return session.with_existing_declaration(
+            declaration_id=self.declaration_id,
+            target=ExistingObjectTarget(values[self.target_field]),
+            fields={name: values[name] for name in self.value_fields},
+        )
 
 
 def _audio_import_contract(operation: str, version: str) -> dict[str, Any]:
@@ -157,6 +188,7 @@ class BusinessAdapter:
     auto_apply_preview: bool = False
     records_business_preview: bool = False
     requires_wwise_path_discipline: bool = False
+    role_declaration: BusinessRoleDeclaration | None = None
 
     def contract(self, version: str) -> dict[str, Any]:
         return self._contract_builder(self.operation, version)
@@ -391,6 +423,26 @@ _SWITCH_ASSIGNMENT_DEFINITION = {
         "cancel",
     ),
     "auto_apply_preview": True,
+    "role_declaration": BusinessRoleDeclaration(
+        command="draft-declare-switch-assignment",
+        declaration_id="assignment",
+        target_field="switch_container_handle",
+        value_fields=("child_handle", "state_or_switch_handle"),
+        roles=("switch_container", "child", "state_or_switch"),
+        continuation_argv=(
+            "--switch-container-handle",
+            "<bound-switch-container-handle>",
+            "--child-handle",
+            "<bound-child-handle>",
+            "--state-or-switch-handle",
+            "<bound-state-or-switch-handle>",
+        ),
+        forbidden_inputs=(
+            "direct_child_selector",
+            "scoped_name_selector",
+            "relationship_request_fragment",
+        ),
+    ),
 }
 
 
@@ -457,6 +509,7 @@ def business_adapter_operations() -> frozenset[str]:
 
 __all__ = [
     "BusinessAdapter",
+    "BusinessRoleDeclaration",
     "business_adapter",
     "business_adapter_operations",
 ]

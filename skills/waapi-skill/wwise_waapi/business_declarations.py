@@ -1234,6 +1234,31 @@ def revalidate_live_object(
     return revalidate_live_objects(registry, (bound,), read_call=read_call)[0]
 
 
+def bound_object_identity_for_handle(
+    registry: BusinessHandleRegistry,
+    handle: str,
+    *,
+    field: str,
+    action: str,
+) -> dict[str, str]:
+    """Resolve one opaque object handle into the internal closed ID selector."""
+
+    try:
+        bound = registry.resolve_object(handle)
+    except BusinessDeclarationError as exc:
+        repair = dict(exc.repair)
+        repair["field"] = field
+        repair["action"] = action
+        raise BusinessDeclarationError(repair) from exc
+    except Exception as exc:
+        raise business_repair(
+            "OBJECT_HANDLE_NOT_AVAILABLE",
+            field=field,
+            action=action,
+        ) from exc
+    return {"kind": "id", "value": bound.object_id}
+
+
 def revalidate_live_types(
     registry: BusinessHandleRegistry,
     bounds: Sequence[BoundTypeHandle],
@@ -2063,6 +2088,7 @@ __all__ = [
     "SUPPORTED_WWISE_VERSIONS",
     "SemanticKind",
     "bind_live_field",
+    "bound_object_identity_for_handle",
     "business_repair",
     "normalize_common_business_fields",
     "revalidate_live_field",

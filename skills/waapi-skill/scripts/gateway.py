@@ -1307,9 +1307,6 @@ def build_parser() -> argparse.ArgumentParser:
     typed_operation.add_argument("--apply", action="store_true", required=True)
     typed_operation.add_argument("--ttl", type=int, default=DEFAULT_PREVIEW_TTL_SECONDS)
     typed_operation.add_argument("--object", nargs="+", dest="typed_object")
-    typed_operation.add_argument("--switch-container", nargs="+")
-    typed_operation.add_argument("--child", nargs="+")
-    typed_operation.add_argument("--state-or-switch", nargs="+")
     typed_operation.add_argument("--text")
     typed_operation.add_argument("--property")
     typed_operation.add_argument("--reference")
@@ -3733,12 +3730,6 @@ def preflight_typed_operation_input(
     values: dict[str, object] = {}
     if args.typed_object is not None:
         values["object"] = tuple(args.typed_object)
-    if args.switch_container is not None:
-        values["switch_container"] = tuple(args.switch_container)
-    if args.child is not None:
-        values["child"] = tuple(args.child)
-    if args.state_or_switch is not None:
-        values["state_or_switch"] = tuple(args.state_or_switch)
     for field in ("text", "property", "reference", "platform", "linked"):
         value = getattr(args, field)
         if value is not None:
@@ -4395,10 +4386,19 @@ def composer_operation_projection(
     projection = spec.as_dict(version=version)
     for field in _LEGACY_OPERATION_PROJECTION_FIELDS:
         projection.pop(field, None)
-    for field in ("constraints", "identity_contract", "parent_child_contract"):
-        value = spec.as_dict(version=version).get(field)
-        if value is not None:
-            projection[field] = value
+    modes = (
+        {operation_input_mode(spec.name, version)}
+        if version is not None and version in spec.supported_versions
+        else {
+            operation_input_mode(spec.name, supported_version)
+            for supported_version in spec.supported_versions
+        }
+    )
+    if modes != {BUSINESS_DECLARATION_INPUT_MODE}:
+        for field in ("constraints", "identity_contract", "parent_child_contract"):
+            value = spec.as_dict(version=version).get(field)
+            if value is not None:
+                projection[field] = value
     if spec.name in {
         "debug.restartWaapiServers",
         "debug.testAssert",
@@ -10532,6 +10532,7 @@ def dispatch_offline_business_draft_update(
             "Bind one exact live project object before adding business declarations"
         )
     session = BusinessDeclarationSession.from_dict(raw_session)
+    role_declaration = adapter.role_declaration
     if args.command == "draft-add-media":
         media_row = {
             name: value
@@ -10725,22 +10726,19 @@ def dispatch_offline_business_draft_update(
             return candidate
 
         event_type = "declaration.added"
-    elif args.command == "draft-declare-switch-assignment":
-        fields = {
-            "child_handle": args.child_handle,
-            "state_or_switch_handle": args.state_or_switch_handle,
+    elif (
+        role_declaration is not None
+        and args.command == role_declaration.command
+    ):
+        values = {
+            name: getattr(args, name)
+            for name in role_declaration.required_fields
         }
 
         def update(
             current: BusinessDeclarationSession,
         ) -> BusinessDeclarationSession:
-            candidate = current.with_existing_declaration(
-                declaration_id="assignment",
-                target=ExistingObjectTarget(
-                    args.switch_container_handle
-                ),
-                fields=fields,
-            )
+            candidate = role_declaration.update(current, values)
             adapter.materialize(candidate)
             return candidate
 
@@ -15969,11 +15967,6 @@ def _business_next_action_binding(
         "draft-declare-object-change",
         *binding,
     ]
-    declare_switch_assignment_prefix = [
-        *base,
-        "draft-declare-switch-assignment",
-        *binding,
-    ]
     declare_field_change_prefix = [
         *base,
         "draft-declare-field-change",
@@ -16053,10 +16046,8 @@ def _business_next_action_binding(
             "then_read_next_response": True,
             "precompute_or_increment_revision": False,
         }
-    if record.operation in {
-        "switchContainer.addAssignment",
-        "switchContainer.removeAssignment",
-    }:
+    role_declaration = adapter.role_declaration
+    if role_declaration is not None:
         shared = {
             "contract": "waapi-skill.business-draft-next-action/v1",
             "responsibility_split": {
@@ -16066,11 +16057,7 @@ def _business_next_action_binding(
             "business_contract": business_contract,
             "object_binding": {
                 **object_binding,
-                "use_only_for": [
-                    "switch_container",
-                    "child",
-                    "state_or_switch",
-                ],
+                "use_only_for": list(role_declaration.roles),
                 "role_assignment": (
                     "bind each exact role and copy its returned handle into "
                     "the same named declaration field"
@@ -16078,9 +16065,7 @@ def _business_next_action_binding(
             },
             "forbidden_inputs": [
                 *forbidden_inputs,
-                "direct_child_selector",
-                "scoped_name_selector",
-                "relationship_request_fragment",
+                *role_declaration.forbidden_inputs,
             ],
             "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
             "then_read_next_response": True,
@@ -16105,16 +16090,9 @@ def _business_next_action_binding(
             ),
             "declaration": {
                 **operation_draft_prefix_copy_binding(
-                    declare_switch_assignment_prefix
+                    [*base, role_declaration.command, *binding]
                 ),
-                "append": [
-                    "--switch-container-handle",
-                    "<bound-switch-container-handle>",
-                    "--child-handle",
-                    "<bound-child-handle>",
-                    "--state-or-switch-handle",
-                    "<bound-state-or-switch-handle>",
-                ],
+                "append": list(role_declaration.continuation_argv),
                 "submit_once": True,
             },
         }

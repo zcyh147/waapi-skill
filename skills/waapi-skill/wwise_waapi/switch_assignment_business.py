@@ -6,8 +6,8 @@ from typing import Any
 
 from .business_declaration_state import BusinessDeclarationSession
 from .business_declarations import (
-    BusinessDeclarationError,
     ExistingObjectTarget,
+    bound_object_identity_for_handle,
     business_repair,
 )
 from .operation_registry import parse_operation_request
@@ -18,32 +18,6 @@ from .switch_assignment_business_contracts import (
 
 _BUSINESS_FIELDS = {"child_handle", "state_or_switch_handle"}
 _NATIVE_FIELDS = {"switch_container", "child", "state_or_switch"}
-
-
-def _identity_for_handle(
-    session: BusinessDeclarationSession,
-    handle: str,
-    *,
-    field: str,
-) -> dict[str, str]:
-    try:
-        bound = session.handles.resolve_object(handle)
-    except BusinessDeclarationError as exc:
-        repair = dict(exc.repair)
-        repair["field"] = field
-        repair["action"] = (
-            "bind the exact relationship object and copy its returned handle"
-        )
-        raise BusinessDeclarationError(repair) from exc
-    except Exception as exc:
-        raise business_repair(
-            "OBJECT_HANDLE_NOT_AVAILABLE",
-            field=field,
-            action=(
-                "bind the exact relationship object and copy its returned handle"
-            ),
-        ) from exc
-    return {"kind": "id", "value": bound.object_id}
 
 
 def materialize_switch_assignment_business_request(
@@ -95,20 +69,29 @@ def materialize_switch_assignment_business_request(
             action="use only the fields disclosed by operation-schema",
         )
     arguments = {
-        "switch_container": _identity_for_handle(
-            session,
+        "switch_container": bound_object_identity_for_handle(
+            session.handles,
             declaration.target.object_handle,
             field="switch_container_handle",
+            action=(
+                "bind the exact relationship object and copy its returned handle"
+            ),
         ),
-        "child": _identity_for_handle(
-            session,
+        "child": bound_object_identity_for_handle(
+            session.handles,
             fields["child_handle"],
             field="child_handle",
+            action=(
+                "bind the exact relationship object and copy its returned handle"
+            ),
         ),
-        "state_or_switch": _identity_for_handle(
-            session,
+        "state_or_switch": bound_object_identity_for_handle(
+            session.handles,
             fields["state_or_switch_handle"],
             field="state_or_switch_handle",
+            action=(
+                "bind the exact relationship object and copy its returned handle"
+            ),
         ),
     }
     return parse_operation_request(

@@ -54,6 +54,50 @@ class FakeClient:
         return None
 
 
+class StaleCheckClient:
+    def __init__(self, tmp_path: Path) -> None:
+        self.tmp_path = tmp_path
+        self.calls: list[tuple[str, Any, Any]] = []
+
+    def call(self, uri: str, args: Any = None, options: Any = None) -> Any:
+        self.calls.append((uri, args, options))
+        if uri == "ak.wwise.core.getInfo":
+            return _info()
+        if uri == "ak.wwise.core.getProjectInfo":
+            return _project(self.tmp_path)
+        if uri == "ak.wwise.core.object.get":
+            return {
+                "return": [
+                    {
+                        "id": CONTAINER_ID,
+                        "name": "Footsteps",
+                        "type": "SwitchContainer",
+                        "path": (
+                            r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps"
+                        ),
+                    },
+                    {
+                        "id": CHILD_ID,
+                        "name": "Snow_Step",
+                        "type": "Sound",
+                        "path": (
+                            r"\Actor-Mixer Hierarchy\Default Work Unit\Moved\Snow_Step"
+                        ),
+                    },
+                    {
+                        "id": VALUE_ID,
+                        "name": "Snow",
+                        "type": "Switch",
+                        "path": r"\Switches\Default Work Unit\Surface\Snow",
+                    },
+                ]
+            }
+        raise AssertionError(f"Unexpected WAAPI call: {uri} {args!r} {options!r}")
+
+    def disconnect(self) -> None:
+        return None
+
+
 def _env(tmp_path: Path) -> dict[str, str]:
     config = tmp_path / "config.json"
     config.write_text(
@@ -261,6 +305,94 @@ def test_gateway_binds_three_roles_then_materializes_assignment(
     }
 
 
+def test_switch_assignment_draft_check_rejects_bound_role_drift(
+    tmp_path: Path,
+) -> None:
+    start_code, started = _offline(
+        tmp_path,
+        "draft-start",
+        "switchContainer.addAssignment",
+    )
+    assert start_code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    container = _bind(
+        tmp_path,
+        draft_id=draft_id,
+        authority=authority,
+        revision=1,
+        object_id=CONTAINER_ID,
+        name="Footsteps",
+        object_type="SwitchContainer",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps",
+    )
+    child = _bind(
+        tmp_path,
+        draft_id=draft_id,
+        authority=authority,
+        revision=2,
+        object_id=CHILD_ID,
+        name="Snow_Step",
+        object_type="Sound",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps\Snow_Step",
+    )
+    value = _bind(
+        tmp_path,
+        draft_id=draft_id,
+        authority=authority,
+        revision=3,
+        object_id=VALUE_ID,
+        name="Snow",
+        object_type="Switch",
+        path=r"\Switches\Default Work Unit\Surface\Snow",
+    )
+    declare_code, declared = _offline(
+        tmp_path,
+        "draft-declare-switch-assignment",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "4",
+        "--switch-container-handle",
+        container["bound_object"]["handle"],
+        "--child-handle",
+        child["bound_object"]["handle"],
+        "--state-or-switch-handle",
+        value["bound_object"]["handle"],
+    )
+    assert declare_code == 0, declared
+
+    check_client = StaleCheckClient(tmp_path)
+    check_code, rejected = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-check",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "5",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: check_client,
+    )
+
+    assert check_code == 2
+    assert rejected["error_code"] == "OBJECT_HANDLE_STALE"
+    assert all(
+        uri != "ak.wwise.core.switchContainer.addAssignment"
+        for uri, _args, _options in check_client.calls
+    )
+    record = OperationDraftStore(tmp_path / "state").inspect(
+        draft_id,
+        task_authority=authority,
+    )
+    assert record.revision == 5
+    assert record.check is None
+
+
 @pytest.mark.parametrize("version", ("2021.1", "2025.1"))
 @pytest.mark.parametrize(
     "operation",
@@ -287,3 +419,20 @@ def test_operation_schema_exposes_only_switch_assignment_business_adapter(
     )
     assert payload["business_adapter"]["legacy_inline_typed_public"] is False
     assert "typed_operation" not in payload
+    assert "identity_contract" not in payload["operation"]
+    encoded = json.dumps(payload["operation"], sort_keys=True).casefold()
+    assert "direct-child" not in encoded
+    assert "scoped-name" not in encoded
+
+
+def test_typed_operation_parser_has_no_legacy_switch_assignment_flags() -> None:
+    parser = gateway.build_parser()
+    subparsers = next(
+        action
+        for action in parser._actions
+        if hasattr(action, "choices") and isinstance(action.choices, dict)
+    )
+    typed_operation = subparsers.choices["typed-operation"]
+    assert "--switch-container" not in typed_operation._option_string_actions
+    assert "--child" not in typed_operation._option_string_actions
+    assert "--state-or-switch" not in typed_operation._option_string_actions
