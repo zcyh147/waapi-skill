@@ -245,7 +245,10 @@ def test_every_migration_row_has_exactly_one_rollup_and_ticket_family() -> None:
         if row["disposition"] == "migration_required"
     }
     assert set(tickets) == expected
-    assert {family["github_issue"] for family in inventory["ticket_families"]} == set(range(77, 94))
+    assert {family["github_issue"] for family in inventory["ticket_families"]} == {
+        *range(77, 94),
+        96,
+    }
     assert all(
         row["owner_issue"] in {56, 57}
         for row in (*inventory["native_lanes"], *inventory["operation_lanes"])
@@ -271,6 +274,47 @@ def test_every_supported_named_operation_uses_or_migrates_to_the_business_path()
         else:
             assert row["disposition"] == "migration_required"
             assert row["owner_issue"] == 56
+
+
+def test_fixed_commands_are_audited_from_their_actual_public_parameters() -> None:
+    inventory = _inventory()
+    object_get = next(
+        row
+        for row in inventory["native_lanes"]
+        if row["version"] == "2025.1"
+        and row["uri"] == "ak.wwise.core.object.get"
+    )
+    assert object_get["classification"] == "generic-fixed-query-metadata"
+    assert object_get["disposition"] == "migration_required"
+    query_values = _model_values(inventory, object_get)
+    assert any(
+        value["channel"] == "query.advanced"
+        and value["name"] == "waql"
+        and value["value_ownership"] == "bounded_domain_expression"
+        for value in query_values
+    )
+    assert any(
+        value["name"] in {"advanced-return", "return"}
+        and value["value_ownership"] == "gateway_derivation"
+        for value in query_values
+    )
+
+    selected = next(
+        row
+        for row in inventory["native_lanes"]
+        if row["version"] == "2023.1"
+        and row["uri"] == "ak.wwise.ui.getSelectedObjects"
+    )
+    assert selected["disposition"] == "migration_required"
+    assert any(
+        value["name"] == "return-field"
+        and value["value_ownership"] == "gateway_derivation"
+        for value in _model_values(inventory, selected)
+    )
+
+    for row in inventory["native_lanes"]:
+        if row["classification"] == "generic-fixed-command-audited-deep":
+            assert _model_values(inventory, row) == []
 
 
 def test_historical_construction_baseline_is_preserved_without_depth_claim() -> None:

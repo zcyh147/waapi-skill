@@ -6,7 +6,7 @@ This report is generated from the exact five-version public surface and the revi
 
 - Native function/Topic lanes: **824**
 - Named-operation lanes: **153**
-- Migration families: **17**
+- Migration families: **18**
 - Unowned migration rows: **0**
 
 Every exact row, version, schema digest, continuation command, field ownership, disposition, and owner is recorded in `interface-depth-inventory.json`.
@@ -33,8 +33,9 @@ Business scalar values remain visible. Native paths, metadata scope, property/re
 | [`generic-core-media-build`](https://github.com/zcyh147/waapi-skill/issues/85) | #57 | 16 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 4 | `eb0692ad57f0a504bf110f38355997bb9abca7519ed412c4ed97c223a6a0decf` |
 | [`generic-core-project-object`](https://github.com/zcyh147/waapi-skill/issues/84) | #57 | 55 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 19 | `caf467378cbabccb637cd93d18cc4e87e5356d409ce110da1f040825af4245ed` |
 | [`generic-core-remaining`](https://github.com/zcyh147/waapi-skill/issues/86) | #57 | 43 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 13 | `a7541ae6dad3c8c033b13089c13c1faad9a2688aee985c72e5c414fdb812fa8a` |
-| [`generic-core-runtime-inspection`](https://github.com/zcyh147/waapi-skill/issues/87) | #57 | 99 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 27 | `626e63d839946e5d4d04414cd091e01b9dd3e3548c3c3dfc26302f7ccfa27ae1` |
-| [`generic-host-ui-debug-waapi`](https://github.com/zcyh147/waapi-skill/issues/90) | #57 | 17 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 6 | `defe5e45b8e2d225ff58c0d2903acf1c7cca078770799783054180a63b8afdc2` |
+| [`generic-core-runtime-inspection`](https://github.com/zcyh147/waapi-skill/issues/87) | #57 | 94 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 26 | `b66b1f4d66d8d77b456b98041c7e14fa2d383e02bae02b4a17fabfb85261d593` |
+| [`generic-fixed-query-metadata`](https://github.com/zcyh147/waapi-skill/issues/96) | #57 | 47 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 11 | `b0d655fc0ea91c541e84ba8bdac59f56010d0b68da15aad86c5b3a6c360f47d9` |
+| [`generic-host-ui-debug-waapi`](https://github.com/zcyh147/waapi-skill/issues/90) | #57 | 15 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 5 | `8d701d66442416c74f627e468842139fa8971b441b9b813be95cd9e7d3712ee0` |
 | [`generic-soundengine-runtime`](https://github.com/zcyh147/waapi-skill/issues/88) | #57 | 124 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 26 | `5075fdcc32810059d6a3fee10499ff6823eea0be4c300dfb717bede6697c6ced` |
 | [`generic-topics`](https://github.com/zcyh147/waapi-skill/issues/91) | #57 | 154 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 33 | `48f62fffb957f2ed581bee75cb11ddd6624411b77fc307813d1984b5ce015982` |
 | [`named-authoring-ui-registration`](https://github.com/zcyh147/waapi-skill/issues/81) | #56 | 20 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 4 | `1b3b5a4a221d4ace2fcb897c15fc3f0076aea91a7c363831c02c043ef1942b52` |
@@ -52,7 +53,7 @@ Business scalar values remain visible. Native paths, metadata scope, property/re
 | Classification | Disposition | Exact lanes | Audit evidence |
 | --- | --- | ---: | --- |
 | `generic-dedicated-route-boundary` | `prohibited_boundary` | 139 | request-schema rejects these exact URI lanes before construction and directs callers to the Registry-selected dedicated operation, preventing a weaker generic bypass. |
-| `generic-fixed-command-audited-deep` | `already_deep` | 49 | The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior. The object.get rows additionally inventory the preferred simple flags, the complete structured Builder contract, and the separately disclosed bounded advanced WAQL contract. |
+| `generic-fixed-command-audited-deep` | `already_deep` | 9 | The fixed command owns its selector/projection/result envelope and exposes no generic request-schema continuation; focused command tests seal its bounded read or metadata behavior. The object.get rows additionally inventory the preferred simple flags, the complete structured Builder contract, and the separately disclosed bounded advanced WAQL contract. |
 | `generic-zero-input-audited-deep` | `already_deep` | 63 | The reflected request accepts no model-authored values; the Gateway owns the complete zero-input envelope, authorization/effect policy, dispatch, result bound, and any project guard. |
 | `named-audio-import-audited-deep` | `already_deep` | 5 | The public audio-import-business/v1 contract exposes semantic kinds and stable declaration values, binds objects and fields live, derives native paths/types/order/batches/continuation, preserves media artifacts exactly, and has complete #54 five-version Program plus macOS/Windows Fresh and real-host evidence. |
 | `named-internal-canonical-boundary` | `prohibited_boundary` | 5 | waapi.call is an internal canonical transaction representation, absent from normal operation discovery, and cannot accept a model-authored native request document. |

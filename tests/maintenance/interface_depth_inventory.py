@@ -68,7 +68,11 @@ def _operation_contract_rows() -> list[dict[str, Any]]:
 
 @lru_cache(maxsize=1)
 def _gateway_subparsers() -> Mapping[str, argparse.ArgumentParser]:
-    """Load the actual public CLI parser used by fixed Gateway commands."""
+    """Load the actual public CLI parser used by fixed Gateway commands.
+
+    Argparse has no public schema-introspection API.  Keep its private action
+    walk isolated here and project only semantic command facts below.
+    """
 
     module_name = "_waapi_skill_interface_depth_gateway"
     spec = importlib.util.spec_from_file_location(module_name, GATEWAY_PATH)
@@ -81,14 +85,39 @@ def _gateway_subparsers() -> Mapping[str, argparse.ArgumentParser]:
     subparsers = next(
         (
             action.choices
-            for action in parser._actions
-            if isinstance(action, argparse._SubParsersAction)
+            for action in _parser_actions(parser)
+            if isinstance(action.choices, Mapping)
+            and all(
+                isinstance(value, argparse.ArgumentParser)
+                for value in action.choices.values()
+            )
         ),
         None,
     )
     if not isinstance(subparsers, Mapping):
         raise RuntimeError("Gateway parser has no public subcommand registry")
     return subparsers
+
+
+def _parser_actions(parser: argparse.ArgumentParser) -> tuple[argparse.Action, ...]:
+    actions = getattr(parser, "_actions", None)
+    if not isinstance(actions, list) or not all(
+        isinstance(action, argparse.Action) for action in actions
+    ):
+        raise RuntimeError("Gateway argparse action registry is malformed")
+    return tuple(actions)
+
+
+def _semantic_parameter_shape(action: argparse.Action) -> tuple[str, bool]:
+    action_kind = type(action).__name__
+    repeatable = action_kind in {"_AppendAction", "_AppendConstAction"}
+    multiple = (
+        repeatable
+        or action.nargs in {"*", "+"}
+        or isinstance(action.nargs, int)
+        and action.nargs > 1
+    )
+    return ("array" if multiple else "scalar", repeatable)
 
 
 def _json_default(value: Any) -> Any:
@@ -110,7 +139,7 @@ def _gateway_command_contract(command_spec: str) -> dict[str, Any]:
         raise RuntimeError(f"unknown fixed Gateway command {command_spec!r}")
     fixed_positionals = iter(tokens[1:])
     parameters: list[dict[str, Any]] = []
-    for action in parser._actions:
+    for action in _parser_actions(parser):
         if action.dest == "help":
             continue
         if not action.option_strings:
@@ -130,12 +159,14 @@ def _gateway_command_contract(command_spec: str) -> dict[str, Any]:
             if action.choices is not None
             else None
         )
+        shape, repeatable = _semantic_parameter_shape(action)
         parameters.append(
             {
                 "name": name,
                 "dest": action.dest,
                 "option_strings": sorted(action.option_strings),
-                "action": type(action).__name__,
+                "shape": shape,
+                "repeatable": repeatable,
                 "required": bool(action.required),
                 "nargs": action.nargs,
                 "choices": choices,
@@ -412,14 +443,7 @@ def _typed_field_rows(
                     "channel": f"fixed.{command['command']}",
                     "path": ["fixed_command", command["command"], parameter["name"]],
                     "name": parameter["name"],
-                    "shape": (
-                        "array"
-                        if parameter["action"] == "_AppendAction"
-                        or parameter["nargs"] in {"*", "+"}
-                        or isinstance(parameter["nargs"], int)
-                        and parameter["nargs"] > 1
-                        else "scalar"
-                    ),
+                    "shape": parameter["shape"],
                     "required": parameter["required"],
                     "value_ownership": ownership,
                     "transport_ownership": "gateway_derivation",
