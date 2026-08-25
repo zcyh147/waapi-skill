@@ -62,8 +62,8 @@ GATEWAY_PATH = REPO_ROOT / "skills" / "waapi-skill" / "scripts" / "gateway.py"
 ACTOR_MIXER_PARENT = r"\Actor-Mixer Hierarchy\Default Work Unit"
 CONTAINERS_PARENT = r"\Containers\Default Work Unit"
 SOUNDBANK_PARENT = r"\SoundBanks\Default Work Unit"
-SWITCH_PARENT = r"\Switches\Default Work Unit"
-STATE_GROUP_PARENT = r"\States\Dynamic Dialogue\ObjectiveStatus"
+FIXTURE_SWITCH_GROUP_PATH = r"\Switches\Default Work Unit\WAAPI_V2_Surface"
+FIXTURE_SWITCH_PATH = FIXTURE_SWITCH_GROUP_PATH + r"\Snow"
 SWITCH_GROUP_REFERENCE = "SwitchGroupOrStateGroup"
 SFX_BUS_ID = "{ED2BCAC8-D7B6-4448-8900-439B557894F4}"
 
@@ -503,7 +503,6 @@ def test_closed_gateway_workflows_across_selected_version(
     switch_container_id: str | None = None
     switch_group_id: str | None = None
     switch_id: str | None = None
-    state_id: str | None = None
     assignment_child_id: str | None = None
 
     try:
@@ -695,24 +694,11 @@ def test_closed_gateway_workflows_across_selected_version(
             object_type="SwitchContainer",
             name=f"WAAPI_GATEWAY_SC_{runtime.version.replace('.', '_')}_{unique_suffix}",
         )
-        switch_group_id = _create_object(
+        switch_group_id = _query_exact_path_id(
             runtime,
-            parent=SWITCH_PARENT,
-            object_type="SwitchGroup",
-            name=f"WAAPI_GATEWAY_SG_{runtime.version.replace('.', '_')}_{unique_suffix}",
+            FIXTURE_SWITCH_GROUP_PATH,
         )
-        switch_id = _create_object(
-            runtime,
-            parent=switch_group_id,
-            object_type="Switch",
-            name=f"WAAPI_GATEWAY_SWITCH_{runtime.version.replace('.', '_')}_{unique_suffix}",
-        )
-        state_id = _create_object(
-            runtime,
-            parent=STATE_GROUP_PARENT,
-            object_type="State",
-            name=f"WAAPI_GATEWAY_STATE_{runtime.version.replace('.', '_')}_{unique_suffix}",
-        )
+        switch_id = _query_exact_path_id(runtime, FIXTURE_SWITCH_PATH)
         _complete_transaction(
             runtime,
             operation="object.setReference",
@@ -780,9 +766,6 @@ def test_closed_gateway_workflows_across_selected_version(
             included_second_id,
             assignment_child_id,
             switch_container_id,
-            switch_id,
-            switch_group_id,
-            state_id,
         )
         for object_id in cleanup_order:
             if object_id is None:
@@ -1003,14 +986,29 @@ def _complete_transaction(
         "operation": operation,
         "arguments": dict(arguments),
     }
-    preview = create_typed_transaction_preview(
-        lambda command: runtime.gateway(
-            command,
-            live=command[0]
-            in {"draft-check", "preview-from-draft", "typed-call", "typed-operation"},
-        ),
-        request,
-    )
+    if operation in {
+        "switchContainer.addAssignment",
+        "switchContainer.removeAssignment",
+    }:
+        preview = _create_switch_assignment_business_preview(
+            runtime,
+            operation=operation,
+            arguments=arguments,
+        )
+    else:
+        preview = create_typed_transaction_preview(
+            lambda command: runtime.gateway(
+                command,
+                live=command[0]
+                in {
+                    "draft-check",
+                    "preview-from-draft",
+                    "typed-call",
+                    "typed-operation",
+                },
+            ),
+            request,
+        )
     assert preview["status"] == TransactionState.AWAITING_CONFIRMATION.value
     assert preview["state"] == TransactionState.AWAITING_CONFIRMATION.value
     preview_request = preview["preview_summary"]["request"]
@@ -1145,6 +1143,49 @@ def _complete_transaction(
         "verify": verified,
         "verification_evidence": verification_evidence,
     }
+
+
+def _create_switch_assignment_business_preview(
+    runtime: _WorkflowSandboxRuntime,
+    *,
+    operation: str,
+    arguments: Mapping[str, Any],
+) -> dict[str, Any]:
+    identities: dict[str, str] = {}
+    for role in ("switch_container", "child", "state_or_switch"):
+        identity = arguments.get(role)
+        assert isinstance(identity, Mapping), arguments
+        assert identity.get("kind") == "id", arguments
+        object_id = identity.get("value")
+        assert isinstance(object_id, str) and object_id, arguments
+        identities[role] = object_id
+
+    draft = _start_business_draft(runtime, operation)
+    handles = {
+        role: _bind_business_object(runtime, draft, object_id=object_id)
+        for role, object_id in identities.items()
+    }
+    _update_business_draft(
+        runtime,
+        draft,
+        "draft-declare-switch-assignment",
+        [
+            "--switch-container-handle",
+            handles["switch_container"],
+            "--child-handle",
+            handles["child"],
+            "--state-or-switch-handle",
+            handles["state_or_switch"],
+        ],
+        live=False,
+    )
+    _update_business_draft(runtime, draft, "draft-check", live=True)
+    return _update_business_draft(
+        runtime,
+        draft,
+        "preview-from-draft",
+        live=True,
+    )
 
 
 def _complete_object_lifecycle_business_transaction(
@@ -1644,16 +1685,49 @@ def _create_object(
     object_type: str,
     name: str,
 ) -> str:
-    parent_identity = (
-        {"kind": "path", "value": parent}
+    draft = _start_business_draft(runtime, "object.create")
+    parent_handle = (
+        _bind_business_object(
+            runtime,
+            draft,
+            path_segments=tuple(
+                segment for segment in parent.split("\\") if segment
+            ),
+        )
         if parent.startswith("\\")
-        else {"kind": "id", "value": parent}
+        else _bind_business_object(runtime, draft, object_id=parent)
     )
-    transaction = _complete_transaction(
+    semantic_kinds = {
+        "ActorMixer": "actor-mixer",
+        "Sound": "sound-sfx",
+        "SwitchContainer": "switch-container",
+    }
+    kind = semantic_kinds.get(object_type)
+    if kind is None:
+        kind = _discover_business_type(
+            runtime,
+            draft,
+            meaning=object_type,
+            role="object",
+            expected_label=object_type,
+        )
+    _update_business_draft(
         runtime,
-        operation="object.create",
-        arguments={"parent": parent_identity, "type": object_type, "name": name},
+        draft,
+        "draft-declare-new",
+        [
+            "--declaration-id",
+            "created-object",
+            "--parent-handle",
+            parent_handle,
+            "--name",
+            name,
+            "--kind",
+            kind,
+        ],
+        live=False,
     )
+    transaction = _complete_business_draft(runtime, draft)
     return _created_object_id(transaction["execute"])
 
 
