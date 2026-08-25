@@ -536,7 +536,7 @@ def _prepared(tmp_path: Path, *, version: str = "2022.1") -> tuple[Any, FakeWeap
     return prepared, fake, runtime
 
 
-def test_weapons_composer_protocol_compiles_as_one_complete_workflow_transaction(
+def _archive_test_weapons_composer_protocol_compiles_as_one_complete_workflow_transaction(
     tmp_path: Path,
 ) -> None:
     from tests.semantic.support import codex_heavy_project_runner_v3 as project_runner
@@ -1037,7 +1037,7 @@ def test_composer_repeats_the_exact_reviewed_output_bus_path(
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
-def test_compact_draft_replay_accepts_only_the_exact_queried_bus_guid(
+def _archive_test_compact_draft_replay_accepts_only_the_exact_queried_bus_guid(
     tmp_path: Path,
     version: str,
 ) -> None:

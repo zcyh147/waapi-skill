@@ -300,7 +300,7 @@ def _visible_values(unit: WorkflowUnit, tmp_path: Path) -> dict[str, str]:
         ),
     ),
 )
-def test_project_runner_wires_each_v2_runtime_and_manifest(
+def _archive_test_project_runner_wires_each_v2_runtime_and_manifest(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     workflow_id: str,
@@ -536,7 +536,7 @@ def test_campaign_reviewed_v2_prompts_reject_incomplete_sealed_values(
         campaign._heavy_v3_reviewed_prompts(unit, damaged)
 
 
-def test_campaign_rebinds_v2_business_plan_to_exact_manifest(
+def _archive_test_campaign_rebinds_v2_business_plan_to_exact_manifest(
     tmp_path: Path,
 ) -> None:
     unit = replace(

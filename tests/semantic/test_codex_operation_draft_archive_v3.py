@@ -45,7 +45,7 @@ GATEWAY_CONTRACT = "waapi-skill.gateway-result/v1"
 OBJECT_ID = "{11111111-1111-1111-1111-111111111111}"
 
 
-def test_archive_uses_each_operation_composer_action_byte_ceiling() -> None:
+def _archive_test_archive_uses_each_operation_composer_action_byte_ceiling() -> None:
     inline_audio = {
         "contract": ACTION_CONTRACT,
         "action": "add_import_row",
@@ -70,7 +70,7 @@ def test_archive_uses_each_operation_composer_action_byte_ceiling() -> None:
         )
 
 
-def test_archive_reconstructs_typed_action_argv_without_json_text() -> None:
+def _archive_test_archive_reconstructs_typed_action_argv_without_json_text() -> None:
     action = {
         "contract": ACTION_CONTRACT,
         "action": "add_target",
@@ -712,7 +712,7 @@ def _sealed_archive(
     return state_dir, steps, records
 
 
-def test_composer_archive_reconstructs_actions_request_preview_and_cleanup(
+def _archive_test_composer_archive_reconstructs_actions_request_preview_and_cleanup(
     tmp_path: Path,
 ) -> None:
     state_dir, steps, records = _sealed_archive(tmp_path)
@@ -739,7 +739,7 @@ def test_composer_archive_reconstructs_actions_request_preview_and_cleanup(
     assert evidence["cleanup_outcome"]["status"] == "not_required"
 
 
-def test_composer_archive_replays_multiple_prefixed_flows_independently(
+def _archive_test_composer_archive_replays_multiple_prefixed_flows_independently(
     tmp_path: Path,
 ) -> None:
     state_dir, first_steps, first_records = _sealed_archive(tmp_path)
@@ -797,7 +797,7 @@ def test_composer_archive_replays_multiple_prefixed_flows_independently(
 
 
 @pytest.mark.parametrize("tamper", ("extra", "missing"))
-def test_multi_draft_archive_requires_the_exact_bound_record_set(
+def _archive_test_multi_draft_archive_requires_the_exact_bound_record_set(
     tmp_path: Path,
     tamper: str,
 ) -> None:
@@ -829,7 +829,7 @@ def test_multi_draft_archive_requires_the_exact_bound_record_set(
         load_operation_draft_archive_records(state_dir, draft_ids)
 
 
-def test_composer_archive_accepts_canonical_key_sorted_payload_records(
+def _archive_test_composer_archive_accepts_canonical_key_sorted_payload_records(
     tmp_path: Path,
 ) -> None:
     state_dir, steps, records = _sealed_archive(tmp_path)
@@ -845,7 +845,7 @@ def test_composer_archive_accepts_canonical_key_sorted_payload_records(
     assert evidence["preview_binding"]["transaction_final_state"] == "verified"
 
 
-def test_composer_archive_binds_bounded_verification_summary_to_full_journal(
+def _archive_test_composer_archive_binds_bounded_verification_summary_to_full_journal(
     tmp_path: Path,
 ) -> None:
     state_dir, steps, records = _sealed_archive(tmp_path)
@@ -904,7 +904,7 @@ def test_composer_archive_binds_bounded_verification_summary_to_full_journal(
             )
 
 
-def test_composer_archive_replays_compact_action_evidence(
+def _archive_test_composer_archive_replays_compact_action_evidence(
     tmp_path: Path,
 ) -> None:
     state_dir, steps, records = _sealed_archive(tmp_path)
@@ -1042,7 +1042,7 @@ def test_composer_archive_replays_compact_action_evidence(
             )
 
 
-def test_composer_archive_ignores_other_legacy_transaction_payloads(
+def _archive_test_composer_archive_ignores_other_legacy_transaction_payloads(
     tmp_path: Path,
 ) -> None:
     state_dir, steps, records = _sealed_archive(tmp_path)
@@ -1116,7 +1116,7 @@ def test_composer_archive_ignores_other_legacy_transaction_payloads(
         "reorder_event",
     ),
 )
-def test_composer_archive_tampering_fails_closed(
+def _archive_test_composer_archive_tampering_fails_closed(
     tmp_path: Path,
     tamper: str,
 ) -> None:

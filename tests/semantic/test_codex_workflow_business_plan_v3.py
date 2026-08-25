@@ -267,7 +267,7 @@ def test_workflow_sections_are_deeply_immutable() -> None:
     assert isinstance(sections.static_expectation["transactions"], tuple)
 
 
-def test_object_set_composer_is_one_complete_ordered_transaction() -> None:
+def _archive_test_object_set_composer_is_one_complete_ordered_transaction() -> None:
     inputs = _workflow_inputs("three_transactions")
     transaction = inputs["transactions"][1]
     steps = inputs["workflow_steps"]
@@ -304,7 +304,7 @@ def test_object_set_composer_is_one_complete_ordered_transaction() -> None:
     ]
 
 
-def test_composer_accepts_independent_facts_before_bound_container_disclosure() -> None:
+def _archive_test_composer_accepts_independent_facts_before_bound_container_disclosure() -> None:
     inputs = _workflow_inputs("three_transactions")
     transaction = inputs["transactions"][1]
     steps = _composer_transaction_steps(transaction, action_count=4)

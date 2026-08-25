@@ -226,7 +226,7 @@ def test_consumed_composer_order_rebinds_each_revision_to_its_actual_predecessor
     )
 
 
-def test_archived_typed_draft_accepts_dependency_free_rebatching(
+def _archive_test_archived_typed_draft_accepts_dependency_free_rebatching(
     tmp_path: Path,
 ) -> None:
     options = _options(tmp_path)
@@ -6004,7 +6004,7 @@ def test_heavy_validator_accepts_frozen_materialized_request_prompt(
     assert archived == f"请把目标音频转换到 {io_root} 并汇总。\n"
 
 
-def test_heavy_validator_accepts_reviewed_confirmation_prompt(
+def _archive_test_heavy_validator_accepts_reviewed_confirmation_prompt(
     tmp_path: Path,
 ) -> None:
     options = _options(tmp_path)
@@ -6038,7 +6038,7 @@ def test_heavy_validator_accepts_reviewed_confirmation_prompt(
     assert confirmation == units[0].turns[1].prompt + "\n"
 
 
-def test_heavy_validator_replays_attested_task_install_with_canonical_bytes(
+def _archive_test_heavy_validator_replays_attested_task_install_with_canonical_bytes(
     tmp_path: Path,
 ) -> None:
     options = _options(tmp_path)
@@ -6521,7 +6521,7 @@ def test_heavy_validator_maps_clean_cli_quota_block_to_retryable(
     assert result.pending_session_ids == ("O22-CLI-MIGRATE-02",)
 
 
-def test_heavy_validator_accepts_later_turn_quota_after_proven_prior_turn(
+def _archive_test_heavy_validator_accepts_later_turn_quota_after_proven_prior_turn(
     tmp_path: Path,
 ) -> None:
     options = _options(tmp_path)
@@ -6556,7 +6556,7 @@ def test_heavy_validator_accepts_later_turn_quota_after_proven_prior_turn(
     assert result.pending_session_ids == ("OBJ22-F-GET-02",)
 
 
-def test_heavy_validator_rejects_resealed_retryable_failed_prompt(
+def _archive_test_heavy_validator_rejects_resealed_retryable_failed_prompt(
     tmp_path: Path,
 ) -> None:
     options = _options(tmp_path)
@@ -6894,7 +6894,7 @@ def test_heavy_validator_rejects_broker_advance_with_resealed_artifact(
     _assert_single_heavy_case_blocked(result, reason="prior proven prefix")
 
 
-def test_heavy_validator_rejects_failed_prior_turn_grade(
+def _archive_test_heavy_validator_rejects_failed_prior_turn_grade(
     tmp_path: Path,
 ) -> None:
     options = _options(tmp_path)

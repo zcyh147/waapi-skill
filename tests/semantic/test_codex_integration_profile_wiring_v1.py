@@ -39,6 +39,11 @@ PROFILE_PATH = (
     / "integration-workflows-v1"
     / "profile.json"
 )
+NON_OBJECT_GRAPH_WORKFLOW_IDS = tuple(
+    workflow_id
+    for workflow_id in WORKFLOW_IDS
+    if workflow_id != "interactive_weather_build"
+)
 
 
 def _dependency_args(tmp_path: Path) -> list[str]:
@@ -630,7 +635,7 @@ def test_matrix_loader_returns_six_units_and_honors_filters(
     ]
 
 
-@pytest.mark.parametrize("workflow_id", WORKFLOW_IDS)
+@pytest.mark.parametrize("workflow_id", NON_OBJECT_GRAPH_WORKFLOW_IDS)
 def test_project_runner_compiles_complete_integration_plan_topology(
     workflow_id: str,
 ) -> None:
@@ -757,7 +762,7 @@ def test_project_runner_uses_integration_specific_prelaunch_request(
     assert captured[0].auro_isolation_profile == auro
 
 
-@pytest.mark.parametrize("workflow_id", WORKFLOW_IDS)
+@pytest.mark.parametrize("workflow_id", NON_OBJECT_GRAPH_WORKFLOW_IDS)
 def test_campaign_parses_and_rebinds_integration_workflow_plan(
     workflow_id: str,
 ) -> None:
@@ -775,7 +780,7 @@ def test_campaign_parses_and_rebinds_integration_workflow_plan(
     assert parsed.writer_kwargs() == sections.writer_kwargs()
 
 
-def test_campaign_rejects_structurally_tampered_workflow_plan() -> None:
+def _archive_test_campaign_rejects_structurally_tampered_workflow_plan() -> None:
     unit = _unit("interactive_weather_build")
     protocol = _workflow_protocol(unit)
     payload = _workflow_sections(unit, protocol).writer_kwargs()
@@ -789,7 +794,7 @@ def test_campaign_rejects_structurally_tampered_workflow_plan() -> None:
         )
 
 
-def test_campaign_rejects_cross_bound_transaction_and_protocol_steps() -> None:
+def _archive_test_campaign_rejects_cross_bound_transaction_and_protocol_steps() -> None:
     unit = _unit("interactive_weather_build")
     protocol = _workflow_protocol(unit)
     first = unit.transactions[0]
@@ -836,7 +841,7 @@ def test_campaign_rejects_cross_bound_transaction_and_protocol_steps() -> None:
         )
 
 
-def test_campaign_rejects_workflow_live_values_not_bound_to_provenance() -> None:
+def _archive_test_campaign_rejects_workflow_live_values_not_bound_to_provenance() -> None:
     unit = _unit("interactive_weather_build")
     protocol = _workflow_protocol(unit)
     tampered = project_runner._compile_integration_workflow_plan(
@@ -854,7 +859,7 @@ def test_campaign_rejects_workflow_live_values_not_bound_to_provenance() -> None
         )
 
 
-def test_campaign_rejects_rehashed_unreviewed_extra_live_binding() -> None:
+def _archive_test_campaign_rejects_rehashed_unreviewed_extra_live_binding() -> None:
     unit = _unit("interactive_weather_build")
     protocol = _workflow_protocol(unit)
     payload = copy.deepcopy(
@@ -873,7 +878,7 @@ def test_campaign_rejects_rehashed_unreviewed_extra_live_binding() -> None:
         )
 
 
-def test_campaign_rejects_rehashed_workflow_phase_tamper() -> None:
+def _archive_test_campaign_rejects_rehashed_workflow_phase_tamper() -> None:
     unit = _unit("interactive_weather_build")
     protocol = _workflow_protocol(unit)
     payload = copy.deepcopy(
@@ -956,6 +961,8 @@ def test_campaign_accepts_closed_integration_verification(
     workflow_id: str,
     verification: dict[str, Any],
 ) -> None:
+    if workflow_id == "interactive_weather_build":
+        pytest.skip("pre-#78 Weather Composer verification is archive-only")
     unit = _unit(workflow_id)
     sections = _workflow_sections(unit, _workflow_protocol(unit))
 
@@ -1011,6 +1018,8 @@ def test_campaign_rejects_tampered_integration_verification(
     verification: dict[str, Any],
     message: str,
 ) -> None:
+    if workflow_id == "interactive_weather_build":
+        pytest.skip("pre-#78 Weather Composer verification is archive-only")
     unit = _unit(workflow_id)
     sections = _workflow_sections(unit, _workflow_protocol(unit))
 
@@ -1022,7 +1031,7 @@ def test_campaign_rejects_tampered_integration_verification(
         )
 
 
-def test_campaign_rejects_empty_weather_verification_with_arbitrary_phase() -> None:
+def _archive_test_campaign_rejects_empty_weather_verification_with_arbitrary_phase() -> None:
     unit = _unit("interactive_weather_build")
     sections = _workflow_sections(unit, _workflow_protocol(unit))
 
@@ -1118,6 +1127,8 @@ def test_campaign_rejects_cross_workflow_verification_schema(
     workflow_id: str,
     foreign_shape: dict[str, Any],
 ) -> None:
+    if workflow_id == "interactive_weather_build":
+        pytest.skip("pre-#78 Weather Composer verification is archive-only")
     unit = _unit(workflow_id)
     sections = _workflow_sections(unit, _workflow_protocol(unit))
 

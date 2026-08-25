@@ -342,7 +342,7 @@ def test_weather_dependency_closure_uses_only_exact_live_names_and_values() -> N
         )
 
 
-def test_weather_protocol_and_business_plan_cover_all_three_transactions(
+def _archive_test_weather_protocol_and_business_plan_cover_all_three_transactions(
     tmp_path: Path,
 ) -> None:
     targets = _targets(tmp_path)

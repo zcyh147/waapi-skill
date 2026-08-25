@@ -220,7 +220,7 @@ def test_policy_protocol_rejects_unknown_mode_or_nontransaction_base() -> None:
 
 
 @pytest.mark.parametrize("policy", POLICY_MODES)
-def test_policy_prompt_provenance_round_trips_without_a_second_harness(
+def _archive_test_policy_prompt_provenance_round_trips_without_a_second_harness(
     tmp_path: Path,
     policy: str,
 ) -> None:

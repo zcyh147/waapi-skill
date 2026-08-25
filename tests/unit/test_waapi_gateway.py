@@ -870,7 +870,7 @@ def test_main_keeps_non_transaction_output_strict_json(
     ) == "ok"
 
 
-def test_main_prints_object_set_operation_schema_as_bounded_compact_json(
+def test_main_prints_object_set_business_schema_as_bounded_compact_json(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: Any,
@@ -900,8 +900,9 @@ def test_main_prints_object_set_operation_schema_as_bounded_compact_json(
     assert list(parsed) == list(payload)
     assert "request_envelope" not in parsed
     assert "request_envelope_policy" not in parsed
-    assert "gateway_argv" not in parsed["composer"]["start"]
-    assert parsed["composer"]["start"]["gateway_argv_after_preconditions"] == [
+    assert parsed["operation"]["input_mode"] == "business_declaration"
+    assert "composer" not in parsed
+    assert parsed["business_adapter"]["start"]["gateway_argv"] == [
         "draft-start",
         "object.set",
     ]

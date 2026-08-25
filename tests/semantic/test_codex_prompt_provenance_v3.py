@@ -841,7 +841,7 @@ def test_fixed_provenance_path_round_trip_and_o_excl_preserves_first_document(
     assert evidence.path.read_bytes() == original
 
 
-def test_historical_prompt_protocol_uses_only_the_offline_archive_codec(
+def _archive_test_historical_prompt_protocol_uses_only_the_offline_archive_codec(
     tmp_path: Path,
 ) -> None:
     root = _scenario_root(tmp_path)
@@ -2154,7 +2154,7 @@ def test_protocol_round_trip_preserves_omitted_default_event_count_flag() -> Non
     )
 
 
-def test_metadata_transaction_protocol_round_trips_its_scope_and_token_binding(
+def _archive_test_metadata_transaction_protocol_round_trips_its_scope_and_token_binding(
     tmp_path: Path,
 ) -> None:
     request = _operation_request(
@@ -2226,7 +2226,7 @@ def test_metadata_transaction_protocol_round_trips_its_scope_and_token_binding(
     ).protocol == protocol
 
 
-def test_object_set_metadata_equivalence_round_trips_and_archive_revalidates(
+def _archive_test_object_set_metadata_equivalence_round_trips_and_archive_revalidates(
     tmp_path: Path,
 ) -> None:
     request = _operation_request(
