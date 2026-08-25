@@ -231,6 +231,20 @@ recorded source hash/mtime stayed unchanged; PASS sandboxes were removed, FAIL
 sandboxes were sealed/quarantined, and scoped residual-process checks were
 empty.
 
+Switch-assignment route candidate
+`d45f75f5e75190d5b4e607a02aee2dcf38e73ab9` passed the one-unit
+`switch_assignment_business_1` profile in macOS root
+`imac-sab-d45f75f-r2` and native-Windows root
+`iwin-sab-d45f75f-r2`; both roots then passed identical
+`--resume --verify-only`. Each Agent issued the exact
+`switchContainer.addAssignment` route, bound only the three natural object
+paths, and reached the Gateway-owned immutable Preview in eight accepted
+commands without Wwise or project changes. The earlier roots
+`imac-sab-d05f1ec-r1` and `iwin-sab-d05f1ec-r1` are frozen FAILs without
+verify-only because the Agents invented operation aliases rejected by the
+Broker before Gateway dispatch. This is focused routing evidence, not public
+`integration` acceptance or real-host execution credit.
+
 The production business-declaration `audio.import` cutover has a later,
 single-candidate Fresh Agent result. Exact packaged-Skill candidate
 `4be64fd80fb14d800a8890012f65fca666ab98f4` passed all eight
@@ -508,6 +522,7 @@ The separately approved V3 executable profiles are:
 | `typed_input_cross_version_25` | 25 | 39 | Fixed representative typed-input profile: five fresh tasks per Wwise version, no same-root retries, and one public Gateway continuation at each step |
 | `integration` | 12 | 36 | Six cross-operation workflows on Wwise 2022.1 and 2025.1; 20 previewed transactions and no additional per-API coverage credit |
 | `modification_policy_9` | 9 | 15 | Three isolated repetitions of each canonical project-modification policy on one reviewed object.create business case |
+| `switch_assignment_business_1` | 1 | 1 | Preview-only routing proof for one independent Switch assignment through three opaque business-object handles and Gateway-owned native materialization |
 
 The two older six-task integration profile IDs remain internal compatibility
 entrypoints for their exact sealed roots. They are deliberately absent from the
@@ -533,6 +548,7 @@ skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py -
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile typed_input_cross_version_25 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-typed-input-new-candidate-r1
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile integration --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-integration-new-candidate-r1
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile modification_policy_9 --campaign-root skills/waapi-skill-workspace/campaign-modification-policy-9
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile switch_assignment_business_1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-switch-assignment-business
 ```
 
 `modification_policy_9` is one closed nine-task campaign; its public campaign
@@ -547,6 +563,12 @@ starts one memory-off Agent per task, and forbids same-root pre-action retries.
 Freeze ordinary semantic failures and repair them only in a new campaign root
 and candidate. A fully passing fresh root may receive identical
 `--resume --verify-only` replay; a failed root remains frozen without replay.
+
+`switch_assignment_business_1` is a single 2022.1 preview-only routing probe.
+It starts no Wwise process and grants no real-host coverage credit. The Agent
+receives only the Switch Container, direct child, and Switch paths; the
+production Gateway must bind all three identities and own the exact GUID
+relationship, opposite precondition, native request, and immutable Preview.
 
 Resume with the same profile, filters, candidate, model, reasoning, service
 tier, timeout, and retry policy plus `--resume`. Use `--resume --verify-only` to
