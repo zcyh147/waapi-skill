@@ -424,6 +424,7 @@ def _typed_field_rows(
                 "schema_digest",
                 "shape",
                 "typed_append",
+                "typed_advanced",
                 "typed_choose",
                 "typed_choose_dynamic",
                 "typed_map_correct",
@@ -432,6 +433,7 @@ def _typed_field_rows(
                 "typed_present",
                 "typed_schema_digest",
                 "typed_set",
+                "typed_structured",
             }:
                 ownership = "gateway_derivation"
             else:

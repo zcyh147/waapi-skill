@@ -298,6 +298,11 @@ def test_fixed_commands_are_audited_from_their_actual_public_parameters() -> Non
         and value["value_ownership"] == "gateway_derivation"
         for value in query_values
     )
+    assert all(
+        value["value_ownership"] == "gateway_derivation"
+        for value in query_values
+        if value["name"] in {"typed-advanced", "typed-structured"}
+    )
 
     selected = next(
         row
