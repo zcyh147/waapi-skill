@@ -339,9 +339,9 @@ python scripts/run.py gateway.py verify <transaction-id>
 
 `object.copy`、`object.delete`、`object.move`、`object.setName` 与
 `object.setNotes` 使用 business-declaration Draft。调用者只绑定准确的对象角色，
-并提供 `new_name`、`notes`、`name_conflict` 等已披露业务结果；Gateway 负责构造
-canonical identity selector 与原生 request 字段。后续 binding、declaration、check
-和 Preview 命令都应直接复制返回值，不要自行重建。
+并只提供精确版本 `operation-schema` 披露的结果字段；Gateway 负责构造 canonical
+identity selector 与原生 request 字段。后续 binding、declaration、check 和 Preview
+命令都应直接复制返回值，不要自行重建。
 
 每个返回阶段应分开执行，并仅使用完整的 `next_command.copy_instruction.source_field` 所指定的字段，不要自行重建命令。
 `transaction-show` 和 `confirm` 属于 `ask_before_changes`；`allow_changes`

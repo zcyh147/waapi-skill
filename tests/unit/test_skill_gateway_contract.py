@@ -319,6 +319,12 @@ def test_public_readmes_route_users_only_through_the_packaged_gateway() -> None:
             assert internal_route not in readme
         assert "inline Python" in readme
         assert "helper script" in readme
+        for operation_specific_field in (
+            "`new_name`",
+            "`notes`",
+            "`name_conflict`",
+        ):
+            assert operation_specific_field not in readme
 
     assert "Manifest reflection is discovery, not permission" in readmes[0]
     assert "request-schema` exposes only reviewed exact-version typed routes" in readmes[0]

@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from wwise_waapi.business_adapters import business_adapter
+from wwise_waapi.business_adapters import (
+    business_adapter,
+    business_adapter_operations,
+)
 from wwise_waapi.business_declaration_state import BusinessDeclarationSession
 from wwise_waapi.business_declarations import (
     BusinessContext,
@@ -15,6 +18,10 @@ from wwise_waapi.object_lifecycle_business import (
 )
 from wwise_waapi.object_lifecycle_business_contracts import (
     object_lifecycle_business_contract_data,
+)
+from wwise_waapi.operation_registry import (
+    BUSINESS_DECLARATION_INPUT_MODE,
+    OPERATION_INPUT_MODE_LANES,
 )
 
 
@@ -44,6 +51,14 @@ def test_business_adapter_registry_selects_one_family_at_one_seam() -> None:
     ) is True
     with pytest.raises(KeyError):
         business_adapter("object.setProperty")
+
+
+def test_every_business_input_lane_has_exactly_one_registered_adapter() -> None:
+    assert business_adapter_operations() == {
+        lane.operation
+        for lane in OPERATION_INPUT_MODE_LANES
+        if lane.input_mode == BUSINESS_DECLARATION_INPUT_MODE
+    }
 
 
 def _session(
