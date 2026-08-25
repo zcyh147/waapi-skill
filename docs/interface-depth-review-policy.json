@@ -342,6 +342,23 @@
       "proportional_evidence": "Representative real events for each distinct event/match family on 2022.1 and 2025.1; targeted Fresh Agent wait/stream selection and repair workflows on both hosts."
     }
   },
+  "ticket_issue_numbers": {
+    "named-object-metadata-fields": 77,
+    "named-object-creation-graph": 78,
+    "named-soundbank-planning": 79,
+    "named-exact-artifact-code": 80,
+    "named-authoring-ui-registration": 81,
+    "named-dangerous-debug-controls": 82,
+    "named-compound-undo": 83,
+    "generic-core-project-object": 84,
+    "generic-core-media-build": 85,
+    "generic-core-remaining": 86,
+    "generic-core-runtime-inspection": 87,
+    "generic-soundengine-runtime": 88,
+    "generic-cli-console": 89,
+    "generic-host-ui-debug-waapi": 90,
+    "generic-topics": 91
+  },
   "field_ownership_rules": {
     "exact_artifact_names": ["audio_file", "files", "import_file", "lua_code", "project", "script_file", "source", "source_file", "sources", "tab_delimited_import_file"],
     "bounded_expression_names": ["transform", "waql", "wa_args"],

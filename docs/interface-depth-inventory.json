@@ -12467,7 +12467,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "e7da6f1361901f4a0419e896e614f1af434848f628ccbee4dc0f412b56b82e6d",
+  "inventory_sha256": "40276f2fd4e378310b69207ce385731c323505378746d3f4733c9173f9b9774c",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -32642,6 +32642,7 @@
     {
       "blocked_by_family": "generic-soundengine-runtime",
       "deterministic_tests": "All exact rows/version deltas, option mapping, exact artifacts, hostile macOS/Windows paths, blocked custom commands, isolated-I/O policy, continuation serialization, and non-bypass.",
+      "github_issue": 89,
       "id": "generic-cli-console",
       "parent_issue": 57,
       "proportional_evidence": "Representative real CLI/Console operations per distinct verifier shape on both OSes, including native-Windows path/PowerShell transport; Fresh Agent for build-intent routing.",
@@ -32721,6 +32722,7 @@
     {
       "blocked_by_family": "generic-core-project-object",
       "deterministic_tests": "All exact rows and version deltas, bounds, hostile numeric values, result ceilings, continuation completeness, and dedicated-route non-bypass.",
+      "github_issue": 85,
       "id": "generic-core-media-build",
       "parent_issue": 57,
       "proportional_evidence": "One real representative per distinct read shape on matching versions; Fresh Agent only for routing ambiguity introduced by the new declarations.",
@@ -32751,6 +32753,7 @@
     {
       "blocked_by_family": null,
       "deterministic_tests": "Every exact inventory row and version, positive/negative/repair/stale cases, identity and version deltas, hostile scalars, continuation completeness, and non-bypass.",
+      "github_issue": 84,
       "id": "generic-core-project-object",
       "parent_issue": 57,
       "proportional_evidence": "Representative real cases per distinct verifier/effect shape on 2022.1 and 2025.1 and targeted Fresh Agent evidence only for changed routing or parameter closure.",
@@ -32820,6 +32823,7 @@
     {
       "blocked_by_family": "generic-core-media-build",
       "deterministic_tests": "Every exact row/version, provider and path boundaries, compound-only rejection, hostile values, continuation completeness, repair, and non-bypass.",
+      "github_issue": 86,
       "id": "generic-core-remaining",
       "parent_issue": 57,
       "proportional_evidence": "Matching-host representatives for each effect/verifier family; use Fresh Agent only where route choice or business vocabulary changed.",
@@ -32877,6 +32881,7 @@
     {
       "blocked_by_family": "generic-core-remaining",
       "deterministic_tests": "All exact rows/versions, read versus runtime-mutation policy, cursor/meter/transport lifecycles, hostile scalars, time/result bounds, continuation completeness, and cleanup.",
+      "github_issue": 87,
       "id": "generic-core-runtime-inspection",
       "parent_issue": 57,
       "proportional_evidence": "Representative real profiler, remote, and transport lifecycles on matching hosts; Fresh Agent only for changed multi-step routing.",
@@ -32990,6 +32995,7 @@
     {
       "blocked_by_family": "generic-cli-console",
       "deterministic_tests": "All exact rows and host/version deltas, Authoring requirements, bounded validateCall input, hostile paths/scalars, continuation completeness, project guards, and no arbitrary escape hatch.",
+      "github_issue": 90,
       "id": "generic-host-ui-debug-waapi",
       "parent_issue": 57,
       "proportional_evidence": "Representative real Authoring/project operations and tone output on matching hosts; Fresh Agent only for changed host/routing decisions.",
@@ -33021,6 +33027,7 @@
     {
       "blocked_by_family": "generic-core-runtime-inspection",
       "deterministic_tests": "All 124 exact version lanes, overload and enum mapping, hostile IDs/scalars, multi-position and aux-send bounds, command continuation, result ceilings, and non-bypass.",
+      "github_issue": 88,
       "id": "generic-soundengine-runtime",
       "parent_issue": 57,
       "proportional_evidence": "Representative real calls per distinct command/result family on matching hosts; targeted Fresh Agent workflows for event/game-object/listener parameter closure.",
@@ -33159,6 +33166,7 @@
     {
       "blocked_by_family": "generic-host-ui-debug-waapi",
       "deterministic_tests": "All 154 exact Topic lanes, version-delta event schemas, empty/nonempty match values, hostile scalars, timeout/no-timeout/event-count rules, size bounds, cancellation cleanup, and continuation uniqueness.",
+      "github_issue": 91,
       "id": "generic-topics",
       "parent_issue": 57,
       "proportional_evidence": "Representative real events for each distinct event/match family on 2022.1 and 2025.1; targeted Fresh Agent wait/stream selection and repair workflows on both hosts.",
@@ -33327,6 +33335,7 @@
     {
       "blocked_by_family": "named-exact-artifact-code",
       "deterministic_tests": "Five-version descriptor schemas, collision/ownership/repair/stale inventory cases, exact handler preservation, lifecycle cleanup, limits, and prohibited generic bypass.",
+      "github_issue": 81,
       "id": "named-authoring-ui-registration",
       "parent_issue": 56,
       "proportional_evidence": "Matching real Authoring host registration/unregistration on macOS and Windows where available, plus a targeted Fresh Agent descriptor workflow.",
@@ -33351,6 +33360,7 @@
     {
       "blocked_by_family": "named-dangerous-debug-controls",
       "deterministic_tests": "Five-version heterogeneous child goldens, nested-route prohibitions, limits, stale child handles, cancel/end failures, no retry, exact-name isolation, and one-outcome verification.",
+      "github_issue": 83,
       "id": "named-compound-undo",
       "parent_issue": 56,
       "proportional_evidence": "One successful and one cancellation/failure shape on matching real hosts, then one representative macOS and Windows Fresh Agent compound workflow.",
@@ -33370,6 +33380,7 @@
     {
       "blocked_by_family": "named-authoring-ui-registration",
       "deterministic_tests": "Exact five-version availability, explicit-confirmation-only policy, no-ack public schemas, terminal success/indeterminate/failure journals, no retry continuation, and generic non-bypass.",
+      "github_issue": 82,
       "id": "named-dangerous-debug-controls",
       "parent_issue": 56,
       "proportional_evidence": "Program and Non-live evidence is primary; no deliberate crash is required. Use only a reviewed matching-host representative if needed, without claiming target effects that were not exercised.",
@@ -33397,6 +33408,7 @@
     {
       "blocked_by_family": "named-soundbank-planning",
       "deterministic_tests": "Exact-byte preservation, five-version availability, hostile paths and Unicode, open-map bounds, reserved-key rejection, repair, stale source authority, and non-bypass.",
+      "github_issue": 80,
       "id": "named-exact-artifact-code",
       "parent_issue": 56,
       "proportional_evidence": "Representative tab import and each distinct Lua host/version shape, with native-Windows filesystem transport probes and targeted Fresh Agent routing only where model behavior changes.",
@@ -33423,6 +33435,7 @@
     {
       "blocked_by_family": "named-object-metadata-fields",
       "deterministic_tests": "Five-version tree and graph goldens, positive/negative/repair/stale handle cases, nested limits, exact-name isolation for the shared object.set URI, and non-bypass.",
+      "github_issue": 78,
       "id": "named-object-creation-graph",
       "parent_issue": 56,
       "proportional_evidence": "Weather-style object.create/object.setRTPC plus createPlugin and bulk-set representatives on 2022.1 and 2025.1 on both hosts; targeted Fresh Agent Weather construction.",
@@ -33454,6 +33467,7 @@
     {
       "blocked_by_family": null,
       "deterministic_tests": "Five-version operation schemas, positive and repair flows, stale/wrong-scope handles, hostile values, exact-name isolation, and generic-route non-bypass.",
+      "github_issue": 77,
       "id": "named-object-metadata-fields",
       "parent_issue": 56,
       "proportional_evidence": "Real Alarm-style property/reference edits on 2022.1 and 2025.1 on macOS and Windows, plus one targeted Fresh Agent repair workflow.",
@@ -33481,6 +33495,7 @@
     {
       "blocked_by_family": "named-object-creation-graph",
       "deterministic_tests": "Five-version inclusion/generation/external-source goldens, empty and multi-value cases, hostile paths, limits, stale identities, isolated-I/O guards, and non-bypass.",
+      "github_issue": 79,
       "id": "named-soundbank-planning",
       "parent_issue": 56,
       "proportional_evidence": "Harbor setInclusions/generate and one external-source conversion on matching 2022.1/2025.1 macOS and Windows hosts; targeted Harbor Fresh Agent workflow.",

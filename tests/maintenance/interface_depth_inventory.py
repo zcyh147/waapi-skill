@@ -340,11 +340,18 @@ def build_interface_depth_inventory() -> dict[str, Any]:
     dispositions = Counter(row["disposition"] for row in native_rows)
     operation_dispositions = Counter(row["disposition"] for row in operation_rows)
     blueprints = policy["ticket_blueprints"]
+    issue_numbers = policy["ticket_issue_numbers"]
     if set(blueprints) != set(ticket_rows):
         raise RuntimeError(
             "ticket blueprint mismatch: "
             f"missing={sorted(set(ticket_rows) - set(blueprints))}, "
             f"extra={sorted(set(blueprints) - set(ticket_rows))}"
+        )
+    if set(issue_numbers) != set(ticket_rows):
+        raise RuntimeError(
+            "ticket issue-number mismatch: "
+            f"missing={sorted(set(ticket_rows) - set(issue_numbers))}, "
+            f"extra={sorted(set(issue_numbers) - set(ticket_rows))}"
         )
     payload: dict[str, Any] = {
         "contract": CONTRACT,
@@ -362,6 +369,7 @@ def build_interface_depth_inventory() -> dict[str, Any]:
         "ticket_families": [
             {
                 "id": ticket_id,
+                "github_issue": issue_numbers[ticket_id],
                 **strict_json_copy(blueprints[ticket_id]),
                 "rows": sorted(rows),
                 "row_count": len(rows),
@@ -444,7 +452,7 @@ def render_interface_depth_inventory(inventory: Mapping[str, Any]) -> str:
         }
         owner = next(row["owner_issue"] for row in indexed)
         lines.append(
-            f"| `{family['id']}` | #{owner} | {family['row_count']} | "
+            f"| [`{family['id']}`](https://github.com/zcyh147/waapi-skill/issues/{family['github_issue']}) | #{owner} | {family['row_count']} | "
             f"{', '.join(versions)} | {len(names)} | `{family['rows_sha256']}` |"
         )
     lines.extend(

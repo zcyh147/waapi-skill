@@ -29,21 +29,21 @@ Business scalar values remain visible. Native paths, metadata scope, property/re
 
 | Family | Roll-up | Exact rows | Versions | Unique API/operation names | Row digest |
 | --- | ---: | ---: | --- | ---: | --- |
-| `generic-cli-console` | #57 | 65 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 14 | `3f5b7464510f32b6f06dc4c6c3e0a7da700159ad07b8aff69b4b759bed41b9e1` |
-| `generic-core-media-build` | #57 | 16 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 4 | `eb0692ad57f0a504bf110f38355997bb9abca7519ed412c4ed97c223a6a0decf` |
-| `generic-core-project-object` | #57 | 55 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 19 | `caf467378cbabccb637cd93d18cc4e87e5356d409ce110da1f040825af4245ed` |
-| `generic-core-remaining` | #57 | 43 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 13 | `a7541ae6dad3c8c033b13089c13c1faad9a2688aee985c72e5c414fdb812fa8a` |
-| `generic-core-runtime-inspection` | #57 | 99 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 27 | `626e63d839946e5d4d04414cd091e01b9dd3e3548c3c3dfc26302f7ccfa27ae1` |
-| `generic-host-ui-debug-waapi` | #57 | 17 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 6 | `defe5e45b8e2d225ff58c0d2903acf1c7cca078770799783054180a63b8afdc2` |
-| `generic-soundengine-runtime` | #57 | 124 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 26 | `5075fdcc32810059d6a3fee10499ff6823eea0be4c300dfb717bede6697c6ced` |
-| `generic-topics` | #57 | 154 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 33 | `48f62fffb957f2ed581bee75cb11ddd6624411b77fc307813d1984b5ce015982` |
-| `named-authoring-ui-registration` | #56 | 10 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 2 | `7cd800c227390e0494e8e20ff1a96742599091a02f53e3fda9eb27ba4961e221` |
-| `named-compound-undo` | #56 | 5 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 1 | `a2d96ad477515f9533aff9f9dc5950b2f043100faf32cdf5d77b3abb1b3a4e85` |
-| `named-dangerous-debug-controls` | #56 | 13 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 3 | `ddd48cfeb2bdc04bbdaa438d9605640b583fb4ddde5956847736b7e7abb6dfb0` |
-| `named-exact-artifact-code` | #56 | 12 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 4 | `bc7b0e8add73f09f4eec32a7bc31e2ceb3ff04ca04673f77874ae91bfb8f33f1` |
-| `named-object-creation-graph` | #56 | 17 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 4 | `a1eef3587d862bfd6a34a26da9c8856e0366354995186a3792eed7148fb12622` |
-| `named-object-metadata-fields` | #56 | 13 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 3 | `d9ac4123421b0686fd97518ac1ee7aae487266869f7f03a7c6146c2421e7aebd` |
-| `named-soundbank-planning` | #56 | 14 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 3 | `353e5de69a0a831633bffcf74794f10ddca298177df144e2c693bff2411bc750` |
+| [`generic-cli-console`](https://github.com/zcyh147/waapi-skill/issues/89) | #57 | 65 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 14 | `3f5b7464510f32b6f06dc4c6c3e0a7da700159ad07b8aff69b4b759bed41b9e1` |
+| [`generic-core-media-build`](https://github.com/zcyh147/waapi-skill/issues/85) | #57 | 16 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 4 | `eb0692ad57f0a504bf110f38355997bb9abca7519ed412c4ed97c223a6a0decf` |
+| [`generic-core-project-object`](https://github.com/zcyh147/waapi-skill/issues/84) | #57 | 55 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 19 | `caf467378cbabccb637cd93d18cc4e87e5356d409ce110da1f040825af4245ed` |
+| [`generic-core-remaining`](https://github.com/zcyh147/waapi-skill/issues/86) | #57 | 43 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 13 | `a7541ae6dad3c8c033b13089c13c1faad9a2688aee985c72e5c414fdb812fa8a` |
+| [`generic-core-runtime-inspection`](https://github.com/zcyh147/waapi-skill/issues/87) | #57 | 99 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 27 | `626e63d839946e5d4d04414cd091e01b9dd3e3548c3c3dfc26302f7ccfa27ae1` |
+| [`generic-host-ui-debug-waapi`](https://github.com/zcyh147/waapi-skill/issues/90) | #57 | 17 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 6 | `defe5e45b8e2d225ff58c0d2903acf1c7cca078770799783054180a63b8afdc2` |
+| [`generic-soundengine-runtime`](https://github.com/zcyh147/waapi-skill/issues/88) | #57 | 124 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 26 | `5075fdcc32810059d6a3fee10499ff6823eea0be4c300dfb717bede6697c6ced` |
+| [`generic-topics`](https://github.com/zcyh147/waapi-skill/issues/91) | #57 | 154 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 33 | `48f62fffb957f2ed581bee75cb11ddd6624411b77fc307813d1984b5ce015982` |
+| [`named-authoring-ui-registration`](https://github.com/zcyh147/waapi-skill/issues/81) | #56 | 10 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 2 | `7cd800c227390e0494e8e20ff1a96742599091a02f53e3fda9eb27ba4961e221` |
+| [`named-compound-undo`](https://github.com/zcyh147/waapi-skill/issues/83) | #56 | 5 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 1 | `a2d96ad477515f9533aff9f9dc5950b2f043100faf32cdf5d77b3abb1b3a4e85` |
+| [`named-dangerous-debug-controls`](https://github.com/zcyh147/waapi-skill/issues/82) | #56 | 13 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 3 | `ddd48cfeb2bdc04bbdaa438d9605640b583fb4ddde5956847736b7e7abb6dfb0` |
+| [`named-exact-artifact-code`](https://github.com/zcyh147/waapi-skill/issues/80) | #56 | 12 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 4 | `bc7b0e8add73f09f4eec32a7bc31e2ceb3ff04ca04673f77874ae91bfb8f33f1` |
+| [`named-object-creation-graph`](https://github.com/zcyh147/waapi-skill/issues/78) | #56 | 17 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 4 | `a1eef3587d862bfd6a34a26da9c8856e0366354995186a3792eed7148fb12622` |
+| [`named-object-metadata-fields`](https://github.com/zcyh147/waapi-skill/issues/77) | #56 | 13 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 3 | `d9ac4123421b0686fd97518ac1ee7aae487266869f7f03a7c6146c2421e7aebd` |
+| [`named-soundbank-planning`](https://github.com/zcyh147/waapi-skill/issues/79) | #56 | 14 | 2021.1, 2022.1, 2023.1, 2024.1, 2025.1 | 3 | `353e5de69a0a831633bffcf74794f10ddca298177df144e2c693bff2411bc750` |
 
 ## Already-deep and boundary evidence
 
