@@ -695,6 +695,10 @@ def test_normal_audio_import_schema_exposes_only_its_business_declaration_input(
     assert schema["business_adapter"]["start"]["append_arguments"] == "forbidden"
     transport = schema["business_adapter"]["field_transport"]
     assert "switch_value" in transport["literal_fields"]
+    assert transport["dedicated_declaration_parameters"] == {
+        "switch_value": "--switch-value"
+    }
+    assert transport["generic_declaration_field_exclusions"] == ["switch_value"]
     assert transport["bound_object_handle_fields"] == ["output_bus"]
     assert transport["reference_value_rule"] == (
         "copy_one_bound_object_handle_never_a_path_or_name"

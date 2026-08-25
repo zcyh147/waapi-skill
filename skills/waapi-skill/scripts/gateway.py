@@ -10409,6 +10409,7 @@ def _parse_audio_import_business_fields(
     pairs: Sequence[Sequence[str]],
     *,
     switch_value: str | None = None,
+    allow_switch_value_pair: bool = True,
     field_value_pairs: Sequence[Sequence[str]] = (),
     event_parent_handle: str | None = None,
     event_name: str | None = None,
@@ -10424,10 +10425,20 @@ def _parse_audio_import_business_fields(
     literal_pairs = [*pairs]
     if switch_value is not None:
         literal_pairs.append(("switch_value", switch_value))
-    for pair in literal_pairs:
+    generic_pair_count = len(pairs)
+    for index, pair in enumerate(literal_pairs):
         if len(pair) != 2:
             raise GatewayInputError("business --field requires FIELD VALUE")
         name, raw = pair
+        if (
+            name == "switch_value"
+            and not allow_switch_value_pair
+            and index < generic_pair_count
+        ):
+            raise GatewayInputError(
+                "Per-declaration switch_value requires the dedicated "
+                "--switch-value business argument"
+            )
         value_type = field_types.get(name)
         if value_type is None:
             raise GatewayInputError(
@@ -10826,6 +10837,7 @@ def dispatch_offline_business_draft_update(
                 session,
                 args.field,
                 switch_value=args.switch_value,
+                allow_switch_value_pair=False,
                 field_value_pairs=args.field_value,
                 event_parent_handle=args.event_parent_handle,
                 event_name=args.event_name,
@@ -16773,7 +16785,7 @@ def _business_next_action_binding(
                 "--kind",
                 "<semantic-kind>",
                 "[--switch-value <exact-user-requested-switch-value>]",
-                "[--field <stable-field> <business-value>]...",
+                "[--field <stable-field-except-switch_value> <business-value>]...",
                 "[--field-value <bound-field-handle> <business-value>]...",
             ],
             "task_local_id": "bounded_unique_not_business_data",
@@ -16787,7 +16799,7 @@ def _business_next_action_binding(
                 "--object-handle",
                 "<bound-object-handle>",
                 "[--switch-value <exact-user-requested-switch-value>]",
-                "[--field <stable-field> <business-value>]...",
+                "[--field <stable-field-except-switch_value> <business-value>]...",
                 "[--field-value <bound-field-handle> <business-value>]...",
             ],
             "task_local_id": "bounded_unique_not_business_data",
@@ -16795,6 +16807,13 @@ def _business_next_action_binding(
         },
         "revise": {
             **operation_draft_prefix_copy_binding(revise_prefix),
+            "append": [
+                "--declaration-id",
+                "<existing-task-local-id>",
+                "[--switch-value <corrected-exact-user-requested-switch-value>]",
+                "[--field <stable-field-except-switch_value> <corrected-business-value>]...",
+                "[--field-value <bound-field-handle> <corrected-business-value>]...",
+            ],
             "use_only_for": "correction_or_late_discovered_fact",
         },
         "remove": {

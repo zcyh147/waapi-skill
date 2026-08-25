@@ -105,6 +105,10 @@ def audio_import_business_contract_data(version: str) -> dict[str, Any]:
             ),
             "bound_object_handle_fields": ["output_bus"],
             "bound_field_handle_container": "field_values",
+            "dedicated_declaration_parameters": {
+                "switch_value": "--switch-value",
+            },
+            "generic_declaration_field_exclusions": ["switch_value"],
             "reference_value_rule": (
                 "copy_one_bound_object_handle_never_a_path_or_name"
             ),

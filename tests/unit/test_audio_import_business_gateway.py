@@ -401,6 +401,14 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     assert "[--switch-value <exact-user-requested-switch-value>]" in (
         bound_next["declare_existing"]["append"]
     )
+    assert "[--switch-value <corrected-exact-user-requested-switch-value>]" in (
+        bound_next["revise"]["append"]
+    )
+    assert all(
+        "<stable-field>" not in item
+        for action in ("declare_new", "declare_existing", "revise")
+        for item in bound_next[action]["append"]
+    )
 
     field_client = FakeClient(
         {
@@ -641,6 +649,32 @@ def test_audio_import_switch_value_is_a_first_class_business_argument(
     assert declared["draft"]["declarations"][0]["fields"] == {
         "switch_value": "Snow"
     }
+    record_path = (
+        tmp_path
+        / "state"
+        / "operation-drafts-v1"
+        / "records"
+        / f"{started['draft']['draft_id']}.json"
+    )
+    before_ambiguous_attempt = record_path.read_bytes()
+    ambiguous_code, ambiguous = _offline(
+        tmp_path,
+        "draft-revise-declaration",
+        started["draft"]["draft_id"],
+        "--task-authority",
+        started["task_authority"],
+        "--expected-revision",
+        "3",
+        "--declaration-id",
+        "snow",
+        "--field",
+        "switch_value",
+        "Rain",
+    )
+    assert ambiguous_code == 2
+    assert ambiguous["error_code"] == "GatewayInputError"
+    assert "--switch-value" in ambiguous["message"]
+    assert record_path.read_bytes() == before_ambiguous_attempt
 
 
 def test_structure_declaration_reaches_live_check_and_persists_readable_preview(
