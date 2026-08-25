@@ -1,17 +1,25 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from collections import Counter
+from pathlib import Path
 
+from wwise_waapi.canonical import canonical_sha256
 from wwise_waapi.operation_registry import OPERATION_SPECS
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
 
 from tests.maintenance.interface_depth_inventory import (
     INVENTORY_DOC_PATH,
     INVENTORY_PATH,
+    _gateway_parser_contract_rows,
     build_interface_depth_inventory,
     render_interface_depth_inventory,
 )
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _inventory() -> dict[str, object]:
@@ -48,6 +56,45 @@ def test_generated_inventory_is_current_and_exactly_covers_both_surfaces() -> No
     assert len(operations) == 153
     assert {(row["operation"], row["version"]) for row in operations} == expected_operations
     assert INVENTORY_DOC_PATH.read_text(encoding="utf-8") == render_interface_depth_inventory(inventory)
+
+
+def test_maintenance_entrypoint_runs_directly_from_the_repository_root() -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "tests/maintenance/generate_interface_depth_inventory.py",
+            "--help",
+        ],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "--check" in result.stdout
+
+
+def test_every_public_gateway_parser_flag_is_sealed_authoritatively() -> None:
+    inventory = _inventory()
+    contracts = _gateway_parser_contract_rows()
+    assert canonical_sha256(contracts) == inventory["source_contracts"][
+        "gateway_parser_sha256"
+    ]
+    by_command = {row["command"]: row["parameters"] for row in contracts}
+    assert {row["name"] for row in by_command["wait-topic"]} >= {
+        "event-count",
+        "no-timeout",
+        "option-set",
+        "match-set",
+    }
+    assert {row["name"] for row in by_command["typed-call"]} >= {
+        "set",
+        "append",
+        "choose",
+    }
+    assert {row["name"] for row in by_command["operation-schema"]} >= {
+        "operation",
+    }
 
 
 def test_every_model_value_and_planning_mechanic_has_one_reviewed_owner() -> None:
@@ -295,6 +342,22 @@ def test_fixed_commands_are_audited_from_their_actual_public_parameters() -> Non
     )
     assert any(
         value["name"] in {"advanced-return", "return"}
+        and value["value_ownership"] == "gateway_derivation"
+        for value in query_values
+    )
+    where = next(value for value in query_values if value["name"] == "where")
+    assert where["value_ownership"] == "reviewed_adapter"
+    assert {
+        component["name"]: component["value_ownership"]
+        for component in where["components"]
+    } == {
+        "FIELD": "gateway_derivation",
+        "OPERATOR": "gateway_derivation",
+        "TYPE": "gateway_derivation",
+        "VALUE": "stable_business_declaration",
+    }
+    assert any(
+        value["name"] == "select"
         and value["value_ownership"] == "gateway_derivation"
         for value in query_values
     )

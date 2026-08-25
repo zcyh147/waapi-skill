@@ -169,6 +169,7 @@ def _gateway_command_contract(command_spec: str) -> dict[str, Any]:
                 "repeatable": repeatable,
                 "required": bool(action.required),
                 "nargs": action.nargs,
+                "metavar": _json_default(action.metavar),
                 "choices": choices,
                 "type": (
                     getattr(action.type, "__name__", str(action.type))
@@ -207,6 +208,47 @@ def _fixed_command_has_model_values(lane: Mapping[str, Any]) -> bool:
     )
 
 
+def _gateway_parser_contract_rows() -> list[dict[str, Any]]:
+    """Return the authoritative schema projection for every public command."""
+
+    return [
+        _gateway_command_contract(command)
+        for command in sorted(_gateway_subparsers())
+    ]
+
+
+def _lane_gateway_command_contracts(
+    lane: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    command_specs = set(lane["execution_policy"]["gateway_commands"])
+    if lane["item_type"] == "topic":
+        command_specs.add("topic-schema")
+    if "request-schema" in command_specs:
+        command_specs.update(
+            {
+                "request-array-item",
+                "request-map-container",
+                "typed-call",
+                "typed-zero-call",
+            }
+        )
+    if "operation-schema" in command_specs:
+        command_specs.update(
+            {
+                "draft-apply",
+                "draft-business-configure",
+                "draft-check",
+                "draft-start",
+                "preview-from-draft",
+                "typed-operation",
+            }
+        )
+    return [
+        _gateway_command_contract(command)
+        for command in sorted(command_specs)
+    ]
+
+
 def _public_continuation_rows(
     surface: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
@@ -217,6 +259,7 @@ def _public_continuation_rows(
             "item_type": lane["item_type"],
             "uri": lane["uri"],
             "gateway_commands": lane["execution_policy"]["gateway_commands"],
+            "gateway_command_contracts": _lane_gateway_command_contracts(lane),
         }
         fixed_contracts = _fixed_command_contracts(lane)
         if fixed_contracts:
@@ -262,6 +305,9 @@ def _validate_policy(
         "operation_contract_sha256": canonical_sha256(_operation_contract_rows()),
         "public_continuation_sha256": canonical_sha256(
             _public_continuation_rows(surface)
+        ),
+        "gateway_parser_sha256": canonical_sha256(
+            _gateway_parser_contract_rows()
         ),
     }
     if observed != expected:
@@ -346,6 +392,8 @@ def _name_ownership(
 ) -> str | None:
     rules = policy["field_ownership_rules"]
     normalized = name.replace("-", "_").lower()
+    if normalized in rules["gateway_derivation_names"]:
+        return "gateway_derivation"
     if normalized in rules["reviewed_adapter_names"]:
         return "reviewed_adapter"
     if normalized in rules["exact_artifact_names"]:
@@ -412,30 +460,11 @@ def _typed_field_rows(
     for command in _fixed_command_contracts(lane):
         for parameter in command["parameters"]:
             normalized = parameter["name"].replace("-", "_")
-            if normalized in {
-                "advanced_return",
-                "api",
-                "choice_handle",
-                "map_handle",
-                "array_handle",
-                "member_key",
-                "parent_schema_token",
-                "return_field",
-                "schema_digest",
-                "shape",
-                "typed_append",
-                "typed_advanced",
-                "typed_choose",
-                "typed_choose_dynamic",
-                "typed_map_correct",
-                "typed_map_put",
-                "typed_map_remove",
-                "typed_present",
-                "typed_schema_digest",
-                "typed_set",
-                "typed_structured",
-            }:
+            rules = policy["field_ownership_rules"]
+            if normalized in rules["fixed_gateway_derivation_names"]:
                 ownership = "gateway_derivation"
+            elif normalized in rules["fixed_reviewed_adapter_names"]:
+                ownership = "reviewed_adapter"
             else:
                 ownership = _name_ownership(
                     parameter["name"], policy, uri=lane["uri"]
@@ -449,6 +478,23 @@ def _typed_field_rows(
                     "required": parameter["required"],
                     "value_ownership": ownership,
                     "transport_ownership": "gateway_derivation",
+                    **(
+                        {
+                            "components": [
+                                {
+                                    "name": component,
+                                    "value_ownership": component_ownership,
+                                    "transport_ownership": "gateway_derivation",
+                                }
+                                for component, component_ownership in rules[
+                                    "fixed_tuple_component_ownership"
+                                ][normalized].items()
+                            ]
+                        }
+                        if normalized
+                        in rules["fixed_tuple_component_ownership"]
+                        else {}
+                    ),
                 }
             )
     for channel, contract in contracts:
@@ -495,9 +541,6 @@ def _schema_value_ownership(
     uri: str,
     policy: Mapping[str, Any],
 ) -> str:
-    normalized = name.replace("-", "_").lower()
-    if normalized == "acknowledge":
-        return "gateway_derivation"
     if any(
         schema.get(key) is True
         for key in (
@@ -511,24 +554,17 @@ def _schema_value_ownership(
     if named is not None:
         return named
     description = str(schema.get("description", "")).lower()
-    if "mutation token" in description or "property metadata" in description:
+    rules = policy["field_ownership_rules"]
+    if any(
+        phrase in description for phrase in rules["live_bound_description_phrases"]
+    ):
         return "live_bound_handle"
-    if "exact wwise" in description and "token" in description:
+    if any(
+        all(phrase in description for phrase in phrase_group)
+        for phrase_group in rules["reviewed_adapter_description_all"]
+    ):
         return "reviewed_adapter"
-    if normalized in {
-        "calls",
-        "children",
-        "commands",
-        "control_input",
-        "inclusions",
-        "kind",
-        "objects",
-        "plugin",
-        "points",
-        "type",
-    }:
-        return "reviewed_adapter"
-    if shape in policy["field_ownership_rules"]["gateway_structure_shapes"] or shape == "object":
+    if shape in rules["gateway_structure_shapes"] or shape == "object":
         return "reviewed_adapter"
     return "stable_business_declaration"
 

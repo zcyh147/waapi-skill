@@ -4,6 +4,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+SKILL_ROOT = REPO_ROOT / "skills/waapi-skill"
+for import_root in (REPO_ROOT, SKILL_ROOT):
+    import_path = str(import_root)
+    if import_path not in sys.path:
+        sys.path.insert(0, import_path)
 
 from tests.maintenance.interface_depth_inventory import (
     INVENTORY_DOC_PATH,
