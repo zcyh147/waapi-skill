@@ -98,6 +98,16 @@ def test_cli_bootstrap_uses_only_the_literal_injected_skill_locator() -> None:
     assert "including for Wwise CLI and project-migration requests" in skill
 
 
+def test_skill_limits_windows_267_recovery_to_one_identical_shell_replay() -> None:
+    skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+
+    assert "CreateProcessAsUserW failed: 267" in skill
+    assert "before PowerShell starts" in skill
+    assert "repeat that identical complete shell command once" in skill
+    assert "This is process-launch recovery, not a Gateway retry" in skill
+    assert "A second 267 or any other shell failure stops" in skill
+
+
 def test_query_reference_has_no_raw_client_fallback() -> None:
     query_reference = (SKILL_ROOT / "references" / "waapi-query.md").read_text(encoding="utf-8")
     query_flat = " ".join(query_reference.split())

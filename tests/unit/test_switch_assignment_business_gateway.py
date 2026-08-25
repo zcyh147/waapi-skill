@@ -160,6 +160,7 @@ def _bind(
     draft_id: str,
     authority: str,
     revision: int,
+    role: str,
     object_id: str,
     name: str,
     object_type: str,
@@ -193,6 +194,8 @@ def _bind(
             authority,
             "--expected-revision",
             str(revision),
+            "--role",
+            role,
             "--object-id",
             object_id,
         ],
@@ -201,6 +204,28 @@ def _bind(
     )
     assert code == 0, payload
     return payload
+
+
+def test_switch_assignment_continuation_owns_the_next_binding_role(
+    tmp_path: Path,
+) -> None:
+    code, started = _offline(
+        tmp_path,
+        "draft-start",
+        "switchContainer.addAssignment",
+    )
+
+    assert code == 0, started
+    binding = started["draft"]["next_action_binding"]["object_binding"]
+    assert binding["next_role"] == "switch_container"
+    assert binding["by_id"]["fixed_argv_prefix"][-2:] == [
+        "--role",
+        "switch_container",
+    ]
+    assert binding["by_path_segments"]["fixed_argv_prefix"][-2:] == [
+        "--role",
+        "switch_container",
+    ]
 
 
 @pytest.mark.parametrize(
@@ -218,6 +243,9 @@ def test_gateway_binds_three_roles_then_materializes_assignment(
     assert start_code == 0, started
     assert started["draft"]["allowed_actions"] == ["bind-object"]
     assert "typed_operation" not in started
+    assert started["draft"]["next_action_binding"]["object_binding"][
+        "next_role"
+    ] == "switch_container"
     draft_id = started["draft"]["draft_id"]
     authority = started["task_authority"]
 
@@ -226,26 +254,35 @@ def test_gateway_binds_three_roles_then_materializes_assignment(
         draft_id=draft_id,
         authority=authority,
         revision=1,
+        role="switch_container",
         object_id=CONTAINER_ID,
         name="Footsteps",
         object_type="SwitchContainer",
         path=r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps",
     )
+    assert container["draft"]["next_action_binding"]["object_binding"][
+        "next_role"
+    ] == "child"
     child = _bind(
         tmp_path,
         draft_id=draft_id,
         authority=authority,
         revision=2,
+        role="child",
         object_id=CHILD_ID,
         name="Snow_Step",
         object_type="Sound",
         path=r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps\Snow_Step",
     )
+    assert child["draft"]["next_action_binding"]["object_binding"][
+        "next_role"
+    ] == "state_or_switch"
     value = _bind(
         tmp_path,
         draft_id=draft_id,
         authority=authority,
         revision=3,
+        role="state_or_switch",
         object_id=VALUE_ID,
         name="Snow",
         object_type="Switch",
@@ -305,6 +342,56 @@ def test_gateway_binds_three_roles_then_materializes_assignment(
     }
 
 
+@pytest.mark.parametrize("role_argv", ((), ("--role", "child")))
+def test_switch_assignment_binding_rejects_missing_or_wrong_role_atomically(
+    tmp_path: Path,
+    role_argv: tuple[str, ...],
+) -> None:
+    start_code, started = _offline(
+        tmp_path,
+        "draft-start",
+        "switchContainer.addAssignment",
+    )
+    assert start_code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [_info()],
+            "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        }
+    )
+
+    code, rejected = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-bind-object",
+            draft_id,
+            "--task-authority",
+            authority,
+            "--expected-revision",
+            "1",
+            *role_argv,
+            "--object-id",
+            CONTAINER_ID,
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert code == 2
+    assert "requires --role switch_container" in json.dumps(rejected)
+    record = OperationDraftStore(tmp_path / "state").inspect(
+        draft_id,
+        task_authority=authority,
+    )
+    assert record.revision == 1
+    assert record.composition == {
+        "contract": "waapi-skill.operation-composition/v1"
+    }
+
+
 def test_switch_assignment_draft_check_rejects_bound_role_drift(
     tmp_path: Path,
 ) -> None:
@@ -321,6 +408,7 @@ def test_switch_assignment_draft_check_rejects_bound_role_drift(
         draft_id=draft_id,
         authority=authority,
         revision=1,
+        role="switch_container",
         object_id=CONTAINER_ID,
         name="Footsteps",
         object_type="SwitchContainer",
@@ -331,6 +419,7 @@ def test_switch_assignment_draft_check_rejects_bound_role_drift(
         draft_id=draft_id,
         authority=authority,
         revision=2,
+        role="child",
         object_id=CHILD_ID,
         name="Snow_Step",
         object_type="Sound",
@@ -341,6 +430,7 @@ def test_switch_assignment_draft_check_rejects_bound_role_drift(
         draft_id=draft_id,
         authority=authority,
         revision=3,
+        role="state_or_switch",
         object_id=VALUE_ID,
         name="Snow",
         object_type="Switch",

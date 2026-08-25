@@ -2041,6 +2041,7 @@ def build_parser() -> argparse.ArgumentParser:
     object_selector.add_argument("--object-id")
     object_selector.add_argument("--object-path")
     object_selector.add_argument("--object-path-segment", action="append")
+    draft_bind_object.add_argument("--role")
 
     draft_bind_field = subparsers.add_parser(
         "draft-bind-field",
@@ -11055,6 +11056,37 @@ def dispatch_business_object_binding(
         live_info=live_info,
         dispatcher=dispatcher,
     )
+    adapter = business_adapter(binding.record.operation)
+    role_declaration = adapter.role_declaration
+    if role_declaration is None:
+        if args.role is not None:
+            raise GatewayInputError(
+                f"Business object roles are unavailable for {binding.record.operation}"
+            )
+    else:
+        raw_session = (
+            binding.record.composition.get("business_session")
+            if binding.record.composition is not None
+            else None
+        )
+        bound_count = (
+            0
+            if raw_session is None
+            else len(
+                BusinessDeclarationSession.from_dict(raw_session).handles.as_dict()[
+                    "objects"
+                ]
+            )
+        )
+        if bound_count >= len(role_declaration.roles):
+            raise GatewayInputError(
+                "Every business object role is already bound; submit the declaration"
+            )
+        expected_role = role_declaration.roles[bound_count]
+        if args.role != expected_role:
+            raise GatewayInputError(
+                f"The next business object binding requires --role {expected_role}"
+            )
     object_path = args.object_path
     if args.object_path_segment is not None:
         object_path = _business_object_path_from_segments(args.object_path_segment)
@@ -11104,7 +11136,6 @@ def dispatch_business_object_binding(
             error_code="BUSINESS_OBJECT_BINDING_MISMATCH",
         )
     semantic_kind: str | None = None
-    adapter = business_adapter(binding.record.operation)
     if adapter.requires_sound_subtype and str(row["type"]).casefold() == "sound":
         subtype_raw = binding.read_call(
             OBJECT_GET_URI,
@@ -16041,6 +16072,32 @@ def _business_next_action_binding(
             "custom_reference_value",
         ],
     }
+    role_declaration = adapter.role_declaration
+
+    def role_object_binding(next_role: str) -> dict[str, Any]:
+        role_bind_prefix = [*object_bind_prefix, "--role", next_role]
+        role_by_id = operation_draft_prefix_copy_binding(role_bind_prefix)
+        role_by_id["append"] = ["--object-id", "<exact-guid>"]
+        role_by_path_segments = operation_draft_prefix_copy_binding(
+            role_bind_prefix
+        )
+        role_by_path_segments["append_repeated"] = [
+            "--object-path-segment",
+            "<one-exact-user-path-segment-without-separators>",
+        ]
+        role_by_path_segments["segment_order"] = "root_to_leaf"
+        return {
+            **object_binding,
+            "by_id": role_by_id,
+            "by_path_segments": role_by_path_segments,
+            "next_role": next_role,
+            "use_only_for": [next_role],
+            "role_assignment": (
+                "copy this Gateway-owned role prefix exactly, then copy "
+                "the returned handle into the same named declaration field"
+            ),
+        }
+
     forbidden_inputs = [
         "native_request",
         "model_invented_object_path",
@@ -16063,6 +16120,27 @@ def _business_next_action_binding(
             ),
         }
     if session is None:
+        if role_declaration is not None:
+            next_role = role_declaration.roles[0]
+            return {
+                "contract": "waapi-skill.business-draft-next-action/v1",
+                "required_next_phase": "bind_remaining_switch_assignment_roles",
+                "responsibility_split": {
+                    "agent": "natural_language_to_closed_high_level_business_facts",
+                    "gateway": (
+                        "business_facts_to_exact_waapi_request_and_execution_plan"
+                    ),
+                },
+                "business_contract": business_contract,
+                "object_binding": role_object_binding(next_role),
+                "forbidden_inputs": [
+                    *forbidden_inputs,
+                    *role_declaration.forbidden_inputs,
+                ],
+                "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+                "then_read_next_response": True,
+                "precompute_or_increment_revision": False,
+            }
         return {
             "contract": "waapi-skill.business-draft-next-action/v1",
             "required_next_phase": "bind_existing_business_object",
@@ -16077,8 +16155,8 @@ def _business_next_action_binding(
             "then_read_next_response": True,
             "precompute_or_increment_revision": False,
         }
-    role_declaration = adapter.role_declaration
     if role_declaration is not None:
+        bound_count = len(session.handles.as_dict()["objects"])
         shared = {
             "contract": "waapi-skill.business-draft-next-action/v1",
             "responsibility_split": {
@@ -16086,14 +16164,6 @@ def _business_next_action_binding(
                 "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
             },
             "business_contract": business_contract,
-            "object_binding": {
-                **object_binding,
-                "use_only_for": list(role_declaration.roles),
-                "role_assignment": (
-                    "bind each exact role and copy its returned handle into "
-                    "the same named declaration field"
-                ),
-            },
             "forbidden_inputs": [
                 *forbidden_inputs,
                 *role_declaration.forbidden_inputs,
@@ -16110,15 +16180,17 @@ def _business_next_action_binding(
                     **operation_draft_prefix_copy_binding(check),
                     "append": [],
                 },
+        }
+        if bound_count < len(role_declaration.roles):
+            next_role = role_declaration.roles[bound_count]
+            return {
+                **shared,
+                "required_next_phase": "bind_remaining_switch_assignment_roles",
+                "object_binding": role_object_binding(next_role),
             }
-        bound_count = len(session.handles.as_dict()["objects"])
         return {
             **shared,
-            "required_next_phase": (
-                "bind_remaining_switch_assignment_roles"
-                if bound_count < 3
-                else "declare_complete_switch_assignment"
-            ),
+            "required_next_phase": "declare_complete_switch_assignment",
             "declaration": {
                 **operation_draft_prefix_copy_binding(
                     [*base, role_declaration.command, *binding]
@@ -17560,10 +17632,41 @@ def operation_draft_payload(
             record.version,
         )
     ):
-        draft["next_action_binding"] = _business_next_action_binding(
+        next_action_binding = _business_next_action_binding(
             record,
             task_authority=task_authority,
         )
+        if (
+            record.operation == "audio.import"
+            and record.check is None
+            and command in {"draft-declare-new", "draft-declare-existing"}
+        ):
+            next_action_binding = {
+                key: next_action_binding[key]
+                for key in (
+                    "contract",
+                    "declare_new",
+                    "declare_existing",
+                    "completion_candidate",
+                    "forbidden_inputs",
+                    "shell_tool_timeout_ms",
+                    "then_read_next_response",
+                    "precompute_or_increment_revision",
+                )
+                if key in next_action_binding
+            }
+            next_action_binding["required_next_phase"] = (
+                "declare_remaining_business_items_or_check_complete_draft"
+            )
+            draft["response_integrity"] = {
+                "complete": True,
+                "truncated": False,
+                "projection": (
+                    "business_declaration_receipt_and_continuation"
+                ),
+                "compact_projection_is_not_truncation": True,
+            }
+        draft["next_action_binding"] = next_action_binding
         draft["agent_control"] = {
             "terminal": False,
             "required_outcome_before_reply": "preview_or_structured_refusal",

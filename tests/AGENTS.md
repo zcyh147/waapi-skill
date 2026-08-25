@@ -220,6 +220,16 @@ With PowerShell's ScheduledTasks cmdlets, pass `-LogonType Interactive` and
 in its exported XML and `Limited` in its Principal. Stop before launch if
 either attestation differs.
 
+The unelevated Codex runner may transiently report
+`CreateProcessAsUserW failed: 267` for an invalid working directory before
+PowerShell starts, even after earlier commands in the same task succeeded. The
+Skill permits exactly one identical replay of that complete shell command, and
+the harness credits it only through `recoverable_preprocess_attempt_indexes`;
+this is process-launch recovery inside one task, not a Gateway or campaign-root
+retry. A second 267, a changed command, or an Agent that stops instead freezes
+the root as infrastructure-blocked. Preserve the failed command index and exact
+reported `cwd` in evidence; do not repair, resume, or rerun that failed root.
+
 Do not match the literal English `Active` in `quser`: its state column is
 localized. On `fusion-win11`, prove the desktop from a user-owned `console`
 row plus an `explorer.exe` in that same numeric session, or use a locale-neutral

@@ -530,6 +530,39 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
         "media_file": str(media),
         "volume_db": -4.0,
     }
+    assert declared["draft"]["response_integrity"] == {
+        "complete": True,
+        "truncated": False,
+        "projection": "business_declaration_receipt_and_continuation",
+        "compact_projection_is_not_truncation": True,
+    }
+    declaration_next = declared["draft"]["next_action_binding"]
+    assert declaration_next["required_next_phase"] == (
+        "declare_remaining_business_items_or_check_complete_draft"
+    )
+    assert {
+        "declare_new",
+        "declare_existing",
+        "completion_candidate",
+    }.issubset(declaration_next)
+    assert all(
+        key not in declaration_next
+        for key in (
+            "business_contract",
+            "object_binding",
+            "field_binding",
+            "binding_decision",
+            "configure",
+            "explicit_global_defaults",
+            "revise",
+            "remove",
+        )
+    )
+    assert len(
+        json.dumps(declared, ensure_ascii=False, separators=(",", ":")).encode(
+            "utf-8"
+        )
+    ) <= 16_384
 
     store = OperationDraftStore(tmp_path / "state")
     materialized = store.materialize_request(
