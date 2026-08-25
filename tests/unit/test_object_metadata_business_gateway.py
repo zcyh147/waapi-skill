@@ -9,6 +9,7 @@ from typing import Any, Mapping, Sequence
 
 from wwise_waapi.operation_composer import operation_composer_digest
 from wwise_waapi.operation_drafts import OperationDraftStore
+from wwise_waapi.business_declarations import business_repair
 
 
 SCRIPT_PATH = (
@@ -266,3 +267,18 @@ def test_property_draft_discovers_opaque_field_and_materializes_business_value(
         "value": -4.0,
         "platform": "Windows",
     }
+
+
+def test_gateway_preserves_bounded_business_repair_details() -> None:
+    error = business_repair(
+        "REFERENCE_TARGET_TYPE_MISMATCH",
+        field="reference_outcome",
+        action="choose one allowed bound target",
+        allowed_target_types=["Bus", "AuxBus"],
+        actual_target_type="BusRef",
+    )
+
+    normalized = waapi_gateway.normalize_gateway_exception(error)
+
+    assert normalized["error_code"] == "REFERENCE_TARGET_TYPE_MISMATCH"
+    assert normalized["details"]["repair"] == error.repair

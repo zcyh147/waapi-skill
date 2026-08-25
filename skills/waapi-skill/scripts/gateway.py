@@ -2947,6 +2947,12 @@ def cleanup_failure_evidence(exc: BaseException) -> dict[str, Any]:
 def normalize_gateway_exception(exc: BaseException) -> dict[str, Any]:
     """Normalize one gateway exception without trusting its string or metadata hooks."""
 
+    if isinstance(exc, BusinessDeclarationError):
+        return {
+            "error_code": exc.error_code,
+            "message": exc.error_code,
+            "details": {"repair": dict(exc.repair)},
+        }
     if isinstance(exc, SemanticValidationError):
         error_code = safe_type_name(exc, "Exception")
     elif isinstance(exc, TimeoutError):
