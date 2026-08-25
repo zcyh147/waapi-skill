@@ -65,6 +65,7 @@ SOUNDBANK_PARENT = r"\SoundBanks\Default Work Unit"
 SWITCH_PARENT = r"\Switches\Default Work Unit"
 STATE_GROUP_PARENT = r"\States\Dynamic Dialogue\ObjectiveStatus"
 SWITCH_GROUP_REFERENCE = "SwitchGroupOrStateGroup"
+SFX_BUS_ID = "{ED2BCAC8-D7B6-4448-8900-439B557894F4}"
 
 GATEWAY_SPEC = importlib.util.spec_from_file_location("waapi_destructive_workflow_gateway", GATEWAY_PATH)
 assert GATEWAY_SPEC is not None and GATEWAY_SPEC.loader is not None
@@ -1051,32 +1052,6 @@ def _complete_object_metadata_business_transaction(
     return {"preview": preview, "execute": executed, "verify": verified}
 
 
-def _exact_object_id_by_path(
-    runtime: _WorkflowSandboxRuntime,
-    path: str,
-) -> str:
-    result = runtime.gateway(
-        [
-            "query-object",
-            "--path",
-            path,
-            "--return-field",
-            "id",
-            "--return-field",
-            "name",
-            "--return-field",
-            "type",
-            "--return-field",
-            "path",
-        ],
-        live=True,
-    )
-    assert result["count"] == 1, result
-    row = result["objects"][0]
-    assert row["path"] == path, row
-    return _required_string(row, "id")
-
-
 @pytest.mark.live
 @pytest.mark.destructive
 def test_object_lifecycle_business_draft_executes_all_five_verifiers(
@@ -1183,14 +1158,7 @@ def test_object_metadata_business_draft_executes_field_verifiers(
             object_type="ActorMixer",
             name=f"WAAPI_METADATA_SOURCE_{suffix}",
         )
-        target_bus_id = _exact_object_id_by_path(
-            runtime,
-            (
-                r"\Master-Mixer Hierarchy\Default Work Unit\Main Audio Bus\SFX"
-                if runtime.version == "2025.1"
-                else r"\Master-Mixer Hierarchy\Default Work Unit\Master Audio Bus\SFX"
-            ),
-        )
+        target_bus_id = SFX_BUS_ID
         _complete_object_metadata_business_transaction(
             runtime,
             operation="object.setProperty",
