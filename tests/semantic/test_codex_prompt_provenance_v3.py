@@ -1820,7 +1820,7 @@ def test_full_reader_migrates_absent_false_protocol_policy(tmp_path: Path) -> No
     assert restored.protocol == protocol
 
 
-def test_full_reader_uses_reviewed_revision_for_3ebbf5f_sfx_policy(
+def test_current_batch_protocol_is_disjoint_from_3ebbf5f_sfx_policy(
     tmp_path: Path,
 ) -> None:
     root = _scenario_root(tmp_path)
@@ -1846,31 +1846,31 @@ def test_full_reader_uses_reviewed_revision_for_3ebbf5f_sfx_policy(
     ).hexdigest()
     _rewrite_payload(evidence.path, payload)
 
-    with pytest.raises(
-        PromptProvenanceError,
-        match="in-memory protocol differs from sealed provenance",
-    ):
-        _read_again(
-            evidence.path,
-            scenario=scenario,
-            root=root,
-            protocol=protocol,
-            visible_values=values,
-            require_paths=False,
-        )
-
-    restored = read_prompt_provenance(
+    restored = _read_again(
         evidence.path,
         scenario=scenario,
-        version=VERSION,
-        scenario_root=root,
-        expected_prompts=_prompts(scenario, values),
-        expected_protocol=protocol,
+        root=root,
+        protocol=protocol,
+        visible_values=values,
         require_paths=False,
-        protocol_manifest_revision=AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION,
     )
-
     assert restored.protocol == protocol
+    with pytest.raises(
+        PromptProvenanceError,
+        match="mismatched declarations",
+    ):
+        read_prompt_provenance(
+            evidence.path,
+            scenario=scenario,
+            version=VERSION,
+            scenario_root=root,
+            expected_prompts=_prompts(scenario, values),
+            expected_protocol=protocol,
+            require_paths=False,
+            protocol_manifest_revision=(
+                AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION
+            ),
+        )
 
 
 def test_typed_draft_action_protocol_round_trips_dynamic_handle_bindings() -> None:

@@ -738,7 +738,7 @@ def test_prepares_exact_gateway_checked_use_existing_batch(
         "tx01.execute",
         "tx01.verify",
     )
-    assert prepared.protocol.turn_prefix_counts == (13, 17)
+    assert prepared.protocol.turn_prefix_counts == (10, 14)
     assert prepared.protocol.commutative_read_only_step_groups == ()
     assert prepared.protocol.commutative_composer_setup_step_groups == ()
     assert all(step.subcommand != "metadata" for step in prepared.protocol.steps)
@@ -759,22 +759,25 @@ def test_rifle_business_protocol_preserves_every_exact_import_row(
     declarations = [
         step
         for step in prepared.protocol.steps
-        if step.name.startswith("tx01.declare.")
+        if step.name == "tx01.declare-batch"
     ]
-    assert len(declarations) == 4
-    assert all(step.subcommand == "draft-declare-existing" for step in declarations)
+    assert len(declarations) == 1
+    assert declarations[0].subcommand == "draft-declare-import-batch"
     assert all(step.subcommand != "draft-apply" for step in prepared.protocol.steps)
     assert all(
         step.name != "tx01.configure" for step in prepared.protocol.steps
     )
     rows = _plain(prepared.operation_request)["arguments"]["imports"]
-    for declaration, row in zip(declarations, rows, strict=True):
-        assert "media_file" in declaration.arguments
-        assert row["audio_file"] in declaration.arguments
-        assert "language" not in declaration.arguments
+    batch_arguments = declarations[0].arguments
+    assert batch_arguments.count("--existing-row") == 4
+    assert batch_arguments.count("--row-order") == 4
+    for row in rows:
+        assert "media_file" in batch_arguments
+        assert row["audio_file"] in batch_arguments
+        assert "language" not in batch_arguments
         assert row["import_language"] == "SFX"
-    assert "volume_db" in declarations[-1].arguments
-    assert "output_bus" in declarations[-1].arguments
+    assert "volume_db" in batch_arguments
+    assert "output_bus" in batch_arguments
     preview = next(
         step for step in prepared.protocol.steps if step.name == "tx01.preview"
     )
