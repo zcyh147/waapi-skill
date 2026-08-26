@@ -706,11 +706,14 @@ def test_audio_import_batch_declaration_is_atomic_complete_and_compact(
         "draft-check",
         started["draft"]["draft_id"],
     ]
-    assert len(
+    response_size = len(
         json.dumps(batch, ensure_ascii=False, separators=(",", ":")).encode(
             "utf-8"
         )
-    ) <= 4_500
+    )
+    # Native Windows must retain the canonical encoded PowerShell audit
+    # envelope; POSIX has no equivalent expansion in next_command.
+    assert response_size <= (8_000 if sys.platform == "win32" else 4_500)
 
     stored = OperationDraftStore(tmp_path / "state").inspect(
         started["draft"]["draft_id"],

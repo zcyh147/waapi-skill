@@ -88,6 +88,7 @@ from wwise_waapi.operation_composer import (
     typed_action_cli_arguments,
 )
 from wwise_waapi.canonical import canonical_sha256
+from wwise_waapi.builders.debug_lua import LUA_SOURCE_AUTHORITY
 from wwise_waapi.operation_drafts import OperationDraftStore
 from wwise_waapi.operation_registry import operation_request_schema_digest
 from wwise_waapi.transactions import confirmation_token_for
@@ -3026,8 +3027,8 @@ def _archive_test_broker_executes_one_atomic_generic_typed_draft_batch(
 @pytest.mark.parametrize(
     "first_indexes,second_indexes",
     (
-        ((0, 1, 2, 3), (4, 5, 6)),
-        ((0, 1, 2, 3, 5, 6), (4,)),
+        ((0, 1, 2, 3, 4, 5), (6, 7, 8, 9, 10)),
+        ((0, 1, 2, 3, 4), (5, 6, 7, 8, 9, 10)),
     ),
 )
 def test_broker_accepts_dependency_free_draft_facts_rebatched_across_adjacent_steps(
@@ -3036,7 +3037,11 @@ def test_broker_accepts_dependency_free_draft_facts_rebatched_across_adjacent_st
     second_indexes: tuple[int, ...],
 ) -> None:
     skill = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
-    protocol = build_transaction_protocol((_soundbank_generate_request(),))
+    io_root = tmp_path / "owned"
+    io_root.mkdir()
+    protocol = build_transaction_protocol(
+        (_dependency_free_rebatch_request(str(io_root)),)
+    )
     action_steps = tuple(
         step for step in protocol.steps if step.subcommand == "draft-apply"
     )
@@ -3052,7 +3057,7 @@ def test_broker_accepts_dependency_free_draft_facts_rebatched_across_adjacent_st
             else (step.arguments[-1],)
         )
     )
-    assert len(original_actions) == 7
+    assert len(original_actions) == 11
     assert not any(action.response_bindings for action in original_actions)
 
     payloads: dict[str, Mapping[str, object]] = {}
@@ -3112,7 +3117,7 @@ def test_broker_accepts_dependency_free_draft_facts_rebatched_across_adjacent_st
     "submitted_indexes",
     (
         (0, 1, 2, 3, 4, 4),
-        (1, 0, 2, 3, 4, 5),
+        (0, 1, 2, 3, 4, 6),
     ),
 )
 def test_broker_rejects_unsafe_fact_order_while_rebatching_adjacent_steps(
@@ -3120,7 +3125,11 @@ def test_broker_rejects_unsafe_fact_order_while_rebatching_adjacent_steps(
     submitted_indexes: tuple[int, ...],
 ) -> None:
     skill = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
-    protocol = build_transaction_protocol((_soundbank_generate_request(),))
+    io_root = tmp_path / "owned"
+    io_root.mkdir()
+    protocol = build_transaction_protocol(
+        (_dependency_free_rebatch_request(str(io_root)),)
+    )
     action_steps = tuple(
         step for step in protocol.steps if step.subcommand == "draft-apply"
     )
@@ -3135,7 +3144,7 @@ def test_broker_rejects_unsafe_fact_order_while_rebatching_adjacent_steps(
             else (step.arguments[-1],)
         )
     )
-    assert original_actions[0].expected.get("fact_action") == "append"
+    assert original_actions[0].expected.get("fact_action") == "set"
     payloads: dict[str, Mapping[str, object]] = {}
 
     def pointer(payload: object, value: str) -> object:
@@ -3265,10 +3274,9 @@ def _archive_test_rebatched_dependency_free_draft_replays_the_exact_canonical_re
         ) == request
 
 
-def test_nested_soundbank_branch_batch_replays_the_exact_canonical_request(
+def test_soundbank_business_plan_witness_replays_the_exact_canonical_request(
     tmp_path: Path,
 ) -> None:
-    skill = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
     request = {
         "contract": "waapi-skill.operation-request/v1",
         "version": "2025.1",
@@ -3288,64 +3296,23 @@ def test_nested_soundbank_branch_batch_replays_the_exact_canonical_request(
         },
     }
     protocol = build_transaction_protocol((request,))
-    final_action_index = max(
-        index
-        for index, step in enumerate(protocol.steps)
-        if step.subcommand == "draft-apply"
+    assert all(step.subcommand != "draft-apply" for step in protocol.steps)
+    assert any(
+        step.subcommand == "draft-declare-soundbank-plan"
+        for step in protocol.steps
     )
-    payloads: dict[str, Mapping[str, object]] = {}
-
-    def pointer(payload: object, value: str) -> object:
-        current = payload
-        for token in value.removeprefix("/").split("/"):
-            assert isinstance(current, (dict, list))
-            current = (
-                current[int(token)] if isinstance(current, list) else current[token]
-            )
-        return current
-
-    with CodexGatewayBroker(
-        skill_source=skill,
+    preview = next(
+        step for step in protocol.steps if step.subcommand == "preview-from-draft"
+    )
+    broker = CodexGatewayBroker(
+        skill_source=tmp_path / "detached-skill-witness",
         expected_steps=protocol.steps,
         expected_wwise_version="2025.1",
-        transport="tcp",
-        working_root=tmp_path / "broker-root",
-    ) as broker:
-        for step in protocol.steps[: final_action_index + 1]:
-            argv = [step.subcommand]
-            for argument in step.arguments:
-                if isinstance(argument, ResponseBinding):
-                    argv.append(str(pointer(payloads[argument.step], argument.pointer)))
-                    continue
-                if isinstance(
-                    argument,
-                    (DraftTypedActionArgument, DraftTypedActionBatchArgument),
-                ):
-                    actions = (
-                        argument.actions
-                        if isinstance(argument, DraftTypedActionBatchArgument)
-                        else (argument,)
-                    )
-                    for typed_action in actions:
-                        action = dict(typed_action.expected)
-                        for binding in typed_action.response_bindings:
-                            action[binding.pointer.removeprefix("/")] = pointer(
-                                payloads[binding.step], binding.response_pointer
-                            )
-                        argv.extend(typed_action_cli_arguments(action))
-                    continue
-                assert isinstance(argument, str)
-                argv.append(argument)
-            result = run_model_command(broker, argv)
-            assert result.returncode == 0, result.stderr
-            payloads[step.name] = json.loads(result.stdout[result.stdout.index("{") :])
+    )
 
-        preview = next(
-            step for step in protocol.steps if step.subcommand == "preview-from-draft"
-        )
-        assert broker._replay_expected_operation_draft_request(  # noqa: SLF001
-            preview
-        ) == request
+    assert broker._replay_expected_operation_draft_request(  # noqa: SLF001
+        preview
+    ) == request
 
 
 def _archive_test_object_set_protocol_batches_independent_targets_through_public_gateway(
@@ -5849,6 +5816,20 @@ def _soundbank_generate_request() -> dict[str, object]:
             "rebuild_soundbanks": False,
             "clear_audio_file_cache": False,
             "rebuild_init_bank": False,
+        },
+    }
+
+
+def _dependency_free_rebatch_request(io_root: str) -> dict[str, object]:
+    return {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2025.1",
+        "operation": "lua.executeCoreInline",
+        "arguments": {
+            "lua_code": "return 1\n",
+            "io_root": io_root,
+            "source_authority": LUA_SOURCE_AUTHORITY,
+            "wa_args": {f"key_{index}": index for index in range(8)},
         },
     }
 

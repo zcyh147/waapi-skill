@@ -352,7 +352,7 @@ def test_exact_soundbank_artifacts_remain_exact_inside_gateway_envelope(
 def test_hostile_exact_artifact_paths_are_preserved_without_file_rewrite(
     tmp_path: Path,
 ) -> None:
-    source = tmp_path / 'I O 根 $(literal) ; "quoted".wsources'
+    source = tmp_path / "I O 根 $HOME (literal) ; 'quoted' & caret^.wsources"
     source.write_bytes(b"<ExternalSourcesList/>\n")
     output = tmp_path / "out $HOME ; literal"
     io_root = tmp_path / "I O 根"
