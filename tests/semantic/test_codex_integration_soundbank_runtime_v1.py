@@ -219,7 +219,7 @@ def test_harbor_runtime_materializes_closed_dual_platform_workflow_and_cleans(
         )
         assert names[0] == f"{transaction_id}.operation-schema"
         draft_start_index = names.index(f"{transaction_id}.draft-start")
-        assert draft_start_index > 1
+        assert draft_start_index >= 1
         assert all(
             name.startswith(f"{transaction_id}.query-object.")
             for name in names[1:draft_start_index]

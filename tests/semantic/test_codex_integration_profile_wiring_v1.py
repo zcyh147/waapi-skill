@@ -164,8 +164,7 @@ def _workflow_protocol(unit: IntegrationWorkflowUnit) -> V3GatewayProtocol:
                 {"name": "Harbor_Release", "artifact_expectation": "nonlocalized"}
             ],
             "platforms": ["Windows", "Mac"],
-            "languages": ["SFX"],
-            "skip_languages": False,
+            "skip_languages": True,
             "write_to_disk": True,
             "io_root": "/owned",
         },

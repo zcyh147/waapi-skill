@@ -511,6 +511,76 @@ def _matches_transaction_step_sequence(
         str(transaction.get("operation")),
         str(transaction.get("version", "2022.1")),
     )
+    soundbank_operations = {
+        "soundbank.convertExternalSources",
+        "soundbank.generate",
+        "soundbank.processDefinitionFiles",
+        "soundbank.setInclusions",
+    }
+    if (
+        input_mode == BUSINESS_DECLARATION_INPUT_MODE
+        and transaction.get("operation") in soundbank_operations
+    ):
+        tail = [
+            (f"{transaction_id}.{suffix}", kind)
+            for suffix, kind in _OBJECT_SET_COMPOSER_TAIL_KINDS
+        ]
+        if len(actual) < len(tail) + 3 or actual[-len(tail) :] != tail:
+            return False
+        construction = actual[: -len(tail)]
+        if construction[0] != (
+            f"{transaction_id}.operation-schema",
+            "operation_schema",
+        ):
+            return False
+        cursor = 1
+        query_indexes: list[int] = []
+        while cursor < len(construction) and construction[cursor][0].startswith(
+            f"{transaction_id}.query-object."
+        ):
+            name, kind = construction[cursor]
+            if kind != "operation_compose":
+                return False
+            raw_index = name.rpartition(".")[2]
+            if len(raw_index) != 3 or not raw_index.isdigit():
+                return False
+            query_indexes.append(int(raw_index))
+            cursor += 1
+        if (
+            cursor >= len(construction)
+            or construction[cursor]
+            != (f"{transaction_id}.draft-start", "operation_compose")
+        ):
+            return False
+        cursor += 1
+        bind_indexes: list[int] = []
+        while cursor < len(construction) and construction[cursor][0].startswith(
+            f"{transaction_id}.bind-object."
+        ):
+            name, kind = construction[cursor]
+            if kind != "operation_compose":
+                return False
+            raw_index = name.rpartition(".")[2]
+            if len(raw_index) != 3 or not raw_index.isdigit():
+                return False
+            bind_indexes.append(int(raw_index))
+            cursor += 1
+        if construction[cursor:] != [
+            (
+                f"{transaction_id}.declare-soundbank-plan",
+                "operation_compose",
+            )
+        ]:
+            return False
+        if transaction.get("operation") in {
+            "soundbank.generate",
+            "soundbank.setInclusions",
+        } and not bind_indexes:
+            return False
+        return all(
+            indexes == list(range(1, len(indexes) + 1))
+            for indexes in (query_indexes, bind_indexes)
+        )
     if input_mode not in {COMPOSER_INPUT_MODE, BUSINESS_DECLARATION_INPUT_MODE}:
         return False
     if len(actual) < 9:
