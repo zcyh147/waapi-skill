@@ -5,6 +5,7 @@ import importlib.util
 import json
 import math
 import os
+import shutil
 import subprocess
 import sys
 import uuid
@@ -51,6 +52,11 @@ from tests.semantic.support.typed_gateway_input import (  # pyright: ignore[repo
     create_object_lifecycle_business_preview,
     create_object_metadata_business_preview,
     create_typed_transaction_preview,
+)
+from tests.semantic.support.codex_project_prelaunch_v3 import (  # pyright: ignore[reportMissingImports]  # noqa: E402
+    ProjectPrelaunchRequest,
+    WWISE_2025_SOUNDBANK_AURO_PROFILE,
+    normalize_project_copy,
 )
 from wwise_waapi.headless import HeadlessLifecycle  # pyright: ignore[reportMissingImports]  # noqa: E402
 from wwise_waapi.operation_registry import OPERATION_REQUEST_CONTRACT  # pyright: ignore[reportMissingImports]  # noqa: E402
@@ -362,16 +368,34 @@ def workflow_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterat
     source_tree_after: tuple[str, int] | None = None
     deferred_error: BaseException | None = None
     task_root = tmp_path_factory.mktemp(f"gateway-workflows-{version.replace('.', '-')}")
+    case_sandbox_root = lock.root / f"gateway-workflows-{uuid.uuid4().hex}"
     state_dir = task_root / "state"
     candidate = exact_git_candidate(REPO_ROOT)
     category_results: list[dict[str, Any]] = []
 
     lock.__enter__()
     try:
-        sandbox = prepare_sample_project_sandbox(env, sandbox_root=lock.root, hash_strategy="bounded")
+        sandbox = prepare_sample_project_sandbox(
+            env,
+            sandbox_root=case_sandbox_root,
+            hash_strategy="bounded",
+        )
         source_hash_before = _hash_mutation_bearing_project_files(sandbox.source_root)
         source_tree_before = _source_tree_inventory(sandbox.source_root)
         assert source_hash_before[1] > 0, "immutable SampleProject source has no .wproj/.wwu files to hash"
+        if version == "2025.1":
+            prelaunch_io_root = case_sandbox_root / "prelaunch-io"
+            prelaunch_io_root.mkdir(parents=True, exist_ok=False)
+            prelaunch = normalize_project_copy(
+                sandbox.sandbox_project,
+                io_root=prelaunch_io_root,
+                owned_root=case_sandbox_root,
+                request=ProjectPrelaunchRequest(
+                    scenario_id="gateway-workflow-transaction-matrix",
+                    auro_isolation_profile=WWISE_2025_SOUNDBANK_AURO_PROFILE,
+                ),
+            )
+            assert prelaunch.auro_soundbank_isolation is not None
         lifecycle = launch_sandboxed_wwise(sandbox, env)
         assert lifecycle.port is not None
         assert sandbox.metadata.selected_port == lifecycle.port
@@ -439,6 +463,12 @@ def workflow_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterat
         if sandbox is not None:
             try:
                 cleanup_sandbox(sandbox, keep=False, failed=False)
+            except BaseException as exc:  # noqa: BLE001 - lock release must still run
+                deferred_error = deferred_error or exc
+
+        if case_sandbox_root.exists():
+            try:
+                shutil.rmtree(case_sandbox_root)
             except BaseException as exc:  # noqa: BLE001 - lock release must still run
                 deferred_error = deferred_error or exc
 
@@ -696,7 +726,7 @@ def test_closed_gateway_workflows_across_selected_version(
         # SoundBank file authority must own both the active sandbox project and
         # every exact input/output artifact.  The sandbox is already unique to
         # this test attempt, so it is the narrowest valid I/O root.
-        soundbank_io_root = runtime.sandbox.sandbox_path
+        soundbank_io_root = runtime.sandbox.sandbox_root
         soundbank_name = (
             f"WAAPI_GATEWAY_BANK_{runtime.version.replace('.', '_')}_{unique_suffix}"
         )
@@ -759,8 +789,13 @@ def test_closed_gateway_workflows_across_selected_version(
             name=definition_event_name,
         )
         definition_file = soundbank_io_root / "gateway-banks.tsv"
+        definition_identity = (
+            definition_event_id
+            if runtime.version == "2022.1"
+            else f'"{definition_event_name}"'
+        )
         definition_file.write_text(
-            f'{soundbank_name}\t"{definition_event_name}"\tEvent\tStructure\tMedia\n',
+            f"{soundbank_name}\t{definition_identity}\tEvent\tStructure\tMedia\n",
             encoding="utf-8",
             newline="\n",
         )
@@ -1741,12 +1776,17 @@ def _save_sandbox_project(runtime: _WorkflowSandboxRuntime) -> None:
 
     api = "ak.wwise.core.project.save"
     schema = runtime.gateway(["request-schema", api], live=False)
-    digest = schema.get("schema_digest")
-    assert isinstance(digest, str) and digest, schema
-    preview = runtime.gateway(
-        ["typed-zero-call", api, "--schema-digest", digest, "--apply"],
-        live=True,
-    )
+    continuation = schema.get("continuation")
+    assert isinstance(continuation, Mapping), schema
+    argv = continuation.get("gateway_argv")
+    if argv is None:
+        argv = continuation.get("gateway_argv_prefix")
+    assert (
+        isinstance(argv, list)
+        and argv
+        and all(isinstance(item, str) and item for item in argv)
+    ), continuation
+    preview = runtime.gateway(argv, live=True)
     transaction_id = preview.get("transaction_id")
     assert isinstance(transaction_id, str) and transaction_id, preview
     shown = runtime.gateway(

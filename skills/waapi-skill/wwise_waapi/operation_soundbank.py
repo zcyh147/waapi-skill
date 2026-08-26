@@ -1793,6 +1793,26 @@ def build_process_definition_operation_plan(
                 details={"index": index},
             )
         document = parse_soundbank_definition_file(value)
+        if lane == "2022.1":
+            name_rows = [
+                int(row["row_number"])
+                for row in document["rows"]
+                if row["identity"]["kind"] == "name"
+            ]
+            if name_rows:
+                raise SoundBankContractError(
+                    "UNSUPPORTED_DEFINITION_IDENTITY",
+                    "Wwise 2022.1 Definition files require GUID or supported "
+                    "uint32 Short ID identities; quoted object names can complete "
+                    "without applying the requested inclusion.",
+                    details={
+                        "version": lane,
+                        "file": document["path"],
+                        "rows": name_rows,
+                        "unsupported_identity_kind": "name",
+                        "supported_identity_kinds": ["guid", "short_id"],
+                    },
+                )
         file_key = host_path_comparison_key(document["path"])
         if file_key in seen_files:
             raise SoundBankContractError(

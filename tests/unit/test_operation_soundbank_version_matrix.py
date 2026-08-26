@@ -8,6 +8,7 @@ import pytest  # pyright: ignore[reportMissingImports]
 
 from wwise_waapi.builders.schema import validate_semantic_payload  # pyright: ignore[reportMissingImports]
 from wwise_waapi.operation_soundbank import (  # pyright: ignore[reportMissingImports]
+    SoundBankContractError,
     build_external_sources_operation_plan,
     build_generate_operation_plan,
     build_process_definition_operation_plan,
@@ -168,8 +169,13 @@ def test_external_sources_closed_plan_matches_each_reflected_request_schema(tmp_
 def test_definition_closed_plan_matches_each_reflected_request_schema(tmp_path: Path, version: str) -> None:
     io_root, project = _project(tmp_path / version)
     definition = Path(project["directories"]["root"]) / "banks.tsv"
+    identity = (
+        "{11111111-1111-1111-1111-111111111111}"
+        if version == "2022.1"
+        else '"Play_Test"'
+    )
     definition.write_text(
-        'Gameplay_Main\t"Play_Test"\tEvent\tStructure\tMedia\n',
+        f"Gameplay_Main\t{identity}\tEvent\tStructure\tMedia\n",
         encoding="utf-8",
     )
     plan = build_process_definition_operation_plan(
@@ -187,3 +193,29 @@ def test_definition_closed_plan_matches_each_reflected_request_schema(tmp_path: 
     )
 
     assert validation.section == "request"
+
+
+def test_2022_definition_name_identity_fails_before_dispatch(tmp_path: Path) -> None:
+    io_root, project = _project(tmp_path)
+    definition = Path(project["directories"]["root"]) / "banks.tsv"
+    definition.write_text(
+        'Gameplay_Main\t"Play_Test"\tEvent\tStructure\tMedia\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SoundBankContractError) as rejected:
+        build_process_definition_operation_plan(
+            {"files": [str(definition)]},
+            version="2022.1",
+            project_info=project,
+            io_root=io_root,
+        )
+
+    assert rejected.value.error_code == "UNSUPPORTED_DEFINITION_IDENTITY"
+    assert rejected.value.details == {
+        "version": "2022.1",
+        "file": str(definition.resolve()),
+        "rows": [1],
+        "unsupported_identity_kind": "name",
+        "supported_identity_kinds": ["guid", "short_id"],
+    }

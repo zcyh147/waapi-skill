@@ -921,7 +921,7 @@ def test_process_definition_plan_derives_names_and_readback_oracle_from_files(tm
 
     plan = build_process_definition_operation_plan(
         {"files": [str(definition)]},
-        version="2022.1",
+        version="2023.1",
         project_info=project,
         io_root=io_root,
     )
@@ -942,8 +942,8 @@ def test_process_definition_plan_rejects_same_bank_across_files_and_2021(tmp_pat
     project_root = Path(project["directories"]["root"])
     first = project_root / "first.txt"
     second = project_root / "second.txt"
-    first.write_text('Gameplay_Main\t"Event_A"\n', encoding="utf-8")
-    second.write_text('Gameplay_Main\t"Event_B"\n', encoding="utf-8")
+    first.write_text(f"Gameplay_Main\t{AUX_ID}\n", encoding="utf-8")
+    second.write_text(f"Gameplay_Main\t{AUX_ID}\n", encoding="utf-8")
 
     with pytest.raises(SoundBankContractError) as collision:
         build_process_definition_operation_plan(

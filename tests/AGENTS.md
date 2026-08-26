@@ -171,6 +171,36 @@ Audit rows include the pid, port, command, sandbox project, `getInfo` version pr
 
 During WwiseConsole startup, repeated `ConnectionRefusedError` lines from WAAPI probes can be normal while Wwise loads the project, missing-plugin warnings, or WAAPI server listeners. Do not treat those probe errors as failure by themselves; judge the run by the final `smoke ok`/`getInfo` proof, `ReadinessTimeout`, or `EarlyProcessExit` diagnostics. For slow 2021.1 launches, `WWISE_READINESS_TIMEOUT=180` and optional `WWISE_WAAPI_PORT=<port>` are valid debugging overrides.
 
+### SoundBank file-operation fixtures
+
+Keep the file-authority sequence explicit in real SoundBank workflows. The
+operation I/O root must own both the active sandbox project and every exact
+input/output artifact, and the sandbox project must be saved and non-dirty
+before each file-processing Preview. Copy the `project.save` continuation
+returned by `request-schema`: 2022.1 returns a complete zero-input
+`gateway_argv`, while 2025.1 returns an inline `gateway_argv_prefix` because
+its save schema includes an optional source-control boolean.
+
+Wwise 2022.1 has a real silent-effect boundary for SoundBank Definition rows:
+an ordinary Event row using the official quoted-name form can return success
+while leaving `getInclusions` empty on both macOS and native Windows. Use a
+canonical GUID or supported uint32 Short ID in 2022.1 fixtures and require the
+public route to reject name identities before dispatch. The same quoted-name
+workflow has macOS real passing evidence on 2023.1, 2024.1, and 2025.1;
+preserve this as a versioned contract rather than globally removing name
+support.
+
+The committed 2025.1 SampleProject contains a hash-pinned optional Auro
+Headphone reference that makes otherwise valid SoundBank generation report a
+`MissingPlugin` error. For a generate workflow, normalize only the private
+sandbox copy before Wwise starts with
+`WWISE_2025_SOUNDBANK_AURO_PROFILE` from
+`tests/semantic/support/codex_project_prelaunch_v3.py`. Keep its project and
+output roots under one case-owned parent, preserve the normalizer's hash
+attestations, and clean that complete parent after the attempt. A hand-edited
+source project or a verifier that ignores the generation error is invalid
+evidence.
+
 ## Extra pytest args passthrough
 
 Append pytest args after `--`:

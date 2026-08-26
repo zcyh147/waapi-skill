@@ -3424,6 +3424,9 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         ),
         constraints=(
             "SoundBank names and inclusion rows are derived only from hashed UTF-8 tab-delimited files",
+            "Wwise 2022.1 Definition object identities are limited to GUIDs and "
+            "supported uint32 Short IDs because quoted names can complete without "
+            "applying inclusions; 2023.1 and later retain the official quoted-name form",
             "unsupported directives, duplicate rows, unknown objects, and ambiguous names fail before dispatch",
             "execution replays file/project and SoundBank inclusion snapshots; verification checks exact target inclusions and one unrelated control Bank",
         ),
