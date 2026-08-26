@@ -43,6 +43,9 @@ from tests.semantic.support.codex_object_heavy_v3 import (
 from tests.semantic.support.codex_typed_input_profile import (
     load_typed_input_profile,
 )
+from tests.semantic.support.typed_gateway_input import (
+    _soundbank_plan_suffix_matches,
+)
 from wwise_waapi.operation_composer import typed_action_cli_arguments
 from wwise_waapi.builders.debug_lua import LUA_SOURCE_AUTHORITY
 from wwise_waapi.platform_commands import encode_windows_powershell_argv
@@ -102,6 +105,31 @@ def test_switch_assignment_business_steps_bind_three_paths_before_declaration() 
         ResponseBinding("tx01.bind-state-or-switch", "/bound_object/handle"),
     )
     assert steps[-1].expected_operation_request == request
+
+
+def test_real_gateway_helper_reuses_soundbank_plan_cli_grammar() -> None:
+    handle = "boh1-" + "1" * 32
+    assert _soundbank_plan_suffix_matches(
+        "soundbank.generate",
+        (
+            "--soundbank",
+            handle,
+            "nonlocalized",
+            "--no-rebuild-soundbank",
+            handle,
+            "--platform",
+            "Windows",
+            "--no-rebuild-soundbanks",
+            "--no-clear-audio-file-cache",
+            "--no-rebuild-init-bank",
+            "--io-root",
+            r"C:\owned",
+        ),
+    )
+    assert not _soundbank_plan_suffix_matches(
+        "soundbank.generate",
+        ("--native-request", "{}"),
+    )
 
 
 def _archive_test_object_create_top_level_facts_precede_dynamic_container_disclosure() -> None:

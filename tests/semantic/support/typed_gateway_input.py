@@ -8,6 +8,7 @@ the semantic Broker and its live fixture lifecycle.
 
 from __future__ import annotations
 
+import argparse
 import json
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any
@@ -26,6 +27,11 @@ from tests.semantic.support.codex_gateway_broker import (
     TypedRequestFactsArgument,
 )
 from wwise_waapi.operation_composer import typed_action_cli_arguments
+from wwise_waapi.soundbank_business_cli import (
+    SoundBankBusinessCliError,
+    add_soundbank_plan_arguments,
+    soundbank_plan_from_namespace,
+)
 from wwise_waapi.typed_operations import inline_operation_cli_arguments
 from wwise_waapi.typed_requests import (
     TypedRequestFact,
@@ -427,9 +433,38 @@ def _business_copy_binding_was_used(
         if list(command[: len(gateway_prefix)]) != gateway_prefix:
             continue
         suffix = list(command[len(gateway_prefix) :])
+        if command[0] == "draft-declare-soundbank-plan":
+            contract = binding.get("business_contract")
+            operation = (
+                contract.get("operation")
+                if isinstance(contract, Mapping)
+                else None
+            )
+            if isinstance(operation, str) and _soundbank_plan_suffix_matches(
+                operation,
+                suffix,
+            ):
+                return True
+            continue
         if _business_binding_suffix_matches(candidate, suffix):
             return True
     return False
+
+
+def _soundbank_plan_suffix_matches(
+    operation: str,
+    suffix: Sequence[str],
+) -> bool:
+    parser = argparse.ArgumentParser(add_help=False, exit_on_error=False)
+    add_soundbank_plan_arguments(parser)
+    try:
+        namespace, unknown = parser.parse_known_args(list(suffix))
+        if unknown:
+            return False
+        soundbank_plan_from_namespace(namespace, operation=operation)
+    except (argparse.ArgumentError, SoundBankBusinessCliError, SystemExit):
+        return False
+    return True
 
 
 def _mapping_nodes(value: Any) -> list[Mapping[str, Any]]:
