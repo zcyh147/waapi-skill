@@ -336,7 +336,15 @@ def _require_disclosed_continuation(
             if isinstance((adapter := payload.get(key)), Mapping)
             and isinstance(adapter.get("start"), Mapping)
         ]
-        if len(starts) != 1 or starts[0].get("gateway_argv") != list(command):
+        disclosed_start: Any = None
+        if len(starts) == 1:
+            next_command = starts[0].get("next_command")
+            disclosed_start = (
+                next_command.get("gateway_argv")
+                if isinstance(next_command, Mapping)
+                else starts[0].get("gateway_argv")
+            )
+        if disclosed_start != list(command):
             raise AssertionError("operation-schema did not disclose the exact draft-start")
         return
 

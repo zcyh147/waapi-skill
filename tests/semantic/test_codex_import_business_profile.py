@@ -51,7 +51,11 @@ def test_real_gateway_adapter_follows_business_schema_start() -> None:
         ),
         {
             "business_adapter": {
-                "start": {"gateway_argv": ["draft-start", "audio.import"]}
+                "start": {
+                    "next_command": {
+                        "gateway_argv": ["draft-start", "audio.import"]
+                    }
+                }
             }
         },
         ["draft-start", "audio.import"],
