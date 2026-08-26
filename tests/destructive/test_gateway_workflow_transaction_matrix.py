@@ -353,6 +353,22 @@ def _query_exact_path_id(runtime: _WorkflowSandboxRuntime, path: str) -> str:
     return _required_string(rows[0], "id")
 
 
+def _restart_workflow_host_after_transport_loss(
+    runtime: _WorkflowSandboxRuntime,
+) -> None:
+    """Restore the module host without retrying the indeterminate operation."""
+
+    port = runtime.port
+    shutdown_sandboxed_wwise(runtime.lifecycle, runtime.sandbox)
+    replacement = launch_sandboxed_wwise(
+        runtime.sandbox,
+        runtime.env,
+        port=port,
+    )
+    assert replacement.port == port
+    runtime.lifecycle = replacement
+
+
 @pytest.fixture(scope="module")
 def workflow_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterator[_WorkflowSandboxRuntime]:
     env = dict(os.environ)
@@ -370,6 +386,7 @@ def workflow_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterat
     source_hash_after: tuple[str, int, int] | None = None
     source_tree_after: tuple[str, int] | None = None
     deferred_error: BaseException | None = None
+    runtime: _WorkflowSandboxRuntime | None = None
     task_root = tmp_path_factory.mktemp(f"gateway-workflows-{version.replace('.', '-')}")
     case_sandbox_root = lock.root / f"gateway-workflows-{uuid.uuid4().hex}"
     state_dir = task_root / "state"
@@ -429,7 +446,7 @@ def workflow_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterat
             "WAAPI_SKILL_STATE_DIR": str(state_dir),
             "WAAPI_SKILL_CONFIG_PATH": str(config_path),
         }
-        yield _WorkflowSandboxRuntime(
+        runtime = _WorkflowSandboxRuntime(
             version=version,
             sandbox=sandbox,
             lifecycle=lifecycle,
@@ -438,10 +455,12 @@ def workflow_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterat
             candidate=candidate,
             category_results=category_results,
         )
+        yield runtime
     finally:
-        if lifecycle is not None and sandbox is not None:
+        active_lifecycle = runtime.lifecycle if runtime is not None else lifecycle
+        if active_lifecycle is not None and sandbox is not None:
             try:
-                shutdown_sandboxed_wwise(lifecycle, sandbox)
+                shutdown_sandboxed_wwise(active_lifecycle, sandbox)
             except BaseException as exc:  # noqa: BLE001 - every teardown guard must still run
                 deferred_error = deferred_error or exc
 
@@ -475,7 +494,7 @@ def workflow_sandbox_runtime(tmp_path_factory: pytest.TempPathFactory) -> Iterat
             except BaseException as exc:  # noqa: BLE001 - lock release must still run
                 deferred_error = deferred_error or exc
 
-        if sandbox is not None and lifecycle is not None:
+        if sandbox is not None and active_lifecycle is not None:
             if not any(item.get("category") == "authoring-ui" for item in category_results):
                 category_results.append(
                     {
@@ -1196,6 +1215,8 @@ def _complete_result_schema_operation(
                 ),
             }
         )
+        if not unavailable:
+            _restart_workflow_host_after_transport_loss(runtime)
         return
     assert execute_code == 0, json.dumps(executed, ensure_ascii=False, sort_keys=True)
     assert executed["state"] == TransactionState.EXECUTED_UNVERIFIED.value, executed
