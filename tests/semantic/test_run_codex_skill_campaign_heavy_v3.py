@@ -389,6 +389,51 @@ def test_archived_broker_replay_preserves_declared_composer_setup_order() -> Non
     assert tuple(step.name for step in replay._execution_steps) == consumed_names
 
 
+def test_archived_broker_replay_precomputes_audio_import_after_media_cleanup(
+    tmp_path: Path,
+) -> None:
+    media = tmp_path / "rain.wav"
+    media.write_bytes(b"RIFF-test")
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "import_operation": "createNew",
+            "imports": [
+                {
+                    "audio_file": str(media),
+                    "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+                    "object_type": "Sound SFX",
+                    "import_language": "SFX",
+                }
+            ],
+        },
+    }
+    protocol = build_audio_import_composer_protocol(request)
+    preview = next(
+        step
+        for step in protocol.steps
+        if step.subcommand == "preview-from-draft"
+    )
+    media.unlink()
+
+    replay = campaign._build_heavy_v3_broker_replay(
+        skill_source=Path("skills/waapi-skill"),
+        invocation_skill_source=Path("skills/waapi-skill"),
+        canonical_steps=protocol.steps,
+        execution_steps=protocol.steps,
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(),
+        expected_wwise_version="2022.1",
+        project_modification_policy="ask_before_changes",
+    )
+
+    assert replay._offline_replay_preview_requests[preview.name] == (  # noqa: SLF001
+        preview.expected_operation_request
+    )
+
+
 def test_archived_broker_replay_rejects_undeclared_composer_interruption() -> None:
     schema = ExpectedGatewayStep(
         "tx01.operation-schema",

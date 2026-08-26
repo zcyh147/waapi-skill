@@ -11268,6 +11268,19 @@ class CodexGatewayBroker:
                     "Business request witness is missing its exact flow-local "
                     "draft-start"
                 )
+            offline_request = self._offline_replay_preview_requests.get(
+                preview_step.name
+            )
+            if offline_request is not None:
+                if _normalize_audio_import_request_named_fields(
+                    offline_request
+                ) != _normalize_audio_import_request_named_fields(
+                    preview_step.expected_operation_request
+                ):
+                    raise GatewayInvocationError(
+                        "Offline business request replay differs from its sealed witness"
+                    )
+                return offline_request
             if (self.skill_source / "wwise_waapi").is_dir():
                 start_payload = self._payloads_by_step.get(prior_starts[-1].name)
                 start_draft = (
@@ -11300,31 +11313,9 @@ class CodexGatewayBroker:
                         else None
                     )
                     session = BusinessDeclarationSession.from_dict(raw_session)
-                    sealed_request = (
-                        record.seal.get("request")
-                        if isinstance(record.seal, Mapping)
-                        else None
+                    replayed = business_adapter(expected_operation).materialize(
+                        session
                     )
-                    if sealed_request is None:
-                        replayed = business_adapter(
-                            expected_operation
-                        ).materialize(session)
-                    else:
-                        sealed_digest = record.seal.get("request_digest")
-                        if (
-                            not isinstance(sealed_request, Mapping)
-                            or not isinstance(sealed_digest, str)
-                            or sealed_digest
-                            != _sha256_bytes(
-                                _canonical_json_bytes(sealed_request)
-                            )
-                            or sealed_request.get("operation")
-                            != expected_operation
-                        ):
-                            raise GatewayInvocationError(
-                                "Durable business Draft seal request is invalid"
-                            )
-                        replayed = dict(sealed_request)
                 except Exception as exc:
                     raise GatewayInvocationError(
                         "Business request cannot be replayed from the durable Draft"

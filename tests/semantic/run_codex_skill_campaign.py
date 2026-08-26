@@ -4388,7 +4388,11 @@ def _build_heavy_v3_broker_replay(
             step.subcommand != "draft-start"
             or not step.arguments
             or step.arguments[0]
-            not in {"lua.executeCliFile", "lua.executeCoreFile"}
+            not in {
+                "audio.import",
+                "lua.executeCliFile",
+                "lua.executeCoreFile",
+            }
         ):
             continue
         preview_index = next(
