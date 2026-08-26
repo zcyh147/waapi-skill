@@ -18,9 +18,9 @@ def add_soundbank_plan_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--inclusion",
         action="append",
-        nargs=2,
+        nargs="+",
         default=[],
-        metavar=("OBJECT_HANDLE", "EVENTS_STRUCTURES_OR_MEDIA"),
+        metavar="OBJECT_HANDLE_OR_FILTER",
     )
     parser.add_argument(
         "--soundbank",
@@ -46,9 +46,9 @@ def add_soundbank_plan_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--generation-inclusion",
         action="append",
-        nargs=2,
+        nargs="+",
         default=[],
-        metavar=("SOUNDBANK_HANDLE", "EVENTS_STRUCTURES_OR_MEDIA"),
+        metavar="SOUNDBANK_HANDLE_OR_FILTER",
     )
     parser.add_argument(
         "--rebuild-soundbank",
@@ -159,15 +159,21 @@ def soundbank_plan_from_namespace(
     if operation == "soundbank.setInclusions":
         grouped: dict[str, list[str]] = {}
         order: list[str] = []
-        for handle, filter_name in args.inclusion:
+        for group in args.inclusion:
+            if len(group) < 2:
+                raise SoundBankBusinessCliError(
+                    "one SoundBank inclusion requires at least one filter"
+                )
+            handle, *filter_names = group
             if handle not in grouped:
                 grouped[handle] = []
                 order.append(handle)
-            if filter_name in grouped[handle]:
-                raise SoundBankBusinessCliError(
-                    "one SoundBank inclusion filter was supplied twice"
-                )
-            grouped[handle].append(filter_name)
+            for filter_name in filter_names:
+                if filter_name in grouped[handle]:
+                    raise SoundBankBusinessCliError(
+                        "one SoundBank inclusion filter was supplied twice"
+                    )
+                grouped[handle].append(filter_name)
         return {
             "soundbank_handle": args.soundbank_handle,
             "mode": args.mode,
@@ -203,7 +209,23 @@ def soundbank_plan_from_namespace(
 
         append_for_bank(args.event, "event_handles")
         append_for_bank(args.aux_bus, "aux_bus_handles")
-        append_for_bank(args.generation_inclusion, "inclusions")
+        for group in args.generation_inclusion:
+            if len(group) < 2:
+                raise SoundBankBusinessCliError(
+                    "one generated SoundBank inclusion requires at least one filter"
+                )
+            bank_handle, *filter_names = group
+            if bank_handle not in rows:
+                raise SoundBankBusinessCliError(
+                    "inclusions references an undeclared SoundBank handle"
+                )
+            inclusions = rows[bank_handle].setdefault("inclusions", [])
+            for filter_name in filter_names:
+                if filter_name in inclusions:
+                    raise SoundBankBusinessCliError(
+                        "one generated SoundBank inclusion filter was supplied twice"
+                    )
+                inclusions.append(filter_name)
         rebuild_choices = [
             *((handle, True) for handle in args.rebuild_soundbank),
             *((handle, False) for handle in args.no_rebuild_soundbank),

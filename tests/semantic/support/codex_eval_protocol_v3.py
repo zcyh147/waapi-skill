@@ -1640,10 +1640,13 @@ def build_soundbank_business_transaction_steps(
         )
         for row in arguments["inclusions"]:
             object_handle = bind(row["object"])
-            for filter_name in row["filters"]:
-                declaration_arguments.extend(
-                    ("--inclusion", object_handle, str(filter_name))
+            declaration_arguments.extend(
+                (
+                    "--inclusion",
+                    object_handle,
+                    *(str(filter_name) for filter_name in row["filters"]),
                 )
+            )
     elif operation == "soundbank.generate":
         bank_handles: list[tuple[Mapping[str, Any], ResponseBinding]] = []
         for bank in arguments["soundbanks"]:
@@ -1671,12 +1674,16 @@ def build_soundbank_business_transaction_steps(
                 declaration_arguments.extend(
                     ("--aux-bus", handle, bind(selector))
                 )
-            for inclusion in bank.get("inclusions", []):
+            inclusions = tuple(bank.get("inclusions", []))
+            if inclusions:
                 declaration_arguments.extend(
                     (
                         "--generation-inclusion",
                         handle,
-                        inclusion_names[str(inclusion)],
+                        *(
+                            inclusion_names[str(inclusion)]
+                            for inclusion in inclusions
+                        ),
                     )
                 )
             if "rebuild" in bank:

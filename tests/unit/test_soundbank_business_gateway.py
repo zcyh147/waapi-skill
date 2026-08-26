@@ -437,8 +437,6 @@ def test_set_inclusions_binds_objects_then_declares_only_business_rows(
         "--inclusion",
         inclusion["bound_object"]["handle"],
         "events",
-        "--inclusion",
-        inclusion["bound_object"]["handle"],
         "media",
     )
     assert code == 0, declared
@@ -474,6 +472,12 @@ def test_soundbank_draft_binds_one_exact_type_name_without_a_separate_query(
     code, started = _offline(tmp_path, "draft-start", "soundbank.generate")
     assert code == 0, started
     binding = started["draft"]["next_action_binding"]["object_binding"]
+    assert binding["direct_query_before_binding"] == "forbidden"
+    assert binding["route_by_user_fact"] == {
+        "complete_object_path": "by_path_segments",
+        "exact_type_and_unscoped_name": "by_exact_type_name",
+        "selected_guid": "by_id",
+    }
     assert binding["by_exact_type_name"]["append"] == [
         "--exact-type-name",
         "<exact-wwise-type>",
@@ -590,8 +594,6 @@ def test_generate_plan_binds_business_objects_and_derives_native_switches(
         "--generation-inclusion",
         bank["bound_object"]["handle"],
         "events",
-        "--generation-inclusion",
-        bank["bound_object"]["handle"],
         "media",
         "--rebuild-soundbank",
         bank["bound_object"]["handle"],

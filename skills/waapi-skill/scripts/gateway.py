@@ -16635,6 +16635,12 @@ def _business_next_action_binding(
         ]
         soundbank_object_binding = {
             **object_binding,
+            "direct_query_before_binding": "forbidden",
+            "route_by_user_fact": {
+                "complete_object_path": "by_path_segments",
+                "exact_type_and_unscoped_name": "by_exact_type_name",
+                "selected_guid": "by_id",
+            },
             "by_exact_type_name": soundbank_exact_type_name,
             "selection_rule": (
                 "user_supplied_complete_path_requires_by_path_segments; "
@@ -16683,13 +16689,13 @@ def _business_next_action_binding(
             "soundbank.setInclusions": [
                 "--mode add|remove|replace",
                 "--soundbank-handle <bound-soundbank-handle>",
-                "[--inclusion <bound-object-handle> events|structures|media]...",
+                "[--inclusion <bound-object-handle> <one-or-more-unique-events|structures|media-filters>]...",
             ],
             "soundbank.generate": [
                 "--soundbank <bound-soundbank-handle> nonlocalized|localized|mixed",
                 "[--event <bound-soundbank-handle> <bound-event-handle>]...",
                 "[--aux-bus <bound-soundbank-handle> <bound-aux-bus-handle>]...",
-                "[--generation-inclusion <bound-soundbank-handle> events|structures|media]...",
+                "[--generation-inclusion <bound-soundbank-handle> <one-or-more-unique-events|structures|media-filters>]...",
                 "[--rebuild-soundbank <bound-soundbank-handle>|--no-rebuild-soundbank <bound-soundbank-handle>]...",
                 "--platform <project-platform-name> [--platform ...]",
                 "[--language <localized-project-language>]...",
@@ -16716,18 +16722,6 @@ def _business_next_action_binding(
                 if binding_roles
                 else "declare_complete_soundbank_plan"
             ),
-            "declaration": {
-                **operation_draft_prefix_copy_binding(
-                    declare_soundbank_plan_prefix,
-                    append_action=(
-                        "copy_verbatim_then_append_one_complete_soundbank_"
-                        "business_plan"
-                    ),
-                ),
-                "append": declaration_shapes[record.operation],
-                "submit_once": True,
-                "native_request_input": "forbidden",
-            },
         }
         if binding_roles:
             result["object_binding"] = {
@@ -16735,6 +16729,17 @@ def _business_next_action_binding(
                 "use_only_for": binding_roles,
                 "repeat_until": "every_object_named_by_the_business_plan_is_bound",
             }
+        result["declaration"] = {
+            **operation_draft_prefix_copy_binding(
+                declare_soundbank_plan_prefix,
+                append_action=(
+                    "copy_verbatim_then_append_one_complete_soundbank_business_plan"
+                ),
+            ),
+            "append": declaration_shapes[record.operation],
+            "submit_once": True,
+            "native_request_input": "forbidden",
+        }
         return result
     if session is None:
         if role_declaration is not None:

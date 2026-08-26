@@ -1117,7 +1117,7 @@ def test_set_inclusions_business_plan_binds_ids_without_typed_disclosure() -> No
                         "kind": "id",
                         "value": "{00000000-0000-0000-0000-000000000002}",
                     },
-                    "filters": ["events"],
+                    "filters": ["events", "structures", "media"],
                 }
             ],
         },
@@ -1142,7 +1142,7 @@ def test_set_inclusions_business_plan_binds_ids_without_typed_disclosure() -> No
         "--object-id",
         "{00000000-0000-0000-0000-000000000002}",
     )
-    assert declare.arguments[-7:] == (
+    assert declare.arguments[-9:] == (
         "--mode",
         "replace",
         "--soundbank-handle",
@@ -1150,7 +1150,10 @@ def test_set_inclusions_business_plan_binds_ids_without_typed_disclosure() -> No
         "--inclusion",
         ResponseBinding("tx01.bind-object.002", "/bound_object/handle"),
         "events",
+        "structures",
+        "media",
     )
+    assert declare.arguments.count("--inclusion") == 1
     assert all(step.subcommand != "draft-apply" for step in protocol.steps)
 
 

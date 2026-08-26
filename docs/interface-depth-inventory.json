@@ -157809,7 +157809,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "691593284bb8679964aa24b38cff68d05d94cf55f4f2f68d8806d8909d141326",
+  "inventory_sha256": "ba904df25d2523c67dacdccde84e8c67e07965a5fdee57f20b3a7204db3a0599",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -190970,9 +190970,9 @@
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request."
   },
   "source_contracts": {
-    "gateway_parser_sha256": "8e777e799ee45617435d71b3705d5d3c2938d63ba208807deca97becb7fae4be",
+    "gateway_parser_sha256": "55a7782a003a35a97ad6ef2e47781444c0b93c6835658666e1dfa5facccf2bb9",
     "operation_contract_sha256": "4ceef731d52c943bc5a28042bb7eec2c3471b675b97817565fca1cc55772ad2a",
-    "public_continuation_sha256": "dec0a20f920d025dfa61c8185dfa35f06658b1e94a16e9ac6ec30a8a74891242",
+    "public_continuation_sha256": "38dd64ac0ed30ed52c153f28d340d5fe1173df07c03778ea0827f29221c74eff",
     "typed_request_surface_sha256": "6d05d64e95a6e0f7099ddd03f1da42c763e9c06f33f93cac7581c7c061a83af8"
   },
   "summary": {
@@ -191903,6 +191903,7 @@
     "non_exemptions": [
       "the API is simple",
       "the API previously passed deterministic, real-host, or Fresh Agent tests",
+      "the API already has a dedicated route, builder, or verifier",
       "the current typed request is already syntactically closed"
     ],
     "required_boundary": "Agent supplies only closed business values or exact user artifacts; Gateway constructs the exact versioned native request and execution plan",
