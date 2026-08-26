@@ -251,6 +251,19 @@ root `iwin-sab-b544197-r1`. Both roots retained sealed attempt manifests,
 started no Wwise process, executed no mutation, removed their temporary launch
 resources, and ended with zero scoped residual processes.
 
+Final deepened candidate `c874917220cb7723d60f86a14cea72c5d15cca52`
+passed the same one-unit profile fresh plus identical verify-only in macOS root
+`imac-sab-c874917-r1` and native-Windows root `iwin-sab-c874917-r1`. The
+public schema supplied a complete copy-ready `draft-start`; each later response
+supplied exactly one ordered role continuation for `switch_container`, `child`,
+and `state_or_switch`. Both Agents reached one immutable Preview without
+starting Wwise or modifying a project. Windows Fresh and replay ran through
+temporary `InteractiveToken`/`Limited` Scheduled Tasks. Both hosts ended with
+zero scoped residual processes and Windows retained zero matching tasks. Mac
+diagnostic root `imac-sab-d10dc23-r1` stopped after a successful schema result
+without issuing `draft-start`; it remains frozen without verify-only and has no
+PASS credit.
+
 The production business-declaration `audio.import` cutover has a later,
 single-candidate Fresh Agent result. Exact packaged-Skill candidate
 `4be64fd80fb14d800a8890012f65fca666ab98f4` passed all eight

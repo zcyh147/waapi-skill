@@ -518,6 +518,27 @@ native-Windows root `iwin-sab-b544197-r1`. Both roots retained sealed attempt
 manifests, started no Wwise process, executed no mutation, removed their
 temporary launch resources, and ended with zero scoped residual processes.
 
+Final deepened Switch-assignment candidate
+`c874917220cb7723d60f86a14cea72c5d15cca52` passed the one-unit profile
+fresh plus identical `--resume --verify-only` in macOS root
+`imac-sab-c874917-r1` and native-Windows root `iwin-sab-c874917-r1`.
+Both Agents followed the Gateway-owned copy-ready `draft-start`, then the fixed
+`switch_container`, `child`, and `state_or_switch` role continuations into one
+Preview; no Wwise process or mutation occurred. The Windows Fresh and replay
+used temporary `InteractiveToken`/`Limited` Scheduled Tasks. Both hosts ended
+with zero scoped residual processes and Windows retained zero matching tasks.
+Exact Program candidate `4c55ba6b53eeb4beff97e7b590686d78da7e612e`
+passed macOS 3659 / 2 skipped and native Windows 3646 / 15 skipped; later
+`c874917` changes only semantic evidence/protocol tests. MacOS Non-live at
+`d10dc23c4dd95eb865a5a768ac8a4e0885e6a233` passed 8639 / 110 skipped /
+27 deselected. The later packaged diffs are bounded to copy-ready business
+start/role continuations and compact audio-import receipts, covered by exact
+focused regressions (410 passed at `4389b6c`, 452 / 4 skipped at `4c55ba6`,
+and 76 passed at `c874917`); Switch native dispatch and verification did not
+change. Frozen Mac diagnostic root `imac-sab-d10dc23-r1` stopped after a
+successful schema read without issuing `draft-start`, received no PASS credit,
+and was not replayed.
+
 The completed 2026-07-31 macOS integration evidence is cumulative across frozen
 campaign roots, not one final-candidate 6/6 run. The initial `a12` root passed
 both Alarm and Harbor workflows on both versions and failed both Weather

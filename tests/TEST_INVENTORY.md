@@ -197,6 +197,27 @@ Both current roots retained their sealed attempt manifest, started no Wwise
 process, created no project mutation, removed their temporary launch resources,
 and ended with zero scoped residual processes.
 
+Final deepened candidate `c874917220cb7723d60f86a14cea72c5d15cca52`
+passed `switch_assignment_business_1` fresh plus identical verify-only in
+macOS root `imac-sab-c874917-r1` and native-Windows root
+`iwin-sab-c874917-r1`. The Gateway supplied one complete copy-ready
+`draft-start`, followed by exact role-bound continuations for
+`switch_container`, `child`, and `state_or_switch`; both Agents reached one
+Preview without starting Wwise or mutating a project. Windows used temporary
+`InteractiveToken`/`Limited` Scheduled Tasks for both runs. Both hosts ended
+with zero scoped residual processes and Windows retained zero matching tasks.
+Exact Program candidate `4c55ba6b53eeb4beff97e7b590686d78da7e612e`
+passed macOS `3659 / 2 skipped` and native Windows `3646 / 15 skipped`;
+`c874917` changes only semantic evidence/protocol tests. MacOS Non-live at
+`d10dc23c4dd95eb865a5a768ac8a4e0885e6a233` passed
+`8639 / 110 skipped / 27 deselected`. Later packaged changes are limited to
+copy-ready business start/role continuations and compact audio-import receipts;
+exact focused carry passed 410 tests at `4389b6c`, 452 / 4 skipped at
+`4c55ba6`, and 76 at `c874917`. Switch native dispatch and verification are
+unchanged. Failed Mac diagnostic root `imac-sab-d10dc23-r1` stopped after a
+successful schema read without issuing `draft-start`; it is frozen without
+verify-only and contributes no PASS credit.
+
 The Authoring UI resource collection made 35 read-only calls in total. Its
 command inventories are build/project/plugin/add-on snapshots, not runtime
 allowlists. It proves the five fixed schemas and inventory capture only; it
@@ -344,3 +365,5 @@ Collected with `ci/test.sh --version all --mode matrix -- --collect-only -q`. Th
 | `ci/test.sh --mode nonlive -- -q -ra` on exact runtime candidate `d05f1ecdc3b33fca83866e75669c65039877edd6` | 8632 passed, 110 skipped, 27 deselected; exit 0 | Final #93 broad runtime regression. No Codex, Wwise, live, or destructive body ran; declared skips receive no PASS credit. |
 | `run_codex_skill_campaign.py --profile switch_assignment_business_1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --max-pre-action-retries 0` on exact route candidate `d45f75f5e75190d5b4e607a02aee2dcf38e73ab9` | macOS root `imac-sab-d45f75f-r2`: 1 passed / 0 failed plus identical verify-only; native-Windows root `iwin-sab-d45f75f-r2`: 1 passed / 0 failed plus identical verify-only | Both fresh memory-off Agents selected `switchContainer.addAssignment`, bound only the Switch Container, direct child, and Switch paths, and reached one Gateway-owned immutable Preview in eight accepted commands. No Wwise process or mutation was permitted. Earlier `d05f1ec` roots on both hosts remain frozen FAILs after invented aliases were rejected before dispatch. Temporary launchers were deleted and scoped residual-process checks were empty. |
 | `ci/test.sh` / `ci\test.bat --version 2022.1|2025.1 --mode destructive -- -q -ra -k closed_gateway_workflows_across_selected_version` | macOS route candidate `d45f75f`: 2022.1 and 2025.1 each 1 passed / 12 deselected; native-Windows runtime candidate `d05f1ec`: 2022.1 and 2025.1 each 1 passed / 12 deselected; every invocation exit 0 | Real #93 add/remove assignment execution, opposite precondition, pair readback, cleanup, and broader closed-workflow regression. The later route-only commit does not change Gateway compilation, dispatch, verification, or cleanup. |
+| Final deepened #93 deterministic and carry gates | Exact Program candidate `4c55ba6`: macOS 3659 passed / 2 skipped; native Windows 3646 passed / 15 skipped. MacOS Non-live candidate `d10dc23`: 8639 passed / 110 skipped / 27 deselected. Exact focused carry: `4389b6c` 410 passed; `4c55ba6` 452 passed / 4 skipped; `c874917` 76 passed. | Commits after `d10dc23` deepen only Gateway-owned business start/role continuations, compact audio-import receipts, and semantic evidence. Switch request materialization, native dispatch, relationship verifier, cleanup, and the previously recorded four real-Wwise rows remain unchanged. |
+| `run_codex_skill_campaign.py --profile switch_assignment_business_1 ... --max-pre-action-retries 0` on final candidate `c874917220cb7723d60f86a14cea72c5d15cca52` | macOS root `imac-sab-c874917-r1`: 1 passed plus identical verify-only; native-Windows root `iwin-sab-c874917-r1`: 1 passed plus identical verify-only | Both fresh memory-off Terra Agents copied the Gateway-owned start and three ordered role continuations into one Preview. No Wwise process or mutation occurred. Windows used `InteractiveToken`/`Limited`; launch resources were deleted and both hosts reported zero scoped residual processes. Frozen Mac root `imac-sab-d10dc23-r1` contributes no credit. |
