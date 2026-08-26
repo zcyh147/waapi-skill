@@ -1175,6 +1175,15 @@ SWITCH_ASSIGNMENT_BUSINESS_OPERATIONS = frozenset(
     }
 )
 
+SOUNDBANK_BUSINESS_OPERATIONS = frozenset(
+    {
+        "soundbank.convertExternalSources",
+        "soundbank.generate",
+        "soundbank.processDefinitionFiles",
+        "soundbank.setInclusions",
+    }
+)
+
 OBJECT_GRAPH_BUSINESS_OPERATIONS = frozenset({"object.create"})
 
 
@@ -1521,6 +1530,299 @@ def build_switch_assignment_business_transaction_steps(
                 "--state-or-switch-handle",
                 handles["state_or_switch"],
             ),
+        )
+    )
+    draft.advance(declaration_name)
+    check_name = f"{label}.check"
+    steps.append(
+        ExpectedGatewayStep(
+            name=check_name,
+            subcommand="draft-check",
+            arguments=draft.prefix(),
+        )
+    )
+    draft.advance(check_name)
+    steps.append(
+        ExpectedGatewayStep(
+            name=f"{label}.preview",
+            subcommand="preview-from-draft",
+            arguments=draft.prefix(),
+            expected_operation_request=normalized,
+        )
+    )
+    return tuple(steps)
+
+
+def build_soundbank_business_transaction_steps(
+    request: Mapping[str, Any],
+    *,
+    label: str,
+) -> tuple[ExpectedGatewayStep, ...]:
+    """Translate one closed SoundBank request into one complete business plan."""
+
+    normalized = _validate_operation_request(request)
+    operation = str(normalized["operation"])
+    if operation not in SOUNDBANK_BUSINESS_OPERATIONS:
+        raise V3ProtocolError(
+            "SoundBank business builder requires one reviewed operation"
+        )
+    if not isinstance(label, str) or not re.fullmatch(r"tx[0-9]{2}", label):
+        raise V3ProtocolError("business transaction label must be txNN")
+    try:
+        parsed = parse_operation_request(normalized)
+    except OperationContractError as exc:
+        raise V3ProtocolError(
+            f"SoundBank business request is invalid: {exc}"
+        ) from exc
+    arguments = parsed.arguments
+    draft = _BusinessDraftSteps.start(operation=operation, label=label)
+    steps = draft.steps
+    bound: dict[str, ResponseBinding] = {}
+    binding_index = 0
+    name_queries: dict[str, ResponseBinding] = {}
+    exact_names: list[tuple[str, str]] = []
+
+    def collect_exact_names(value: Any) -> None:
+        if isinstance(value, Mapping):
+            if (
+                value.get("kind") == "exact-type-name"
+                and isinstance(value.get("type"), str)
+                and isinstance(value.get("name"), str)
+            ):
+                exact_names.append((str(value["type"]), str(value["name"])))
+                return
+            for nested in value.values():
+                collect_exact_names(nested)
+        elif isinstance(value, list):
+            for nested in value:
+                collect_exact_names(nested)
+
+    collect_exact_names(arguments)
+    if operation == "soundbank.generate":
+        exact_names.extend(
+            ("SoundBank", str(bank["name"]))
+            for bank in arguments["soundbanks"]
+        )
+    seen_names: set[tuple[str, str]] = set()
+    for object_type, name in exact_names:
+        identity = (object_type, name)
+        if identity in seen_names:
+            continue
+        seen_names.add(identity)
+        query_name = f"{label}.query-object.{len(seen_names):03d}"
+        query_arguments: list[str] = [
+            "--type",
+            object_type,
+            "--where",
+            "name",
+            "=",
+            "string",
+            name,
+            "--take",
+            "2",
+        ]
+        for field in ("id", "name", "type", "path"):
+            query_arguments.extend(("--return-field", field))
+        steps.insert(
+            -1,
+            ExpectedGatewayStep(
+                name=query_name,
+                subcommand="query-object",
+                arguments=tuple(query_arguments),
+            ),
+        )
+        key = json.dumps(
+            ["exact-type-name", object_type, name],
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        name_queries[key] = ResponseBinding(query_name, "/objects/0/id")
+
+    def bind(selector: Any, *, object_type: str | None = None) -> ResponseBinding:
+        nonlocal binding_index
+        if object_type is not None:
+            if not isinstance(selector, str) or not selector:
+                raise V3ProtocolError("SoundBank name binding is invalid")
+            key = json.dumps(
+                ["exact-type-name", object_type, selector],
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+            existing = bound.get(key)
+            if existing is not None:
+                return existing
+            query_binding = name_queries.get(key)
+            if query_binding is None:
+                raise V3ProtocolError("SoundBank name query is unavailable")
+            binding_index += 1
+            bind_name = f"{label}.bind-object.{binding_index:03d}"
+            steps.append(
+                ExpectedGatewayStep(
+                    name=bind_name,
+                    subcommand="draft-bind-object",
+                    arguments=(
+                        *draft.prefix(),
+                        "--object-id",
+                        query_binding,
+                    ),
+                )
+            )
+            draft.advance(bind_name)
+            result = ResponseBinding(bind_name, "/bound_object/handle")
+            bound[key] = result
+            return result
+        if not isinstance(selector, Mapping):
+            raise V3ProtocolError("SoundBank object identity is invalid")
+        if selector.get("kind") == "exact-type-name":
+            object_type_value = selector.get("type")
+            name_value = selector.get("name")
+            if not isinstance(object_type_value, str) or not isinstance(
+                name_value, str
+            ):
+                raise V3ProtocolError("SoundBank exact name identity is invalid")
+            key = json.dumps(
+                ["exact-type-name", object_type_value, name_value],
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+            existing = bound.get(key)
+            if existing is not None:
+                return existing
+            query_binding = name_queries.get(key)
+            if query_binding is None:
+                raise V3ProtocolError("SoundBank exact name query is unavailable")
+            binding_index += 1
+            bind_name = f"{label}.bind-object.{binding_index:03d}"
+            steps.append(
+                ExpectedGatewayStep(
+                    name=bind_name,
+                    subcommand="draft-bind-object",
+                    arguments=(
+                        *draft.prefix(),
+                        "--object-id",
+                        query_binding,
+                    ),
+                )
+            )
+            draft.advance(bind_name)
+            result = ResponseBinding(bind_name, "/bound_object/handle")
+            bound[key] = result
+            return result
+        key = json.dumps(
+            dict(selector),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        existing = bound.get(key)
+        if existing is not None:
+            return existing
+        binding_index += 1
+        result = draft.bind_object(
+            selector,
+            step_name=f"{label}.bind-object.{binding_index:03d}",
+            error_subject="SoundBank business",
+        )
+        bound[key] = result
+        return result
+
+    declaration_arguments: list[Any] = [*draft.prefix()]
+    if operation == "soundbank.setInclusions":
+        declaration_arguments.extend(
+            (
+                "--mode",
+                str(arguments["mode"]),
+                "--soundbank-handle",
+                bind(arguments["soundbank"]),
+            )
+        )
+        for row in arguments["inclusions"]:
+            object_handle = bind(row["object"])
+            for filter_name in row["filters"]:
+                declaration_arguments.extend(
+                    ("--inclusion", object_handle, str(filter_name))
+                )
+    elif operation == "soundbank.generate":
+        bank_handles: list[tuple[Mapping[str, Any], ResponseBinding]] = []
+        for bank in arguments["soundbanks"]:
+            handle = bind(str(bank["name"]), object_type="SoundBank")
+            bank_handles.append((bank, handle))
+        declaration_arguments = [*draft.prefix()]
+        inclusion_names = {
+            "event": "events",
+            "structure": "structures",
+            "media": "media",
+        }
+        for bank, handle in bank_handles:
+            declaration_arguments.extend(
+                (
+                    "--soundbank",
+                    handle,
+                    str(bank["artifact_expectation"]),
+                )
+            )
+            for selector in bank.get("events", []):
+                declaration_arguments.extend(
+                    ("--event", handle, bind(selector))
+                )
+            for selector in bank.get("aux_busses", []):
+                declaration_arguments.extend(
+                    ("--aux-bus", handle, bind(selector))
+                )
+            for inclusion in bank.get("inclusions", []):
+                declaration_arguments.extend(
+                    (
+                        "--generation-inclusion",
+                        handle,
+                        inclusion_names[str(inclusion)],
+                    )
+                )
+            if "rebuild" in bank:
+                declaration_arguments.extend(
+                    (
+                        "--rebuild-soundbank"
+                        if bank["rebuild"] is True
+                        else "--no-rebuild-soundbank",
+                        handle,
+                    )
+                )
+        for platform in arguments["platforms"]:
+            declaration_arguments.extend(("--platform", str(platform)))
+        for language in arguments.get("languages", []):
+            declaration_arguments.extend(("--language", str(language)))
+        for field, flag in (
+            ("rebuild_soundbanks", "rebuild-soundbanks"),
+            ("clear_audio_file_cache", "clear-audio-file-cache"),
+            ("rebuild_init_bank", "rebuild-init-bank"),
+        ):
+            if field in arguments:
+                declaration_arguments.append(
+                    f"--{flag}" if arguments[field] is True else f"--no-{flag}"
+                )
+        declaration_arguments.extend(("--io-root", str(arguments["io_root"])))
+    elif operation == "soundbank.convertExternalSources":
+        for source in arguments["sources"]:
+            declaration_arguments.extend(
+                (
+                    "--source",
+                    str(source["input"]),
+                    str(source["platform"]),
+                    str(source["output"]),
+                )
+            )
+        declaration_arguments.extend(("--io-root", str(arguments["io_root"])))
+    else:
+        for path in arguments["files"]:
+            declaration_arguments.extend(("--definition-file", str(path)))
+        declaration_arguments.extend(("--io-root", str(arguments["io_root"])))
+
+    declaration_arguments[:5] = draft.prefix()
+    declaration_name = f"{label}.declare-soundbank-plan"
+    steps.append(
+        ExpectedGatewayStep(
+            name=declaration_name,
+            subcommand="draft-declare-soundbank-plan",
+            arguments=tuple(declaration_arguments),
         )
     )
     draft.advance(declaration_name)
@@ -3022,6 +3324,14 @@ def build_transaction_protocol(
                     request,
                     label=label,
                 )
+            elif (
+                input_mode == BUSINESS_DECLARATION_INPUT_MODE
+                and operation in SOUNDBANK_BUSINESS_OPERATIONS
+            ):
+                operation_steps = build_soundbank_business_transaction_steps(
+                    request,
+                    label=label,
+                )
             else:
                 operation_steps = _build_generic_typed_draft_transaction_steps(
                     request,
@@ -3851,6 +4161,7 @@ __all__ = [
     "OBJECT_LIFECYCLE_BUSINESS_OPERATIONS",
     "build_object_lifecycle_business_transaction_steps",
     "build_object_metadata_business_transaction_steps",
+    "build_soundbank_business_transaction_steps",
     "build_switch_assignment_business_transaction_steps",
     "build_object_graph_business_transaction_steps",
     "build_object_set_composer_transaction_steps",

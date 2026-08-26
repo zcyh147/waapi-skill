@@ -1094,6 +1094,13 @@ def _metadata_activation_decision() -> dict[str, str]:
 def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
     """Return one reviewed Adapter contract, derived from the Registry."""
 
+    if operation_uses_business_declaration(operation, version):
+        raise OperationComposerError(
+            f"No shallow Operation Composer Adapter is available for {operation!r}.",
+            error_code="OPERATION_DRAFT_ADAPTER_UNAVAILABLE",
+            details={"operation": operation, "version": version},
+        )
+
     if operation == "waapi.undoGroup":
         typed = draft_operation_request_contract(operation, version)
         child_operations = compound_child_operations(version)
@@ -2182,6 +2189,12 @@ def _business_composition_projection(
             ),
         }
     session = BusinessDeclarationSession.from_dict(raw_session)
+    adapter = business_adapter(operation)
+    complete = (
+        bool(session.settings)
+        if adapter.settings_are_complete_declaration
+        else bool(session.declarations)
+    )
     return {
         "business_revision": session.revision,
         "declarations": [row.as_dict() for row in session.declarations],
@@ -2191,13 +2204,11 @@ def _business_composition_projection(
             else session.active_preview.readable_projection()
         ),
         "detail_available": session.active_preview is not None,
-        "missing_fields": (
-            ["business_declaration"] if not session.declarations else []
-        ),
+        "missing_fields": [] if complete else ["business_declaration"],
         "missing_fields_status": (
-            "incomplete" if not session.declarations else "complete"
+            "complete" if complete else "incomplete"
         ),
-        "allowed_actions": business_adapter(operation).projection_actions(
+        "allowed_actions": adapter.projection_actions(
             session_bound=True
         ),
     }

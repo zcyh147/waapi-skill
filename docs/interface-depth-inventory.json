@@ -705,6 +705,77 @@
     {
       "model_values": [
         {
+          "name": "sources",
+          "path": [
+            "soundbank_plan",
+            "sources"
+          ],
+          "required": true,
+          "schema_sha256": "df6fba94ec740a44fa2389bf107db2ad924d7b0733ca973b5550c80c3fe09c05",
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "name": "input",
+          "path": [
+            "soundbank_plan",
+            "sources",
+            "[]",
+            "input"
+          ],
+          "required": true,
+          "schema_sha256": "3542d49af2eb96304ed76d31c6230f91dbe23fcf7ea3cdf6da60738552ccff8f",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "name": "platform",
+          "path": [
+            "soundbank_plan",
+            "sources",
+            "[]",
+            "platform"
+          ],
+          "required": true,
+          "schema_sha256": "b36cb9142b79cf5a1168dfd70929916af76e470428b57a4bc9e52dac8385c79a",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "output",
+          "path": [
+            "soundbank_plan",
+            "sources",
+            "[]",
+            "output"
+          ],
+          "required": true,
+          "schema_sha256": "30f47faed41cdaae08901b98f793ed0f2666e741e7579bd7a159092ca2517f05",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "name": "io_root",
+          "path": [
+            "soundbank_plan",
+            "io_root"
+          ],
+          "required": true,
+          "schema_sha256": "ab9838cbafd402cd460b242a77390f12536afbd158a80e138b7f2fd1825237ae",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        }
+      ],
+      "sha256": "14c79ef254c97578426a42f57dfa19418d07762c408a9c078001c5f4b6a9e85b"
+    },
+    {
+      "model_values": [
+        {
           "name": "object_handle",
           "path": [
             "declaration",
@@ -2674,6 +2745,179 @@
     {
       "model_values": [
         {
+          "name": "soundbanks",
+          "path": [
+            "soundbank_plan",
+            "soundbanks"
+          ],
+          "required": true,
+          "schema_sha256": "e7ee6761a184c69b25d4b7023679346f860c16eb8f3be6f612c5ed39626beedc",
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "name": "soundbank_handle",
+          "path": [
+            "soundbank_plan",
+            "soundbanks",
+            "[]",
+            "soundbank_handle"
+          ],
+          "required": true,
+          "schema_sha256": "44e59257f6386c24df454591f8274fd90475d8005ee5266f99ef08449ac70c96",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "name": "artifact_expectation",
+          "path": [
+            "soundbank_plan",
+            "soundbanks",
+            "[]",
+            "artifact_expectation"
+          ],
+          "required": true,
+          "schema_sha256": "382ccc91e70f1a774d23ac3d0fd49233befebf9fcea0bec031634a8fb6ec0fa5",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "rebuild",
+          "path": [
+            "soundbank_plan",
+            "soundbanks",
+            "[]",
+            "rebuild"
+          ],
+          "required": false,
+          "schema_sha256": "92ab3dc9df2b6a9ec6dda4bc411a3d68679c8b3a8e71ba365b76975e889683dd",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "event_handles",
+          "path": [
+            "soundbank_plan",
+            "soundbanks",
+            "[]",
+            "event_handles"
+          ],
+          "required": false,
+          "schema_sha256": "10183c8cd4aec2e940d0b846c49b9a25c24b5867536cbd4d311b9757b3d524e3",
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "name": "aux_bus_handles",
+          "path": [
+            "soundbank_plan",
+            "soundbanks",
+            "[]",
+            "aux_bus_handles"
+          ],
+          "required": false,
+          "schema_sha256": "75521d7dddd4e82815fbb53712fdc58e73430c44defbdf1ca7c36f0231e06aec",
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "name": "inclusions",
+          "path": [
+            "soundbank_plan",
+            "soundbanks",
+            "[]",
+            "inclusions"
+          ],
+          "required": false,
+          "schema_sha256": "1acecaa7d625915ea9f433db056fa8afb054630e821972f5723df0ee11d1f672",
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "platforms",
+          "path": [
+            "soundbank_plan",
+            "platforms"
+          ],
+          "required": true,
+          "schema_sha256": "7b93d7ae38f729cec2cb84703493907da8fbd6f072a830c6c2f8bd95730ec813",
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "languages",
+          "path": [
+            "soundbank_plan",
+            "languages"
+          ],
+          "required": false,
+          "schema_sha256": "e2955bad917f200c0475e733422b33f41013e2251ee0cc4c7c5aefff0a445dec",
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "rebuild_soundbanks",
+          "path": [
+            "soundbank_plan",
+            "rebuild_soundbanks"
+          ],
+          "required": false,
+          "schema_sha256": "cb1030671213373acac28db1ff0705c41c75fcd361f032a76fd4552738d3998f",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "clear_audio_file_cache",
+          "path": [
+            "soundbank_plan",
+            "clear_audio_file_cache"
+          ],
+          "required": false,
+          "schema_sha256": "d30d3f6c408701962462e11153ccca1e77073174dd5cf217576fc8ae010581f3",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "rebuild_init_bank",
+          "path": [
+            "soundbank_plan",
+            "rebuild_init_bank"
+          ],
+          "required": false,
+          "schema_sha256": "1cbc056802676f98c1758c8bc4c3bb4dd2ef2cb4b27683c041879f17fc9ede10",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "io_root",
+          "path": [
+            "soundbank_plan",
+            "io_root"
+          ],
+          "required": true,
+          "schema_sha256": "6206da5aea2f11ffba0d75e0604771e98a9ac259c4d72e1d8592ce6dadec1f89",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        }
+      ],
+      "sha256": "4f817751ee99433a905c368da26e4b2f24b6cb92bafee37c017c594ad0289a83"
+    },
+    {
+      "model_values": [
+        {
           "name": "io_root",
           "path": [
             "arguments",
@@ -2994,48 +3238,6 @@
         }
       ],
       "sha256": "81192ecb4731e853169d839171b48046be660b457f06490fabd6afe76ff8e9e5"
-    },
-    {
-      "model_values": [
-        {
-          "name": "files",
-          "path": [
-            "arguments",
-            "files"
-          ],
-          "required": true,
-          "schema_sha256": "f81aaff33b801d51efa3447230ea5d7767d2362e92d84f42dd7b159456f2efae",
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "files",
-          "path": [
-            "arguments",
-            "files",
-            "[]"
-          ],
-          "required": true,
-          "schema_sha256": "9bc9afaf0da36a6811c6ccbc5660fa2adbc2c69639727730f52395bfceb2505c",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "io_root",
-          "path": [
-            "arguments",
-            "io_root"
-          ],
-          "required": true,
-          "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        }
-      ],
-      "sha256": "883085202bc543c4e0ee4dc0e31ca4869d17b5e1cac196a21052a235f84b3be0"
     },
     {
       "model_values": [
@@ -3660,90 +3862,6 @@
         }
       ],
       "sha256": "8ac0604951d1b39bf081bd919d99866ffe54a4c1fe66cc74f3463efa2f36c88e"
-    },
-    {
-      "model_values": [
-        {
-          "name": "io_root",
-          "path": [
-            "arguments",
-            "io_root"
-          ],
-          "required": true,
-          "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "sources",
-          "path": [
-            "arguments",
-            "sources"
-          ],
-          "required": true,
-          "schema_sha256": "985909ec8bdf98f26e3acec6819420b518436f63f859c98158fdc2cfbf8e79b8",
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "sources",
-          "path": [
-            "arguments",
-            "sources",
-            "[]"
-          ],
-          "required": true,
-          "schema_sha256": "d8e1a64530d744923135692f4fc24ef748cadb26b9e7dace5dd7e2ce8ef11624",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "input",
-          "path": [
-            "arguments",
-            "sources",
-            "[]",
-            "input"
-          ],
-          "required": true,
-          "schema_sha256": "9bc9afaf0da36a6811c6ccbc5660fa2adbc2c69639727730f52395bfceb2505c",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "output",
-          "path": [
-            "arguments",
-            "sources",
-            "[]",
-            "output"
-          ],
-          "required": true,
-          "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "platform",
-          "path": [
-            "arguments",
-            "sources",
-            "[]",
-            "platform"
-          ],
-          "required": true,
-          "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "95dcfdb6f451a2f3a2044240cb8753e7ccc5128cbb572c63d54ff32f6b41842c"
     },
     {
       "model_values": [
@@ -5045,1531 +5163,6 @@
     {
       "model_values": [
         {
-          "name": "clear_audio_file_cache",
-          "path": [
-            "arguments",
-            "clear_audio_file_cache"
-          ],
-          "required": false,
-          "schema_sha256": "f56777819c8be28f711bc04bdfdb5fb6a82bdaf4109198c616273cb0003e4137",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "io_root",
-          "path": [
-            "arguments",
-            "io_root"
-          ],
-          "required": true,
-          "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "languages",
-          "path": [
-            "arguments",
-            "languages"
-          ],
-          "required": false,
-          "schema_sha256": "f31f6e0c1fc8db3b70776aba5ac16bc921a3eba9c6c3427035a4dda71f6566ff",
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "languages",
-          "path": [
-            "arguments",
-            "languages",
-            "[]"
-          ],
-          "required": false,
-          "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "platforms",
-          "path": [
-            "arguments",
-            "platforms"
-          ],
-          "required": true,
-          "schema_sha256": "31dda81e6ea1f19cbaafd94814021961026583dd20f425e025831cdf0fb68c23",
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "platforms",
-          "path": [
-            "arguments",
-            "platforms",
-            "[]"
-          ],
-          "required": true,
-          "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "rebuild_init_bank",
-          "path": [
-            "arguments",
-            "rebuild_init_bank"
-          ],
-          "required": false,
-          "schema_sha256": "f56777819c8be28f711bc04bdfdb5fb6a82bdaf4109198c616273cb0003e4137",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "rebuild_soundbanks",
-          "path": [
-            "arguments",
-            "rebuild_soundbanks"
-          ],
-          "required": false,
-          "schema_sha256": "1d1182ad5f2524073d5684868402f9d835ebc57bfc2fe22e5748ea7d83a0e2a6",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "skip_languages",
-          "path": [
-            "arguments",
-            "skip_languages"
-          ],
-          "required": true,
-          "schema_sha256": "3003cc6adde36b590ff21fd18d2a94962bdea3652c20fea4084a34290d5ac43d",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "soundbanks",
-          "path": [
-            "arguments",
-            "soundbanks"
-          ],
-          "required": true,
-          "schema_sha256": "56dba7f54703c6998bacfe9d5e0f6ff142a9067a3eac7ef4d89317198ea717aa",
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "soundbanks",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]"
-          ],
-          "required": true,
-          "schema_sha256": "e5540c621334ebe1d3e196f29a13e141af2de937c13afded6bbba5a360b72877",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "artifact_expectation",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "artifact_expectation"
-          ],
-          "required": true,
-          "schema_sha256": "efb0d4593619c71decccf8a3eef2203f81e7b111ee94a9f9a4100c7165c600b2",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "aux_busses",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses"
-          ],
-          "required": false,
-          "schema_sha256": "fd14c850897721d258b59a58da763b8914c159e1cd61765385eadba2e8538968",
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "aux_busses",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]"
-          ],
-          "required": false,
-          "schema_sha256": "b2bb079f7369ee516099b6c0a25dfe674aa43aac955e2b5d8ef0183cca124e25",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "aux_busses",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:0>"
-          ],
-          "required": false,
-          "schema_sha256": "85724bd9311dc46c53a1c13d79ed38078e5fbf1a01b2ddea93a8a672f0066219",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:0>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "d200cc9eadb263de6c9688067b7e6eb04e33683d53f83bad31da853c75f52b20",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:0>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "138251f1baf7e77020390ef9cd05892e62d874014a557420090b840bcfa9cd82",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "aux_busses",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:1>"
-          ],
-          "required": false,
-          "schema_sha256": "037094c5eae8f946c0e71e2f882b8b8c913c545ca207ba4e977d4814e90e706e",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:1>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "8bfe7b4c0bbae812f7c3731be03db558265f0dede2f8a0d2ec2e11f57c9dabd9",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:1>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "b96b8929cc6713ed744c5758d79ff4fd503c3148de163db8ab8b303633632491",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "aux_busses",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:2>"
-          ],
-          "required": false,
-          "schema_sha256": "5920c555e83a3810a7bc95e42a39badb953a8778584681afa898498048adf6eb",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:2>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "8c8e2cd132588ba8443f3e9270d212bce04e44523e8b04fa797da79d909e3e89",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "name",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:2>",
-            "name"
-          ],
-          "required": true,
-          "schema_sha256": "7d0349c7ff2f686133d83602cd1090da1afdea8d2d400781f20b57ba1ec6f91c",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "type",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:2>",
-            "type"
-          ],
-          "required": true,
-          "schema_sha256": "92994459004182a0f29d27de909cca8b376cb596a8d655ac554fa92a8d30adc1",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "aux_busses",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:3>"
-          ],
-          "required": false,
-          "schema_sha256": "7dac0ff5f3b52d1b13afcf764d83a0720511b190c51d1a73c74bc9696774cbed",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:3>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "666775010b4235464589f4bcb1af1520b304a646160023ac993996c742684a63",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:3>",
-            "parent"
-          ],
-          "required": true,
-          "schema_sha256": "d5f6e876f64505c683365c538b704c06c1460925a7dde2a4b89f9bdc61c608d1",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "d0f6f2a06ef4d48e51291dd5efe02a3b0c0fc46df73617a8cf8bd42cf0caa1c5",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "d200cc9eadb263de6c9688067b7e6eb04e33683d53f83bad31da853c75f52b20",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "5bd1466d67f023e4365da9a452bb548f39556df880a1ef3e3505803c3443b95a",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>",
-            "value",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "f7be3125a2038a14d7cd75b5ae3a7eeefaaf39698437bbbabfa6eb0163390469",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>",
-            "value",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "f0765dbf409c74f001806c446f2cf171d8c46b5b15779d54423dde921a4b0670",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "716ae013236f7371a9e43c1fa2b8c42b87fae7a66e9dfae14ca33c032df691d4",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:1>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "8bfe7b4c0bbae812f7c3731be03db558265f0dede2f8a0d2ec2e11f57c9dabd9",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:1>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "0bd5eabca0b8834581462a67de41e64a73d914fc40a8d96e42e09616f14584fb",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "type",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:3>",
-            "type"
-          ],
-          "required": true,
-          "schema_sha256": "2dd450490534930e9da665377cc98230d62d9a57253a1f8bf466f5c8747f764a",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "aux_busses",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:4>"
-          ],
-          "required": false,
-          "schema_sha256": "d96cee783c630aec17979cf18e304562ca46204302a62b26520373e4eff06668",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:4>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "f9254c4e13d76ac7baea8339084fb01d9113a170f373e2f36082a10e5674a606",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "name",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:4>",
-            "name"
-          ],
-          "required": true,
-          "schema_sha256": "9a117032d9994f3df9b834eceb77ba902e6f65eee0beaa5d30091d92e06dfbf0",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:4>",
-            "parent"
-          ],
-          "required": true,
-          "schema_sha256": "6b838ac597f1abb82ed093744485b90ae3c44be598aca21acf6d38c3a2ff654e",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "d0f6f2a06ef4d48e51291dd5efe02a3b0c0fc46df73617a8cf8bd42cf0caa1c5",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "d200cc9eadb263de6c9688067b7e6eb04e33683d53f83bad31da853c75f52b20",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "5bd1466d67f023e4365da9a452bb548f39556df880a1ef3e3505803c3443b95a",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>",
-            "value",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "f7be3125a2038a14d7cd75b5ae3a7eeefaaf39698437bbbabfa6eb0163390469",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>",
-            "value",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "f0765dbf409c74f001806c446f2cf171d8c46b5b15779d54423dde921a4b0670",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "716ae013236f7371a9e43c1fa2b8c42b87fae7a66e9dfae14ca33c032df691d4",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:1>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "8bfe7b4c0bbae812f7c3731be03db558265f0dede2f8a0d2ec2e11f57c9dabd9",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:1>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "0bd5eabca0b8834581462a67de41e64a73d914fc40a8d96e42e09616f14584fb",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "type",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "aux_busses",
-            "[]",
-            "<oneOf:4>",
-            "type"
-          ],
-          "required": true,
-          "schema_sha256": "85cd5844c08d8ec0f594d4e56ded2c20ceb316f737e25e09227822978721f043",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "events",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events"
-          ],
-          "required": false,
-          "schema_sha256": "fd14c850897721d258b59a58da763b8914c159e1cd61765385eadba2e8538968",
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "events",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]"
-          ],
-          "required": false,
-          "schema_sha256": "b2bb079f7369ee516099b6c0a25dfe674aa43aac955e2b5d8ef0183cca124e25",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "events",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:0>"
-          ],
-          "required": false,
-          "schema_sha256": "85724bd9311dc46c53a1c13d79ed38078e5fbf1a01b2ddea93a8a672f0066219",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:0>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "d200cc9eadb263de6c9688067b7e6eb04e33683d53f83bad31da853c75f52b20",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:0>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "138251f1baf7e77020390ef9cd05892e62d874014a557420090b840bcfa9cd82",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "events",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:1>"
-          ],
-          "required": false,
-          "schema_sha256": "037094c5eae8f946c0e71e2f882b8b8c913c545ca207ba4e977d4814e90e706e",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:1>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "8bfe7b4c0bbae812f7c3731be03db558265f0dede2f8a0d2ec2e11f57c9dabd9",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:1>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "b96b8929cc6713ed744c5758d79ff4fd503c3148de163db8ab8b303633632491",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "events",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:2>"
-          ],
-          "required": false,
-          "schema_sha256": "5920c555e83a3810a7bc95e42a39badb953a8778584681afa898498048adf6eb",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:2>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "8c8e2cd132588ba8443f3e9270d212bce04e44523e8b04fa797da79d909e3e89",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "name",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:2>",
-            "name"
-          ],
-          "required": true,
-          "schema_sha256": "7d0349c7ff2f686133d83602cd1090da1afdea8d2d400781f20b57ba1ec6f91c",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "type",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:2>",
-            "type"
-          ],
-          "required": true,
-          "schema_sha256": "92994459004182a0f29d27de909cca8b376cb596a8d655ac554fa92a8d30adc1",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "events",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:3>"
-          ],
-          "required": false,
-          "schema_sha256": "7dac0ff5f3b52d1b13afcf764d83a0720511b190c51d1a73c74bc9696774cbed",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:3>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "666775010b4235464589f4bcb1af1520b304a646160023ac993996c742684a63",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:3>",
-            "parent"
-          ],
-          "required": true,
-          "schema_sha256": "d5f6e876f64505c683365c538b704c06c1460925a7dde2a4b89f9bdc61c608d1",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "d0f6f2a06ef4d48e51291dd5efe02a3b0c0fc46df73617a8cf8bd42cf0caa1c5",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "d200cc9eadb263de6c9688067b7e6eb04e33683d53f83bad31da853c75f52b20",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "5bd1466d67f023e4365da9a452bb548f39556df880a1ef3e3505803c3443b95a",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>",
-            "value",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "f7be3125a2038a14d7cd75b5ae3a7eeefaaf39698437bbbabfa6eb0163390469",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>",
-            "value",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "f0765dbf409c74f001806c446f2cf171d8c46b5b15779d54423dde921a4b0670",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "716ae013236f7371a9e43c1fa2b8c42b87fae7a66e9dfae14ca33c032df691d4",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:1>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "8bfe7b4c0bbae812f7c3731be03db558265f0dede2f8a0d2ec2e11f57c9dabd9",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:1>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "0bd5eabca0b8834581462a67de41e64a73d914fc40a8d96e42e09616f14584fb",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "type",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:3>",
-            "type"
-          ],
-          "required": true,
-          "schema_sha256": "2dd450490534930e9da665377cc98230d62d9a57253a1f8bf466f5c8747f764a",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "events",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:4>"
-          ],
-          "required": false,
-          "schema_sha256": "d96cee783c630aec17979cf18e304562ca46204302a62b26520373e4eff06668",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:4>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "f9254c4e13d76ac7baea8339084fb01d9113a170f373e2f36082a10e5674a606",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "name",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:4>",
-            "name"
-          ],
-          "required": true,
-          "schema_sha256": "9a117032d9994f3df9b834eceb77ba902e6f65eee0beaa5d30091d92e06dfbf0",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:4>",
-            "parent"
-          ],
-          "required": true,
-          "schema_sha256": "6b838ac597f1abb82ed093744485b90ae3c44be598aca21acf6d38c3a2ff654e",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "d0f6f2a06ef4d48e51291dd5efe02a3b0c0fc46df73617a8cf8bd42cf0caa1c5",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "d200cc9eadb263de6c9688067b7e6eb04e33683d53f83bad31da853c75f52b20",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "5bd1466d67f023e4365da9a452bb548f39556df880a1ef3e3505803c3443b95a",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>",
-            "value",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "f7be3125a2038a14d7cd75b5ae3a7eeefaaf39698437bbbabfa6eb0163390469",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>",
-            "value",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "f0765dbf409c74f001806c446f2cf171d8c46b5b15779d54423dde921a4b0670",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "716ae013236f7371a9e43c1fa2b8c42b87fae7a66e9dfae14ca33c032df691d4",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:1>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "8bfe7b4c0bbae812f7c3731be03db558265f0dede2f8a0d2ec2e11f57c9dabd9",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:1>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "0bd5eabca0b8834581462a67de41e64a73d914fc40a8d96e42e09616f14584fb",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "type",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "events",
-            "[]",
-            "<oneOf:4>",
-            "type"
-          ],
-          "required": true,
-          "schema_sha256": "85cd5844c08d8ec0f594d4e56ded2c20ceb316f737e25e09227822978721f043",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "inclusions",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "inclusions"
-          ],
-          "required": false,
-          "schema_sha256": "b503394c57e07725df776645832b1cfac5877f78211b4dca260b2bdb19517696",
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "inclusions",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "inclusions",
-            "[]"
-          ],
-          "required": false,
-          "schema_sha256": "1dc8021993ee9f45d965bd39be79f93c0f552bd11f05956d8e5cc9ffda2fcd06",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "name",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "name"
-          ],
-          "required": true,
-          "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "rebuild",
-          "path": [
-            "arguments",
-            "soundbanks",
-            "[]",
-            "rebuild"
-          ],
-          "required": false,
-          "schema_sha256": "7cfd36e91c47df01a909a094d2b410e4276e3371a80e4b2468db5f44a13803bc",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "write_to_disk",
-          "path": [
-            "arguments",
-            "write_to_disk"
-          ],
-          "required": true,
-          "schema_sha256": "02e70d99380d0cc184f95bd0d4c286c1c4d5e530ba725618c6321376ec9480b9",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "a202a02753c98017d25d4a4fd9a6d3337d86d1089808cbded55bf7aab07acc6f"
-    },
-    {
-      "model_values": [
-        {
           "name": "io_root",
           "path": [
             "arguments",
@@ -7163,6 +5756,35 @@
     {
       "model_values": [
         {
+          "name": "files",
+          "path": [
+            "soundbank_plan",
+            "files"
+          ],
+          "required": true,
+          "schema_sha256": "4af93c0f47fb9f249702b5112bbdfcac7c6c0e046d221912c6c00d215ed3bcdb",
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "name": "io_root",
+          "path": [
+            "soundbank_plan",
+            "io_root"
+          ],
+          "required": true,
+          "schema_sha256": "a4e97ef5bd69435e645817b19d569f30005f754c1b877f7046016770e855a7ef",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        }
+      ],
+      "sha256": "ba8b387b5fed3d8621b03bf1e9aba4b52bbe775d3ec6b48f73eaf1d7eb0a76c2"
+    },
+    {
+      "model_values": [
+        {
           "name": "object_handle",
           "path": [
             "declaration",
@@ -7478,1203 +6100,71 @@
     {
       "model_values": [
         {
-          "name": "inclusions",
+          "name": "soundbank_handle",
           "path": [
-            "arguments",
-            "inclusions"
+            "soundbank_plan",
+            "soundbank_handle"
           ],
           "required": true,
-          "schema_sha256": "cd450f090eb52aed6ecaf451efa09ed68ecb32c21b62c8ed7407893313156983",
-          "shape": "array",
+          "schema_sha256": "822480076c6cd5e2571bcd4dd9a3f4218fda284a770db9348df8a57024ebff91",
+          "shape": "scalar",
           "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "name": "mode",
+          "path": [
+            "soundbank_plan",
+            "mode"
+          ],
+          "required": true,
+          "schema_sha256": "f2774112fc1dba0d1803f63c6b0f24b63a4801324be682a1c2d9fc27711b0793",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
         },
         {
           "name": "inclusions",
           "path": [
-            "arguments",
-            "inclusions",
-            "[]"
+            "soundbank_plan",
+            "inclusions"
           ],
           "required": true,
-          "schema_sha256": "6db23811d5681def9b7b17858f441d63d0b79d8f62b5879416d250375940b164",
-          "shape": "object",
+          "schema_sha256": "cf59a200053c62794d45b07da9fc5c5146d389fe1c0d1e1b2de6197554065aca",
+          "shape": "array",
           "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "name": "object_handle",
+          "path": [
+            "soundbank_plan",
+            "inclusions",
+            "[]",
+            "object_handle"
+          ],
+          "required": true,
+          "schema_sha256": "632163d0723fa8ac65d3f6db688998cc9962cc484c725145eb118033572ead98",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
         },
         {
           "name": "filters",
           "path": [
-            "arguments",
+            "soundbank_plan",
             "inclusions",
             "[]",
             "filters"
           ],
           "required": true,
-          "schema_sha256": "ba47b7faee5de3c5640fd675f7d68af01a623a220d5da0f57f45b13c0a59de21",
+          "schema_sha256": "fafbdabe6a4628b1889e90e20208200e689d4cd038ee7a7a3b1732863f04f3cf",
           "shape": "array",
           "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "filters",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "filters",
-            "[]"
-          ],
-          "required": true,
-          "schema_sha256": "bf3269552d8c37075160031e15035f2f116ac02c9566f5e5ee977f5bb8096a01",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
           "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "object",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object"
-          ],
-          "required": true,
-          "schema_sha256": "b2bb079f7369ee516099b6c0a25dfe674aa43aac955e2b5d8ef0183cca124e25",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "object",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "85724bd9311dc46c53a1c13d79ed38078e5fbf1a01b2ddea93a8a672f0066219",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:0>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "d200cc9eadb263de6c9688067b7e6eb04e33683d53f83bad31da853c75f52b20",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:0>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "138251f1baf7e77020390ef9cd05892e62d874014a557420090b840bcfa9cd82",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "object",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "037094c5eae8f946c0e71e2f882b8b8c913c545ca207ba4e977d4814e90e706e",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:1>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "8bfe7b4c0bbae812f7c3731be03db558265f0dede2f8a0d2ec2e11f57c9dabd9",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:1>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "b96b8929cc6713ed744c5758d79ff4fd503c3148de163db8ab8b303633632491",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "object",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:2>"
-          ],
-          "required": true,
-          "schema_sha256": "5920c555e83a3810a7bc95e42a39badb953a8778584681afa898498048adf6eb",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:2>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "8c8e2cd132588ba8443f3e9270d212bce04e44523e8b04fa797da79d909e3e89",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "name",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:2>",
-            "name"
-          ],
-          "required": true,
-          "schema_sha256": "7d0349c7ff2f686133d83602cd1090da1afdea8d2d400781f20b57ba1ec6f91c",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "type",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:2>",
-            "type"
-          ],
-          "required": true,
-          "schema_sha256": "92994459004182a0f29d27de909cca8b376cb596a8d655ac554fa92a8d30adc1",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "object",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:3>"
-          ],
-          "required": true,
-          "schema_sha256": "7dac0ff5f3b52d1b13afcf764d83a0720511b190c51d1a73c74bc9696774cbed",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:3>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "666775010b4235464589f4bcb1af1520b304a646160023ac993996c742684a63",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:3>",
-            "parent"
-          ],
-          "required": true,
-          "schema_sha256": "d5f6e876f64505c683365c538b704c06c1460925a7dde2a4b89f9bdc61c608d1",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "d0f6f2a06ef4d48e51291dd5efe02a3b0c0fc46df73617a8cf8bd42cf0caa1c5",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "d200cc9eadb263de6c9688067b7e6eb04e33683d53f83bad31da853c75f52b20",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "5bd1466d67f023e4365da9a452bb548f39556df880a1ef3e3505803c3443b95a",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>",
-            "value",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "f7be3125a2038a14d7cd75b5ae3a7eeefaaf39698437bbbabfa6eb0163390469",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>",
-            "value",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "f0765dbf409c74f001806c446f2cf171d8c46b5b15779d54423dde921a4b0670",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "716ae013236f7371a9e43c1fa2b8c42b87fae7a66e9dfae14ca33c032df691d4",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:1>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "8bfe7b4c0bbae812f7c3731be03db558265f0dede2f8a0d2ec2e11f57c9dabd9",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:1>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "0bd5eabca0b8834581462a67de41e64a73d914fc40a8d96e42e09616f14584fb",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "type",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:3>",
-            "type"
-          ],
-          "required": true,
-          "schema_sha256": "2dd450490534930e9da665377cc98230d62d9a57253a1f8bf466f5c8747f764a",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "object",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:4>"
-          ],
-          "required": true,
-          "schema_sha256": "d96cee783c630aec17979cf18e304562ca46204302a62b26520373e4eff06668",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:4>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "f9254c4e13d76ac7baea8339084fb01d9113a170f373e2f36082a10e5674a606",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "name",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:4>",
-            "name"
-          ],
-          "required": true,
-          "schema_sha256": "9a117032d9994f3df9b834eceb77ba902e6f65eee0beaa5d30091d92e06dfbf0",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:4>",
-            "parent"
-          ],
-          "required": true,
-          "schema_sha256": "6b838ac597f1abb82ed093744485b90ae3c44be598aca21acf6d38c3a2ff654e",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "d0f6f2a06ef4d48e51291dd5efe02a3b0c0fc46df73617a8cf8bd42cf0caa1c5",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "d200cc9eadb263de6c9688067b7e6eb04e33683d53f83bad31da853c75f52b20",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "5bd1466d67f023e4365da9a452bb548f39556df880a1ef3e3505803c3443b95a",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>",
-            "value",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "f7be3125a2038a14d7cd75b5ae3a7eeefaaf39698437bbbabfa6eb0163390469",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>",
-            "value",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "f0765dbf409c74f001806c446f2cf171d8c46b5b15779d54423dde921a4b0670",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "716ae013236f7371a9e43c1fa2b8c42b87fae7a66e9dfae14ca33c032df691d4",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:1>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "8bfe7b4c0bbae812f7c3731be03db558265f0dede2f8a0d2ec2e11f57c9dabd9",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:1>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "0bd5eabca0b8834581462a67de41e64a73d914fc40a8d96e42e09616f14584fb",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "type",
-          "path": [
-            "arguments",
-            "inclusions",
-            "[]",
-            "object",
-            "<oneOf:4>",
-            "type"
-          ],
-          "required": true,
-          "schema_sha256": "85cd5844c08d8ec0f594d4e56ded2c20ceb316f737e25e09227822978721f043",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "mode",
-          "path": [
-            "arguments",
-            "mode"
-          ],
-          "required": true,
-          "schema_sha256": "5a597f6c9fa554812e531c7016926a32e541122be25d20b805c298c9f8a417d9",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "soundbank",
-          "path": [
-            "arguments",
-            "soundbank"
-          ],
-          "required": true,
-          "schema_sha256": "b2bb079f7369ee516099b6c0a25dfe674aa43aac955e2b5d8ef0183cca124e25",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "soundbank",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "85724bd9311dc46c53a1c13d79ed38078e5fbf1a01b2ddea93a8a672f0066219",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:0>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "d200cc9eadb263de6c9688067b7e6eb04e33683d53f83bad31da853c75f52b20",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:0>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "138251f1baf7e77020390ef9cd05892e62d874014a557420090b840bcfa9cd82",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "soundbank",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "037094c5eae8f946c0e71e2f882b8b8c913c545ca207ba4e977d4814e90e706e",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:1>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "8bfe7b4c0bbae812f7c3731be03db558265f0dede2f8a0d2ec2e11f57c9dabd9",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:1>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "b96b8929cc6713ed744c5758d79ff4fd503c3148de163db8ab8b303633632491",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "soundbank",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:2>"
-          ],
-          "required": true,
-          "schema_sha256": "5920c555e83a3810a7bc95e42a39badb953a8778584681afa898498048adf6eb",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:2>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "8c8e2cd132588ba8443f3e9270d212bce04e44523e8b04fa797da79d909e3e89",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "name",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:2>",
-            "name"
-          ],
-          "required": true,
-          "schema_sha256": "7d0349c7ff2f686133d83602cd1090da1afdea8d2d400781f20b57ba1ec6f91c",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "type",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:2>",
-            "type"
-          ],
-          "required": true,
-          "schema_sha256": "92994459004182a0f29d27de909cca8b376cb596a8d655ac554fa92a8d30adc1",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "soundbank",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:3>"
-          ],
-          "required": true,
-          "schema_sha256": "7dac0ff5f3b52d1b13afcf764d83a0720511b190c51d1a73c74bc9696774cbed",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:3>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "666775010b4235464589f4bcb1af1520b304a646160023ac993996c742684a63",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:3>",
-            "parent"
-          ],
-          "required": true,
-          "schema_sha256": "d5f6e876f64505c683365c538b704c06c1460925a7dde2a4b89f9bdc61c608d1",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "d0f6f2a06ef4d48e51291dd5efe02a3b0c0fc46df73617a8cf8bd42cf0caa1c5",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "d200cc9eadb263de6c9688067b7e6eb04e33683d53f83bad31da853c75f52b20",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "5bd1466d67f023e4365da9a452bb548f39556df880a1ef3e3505803c3443b95a",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>",
-            "value",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "f7be3125a2038a14d7cd75b5ae3a7eeefaaf39698437bbbabfa6eb0163390469",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>",
-            "value",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "f0765dbf409c74f001806c446f2cf171d8c46b5b15779d54423dde921a4b0670",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "716ae013236f7371a9e43c1fa2b8c42b87fae7a66e9dfae14ca33c032df691d4",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:1>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "8bfe7b4c0bbae812f7c3731be03db558265f0dede2f8a0d2ec2e11f57c9dabd9",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:1>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "0bd5eabca0b8834581462a67de41e64a73d914fc40a8d96e42e09616f14584fb",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "type",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:3>",
-            "type"
-          ],
-          "required": true,
-          "schema_sha256": "2dd450490534930e9da665377cc98230d62d9a57253a1f8bf466f5c8747f764a",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "soundbank",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:4>"
-          ],
-          "required": true,
-          "schema_sha256": "d96cee783c630aec17979cf18e304562ca46204302a62b26520373e4eff06668",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:4>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "f9254c4e13d76ac7baea8339084fb01d9113a170f373e2f36082a10e5674a606",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "name",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:4>",
-            "name"
-          ],
-          "required": true,
-          "schema_sha256": "9a117032d9994f3df9b834eceb77ba902e6f65eee0beaa5d30091d92e06dfbf0",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:4>",
-            "parent"
-          ],
-          "required": true,
-          "schema_sha256": "6b838ac597f1abb82ed093744485b90ae3c44be598aca21acf6d38c3a2ff654e",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "d0f6f2a06ef4d48e51291dd5efe02a3b0c0fc46df73617a8cf8bd42cf0caa1c5",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "d200cc9eadb263de6c9688067b7e6eb04e33683d53f83bad31da853c75f52b20",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "5bd1466d67f023e4365da9a452bb548f39556df880a1ef3e3505803c3443b95a",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>",
-            "value",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "f7be3125a2038a14d7cd75b5ae3a7eeefaaf39698437bbbabfa6eb0163390469",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>",
-            "value",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "f0765dbf409c74f001806c446f2cf171d8c46b5b15779d54423dde921a4b0670",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "716ae013236f7371a9e43c1fa2b8c42b87fae7a66e9dfae14ca33c032df691d4",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:1>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "8bfe7b4c0bbae812f7c3731be03db558265f0dede2f8a0d2ec2e11f57c9dabd9",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:1>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "0bd5eabca0b8834581462a67de41e64a73d914fc40a8d96e42e09616f14584fb",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "type",
-          "path": [
-            "arguments",
-            "soundbank",
-            "<oneOf:4>",
-            "type"
-          ],
-          "required": true,
-          "schema_sha256": "85cd5844c08d8ec0f594d4e56ded2c20ceb316f737e25e09227822978721f043",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
         }
       ],
-      "sha256": "ff2d5ed91e35a1ab76d32929f114271cf886cead631ecc39fd39135f4027fbb2"
+      "sha256": "f2718d132b9b2f7c65cd01b4e48239e2d734c1ac90f02d2b1d5c1ae0fc26bd79"
     }
   ],
   "contract": "waapi-skill.interface-depth-inventory/v1",
@@ -160319,7 +157809,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "31e14a2988493d781b4973e5603a2818e5fa3b7faef8880a41cfa81f5b722772",
+  "inventory_sha256": "691593284bb8679964aa24b38cff68d05d94cf55f4f2f68d8806d8909d141326",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -191757,12 +189247,12 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "95dcfdb6f451a2f3a2044240cb8753e7ccc5128cbb572c63d54ff32f6b41842c",
+      "argument_contract_sha256": "14c79ef254c97578426a42f57dfa19418d07762c408a9c078001c5f4b6a9e85b",
       "audit_evidence": null,
       "classification": "named-soundbank-planning",
-      "contract_sha256": "89bb1f3867d627f30f92836efed55426102b399b829e2eb94ae7ee81cadb172e",
+      "contract_sha256": "b421c3649837ecea93bce7599b86daa6ad51ccb0f7c2d8964bd9113770e39b44",
       "disposition": "migration_required",
-      "input_mode": "composer",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "native_object_path",
         "wire_type",
@@ -191788,12 +189278,12 @@
       "version": "2022.1"
     },
     {
-      "argument_contract_sha256": "95dcfdb6f451a2f3a2044240cb8753e7ccc5128cbb572c63d54ff32f6b41842c",
+      "argument_contract_sha256": "14c79ef254c97578426a42f57dfa19418d07762c408a9c078001c5f4b6a9e85b",
       "audit_evidence": null,
       "classification": "named-soundbank-planning",
-      "contract_sha256": "89bb1f3867d627f30f92836efed55426102b399b829e2eb94ae7ee81cadb172e",
+      "contract_sha256": "661fd8c5f5e22155d395580d31b750942ef3ef099b6dacb2647aa02d65cdd4b6",
       "disposition": "migration_required",
-      "input_mode": "composer",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "native_object_path",
         "wire_type",
@@ -191819,12 +189309,12 @@
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "95dcfdb6f451a2f3a2044240cb8753e7ccc5128cbb572c63d54ff32f6b41842c",
+      "argument_contract_sha256": "14c79ef254c97578426a42f57dfa19418d07762c408a9c078001c5f4b6a9e85b",
       "audit_evidence": null,
       "classification": "named-soundbank-planning",
-      "contract_sha256": "89bb1f3867d627f30f92836efed55426102b399b829e2eb94ae7ee81cadb172e",
+      "contract_sha256": "d14e679cfe6da2a64eddf66e9df793f1562a605c612569760f279530dd2c5609",
       "disposition": "migration_required",
-      "input_mode": "composer",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "native_object_path",
         "wire_type",
@@ -191850,12 +189340,12 @@
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "95dcfdb6f451a2f3a2044240cb8753e7ccc5128cbb572c63d54ff32f6b41842c",
+      "argument_contract_sha256": "14c79ef254c97578426a42f57dfa19418d07762c408a9c078001c5f4b6a9e85b",
       "audit_evidence": null,
       "classification": "named-soundbank-planning",
-      "contract_sha256": "89bb1f3867d627f30f92836efed55426102b399b829e2eb94ae7ee81cadb172e",
+      "contract_sha256": "870b875e8d738481b2fbfba155552facf2f555e32cc79f36ead76b6caefcd32c",
       "disposition": "migration_required",
-      "input_mode": "composer",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "native_object_path",
         "wire_type",
@@ -191881,12 +189371,12 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "a202a02753c98017d25d4a4fd9a6d3337d86d1089808cbded55bf7aab07acc6f",
+      "argument_contract_sha256": "4f817751ee99433a905c368da26e4b2f24b6cb92bafee37c017c594ad0289a83",
       "audit_evidence": null,
       "classification": "named-soundbank-planning",
-      "contract_sha256": "f16ddcb3ac4379f49b95999102a31f91626efc713ea046c4e8bf3b6e279eb64f",
+      "contract_sha256": "7cf412e29373848fead85a5bbfc872938f050ad57c567d1c0cdcef82adcb6bd7",
       "disposition": "migration_required",
-      "input_mode": "composer",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "native_object_path",
         "wire_type",
@@ -191912,12 +189402,12 @@
       "version": "2021.1"
     },
     {
-      "argument_contract_sha256": "a202a02753c98017d25d4a4fd9a6d3337d86d1089808cbded55bf7aab07acc6f",
+      "argument_contract_sha256": "4f817751ee99433a905c368da26e4b2f24b6cb92bafee37c017c594ad0289a83",
       "audit_evidence": null,
       "classification": "named-soundbank-planning",
-      "contract_sha256": "f16ddcb3ac4379f49b95999102a31f91626efc713ea046c4e8bf3b6e279eb64f",
+      "contract_sha256": "5cc37a01f6c647f04bf9c9b1a5cc45069e2503a95b0bf2d3f47a17a3a977f409",
       "disposition": "migration_required",
-      "input_mode": "composer",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "native_object_path",
         "wire_type",
@@ -191943,12 +189433,12 @@
       "version": "2022.1"
     },
     {
-      "argument_contract_sha256": "a202a02753c98017d25d4a4fd9a6d3337d86d1089808cbded55bf7aab07acc6f",
+      "argument_contract_sha256": "4f817751ee99433a905c368da26e4b2f24b6cb92bafee37c017c594ad0289a83",
       "audit_evidence": null,
       "classification": "named-soundbank-planning",
-      "contract_sha256": "f16ddcb3ac4379f49b95999102a31f91626efc713ea046c4e8bf3b6e279eb64f",
+      "contract_sha256": "ed993510516dfbc512bdac3741ba5302c6a9bee6a64f07f31f8e6580d7127612",
       "disposition": "migration_required",
-      "input_mode": "composer",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "native_object_path",
         "wire_type",
@@ -191974,12 +189464,12 @@
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "a202a02753c98017d25d4a4fd9a6d3337d86d1089808cbded55bf7aab07acc6f",
+      "argument_contract_sha256": "4f817751ee99433a905c368da26e4b2f24b6cb92bafee37c017c594ad0289a83",
       "audit_evidence": null,
       "classification": "named-soundbank-planning",
-      "contract_sha256": "f16ddcb3ac4379f49b95999102a31f91626efc713ea046c4e8bf3b6e279eb64f",
+      "contract_sha256": "67cbacc18c5ac2b147be6feded649b82465da204d8d25936bdf5f09da1d55b10",
       "disposition": "migration_required",
-      "input_mode": "composer",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "native_object_path",
         "wire_type",
@@ -192005,12 +189495,12 @@
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "a202a02753c98017d25d4a4fd9a6d3337d86d1089808cbded55bf7aab07acc6f",
+      "argument_contract_sha256": "4f817751ee99433a905c368da26e4b2f24b6cb92bafee37c017c594ad0289a83",
       "audit_evidence": null,
       "classification": "named-soundbank-planning",
-      "contract_sha256": "f16ddcb3ac4379f49b95999102a31f91626efc713ea046c4e8bf3b6e279eb64f",
+      "contract_sha256": "9c0f1d428948243bf687219cda5b10af40604f75d671843708c4c6a7620bfc39",
       "disposition": "migration_required",
-      "input_mode": "composer",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "native_object_path",
         "wire_type",
@@ -192036,12 +189526,12 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "883085202bc543c4e0ee4dc0e31ca4869d17b5e1cac196a21052a235f84b3be0",
+      "argument_contract_sha256": "ba8b387b5fed3d8621b03bf1e9aba4b52bbe775d3ec6b48f73eaf1d7eb0a76c2",
       "audit_evidence": null,
       "classification": "named-soundbank-planning",
-      "contract_sha256": "5e8197adb26f2ed96040680eeba5cc526c3545da0e65eb65cad7b9194f403596",
+      "contract_sha256": "c81bdccd4d114e0b24b6b933926197f586b24a6e062880a724b91d7ad81b454b",
       "disposition": "migration_required",
-      "input_mode": "inline_typed",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "native_object_path",
         "wire_type",
@@ -192067,12 +189557,12 @@
       "version": "2022.1"
     },
     {
-      "argument_contract_sha256": "883085202bc543c4e0ee4dc0e31ca4869d17b5e1cac196a21052a235f84b3be0",
+      "argument_contract_sha256": "ba8b387b5fed3d8621b03bf1e9aba4b52bbe775d3ec6b48f73eaf1d7eb0a76c2",
       "audit_evidence": null,
       "classification": "named-soundbank-planning",
-      "contract_sha256": "5e8197adb26f2ed96040680eeba5cc526c3545da0e65eb65cad7b9194f403596",
+      "contract_sha256": "9cef48d5f50ad4800f7a9d4758f5c5beceebb1ff3fa17997412749bf531cad40",
       "disposition": "migration_required",
-      "input_mode": "inline_typed",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "native_object_path",
         "wire_type",
@@ -192098,12 +189588,12 @@
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "883085202bc543c4e0ee4dc0e31ca4869d17b5e1cac196a21052a235f84b3be0",
+      "argument_contract_sha256": "ba8b387b5fed3d8621b03bf1e9aba4b52bbe775d3ec6b48f73eaf1d7eb0a76c2",
       "audit_evidence": null,
       "classification": "named-soundbank-planning",
-      "contract_sha256": "5e8197adb26f2ed96040680eeba5cc526c3545da0e65eb65cad7b9194f403596",
+      "contract_sha256": "5ffb943cc1946a315cf43b3355f10ffcce306ce2367a86356a45e59ee5822efd",
       "disposition": "migration_required",
-      "input_mode": "inline_typed",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "native_object_path",
         "wire_type",
@@ -192129,12 +189619,12 @@
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "883085202bc543c4e0ee4dc0e31ca4869d17b5e1cac196a21052a235f84b3be0",
+      "argument_contract_sha256": "ba8b387b5fed3d8621b03bf1e9aba4b52bbe775d3ec6b48f73eaf1d7eb0a76c2",
       "audit_evidence": null,
       "classification": "named-soundbank-planning",
-      "contract_sha256": "5e8197adb26f2ed96040680eeba5cc526c3545da0e65eb65cad7b9194f403596",
+      "contract_sha256": "def16404c37c7e33e628410da2c1a4a593fc10815cd9cc9293aceac7dc9694d5",
       "disposition": "migration_required",
-      "input_mode": "inline_typed",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "native_object_path",
         "wire_type",
@@ -192160,12 +189650,12 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "ff2d5ed91e35a1ab76d32929f114271cf886cead631ecc39fd39135f4027fbb2",
+      "argument_contract_sha256": "f2718d132b9b2f7c65cd01b4e48239e2d734c1ac90f02d2b1d5c1ae0fc26bd79",
       "audit_evidence": null,
       "classification": "named-soundbank-planning",
-      "contract_sha256": "8169791aa5f7fbedf768d06e112fdc12911be4fdba5e4593eef0bfe4a4a322b0",
+      "contract_sha256": "60329043c5d56770a343a72eed6951f4176a448dfb5e40ab513ac87916aadb1b",
       "disposition": "migration_required",
-      "input_mode": "composer",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "native_object_path",
         "wire_type",
@@ -192191,12 +189681,12 @@
       "version": "2021.1"
     },
     {
-      "argument_contract_sha256": "ff2d5ed91e35a1ab76d32929f114271cf886cead631ecc39fd39135f4027fbb2",
+      "argument_contract_sha256": "f2718d132b9b2f7c65cd01b4e48239e2d734c1ac90f02d2b1d5c1ae0fc26bd79",
       "audit_evidence": null,
       "classification": "named-soundbank-planning",
-      "contract_sha256": "8169791aa5f7fbedf768d06e112fdc12911be4fdba5e4593eef0bfe4a4a322b0",
+      "contract_sha256": "40a06daa9925de5043f13b2e651598bd38cc58ed1db2ab551ccd3eeb8be59d56",
       "disposition": "migration_required",
-      "input_mode": "composer",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "native_object_path",
         "wire_type",
@@ -192222,12 +189712,12 @@
       "version": "2022.1"
     },
     {
-      "argument_contract_sha256": "ff2d5ed91e35a1ab76d32929f114271cf886cead631ecc39fd39135f4027fbb2",
+      "argument_contract_sha256": "f2718d132b9b2f7c65cd01b4e48239e2d734c1ac90f02d2b1d5c1ae0fc26bd79",
       "audit_evidence": null,
       "classification": "named-soundbank-planning",
-      "contract_sha256": "8169791aa5f7fbedf768d06e112fdc12911be4fdba5e4593eef0bfe4a4a322b0",
+      "contract_sha256": "4d8d02b671126953633f8d4e8403208a0ceb1665b80b808262eec0c677f65676",
       "disposition": "migration_required",
-      "input_mode": "composer",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "native_object_path",
         "wire_type",
@@ -192253,12 +189743,12 @@
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "ff2d5ed91e35a1ab76d32929f114271cf886cead631ecc39fd39135f4027fbb2",
+      "argument_contract_sha256": "f2718d132b9b2f7c65cd01b4e48239e2d734c1ac90f02d2b1d5c1ae0fc26bd79",
       "audit_evidence": null,
       "classification": "named-soundbank-planning",
-      "contract_sha256": "8169791aa5f7fbedf768d06e112fdc12911be4fdba5e4593eef0bfe4a4a322b0",
+      "contract_sha256": "d93019249087d4a0781deac4fbd0029528a684933b4d369fb5f6f7913db28e95",
       "disposition": "migration_required",
-      "input_mode": "composer",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "native_object_path",
         "wire_type",
@@ -192284,12 +189774,12 @@
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "ff2d5ed91e35a1ab76d32929f114271cf886cead631ecc39fd39135f4027fbb2",
+      "argument_contract_sha256": "f2718d132b9b2f7c65cd01b4e48239e2d734c1ac90f02d2b1d5c1ae0fc26bd79",
       "audit_evidence": null,
       "classification": "named-soundbank-planning",
-      "contract_sha256": "8169791aa5f7fbedf768d06e112fdc12911be4fdba5e4593eef0bfe4a4a322b0",
+      "contract_sha256": "86593a93d08e95a50c68c49067385e63169b01d71d08b5d92ccde585763f8179",
       "disposition": "migration_required",
-      "input_mode": "composer",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "native_object_path",
         "wire_type",
@@ -193480,8 +190970,8 @@
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request."
   },
   "source_contracts": {
-    "gateway_parser_sha256": "01d30041d19fba4a1753a893e021ab1aa017d020e878ad8e91162a18465d0ea2",
-    "operation_contract_sha256": "35485fdce149e494a854a28b112bfb01f615a1e238510bd5a5881650a08419a2",
+    "gateway_parser_sha256": "8e777e799ee45617435d71b3705d5d3c2938d63ba208807deca97becb7fae4be",
+    "operation_contract_sha256": "4ceef731d52c943bc5a28042bb7eec2c3471b675b97817565fca1cc55772ad2a",
     "public_continuation_sha256": "dec0a20f920d025dfa61c8185dfa35f06658b1e94a16e9ac6ec30a8a74891242",
     "typed_request_surface_sha256": "6d05d64e95a6e0f7099ddd03f1da42c763e9c06f33f93cac7581c7c061a83af8"
   },

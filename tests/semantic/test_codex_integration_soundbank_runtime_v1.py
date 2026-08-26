@@ -217,9 +217,16 @@ def test_harbor_runtime_materializes_closed_dual_platform_workflow_and_cleans(
             for row in prepared.protocol.steps
             if row.name.startswith(f"{transaction_id}.")
         )
-        assert names[:2] == (
-            f"{transaction_id}.operation-schema",
-            f"{transaction_id}.draft-start",
+        assert names[0] == f"{transaction_id}.operation-schema"
+        draft_start_index = names.index(f"{transaction_id}.draft-start")
+        assert draft_start_index > 1
+        assert all(
+            name.startswith(f"{transaction_id}.query-object.")
+            for name in names[1:draft_start_index]
+        )
+        assert all(
+            not name.startswith(f"{transaction_id}.query-object.")
+            for name in names[draft_start_index + 1 :]
         )
         assert names[-5:] == (
             f"{transaction_id}.preview",

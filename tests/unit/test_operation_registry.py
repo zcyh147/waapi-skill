@@ -142,23 +142,24 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                 "object.delete",
                 "object.move",
                 "object.setName",
-                    "object.setNotes",
-                    "object.setLinked",
-                    "object.setProperty",
-                    "object.setReference",
-                    "object.create",
-                    "object.createPlugin",
-                    "object.setRTPC",
-                    "object.set",
-                    "switchContainer.addAssignment",
-                    "switchContainer.removeAssignment",
-                }
-            else COMPOSER_INPUT_MODE
-            if name
-                in {
+                "object.setNotes",
+                "object.setLinked",
+                "object.setProperty",
+                "object.setReference",
+                "object.create",
+                "object.createPlugin",
+                "object.setRTPC",
+                "object.set",
                 "soundbank.convertExternalSources",
                 "soundbank.generate",
+                "soundbank.processDefinitionFiles",
                 "soundbank.setInclusions",
+                "switchContainer.addAssignment",
+                "switchContainer.removeAssignment",
+            }
+            else COMPOSER_INPUT_MODE
+            if name
+            in {
                 "ui.commands.register",
                 "ui.commands.unregister",
                 "lua.executeCliFile",
@@ -166,18 +167,18 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                 "lua.executeCoreInline",
                 "waapi.undoGroup",
             }
-                else "inline_typed"
-                if name in {
-                    "debug.restartWaapiServers",
-                    "debug.setAsserts",
-                    "debug.setAutomationMode",
-                    "debug.testAssert",
-                    "debug.testCrash",
-                    "soundbank.processDefinitionFiles",
-                    "ui.captureScreen",
-                    "ui.commands.execute",
-                    "audio.importTabDelimited",
-                }
+            else "inline_typed"
+            if name
+            in {
+                "debug.restartWaapiServers",
+                "debug.setAsserts",
+                "debug.setAutomationMode",
+                "debug.testAssert",
+                "debug.testCrash",
+                "ui.captureScreen",
+                "ui.commands.execute",
+                "audio.importTabDelimited",
+            }
             else INTERNAL_CANONICAL_INPUT_MODE
         )
         assert operation_input_modes_by_version(name) == {

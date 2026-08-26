@@ -904,60 +904,6 @@ def test_metadata_preconditions_are_operation_local_in_composer_start(
     ]
 
 
-@pytest.mark.parametrize(
-    ("version", "operation", "path", "expected"),
-    (
-        (
-            "2022.1",
-            "soundbank.setInclusions",
-            ["args", "soundbank", "kind"],
-            {
-                "phase": "before_dynamic_disclosure",
-                "fact_action": "set",
-                "constant_fact_required": True,
-            },
-        ),
-    ),
-)
-def test_public_composer_fields_bind_fact_action_before_disclosure(
-    tmp_path: Path,
-    version: str,
-    operation: str,
-    path: list[str],
-    expected: dict[str, object],
-) -> None:
-    code, payload = execute(
-        tmp_path,
-        "--version",
-        version,
-        "operation-schema",
-        operation,
-    )
-
-    assert code == 0, payload
-    field = next(
-        item
-        for item in _composer_fields(payload["composer"])
-        if item["path"] == path
-    )
-    if "constant_fact_required" in expected:
-        assert field["constant_values"]
-        assert "fact_construction" not in field
-    else:
-        columns = payload["composer"]["top_level_fact_plan"]["columns"]
-        rows = payload["composer"]["top_level_fact_plan"]["rows"]
-        plan = [dict(zip(columns, row, strict=True)) for row in rows]
-        planned = next(item for item in plan if item["handle"] == field["handle"])
-        assert planned["phase"] == "fact"
-        assert planned["action"] == expected["fact_action"]
-    assert payload["composer"]["construction_order"]["top_level_facts"] == (
-        "follow top_level_fact_plan before disclosures"
-    )
-    assert payload["composer"]["construction_order"]["constant_facts"] == (
-        "set selected constants"
-    )
-
-
 def _archive_test_choose_response_discloses_the_selected_branch_constant_before_disclosure(
     tmp_path: Path,
 ) -> None:
@@ -2094,9 +2040,6 @@ def test_registry_composer_lanes_and_real_adapters_are_one_to_one() -> None:
 
     assert adapter_lanes == composer_lanes
     assert {operation for operation, _version in composer_lanes} == {
-        "soundbank.convertExternalSources",
-        "soundbank.generate",
-        "soundbank.setInclusions",
         "ui.commands.register",
         "ui.commands.unregister",
         "lua.executeCliFile",
@@ -2106,16 +2049,11 @@ def test_registry_composer_lanes_and_real_adapters_are_one_to_one() -> None:
     }
 
 
-def test_soundbank_generate_composer_keeps_explicit_false_batch_controls() -> None:
-    contract = operation_composer_contract("soundbank.generate", "2022.1")
+def test_soundbank_generate_shallow_composer_is_removed() -> None:
+    with pytest.raises(OperationComposerError) as error:
+        operation_composer_contract("soundbank.generate", "2022.1")
 
-    assert contract["top_level_fact_plan"]["explicit_false_controls"] == {
-        "rebuild_soundbanks": "do_not_rebuild_all_soundbanks",
-        "clear_audio_file_cache": "do_not_clear_audio_file_cache",
-        "rebuild_init_bank": "do_not_rebuild_init_bank",
-        "prompt_present_false_is_not_omitted_as_default": True,
-        "batch_with_every_remaining_complete_top_level_fact": True,
-    }
+    assert error.value.error_code == "OPERATION_DRAFT_ADAPTER_UNAVAILABLE"
 
 
 def _archive_test_live_check_is_bounded_durable_and_any_edit_invalidates_it(

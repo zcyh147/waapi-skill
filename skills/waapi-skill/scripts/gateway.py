@@ -251,6 +251,11 @@ from wwise_waapi.business_declarations import (  # noqa: E402  # pyright: ignore
     revalidate_live_types,
     resolve_semantic_kind,
 )
+from wwise_waapi.soundbank_business_cli import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    SoundBankBusinessCliError,
+    add_soundbank_plan_arguments,
+    soundbank_plan_from_namespace,
+)
 from wwise_waapi.operation_composer import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_TYPED_ACTIONS_PER_APPLY,
     OperationComposerError,
@@ -2027,6 +2032,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--state-or-switch-handle",
         required=True,
     )
+
+    draft_declare_soundbank_plan = subparsers.add_parser(
+        "draft-declare-soundbank-plan",
+        help=(
+            "Declare one complete high-level SoundBank plan using bound "
+            "objects, stable business choices, and exact caller artifacts"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_soundbank_plan)
+    add_soundbank_plan_arguments(draft_declare_soundbank_plan)
 
     draft_declare_field_change = subparsers.add_parser(
         "draft-declare-field-change",
@@ -8527,6 +8542,16 @@ def dispatch_command(
             dispatcher=dispatcher,
             common=common,
         )
+    if args.command == "draft-declare-soundbank-plan":
+        return dispatch_business_soundbank_plan(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
     if args.command == "draft-bind-field":
         return dispatch_business_field_binding(
             args,
@@ -11253,6 +11278,92 @@ def dispatch_offline_business_draft_update(
         record,
         task_authority=args.task_authority,
     )
+
+
+def dispatch_business_soundbank_plan(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Bind and validate one complete SoundBank plan without dispatching it."""
+
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if not adapter.accepts_update_command(args.command):
+        raise GatewayInputError(
+            f"{binding.record.operation} does not expose {args.command}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    session = (
+        BusinessDeclarationSession.create(binding.context)
+        if raw_session is None
+        else BusinessDeclarationSession.from_dict(raw_session)
+    )
+    if session.context != binding.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the SoundBank plan binding."
+        )
+    try:
+        plan = soundbank_plan_from_namespace(
+            args,
+            operation=binding.record.operation,
+        )
+    except SoundBankBusinessCliError as exc:
+        raise GatewayInputError(str(exc)) from exc
+
+    def update(
+        current: BusinessDeclarationSession,
+    ) -> BusinessDeclarationSession:
+        candidate = current.with_settings({"soundbank_plan": plan})
+        adapter.materialize(candidate)
+        return candidate
+
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="settings.revised",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+        }
+    )
+    return payload
 
 
 def _business_context_from_live(
@@ -16221,6 +16332,8 @@ def operation_draft_copy_command(
 
 def operation_draft_prefix_copy_binding(
     full_argv: Sequence[str],
+    *,
+    append_action: str = "copy_verbatim_then_append_complete_typed_action_groups",
 ) -> dict[str, Any]:
     """Return one copy-ready Draft prefix plus its closed append policy."""
 
@@ -16231,7 +16344,7 @@ def operation_draft_prefix_copy_binding(
         "fixed_argv_prefix_copy_instruction": {
             "contract": OPERATION_DRAFT_COMMAND_COPY_INSTRUCTION_CONTRACT,
             "source_field": "fixed_argv_prefix_copy",
-            "action": "copy_verbatim_then_append_complete_typed_action_groups",
+            "action": append_action,
             "forbidden_transformations": [
                 "reconstruct",
                 "shorten",
@@ -16381,6 +16494,11 @@ def _business_next_action_binding(
         *binding,
     ]
     declare_rtpc_prefix = [*base, "draft-declare-rtpc", *binding]
+    declare_soundbank_plan_prefix = [
+        *base,
+        "draft-declare-soundbank-plan",
+        *binding,
+    ]
     revise_prefix = [*base, "draft-revise-declaration", *binding]
     remove_prefix = [*base, "draft-remove-declaration", *binding]
     check = [*base, "draft-check", *binding]
@@ -16465,6 +16583,93 @@ def _business_next_action_binding(
                 "the_same_named_declaration_field"
             ),
         }
+    if adapter.family == "soundbank-planning":
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": {
+                "agent": "natural_language_to_closed_high_level_business_facts",
+                "gateway": "business_facts_to_exact_waapi_request_and_execution_plan",
+            },
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "native_soundbank_row",
+                "identity_selector",
+                "skip_languages",
+                "write_to_disk",
+                "request_fragment",
+                "batch_layout",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is not None and session.settings:
+            return {
+                **shared,
+                "required_next_phase": "check_complete_business_declaration",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        declaration_shapes = {
+            "soundbank.setInclusions": [
+                "--mode add|remove|replace",
+                "--soundbank-handle <bound-soundbank-handle>",
+                "[--inclusion <bound-object-handle> events|structures|media]...",
+            ],
+            "soundbank.generate": [
+                "--soundbank <bound-soundbank-handle> nonlocalized|localized|mixed",
+                "[--event <bound-soundbank-handle> <bound-event-handle>]...",
+                "[--aux-bus <bound-soundbank-handle> <bound-aux-bus-handle>]...",
+                "[--generation-inclusion <bound-soundbank-handle> events|structures|media]...",
+                "[--rebuild-soundbank <bound-soundbank-handle>|--no-rebuild-soundbank <bound-soundbank-handle>]...",
+                "--platform <project-platform-name> [--platform ...]",
+                "[--language <localized-project-language>]...",
+                "[--rebuild-soundbanks|--no-rebuild-soundbanks]",
+                "[--clear-audio-file-cache|--no-clear-audio-file-cache]",
+                "[--rebuild-init-bank|--no-rebuild-init-bank]",
+                "--io-root <exact-isolated-output-root>",
+            ],
+            "soundbank.convertExternalSources": [
+                "--source <exact-wsources-file> <project-platform-name> <exact-output-root>",
+                "[--source ...]...",
+                "--io-root <exact-isolated-root>",
+            ],
+            "soundbank.processDefinitionFiles": [
+                "--definition-file <exact-definition-file> [--definition-file ...]",
+                "--io-root <exact-isolated-root>",
+            ],
+        }
+        binding_roles = business_contract["binding"]["roles"]
+        result = {
+            **shared,
+            "required_next_phase": (
+                "bind_remaining_plan_objects_or_declare_complete_soundbank_plan"
+                if binding_roles
+                else "declare_complete_soundbank_plan"
+            ),
+            "declaration": {
+                **operation_draft_prefix_copy_binding(
+                    declare_soundbank_plan_prefix,
+                    append_action=(
+                        "copy_verbatim_then_append_one_complete_soundbank_"
+                        "business_plan"
+                    ),
+                ),
+                "append": declaration_shapes[record.operation],
+                "submit_once": True,
+                "native_request_input": "forbidden",
+            },
+        }
+        if binding_roles:
+            result["object_binding"] = {
+                **object_binding,
+                "use_only_for": binding_roles,
+                "repeat_until": "every_object_named_by_the_business_plan_is_bound",
+            }
+        return result
     if session is None:
         if role_declaration is not None:
             next_role = role_declaration.roles[0]

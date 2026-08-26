@@ -18,6 +18,7 @@ from .object_graph_business_contracts import object_graph_business_contract_data
 from .switch_assignment_business_contracts import (
     switch_assignment_business_contract_data,
 )
+from .soundbank_business_contracts import soundbank_business_contract_data
 
 
 ContractBuilder = Callable[[str, str], dict[str, Any]]
@@ -100,6 +101,10 @@ def _switch_assignment_contract(
     return switch_assignment_business_contract_data(operation, version)
 
 
+def _soundbank_contract(operation: str, version: str) -> dict[str, Any]:
+    return soundbank_business_contract_data(operation, version)
+
+
 def _materialize_audio_import(
     operation: str,
     session: BusinessDeclarationSession,
@@ -170,6 +175,15 @@ def _materialize_switch_assignment(
     return materialize_switch_assignment_business_request(operation, session)
 
 
+def _materialize_soundbank(
+    operation: str,
+    session: BusinessDeclarationSession,
+) -> Mapping[str, Any]:
+    from .soundbank_business import materialize_soundbank_business_request
+
+    return materialize_soundbank_business_request(operation, session)
+
+
 def _compile_audio_import_preview(
     session: BusinessDeclarationSession,
     build_continuation: Callable[..., Mapping[str, Any]],
@@ -203,6 +217,7 @@ class BusinessAdapter:
     records_business_preview: bool = False
     requires_wwise_path_discipline: bool = False
     role_declaration: BusinessRoleDeclaration | None = None
+    settings_are_complete_declaration: bool = False
 
     @property
     def supports_cleaned_file_evidence(self) -> bool:
@@ -468,6 +483,28 @@ _SWITCH_ASSIGNMENT_DEFINITION = {
     ),
 }
 
+_SOUNDBANK_DEFINITION = {
+    "family": "soundbank-planning",
+    "contract_builder": _soundbank_contract,
+    "materializer": _materialize_soundbank,
+    "update_commands": frozenset({"draft-declare-soundbank-plan"}),
+    "initial_projection_actions": (
+        "bind-object",
+        "declare-soundbank-plan",
+        "inspect",
+        "cancel",
+    ),
+    "active_projection_actions": (
+        "bind-object",
+        "declare-soundbank-plan",
+        "check",
+        "inspect",
+        "cancel",
+    ),
+    "auto_apply_preview": True,
+    "settings_are_complete_declaration": True,
+}
+
 
 def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdapter:
     values = dict(definition)
@@ -499,6 +536,15 @@ _BUSINESS_ADAPTERS = {
         "switchContainer.removeAssignment",
         _SWITCH_ASSIGNMENT_DEFINITION,
     ),
+    **{
+        operation: _bind_adapter(operation, _SOUNDBANK_DEFINITION)
+        for operation in (
+            "soundbank.convertExternalSources",
+            "soundbank.generate",
+            "soundbank.processDefinitionFiles",
+            "soundbank.setInclusions",
+        )
+    },
     **{
         operation: _bind_adapter(operation, _OBJECT_LIFECYCLE_DEFINITION)
         for operation in (

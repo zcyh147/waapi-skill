@@ -10798,6 +10798,17 @@ class CodexGatewayBroker:
                 "only draft-start may disclose the task authority"
             )
         if step.subcommand == "preview-from-draft":
+            if step.allowed_exit_codes == (2,):
+                if (
+                    payload.get("ok") is not False
+                    or payload.get("command") != step.expected_result_command
+                    or payload.get("error_code") != step.expected_error_code
+                ):
+                    raise GatewayInvocationError(
+                        "preview-from-draft structured refusal does not match its "
+                        "reviewed boundary"
+                    )
+                return
             if not isinstance(payload.get("transaction_id"), str) or not payload[
                 "transaction_id"
             ]:

@@ -46,10 +46,10 @@ planning; the Registry remains authoritative during implementation.
 | `object.setProperty` | 2021.1–2025.1 | Business declaration | object handle, live field handle, business scalar | live metadata and typed readback | wave 01 deep cutover complete |
 | `object.setRTPC` | 2022.1–2025.1 | Business declaration | bound object/control input, discovered property, business curve points | dedicated curve on shared URI | named graph deep cutover |
 | `object.setReference` | 2021.1–2025.1 | Business declaration | object/field/target handles or explicit clear | metadata and exact null clearing | wave 01 deep cutover complete |
-| `soundbank.convertExternalSources` | 2022.1–2025.1 | Composer | sources and I/O root | proven files and isolated artifacts | wave 04 complete |
-| `soundbank.generate` | 2021.1–2025.1 | Composer | banks/platforms/languages/output root | host paths and artifacts | wave 04 complete |
-| `soundbank.processDefinitionFiles` | 2022.1–2025.1 | Inline typed | definition files and I/O root | derived identities/inclusions | wave 04 complete |
-| `soundbank.setInclusions` | 2021.1–2025.1 | Composer | bank/mode/inclusions | list pre-state/replacement | wave 04 complete |
+| `soundbank.convertExternalSources` | 2022.1–2025.1 | Business declaration | exact source artifacts, platforms, and isolated output roots | Gateway-owned conversion rows and request envelope | wave 04 deep cutover complete |
+| `soundbank.generate` | 2021.1–2025.1 | Business declaration | bound Banks/Events/Aux Busses, artifact intent, platforms, languages, and rebuild choices | Gateway-owned identities, language switch, batch layout, and artifact plan | wave 04 deep cutover complete |
+| `soundbank.processDefinitionFiles` | 2022.1–2025.1 | Business declaration | exact Definition files and isolated I/O root | Gateway-owned file-processing plan and derived inclusion verification | wave 04 deep cutover complete |
+| `soundbank.setInclusions` | 2021.1–2025.1 | Business declaration | bound Bank/object handles, add/remove/replace intent, and inclusion meanings | Gateway-owned GUID rows, normalized pre-state, and exact replacement | wave 04 deep cutover complete |
 | `switchContainer.addAssignment` | 2021.1–2025.1 | Business declaration | bound container, child, and state-or-switch handles | Gateway-derived GUID relationship, opposite precondition, and pair readback | wave 03 deep cutover complete |
 | `switchContainer.removeAssignment` | 2021.1–2025.1 | Business declaration | bound container, child, and state-or-switch handles | Gateway-derived GUID relationship, opposite precondition, and absence readback | wave 03 deep cutover complete |
 | `ui.captureScreen` | 2021.1–2025.1 | Inline typed | optional view/channel/rectangle | Authoring and output confinement | wave 05 complete |

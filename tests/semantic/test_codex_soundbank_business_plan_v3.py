@@ -180,7 +180,7 @@ def _case(api: str, scenario_id: str, root: Path, *, refusal: bool = False, topi
             refusal=(
                 StructuredRefusal(
                     PROCESS_REFUSAL_ERROR_CODE,
-                    result_command="typed-operation",
+                    result_command="preview-from-draft",
                 )
                 if refusal
                 else None

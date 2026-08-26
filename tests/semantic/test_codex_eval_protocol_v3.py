@@ -968,7 +968,7 @@ def test_transaction_protocol_routes_object_metadata_around_typed_ingress() -> N
     assert all(step.subcommand != "typed-operation" for step in protocol.steps)
 
 
-def test_soundbank_generate_transaction_uses_typed_draft_facts() -> None:
+def test_soundbank_generate_transaction_uses_one_complete_business_plan() -> None:
     request = {
         **_request(),
         "operation": "soundbank.generate",
@@ -992,23 +992,26 @@ def test_soundbank_generate_transaction_uses_typed_draft_facts() -> None:
 
     protocol = build_transaction_protocol([request])
 
-    actions = tuple(
-        step.arguments[-1]
+    declare = next(
+        step
         for step in protocol.steps
-        if step.subcommand == "draft-apply"
+        if step.subcommand == "draft-declare-soundbank-plan"
     )
-    assert actions
-    assert all(
-        isinstance(value, (DraftTypedActionArgument, DraftTypedActionBatchArgument))
-        for value in actions
-    )
-    assert any(isinstance(value, DraftTypedActionBatchArgument) for value in actions)
-    assert all(value.operation == "soundbank.generate" for value in actions)
+
+    assert "--soundbank" in declare.arguments
+    assert "--platform" in declare.arguments
+    assert "--no-rebuild-soundbanks" in declare.arguments
+    assert "--no-clear-audio-file-cache" in declare.arguments
+    assert "--no-rebuild-init-bank" in declare.arguments
+    assert any(step.subcommand == "query-object" for step in protocol.steps)
+    assert any(step.subcommand == "draft-bind-object" for step in protocol.steps)
     assert any(step.subcommand == "preview-from-draft" for step in protocol.steps)
+    assert all(step.subcommand != "draft-apply" for step in protocol.steps)
+    assert all(step.subcommand != "typed-operation" for step in protocol.steps)
     assert all("--request-json" not in step.arguments for step in protocol.steps)
 
 
-def test_multi_row_typed_draft_finishes_each_disclosure_chain_before_next_row() -> None:
+def test_multi_bank_business_plan_binds_each_bank_once_before_one_declaration() -> None:
     request = {
         **_request(),
         "version": "2024.1",
@@ -1037,31 +1040,31 @@ def test_multi_row_typed_draft_finishes_each_disclosure_chain_before_next_row() 
     }
 
     protocol = build_transaction_protocol([request])
-    construction_names = [
-        step.name
+    queries = [
+        step for step in protocol.steps if step.subcommand == "query-object"
+    ]
+    bindings = [
+        step for step in protocol.steps if step.subcommand == "draft-bind-object"
+    ]
+    declarations = [
+        step
         for step in protocol.steps
-        if ".action." in step.name or ".disclose." in step.name
+        if step.subcommand == "draft-declare-soundbank-plan"
     ]
 
-    first_disclosure = construction_names.index("tx01.disclose.001")
-    second_disclosure = construction_names.index("tx01.disclose.002")
-    assert construction_names.index("tx01.action.001") < first_disclosure
-    assert construction_names.index("tx01.action.002") < first_disclosure
-    assert first_disclosure < construction_names.index("tx01.action.003")
-    assert construction_names.index("tx01.action.003") < second_disclosure
-    assert second_disclosure < construction_names.index("tx01.action.004")
-    batches = {
-        step.name: step.arguments[-1]
-        for step in protocol.steps
-        if step.subcommand == "draft-apply"
-    }
-    assert isinstance(batches["tx01.action.003"], DraftTypedActionBatchArgument)
-    assert isinstance(batches["tx01.action.004"], DraftTypedActionBatchArgument)
-    assert len(batches["tx01.action.003"].actions) == 4
-    assert len(batches["tx01.action.004"].actions) == 4
+    assert [step.arguments[6] for step in queries] == ["Main_UI", "Dialogue"]
+    assert len(bindings) == 2
+    assert len(declarations) == 1
+    declare = declarations[0]
+    assert declare.arguments.count("--soundbank") == 2
+    assert declare.arguments.count("--no-rebuild-soundbank") == 2
+    assert declare.arguments[4] == ResponseBinding(
+        "tx01.bind-object.002",
+        "/draft/revision",
+    )
 
 
-def test_nested_choice_uses_parent_disclosure_choice_without_requery() -> None:
+def test_set_inclusions_business_plan_binds_ids_without_typed_disclosure() -> None:
     request = {
         **_request(),
         "operation": "soundbank.setInclusions",
@@ -1084,35 +1087,34 @@ def test_nested_choice_uses_parent_disclosure_choice_without_requery() -> None:
     }
 
     protocol = build_transaction_protocol([request])
-    construction = tuple(
+    bindings = [
+        step for step in protocol.steps if step.subcommand == "draft-bind-object"
+    ]
+    declare = next(
         step
         for step in protocol.steps
-        if ".action." in step.name or ".disclose." in step.name
+        if step.subcommand == "draft-declare-soundbank-plan"
     )
 
-    assert all(not step.name.endswith(".choices") for step in construction)
-    object_disclosure = next(
-        step for step in construction if step.name == "tx01.disclose.002"
+    assert len(bindings) == 2
+    assert bindings[0].arguments[-2:] == (
+        "--object-id",
+        "{00000000-0000-0000-0000-000000000001}",
     )
-    assert object_disclosure.arguments[-2] == "--choice-handle"
-    assert object_disclosure.arguments[-1] == ResponseBinding(
-        "tx01.disclose.001",
-        "/child_contract/branch_choices/0/choices/0/handle",
+    assert bindings[1].arguments[-2:] == (
+        "--object-id",
+        "{00000000-0000-0000-0000-000000000002}",
     )
-    construction_names = [step.name for step in construction]
-    assert construction_names.index("tx01.disclose.002") < construction_names.index(
-        "tx01.action.002"
+    assert declare.arguments[-7:] == (
+        "--mode",
+        "replace",
+        "--soundbank-handle",
+        ResponseBinding("tx01.bind-object.001", "/bound_object/handle"),
+        "--inclusion",
+        ResponseBinding("tx01.bind-object.002", "/bound_object/handle"),
+        "events",
     )
-    action_batches = [
-        step.arguments[-1]
-        for step in construction
-        if step.name in {"tx01.action.002", "tx01.action.003"}
-    ]
-    assert all(
-        isinstance(batch, DraftTypedActionBatchArgument)
-        for batch in action_batches
-    )
-    assert [len(batch.actions) for batch in action_batches] == [6, 2]
+    assert all(step.subcommand != "draft-apply" for step in protocol.steps)
 
 
 def test_metadata_transaction_protocol_is_generic_and_binds_every_preview() -> None:

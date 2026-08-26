@@ -189,6 +189,7 @@ EXPECTED_DRAFT_REVISION_SUBCOMMANDS = frozenset(
         "draft-declare-object-change",
         "draft-declare-rtpc",
         "draft-declare-switch-assignment",
+        "draft-declare-soundbank-plan",
         "draft-discover-fields",
         "draft-discover-types",
         "draft-remove-declaration",
@@ -2354,6 +2355,12 @@ def _synthetic_gateway_records(
     records: list[dict[str, Any]] = []
     draft_store = OperationDraftStore(task_root / "broker" / "state")
     draft_started: dict[str, tuple[str, str, str, int]] = {}
+    soundbank_business_operations = {
+        "soundbank.convertExternalSources",
+        "soundbank.generate",
+        "soundbank.processDefinitionFiles",
+        "soundbank.setInclusions",
+    }
     required_response_values: dict[tuple[str, str], Any] = {}
     for expected_step in protocol.steps:
         for expected_argument in expected_step.arguments:
@@ -2529,6 +2536,82 @@ def _synthetic_gateway_records(
                     "task_authority": started.task_authority,
                 }
             )
+        elif step.subcommand == "query-object":
+            query_arguments = tuple(
+                item for item in step.arguments if isinstance(item, str)
+            )
+            if "--type" in query_arguments and "--where" in query_arguments:
+                object_type = query_arguments[query_arguments.index("--type") + 1]
+                where_index = query_arguments.index("--where")
+                if query_arguments[where_index + 1 : where_index + 4] == (
+                    "name",
+                    "=",
+                    "string",
+                ):
+                    object_name = query_arguments[where_index + 4]
+                    object_suffix = hashlib.sha256(
+                        f"{object_type}\0{object_name}".encode("utf-8")
+                    ).hexdigest()[:12].upper()
+                    payload["objects"] = [
+                        {
+                            "id": "{00000000-0000-0000-0000-" + object_suffix + "}",
+                            "name": object_name,
+                            "type": object_type,
+                            "path": f"\\Synthetic\\{object_name}",
+                        }
+                    ]
+        elif step.subcommand == "draft-bind-object":
+            operation = next(reversed(draft_started))
+            draft_id, authority, schema_digest, revision = draft_started[operation]
+            if operation not in soundbank_business_operations:
+                raise AssertionError(
+                    "synthetic object binding is only modeled for SoundBank business"
+                )
+            revision += 1
+            draft_started[operation] = (
+                draft_id,
+                authority,
+                schema_digest,
+                revision,
+            )
+            handle = "boh1-" + f"{index:032x}"
+            payload.update(
+                {
+                    "draft": {
+                        "draft_id": draft_id,
+                        "revision": revision,
+                        "lifecycle_state": "editable",
+                        "binding": {
+                            "operation": operation,
+                            "version": version,
+                            "schema_digest": schema_digest,
+                        },
+                    },
+                    "bound_object": {"handle": handle},
+                }
+            )
+        elif step.subcommand == "draft-declare-soundbank-plan":
+            operation = next(reversed(draft_started))
+            draft_id, authority, schema_digest, revision = draft_started[operation]
+            if operation not in soundbank_business_operations:
+                raise AssertionError("synthetic SoundBank plan operation is invalid")
+            revision += 1
+            draft_started[operation] = (
+                draft_id,
+                authority,
+                schema_digest,
+                revision,
+            )
+            payload["draft"] = {
+                "draft_id": draft_id,
+                "revision": revision,
+                "lifecycle_state": "editable",
+                "binding": {
+                    "operation": operation,
+                    "version": version,
+                    "schema_digest": schema_digest,
+                },
+            }
         elif step.subcommand == "draft-apply":
             operation = next(reversed(draft_started))
             draft_id, authority, schema_digest, revision = draft_started[operation]
@@ -2595,44 +2678,61 @@ def _synthetic_gateway_records(
         elif step.subcommand == "draft-check":
             operation = next(reversed(draft_started))
             draft_id, authority, schema_digest, revision = draft_started[operation]
-            materialized = draft_store.materialize_request(
-                draft_id,
-                task_authority=authority,
-                expected_revision=revision,
-                schema_digest=schema_digest,
-                composer_digest=operation_composer_digest(operation, version),
-            )
-            checked = draft_store.record_check(
-                draft_id,
-                task_authority=authority,
-                expected_revision=revision,
-                schema_digest=schema_digest,
-                composer_digest=operation_composer_digest(operation, version),
-                request_digest=materialized.request_digest,
-                project_guard={},
-                runtime_guard_fingerprint="b" * 64,
-                prepared_digest="c" * 64,
-            )
-            draft_started[operation] = (
-                draft_id,
-                authority,
-                schema_digest,
-                checked.revision,
-            )
+            if operation in soundbank_business_operations:
+                revision += 1
+                draft_started[operation] = (
+                    draft_id,
+                    authority,
+                    schema_digest,
+                    revision,
+                )
+                checked_revision = revision
+                checked_composition: Mapping[str, Any] | None = None
+            else:
+                materialized = draft_store.materialize_request(
+                    draft_id,
+                    task_authority=authority,
+                    expected_revision=revision,
+                    schema_digest=schema_digest,
+                    composer_digest=operation_composer_digest(operation, version),
+                )
+                checked = draft_store.record_check(
+                    draft_id,
+                    task_authority=authority,
+                    expected_revision=revision,
+                    schema_digest=schema_digest,
+                    composer_digest=operation_composer_digest(operation, version),
+                    request_digest=materialized.request_digest,
+                    project_guard={},
+                    runtime_guard_fingerprint="b" * 64,
+                    prepared_digest="c" * 64,
+                )
+                draft_started[operation] = (
+                    draft_id,
+                    authority,
+                    schema_digest,
+                    checked.revision,
+                )
+                checked_revision = checked.revision
+                checked_composition = checked.composition
             payload["draft"] = {
                 "draft_id": draft_id,
-                "revision": checked.revision,
+                "revision": checked_revision,
                 "lifecycle_state": "editable",
                 "binding": {
                     "operation": operation,
                     "version": version,
                     "schema_digest": schema_digest,
                 },
-                **operation_draft_public_projection(
-                    composition_projection(
-                        operation,
-                        version,
-                        checked.composition,
+                **(
+                    {}
+                    if checked_composition is None
+                    else operation_draft_public_projection(
+                        composition_projection(
+                            operation,
+                            version,
+                            checked_composition,
+                        )
                     )
                 ),
             }
@@ -2659,21 +2759,26 @@ def _synthetic_gateway_records(
         elif step.subcommand == "preview-from-draft":
             operation = next(reversed(draft_started))
             draft_id, authority, schema_digest, revision = draft_started[operation]
-            reservation = draft_store.reserve_seal(
-                draft_id,
-                task_authority=authority,
-                expected_revision=revision,
-                schema_digest=schema_digest,
-                composer_digest=operation_composer_digest(operation, version),
-                transaction_id=transaction_id,
-                apply=True,
-                ttl_seconds=1800,
-                policy="ask_before_changes",
-            )
-            artifact_hash = (
-                "a" * 64
-            )
-            canonical_request = reservation.request
+            if operation in soundbank_business_operations:
+                if step.expected_operation_request is None:
+                    raise AssertionError(
+                        "synthetic SoundBank preview requires its canonical request"
+                    )
+                canonical_request = dict(step.expected_operation_request)
+                reservation = None
+            else:
+                reservation = draft_store.reserve_seal(
+                    draft_id,
+                    task_authority=authority,
+                    expected_revision=revision,
+                    schema_digest=schema_digest,
+                    composer_digest=operation_composer_digest(operation, version),
+                    transaction_id=transaction_id,
+                    apply=True,
+                    ttl_seconds=1800,
+                    policy="ask_before_changes",
+                )
+                canonical_request = reservation.request
             prepared = {
                 "request": canonical_request,
                 "cleanup": {"kind": "none"},
@@ -2687,14 +2792,15 @@ def _synthetic_gateway_records(
             transaction_store.submit_for_confirmation(transaction_id)
             awaiting_snapshot = transaction_store.load_snapshot(transaction_id)
             artifact_hash = awaiting_snapshot.preview.artifact_hash
-            draft_store.commit_seal(
-                draft_id,
-                task_authority=authority,
-                source_revision=reservation.source_revision,
-                transaction_id=transaction_id,
-                artifact_hash=artifact_hash,
-                transaction_state="awaiting_confirmation",
-            )
+            if reservation is not None:
+                draft_store.commit_seal(
+                    draft_id,
+                    task_authority=authority,
+                    source_revision=reservation.source_revision,
+                    transaction_id=transaction_id,
+                    artifact_hash=artifact_hash,
+                    transaction_state="awaiting_confirmation",
+                )
             payload.update(
                 {
                     "transaction_id": transaction_id,
@@ -3626,7 +3732,7 @@ def test_campaign_broker_seal_accepts_expected_exit2_failed_command_status(
 
     assert len(command_records) == len(protocol.steps)
     assert [(record.exit_code, record.status) for record in command_records] == [
-        (0, "completed"),
+        *((0, "completed"),) * (len(protocol.steps) - 1),
         (2, "failed"),
     ]
     campaign._validate_heavy_v3_broker_records(

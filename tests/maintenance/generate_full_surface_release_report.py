@@ -290,6 +290,24 @@ def _continuation_error(
                                 or not contract.get("gateway_derivations")
                             ):
                                 return "business declaration Adapter is incomplete"
+                        elif operation in {
+                            "soundbank.convertExternalSources",
+                            "soundbank.generate",
+                            "soundbank.processDefinitionFiles",
+                            "soundbank.setInclusions",
+                        }:
+                            if (
+                                not isinstance(declaration, Mapping)
+                                or declaration.get("subcommand")
+                                != "draft-declare-soundbank-plan"
+                                or not declaration.get("required_fields")
+                                or contract.get("legacy_composer_public")
+                                is not False
+                                or contract.get("legacy_inline_typed_public")
+                                is not False
+                                or not contract.get("gateway_derivations")
+                            ):
+                                return "business declaration Adapter is incomplete"
                         elif (
                             not isinstance(declaration, Mapping)
                             or not declaration.get("required_fields")

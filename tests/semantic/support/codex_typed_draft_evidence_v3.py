@@ -78,6 +78,7 @@ _BUSINESS_DRAFT_EVENT_OPTIONS = {
     "draft-declare-object-change": frozenset({"declaration.added"}),
     "draft-declare-rtpc": frozenset({"declaration.added"}),
     "draft-declare-switch-assignment": frozenset({"declaration.added"}),
+    "draft-declare-soundbank-plan": frozenset({"settings.revised"}),
     "draft-discover-fields": frozenset({"handles.bound"}),
     "draft-discover-types": frozenset({"handles.bound"}),
     "draft-remove-declaration": frozenset({"declaration.removed"}),

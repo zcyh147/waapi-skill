@@ -579,7 +579,7 @@ def _archive_test_typed_switch_assignment_enters_the_single_preview_ingress(
     assert payload["request"] == captured[0]
 
 
-def test_typed_definition_files_enters_the_single_preview_ingress(
+def test_typed_definition_files_is_not_public_after_business_cutover(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -604,16 +604,9 @@ def test_typed_definition_files_enters_the_single_preview_ingress(
         client_factory=lambda _url: client,
     )
 
-    assert code == 0, payload
-    assert captured == [
-        {
-            "contract": OPERATION_REQUEST_CONTRACT,
-            "version": "2022.1",
-            "operation": operation,
-            "arguments": {"files": [definition], "io_root": io_root},
-        }
-    ]
-    assert payload["request"] == captured[0]
+    assert code == 2, payload
+    assert payload["error_code"] == "GatewayInputError"
+    assert captured == []
 
 
 def test_typed_tab_import_enters_the_single_preview_ingress(

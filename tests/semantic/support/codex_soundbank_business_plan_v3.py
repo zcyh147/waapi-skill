@@ -293,7 +293,7 @@ def _validate_inputs(materialized: MaterializedSoundBankCase, before: SoundBankS
             refusal=(
                 StructuredRefusal(
                     blueprint.zero_dispatch_error_code,
-                    result_command="typed-operation",
+                    result_command="preview-from-draft",
                 )
                 if blueprint.expected_primary_dispatch_count == 0
                 else None
@@ -406,7 +406,7 @@ def _expected_protocol_archive(static: Mapping[str, Any], live: Mapping[str, Any
 
 
 def _refusal(code: str):
-    return StructuredRefusal(code, result_command="typed-operation")
+    return StructuredRefusal(code, result_command="preview-from-draft")
 
 
 def _sections(kind: str, primary: Sequence[str], verify: Sequence[str], assertions: Sequence[str], static: Mapping[str, Any], live: Mapping[str, Any], rules: Sequence[Mapping[str, Any]]) -> SoundBankBusinessPlanSections:

@@ -3,11 +3,11 @@
   "scope": {
     "registry_operations": 34,
     "registry_version_lanes": 153,
-    "composer_version_lanes": 36,
-    "business_declaration_version_lanes": 70,
-    "inline_typed_version_lanes": 42,
+    "composer_version_lanes": 22,
+    "business_declaration_version_lanes": 88,
+    "inline_typed_version_lanes": 38,
     "internal_canonical_version_lanes": 5,
-    "lane_inventory_sha256": "9331c363206be0f0019f5d6e05fc041d6313a7902aafcc64bb4e0c4a55cf0aee",
+    "lane_inventory_sha256": "544792263cb5e7366bca05fe02b6bac4a4af9f28949e17a6ea4c07517283e48f",
     "version_rule": "Every supported version lane inherits the disposition of its exact Registry operation name.",
     "normal_input_rule": "The Operation Registry exposes one typed normal input mode per public operation and version. Internal canonical transaction representations are not model-facing operations.",
     "native_uri_rule": "A shared native URI never implies a shared migration decision. Isolation is keyed by exact operation name and version."
@@ -138,9 +138,9 @@
         "soundbank.setInclusions"
       ],
       "reuse": [
-        "OperationDraftStore for repeated and nested facts",
-        "concise inline submission for caller-owned Definition files",
-        "bounded file and host-path facts",
+        "BusinessDeclarationSession for one complete SoundBank plan",
+        "opaque live object handles for SoundBanks, Events, Aux Busses, and inclusion objects",
+        "exact caller-owned Definition and External Source artifacts inside the bounded plan",
         "isolated I/O guards",
         "Canonical OperationRequest parser",
         "Change Preview ingress"

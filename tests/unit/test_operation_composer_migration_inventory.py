@@ -72,6 +72,10 @@ def test_inventory_exactly_covers_every_registry_operation_and_version_lane() ->
             "object.createPlugin",
             "object.set",
             "object.setRTPC",
+            "soundbank.convertExternalSources",
+            "soundbank.generate",
+            "soundbank.processDefinitionFiles",
+            "soundbank.setInclusions",
             "switchContainer.addAssignment",
             "switchContainer.removeAssignment",
         }:
@@ -80,10 +84,6 @@ def test_inventory_exactly_covers_every_registry_operation_and_version_lane() ->
             assignments[name][1]
             in {"wave-00-complete", "wave-02-object-graph"}
             or name == "object.create"
-            or (
-                assignments[name][1] == "wave-04-soundbank-and-files"
-                and name != "soundbank.processDefinitionFiles"
-            )
             or (
                 assignments[name][1] == "wave-05-authoring-ui"
                 and name in {"ui.commands.register", "ui.commands.unregister"}
@@ -171,6 +171,10 @@ def test_human_inventory_does_not_label_business_cutovers_as_inline_typed() -> N
         "object.move",
         "object.setName",
         "object.setNotes",
+        "soundbank.convertExternalSources",
+        "soundbank.generate",
+        "soundbank.processDefinitionFiles",
+        "soundbank.setInclusions",
     ):
         assert rows[operation] == "Business declaration"
 

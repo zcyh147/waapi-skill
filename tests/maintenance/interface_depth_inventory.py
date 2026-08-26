@@ -849,6 +849,8 @@ def _operation_model_values(
             "object.setRTPC",
         }:
             return _object_graph_model_values(name, business_contract)
+        if name.startswith("soundbank."):
+            return _soundbank_model_values(name)
         declaration = business_contract["declaration"]
         required = set(declaration["required_fields"])
         return [
@@ -894,6 +896,88 @@ def _operation_model_values(
                     policy=policy,
                 )
             )
+    return rows
+
+
+def _soundbank_model_values(name: str) -> list[dict[str, Any]]:
+    """Project the high-level #79 plan rather than its derived native rows."""
+
+    rows: list[dict[str, Any]] = []
+
+    def add(
+        path: tuple[str, ...],
+        *,
+        field_name: str,
+        shape: str,
+        required: bool,
+        ownership: str,
+    ) -> None:
+        rows.append(
+            {
+                "path": ["soundbank_plan", *path],
+                "name": field_name,
+                "shape": shape,
+                "required": required,
+                "value_ownership": ownership,
+                "transport_ownership": "gateway_derivation",
+                "schema_sha256": canonical_sha256(
+                    {
+                        "operation": name,
+                        "path": path,
+                        "shape": shape,
+                        "ownership": ownership,
+                    }
+                ),
+            }
+        )
+
+    if name == "soundbank.generate":
+        for path, field, shape, required, ownership in (
+            (("soundbanks",), "soundbanks", "array", True, "gateway_derivation"),
+            (("soundbanks", "[]", "soundbank_handle"), "soundbank_handle", "scalar", True, "live_bound_handle"),
+            (("soundbanks", "[]", "artifact_expectation"), "artifact_expectation", "scalar", True, "stable_business_declaration"),
+            (("soundbanks", "[]", "rebuild"), "rebuild", "scalar", False, "stable_business_declaration"),
+            (("soundbanks", "[]", "event_handles"), "event_handles", "array", False, "live_bound_handle"),
+            (("soundbanks", "[]", "aux_bus_handles"), "aux_bus_handles", "array", False, "live_bound_handle"),
+            (("soundbanks", "[]", "inclusions"), "inclusions", "array", False, "stable_business_declaration"),
+            (("platforms",), "platforms", "array", True, "stable_business_declaration"),
+            (("languages",), "languages", "array", False, "stable_business_declaration"),
+            (("rebuild_soundbanks",), "rebuild_soundbanks", "scalar", False, "stable_business_declaration"),
+            (("clear_audio_file_cache",), "clear_audio_file_cache", "scalar", False, "stable_business_declaration"),
+            (("rebuild_init_bank",), "rebuild_init_bank", "scalar", False, "stable_business_declaration"),
+            (("io_root",), "io_root", "scalar", True, "exact_user_artifact"),
+        ):
+            add(path, field_name=field, shape=shape, required=required, ownership=ownership)
+        return rows
+    if name == "soundbank.setInclusions":
+        values = (
+            (("soundbank_handle",), "soundbank_handle", "scalar", True, "live_bound_handle"),
+            (("mode",), "mode", "scalar", True, "stable_business_declaration"),
+            (("inclusions",), "inclusions", "array", True, "gateway_derivation"),
+            (("inclusions", "[]", "object_handle"), "object_handle", "scalar", True, "live_bound_handle"),
+            (("inclusions", "[]", "filters"), "filters", "array", True, "stable_business_declaration"),
+        )
+    elif name == "soundbank.convertExternalSources":
+        values = (
+            (("sources",), "sources", "array", True, "gateway_derivation"),
+            (("sources", "[]", "input"), "input", "scalar", True, "exact_user_artifact"),
+            (("sources", "[]", "platform"), "platform", "scalar", True, "stable_business_declaration"),
+            (("sources", "[]", "output"), "output", "scalar", True, "exact_user_artifact"),
+            (("io_root",), "io_root", "scalar", True, "exact_user_artifact"),
+        )
+    else:
+        values = (
+            (("files",), "files", "array", True, "exact_user_artifact"),
+            (("io_root",), "io_root", "scalar", True, "exact_user_artifact"),
+        )
+    for path, field, shape, required, ownership in values:
+        add(
+            path,
+            field_name=field,
+            shape=shape,
+            required=required,
+            ownership=ownership,
+        )
     return rows
 
 
