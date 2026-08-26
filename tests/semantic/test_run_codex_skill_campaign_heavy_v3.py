@@ -66,6 +66,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
 )
 from tests.semantic.support.codex_gateway_broker import (
     CodexGatewayBroker,
+    DRAFT_REVISION_SUBCOMMANDS,
     DraftTypedActionArgument,
     DraftTypedActionBatchArgument,
     ExpectedGatewayStep,
@@ -171,6 +172,68 @@ from wwise_waapi.transactions import (
     TransactionStore,
     confirmation_token_for,
 )
+
+
+EXPECTED_DRAFT_REVISION_SUBCOMMANDS = frozenset(
+    {
+        "draft-apply",
+        "draft-add-media",
+        "draft-bind-field",
+        "draft-bind-object",
+        "draft-business-configure",
+        "draft-declare-import-batch",
+        "draft-clear-object-list",
+        "draft-declare-existing",
+        "draft-declare-field-change",
+        "draft-declare-new",
+        "draft-declare-object-change",
+        "draft-declare-rtpc",
+        "draft-declare-switch-assignment",
+        "draft-discover-fields",
+        "draft-discover-types",
+        "draft-remove-declaration",
+        "draft-revise-declaration",
+        "draft-check",
+        "draft-cancel",
+        "preview-from-draft",
+    }
+)
+
+
+@pytest.mark.parametrize(
+    "subcommand",
+    sorted(EXPECTED_DRAFT_REVISION_SUBCOMMANDS),
+)
+def test_consumed_order_rebinds_every_public_draft_revision_subcommand(
+    subcommand: str,
+) -> None:
+    start = ExpectedGatewayStep(
+        "tx01.draft-start",
+        "draft-start",
+        ("audio.import",),
+    )
+    mutation = ExpectedGatewayStep(
+        f"tx01.{subcommand}",
+        subcommand,
+        (
+            ResponseBinding(start.name, "/draft/draft_id"),
+            "--task-authority",
+            ResponseBinding(start.name, "/task_authority"),
+            "--expected-revision",
+            ResponseBinding("stale-step", "/draft/revision"),
+        ),
+    )
+
+    assert DRAFT_REVISION_SUBCOMMANDS == EXPECTED_DRAFT_REVISION_SUBCOMMANDS
+    rebound = campaign._steps_in_consumed_order(
+        (start, mutation),
+        (start.name, mutation.name),
+    )
+
+    assert rebound[1].arguments[4] == ResponseBinding(
+        start.name,
+        "/draft/revision",
+    )
 
 
 def test_consumed_composer_order_rebinds_each_revision_to_its_actual_predecessor(

@@ -39,6 +39,10 @@ from tests.semantic.support.codex_filesystem_security import (
     path_is_link_or_reparse,
     read_bounded_exclusive_regular_file,
 )
+from tests.semantic.support.codex_draft_commands import (
+    DRAFT_GATEWAY_SUBCOMMANDS,
+    DRAFT_REVISION_SUBCOMMANDS,
+)
 from wwise_waapi.operation_composer import (
     MAX_TYPED_ACTIONS_PER_APPLY,
     OperationComposerError,
@@ -2129,32 +2133,7 @@ def _commutative_composer_setup_pairs(
     return pairs
 
 
-_DRAFT_SUBCOMMANDS = frozenset(
-    {
-        "draft-start",
-        "draft-inspect",
-        "draft-apply",
-        "draft-bind-object",
-        "draft-bind-field",
-        "draft-business-configure",
-        "draft-declare-import-batch",
-        "draft-declare-field-change",
-        "draft-declare-object-change",
-        "draft-declare-switch-assignment",
-        "draft-discover-fields",
-        "draft-declare-new",
-        "draft-declare-existing",
-        "draft-revise-declaration",
-        "draft-remove-declaration",
-        "draft-check",
-        "draft-cancel",
-        "preview-from-draft",
-    }
-)
-DRAFT_REVISION_SUBCOMMANDS = _DRAFT_SUBCOMMANDS - {
-    "draft-start",
-    "draft-inspect",
-}
+_DRAFT_SUBCOMMANDS = DRAFT_GATEWAY_SUBCOMMANDS
 _DRAFT_ID_RE = re.compile(r"^od1-[0-9a-f]{32}$")
 _DRAFT_AUTHORITY_RE = re.compile(r"^da1-[0-9a-f]{40}$")
 _DRAFT_HANDLE_RE = re.compile(
