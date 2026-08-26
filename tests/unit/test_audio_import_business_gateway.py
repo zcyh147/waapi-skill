@@ -10,11 +10,6 @@ from typing import Any, Mapping, Sequence
 from wwise_waapi.operation_composer import operation_composer_digest
 from wwise_waapi.canonical import canonical_sha256
 from wwise_waapi.operation_registry import audio_import_business_contract
-from tests.semantic.support.typed_gateway_input import (
-    _business_copy_binding_was_used,
-)
-
-
 def test_audio_import_draft_digest_binds_only_the_registry_business_adapter() -> None:
     version = "2022.1"
 
@@ -354,99 +349,40 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
         "waapi-skill.business-draft-next-action/v1"
     )
     assert bound_next["required_next_phase"] == (
-        "complete_business_declarations_then_check"
+        "bind_only_additional_handle_typed_business_values_then_submit_one_"
+        "complete_import_batch"
     )
-    assert "switch_value" in bound_next["binding_decision"]["literal_never_bind"]
-    assert bound_next["binding_decision"]["bound_object_handle_fields"] == [
-        "output_bus",
-        "event_parent",
-        "custom_reference_value",
-    ]
     for scope_name in ("object_scope", "class_scope"):
         scope = bound_next["field_binding"][scope_name]
         assert scope["fixed_argv_prefix_copy_instruction"]["source_field"] == (
             "fixed_argv_prefix_copy"
         )
         assert scope["fixed_argv_prefix_copy"]
-    for action_name in (
-        "configure",
-        "declare_new",
-        "declare_existing",
-        "revise",
-        "remove",
-    ):
-        action = bound_next[action_name]
-        assert action["fixed_argv_prefix_copy_instruction"]["source_field"] == (
-            "fixed_argv_prefix_copy"
+    batch_action = bound_next["declare_import_batch"]
+    assert batch_action["fixed_argv_prefix"][3] == (
+        "draft-declare-import-batch"
+    )
+    assert batch_action["fixed_argv_prefix_copy_instruction"]["source_field"] == (
+        "fixed_argv_prefix_copy"
+    )
+    assert batch_action["closure"] == [
+        "--expected-declaration-count",
+        "<count-of-all-user-requested-import-rows>",
+        "--expected-switch-assignment-count",
+        "<count-of-all-user-requested-switch-assignments>",
+    ]
+    assert batch_action["complete_on_first_submission"] is True
+    assert batch_action["submit_once"] is True
+    assert "switch_assignment" in batch_action["row_fields"]
+    assert all(
+        name not in bound_next
+        for name in (
+            "declare_new",
+            "declare_existing",
+            "revise",
+            "remove",
+            "explicit_global_defaults",
         )
-        assert action["fixed_argv_prefix_copy"]
-    declare_prefix = bound_next["declare_new"]["fixed_argv_prefix"][3:]
-    assert _business_copy_binding_was_used(
-        bound,
-        [
-            *declare_prefix,
-            "--declaration-id",
-            "row-001",
-            "--parent-handle",
-            parent_handle,
-            "--name",
-            "Rain",
-            "--kind",
-            "sound-sfx",
-            "--field",
-            "media_file",
-            str(media),
-        ],
-    )
-    assert all(
-        "--default" not in value
-        for value in bound_next["configure"]["append"]
-    )
-    explicit_defaults = bound_next["explicit_global_defaults"]
-    assert explicit_defaults["scope"] == (
-        "every_declaration_in_the_batch_after_expansion"
-    )
-    assert explicit_defaults["use_only_when"] == (
-        "user_explicitly_requests_a_Wwise_global_batch_default"
-    )
-    assert "--default <stable-field> <business-value>" in (
-        explicit_defaults["append"][0]
-    )
-    assert bound_next["configure"]["append"][0] == (
-        "[--mode replace] only_for_explicit_replacement; "
-        "create_and_reimport_derive_from_target_form"
-    )
-    assert bound_next["declare_new"]["known_user_fields"] == (
-        "complete_on_first_submission"
-    )
-    required_switch_value = (
-        "--switch-value <exact-user-requested-switch-value> "
-        "required_when_user_requests_this_declaration_be_assigned_to_a_"
-        "switch_value; omission_is_incomplete"
-    )
-    conditional_switch_rule = {
-        "argument": "--switch-value",
-        "value": "exact_user_requested_switch_value",
-        "required_when": (
-            "user_requests_this_declaration_be_assigned_to_a_switch_value"
-        ),
-        "omission": "incomplete_declaration",
-    }
-    assert required_switch_value in bound_next["declare_new"]["append"]
-    assert required_switch_value in bound_next["declare_existing"]["append"]
-    assert bound_next["declare_new"]["conditional_required_user_fields"] == {
-        "switch_assignment": conditional_switch_rule
-    }
-    assert bound_next["declare_existing"]["conditional_required_user_fields"] == {
-        "switch_assignment": conditional_switch_rule
-    }
-    assert "[--switch-value <corrected-exact-user-requested-switch-value>]" in (
-        bound_next["revise"]["append"]
-    )
-    assert all(
-        "<stable-field>" not in item
-        for action in ("declare_new", "declare_existing", "revise")
-        for item in bound_next[action]["append"]
     )
 
     field_client = FakeClient(
@@ -567,13 +503,16 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     }
     declaration_next = declared["draft"]["next_action_binding"]
     assert declaration_next["required_next_phase"] == (
-        "declare_remaining_business_items_or_check_complete_draft"
+        "check_complete_business_declaration"
     )
-    assert {
-        "declare_new",
-        "declare_existing",
-        "completion_candidate",
-    }.issubset(declaration_next)
+    assert set(declaration_next) == {
+        "contract",
+        "required_next_phase",
+        "check",
+        "shell_tool_timeout_ms",
+        "then_read_next_response",
+        "precompute_or_increment_revision",
+    }
     assert all(
         key not in declaration_next
         for key in (
@@ -615,6 +554,227 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
             {"name": "CustomGain", "value": -2.5},
         ],
     }
+
+
+def test_audio_import_batch_declaration_is_atomic_complete_and_compact(
+    tmp_path: Path,
+) -> None:
+    code, started = _offline(tmp_path, "draft-start", "audio.import")
+    assert code == 0, started
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [_info()],
+            "ak.wwise.core.getProjectInfo": [
+                {
+                    "id": PROJECT_ID,
+                    "name": "SampleProject",
+                    "path": str(_project_path(tmp_path)),
+                }
+            ],
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": PARENT_ID,
+                            "name": "Player_Footsteps",
+                            "type": "SwitchContainer",
+                            "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Player_Footsteps",
+                        }
+                    ]
+                }
+            ],
+        }
+    )
+    bind_code, bound = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-bind-object",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            "1",
+            "--object-id",
+            PARENT_ID,
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+    assert bind_code == 0, bound
+    parent_handle = bound["bound_object"]["handle"]
+    media_files = []
+    for index in range(1, 5):
+        path = tmp_path / f"snow_step_{index:02d}.wav"
+        path.write_bytes(b"RIFF-test")
+        media_files.append(path)
+
+    batch_argv = [
+        "draft-declare-import-batch",
+        started["draft"]["draft_id"],
+        "--task-authority",
+        started["task_authority"],
+        "--expected-revision",
+        "2",
+        "--expected-declaration-count",
+        "5",
+        "--expected-switch-assignment-count",
+        "1",
+        "--row-order",
+        "snow",
+        "--new-root-row",
+        "snow",
+        parent_handle,
+        "Snow",
+        "random-container",
+        "--switch-value",
+        "snow",
+        "Snow",
+    ]
+    for index, path in enumerate(media_files, start=1):
+        declaration_id = f"snow-step-{index:02d}"
+        batch_argv.extend(
+            (
+                "--row-order",
+                declaration_id,
+                "--new-child-row",
+                declaration_id,
+                "snow",
+                f"Snow_Step_{index:02d}",
+                "sound-sfx",
+                "--field",
+                declaration_id,
+                "media_file",
+                str(path),
+            )
+        )
+
+    batch_code, batch = _offline(tmp_path, *batch_argv)
+
+    assert batch_code == 0, batch
+    assert batch["draft"]["revision"] == 3
+    assert batch["draft"]["batch_receipt"] == {
+        "contract": "waapi-skill.business-declaration-batch-receipt/v1",
+        "declaration_count": 5,
+        "switch_assignment_count": 1,
+        "declaration_ids": [
+            "snow",
+            "snow-step-01",
+            "snow-step-02",
+            "snow-step-03",
+            "snow-step-04",
+        ],
+    }
+    assert batch["draft"]["declarations_summary"]["count"] == 5
+    assert set(batch["draft"]["next_action_binding"]) == {
+        "contract",
+        "required_next_phase",
+        "check",
+        "shell_tool_timeout_ms",
+        "then_read_next_response",
+        "precompute_or_increment_revision",
+    }
+    assert batch["draft"]["next_action_binding"]["required_next_phase"] == (
+        "check_complete_business_declaration"
+    )
+    assert len(
+        json.dumps(batch, ensure_ascii=False, separators=(",", ":")).encode(
+            "utf-8"
+        )
+    ) <= 4_500
+
+    stored = OperationDraftStore(tmp_path / "state").inspect(
+        started["draft"]["draft_id"],
+        task_authority=started["task_authority"],
+    )
+    session = stored.composition["business_session"]
+    assert [row["declaration_id"] for row in session["declarations"]] == [
+        "snow",
+        "snow-step-01",
+        "snow-step-02",
+        "snow-step-03",
+        "snow-step-04",
+    ]
+
+
+def test_audio_import_batch_count_mismatch_is_atomic(tmp_path: Path) -> None:
+    code, started = _offline(tmp_path, "draft-start", "audio.import")
+    assert code == 0, started
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [_info()],
+            "ak.wwise.core.getProjectInfo": [
+                {
+                    "id": PROJECT_ID,
+                    "name": "SampleProject",
+                    "path": str(_project_path(tmp_path)),
+                }
+            ],
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": PARENT_ID,
+                            "name": "Weather",
+                            "type": "ActorMixer",
+                            "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Weather",
+                        }
+                    ]
+                }
+            ],
+        }
+    )
+    bind_code, bound = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-bind-object",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            "1",
+            "--object-id",
+            PARENT_ID,
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+    assert bind_code == 0, bound
+    record_path = (
+        tmp_path
+        / "state"
+        / "operation-drafts-v1"
+        / "records"
+        / f"{started['draft']['draft_id']}.json"
+    )
+    before = record_path.read_bytes()
+
+    mismatch_code, mismatch = _offline(
+        tmp_path,
+        "draft-declare-import-batch",
+        started["draft"]["draft_id"],
+        "--task-authority",
+        started["task_authority"],
+        "--expected-revision",
+        "2",
+        "--expected-declaration-count",
+        "2",
+        "--expected-switch-assignment-count",
+        "1",
+        "--row-order",
+        "rain",
+        "--new-root-row",
+        "rain",
+        bound["bound_object"]["handle"],
+        "Rain",
+        "random-container",
+    )
+
+    assert mismatch_code == 2
+    assert mismatch["error_code"] == "GatewayInputError"
+    assert "declaration count" in mismatch["message"].casefold()
+    assert record_path.read_bytes() == before
 
 
 def test_audio_import_business_start_discloses_only_copy_ready_object_binding(

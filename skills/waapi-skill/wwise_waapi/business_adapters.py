@@ -252,6 +252,7 @@ _AUDIO_IMPORT_DEFINITION = {
     "update_commands": frozenset(
         {
             "draft-business-configure",
+            "draft-declare-import-batch",
             "draft-declare-existing",
             "draft-declare-new",
             "draft-remove-declaration",
@@ -264,6 +265,7 @@ _AUDIO_IMPORT_DEFINITION = {
         "configure",
         "declare-new",
         "declare-existing",
+        "declare-import-batch",
         "inspect",
         "cancel",
     ),
@@ -273,6 +275,7 @@ _AUDIO_IMPORT_DEFINITION = {
         "configure",
         "declare-new",
         "declare-existing",
+        "declare-import-batch",
         "revise-declaration",
         "remove-declaration",
         "check",

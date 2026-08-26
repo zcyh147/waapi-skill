@@ -44,6 +44,7 @@ AUDIO_IMPORT_BUSINESS_COMMANDS = (
     "draft-bind-object",
     "draft-bind-field",
     "draft-business-configure",
+    "draft-declare-import-batch",
     "draft-declare-new",
     "draft-declare-existing",
     "draft-revise-declaration",

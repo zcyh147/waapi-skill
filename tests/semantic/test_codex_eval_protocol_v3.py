@@ -360,15 +360,23 @@ def test_audio_import_protocol_emits_ordered_business_steps_without_native_rows(
         "draft-bind-object",
         "draft-bind-object",
         "draft-business-configure",
-        "draft-declare-new",
+        "draft-declare-import-batch",
         "draft-check",
         "preview-from-draft",
     ]
-    declaration = next(step for step in steps if step.subcommand == "draft-declare-new")
+    declaration = next(
+        step
+        for step in steps
+        if step.subcommand == "draft-declare-import-batch"
+    )
     assert "--field" in declaration.arguments
     assert "volume_db" in declaration.arguments
     assert "output_bus" in declaration.arguments
-    assert "--event-parent-handle" in declaration.arguments
+    assert "--event" in declaration.arguments
+    assert declaration.arguments.count("--row-order") == 1
+    assert declaration.arguments[declaration.arguments.index(
+        "--expected-declaration-count"
+    ) + 1] == "1"
     assert all(step.subcommand != "draft-apply" for step in steps)
     assert next(step for step in steps if step.name == "tx01.preview").subcommand == (
         "preview-from-draft"
@@ -389,10 +397,11 @@ def test_audio_import_switch_assignment_is_part_of_the_business_declaration() ->
         for step in build_audio_import_composer_transaction_steps(
             request, label="tx01"
         )
-        if step.subcommand == "draft-declare-new"
+        if step.subcommand == "draft-declare-import-batch"
     )
     switch_index = declaration.arguments.index("--switch-value")
-    assert declaration.arguments[switch_index + 1] == switch_assignment
+    assert declaration.arguments[switch_index + 1] == "row-001"
+    assert declaration.arguments[switch_index + 2] == switch_assignment
 
     request["arguments"]["imports"][0].pop("switch_assignment")  # type: ignore[index]
     ordinary = next(
@@ -400,7 +409,7 @@ def test_audio_import_switch_assignment_is_part_of_the_business_declaration() ->
         for step in build_audio_import_composer_transaction_steps(
             request, label="tx01"
         )
-        if step.subcommand == "draft-declare-new"
+        if step.subcommand == "draft-declare-import-batch"
     )
     assert "--switch-value" not in ordinary.arguments
 
@@ -751,7 +760,10 @@ def test_commutative_composer_setup_groups_are_narrow_and_cannot_cross_turns() -
 def test_audio_import_transaction_request_uses_business_declaration_steps() -> None:
     protocol = build_transaction_protocol([_audio_import_request()])
 
-    assert any(step.subcommand == "draft-declare-new" for step in protocol.steps)
+    assert any(
+        step.subcommand == "draft-declare-import-batch"
+        for step in protocol.steps
+    )
     assert any(step.subcommand == "draft-bind-object" for step in protocol.steps)
     assert all(step.subcommand != "draft-apply" for step in protocol.steps)
     assert all("--request-json" not in step.arguments for step in protocol.steps)
@@ -1287,7 +1299,10 @@ def test_metadata_transaction_protocol_selects_closed_audio_import_equivalence()
         "draft-start",
     )
     assert any(step.subcommand == "draft-bind-field" for step in protocol.steps)
-    assert any(step.subcommand == "draft-declare-new" for step in protocol.steps)
+    assert any(
+        step.subcommand == "draft-declare-import-batch"
+        for step in protocol.steps
+    )
     assert all(step.subcommand != "metadata" for step in protocol.steps)
     assert all(step.subcommand != "draft-apply" for step in protocol.steps)
     assert protocol.commutative_read_only_step_groups == ()
@@ -1316,11 +1331,16 @@ def test_audio_import_protocol_serializes_bound_existing_declarations() -> None:
 
     steps = build_audio_import_composer_transaction_steps(request, label="tx01")
     assert sum(step.subcommand == "draft-bind-object" for step in steps) == 5
-    declarations = tuple(
-        step for step in steps if step.subcommand == "draft-declare-existing"
+    declaration = next(
+        step
+        for step in steps
+        if step.subcommand == "draft-declare-import-batch"
     )
-    assert len(declarations) == 5
-    assert all("--object-handle" in step.arguments for step in declarations)
+    assert declaration.arguments.count("--existing-row") == 5
+    assert declaration.arguments.count("--row-order") == 5
+    assert declaration.arguments[
+        declaration.arguments.index("--expected-declaration-count") + 1
+    ] == "5"
     assert all(step.subcommand != "draft-apply" for step in steps)
 
 

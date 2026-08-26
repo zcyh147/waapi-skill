@@ -351,6 +351,7 @@ OFFLINE_COMMANDS = frozenset(
         "draft-business-configure",
         "draft-clear-object-list",
         "draft-declare-field-change",
+        "draft-declare-import-batch",
         "draft-declare-object-change",
         "draft-declare-switch-assignment",
         "draft-declare-rtpc",
@@ -1866,6 +1867,81 @@ def build_parser() -> argparse.ArgumentParser:
     draft_business_configure.add_argument(
         "--default-event-action",
         choices=("Play", "Stop", "Pause", "Resume", "Break", "Seek"),
+    )
+
+    draft_declare_import_batch = subparsers.add_parser(
+        "draft-declare-import-batch",
+        help=(
+            "Atomically submit one complete high-level audio import batch "
+            "without native WAAPI rows or JSON shell quoting"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_import_batch)
+    draft_declare_import_batch.add_argument(
+        "--expected-declaration-count",
+        required=True,
+        type=int,
+    )
+    draft_declare_import_batch.add_argument(
+        "--expected-switch-assignment-count",
+        required=True,
+        type=int,
+    )
+    draft_declare_import_batch.add_argument(
+        "--row-order",
+        action="append",
+        required=True,
+        metavar="ID",
+        help="Repeat once per row in the exact requested import order",
+    )
+    draft_declare_import_batch.add_argument(
+        "--new-root-row",
+        action="append",
+        nargs=4,
+        default=[],
+        metavar=("ID", "PARENT_HANDLE", "NAME", "KIND"),
+    )
+    draft_declare_import_batch.add_argument(
+        "--new-child-row",
+        action="append",
+        nargs=4,
+        default=[],
+        metavar=("ID", "PARENT_ID", "NAME", "KIND"),
+    )
+    draft_declare_import_batch.add_argument(
+        "--existing-row",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("ID", "OBJECT_HANDLE"),
+    )
+    draft_declare_import_batch.add_argument(
+        "--field",
+        action="append",
+        nargs=3,
+        default=[],
+        metavar=("ID", "FIELD", "VALUE"),
+    )
+    draft_declare_import_batch.add_argument(
+        "--field-value",
+        action="append",
+        nargs=3,
+        default=[],
+        metavar=("ID", "FIELD_HANDLE", "VALUE"),
+    )
+    draft_declare_import_batch.add_argument(
+        "--switch-value",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("ID", "VALUE"),
+    )
+    draft_declare_import_batch.add_argument(
+        "--event",
+        action="append",
+        nargs=4,
+        default=[],
+        metavar=("ID", "PARENT_HANDLE", "NAME", "ACTION"),
     )
 
     draft_declare_object_change = subparsers.add_parser(
@@ -7084,6 +7160,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         "draft-business-configure",
         "draft-clear-object-list",
         "draft-declare-field-change",
+        "draft-declare-import-batch",
         "draft-declare-object-change",
         "draft-declare-switch-assignment",
         "draft-declare-rtpc",
@@ -10573,7 +10650,175 @@ def dispatch_offline_business_draft_update(
         )
     session = BusinessDeclarationSession.from_dict(raw_session)
     role_declaration = adapter.role_declaration
-    if args.command == "draft-add-media":
+    if args.command == "draft-declare-import-batch":
+        if adapter.family != "audio-import":
+            raise GatewayInputError(
+                "draft-declare-import-batch is available only for audio.import"
+            )
+        if args.expected_declaration_count < 1:
+            raise GatewayInputError(
+                "Expected declaration count must be at least one"
+            )
+        if args.expected_switch_assignment_count < 0:
+            raise GatewayInputError(
+                "Expected Switch assignment count cannot be negative"
+            )
+
+        row_specs: dict[str, tuple[str, tuple[str, ...]]] = {}
+
+        def add_row(
+            declaration_id: str,
+            form: str,
+            values: tuple[str, ...],
+        ) -> None:
+            if declaration_id in row_specs:
+                raise GatewayInputError(
+                    f"Import batch declaration id {declaration_id!r} was supplied twice"
+                )
+            row_specs[declaration_id] = (form, values)
+
+        for declaration_id, parent_handle, name, kind in args.new_root_row:
+            add_row(
+                declaration_id,
+                "new-root",
+                (parent_handle, name, kind),
+            )
+        for declaration_id, parent_id, name, kind in args.new_child_row:
+            add_row(
+                declaration_id,
+                "new-child",
+                (parent_id, name, kind),
+            )
+        for declaration_id, object_handle in args.existing_row:
+            add_row(declaration_id, "existing", (object_handle,))
+
+        row_order = list(args.row_order)
+        if (
+            len(row_order) != len(set(row_order))
+            or set(row_order) != set(row_specs)
+        ):
+            raise GatewayInputError(
+                "Import batch row order must name every supplied declaration exactly once"
+            )
+        if args.expected_declaration_count != len(row_order):
+            raise GatewayInputError(
+                "Expected declaration count does not match the complete import batch"
+            )
+
+        fields_by_id: dict[str, list[tuple[str, str]]] = {}
+        field_values_by_id: dict[str, list[tuple[str, str]]] = {}
+        switch_values: dict[str, str] = {}
+        events: dict[str, tuple[str, str, str]] = {}
+        for declaration_id, field_name, value in args.field:
+            fields_by_id.setdefault(declaration_id, []).append(
+                (field_name, value)
+            )
+        for declaration_id, field_handle, value in args.field_value:
+            field_values_by_id.setdefault(declaration_id, []).append(
+                (field_handle, value)
+            )
+        for declaration_id, value in args.switch_value:
+            if declaration_id in switch_values:
+                raise GatewayInputError(
+                    f"Import batch Switch value for {declaration_id!r} was supplied twice"
+                )
+            switch_values[declaration_id] = value
+        for declaration_id, parent_handle, name, action in args.event:
+            if declaration_id in events:
+                raise GatewayInputError(
+                    f"Import batch Event for {declaration_id!r} was supplied twice"
+                )
+            if action not in {"Play", "Stop", "Pause", "Resume", "Break", "Seek"}:
+                raise GatewayInputError(
+                    f"Import batch Event action {action!r} is not supported"
+                )
+            events[declaration_id] = (parent_handle, name, action)
+
+        supplied_fact_ids = (
+            set(fields_by_id)
+            | set(field_values_by_id)
+            | set(switch_values)
+            | set(events)
+        )
+        unknown_fact_ids = supplied_fact_ids - set(row_specs)
+        if unknown_fact_ids:
+            raise GatewayInputError(
+                "Import batch fields reference an unknown declaration id"
+            )
+        if args.expected_switch_assignment_count != len(switch_values):
+            raise GatewayInputError(
+                "Expected Switch assignment count does not match the complete import batch"
+            )
+
+        def update(
+            current: BusinessDeclarationSession,
+        ) -> BusinessDeclarationSession:
+            candidate = current
+            for declaration_id in row_order:
+                form, values = row_specs[declaration_id]
+                event = events.get(declaration_id)
+                fields = _parse_audio_import_business_fields(
+                    candidate,
+                    fields_by_id.get(declaration_id, []),
+                    switch_value=switch_values.get(declaration_id),
+                    allow_switch_value_pair=False,
+                    field_value_pairs=field_values_by_id.get(
+                        declaration_id,
+                        [],
+                    ),
+                    event_parent_handle=None if event is None else event[0],
+                    event_name=None if event is None else event[1],
+                    event_action=None if event is None else event[2],
+                )
+                if form == "new-root":
+                    parent_handle, name, kind = values
+                    target = NewDescendantTarget(
+                        parent_handle=parent_handle,
+                        name=name,
+                        kind=kind,
+                    )
+                    candidate = candidate.with_new_declaration(
+                        declaration_id=declaration_id,
+                        target=target,
+                        fields=fields,
+                    )
+                elif form == "new-child":
+                    parent_id, name, kind = values
+                    parent_matches = [
+                        row
+                        for row in candidate.declarations
+                        if row.declaration_id == parent_id
+                    ]
+                    if len(parent_matches) != 1:
+                        raise business_repair(
+                            "BATCH_PARENT_NOT_AVAILABLE",
+                            field="parent_declaration_id",
+                            draft_revision=current.revision,
+                            action=(
+                                "put each parent before its children in --row-order"
+                            ),
+                        )
+                    candidate = candidate.with_new_declaration(
+                        declaration_id=declaration_id,
+                        target=NewDescendantTarget(
+                            parent_handle=parent_matches[0].result_handle,
+                            name=name,
+                            kind=kind,
+                        ),
+                        fields=fields,
+                    )
+                else:
+                    (object_handle,) = values
+                    candidate = candidate.with_existing_declaration(
+                        declaration_id=declaration_id,
+                        target=ExistingObjectTarget(object_handle),
+                        fields=fields,
+                    )
+            adapter.materialize(candidate)
+            return candidate
+
+        event_type = "declaration.batch-added"
+    elif args.command == "draft-add-media":
         media_row = {
             name: value
             for name, value in (
@@ -16030,6 +16275,11 @@ def _business_next_action_binding(
     configure_prefix = [*base, "draft-business-configure", *binding]
     declare_new_prefix = [*base, "draft-declare-new", *binding]
     declare_existing_prefix = [*base, "draft-declare-existing", *binding]
+    declare_import_batch_prefix = [
+        *base,
+        "draft-declare-import-batch",
+        *binding,
+    ]
     add_media_prefix = [*base, "draft-add-media", *binding]
     clear_object_list_prefix = [
         *base,
@@ -16778,6 +17028,118 @@ def _business_next_action_binding(
                 **declaration_prefix,
                 "append": declaration_append,
             },
+        }
+    if adapter.family == "audio-import":
+        return {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "required_next_phase": (
+                "bind_only_additional_handle_typed_business_values_then_submit_"
+                "one_complete_import_batch"
+            ),
+            "object_binding": object_binding,
+            "field_binding": {
+                "object_scope": {
+                    **operation_draft_prefix_copy_binding(field_bind_prefix),
+                    "append": [
+                        "--object-handle",
+                        "<bound-object-handle>",
+                        "--token",
+                        "<exact-live-field-token>",
+                    ],
+                },
+                "class_scope": {
+                    **operation_draft_prefix_copy_binding(field_bind_prefix),
+                    "append": [
+                        "--class-name",
+                        "<exact-live-class-name>",
+                        "--token",
+                        "<exact-live-field-token>",
+                    ],
+                },
+                "use_only_for": "custom_property_or_reference_field_values",
+            },
+            "configure": {
+                **operation_draft_prefix_copy_binding(configure_prefix),
+                "append": [
+                    "[--mode replace]",
+                    "[--add-to-source-control|--no-add-to-source-control]",
+                    "[--check-out-from-source-control|--no-check-out-from-source-control]",
+                    "[--default <stable-field> <business-value>]...",
+                    "[--default-field-value <bound-field-handle> <business-value>]...",
+                ],
+                "use_only_when": (
+                    "the_user_explicitly_requests_batch_settings_or_defaults"
+                ),
+            },
+            "declare_import_batch": {
+                **operation_draft_prefix_copy_binding(
+                    declare_import_batch_prefix
+                ),
+                "closure": [
+                    "--expected-declaration-count",
+                    "<count-of-all-user-requested-import-rows>",
+                    "--expected-switch-assignment-count",
+                    "<count-of-all-user-requested-switch-assignments>",
+                ],
+                "row_order": [
+                    "--row-order",
+                    "<declaration-id>",
+                    "repeat_once_per_row_in_exact_import_order",
+                ],
+                "row_forms": {
+                    "new_root": [
+                        "--new-root-row",
+                        "<id>",
+                        "<bound-parent-handle>",
+                        "<name>",
+                        "<semantic-kind>",
+                    ],
+                    "new_child": [
+                        "--new-child-row",
+                        "<id>",
+                        "<earlier-parent-id>",
+                        "<name>",
+                        "<semantic-kind>",
+                    ],
+                    "existing": [
+                        "--existing-row",
+                        "<id>",
+                        "<bound-existing-object-handle>",
+                    ],
+                },
+                "row_fields": {
+                    "stable": [
+                        "--field",
+                        "<id>",
+                        "<stable-field-except-switch_value>",
+                        "<business-value>",
+                    ],
+                    "custom": [
+                        "--field-value",
+                        "<id>",
+                        "<bound-field-handle>",
+                        "<business-value>",
+                    ],
+                    "switch_assignment": [
+                        "--switch-value",
+                        "<id>",
+                        "<exact-user-requested-switch-value>",
+                    ],
+                    "event": [
+                        "--event",
+                        "<id>",
+                        "<bound-event-parent-handle>",
+                        "<event-name>",
+                        "<Play|Stop|Pause|Resume|Break|Seek>",
+                    ],
+                },
+                "complete_on_first_submission": True,
+                "submit_once": True,
+            },
+            "forbidden_inputs": forbidden_inputs,
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
         }
     return {
         "contract": "waapi-skill.business-draft-next-action/v1",
@@ -17648,7 +18010,126 @@ def operation_draft_payload(
             record,
             task_authority=task_authority,
         )
+        adapter = business_adapter(record.operation)
         if (
+            command == "draft-bind-object"
+            and adapter.role_declaration is not None
+            and record.check is None
+        ):
+            next_action_binding = {
+                key: next_action_binding[key]
+                for key in (
+                    "contract",
+                    "required_next_phase",
+                    "object_binding",
+                    "declaration",
+                    "check",
+                    "shell_tool_timeout_ms",
+                    "then_read_next_response",
+                    "precompute_or_increment_revision",
+                )
+                if key in next_action_binding
+            }
+            draft = {
+                key: draft[key]
+                for key in (
+                    "contract",
+                    "draft_id",
+                    "lifecycle_state",
+                    "revision",
+                    "binding",
+                    "business_revision",
+                )
+                if key in draft
+            }
+            draft["response_integrity"] = {
+                "complete": True,
+                "truncated": False,
+                "projection": "bound_role_and_singular_continuation",
+                "compact_projection_is_not_truncation": True,
+            }
+        if (
+            record.operation == "audio.import"
+            and record.check is None
+            and command == "draft-declare-import-batch"
+        ):
+            declarations = draft.get("declarations")
+            if not isinstance(declarations, list) or not declarations:
+                raise GatewayInputError(
+                    "Audio import batch receipt is unavailable."
+                )
+            check_argv = [
+                "python",
+                str(GATEWAY_RUNNER_PATH),
+                "gateway.py",
+                "draft-check",
+                record.draft_id,
+                "--task-authority",
+                task_authority or "<task-authority-from-draft-start>",
+                "--expected-revision",
+                str(record.revision),
+            ]
+            next_action_binding = {
+                "contract": "waapi-skill.business-draft-next-action/v1",
+                "required_next_phase": "check_complete_business_declaration",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check_argv),
+                    "append": [],
+                },
+                "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+                "then_read_next_response": True,
+                "precompute_or_increment_revision": False,
+            }
+            draft = {
+                key: draft[key]
+                for key in (
+                    "contract",
+                    "draft_id",
+                    "lifecycle_state",
+                    "revision",
+                    "binding",
+                    "business_revision",
+                )
+                if key in draft
+            }
+            declaration_ids = [
+                row.get("declaration_id")
+                for row in declarations
+                if isinstance(row, Mapping)
+            ]
+            if (
+                len(declaration_ids) != len(declarations)
+                or not all(isinstance(value, str) for value in declaration_ids)
+            ):
+                raise GatewayInputError(
+                    "Audio import batch receipt has invalid declaration identities."
+                )
+            switch_assignment_count = sum(
+                1
+                for row in declarations
+                if isinstance(row, Mapping)
+                and isinstance(row.get("fields"), Mapping)
+                and "switch_value" in row["fields"]
+            )
+            draft["batch_receipt"] = {
+                "contract": (
+                    "waapi-skill.business-declaration-batch-receipt/v1"
+                ),
+                "declaration_count": len(declarations),
+                "switch_assignment_count": switch_assignment_count,
+                "declaration_ids": declaration_ids,
+            }
+            draft["declarations_summary"] = {
+                "count": len(declarations),
+                "canonical_sha256": canonical_sha256(declarations),
+            }
+            draft["response_integrity"] = {
+                "complete": True,
+                "truncated": False,
+                "projection": "business_declaration_batch_receipt_and_check",
+                "compact_projection_is_not_truncation": True,
+            }
+        elif (
             record.operation == "audio.import"
             and record.check is None
             and command in {"draft-declare-new", "draft-declare-existing"}
@@ -17658,23 +18139,28 @@ def operation_draft_payload(
                 raise GatewayInputError(
                     "Audio import declaration receipt is unavailable."
                 )
+            check_argv = [
+                "python",
+                str(GATEWAY_RUNNER_PATH),
+                "gateway.py",
+                "draft-check",
+                record.draft_id,
+                "--task-authority",
+                task_authority or "<task-authority-from-draft-start>",
+                "--expected-revision",
+                str(record.revision),
+            ]
             next_action_binding = {
-                key: next_action_binding[key]
-                for key in (
-                    "contract",
-                    "declare_new",
-                    "declare_existing",
-                    "completion_candidate",
-                    "forbidden_inputs",
-                    "shell_tool_timeout_ms",
-                    "then_read_next_response",
-                    "precompute_or_increment_revision",
-                )
-                if key in next_action_binding
+                "contract": "waapi-skill.business-draft-next-action/v1",
+                "required_next_phase": "check_complete_business_declaration",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check_argv),
+                    "append": [],
+                },
+                "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+                "then_read_next_response": True,
+                "precompute_or_increment_revision": False,
             }
-            next_action_binding["required_next_phase"] = (
-                "declare_remaining_business_items_or_check_complete_draft"
-            )
             draft = {
                 key: draft[key]
                 for key in (

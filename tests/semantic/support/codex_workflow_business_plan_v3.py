@@ -560,6 +560,32 @@ def _matches_transaction_step_sequence(
                 "bind-state-or-switch",
                 "declare-switch-assignment",
             ]
+        if transaction.get("operation") == "audio.import":
+            if prefixes[-1:] != ["declare-batch"]:
+                return False
+            setup_prefixes = prefixes[:-1]
+            configure_seen = False
+            counters = {"bind-object": [], "bind-field": []}
+            for prefix in setup_prefixes:
+                if prefix == "configure":
+                    if configure_seen:
+                        return False
+                    configure_seen = True
+                    continue
+                family, separator, raw_index = prefix.rpartition(".")
+                if (
+                    not separator
+                    or family not in counters
+                    or len(raw_index) != 3
+                    or not raw_index.isdigit()
+                    or configure_seen
+                ):
+                    return False
+                counters[family].append(int(raw_index))
+            return bool(counters["bind-object"]) and all(
+                indexes == list(range(1, len(indexes) + 1))
+                for indexes in counters.values()
+            )
         counters = {"bind-object": [], "bind-field": [], "declare": []}
         configure_seen = False
         declaration_seen = False

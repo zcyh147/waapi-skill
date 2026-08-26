@@ -420,7 +420,7 @@ _DERIVED_SFX_PROTOCOL_HARNESS_SHA256 = frozenset(
     }
 )
 _CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION = (
-    "audio-import-business-agent/current-v1"
+    "audio-import-business-agent/current-v2-batch"
 )
 HEAVY_V3_ORACLE_CONTRACT = "waapi-skill.heavy-oracle/v2"
 HEAVY_V3_LIVE_PREFLIGHT_CONTRACT = "waapi-skill.codex-semantic-live-preflight/v1"
@@ -3440,31 +3440,50 @@ def _validate_audio_import_business_agent_protocol(
             task_root / "runtime",
             require_media_files=True,
         )
-        steps = build_preview_only_business_steps(requests)
-        protocol = V3GatewayProtocol(
-            steps=steps,
-            turn_prefix_counts=(len(steps),),
-        )
+        if protocol_manifest_revision == AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION:
+            provenance = load_strict_regular_json(
+                scenario_root / "evidence" / HEAVY_V3_PROMPT_PROVENANCE_FILE
+            )
+            raw_protocol = provenance.get("protocol")
+            protocol_value = (
+                raw_protocol.get("value")
+                if isinstance(raw_protocol, Mapping)
+                else None
+            )
+            if not isinstance(protocol_value, Mapping):
+                raise PromptProvenanceError(
+                    "legacy audio import evidence lacks its sealed protocol"
+                )
+            canonical = _canonicalize_legacy_protocol_manifest(
+                protocol_value,
+                protocol_manifest_revision=protocol_manifest_revision,
+            )
+            protocol = deserialize_protocol(canonical)
+            steps = protocol.steps
+        else:
+            steps = build_preview_only_business_steps(requests)
+            protocol = V3GatewayProtocol(
+                steps=steps,
+                turn_prefix_counts=(len(steps),),
+            )
     except (OSError, TypeError, ValueError, V3ProtocolError) as exc:
         raise CampaignEvidenceError(
             "audio import business sealed protocol cannot be reconstructed"
         ) from exc
+    except PromptProvenanceError as exc:
+        raise CampaignEvidenceError(str(exc)) from exc
 
-    protocol_value = serialize_protocol(protocol)
     if protocol_manifest_revision == AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION:
-        legacy_value = json.loads(json.dumps(protocol_value))
-        for step in legacy_value["steps"]:
-            step.pop("allow_explicit_derived_sfx_language")
-        try:
-            canonical = _canonicalize_legacy_protocol_manifest(
-                legacy_value,
-                protocol_manifest_revision=protocol_manifest_revision,
-            )
-        except PromptProvenanceError as exc:
-            raise CampaignEvidenceError(str(exc)) from exc
-        if deserialize_protocol(canonical) != protocol:
+        preview_steps = tuple(
+            step
+            for step in steps
+            if step.subcommand == "preview-from-draft"
+            and isinstance(step.expected_operation_request, Mapping)
+            and step.expected_operation_request.get("operation") == "audio.import"
+        )
+        if len(preview_steps) != len(requests):
             raise CampaignEvidenceError(
-                "audio import business protocol revision is not exact"
+                "legacy audio import protocol transaction count drifted"
             )
     elif protocol_manifest_revision != _CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION:
         raise CampaignEvidenceError(
@@ -7223,6 +7242,7 @@ def _validate_integration_workflow_business_plan(
             "draft-start": "operation_compose",
             "draft-apply": "operation_compose",
             "draft-business-configure": "operation_compose",
+            "draft-declare-import-batch": "operation_compose",
             "draft-bind-object": "operation_compose",
             "draft-bind-field": "operation_compose",
             "draft-discover-fields": "operation_compose",

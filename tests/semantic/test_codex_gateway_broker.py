@@ -3830,16 +3830,19 @@ def test_audio_import_numbered_declarations_remain_strictly_ordered(
     }
 
     steps = build_audio_import_composer_transaction_steps(request, label="tx01")
-    declarations = tuple(
-        step for step in steps if step.subcommand == "draft-declare-new"
+    declaration = next(
+        step
+        for step in steps
+        if step.subcommand == "draft-declare-import-batch"
     )
 
-    assert [step.name for step in declarations] == [
-        "tx01.declare.001",
-        "tx01.declare.002",
-    ]
-    assert declarations[0].arguments[4] != declarations[1].arguments[4]
-    assert steps.index(declarations[0]) < steps.index(declarations[1])
+    assert declaration.name == "tx01.declare-batch"
+    assert [
+        declaration.arguments[index + 1]
+        for index, value in enumerate(declaration.arguments)
+        if value == "--row-order"
+    ] == ["row-001", "row-002"]
+    assert declaration.arguments.count("--new-root-row") == 2
     assert all(step.subcommand != "draft-apply" for step in steps)
 
 
@@ -3876,16 +3879,17 @@ def test_audio_import_business_protocol_uses_stable_fields_and_strict_revision_o
     }
 
     steps = build_audio_import_composer_transaction_steps(request, label="tx01")
-    declarations = tuple(
-        step for step in steps if step.subcommand == "draft-declare-new"
+    declaration = next(
+        step
+        for step in steps
+        if step.subcommand == "draft-declare-import-batch"
     )
 
-    assert len(declarations) == 2
     assert sum(step.subcommand == "draft-bind-field" for step in steps) == 1
-    assert all("volume_db" in step.arguments for step in declarations)
-    assert all("--field-value" in step.arguments for step in declarations)
-    assert all("--object-type" not in step.arguments for step in declarations)
-    assert all("--object-path" not in step.arguments for step in declarations)
+    assert declaration.arguments.count("volume_db") == 2
+    assert declaration.arguments.count("--field-value") == 2
+    assert "--object-type" not in declaration.arguments
+    assert "--object-path" not in declaration.arguments
     assert all(step.subcommand != "draft-apply" for step in steps)
     preview = next(
         step for step in steps if step.subcommand == "preview-from-draft"
@@ -3898,8 +3902,8 @@ def test_audio_import_business_protocol_uses_stable_fields_and_strict_revision_o
     )
     broker_module.validate_operation_draft_protocol_steps(steps)
 
-    first_index = steps.index(declarations[0])
-    second_index = steps.index(declarations[1])
+    first_index = steps.index(declaration)
+    second_index = first_index + 1
     reordered = list(steps)
     reordered[first_index], reordered[second_index] = (
         reordered[second_index],
@@ -3934,20 +3938,23 @@ def test_audio_import_nested_declaration_binds_compact_parent_receipt() -> None:
     }
 
     steps = build_audio_import_composer_transaction_steps(request, label="tx01")
-    declarations = tuple(
-        step for step in steps if step.subcommand == "draft-declare-new"
+    declaration = next(
+        step
+        for step in steps
+        if step.subcommand == "draft-declare-import-batch"
     )
     bindings = tuple(
         argument
-        for argument in declarations[1].arguments
+        for argument in declaration.arguments
         if isinstance(argument, ResponseBinding)
     )
 
-    assert ResponseBinding(
-        declarations[0].name,
-        "/draft/declaration_receipt/result_handle",
-    ) in bindings
-    assert all("/draft/declarations/" not in binding.pointer for binding in bindings)
+    child_index = declaration.arguments.index("--new-child-row")
+    assert declaration.arguments[child_index + 2] == "row-001"
+    assert all(
+        "/draft/declaration_receipt/" not in binding.pointer
+        for binding in bindings
+    )
 
 
 def test_audio_import_witness_normalizes_only_gateway_owned_type_path_segments() -> None:
@@ -4195,6 +4202,101 @@ def test_business_declaration_accepts_only_exact_explicit_derived_sfx_language()
         ) == invalid
 
 
+def test_import_batch_group_order_is_transport_but_row_order_is_business_meaning() -> None:
+    fixed = (
+        "od1-" + "1" * 32,
+        "--task-authority",
+        "da1-" + "2" * 40,
+        "--expected-revision",
+        "2",
+    )
+    step = ExpectedGatewayStep(
+        name="tx01.declare-batch",
+        subcommand="draft-declare-import-batch",
+        arguments=(
+            *fixed,
+            "--expected-declaration-count",
+            "2",
+            "--expected-switch-assignment-count",
+            "1",
+            "--row-order",
+            "snow",
+            "--new-root-row",
+            "snow",
+            "parent",
+            "Snow",
+            "random-container",
+            "--switch-value",
+            "snow",
+            "Snow",
+            "--row-order",
+            "snow-step-01",
+            "--new-child-row",
+            "snow-step-01",
+            "snow",
+            "Snow_Step_01",
+            "sound-sfx",
+            "--field",
+            "snow-step-01",
+            "media_file",
+            "/tmp/snow.wav",
+        ),
+    )
+    reordered = (
+        *fixed,
+        "--row-order",
+        "snow",
+        "--row-order",
+        "snow-step-01",
+        "--field",
+        "snow-step-01",
+        "media_file",
+        "/tmp/snow.wav",
+        "--switch-value",
+        "snow",
+        "Snow",
+        "--new-child-row",
+        "snow-step-01",
+        "snow",
+        "Snow_Step_01",
+        "sound-sfx",
+        "--new-root-row",
+        "snow",
+        "parent",
+        "Snow",
+        "random-container",
+        "--expected-switch-assignment-count",
+        "1",
+        "--expected-declaration-count",
+        "2",
+    )
+    broker = SimpleNamespace(_payloads_by_step={})
+
+    assert CodexGatewayBroker._normalize_business_declaration_fact_order(
+        broker,
+        step,
+        reordered,
+    ) == step.arguments
+    wrong_order = list(reordered)
+    first = wrong_order.index("snow", len(fixed))
+    second = wrong_order.index("snow-step-01", first + 1)
+    wrong_order[first], wrong_order[second] = (
+        wrong_order[second],
+        wrong_order[first],
+    )
+    assert CodexGatewayBroker._normalize_business_declaration_fact_order(
+        broker,
+        step,
+        tuple(wrong_order),
+    ) == tuple(wrong_order)
+    duplicate = (*reordered, "--switch-value", "snow", "Snow")
+    assert CodexGatewayBroker._normalize_business_declaration_fact_order(
+        broker,
+        step,
+        duplicate,
+    ) == duplicate
+
+
 def test_business_request_normalizes_only_exact_live_bound_reference_paths() -> None:
     bound_path = r"\Master-Mixer Hierarchy\Default Work Unit\Weather_Bus"
     unknown_path = r"\Master-Mixer Hierarchy\Default Work Unit\Unknown"
@@ -4322,7 +4424,7 @@ def test_business_draft_setup_broker_selects_unique_binding_and_configuration(
     declaration_index = next(
         index
         for index, step in enumerate(broker._execution_steps)  # noqa: SLF001
-        if step.name == "tx01.declare.001"
+        if step.name == "tx01.declare-batch"
     )
     previous = broker._execution_steps[declaration_index - 1]  # noqa: SLF001
     broker._payloads_by_step[previous.name] = {  # noqa: SLF001

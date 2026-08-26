@@ -1044,6 +1044,7 @@ def gateway_command(skill: Path, arguments: str) -> str:
         "draft-bind-field",
         "draft-bind-object",
         "draft-business-configure",
+        "draft-declare-import-batch",
         "draft-clear-object-list",
         "draft-declare-existing",
         "draft-declare-field-change",

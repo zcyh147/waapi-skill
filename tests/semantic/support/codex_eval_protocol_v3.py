@@ -567,7 +567,8 @@ def build_audio_import_composer_transaction_steps(
     steps = draft.steps
     object_bindings: dict[tuple[str, str], ResponseBinding] = {}
     field_bindings: dict[tuple[str, str, str], ResponseBinding] = {}
-    planned_by_path: dict[str, ResponseBinding] = {}
+    planned_by_path: dict[str, str] = {}
+    batch_rows: list[dict[str, Any]] = []
     bind_object_index = 0
     bind_field_index = 0
 
@@ -770,24 +771,16 @@ def build_audio_import_composer_transaction_steps(
         existing_target_handle: ResponseBinding | None = None
         if existing_target_form:
             existing_target_handle = bind_object({"kind": "path", "value": target_path})
-            target_arguments: list[Any] = [
-                "--object-handle",
-                existing_target_handle,
-            ]
-            subcommand = "draft-declare-existing"
+            row_form = "existing"
+            row_target: Any = existing_target_handle
         else:
-            parent_handle = planned_by_path.get(parent_path)
-            if parent_handle is None:
-                parent_handle = bind_object({"kind": "path", "value": parent_path})
-            target_arguments = [
-                "--parent-handle",
-                parent_handle,
-                "--name",
-                name,
-                "--kind",
-                kind,
-            ]
-            subcommand = "draft-declare-new"
+            parent_declaration_id = planned_by_path.get(parent_path)
+            if parent_declaration_id is None:
+                row_form = "new-root"
+                row_target = bind_object({"kind": "path", "value": parent_path})
+            else:
+                row_form = "new-child"
+                row_target = parent_declaration_id
 
         business_fields: list[tuple[str, Any]] = []
         direct_mapping = (
@@ -896,50 +889,110 @@ def build_audio_import_composer_transaction_steps(
                 event_action,
             ]
 
-        declaration_name = f"{label}.declare.{row_index + 1:03d}"
-        declaration_arguments: list[Any] = [
-            *draft.prefix(),
-            "--declaration-id",
-            f"row-{row_index + 1:03d}",
-            *target_arguments,
-        ]
-        for field_name, field_value in business_fields:
+        declaration_id = f"row-{row_index + 1:03d}"
+        batch_rows.append(
+            {
+                "id": declaration_id,
+                "form": row_form,
+                "target": row_target,
+                "name": name,
+                "kind": kind,
+                "fields": business_fields,
+                "field_values": dynamic_values,
+                "event": event_arguments,
+            }
+        )
+        if not existing_target_form:
+            planned_by_path[target_path] = declaration_id
+
+    batch_name = f"{label}.declare-batch"
+    batch_arguments: list[Any] = [
+        *draft.prefix(),
+        "--expected-declaration-count",
+        str(len(batch_rows)),
+        "--expected-switch-assignment-count",
+        str(
+            sum(
+                1
+                for row in batch_rows
+                for field_name, _value in row["fields"]
+                if field_name == "switch_value"
+            )
+        ),
+    ]
+    for row in batch_rows:
+        declaration_id = row["id"]
+        batch_arguments.extend(("--row-order", declaration_id))
+        if row["form"] == "new-root":
+            batch_arguments.extend(
+                (
+                    "--new-root-row",
+                    declaration_id,
+                    row["target"],
+                    row["name"],
+                    row["kind"],
+                )
+            )
+        elif row["form"] == "new-child":
+            batch_arguments.extend(
+                (
+                    "--new-child-row",
+                    declaration_id,
+                    row["target"],
+                    row["name"],
+                    row["kind"],
+                )
+            )
+        else:
+            batch_arguments.extend(
+                ("--existing-row", declaration_id, row["target"])
+            )
+        for field_name, field_value in row["fields"]:
             rendered_value = (
                 field_value
                 if isinstance(field_value, ResponseBinding)
                 else value_text(field_value)
             )
             if field_name == "switch_value":
-                declaration_arguments.extend(("--switch-value", rendered_value))
+                batch_arguments.extend(
+                    ("--switch-value", declaration_id, rendered_value)
+                )
             else:
-                declaration_arguments.extend(("--field", field_name, rendered_value))
-        for field_handle, field_value in dynamic_values:
-            declaration_arguments.extend(
+                batch_arguments.extend(
+                    ("--field", declaration_id, field_name, rendered_value)
+                )
+        for field_handle, field_value in row["field_values"]:
+            batch_arguments.extend(
                 (
                     "--field-value",
+                    declaration_id,
                     field_handle,
-                    field_value if isinstance(field_value, ResponseBinding) else value_text(field_value),
+                    (
+                        field_value
+                        if isinstance(field_value, ResponseBinding)
+                        else value_text(field_value)
+                    ),
                 )
             )
-        declaration_arguments.extend(event_arguments)
-        steps.append(
-            ExpectedGatewayStep(
-                name=declaration_name,
-                subcommand=subcommand,
-                arguments=tuple(declaration_arguments),
-                allow_explicit_derived_sfx_language=(
-                    kind == "sound-sfx"
-                    and isinstance(language, str)
-                    and language.casefold() == "sfx"
-                ),
+        event_arguments = row["event"]
+        if event_arguments:
+            batch_arguments.extend(
+                (
+                    "--event",
+                    declaration_id,
+                    event_arguments[1],
+                    event_arguments[3],
+                    event_arguments[5],
+                )
             )
+    steps.append(
+        ExpectedGatewayStep(
+            name=batch_name,
+            subcommand="draft-declare-import-batch",
+            arguments=tuple(batch_arguments),
         )
-        draft.advance(declaration_name)
-        if not existing_target_form:
-            planned_by_path[target_path] = ResponseBinding(
-                declaration_name,
-                "/draft/declaration_receipt/result_handle",
-            )
+    )
+    draft.advance(batch_name)
 
     # The public business continuation tells a fresh Agent to bind every exact
     # live object before it configures or declares the import batch.  Keep the
@@ -962,7 +1015,12 @@ def build_audio_import_composer_transaction_steps(
     declaration_steps = [
         step
         for step in mutable_business_steps
-        if step.subcommand in {"draft-declare-new", "draft-declare-existing"}
+        if step.subcommand
+        in {
+            "draft-declare-import-batch",
+            "draft-declare-new",
+            "draft-declare-existing",
+        }
     ]
     if len(binding_steps) + len(configure_steps) + len(declaration_steps) != len(
         mutable_business_steps

@@ -263,6 +263,19 @@ def test_gateway_binds_three_roles_then_materializes_assignment(
     assert container["draft"]["next_action_binding"]["object_binding"][
         "next_role"
     ] == "child"
+    assert len(
+        json.dumps(container, ensure_ascii=False, separators=(",", ":")).encode(
+            "utf-8"
+        )
+    ) <= 5_500
+    assert set(container["draft"]["next_action_binding"]) == {
+        "contract",
+        "required_next_phase",
+        "object_binding",
+        "shell_tool_timeout_ms",
+        "then_read_next_response",
+        "precompute_or_increment_revision",
+    }
     child = _bind(
         tmp_path,
         draft_id=draft_id,

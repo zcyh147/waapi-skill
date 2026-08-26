@@ -1383,6 +1383,7 @@ def _workflow_plan_steps(
         "draft-start": "operation_compose",
         "draft-apply": "operation_compose",
         "draft-business-configure": "operation_compose",
+        "draft-declare-import-batch": "operation_compose",
         "draft-bind-object": "operation_compose",
         "draft-bind-field": "operation_compose",
         "draft-discover-fields": "operation_compose",

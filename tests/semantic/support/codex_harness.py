@@ -273,6 +273,7 @@ GATEWAY_SUBCOMMANDS = frozenset(
         "draft-bind-field",
         "draft-bind-object",
         "draft-business-configure",
+        "draft-declare-import-batch",
         "draft-check",
         "draft-clear-object-list",
         "draft-cancel",

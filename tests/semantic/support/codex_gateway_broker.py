@@ -2137,6 +2137,7 @@ _DRAFT_SUBCOMMANDS = frozenset(
         "draft-bind-object",
         "draft-bind-field",
         "draft-business-configure",
+        "draft-declare-import-batch",
         "draft-declare-field-change",
         "draft-declare-object-change",
         "draft-declare-switch-assignment",
@@ -2164,6 +2165,7 @@ _BUSINESS_DRAFT_REVISION_SUBCOMMANDS = frozenset(
         "draft-bind-object",
         "draft-bind-field",
         "draft-business-configure",
+        "draft-declare-import-batch",
         "draft-declare-field-change",
         "draft-declare-object-change",
         "draft-declare-switch-assignment",
@@ -9291,6 +9293,12 @@ class CodexGatewayBroker:
     ) -> tuple[str, ...]:
         """Order declaration fields by identity without weakening their values."""
 
+        if step.subcommand == "draft-declare-import-batch":
+            return CodexGatewayBroker._normalize_import_batch_fact_order(
+                self,
+                step,
+                actual,
+            )
         if step.subcommand not in {
             "draft-declare-new",
             "draft-declare-existing",
@@ -9360,6 +9368,110 @@ class CodexGatewayBroker:
             occurrences = actual_groups.count(derived_language)
             if occurrences == 1 and derived_language not in expected_groups:
                 actual_groups.remove(derived_language)
+        expected_keys = [key(group, expected=True) for group in expected_groups]
+        actual_keys = [key(group, expected=False) for group in actual_groups]
+        if (
+            any(item is None for item in (*expected_keys, *actual_keys))
+            or len(set(expected_keys)) != len(expected_keys)
+            or len(set(actual_keys)) != len(actual_keys)
+            or set(expected_keys) != set(actual_keys)
+        ):
+            return tuple(actual)
+        actual_by_key = dict(zip(actual_keys, actual_groups, strict=True))
+        return (
+            *tuple(actual[:fixed_count]),
+            *(
+                token
+                for expected_key in expected_keys
+                for token in actual_by_key[expected_key]
+            ),
+        )
+
+    def _normalize_import_batch_fact_order(
+        self,
+        step: ExpectedGatewayStep,
+        actual: Sequence[str],
+    ) -> tuple[str, ...]:
+        """Canonicalize closed batch groups while preserving exact row order."""
+
+        fixed_count = 5
+        if len(step.arguments) < fixed_count or len(actual) < fixed_count:
+            return tuple(actual)
+        option_arity = {
+            "--expected-declaration-count": 1,
+            "--expected-switch-assignment-count": 1,
+            "--row-order": 1,
+            "--new-root-row": 4,
+            "--new-child-row": 4,
+            "--existing-row": 2,
+            "--field": 3,
+            "--field-value": 3,
+            "--switch-value": 2,
+            "--event": 4,
+        }
+
+        def parse(values: Sequence[Any]) -> list[tuple[Any, ...]] | None:
+            groups: list[tuple[Any, ...]] = []
+            cursor = fixed_count
+            while cursor < len(values):
+                option = values[cursor]
+                arity = option_arity.get(option) if isinstance(option, str) else None
+                if arity is None or cursor + arity >= len(values):
+                    return None
+                groups.append(tuple(values[cursor : cursor + arity + 1]))
+                cursor += arity + 1
+            return groups
+
+        def bound_text(value: Any) -> str | None:
+            if isinstance(value, str):
+                return value
+            if not isinstance(value, ResponseBinding):
+                return None
+            source = self._payloads_by_step.get(value.step)
+            if source is None:
+                return None
+            try:
+                result = _json_pointer(source, value.pointer)
+            except (GatewayInvocationError, KeyError, TypeError, ValueError):
+                return None
+            return str(result) if isinstance(result, (str, int, float, bool)) else None
+
+        def key(group: tuple[Any, ...], *, expected: bool) -> tuple[str, ...] | None:
+            option = group[0]
+            if not isinstance(option, str):
+                return None
+            if option in {
+                "--expected-declaration-count",
+                "--expected-switch-assignment-count",
+            }:
+                return (option,)
+            declaration_id = group[1]
+            if not isinstance(declaration_id, str):
+                return None
+            if option == "--field":
+                field_name = group[2]
+                return (
+                    option,
+                    declaration_id,
+                    field_name,
+                ) if isinstance(field_name, str) else None
+            if option == "--field-value":
+                handle = bound_text(group[2]) if expected else group[2]
+                return (
+                    option,
+                    declaration_id,
+                    handle,
+                ) if isinstance(handle, str) else None
+            return (option, declaration_id)
+
+        expected_groups = parse(step.arguments)
+        actual_groups = parse(tuple(actual))
+        if expected_groups is None or actual_groups is None:
+            return tuple(actual)
+        expected_order = [group[1] for group in expected_groups if group[0] == "--row-order"]
+        actual_order = [group[1] for group in actual_groups if group[0] == "--row-order"]
+        if actual_order != expected_order:
+            return tuple(actual)
         expected_keys = [key(group, expected=True) for group in expected_groups]
         actual_keys = [key(group, expected=False) for group in actual_groups]
         if (

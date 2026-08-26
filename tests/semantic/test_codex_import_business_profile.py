@@ -274,7 +274,7 @@ def test_every_profile_transaction_compiles_to_the_production_business_draft() -
             )
             subcommands = tuple(step.subcommand for step in steps)
             assert "draft-start" in subcommands
-            assert "draft-declare-new" in subcommands or "draft-declare-existing" in subcommands
+            assert "draft-declare-import-batch" in subcommands
             assert "draft-check" in subcommands
             assert "preview-from-draft" in subcommands
             assert "draft-apply" not in subcommands
@@ -307,7 +307,9 @@ def test_protocol_accepts_the_normal_wwise_actor_mixer_path_token() -> None:
     steps = build_audio_import_composer_transaction_steps(request, label="tx01")
 
     declaration = next(
-        step for step in steps if step.subcommand == "draft-declare-new"
+        step
+        for step in steps
+        if step.subcommand == "draft-declare-import-batch"
     )
     assert "actor-mixer" in declaration.arguments
 
@@ -339,14 +341,14 @@ def test_implicit_create_uses_the_planned_parent_instead_of_live_binding_it() ->
     assert all(
         step.subcommand != "draft-business-configure" for step in steps
     )
-    sound_declarations = [
+    batch = next(
         step
         for step in steps
-        if step.subcommand == "draft-declare-new"
-        and "sound-sfx" in step.arguments
-    ]
-    assert sound_declarations
-    assert all("language" not in step.arguments for step in sound_declarations)
+        if step.subcommand == "draft-declare-import-batch"
+    )
+    assert "sound-sfx" in batch.arguments
+    assert "--new-child-row" in batch.arguments
+    assert "language" not in batch.arguments
 
 
 def test_existing_target_derives_reimport_while_replace_remains_explicit() -> None:
@@ -689,12 +691,12 @@ def test_campaign_validates_the_profile_specific_agent_outcome(tmp_path: Path) -
         },
         expected_unit=unit,
         scenario_root=tmp_path,
-        options=SimpleNamespace(
-            profile=campaign.AUDIO_IMPORT_BUSINESS_PROFILE_ID,
-            protocol_manifest_revision=(
-                campaign.AUDIO_IMPORT_DERIVED_SFX_PROTOCOL_REVISION
-            )
-        ),
+            options=SimpleNamespace(
+                profile=campaign.AUDIO_IMPORT_BUSINESS_PROFILE_ID,
+                protocol_manifest_revision=(
+                    campaign._CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION
+                )
+            ),
     )
 
 
@@ -728,16 +730,6 @@ def test_campaign_child_validator_consumes_reviewed_agent_protocol_revision(
     live = tmp_path / "live.json"
     for path, content in ((codex, "codex"), (auth, "{}"), (live, "{}")):
         path.write_text(content, encoding="utf-8")
-    legacy_revision = campaign._sealed_protocol_manifest_revision(
-        {
-            "selection": {"profile": matrix.AUDIO_IMPORT_BUSINESS_PROFILE_ID},
-            "harness": {
-                "semantic_tree_sha256": (
-                    "b152de8c55f8cb1085321da3ec877507627352acb10bed43e2ba7dbfae8b37df"
-                )
-            },
-        }
-    )
     options = campaign.CampaignOptions(
         campaign_root=tmp_path / "campaign",
         resume=True,
@@ -758,7 +750,9 @@ def test_campaign_child_validator_consumes_reviewed_agent_protocol_revision(
         offline_only=False,
         lock_timeout_seconds=1.0,
         max_pre_action_retries=0,
-        protocol_manifest_revision=legacy_revision,
+        protocol_manifest_revision=(
+            campaign._CURRENT_AUDIO_IMPORT_PROTOCOL_REVISION
+        ),
     )
     runner_options = matrix.RunnerOptions(
         profile=options.profile,

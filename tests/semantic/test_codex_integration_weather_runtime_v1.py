@@ -451,26 +451,21 @@ def _archive_test_weather_protocol_and_business_plan_cover_all_three_transaction
     import_declarations = [
         step
         for step in protocol.steps
-        if step.name.startswith("tx01.declare.")
+        if step.name == "tx01.declare-batch"
     ]
-    assert len(import_declarations) == 9
-    assert all(
-        step.subcommand == "draft-declare-new" for step in import_declarations
+    assert len(import_declarations) == 1
+    assert import_declarations[0].subcommand == (
+        "draft-declare-import-batch"
     )
     assert not any(
         step.name.startswith("tx01.") and step.subcommand == "draft-bind-field"
         for step in protocol.steps
     )
-    media_declarations = import_declarations[4:]
-    assert len(media_declarations) == 5
-    for declaration in media_declarations:
-        fields = {
-            declaration.arguments[index + 1]: declaration.arguments[index + 2]
-            for index, token in enumerate(declaration.arguments)
-            if token == "--field"
-        }
-        assert fields["override_parent_instance_limit"] == "true"
-        assert "IgnoreParentMaxSoundInstance" not in declaration.arguments
+    batch_arguments = import_declarations[0].arguments
+    assert batch_arguments.count("--row-order") == 9
+    assert batch_arguments.count("override_parent_instance_limit") == 5
+    assert batch_arguments.count("true") >= 5
+    assert "IgnoreParentMaxSoundInstance" not in batch_arguments
     action_preview = next(
         step for step in protocol.steps if step.name == "tx02.preview"
     )

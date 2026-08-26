@@ -37,6 +37,7 @@ MAX_BUSINESS_PREVIEW_DETAIL_BYTES = 256 * 1024
 BUSINESS_SESSION_UPDATE_EVENTS = frozenset(
     {
         "declaration.added",
+        "declaration.batch-added",
         "declaration.removed",
         "declaration.revised",
         "handles.bound",
@@ -435,6 +436,22 @@ class BusinessDeclarationSession:
         candidate_payload = candidate.as_dict()
         if candidate.context != previous.context:
             raise ValueError("business session transition changed its live binding")
+        if event_type == "declaration.batch-added":
+            previous_declarations = previous_payload["declarations"]
+            candidate_declarations = candidate_payload["declarations"]
+            added_count = len(candidate_declarations) - len(previous_declarations)
+            if (
+                added_count < 1
+                or candidate.revision != previous.revision + added_count
+                or candidate.active_preview is not None
+                or candidate_declarations[: len(previous_declarations)]
+                != previous_declarations
+                or candidate_payload["settings"] != previous_payload["settings"]
+            ):
+                raise ValueError(
+                    "declaration batch transition must append one bounded batch atomically"
+                )
+            return
         if event_type.startswith("declaration."):
             if (
                 candidate.revision != previous.revision + 1

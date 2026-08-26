@@ -395,7 +395,7 @@ def test_compound_direct_import_binds_defaults_row_overrides_and_inline_wav(
     declarations = [
         step
         for step in protocol.steps
-        if step.subcommand in {"draft-declare-new", "draft-declare-existing"}
+        if step.subcommand == "draft-declare-import-batch"
     ]
     assert declarations
     assert not any(step.subcommand == "draft-apply" for step in protocol.steps)

@@ -68,6 +68,7 @@ _BUSINESS_DRAFT_EVENT_OPTIONS = {
     "draft-bind-field": frozenset({"handles.bound"}),
     "draft-bind-object": frozenset({"handles.bound"}),
     "draft-business-configure": frozenset({"settings.revised"}),
+    "draft-declare-import-batch": frozenset({"declaration.batch-added"}),
     "draft-clear-object-list": frozenset(
         {"declaration.added", "declaration.revised"}
     ),
