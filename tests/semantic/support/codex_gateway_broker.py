@@ -9400,12 +9400,14 @@ class CodexGatewayBroker:
         option_arity = {
             "--expected-declaration-count": 1,
             "--expected-switch-assignment-count": 1,
+            "--media-directory": 1,
             "--row-order": 1,
             "--new-root-row": 4,
             "--new-child-row": 4,
             "--existing-row": 2,
             "--field": 3,
             "--field-value": 3,
+            "--media-file": 2,
             "--switch-value": 2,
             "--event": 4,
         }
@@ -9443,6 +9445,7 @@ class CodexGatewayBroker:
             if option in {
                 "--expected-declaration-count",
                 "--expected-switch-assignment-count",
+                "--media-directory",
             }:
                 return (option,)
             declaration_id = group[1]
@@ -9489,6 +9492,7 @@ class CodexGatewayBroker:
             if option in {
                 "--expected-declaration-count",
                 "--expected-switch-assignment-count",
+                "--media-directory",
             }:
                 return group
             declaration_id = group[1]

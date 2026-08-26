@@ -11,6 +11,7 @@ import json
 import math
 import re
 from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from tests.semantic.support.codex_gateway_broker import (
@@ -920,6 +921,28 @@ def build_audio_import_composer_transaction_steps(
             )
         ),
     ]
+    media_values = [
+        field_value
+        for row in batch_rows
+        for field_name, field_value in row["fields"]
+        if field_name == "media_file"
+    ]
+    media_paths = [
+        Path(value)
+        for value in media_values
+        if isinstance(value, str)
+    ]
+    shared_media_directory: Path | None = None
+    if (
+        len(media_paths) == len(media_values)
+        and len(media_paths) >= 2
+        and all(path.is_absolute() and path.name for path in media_paths)
+        and len({path.parent for path in media_paths}) == 1
+    ):
+        shared_media_directory = media_paths[0].parent
+        batch_arguments.extend(
+            ("--media-directory", str(shared_media_directory))
+        )
     for row in batch_rows:
         declaration_id = row["id"]
         batch_arguments.extend(("--row-order", declaration_id))
@@ -956,6 +979,17 @@ def build_audio_import_composer_transaction_steps(
             if field_name == "switch_value":
                 batch_arguments.extend(
                     ("--switch-value", declaration_id, rendered_value)
+                )
+            elif (
+                field_name == "media_file"
+                and shared_media_directory is not None
+            ):
+                batch_arguments.extend(
+                    (
+                        "--media-file",
+                        declaration_id,
+                        Path(str(rendered_value)).name,
+                    )
                 )
             else:
                 batch_arguments.extend(

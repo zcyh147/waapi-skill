@@ -703,7 +703,14 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
     assert batch_arguments.count("--new-child-row") == 4
     assert batch_arguments.count("--row-order") == 5
     assert batch_arguments.count("--switch-value") == 1
-    assert batch_arguments.count("media_file") == 4
+    assert batch_arguments.count("--media-directory") == 1
+    assert batch_arguments.count("--media-file") == 4
+    media_directory_index = batch_arguments.index("--media-directory")
+    assert batch_arguments[media_directory_index + 1] == (
+        prepared.visible_values["snow_source_directory"]
+    )
+    for index in range(1, 5):
+        assert f"snow_step_{index:02d}.wav" in batch_arguments
     assert "Snow" in batch_arguments
     assert "random-container" in batch_arguments
     assert batch_arguments[
@@ -1086,6 +1093,19 @@ def test_business_oracle_plan_has_two_unambiguous_transaction_deltas(
     assert sections.payload_bindings["primary_steps"] == (
         "tx01.execute",
         "tx02.execute",
+    )
+    campaign._validate_integration_workflow_business_plan(
+        sections,
+        expected_unit=SimpleNamespace(
+            workflow_id=case.unit.workflow_id,
+            version=case.unit.version,
+            transactions=case.unit.transactions,
+            baseline_manifest=case.manifest,
+        ),
+        provenance=SimpleNamespace(
+            protocol=case.prepared.protocol,
+            visible_values=case.prepared.visible_values,
+        ),
     )
     case.prepared.cleanup().assert_passed()
 

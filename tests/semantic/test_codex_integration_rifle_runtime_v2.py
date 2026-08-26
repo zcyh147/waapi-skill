@@ -771,9 +771,14 @@ def test_rifle_business_protocol_preserves_every_exact_import_row(
     batch_arguments = declarations[0].arguments
     assert batch_arguments.count("--existing-row") == 4
     assert batch_arguments.count("--row-order") == 4
+    assert batch_arguments.count("--media-directory") == 1
+    assert batch_arguments.count("--media-file") == 4
+    media_directory_index = batch_arguments.index("--media-directory")
+    media_directory = Path(str(batch_arguments[media_directory_index + 1]))
     for row in rows:
-        assert "media_file" in batch_arguments
-        assert row["audio_file"] in batch_arguments
+        audio_file = Path(row["audio_file"])
+        assert audio_file.parent == media_directory
+        assert audio_file.name in batch_arguments
         assert "language" not in batch_arguments
         assert row["import_language"] == "SFX"
     assert "volume_db" in batch_arguments

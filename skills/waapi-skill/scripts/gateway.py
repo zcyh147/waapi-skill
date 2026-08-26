@@ -1930,6 +1930,17 @@ def build_parser() -> argparse.ArgumentParser:
         metavar=("ID", "FIELD_HANDLE", "VALUE"),
     )
     draft_declare_import_batch.add_argument(
+        "--media-directory",
+        metavar="ABSOLUTE_DIRECTORY",
+    )
+    draft_declare_import_batch.add_argument(
+        "--media-file",
+        action="append",
+        nargs=2,
+        default=[],
+        metavar=("ID", "FILE_NAME"),
+    )
+    draft_declare_import_batch.add_argument(
         "--switch-value",
         action="append",
         nargs=2,
@@ -10713,6 +10724,54 @@ def dispatch_offline_business_draft_update(
             fields_by_id.setdefault(declaration_id, []).append(
                 (field_name, value)
             )
+        if args.media_file and args.media_directory is None:
+            raise GatewayInputError(
+                "Import batch media files require one absolute media directory"
+            )
+        if args.media_directory is not None and not args.media_file:
+            raise GatewayInputError(
+                "Import batch media directory requires at least one media file"
+            )
+        media_file_ids: set[str] = set()
+        if args.media_directory is not None:
+            media_directory = Path(args.media_directory)
+            if (
+                not media_directory.is_absolute()
+                or ".." in media_directory.parts
+                or not media_directory.is_dir()
+            ):
+                raise GatewayInputError(
+                    "Import batch media directory must be one existing absolute directory without traversal"
+                )
+            for declaration_id, file_name in args.media_file:
+                if (
+                    not file_name
+                    or file_name in {".", ".."}
+                    or "/" in file_name
+                    or "\\" in file_name
+                    or "\x00" in file_name
+                ):
+                    raise GatewayInputError(
+                        "Import batch media file name must be one leaf name without separators or traversal"
+                    )
+                if declaration_id in media_file_ids:
+                    raise GatewayInputError(
+                        f"Import batch media file for {declaration_id!r} was supplied twice"
+                    )
+                if any(
+                    field_name == "media_file"
+                    for field_name, _value in fields_by_id.get(
+                        declaration_id,
+                        [],
+                    )
+                ):
+                    raise GatewayInputError(
+                        f"Import batch media file for {declaration_id!r} has two transports"
+                    )
+                media_file_ids.add(declaration_id)
+                fields_by_id.setdefault(declaration_id, []).append(
+                    ("media_file", str(media_directory / file_name))
+                )
         for declaration_id, field_handle, value in args.field_value:
             field_values_by_id.setdefault(declaration_id, []).append(
                 (field_handle, value)
@@ -17132,6 +17191,21 @@ def _business_next_action_binding(
                         "<event-name>",
                         "<Play|Stop|Pause|Resume|Break|Seek>",
                     ],
+                },
+                "media_source": {
+                    "directory": [
+                        "--media-directory",
+                        "<one-absolute-source-directory>",
+                    ],
+                    "file": [
+                        "--media-file",
+                        "<id>",
+                        "<one-file-name-without-separators>",
+                    ],
+                    "rule": (
+                        "when two or more requested media files share a directory, "
+                        "copy that directory once and submit one leaf file name per row"
+                    ),
                 },
                 "complete_on_first_submission": True,
                 "submit_once": True,

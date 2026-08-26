@@ -373,6 +373,15 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     ]
     assert batch_action["complete_on_first_submission"] is True
     assert batch_action["submit_once"] is True
+    assert batch_action["media_source"]["directory"] == [
+        "--media-directory",
+        "<one-absolute-source-directory>",
+    ]
+    assert batch_action["media_source"]["file"] == [
+        "--media-file",
+        "<id>",
+        "<one-file-name-without-separators>",
+    ]
     assert "switch_assignment" in batch_action["row_fields"]
     assert all(
         name not in bound_next
@@ -630,6 +639,8 @@ def test_audio_import_batch_declaration_is_atomic_complete_and_compact(
         "--switch-value",
         "snow",
         "Snow",
+        "--media-directory",
+        str(tmp_path),
     ]
     for index, path in enumerate(media_files, start=1):
         declaration_id = f"snow-step-{index:02d}"
@@ -642,10 +653,9 @@ def test_audio_import_batch_declaration_is_atomic_complete_and_compact(
                 "snow",
                 f"Snow_Step_{index:02d}",
                 "sound-sfx",
-                "--field",
+                "--media-file",
                 declaration_id,
-                "media_file",
-                str(path),
+                path.name,
             )
         )
 
@@ -695,6 +705,10 @@ def test_audio_import_batch_declaration_is_atomic_complete_and_compact(
         "snow-step-03",
         "snow-step-04",
     ]
+    assert [
+        row["fields"]["media_file"]
+        for row in session["declarations"][1:]
+    ] == [str(path) for path in media_files]
 
 
 def test_audio_import_batch_count_mismatch_is_atomic(tmp_path: Path) -> None:
@@ -749,6 +763,37 @@ def test_audio_import_batch_count_mismatch_is_atomic(tmp_path: Path) -> None:
         / f"{started['draft']['draft_id']}.json"
     )
     before = record_path.read_bytes()
+
+    traversal_code, traversal = _offline(
+        tmp_path,
+        "draft-declare-import-batch",
+        started["draft"]["draft_id"],
+        "--task-authority",
+        started["task_authority"],
+        "--expected-revision",
+        "2",
+        "--expected-declaration-count",
+        "1",
+        "--expected-switch-assignment-count",
+        "0",
+        "--row-order",
+        "rain",
+        "--new-root-row",
+        "rain",
+        bound["bound_object"]["handle"],
+        "Rain",
+        "sound-sfx",
+        "--media-directory",
+        str(tmp_path),
+        "--media-file",
+        "rain",
+        "../rain.wav",
+    )
+
+    assert traversal_code == 2
+    assert traversal["error_code"] == "GatewayInputError"
+    assert "file name" in traversal["message"].casefold()
+    assert record_path.read_bytes() == before
 
     mismatch_code, mismatch = _offline(
         tmp_path,
