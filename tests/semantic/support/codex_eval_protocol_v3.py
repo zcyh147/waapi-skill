@@ -1634,7 +1634,8 @@ def build_soundbank_business_transaction_steps(
         bound[key] = result
         return result
 
-    declaration_arguments: list[Any] = [*draft.prefix()]
+    initial_prefix = draft.prefix()
+    declaration_arguments: list[Any] = [*initial_prefix]
     if operation == "soundbank.setInclusions":
         declaration_arguments.extend(
             (
@@ -1735,7 +1736,7 @@ def build_soundbank_business_transaction_steps(
             declaration_arguments.extend(("--definition-file", str(path)))
         declaration_arguments.extend(("--io-root", str(arguments["io_root"])))
 
-    declaration_arguments[:5] = draft.prefix()
+    declaration_arguments[: len(initial_prefix)] = draft.prefix()
     declaration_name = f"{label}.declare-soundbank-plan"
     steps.append(
         ExpectedGatewayStep(

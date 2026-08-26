@@ -16657,15 +16657,11 @@ def _business_next_action_binding(
                 "result": "copy_the_returned_bound_object.handle",
             }
             if role == "soundbank":
-                role_exact_type_name = operation_draft_prefix_copy_binding(
-                    role_prefix
+                role_exact_name = operation_draft_prefix_copy_binding(
+                    [*role_prefix, "--exact-type-name", "SoundBank"]
                 )
-                role_exact_type_name["append"] = [
-                    "--exact-type-name",
-                    "<exact-wwise-type>",
-                    "<exact-object-name>",
-                ]
-                route["by_exact_type_name"] = role_exact_type_name
+                role_exact_name["append"] = ["<exact-object-name>"]
+                route["by_exact_name"] = role_exact_name
             return route
 
         soundbank_object_binding = {
@@ -16673,7 +16669,7 @@ def _business_next_action_binding(
             "route_by_user_fact": {
                 "complete_object_path": "role_routes.<role>.by_path_segments",
                 "exact_soundbank_name": (
-                    "role_routes.soundbank.by_exact_type_name"
+                    "role_routes.soundbank.by_exact_name"
                 ),
                 "selected_guid": "role_routes.<role>.by_id",
             },
@@ -16685,7 +16681,7 @@ def _business_next_action_binding(
                 "choose_the_business_role_first_then_copy_its_disclosed_identity_route"
             ),
             "name_rule": (
-                "an_unscoped_soundbank_name_uses_the_soundbank_exact_type_name_route"
+                "an_unscoped_soundbank_name_uses_the_soundbank_exact_name_route"
             ),
             "result_validation_rule": (
                 "compare_returned_name_type_path_to_the_user_target_before_using_"

@@ -1935,10 +1935,12 @@ def _write_external_sources_document(
     source_relative = source_file.resolve(strict=True).relative_to(
         media_root.resolve(strict=True)
     ).as_posix()
-    root_value = os.path.relpath(
-        media_root.resolve(strict=True),
-        project_root.resolve(strict=True),
-    ).replace(os.sep, "/")
+    root_value = Path(
+        os.path.relpath(
+            media_root.resolve(strict=True),
+            project_root.resolve(strict=True),
+        )
+    ).as_posix()
     root = ET.Element(
         "ExternalSourcesList",
         {"SchemaVersion": "1", "Root": root_value},

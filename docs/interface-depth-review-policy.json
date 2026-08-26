@@ -93,10 +93,11 @@
     },
     {
       "id": "named-soundbank-planning",
-      "disposition": "migration_required",
-      "owner_issue": 56,
+      "disposition": "already_deep",
+      "owner_issue": null,
       "operations": ["soundbank.convertExternalSources", "soundbank.generate", "soundbank.processDefinitionFiles", "soundbank.setInclusions"],
-      "leaked_mechanics": ["native_object_path", "wire_type", "dependency_order", "batch_layout", "request_fragment"]
+      "leaked_mechanics": [],
+      "audit_evidence": "The public soundbank-business/v1 Adapters accept live-bound SoundBank and inclusion identities, stable platform/language/rebuild/filter scalars, exact source artifacts, and exact Definition files; issue and enforce operation-selected business-role continuations; compile native object paths, wire types, dependency order, batch layout, request envelopes, file-processing plans, and the one immutable Preview inside the Gateway; and remove normal SoundBank inline_typed and Composer ingress. #79 retains five-version deterministic coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution for all four operations, and targeted Terra Fresh Agent Harbor evidence on both hosts."
     },
     {
       "id": "named-exact-artifact-code",
@@ -217,15 +218,6 @@
     }
   ],
   "ticket_blueprints": {
-    "named-soundbank-planning": {
-      "title": "Compile SoundBank inclusion, generation, and external-source plans",
-      "parent_issue": 56,
-      "blocked_by_family": "named-switch-assignments",
-      "public_behavior": "Accept SoundBank identities, inclusion intent, platforms, languages, rebuild choices, exact source artifacts, and exact Definition files; derive native batch layout, object paths, order, request envelopes, and file-processing plans.",
-      "deterministic_tests": "Five-version inclusion/generation/external-source/Definition-file goldens, empty and multi-value cases, hostile paths, limits, stale identities, isolated-I/O guards, exact-byte preservation, and non-bypass.",
-      "removal_boundary": "Remove SoundBank Composer and inline_typed normal inputs after parity; keep exact file authority, artifact verification, and project guards.",
-      "proportional_evidence": "Harbor setInclusions/generate, external-source conversion, and Definition-file processing on matching 2022.1/2025.1 macOS and Windows hosts; targeted Harbor Fresh Agent workflow."
-    },
     "named-exact-artifact-code": {
       "title": "Wrap tabular import and Lua artifacts in deep Gateway envelopes",
       "parent_issue": 56,
@@ -346,7 +338,6 @@
   },
   "ticket_issue_numbers": {
     "generic-fixed-query-metadata": 96,
-    "named-soundbank-planning": 79,
     "named-exact-artifact-code": 80,
     "named-authoring-ui-registration": 81,
     "named-dangerous-debug-controls": 82,

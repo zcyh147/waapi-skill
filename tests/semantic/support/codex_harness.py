@@ -58,7 +58,7 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "composer.start.preconditions; absent=none; prompt/schema!=live; all dynamic tokens "
     "pre-draft; single existing=>--object GUID; --object-type "
     "only new/imported/plural. "
-    "SoundBank=>role_route; exact bank=>soundbank.by_exact_type_name. "
+    "SoundBank=>role_route; exact bank=>soundbank.by_exact_name. "
     "path=>by_path_segments one "
     "arg/segment; name=>query>ID=>by_id; GUID=>by_id. "
     "Else exact path=>path; never exact-type-name; reread selected "

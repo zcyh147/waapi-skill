@@ -522,18 +522,20 @@ def test_set_inclusions_rejects_handles_bound_for_the_wrong_business_roles(
     assert rejected["error_code"] == "BOUND_OBJECT_ROLE_MISMATCH"
 
 
-def test_soundbank_draft_binds_one_exact_type_name_without_a_separate_query(
+def test_soundbank_draft_derives_type_for_one_exact_name_without_a_separate_query(
     tmp_path: Path,
 ) -> None:
     code, started = _offline(tmp_path, "draft-start", "soundbank.generate")
     assert code == 0, started
     binding = started["draft"]["next_action_binding"]["object_binding"]
     assert binding["direct_query_before_binding"] == "forbidden"
-    assert binding["role_routes"]["soundbank"]["by_exact_type_name"]["append"] == [
+    exact_name = binding["role_routes"]["soundbank"]["by_exact_name"]
+    assert exact_name["fixed_argv_prefix"][-2:] == [
         "--exact-type-name",
-        "<exact-wwise-type>",
-        "<exact-object-name>",
+        "SoundBank",
     ]
+    assert exact_name["append"] == ["<exact-object-name>"]
+    assert "<exact-wwise-type>" not in json.dumps(binding)
     assert binding["role_routes"]["soundbank"]["fixed_role"] == "soundbank"
     assert binding["role_routes"]["event"]["fixed_role"] == "event"
     assert binding["role_routes"]["aux_bus"]["fixed_role"] == "aux_bus"
