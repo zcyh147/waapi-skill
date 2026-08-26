@@ -269,7 +269,7 @@ The final #93 public-integration boundary is exact candidate
 units each passed fresh plus identical `--resume --verify-only` on both hosts:
 macOS roots `imac-int-footsteps-3a31a05-r20-int22` and
 `imac-int-footsteps-3a31a05-r21-int25`, and native-Windows roots
-`iwin-int-footsteps-3a31a05-r21-int22` and
+`iwin-int-footsteps-3a31a05-r23-int22` and
 `iwin-int-footsteps-3a31a05-r22-int25`. This is cumulative 2/2 evidence per
 host, not a single two-unit root. Each workflow separately previewed and
 executed the Snow import/assignment mutation and the obsolete Mud-assignment

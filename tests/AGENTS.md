@@ -234,6 +234,15 @@ With PowerShell's ScheduledTasks cmdlets, pass `-LogonType Interactive` and
 in its exported XML and `Limited` in its Principal. Stop before launch if
 either attestation differs.
 
+Treat Task Scheduler `Ready` as the action-shell state, not campaign
+completion. A formal campaign can leave token-owned Python/Codex/Wwise
+descendants running after the PowerShell action returns. After `Ready`, wait
+for the exact campaign-root token to disappear from a fresh process query,
+then require the sealed consolidated summary and attempt manifest. Run that
+query from a generic profile-free `.ps1` whose own path omits the root token;
+otherwise the checker can count itself. Only then unregister the task and
+classify the root.
+
 The unelevated Codex runner may transiently report
 `CreateProcessAsUserW failed: 267` for an invalid working directory before
 PowerShell starts, even after earlier commands in the same task succeeded. The
