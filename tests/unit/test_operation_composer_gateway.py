@@ -2042,9 +2042,6 @@ def test_registry_composer_lanes_and_real_adapters_are_one_to_one() -> None:
     assert {operation for operation, _version in composer_lanes} == {
         "ui.commands.register",
         "ui.commands.unregister",
-        "lua.executeCliFile",
-        "lua.executeCoreFile",
-        "lua.executeCoreInline",
         "waapi.undoGroup",
     }
 

@@ -50,7 +50,6 @@ INLINE_OPERATIONS = frozenset(
         "object.delete",
         "object.copy",
         "object.move",
-        "audio.importTabDelimited",
         "ui.captureScreen",
         "ui.commands.execute",
     }
@@ -59,9 +58,6 @@ DRAFT_TYPED_OPERATIONS = frozenset(
     {
         "ui.commands.register",
         "ui.commands.unregister",
-        "lua.executeCliFile",
-        "lua.executeCoreFile",
-        "lua.executeCoreInline",
         "waapi.undoGroup",
     }
 )
@@ -231,46 +227,6 @@ def materialize_inline_operation_request(
     elif operation in {"debug.setAsserts", "debug.setAutomationMode"}:
         _require_keys(values, required=frozenset({"enable"}))
         arguments = {"enable": _typed_scalar("boolean", values["enable"])}
-    elif operation == "audio.importTabDelimited":
-        _require_keys(
-            values,
-            required=frozenset(
-                {"import_file", "import_location", "import_language"}
-            ),
-            optional=frozenset(
-                {
-                    "import_operation",
-                    "auto_add_to_source_control",
-                    "auto_check_out_to_source_control",
-                }
-            ),
-        )
-        arguments = {
-            "import_file": _bounded_text(
-                values["import_file"], field="import_file", allow_empty=False
-            ),
-            "import_location": _selector(
-                values["import_location"],
-                operation=operation,
-                version=version,
-                field="import_location",
-            ),
-            "import_language": _bounded_text(
-                values["import_language"], field="import_language", allow_empty=False
-            ),
-        }
-        if "import_operation" in values:
-            arguments["import_operation"] = _bounded_text(
-                values["import_operation"],
-                field="import_operation",
-                allow_empty=False,
-            )
-        for field in (
-            "auto_add_to_source_control",
-            "auto_check_out_to_source_control",
-        ):
-            if field in values:
-                arguments[field] = _typed_scalar("boolean", values[field])
     elif operation == "ui.captureScreen":
         _require_keys(
             values,
@@ -493,19 +449,6 @@ def inline_operation_cli_arguments(request: Mapping[str, Any]) -> tuple[str, ...
         pass
     elif operation in {"debug.setAsserts", "debug.setAutomationMode"}:
         result.extend(("--enable", scalar_tokens(arguments["enable"])[1]))
-    elif operation == "audio.importTabDelimited":
-        result.extend(("--import-file", str(arguments["import_file"])))
-        result.extend(
-            ("--import-location", *_selector_cli_tokens(arguments["import_location"]))
-        )
-        result.extend(("--import-language", str(arguments["import_language"])))
-        for name, flag in (
-            ("import_operation", "--import-operation"),
-            ("auto_add_to_source_control", "--auto-add"),
-            ("auto_check_out_to_source_control", "--auto-check-out"),
-        ):
-            if name in arguments:
-                result.extend((flag, scalar_tokens(arguments[name])[1]))
     elif operation == "soundbank.processDefinitionFiles":
         for path in arguments["files"]:
             result.extend(("--file", str(path)))
@@ -674,26 +617,11 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
         }
         else ["--enable true|false"]
         if operation in {"debug.setAsserts", "debug.setAutomationMode"}
-        else (
-            [
-                    "--import-file ABSOLUTE_PATH",
-                    "--import-location SELECTOR_KIND SELECTOR_VALUES...",
-                    "--import-language LANGUAGE",
-                    "--import-operation createNew|useExisting|replaceExisting (optional)",
-                    "--auto-add true|false (optional)",
-                    *(
-                        ["--auto-check-out true|false (optional)"]
-                        if version in {"2023.1", "2024.1", "2025.1"}
-                        else []
-                    ),
-                ]
-                if operation == "audio.importTabDelimited"
-                else ["--view-name NAME (optional)", "--view-channel 1|2|3|4 (optional)", "--rect X Y WIDTH HEIGHT (optional)"]
-                if operation == "ui.captureScreen"
-                else ["--command ID", "--command-object VALUE (repeat)", "--command-platform VALUE (repeat)", "--value TYPE VALUE (optional)", "--file ABSOLUTE_PATH (2025.1 only; repeat)"]
-                if operation == "ui.commands.execute"
-                else ["--object SELECTOR"]
-        )
+        else ["--view-name NAME (optional)", "--view-channel 1|2|3|4 (optional)", "--rect X Y WIDTH HEIGHT (optional)"]
+        if operation == "ui.captureScreen"
+        else ["--command ID", "--command-object VALUE (repeat)", "--command-platform VALUE (repeat)", "--value TYPE VALUE (optional)", "--file ABSOLUTE_PATH (2025.1 only; repeat)"]
+        if operation == "ui.commands.execute"
+        else ["--object SELECTOR"]
     )
     schema_digest = operation_request_schema_digest(operation, version)
     continuation: dict[str, Any] = {
@@ -725,7 +653,6 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
         "debug.testAssert",
         "debug.testCrash",
         "soundbank.processDefinitionFiles",
-        "audio.importTabDelimited",
         "ui.captureScreen",
         "ui.commands.execute",
     }:
@@ -757,18 +684,6 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
     else:
         fields.extend(["--property TOKEN", "--platform PLATFORM", "--linked true|false"])
     continuation["fields"] = fields
-    if operation == "audio.importTabDelimited":
-        continuation["selector_argv"] = {
-            "path": ["--import-location", "path", "<complete_wwise_path>"],
-            "id-string": ["--import-location", "id-string", "<guid>"],
-            "id-integer": ["--import-location", "id-integer", "<integer_id>"],
-            "exact-type-name": [
-                "--import-location",
-                "exact-type-name",
-                "<type>",
-                "<name>",
-            ],
-        }
     contract = {
         "contract": INLINE_OPERATION_CONTRACT,
         "operation": operation,

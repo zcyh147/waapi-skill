@@ -609,7 +609,7 @@ def test_typed_definition_files_is_not_public_after_business_cutover(
     assert captured == []
 
 
-def test_typed_tab_import_enters_the_single_preview_ingress(
+def test_retired_typed_tab_import_is_absent_from_the_public_parser(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -625,35 +625,22 @@ def test_typed_tab_import_enters_the_single_preview_ingress(
     source = str((tmp_path / "Import.tsv").resolve())
     location = r"\Actor-Mixer Hierarchy\Default Work Unit"
     client = FakeClient({"ak.wwise.core.getInfo": [live_info()]})
-    code, payload = waapi_gateway.execute_gateway(
-        [
-            "typed-operation", operation, "--schema-digest", digest, "--apply",
-            "--import-file", source,
-            "--import-location", "path", location,
-            "--import-language", "SFX",
-            "--import-operation", "useExisting",
-            "--auto-add", "true",
-        ],
-        env=gateway_env(tmp_path),
-        client_factory=lambda _url: client,
-    )
+    with pytest.raises(SystemExit) as exc_info:
+        waapi_gateway.execute_gateway(
+            [
+                "typed-operation", operation, "--schema-digest", digest, "--apply",
+                "--import-file", source,
+                "--import-location", "path", location,
+                "--import-language", "SFX",
+                "--import-operation", "useExisting",
+                "--auto-add", "true",
+            ],
+            env=gateway_env(tmp_path),
+            client_factory=lambda _url: client,
+        )
 
-    assert code == 0, payload
-    assert captured == [
-        {
-            "contract": OPERATION_REQUEST_CONTRACT,
-            "version": "2022.1",
-            "operation": operation,
-            "arguments": {
-                "import_file": source,
-                "import_location": {"kind": "path", "value": location},
-                "import_language": "SFX",
-                "import_operation": "useExisting",
-                "auto_add_to_source_control": True,
-            },
-        }
-    ]
-    assert payload["request"] == captured[0]
+    assert exc_info.value.code == 2
+    assert captured == []
 
 
 def _without_route_specific_schema_fields(payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -758,7 +745,11 @@ def test_normal_audio_import_schema_exposes_only_its_business_declaration_input(
         version: BUSINESS_DECLARATION_INPUT_MODE
         for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
     }
-    assert tab_schema["operation"]["input_mode"] == "inline_typed"
+    assert tab_schema["operation"]["input_mode"] == BUSINESS_DECLARATION_INPUT_MODE
+    assert tab_schema["business_adapter"]["contract"] == (
+        "waapi-skill.exact-artifact-business/v1"
+    )
+    assert "typed_operation" not in tab_schema
     assert "composer" not in tab_schema
 
 
@@ -1322,8 +1313,8 @@ def test_schema_input_mode_projection_is_isolated_by_exact_operation_key(
         ("object.set", "2025.1", BUSINESS_DECLARATION_INPUT_MODE),
         ("object.setRTPC", "2025.1", BUSINESS_DECLARATION_INPUT_MODE),
         ("object.createPlugin", "2025.1", BUSINESS_DECLARATION_INPUT_MODE),
-        ("lua.executeCoreInline", "2025.1", COMPOSER_INPUT_MODE),
-        ("lua.executeCoreFile", "2025.1", COMPOSER_INPUT_MODE),
+        ("lua.executeCoreInline", "2025.1", BUSINESS_DECLARATION_INPUT_MODE),
+        ("lua.executeCoreFile", "2025.1", BUSINESS_DECLARATION_INPUT_MODE),
     )
     for operation, version, expected in cases:
         exit_code, payload = offline_execute(

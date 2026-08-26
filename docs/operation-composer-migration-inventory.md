@@ -25,15 +25,15 @@ planning; the Registry remains authoritative during implementation.
 | Exact operation | Versions | Current input | Closed request shape | Primary risk | Assignment |
 | --- | --- | --- | --- | --- | --- |
 | `audio.import` | 2021.1–2025.1 | Business declaration | bound objects, semantic kinds, stable fields, custom Field Handles | Gateway-derived rows, paths, types, metadata scopes, side effects | deep cutover complete |
-| `audio.importTabDelimited` | 2021.1–2025.1 | Inline typed | file, location, language; optional mode/source-control | caller-owned serialized file | wave 05 file/Lua complete |
+| `audio.importTabDelimited` | 2021.1–2025.1 | Business declaration | exact table, bound location, language, stable mode/source-control | Gateway-derived native selector, loader fields, and request order | wave 05 deep cutover complete |
 | `debug.restartWaapiServers` | 2023.1–2025.1 | Inline typed (zero value) | Gateway-owned acknowledgement | expected connection loss | wave 05 debug complete |
 | `debug.setAsserts` | 2021.1–2025.1 | Inline typed | boolean enable | process-wide ref-count state | wave 05 debug complete |
 | `debug.setAutomationMode` | 2021.1–2025.1 | Inline typed | boolean enable | process-wide host mode | wave 05 debug complete |
 | `debug.testAssert` | 2021.1–2025.1 | Inline typed (zero value) | Gateway-owned acknowledgement | deliberate assertion | wave 05 debug complete |
 | `debug.testCrash` | 2021.1–2025.1 | Inline typed (zero value) | Gateway-owned acknowledgement | deliberate termination | wave 05 debug complete |
-| `lua.executeCliFile` | 2023.1–2025.1 | Composer | source file/root/authority; optional typed args/watchdog | exact user code and isolated I/O | wave 05 file/Lua complete |
-| `lua.executeCoreFile` | 2023.1–2025.1 | Composer | source file/root/authority; optional typed args | exact user code in Authoring | wave 05 file/Lua complete |
-| `lua.executeCoreInline` | 2025.1 | Composer | source text/root/authority; optional typed args | Agent composition forbidden | wave 05 file/Lua complete |
+| `lua.executeCliFile` | 2023.1–2025.1 | Business declaration | exact script; optional strict-JSON arguments/watchdog | Gateway-derived root, authority, loader, and serialization | wave 05 deep cutover complete |
+| `lua.executeCoreFile` | 2023.1–2025.1 | Business declaration | exact script; optional strict-JSON arguments | Gateway-derived root, authority, loader, and serialization | wave 05 deep cutover complete |
+| `lua.executeCoreInline` | 2025.1 | Business declaration | exact source/root; optional strict-JSON arguments | Gateway-derived authority, loader, and serialization | wave 05 deep cutover complete |
 | `object.copy` | 2021.1–2025.1 | Business declaration | object and parent | returned GUID and parent/path verification | wave 02 object lifecycle complete |
 | `object.create` | 2021.1–2025.1 | Business declaration | bound parent, named descendants, stable fields, discovered types | recursive bounds and replace ownership | named graph deep cutover |
 | `object.createPlugin` | 2022.1–2025.1 | Business declaration | bound target, plug-in role, discovered type and fields | versioned topology on shared URI | named graph deep cutover |
@@ -65,7 +65,7 @@ Waves 00 through 06 are complete: complex Draft Adapters and concise typed opera
 cover object batches, imports, single-object edits, recursive creation, object
 lifecycle, plug-in topology, RTPC curves, Switch Container assignments, and
 SoundBank/isolated-file workflows, Authoring-only UI operations, caller-owned table
-imports, exact user-authored Lua with bounded typed argument maps, and compound Undo
+imports, exact user-authored Lua with bounded strict-JSON argument maps, and compound Undo
 Groups whose ordered children are disclosed from their exact typed contracts.
 
 Each operation owns its action vocabulary and verifier. A wave reuses deep

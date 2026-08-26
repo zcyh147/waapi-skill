@@ -138,6 +138,10 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
             if name
             in {
                 "audio.import",
+                "audio.importTabDelimited",
+                "lua.executeCliFile",
+                "lua.executeCoreFile",
+                "lua.executeCoreInline",
                 "object.copy",
                 "object.delete",
                 "object.move",
@@ -162,9 +166,6 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
             in {
                 "ui.commands.register",
                 "ui.commands.unregister",
-                "lua.executeCliFile",
-                "lua.executeCoreFile",
-                "lua.executeCoreInline",
                 "waapi.undoGroup",
             }
             else "inline_typed"
@@ -177,7 +178,6 @@ def test_every_supported_operation_version_has_one_explicit_normal_input_mode() 
                 "debug.testCrash",
                 "ui.captureScreen",
                 "ui.commands.execute",
-                "audio.importTabDelimited",
             }
             else INTERNAL_CANONICAL_INPUT_MODE
         )
@@ -281,8 +281,14 @@ def test_input_mode_selection_is_isolated_by_exact_operation_not_shared_native_u
         operation_input_mode("object.createPlugin", "2022.1")
         == BUSINESS_DECLARATION_INPUT_MODE
     )
-    assert operation_input_mode("lua.executeCoreInline", "2025.1") == COMPOSER_INPUT_MODE
-    assert operation_input_mode("lua.executeCoreFile", "2025.1") == COMPOSER_INPUT_MODE
+    assert (
+        operation_input_mode("lua.executeCoreInline", "2025.1")
+        == COMPOSER_INPUT_MODE
+    )
+    assert (
+        operation_input_mode("lua.executeCoreFile", "2025.1")
+        == BUSINESS_DECLARATION_INPUT_MODE
+    )
     assert {
         (spec.name, version): operation_request_schema_digest(spec.name, version)
         for spec in list_operation_specs()

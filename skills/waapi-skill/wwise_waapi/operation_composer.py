@@ -1979,15 +1979,6 @@ def materialize_operation_request(
             ),
         }
         if operation in DRAFT_TYPED_OPERATIONS:
-            if allow_cleaned_file_evidence and operation in {
-                "lua.executeCliFile",
-                "lua.executeCoreFile",
-            }:
-                # A sealed PASS archive is replayed after its owned source tree
-                # has been deleted.  Typed Core still rebuilds every fact and
-                # the durable seal supplies the exact request comparison; only
-                # the live file-existence proof is intentionally not repeated.
-                return request
             try:
                 return parse_operation_request(request, expected_version=version).as_dict()
             except OperationContractError as exc:

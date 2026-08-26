@@ -3,11 +3,11 @@
   "scope": {
     "registry_operations": 34,
     "registry_version_lanes": 153,
-    "composer_version_lanes": 22,
-    "business_declaration_version_lanes": 88,
-    "inline_typed_version_lanes": 38,
+    "composer_version_lanes": 15,
+    "business_declaration_version_lanes": 100,
+    "inline_typed_version_lanes": 33,
     "internal_canonical_version_lanes": 5,
-    "lane_inventory_sha256": "544792263cb5e7366bca05fe02b6bac4a4af9f28949e17a6ea4c07517283e48f",
+    "lane_inventory_sha256": "83147f27e3b4e1cb3a649af2a5c701ccd60d66ad941dd1e5fa6961d14ef3a76c",
     "version_rule": "Every supported version lane inherits the disposition of its exact Registry operation name.",
     "normal_input_rule": "The Operation Registry exposes one typed normal input mode per public operation and version. Internal canonical transaction representations are not model-facing operations.",
     "native_uri_rule": "A shared native URI never implies a shared migration decision. Isolation is keyed by exact operation name and version."
@@ -181,7 +181,7 @@
     {
       "id": "wave-05-file-lua",
       "status": "complete",
-      "purpose": "Migrate caller-owned tabular import and exact Lua source through typed file facts and a bounded open argument map.",
+      "purpose": "Migrate caller-owned tabular import and exact Lua source through one deep exact-artifact Business Adapter.",
       "operations": [
         "audio.importTabDelimited",
         "lua.executeCliFile",
@@ -189,9 +189,9 @@
         "lua.executeCoreInline"
       ],
       "reuse": [
-        "concise typed file import submission",
-        "OperationDraftStore for bounded Lua wa_args",
-        "source authority and isolated I/O proofs",
+        "one complete exact-artifact business declaration",
+        "live-bound tabular import location",
+        "Gateway-derived Lua loader authority and isolated I/O proofs",
         "Canonical OperationRequest parser",
         "Change Preview ingress"
       ],

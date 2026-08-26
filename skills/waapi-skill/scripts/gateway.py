@@ -263,6 +263,11 @@ from wwise_waapi.soundbank_business_cli import (  # noqa: E402  # pyright: ignor
     add_soundbank_plan_arguments,
     soundbank_plan_from_namespace,
 )
+from wwise_waapi.exact_artifact_business_cli import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    ExactArtifactBusinessCliError,
+    add_exact_artifact_plan_arguments,
+    exact_artifact_plan_from_namespace,
+)
 from wwise_waapi.operation_composer import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_TYPED_ACTIONS_PER_APPLY,
     OperationComposerError,
@@ -2049,6 +2054,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_business_draft_binding_arguments(draft_declare_soundbank_plan)
     add_soundbank_plan_arguments(draft_declare_soundbank_plan)
+
+    draft_declare_artifact_plan = subparsers.add_parser(
+        "draft-declare-artifact-plan",
+        help=(
+            "Declare one complete tabular or Lua artifact plan while the "
+            "Gateway owns native loader fields and source authority"
+        ),
+    )
+    _add_business_draft_binding_arguments(draft_declare_artifact_plan)
+    add_exact_artifact_plan_arguments(draft_declare_artifact_plan)
 
     draft_declare_field_change = subparsers.add_parser(
         "draft-declare-field-change",
@@ -8564,6 +8579,16 @@ def dispatch_command(
             dispatcher=dispatcher,
             common=common,
         )
+    if args.command == "draft-declare-artifact-plan":
+        return dispatch_business_exact_artifact_plan(
+            args,
+            env=env,
+            connection=connection,
+            detected_version=detected_version,
+            live_info=live_info,
+            dispatcher=dispatcher,
+            common=common,
+        )
     if args.command == "draft-bind-field":
         return dispatch_business_field_binding(
             args,
@@ -11343,6 +11368,92 @@ def dispatch_business_soundbank_plan(
         current: BusinessDeclarationSession,
     ) -> BusinessDeclarationSession:
         candidate = current.with_settings({"soundbank_plan": plan})
+        adapter.materialize(candidate)
+        return candidate
+
+    record = binding.store.apply_business_update(
+        args.draft_id,
+        task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        composer_digest=operation_composer_digest(
+            binding.record.operation,
+            detected_version,
+        ),
+        context=binding.context,
+        update=update,
+        event_type="settings.revised",
+    )
+    payload = operation_draft_payload(
+        args.command,
+        record,
+        offline=False,
+        task_authority=args.task_authority,
+    )
+    payload.update(
+        {
+            "endpoint": dict(common["endpoint"]),
+            "detected_version": detected_version,
+            "project_call": dispatch_call_summary(binding.project_call),
+        }
+    )
+    return payload
+
+
+def dispatch_business_exact_artifact_plan(
+    args: argparse.Namespace,
+    *,
+    env: Mapping[str, str],
+    connection: GatewayConnection,
+    detected_version: str,
+    live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher,
+    common: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Bind one exact artifact plan without exposing its native loader."""
+
+    binding = _open_business_binding(
+        args,
+        env=env,
+        connection=connection,
+        detected_version=detected_version,
+        live_info=live_info,
+        dispatcher=dispatcher,
+    )
+    adapter = business_adapter(binding.record.operation)
+    if not adapter.accepts_update_command(args.command):
+        raise GatewayInputError(
+            f"{binding.record.operation} does not expose {args.command}"
+        )
+    raw_session = (
+        binding.record.composition.get("business_session")
+        if binding.record.composition is not None
+        else None
+    )
+    session = (
+        BusinessDeclarationSession.create(binding.context)
+        if raw_session is None
+        else BusinessDeclarationSession.from_dict(raw_session)
+    )
+    if session.context != binding.context:
+        raise OperationDraftBindingDrift(
+            "Live project or Wwise build differs from the artifact plan binding."
+        )
+    try:
+        plan = exact_artifact_plan_from_namespace(
+            args,
+            operation=binding.record.operation,
+        )
+    except ExactArtifactBusinessCliError as exc:
+        raise GatewayInputError(str(exc)) from exc
+
+    def update(
+        current: BusinessDeclarationSession,
+    ) -> BusinessDeclarationSession:
+        candidate = current.with_settings({"artifact_plan": plan})
         adapter.materialize(candidate)
         return candidate
 
@@ -16553,6 +16664,11 @@ def _business_next_action_binding(
         "draft-declare-soundbank-plan",
         *binding,
     ]
+    declare_artifact_plan_prefix = [
+        *base,
+        "draft-declare-artifact-plan",
+        *binding,
+    ]
     revise_prefix = [*base, "draft-revise-declaration", *binding]
     remove_prefix = [*base, "draft-remove-declaration", *binding]
     check = [*base, "draft-check", *binding]
@@ -16636,6 +16752,102 @@ def _business_next_action_binding(
                 "bind_each_required_role_then_copy_its_returned_handle_into_"
                 "the_same_named_declaration_field"
             ),
+        }
+    if adapter.family == "exact-artifact-code":
+        shared = {
+            "contract": "waapi-skill.business-draft-next-action/v1",
+            "responsibility_split": {
+                "agent": (
+                    "select_the_operation_and_copy_exact_user_artifacts_plus_"
+                    "closed_business_values"
+                ),
+                "gateway": (
+                    "derive_source_authority_io_root_native_loader_fields_"
+                    "request_order_and_serialization"
+                ),
+            },
+            "business_contract": business_contract,
+            "forbidden_inputs": [
+                *forbidden_inputs,
+                "source_authority",
+                "native_loader_field",
+                "luaScript",
+                "luaString",
+                "doFiles",
+                "luaPaths",
+                "requires",
+                "request_fragment",
+                "serialized_native_payload",
+            ],
+            "shell_tool_timeout_ms": GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            "then_read_next_response": True,
+            "precompute_or_increment_revision": False,
+        }
+        if session is not None and session.settings:
+            return {
+                **shared,
+                "required_next_phase": "check_complete_business_declaration",
+                "check": {
+                    **operation_draft_prefix_copy_binding(check),
+                    "append": [],
+                },
+            }
+        binding_roles = business_contract["binding"]["roles"]
+        bound_roles = (
+            set()
+            if session is None
+            else {
+                row.get("role")
+                for row in session.handles.as_dict()["objects"]
+                if isinstance(row, Mapping)
+            }
+        )
+        missing_roles = [role for role in binding_roles if role not in bound_roles]
+        if missing_roles:
+            next_role = missing_roles[0]
+            return {
+                **shared,
+                "required_next_phase": "bind_exact_artifact_business_role",
+                "object_binding": role_object_binding(next_role),
+            }
+        declaration_shapes = {
+            "audio.importTabDelimited": [
+                "--table-file <exact-user-supplied-tsv-file>",
+                "--location-handle <bound-import-location-handle>",
+                "--language <exact-project-language>",
+                "[--mode create|reimport|replace]",
+                "[--add-to-source-control|--no-add-to-source-control]",
+                "[--check-out-from-source-control|--no-check-out-from-source-control] (2023.1+)",
+            ],
+            "lua.executeCliFile": [
+                "--script-file <exact-user-supplied-lua-file>",
+                "[--argument <key> string|boolean|integer|number|json <exact-value>]...",
+                "[--watchdog-seconds <non-negative-integer>] (2024.1+)",
+            ],
+            "lua.executeCoreFile": [
+                "--script-file <exact-user-supplied-lua-file>",
+                "[--argument <key> string|boolean|integer|number|json <exact-value>]...",
+            ],
+            "lua.executeCoreInline": [
+                "--lua-source <exact-user-supplied-utf8-source>",
+                "--io-root <exact-isolated-transaction-root>",
+                "[--argument <key> string|boolean|integer|number|json <exact-value>]...",
+            ],
+        }
+        return {
+            **shared,
+            "required_next_phase": "declare_complete_exact_artifact_plan",
+            "declaration": {
+                **operation_draft_prefix_copy_binding(
+                    declare_artifact_plan_prefix,
+                    append_action=(
+                        "copy_verbatim_then_append_one_complete_exact_artifact_plan"
+                    ),
+                ),
+                "append": declaration_shapes[record.operation],
+                "submit_once": True,
+                "native_request_input": "forbidden",
+            },
         }
     if adapter.family == "soundbank-planning":
         def soundbank_role_route(role: str) -> dict[str, Any]:

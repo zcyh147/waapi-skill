@@ -853,6 +853,41 @@ def _operation_model_values(
             return _soundbank_model_values(name)
         declaration = business_contract["declaration"]
         required = set(declaration["required_fields"])
+        if name in {
+            "audio.importTabDelimited",
+            "lua.executeCliFile",
+            "lua.executeCoreFile",
+            "lua.executeCoreInline",
+        }:
+            properties = declaration["schema"]["properties"]
+            exact = set(business_contract["exact_user_artifacts"])
+            return [
+                {
+                    "path": ["declaration", field_name],
+                    "name": field_name,
+                    "shape": (
+                        "map"
+                        if properties[field_name].get("type") == "object"
+                        else "array"
+                        if properties[field_name].get("type") == "array"
+                        else "scalar"
+                    ),
+                    "required": field_name in required,
+                    "value_ownership": (
+                        "live_bound_handle"
+                        if field_name == "location_handle"
+                        else "exact_user_artifact"
+                        if field_name in exact
+                        else "stable_business_declaration"
+                    ),
+                    "transport_ownership": "gateway_derivation",
+                    "schema_sha256": canonical_sha256(properties[field_name]),
+                }
+                for field_name in (
+                    *declaration["required_fields"],
+                    *declaration["optional_fields"],
+                )
+            ]
         return [
             {
                 "path": ["declaration", field_name],

@@ -21,6 +21,7 @@ DRAFT_GATEWAY_SUBCOMMANDS = frozenset(
         "draft-declare-rtpc",
         "draft-declare-switch-assignment",
         "draft-declare-soundbank-plan",
+        "draft-declare-artifact-plan",
         "draft-discover-fields",
         "draft-discover-types",
         "draft-remove-declaration",

@@ -6,6 +6,9 @@ from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
 from .audio_import_business_contracts import audio_import_business_contract_data
+from .exact_artifact_business_contracts import (
+    exact_artifact_business_contract_data,
+)
 from .business_declaration_state import BusinessDeclarationSession
 from .business_declarations import ExistingObjectTarget, business_repair
 from .object_lifecycle_business_contracts import (
@@ -105,6 +108,10 @@ def _soundbank_contract(operation: str, version: str) -> dict[str, Any]:
     return soundbank_business_contract_data(operation, version)
 
 
+def _exact_artifact_contract(operation: str, version: str) -> dict[str, Any]:
+    return exact_artifact_business_contract_data(operation, version)
+
+
 def _materialize_audio_import(
     operation: str,
     session: BusinessDeclarationSession,
@@ -182,6 +189,32 @@ def _materialize_soundbank(
     from .soundbank_business import materialize_soundbank_business_request
 
     return materialize_soundbank_business_request(operation, session)
+
+
+def _materialize_exact_artifact(
+    operation: str,
+    session: BusinessDeclarationSession,
+) -> Mapping[str, Any]:
+    from .exact_artifact_business import (
+        materialize_exact_artifact_business_request,
+    )
+
+    return materialize_exact_artifact_business_request(operation, session)
+
+
+def _materialize_exact_artifact_with_cleaned_file_evidence(
+    operation: str,
+    session: BusinessDeclarationSession,
+) -> Mapping[str, Any]:
+    from .exact_artifact_business import (
+        materialize_exact_artifact_business_request,
+    )
+
+    return materialize_exact_artifact_business_request(
+        operation,
+        session,
+        allow_cleaned_file_evidence=True,
+    )
 
 
 def _compile_audio_import_preview(
@@ -505,6 +538,31 @@ _SOUNDBANK_DEFINITION = {
     "settings_are_complete_declaration": True,
 }
 
+_EXACT_ARTIFACT_DEFINITION = {
+    "family": "exact-artifact-code",
+    "contract_builder": _exact_artifact_contract,
+    "materializer": _materialize_exact_artifact,
+    "cleaned_file_evidence_materializer": (
+        _materialize_exact_artifact_with_cleaned_file_evidence
+    ),
+    "update_commands": frozenset({"draft-declare-artifact-plan"}),
+    "initial_projection_actions": (
+        "bind-object",
+        "declare-artifact-plan",
+        "inspect",
+        "cancel",
+    ),
+    "active_projection_actions": (
+        "bind-object",
+        "declare-artifact-plan",
+        "check",
+        "inspect",
+        "cancel",
+    ),
+    "auto_apply_preview": True,
+    "settings_are_complete_declaration": True,
+}
+
 
 def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdapter:
     values = dict(definition)
@@ -520,6 +578,15 @@ def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdap
 
 _BUSINESS_ADAPTERS = {
     "audio.import": _bind_adapter("audio.import", _AUDIO_IMPORT_DEFINITION),
+    **{
+        operation: _bind_adapter(operation, _EXACT_ARTIFACT_DEFINITION)
+        for operation in (
+            "audio.importTabDelimited",
+            "lua.executeCliFile",
+            "lua.executeCoreFile",
+            "lua.executeCoreInline",
+        )
+    },
     "object.create": _bind_adapter("object.create", _OBJECT_GRAPH_DEFINITION),
     "object.createPlugin": _bind_adapter(
         "object.createPlugin", _OBJECT_PLUGIN_DEFINITION

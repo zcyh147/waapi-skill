@@ -3024,6 +3024,10 @@ def _archive_test_broker_executes_one_atomic_generic_typed_draft_batch(
     }
 
 
+# Archived with the retired generic Lua Composer ingress.  The remaining
+# Composer operations do not expose one public, handle-free multi-batch shape;
+# keeping Lua draft-apply callable only for this harness test would violate the
+# exact-artifact Business Adapter boundary.
 @pytest.mark.parametrize(
     "first_indexes,second_indexes",
     (
@@ -3031,7 +3035,7 @@ def _archive_test_broker_executes_one_atomic_generic_typed_draft_batch(
         ((0, 1, 2, 3, 4), (5, 6, 7, 8, 9, 10)),
     ),
 )
-def test_broker_accepts_dependency_free_draft_facts_rebatched_across_adjacent_steps(
+def _archive_test_broker_accepts_dependency_free_draft_facts_rebatched_across_adjacent_steps(
     tmp_path: Path,
     first_indexes: tuple[int, ...],
     second_indexes: tuple[int, ...],
@@ -3039,9 +3043,7 @@ def test_broker_accepts_dependency_free_draft_facts_rebatched_across_adjacent_st
     skill = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
     io_root = tmp_path / "owned"
     io_root.mkdir()
-    protocol = build_transaction_protocol(
-        (_dependency_free_rebatch_request(str(io_root)),)
-    )
+    protocol = _dependency_free_rebatch_protocol(str(io_root))
     action_steps = tuple(
         step for step in protocol.steps if step.subcommand == "draft-apply"
     )
@@ -3120,16 +3122,14 @@ def test_broker_accepts_dependency_free_draft_facts_rebatched_across_adjacent_st
         (0, 1, 2, 3, 4, 6),
     ),
 )
-def test_broker_rejects_unsafe_fact_order_while_rebatching_adjacent_steps(
+def _archive_test_broker_rejects_unsafe_fact_order_while_rebatching_adjacent_steps(
     tmp_path: Path,
     submitted_indexes: tuple[int, ...],
 ) -> None:
     skill = Path(__file__).resolve().parents[2] / "skills" / "waapi-skill"
     io_root = tmp_path / "owned"
     io_root.mkdir()
-    protocol = build_transaction_protocol(
-        (_dependency_free_rebatch_request(str(io_root)),)
-    )
+    protocol = _dependency_free_rebatch_protocol(str(io_root))
     action_steps = tuple(
         step for step in protocol.steps if step.subcommand == "draft-apply"
     )
@@ -5842,17 +5842,29 @@ def _soundbank_generate_request() -> dict[str, object]:
 
 
 def _dependency_free_rebatch_request(io_root: str) -> dict[str, object]:
+    del io_root
     return {
         "contract": "waapi-skill.operation-request/v1",
         "version": "2025.1",
-        "operation": "lua.executeCoreInline",
+        "operation": "ui.commands.unregister",
         "arguments": {
-            "lua_code": "return 1\n",
-            "io_root": io_root,
-            "source_authority": LUA_SOURCE_AUTHORITY,
-            "wa_args": {f"key_{index}": index for index in range(8)},
+            "command_ids": [
+                f"example.command{index}"
+                for index in range(10)
+            ],
+            "acknowledgement": (
+                "unregister_existing_commands_without_definition"
+            ),
         },
     }
+
+
+def _dependency_free_rebatch_protocol(io_root: str):
+    """Build two adjacent public Composer batches with no response handles."""
+
+    return build_transaction_protocol(
+        (_dependency_free_rebatch_request(io_root),)
+    )
 
 
 def _without_soundbank_generate_false_defaults(

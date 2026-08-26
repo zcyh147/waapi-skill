@@ -190,6 +190,7 @@ EXPECTED_DRAFT_REVISION_SUBCOMMANDS = frozenset(
         "draft-declare-rtpc",
         "draft-declare-switch-assignment",
         "draft-declare-soundbank-plan",
+        "draft-declare-artifact-plan",
         "draft-discover-fields",
         "draft-discover-types",
         "draft-remove-declaration",
@@ -2361,6 +2362,21 @@ def _synthetic_gateway_records(
         "soundbank.processDefinitionFiles",
         "soundbank.setInclusions",
     }
+    exact_artifact_business_operations = {
+        "audio.importTabDelimited",
+        "lua.executeCliFile",
+        "lua.executeCoreFile",
+        "lua.executeCoreInline",
+    }
+    business_contexts: dict[str, BusinessContext] = {}
+    bound_artifact_handles: dict[str, str] = {}
+    expected_business_requests = {
+        str(step.expected_operation_request["operation"]): dict(
+            step.expected_operation_request
+        )
+        for step in protocol.steps
+        if step.expected_operation_request is not None
+    }
     required_response_values: dict[tuple[str, str], Any] = {}
     for expected_step in protocol.steps:
         for expected_argument in expected_step.arguments:
@@ -2514,9 +2530,18 @@ def _synthetic_gateway_records(
                 schema_digest,
                 started.record.revision,
             )
+            if operation in exact_artifact_business_operations:
+                business_contexts[operation] = BusinessContext.create(
+                    task_authority=started.task_authority,
+                    project_id="{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+                    project_path=str(task_root / "SampleProject.wproj"),
+                    wwise_version=version,
+                    wwise_build=f"{version}.synthetic",
+                )
             payload.update(
                 {
                     "draft": {
+                        "contract": "waapi-skill.operation-draft/v1",
                         "draft_id": started.record.draft_id,
                         "revision": started.record.revision,
                         "lifecycle_state": "editable",
@@ -2563,21 +2588,75 @@ def _synthetic_gateway_records(
         elif step.subcommand == "draft-bind-object":
             operation = next(reversed(draft_started))
             draft_id, authority, schema_digest, revision = draft_started[operation]
-            if operation not in soundbank_business_operations:
+            if operation in exact_artifact_business_operations:
+                if operation != "audio.importTabDelimited":
+                    raise AssertionError(
+                        "only tabular import binds an exact-artifact object"
+                    )
+                request = expected_business_requests[operation]
+                request_arguments = request["arguments"]
+                selector = request_arguments["import_location"]
+                selector_kind = selector.get("kind")
+                selector_value = selector.get("value")
+                if selector_kind == "path":
+                    object_id = "{00000000-0000-0000-0000-000000000001}"
+                    object_path = str(selector_value)
+                elif selector_kind == "id":
+                    object_id = str(selector_value)
+                    object_path = r"\Synthetic\Import Location"
+                else:
+                    raise AssertionError(
+                        "synthetic tabular import requires an exact path or GUID"
+                    )
+                context = business_contexts[operation]
+                created: dict[str, str] = {}
+
+                def bind_artifact_object(
+                    current: BusinessDeclarationSession,
+                ) -> BusinessDeclarationSession:
+                    handles = BusinessHandleRegistry.from_dict(
+                        current.handles.as_dict()
+                    )
+                    bound = handles.bind_object(
+                        object_id=object_id,
+                        name=object_path.rsplit("\\", 1)[-1],
+                        object_type="WorkUnit",
+                        path=object_path,
+                        role="import_location",
+                    )
+                    created["handle"] = bound.handle
+                    return current.with_handle_registry(handles)
+
+                updated = draft_store.apply_business_update(
+                    draft_id,
+                    task_authority=authority,
+                    expected_revision=revision,
+                    schema_digest=schema_digest,
+                    composer_digest=operation_composer_digest(operation, version),
+                    context=context,
+                    update=bind_artifact_object,
+                    event_type="handles.bound",
+                )
+                revision = updated.revision
+                handle = created["handle"]
+                bound_artifact_handles[operation] = handle
+            elif operation in soundbank_business_operations:
+                revision += 1
+                handle = "boh1-" + f"{index:032x}"
+            else:
                 raise AssertionError(
                     "synthetic object binding is only modeled for SoundBank business"
                 )
-            revision += 1
             draft_started[operation] = (
                 draft_id,
                 authority,
                 schema_digest,
                 revision,
             )
-            handle = "boh1-" + f"{index:032x}"
             payload.update(
                 {
                     "draft": {
+                        "contract": "waapi-skill.operation-draft/v1",
                         "draft_id": draft_id,
                         "revision": revision,
                         "lifecycle_state": "editable",
@@ -2603,8 +2682,89 @@ def _synthetic_gateway_records(
                 revision,
             )
             payload["draft"] = {
+                "contract": "waapi-skill.operation-draft/v1",
                 "draft_id": draft_id,
                 "revision": revision,
+                "lifecycle_state": "editable",
+                "binding": {
+                    "operation": operation,
+                    "version": version,
+                    "schema_digest": schema_digest,
+                },
+            }
+        elif step.subcommand == "draft-declare-artifact-plan":
+            operation = next(reversed(draft_started))
+            draft_id, authority, schema_digest, revision = draft_started[operation]
+            if operation not in exact_artifact_business_operations:
+                raise AssertionError("synthetic exact-artifact operation is invalid")
+            request = expected_business_requests[operation]
+            request_arguments = request["arguments"]
+            if operation == "audio.importTabDelimited":
+                native_mode = request_arguments.get("import_operation")
+                business_mode = {
+                    "createNew": "create",
+                    "useExisting": "reimport",
+                    "replaceExisting": "replace",
+                }
+                plan: dict[str, Any] = {
+                    "table_file": request_arguments["import_file"],
+                    "location_handle": bound_artifact_handles[operation],
+                    "language": request_arguments["import_language"],
+                }
+                if native_mode is not None:
+                    plan["mode"] = business_mode[native_mode]
+                if "auto_add_to_source_control" in request_arguments:
+                    plan["add_to_source_control"] = request_arguments[
+                        "auto_add_to_source_control"
+                    ]
+                if "auto_check_out_to_source_control" in request_arguments:
+                    plan["check_out_from_source_control"] = request_arguments[
+                        "auto_check_out_to_source_control"
+                    ]
+            elif operation.endswith("File"):
+                plan = {"script_file": request_arguments["script_file"]}
+                if "wa_args" in request_arguments:
+                    plan["arguments"] = request_arguments["wa_args"]
+                if "watchdog_seconds" in request_arguments:
+                    plan["watchdog_seconds"] = request_arguments[
+                        "watchdog_seconds"
+                    ]
+            else:
+                plan = {
+                    "lua_source": request_arguments["lua_code"],
+                    "io_root": request_arguments["io_root"],
+                }
+                if "wa_args" in request_arguments:
+                    plan["arguments"] = request_arguments["wa_args"]
+            context = business_contexts[operation]
+
+            def declare_artifact(
+                current: BusinessDeclarationSession,
+            ) -> BusinessDeclarationSession:
+                candidate = current.with_settings({"artifact_plan": plan})
+                business_adapter(operation).materialize(candidate)
+                return candidate
+
+            updated = draft_store.apply_business_update(
+                draft_id,
+                task_authority=authority,
+                expected_revision=revision,
+                schema_digest=schema_digest,
+                composer_digest=operation_composer_digest(operation, version),
+                context=context,
+                update=declare_artifact,
+                event_type="settings.revised",
+            )
+            draft_started[operation] = (
+                draft_id,
+                authority,
+                schema_digest,
+                updated.revision,
+            )
+            payload["draft"] = {
+                "contract": "waapi-skill.operation-draft/v1",
+                "draft_id": draft_id,
+                "revision": updated.revision,
                 "lifecycle_state": "editable",
                 "binding": {
                     "operation": operation,
@@ -2651,6 +2811,7 @@ def _synthetic_gateway_records(
                 updated.revision,
             )
             payload["draft"] = {
+                "contract": "waapi-skill.operation-draft/v1",
                 "draft_id": draft_id,
                 "revision": updated.revision,
                 "lifecycle_state": "editable",
@@ -2716,6 +2877,7 @@ def _synthetic_gateway_records(
                 checked_revision = checked.revision
                 checked_composition = checked.composition
             payload["draft"] = {
+                "contract": "waapi-skill.operation-draft/v1",
                 "draft_id": draft_id,
                 "revision": checked_revision,
                 "lifecycle_state": "editable",
@@ -2740,6 +2902,7 @@ def _synthetic_gateway_records(
             operation = next(reversed(draft_started))
             draft_id, _authority, schema_digest, revision = draft_started[operation]
             payload["draft"] = {
+                "contract": "waapi-skill.operation-draft/v1",
                 "draft_id": draft_id,
                 "revision": revision,
                 "lifecycle_state": "editable",

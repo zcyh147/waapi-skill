@@ -52,6 +52,10 @@ from wwise_waapi.operation_registry import (
     operation_input_mode,
     parse_operation_request,
 )
+from wwise_waapi.exact_artifact_business_contracts import (
+    EXACT_ARTIFACT_BUSINESS_OPERATIONS,
+    exact_artifact_business_contract_data,
+)
 from wwise_waapi.typed_operations import (
     INLINE_OPERATIONS,
     draft_operation_request_contract,
@@ -1766,6 +1770,250 @@ def build_soundbank_business_transaction_steps(
     return tuple(steps)
 
 
+_TAB_IMPORT_NATIVE_TO_BUSINESS_MODE = {
+    "createNew": "create",
+    "useExisting": "reimport",
+    "replaceExisting": "replace",
+}
+
+
+def _exact_artifact_argument_cli(
+    arguments: Mapping[str, Any],
+) -> tuple[str, ...]:
+    """Encode one exact strict-JSON map through the public business CLI."""
+
+    values: list[str] = []
+    for key, value in arguments.items():
+        if isinstance(value, str):
+            value_type = "string"
+            encoded = value
+        elif type(value) is bool:
+            value_type = "boolean"
+            encoded = "true" if value else "false"
+        elif type(value) is int:
+            value_type = "integer"
+            encoded = str(value)
+        elif type(value) is float and math.isfinite(value):
+            value_type = "number"
+            encoded = json.dumps(value, allow_nan=False, separators=(",", ":"))
+        elif value is None:
+            value_type = "null"
+            encoded = "null"
+        elif isinstance(value, (dict, list)):
+            value_type = "json"
+            encoded = json.dumps(
+                value,
+                ensure_ascii=False,
+                allow_nan=False,
+                separators=(",", ":"),
+            )
+        else:
+            raise V3ProtocolError(
+                "Lua business arguments must contain only strict JSON values"
+            )
+        values.extend(("--argument", key, value_type, encoded))
+    return tuple(values)
+
+
+def build_exact_artifact_business_transaction_steps(
+    request: Mapping[str, Any],
+    *,
+    label: str,
+) -> tuple[ExpectedGatewayStep, ...]:
+    """Translate exact user artifacts into one Gateway-owned business plan."""
+
+    normalized = _validate_operation_request(request)
+    operation = str(normalized["operation"])
+    if operation not in EXACT_ARTIFACT_BUSINESS_OPERATIONS:
+        raise V3ProtocolError(
+            "exact-artifact business builder requires one reviewed operation"
+        )
+    if not isinstance(label, str) or not re.fullmatch(r"tx[0-9]{2}", label):
+        raise V3ProtocolError("business transaction label must be txNN")
+    version = str(normalized["version"])
+    try:
+        exact_artifact_business_contract_data(operation, version)
+    except ValueError as exc:
+        raise V3ProtocolError(
+            f"exact-artifact business request is unavailable: {exc}"
+        ) from exc
+    arguments = normalized["arguments"]
+    required_by_operation = {
+        "audio.importTabDelimited": {
+            "import_file",
+            "import_location",
+            "import_language",
+        },
+        "lua.executeCliFile": {
+            "script_file",
+            "io_root",
+            "source_authority",
+        },
+        "lua.executeCoreFile": {
+            "script_file",
+            "io_root",
+            "source_authority",
+        },
+        "lua.executeCoreInline": {
+            "lua_code",
+            "io_root",
+            "source_authority",
+        },
+    }
+    optional_by_operation = {
+        "audio.importTabDelimited": {
+            "import_operation",
+            "auto_add_to_source_control",
+            "auto_check_out_to_source_control",
+        },
+        "lua.executeCliFile": {"wa_args", "watchdog_seconds"},
+        "lua.executeCoreFile": {"wa_args"},
+        "lua.executeCoreInline": {"wa_args"},
+    }
+    required = required_by_operation[operation]
+    if not required.issubset(arguments) or set(arguments) - (
+        required | optional_by_operation[operation]
+    ):
+        raise V3ProtocolError(
+            "exact-artifact business request fields are not closed"
+        )
+    draft = _BusinessDraftSteps.start(operation=operation, label=label)
+    steps = draft.steps
+    declaration_arguments: list[Any] = []
+    expected_request = normalized
+
+    if operation == "audio.importTabDelimited":
+        if (
+            not isinstance(arguments["import_file"], str)
+            or not arguments["import_file"]
+            or not isinstance(arguments["import_language"], str)
+            or not arguments["import_language"]
+        ):
+            raise V3ProtocolError("tabular import exact fields are invalid")
+        location = arguments["import_location"]
+        location_handle = draft.bind_object(
+            location,
+            step_name=f"{label}.bind-import-location",
+            error_subject="tabular import location",
+            role="import_location",
+        )
+        declaration_arguments.extend(
+            (
+                "--table-file",
+                str(arguments["import_file"]),
+                "--location-handle",
+                location_handle,
+                "--language",
+                str(arguments["import_language"]),
+            )
+        )
+        if "import_operation" in arguments:
+            mode = _TAB_IMPORT_NATIVE_TO_BUSINESS_MODE.get(
+                arguments["import_operation"]
+            )
+            if mode is None:
+                raise V3ProtocolError("tabular import operation is invalid")
+            declaration_arguments.extend(("--mode", mode))
+        for native, positive, negative in (
+            (
+                "auto_add_to_source_control",
+                "--add-to-source-control",
+                "--no-add-to-source-control",
+            ),
+            (
+                "auto_check_out_to_source_control",
+                "--check-out-from-source-control",
+                "--no-check-out-from-source-control",
+            ),
+        ):
+            if native in arguments:
+                if type(arguments[native]) is not bool:
+                    raise V3ProtocolError(
+                        "tabular import source-control settings must be Boolean"
+                    )
+                declaration_arguments.append(
+                    positive if arguments[native] else negative
+                )
+    else:
+        authority = arguments.get("source_authority")
+        if authority != "user_supplied_verbatim":
+            raise V3ProtocolError(
+                "Lua source authority must be the closed user-supplied constant"
+            )
+        if operation.endswith("File"):
+            script_file = arguments["script_file"]
+            if not isinstance(script_file, str) or not script_file:
+                raise V3ProtocolError("Lua script file must be one exact path")
+            declaration_arguments.extend(("--script-file", script_file))
+            expected_arguments = dict(arguments)
+            expected_arguments["io_root"] = str(Path(script_file).parent)
+            expected_request = dict(normalized)
+            expected_request["arguments"] = expected_arguments
+        else:
+            if (
+                not isinstance(arguments["lua_code"], str)
+                or not arguments["lua_code"]
+                or not isinstance(arguments["io_root"], str)
+                or not arguments["io_root"]
+            ):
+                raise V3ProtocolError(
+                    "inline Lua source and io_root must be non-empty strings"
+                )
+            declaration_arguments.extend(
+                (
+                    "--lua-source",
+                    arguments["lua_code"],
+                    "--io-root",
+                    arguments["io_root"],
+                )
+            )
+        wa_args = arguments.get("wa_args", {})
+        if not isinstance(wa_args, Mapping):
+            raise V3ProtocolError("Lua wa_args must be one strict JSON object")
+        declaration_arguments.extend(_exact_artifact_argument_cli(wa_args))
+        if "watchdog_seconds" in arguments:
+            watchdog = arguments["watchdog_seconds"]
+            if (
+                version not in {"2024.1", "2025.1"}
+                or type(watchdog) is not int
+                or watchdog < 0
+            ):
+                raise V3ProtocolError(
+                    "Lua CLI watchdog is available as a non-negative integer on Wwise 2024.1+"
+                )
+            declaration_arguments.extend(
+                ("--watchdog-seconds", str(watchdog))
+            )
+
+    declaration_name = f"{label}.declare-artifact-plan"
+    steps.append(
+        ExpectedGatewayStep(
+            name=declaration_name,
+            subcommand="draft-declare-artifact-plan",
+            arguments=(*draft.prefix(), *declaration_arguments),
+        )
+    )
+    draft.advance(declaration_name)
+    check_name = f"{label}.check"
+    steps.append(
+        ExpectedGatewayStep(
+            name=check_name,
+            subcommand="draft-check",
+            arguments=draft.prefix(),
+        )
+    )
+    draft.advance(check_name)
+    steps.append(
+        ExpectedGatewayStep(
+            name=f"{label}.preview",
+            subcommand="preview-from-draft",
+            arguments=draft.prefix(),
+            expected_operation_request=expected_request,
+        )
+    )
+    return tuple(steps)
+
+
 def build_object_metadata_business_transaction_steps(
     request: Mapping[str, Any],
     *,
@@ -2066,6 +2314,7 @@ def materialize_typed_transaction_protocol_requests(
         if (
             allow_cleaned_file_evidence
             and operation in _SEALED_FILE_REPLAY_OPERATIONS
+            and protocol.steps[terminal_index].expected_operation_request is None
         ):
             facts: list[TypedRequestFact] = []
             for step in protocol.steps[start_index + 1 : terminal_index]:
@@ -3249,6 +3498,14 @@ def build_transaction_protocol(
                 and operation in SOUNDBANK_BUSINESS_OPERATIONS
             ):
                 operation_steps = build_soundbank_business_transaction_steps(
+                    request,
+                    label=label,
+                )
+            elif (
+                input_mode == BUSINESS_DECLARATION_INPUT_MODE
+                and operation in EXACT_ARTIFACT_BUSINESS_OPERATIONS
+            ):
+                operation_steps = build_exact_artifact_business_transaction_steps(
                     request,
                     label=label,
                 )

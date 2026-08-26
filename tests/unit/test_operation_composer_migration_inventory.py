@@ -60,6 +60,10 @@ def test_inventory_exactly_covers_every_registry_operation_and_version_lane() ->
         expected_mode = INTERNAL_CANONICAL_INPUT_MODE
         if name in {
             "audio.import",
+            "audio.importTabDelimited",
+            "lua.executeCliFile",
+            "lua.executeCoreFile",
+            "lua.executeCoreInline",
             "object.copy",
             "object.delete",
             "object.move",

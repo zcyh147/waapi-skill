@@ -27,6 +27,11 @@ from tests.semantic.support.codex_gateway_broker import (
     TypedRequestFactsArgument,
 )
 from wwise_waapi.operation_composer import typed_action_cli_arguments
+from wwise_waapi.exact_artifact_business_cli import (
+    ExactArtifactBusinessCliError,
+    add_exact_artifact_plan_arguments,
+    exact_artifact_plan_from_namespace,
+)
 from wwise_waapi.soundbank_business_cli import (
     SoundBankBusinessCliError,
     add_soundbank_plan_arguments,
@@ -446,9 +451,47 @@ def _business_copy_binding_was_used(
             ):
                 return True
             continue
+        if command[0] == "draft-declare-artifact-plan":
+            contract = binding.get("business_contract")
+            operation = (
+                contract.get("operation")
+                if isinstance(contract, Mapping)
+                else None
+            )
+            if isinstance(operation, str) and _exact_artifact_plan_suffix_matches(
+                operation,
+                suffix,
+            ):
+                return True
+            continue
         if _business_binding_suffix_matches(candidate, suffix):
             return True
     return False
+
+
+def _exact_artifact_plan_suffix_matches(
+    operation: str,
+    suffix: list[str],
+) -> bool:
+    parser = argparse.ArgumentParser(add_help=False, exit_on_error=False)
+    add_exact_artifact_plan_arguments(parser)
+    try:
+        namespace, unknown = parser.parse_known_args(suffix)
+        if unknown:
+            return False
+        plan = exact_artifact_plan_from_namespace(
+            namespace,
+            operation=operation,
+        )
+    except (argparse.ArgumentError, ExactArtifactBusinessCliError, SystemExit):
+        return False
+    required = {
+        "audio.importTabDelimited": {"table_file", "location_handle", "language"},
+        "lua.executeCliFile": {"script_file"},
+        "lua.executeCoreFile": {"script_file"},
+        "lua.executeCoreInline": {"lua_source", "io_root"},
+    }.get(operation)
+    return required is not None and all(plan.get(field) is not None for field in required)
 
 
 def _soundbank_plan_suffix_matches(

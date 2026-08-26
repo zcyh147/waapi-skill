@@ -11,6 +11,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     V3ProtocolError,
     build_audio_import_composer_transaction_steps,
     build_direct_protocol,
+    build_exact_artifact_business_transaction_steps,
     build_metadata_transaction_protocol,
     build_object_lifecycle_business_transaction_steps,
     build_object_metadata_business_transaction_steps,
@@ -62,6 +63,88 @@ def _request(index: int = 1) -> dict[str, object]:
             "source_authority": LUA_SOURCE_AUTHORITY,
         },
     }
+
+
+def test_exact_artifact_business_steps_hide_lua_loader_fields(
+    tmp_path: Path,
+) -> None:
+    request = _request()
+    request["arguments"]["io_root"] = str(tmp_path)
+    request["arguments"]["wa_args"] = {
+        "name": "Weather",
+        "enabled": True,
+        "missing": None,
+        "rows": [1, 2],
+    }
+
+    steps = build_exact_artifact_business_transaction_steps(
+        request,
+        label="tx01",
+    )
+
+    assert [step.subcommand for step in steps] == [
+        "operation-schema",
+        "draft-start",
+        "draft-declare-artifact-plan",
+        "draft-check",
+        "preview-from-draft",
+    ]
+    declaration = steps[2]
+    assert "--source-authority" not in declaration.arguments
+    assert "--argument" in declaration.arguments
+    lua_index = declaration.arguments.index("--lua-source")
+    assert declaration.arguments[lua_index : lua_index + 4] == (
+        "--lua-source",
+        request["arguments"]["lua_code"],
+        "--io-root",
+        request["arguments"]["io_root"],
+    )
+    assert steps[-1].expected_operation_request == request
+
+
+def test_exact_artifact_tab_steps_bind_location_and_translate_mode() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.importTabDelimited",
+        "arguments": {
+            "import_file": "/owned/import.tsv",
+            "import_location": {
+                "kind": "path",
+                "value": r"\Actor-Mixer Hierarchy\Default Work Unit",
+            },
+            "import_language": "SFX",
+            "import_operation": "useExisting",
+            "auto_add_to_source_control": False,
+        },
+    }
+
+    steps = build_exact_artifact_business_transaction_steps(
+        request,
+        label="tx01",
+    )
+
+    assert [step.subcommand for step in steps] == [
+        "operation-schema",
+        "draft-start",
+        "draft-bind-object",
+        "draft-declare-artifact-plan",
+        "draft-check",
+        "preview-from-draft",
+    ]
+    assert steps[2].arguments[-4:] == (
+        "--object-path-segment",
+        "Actor-Mixer Hierarchy",
+        "--object-path-segment",
+        "Default Work Unit",
+    )
+    declaration = steps[3]
+    assert "--mode" in declaration.arguments
+    assert declaration.arguments[declaration.arguments.index("--mode") + 1] == (
+        "reimport"
+    )
+    assert "--no-add-to-source-control" in declaration.arguments
+    assert steps[-1].expected_operation_request == request
 
 
 def test_switch_assignment_business_steps_bind_three_paths_before_declaration() -> None:
@@ -602,7 +685,7 @@ def test_single_transaction_spans_two_turn_prefixes_with_response_bindings() -> 
     assert tuple(step.subcommand for step in protocol.steps) == (
         "operation-schema",
         "draft-start",
-        "draft-apply",
+        "draft-declare-artifact-plan",
         "draft-check",
         "preview-from-draft",
         "transaction-show",
@@ -1390,7 +1473,7 @@ def test_audio_import_protocol_serializes_bound_existing_declarations() -> None:
     assert all(step.subcommand != "draft-apply" for step in steps)
 
 
-def test_metadata_transaction_protocol_selects_closed_tab_import_equivalence() -> None:
+def test_metadata_transaction_protocol_keeps_tab_import_on_business_preview() -> None:
     request = {
         "contract": "waapi-skill.operation-request/v1",
         "version": "2025.1",
@@ -1412,12 +1495,13 @@ def test_metadata_transaction_protocol_selects_closed_tab_import_equivalence() -
         required_tokens=("IsLoopingEnabled",),
         equivalence="audio_import_tab_v1",
     )
-    typed_operation = next(
-        step for step in protocol.steps if step.subcommand == "typed-operation"
+    preview = next(
+        step for step in protocol.steps if step.subcommand == "preview-from-draft"
     )
-    assert typed_operation.metadata_binding is not None
-    assert typed_operation.metadata_binding.step == "metadata.discover"
-    assert typed_operation.metadata_binding.required_tokens == ("IsLoopingEnabled",)
+    assert preview.metadata_binding is not None
+    assert preview.metadata_binding.step == "metadata.discover"
+    assert preview.metadata_binding.required_tokens == ("IsLoopingEnabled",)
+    assert all(step.subcommand != "typed-operation" for step in protocol.steps)
 
 
 def test_metadata_transaction_protocol_selects_closed_object_set_equivalence() -> None:
@@ -1642,7 +1726,7 @@ def test_terminal_execute_transaction_ends_at_execute_without_verify() -> None:
     assert tuple(step.subcommand for step in protocol.steps) == (
         "operation-schema",
         "draft-start",
-        "draft-apply",
+        "draft-declare-artifact-plan",
         "draft-check",
         "preview-from-draft",
         "transaction-show",
@@ -1843,7 +1927,10 @@ def test_wait_topic_and_operation_requests_use_typed_inputs() -> None:
 
     protocol = build_transaction_protocol((_request(),))
     assert all("--request-json" not in step.arguments for step in protocol.steps)
-    assert any(step.subcommand == "draft-apply" for step in protocol.steps)
+    assert any(
+        step.subcommand == "draft-declare-artifact-plan"
+        for step in protocol.steps
+    )
 
 
 @pytest.mark.parametrize(

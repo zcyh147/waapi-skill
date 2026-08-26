@@ -1530,34 +1530,34 @@
     {
       "model_values": [
         {
-          "name": "auto_add_to_source_control",
+          "name": "table_file",
           "path": [
-            "arguments",
-            "auto_add_to_source_control"
-          ],
-          "required": false,
-          "schema_sha256": "f56777819c8be28f711bc04bdfdb5fb6a82bdaf4109198c616273cb0003e4137",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "import_file",
-          "path": [
-            "arguments",
-            "import_file"
+            "declaration",
+            "table_file"
           ],
           "required": true,
-          "schema_sha256": "9bc9afaf0da36a6811c6ccbc5660fa2adbc2c69639727730f52395bfceb2505c",
+          "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
           "shape": "scalar",
           "transport_ownership": "gateway_derivation",
           "value_ownership": "exact_user_artifact"
         },
         {
-          "name": "import_language",
+          "name": "location_handle",
           "path": [
-            "arguments",
-            "import_language"
+            "declaration",
+            "location_handle"
+          ],
+          "required": true,
+          "schema_sha256": "43a2cd8a5a436b0db16d6cd18d0d624b5dfaf633b41225d9e8820b0260f95667",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        },
+        {
+          "name": "language",
+          "path": [
+            "declaration",
+            "language"
           ],
           "required": true,
           "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
@@ -1566,548 +1566,43 @@
           "value_ownership": "stable_business_declaration"
         },
         {
-          "name": "import_location",
+          "name": "add_to_source_control",
           "path": [
-            "arguments",
-            "import_location"
-          ],
-          "required": true,
-          "schema_sha256": "b2bb079f7369ee516099b6c0a25dfe674aa43aac955e2b5d8ef0183cca124e25",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "import_location",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "85724bd9311dc46c53a1c13d79ed38078e5fbf1a01b2ddea93a8a672f0066219",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:0>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "d200cc9eadb263de6c9688067b7e6eb04e33683d53f83bad31da853c75f52b20",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:0>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "138251f1baf7e77020390ef9cd05892e62d874014a557420090b840bcfa9cd82",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "import_location",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "037094c5eae8f946c0e71e2f882b8b8c913c545ca207ba4e977d4814e90e706e",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:1>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "8bfe7b4c0bbae812f7c3731be03db558265f0dede2f8a0d2ec2e11f57c9dabd9",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:1>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "b96b8929cc6713ed744c5758d79ff4fd503c3148de163db8ab8b303633632491",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "import_location",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:2>"
-          ],
-          "required": true,
-          "schema_sha256": "5920c555e83a3810a7bc95e42a39badb953a8778584681afa898498048adf6eb",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:2>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "8c8e2cd132588ba8443f3e9270d212bce04e44523e8b04fa797da79d909e3e89",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "name",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:2>",
-            "name"
-          ],
-          "required": true,
-          "schema_sha256": "7d0349c7ff2f686133d83602cd1090da1afdea8d2d400781f20b57ba1ec6f91c",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "type",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:2>",
-            "type"
-          ],
-          "required": true,
-          "schema_sha256": "92994459004182a0f29d27de909cca8b376cb596a8d655ac554fa92a8d30adc1",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "import_location",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:3>"
-          ],
-          "required": true,
-          "schema_sha256": "7dac0ff5f3b52d1b13afcf764d83a0720511b190c51d1a73c74bc9696774cbed",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:3>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "666775010b4235464589f4bcb1af1520b304a646160023ac993996c742684a63",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:3>",
-            "parent"
-          ],
-          "required": true,
-          "schema_sha256": "d5f6e876f64505c683365c538b704c06c1460925a7dde2a4b89f9bdc61c608d1",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "d0f6f2a06ef4d48e51291dd5efe02a3b0c0fc46df73617a8cf8bd42cf0caa1c5",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "d200cc9eadb263de6c9688067b7e6eb04e33683d53f83bad31da853c75f52b20",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "5bd1466d67f023e4365da9a452bb548f39556df880a1ef3e3505803c3443b95a",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>",
-            "value",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "f7be3125a2038a14d7cd75b5ae3a7eeefaaf39698437bbbabfa6eb0163390469",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>",
-            "value",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "f0765dbf409c74f001806c446f2cf171d8c46b5b15779d54423dde921a4b0670",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "716ae013236f7371a9e43c1fa2b8c42b87fae7a66e9dfae14ca33c032df691d4",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:1>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "8bfe7b4c0bbae812f7c3731be03db558265f0dede2f8a0d2ec2e11f57c9dabd9",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:1>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "0bd5eabca0b8834581462a67de41e64a73d914fc40a8d96e42e09616f14584fb",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "type",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:3>",
-            "type"
-          ],
-          "required": true,
-          "schema_sha256": "2dd450490534930e9da665377cc98230d62d9a57253a1f8bf466f5c8747f764a",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "import_location",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>"
-          ],
-          "required": true,
-          "schema_sha256": "d96cee783c630aec17979cf18e304562ca46204302a62b26520373e4eff06668",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "f9254c4e13d76ac7baea8339084fb01d9113a170f373e2f36082a10e5674a606",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "name",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>",
-            "name"
-          ],
-          "required": true,
-          "schema_sha256": "9a117032d9994f3df9b834eceb77ba902e6f65eee0beaa5d30091d92e06dfbf0",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>",
-            "parent"
-          ],
-          "required": true,
-          "schema_sha256": "6b838ac597f1abb82ed093744485b90ae3c44be598aca21acf6d38c3a2ff654e",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "d0f6f2a06ef4d48e51291dd5efe02a3b0c0fc46df73617a8cf8bd42cf0caa1c5",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "d200cc9eadb263de6c9688067b7e6eb04e33683d53f83bad31da853c75f52b20",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "5bd1466d67f023e4365da9a452bb548f39556df880a1ef3e3505803c3443b95a",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>",
-            "value",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "f7be3125a2038a14d7cd75b5ae3a7eeefaaf39698437bbbabfa6eb0163390469",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>",
-            "value",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "f0765dbf409c74f001806c446f2cf171d8c46b5b15779d54423dde921a4b0670",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "716ae013236f7371a9e43c1fa2b8c42b87fae7a66e9dfae14ca33c032df691d4",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:1>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "8bfe7b4c0bbae812f7c3731be03db558265f0dede2f8a0d2ec2e11f57c9dabd9",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:1>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "0bd5eabca0b8834581462a67de41e64a73d914fc40a8d96e42e09616f14584fb",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "type",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>",
-            "type"
-          ],
-          "required": true,
-          "schema_sha256": "85cd5844c08d8ec0f594d4e56ded2c20ceb316f737e25e09227822978721f043",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "import_operation",
-          "path": [
-            "arguments",
-            "import_operation"
+            "declaration",
+            "add_to_source_control"
           ],
           "required": false,
-          "schema_sha256": "e268850a07c7f44ff45897589d6004229f584cd7576ffa3a2f86f0216d44f292",
+          "schema_sha256": "7cb541e84f226754a46c21c79f131fa2898354e1242456e6fd1c162bce319553",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "check_out_from_source_control",
+          "path": [
+            "declaration",
+            "check_out_from_source_control"
+          ],
+          "required": false,
+          "schema_sha256": "7cb541e84f226754a46c21c79f131fa2898354e1242456e6fd1c162bce319553",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "mode",
+          "path": [
+            "declaration",
+            "mode"
+          ],
+          "required": false,
+          "schema_sha256": "444cf082e5be04943b28efe7ac0859cdaf0d3704a73422458447250c7a4739b2",
           "shape": "scalar",
           "transport_ownership": "gateway_derivation",
           "value_ownership": "stable_business_declaration"
         }
       ],
-      "sha256": "37f62fb28af69c3468d7994c3cd3b6c6084a6f51cb44f19e23cc1ceb325cc660"
+      "sha256": "2e26aaa8fc7f4688882739f8998dd75c3665c2b9197144298e560aa58b1d8999"
     },
     {
       "model_values": [
@@ -2125,6 +1620,47 @@
         }
       ],
       "sha256": "3914691a66d82507a89ddff91c4d241ecfe1751424b202ff7e501487b08a395e"
+    },
+    {
+      "model_values": [
+        {
+          "name": "lua_source",
+          "path": [
+            "declaration",
+            "lua_source"
+          ],
+          "required": true,
+          "schema_sha256": "d80b4c3f15e1df8c955c901fbdc093f124a71be7452b58a461d7f383dcbae834",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "name": "io_root",
+          "path": [
+            "declaration",
+            "io_root"
+          ],
+          "required": true,
+          "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "name": "arguments",
+          "path": [
+            "declaration",
+            "arguments"
+          ],
+          "required": false,
+          "schema_sha256": "c03bc16f5a46306ddb20f95734201d50be2949d9c1922cf993abc10c868b2d55",
+          "shape": "map",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        }
+      ],
+      "sha256": "3ad4db3f9159b9b1e5a5f5a63861a9e8b5496bc0854800b5609a7687ed4ad8e5"
     },
     {
       "model_values": [
@@ -2918,67 +2454,31 @@
     {
       "model_values": [
         {
-          "name": "io_root",
-          "path": [
-            "arguments",
-            "io_root"
-          ],
-          "required": true,
-          "schema_sha256": "f65a8ed80c26e6475831fd162f6c8dd6614ab589d94c5b10a1b3db351ef5d3f1",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
           "name": "script_file",
           "path": [
-            "arguments",
+            "declaration",
             "script_file"
           ],
           "required": true,
-          "schema_sha256": "0dbb1cf92c1db8a70dbac6f5f470c0934e94c5f9032b9a1d7f26fae8569b05e6",
+          "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
           "shape": "scalar",
           "transport_ownership": "gateway_derivation",
           "value_ownership": "exact_user_artifact"
         },
         {
-          "name": "source_authority",
+          "name": "arguments",
           "path": [
-            "arguments",
-            "source_authority"
-          ],
-          "required": true,
-          "schema_sha256": "ab1a23f151b0045aba9395b8c3316fea2e5e8f111441a89e3ee7f7a157dabf21",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "wa_args",
-          "path": [
-            "arguments",
-            "wa_args"
+            "declaration",
+            "arguments"
           ],
           "required": false,
-          "schema_sha256": "9afc35fb94c047cec7e6739a0da62bd5461d1fd09210deba9cca88cbdac255fa",
-          "shape": "object",
+          "schema_sha256": "c03bc16f5a46306ddb20f95734201d50be2949d9c1922cf993abc10c868b2d55",
+          "shape": "map",
           "transport_ownership": "gateway_derivation",
           "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "watchdog_seconds",
-          "path": [
-            "arguments",
-            "watchdog_seconds"
-          ],
-          "required": false,
-          "schema_sha256": "d53ebfae6736d22e0fe7037bc5e09d08646757a24868a23e0d90f57c309c579b",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
         }
       ],
-      "sha256": "56308c4230a31516690dd1796e7b747c19cc2e6ddd3092a95ea61f61cbc9c8cf"
+      "sha256": "5593588c6d1ab9b5eff4a4d1504247da4e776efc900a1623b2a76fcc99d11585"
     },
     {
       "model_values": [
@@ -3866,600 +3366,6 @@
     {
       "model_values": [
         {
-          "name": "auto_add_to_source_control",
-          "path": [
-            "arguments",
-            "auto_add_to_source_control"
-          ],
-          "required": false,
-          "schema_sha256": "f56777819c8be28f711bc04bdfdb5fb6a82bdaf4109198c616273cb0003e4137",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "auto_check_out_to_source_control",
-          "path": [
-            "arguments",
-            "auto_check_out_to_source_control"
-          ],
-          "required": false,
-          "schema_sha256": "99cd37ff523c3c307a5a992583ddd6633ad1287990d5d719622eefd144235a9b",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "import_file",
-          "path": [
-            "arguments",
-            "import_file"
-          ],
-          "required": true,
-          "schema_sha256": "9bc9afaf0da36a6811c6ccbc5660fa2adbc2c69639727730f52395bfceb2505c",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "import_language",
-          "path": [
-            "arguments",
-            "import_language"
-          ],
-          "required": true,
-          "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "import_location",
-          "path": [
-            "arguments",
-            "import_location"
-          ],
-          "required": true,
-          "schema_sha256": "b2bb079f7369ee516099b6c0a25dfe674aa43aac955e2b5d8ef0183cca124e25",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "import_location",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "85724bd9311dc46c53a1c13d79ed38078e5fbf1a01b2ddea93a8a672f0066219",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:0>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "d200cc9eadb263de6c9688067b7e6eb04e33683d53f83bad31da853c75f52b20",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:0>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "138251f1baf7e77020390ef9cd05892e62d874014a557420090b840bcfa9cd82",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "import_location",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "037094c5eae8f946c0e71e2f882b8b8c913c545ca207ba4e977d4814e90e706e",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:1>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "8bfe7b4c0bbae812f7c3731be03db558265f0dede2f8a0d2ec2e11f57c9dabd9",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:1>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "b96b8929cc6713ed744c5758d79ff4fd503c3148de163db8ab8b303633632491",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "import_location",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:2>"
-          ],
-          "required": true,
-          "schema_sha256": "5920c555e83a3810a7bc95e42a39badb953a8778584681afa898498048adf6eb",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:2>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "8c8e2cd132588ba8443f3e9270d212bce04e44523e8b04fa797da79d909e3e89",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "name",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:2>",
-            "name"
-          ],
-          "required": true,
-          "schema_sha256": "7d0349c7ff2f686133d83602cd1090da1afdea8d2d400781f20b57ba1ec6f91c",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "type",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:2>",
-            "type"
-          ],
-          "required": true,
-          "schema_sha256": "92994459004182a0f29d27de909cca8b376cb596a8d655ac554fa92a8d30adc1",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "import_location",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:3>"
-          ],
-          "required": true,
-          "schema_sha256": "7dac0ff5f3b52d1b13afcf764d83a0720511b190c51d1a73c74bc9696774cbed",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:3>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "666775010b4235464589f4bcb1af1520b304a646160023ac993996c742684a63",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:3>",
-            "parent"
-          ],
-          "required": true,
-          "schema_sha256": "d5f6e876f64505c683365c538b704c06c1460925a7dde2a4b89f9bdc61c608d1",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "d0f6f2a06ef4d48e51291dd5efe02a3b0c0fc46df73617a8cf8bd42cf0caa1c5",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "d200cc9eadb263de6c9688067b7e6eb04e33683d53f83bad31da853c75f52b20",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "5bd1466d67f023e4365da9a452bb548f39556df880a1ef3e3505803c3443b95a",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>",
-            "value",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "f7be3125a2038a14d7cd75b5ae3a7eeefaaf39698437bbbabfa6eb0163390469",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:0>",
-            "value",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "f0765dbf409c74f001806c446f2cf171d8c46b5b15779d54423dde921a4b0670",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "716ae013236f7371a9e43c1fa2b8c42b87fae7a66e9dfae14ca33c032df691d4",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:1>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "8bfe7b4c0bbae812f7c3731be03db558265f0dede2f8a0d2ec2e11f57c9dabd9",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:3>",
-            "parent",
-            "<oneOf:1>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "0bd5eabca0b8834581462a67de41e64a73d914fc40a8d96e42e09616f14584fb",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "type",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:3>",
-            "type"
-          ],
-          "required": true,
-          "schema_sha256": "2dd450490534930e9da665377cc98230d62d9a57253a1f8bf466f5c8747f764a",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "import_location",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>"
-          ],
-          "required": true,
-          "schema_sha256": "d96cee783c630aec17979cf18e304562ca46204302a62b26520373e4eff06668",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "f9254c4e13d76ac7baea8339084fb01d9113a170f373e2f36082a10e5674a606",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "name",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>",
-            "name"
-          ],
-          "required": true,
-          "schema_sha256": "9a117032d9994f3df9b834eceb77ba902e6f65eee0beaa5d30091d92e06dfbf0",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>",
-            "parent"
-          ],
-          "required": true,
-          "schema_sha256": "6b838ac597f1abb82ed093744485b90ae3c44be598aca21acf6d38c3a2ff654e",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "d0f6f2a06ef4d48e51291dd5efe02a3b0c0fc46df73617a8cf8bd42cf0caa1c5",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "d200cc9eadb263de6c9688067b7e6eb04e33683d53f83bad31da853c75f52b20",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "5bd1466d67f023e4365da9a452bb548f39556df880a1ef3e3505803c3443b95a",
-          "shape": "branch",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>",
-            "value",
-            "<oneOf:0>"
-          ],
-          "required": true,
-          "schema_sha256": "f7be3125a2038a14d7cd75b5ae3a7eeefaaf39698437bbbabfa6eb0163390469",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:0>",
-            "value",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "f0765dbf409c74f001806c446f2cf171d8c46b5b15779d54423dde921a4b0670",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "parent",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:1>"
-          ],
-          "required": true,
-          "schema_sha256": "716ae013236f7371a9e43c1fa2b8c42b87fae7a66e9dfae14ca33c032df691d4",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "kind",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:1>",
-            "kind"
-          ],
-          "required": true,
-          "schema_sha256": "8bfe7b4c0bbae812f7c3731be03db558265f0dede2f8a0d2ec2e11f57c9dabd9",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "value",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>",
-            "parent",
-            "<oneOf:1>",
-            "value"
-          ],
-          "required": true,
-          "schema_sha256": "0bd5eabca0b8834581462a67de41e64a73d914fc40a8d96e42e09616f14584fb",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "type",
-          "path": [
-            "arguments",
-            "import_location",
-            "<oneOf:4>",
-            "type"
-          ],
-          "required": true,
-          "schema_sha256": "85cd5844c08d8ec0f594d4e56ded2c20ceb316f737e25e09227822978721f043",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "import_operation",
-          "path": [
-            "arguments",
-            "import_operation"
-          ],
-          "required": false,
-          "schema_sha256": "e268850a07c7f44ff45897589d6004229f584cd7576ffa3a2f86f0216d44f292",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "97362ca27c04bdccc723e362ab5242775fd1025af0bf7c80d30aed24d093493a"
-    },
-    {
-      "model_values": [
-        {
           "name": "object_handle",
           "path": [
             "declaration",
@@ -5163,108 +4069,67 @@
     {
       "model_values": [
         {
-          "name": "io_root",
+          "name": "table_file",
           "path": [
-            "arguments",
-            "io_root"
+            "declaration",
+            "table_file"
           ],
           "required": true,
-          "schema_sha256": "f65a8ed80c26e6475831fd162f6c8dd6614ab589d94c5b10a1b3db351ef5d3f1",
+          "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
           "shape": "scalar",
           "transport_ownership": "gateway_derivation",
           "value_ownership": "exact_user_artifact"
         },
         {
-          "name": "script_file",
+          "name": "location_handle",
           "path": [
-            "arguments",
-            "script_file"
+            "declaration",
+            "location_handle"
           ],
           "required": true,
-          "schema_sha256": "0dbb1cf92c1db8a70dbac6f5f470c0934e94c5f9032b9a1d7f26fae8569b05e6",
+          "schema_sha256": "43a2cd8a5a436b0db16d6cd18d0d624b5dfaf633b41225d9e8820b0260f95667",
           "shape": "scalar",
           "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
+          "value_ownership": "live_bound_handle"
         },
         {
-          "name": "source_authority",
+          "name": "language",
           "path": [
-            "arguments",
-            "source_authority"
+            "declaration",
+            "language"
           ],
           "required": true,
-          "schema_sha256": "ab1a23f151b0045aba9395b8c3316fea2e5e8f111441a89e3ee7f7a157dabf21",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "wa_args",
-          "path": [
-            "arguments",
-            "wa_args"
-          ],
-          "required": false,
-          "schema_sha256": "9afc35fb94c047cec7e6739a0da62bd5461d1fd09210deba9cca88cbdac255fa",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        }
-      ],
-      "sha256": "a3ef38e62ffd64a23d137d2c977f08fa31ad6140ccf51c59bb2f66e5fec4b362"
-    },
-    {
-      "model_values": [
-        {
-          "name": "io_root",
-          "path": [
-            "arguments",
-            "io_root"
-          ],
-          "required": true,
-          "schema_sha256": "f65a8ed80c26e6475831fd162f6c8dd6614ab589d94c5b10a1b3db351ef5d3f1",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "lua_code",
-          "path": [
-            "arguments",
-            "lua_code"
-          ],
-          "required": true,
-          "schema_sha256": "d80b4c3f15e1df8c955c901fbdc093f124a71be7452b58a461d7f383dcbae834",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "source_authority",
-          "path": [
-            "arguments",
-            "source_authority"
-          ],
-          "required": true,
-          "schema_sha256": "ab1a23f151b0045aba9395b8c3316fea2e5e8f111441a89e3ee7f7a157dabf21",
+          "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
           "shape": "scalar",
           "transport_ownership": "gateway_derivation",
           "value_ownership": "stable_business_declaration"
         },
         {
-          "name": "wa_args",
+          "name": "add_to_source_control",
           "path": [
-            "arguments",
-            "wa_args"
+            "declaration",
+            "add_to_source_control"
           ],
           "required": false,
-          "schema_sha256": "9afc35fb94c047cec7e6739a0da62bd5461d1fd09210deba9cca88cbdac255fa",
-          "shape": "object",
+          "schema_sha256": "7cb541e84f226754a46c21c79f131fa2898354e1242456e6fd1c162bce319553",
+          "shape": "scalar",
           "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "mode",
+          "path": [
+            "declaration",
+            "mode"
+          ],
+          "required": false,
+          "schema_sha256": "444cf082e5be04943b28efe7ac0859cdaf0d3704a73422458447250c7a4739b2",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
         }
       ],
-      "sha256": "b36da1833a1e31e2448f27dab952fdc0ae2e1d412717015def633dcffc9a63c3"
+      "sha256": "a454803a11289dcc1c12a68b011d696ce3774a9d371b0733fb44a2a6d9005324"
     },
     {
       "model_values": [
@@ -5880,6 +4745,47 @@
         }
       ],
       "sha256": "c612a7ac64a630e531e4e38892c3dd7fea49447bf9079cacb15f01d80691a0f5"
+    },
+    {
+      "model_values": [
+        {
+          "name": "script_file",
+          "path": [
+            "declaration",
+            "script_file"
+          ],
+          "required": true,
+          "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "name": "arguments",
+          "path": [
+            "declaration",
+            "arguments"
+          ],
+          "required": false,
+          "schema_sha256": "c03bc16f5a46306ddb20f95734201d50be2949d9c1922cf993abc10c868b2d55",
+          "shape": "map",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "name": "watchdog_seconds",
+          "path": [
+            "declaration",
+            "watchdog_seconds"
+          ],
+          "required": false,
+          "schema_sha256": "0d3ac1e9e006c0119b57d0512759bd7e261ea0d8cb38951a5183d17cdb4391f0",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "c6855c462d431d47cfea4fd4b653cd712c1c7b24e6bf1b39d6a7ced8193b113a"
     },
     {
       "model_values": [
@@ -157809,7 +156715,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "179880ecb324ef1ece28dc8f03881094a51a532fa3912b70ce46de45e4b931b7",
+  "inventory_sha256": "620bc9dfa6de5adefabb1336d12e67f3f973ec3c08d63f007130feb9a10a9c3e",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -186856,12 +185762,12 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "37f62fb28af69c3468d7994c3cd3b6c6084a6f51cb44f19e23cc1ceb325cc660",
+      "argument_contract_sha256": "a454803a11289dcc1c12a68b011d696ce3774a9d371b0733fb44a2a6d9005324",
       "audit_evidence": null,
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "fa4607449e76116edb59075f21ef42973efac87d8d432c2ff7a0d1fd2c6b3a14",
+      "contract_sha256": "ddb9f482a77a96afd98738ecfd1da0d1eaa303a0c7610cc7e6c6e51e7ec9db95",
       "disposition": "migration_required",
-      "input_mode": "inline_typed",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "wire_type",
         "dependency_order",
@@ -186887,12 +185793,12 @@
       "version": "2021.1"
     },
     {
-      "argument_contract_sha256": "37f62fb28af69c3468d7994c3cd3b6c6084a6f51cb44f19e23cc1ceb325cc660",
+      "argument_contract_sha256": "a454803a11289dcc1c12a68b011d696ce3774a9d371b0733fb44a2a6d9005324",
       "audit_evidence": null,
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "fa4607449e76116edb59075f21ef42973efac87d8d432c2ff7a0d1fd2c6b3a14",
+      "contract_sha256": "dfb19c00f12f9c74b2118736f9dd941301691d1958f10fb42f145ab9c87bc16b",
       "disposition": "migration_required",
-      "input_mode": "inline_typed",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "wire_type",
         "dependency_order",
@@ -186918,12 +185824,12 @@
       "version": "2022.1"
     },
     {
-      "argument_contract_sha256": "97362ca27c04bdccc723e362ab5242775fd1025af0bf7c80d30aed24d093493a",
+      "argument_contract_sha256": "2e26aaa8fc7f4688882739f8998dd75c3665c2b9197144298e560aa58b1d8999",
       "audit_evidence": null,
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "6ee0119390d86c0814fc241ef003e227f86cb926460d857773a6e210aa7e6b27",
+      "contract_sha256": "c5c88902e9db49fc4c3172bec435c29affefd106e285dbbbd6ca33b2121e8366",
       "disposition": "migration_required",
-      "input_mode": "inline_typed",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "wire_type",
         "dependency_order",
@@ -186949,12 +185855,12 @@
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "97362ca27c04bdccc723e362ab5242775fd1025af0bf7c80d30aed24d093493a",
+      "argument_contract_sha256": "2e26aaa8fc7f4688882739f8998dd75c3665c2b9197144298e560aa58b1d8999",
       "audit_evidence": null,
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "6ee0119390d86c0814fc241ef003e227f86cb926460d857773a6e210aa7e6b27",
+      "contract_sha256": "e7b784e1661509401767fbac1654cc264c2faad0b595ea4cdaf2d327bb087310",
       "disposition": "migration_required",
-      "input_mode": "inline_typed",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "wire_type",
         "dependency_order",
@@ -186980,12 +185886,12 @@
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "97362ca27c04bdccc723e362ab5242775fd1025af0bf7c80d30aed24d093493a",
+      "argument_contract_sha256": "2e26aaa8fc7f4688882739f8998dd75c3665c2b9197144298e560aa58b1d8999",
       "audit_evidence": null,
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "6ee0119390d86c0814fc241ef003e227f86cb926460d857773a6e210aa7e6b27",
+      "contract_sha256": "a5684165ecf9787e86d9e459dddedaf6597ae266aa06d8df189413c962778cf5",
       "disposition": "migration_required",
-      "input_mode": "inline_typed",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "wire_type",
         "dependency_order",
@@ -187655,12 +186561,12 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "a3ef38e62ffd64a23d137d2c977f08fa31ad6140ccf51c59bb2f66e5fec4b362",
+      "argument_contract_sha256": "5593588c6d1ab9b5eff4a4d1504247da4e776efc900a1623b2a76fcc99d11585",
       "audit_evidence": null,
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "789e8ce6de14c4efb74e0e8dff6fb2319ee6cbb76c225d78b2e9ed6e84d1043e",
+      "contract_sha256": "534450eca61786b6720b218eb5f7aea4c5b208e451056d51ba2cae3590181ea7",
       "disposition": "migration_required",
-      "input_mode": "composer",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "wire_type",
         "dependency_order",
@@ -187686,12 +186592,12 @@
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "56308c4230a31516690dd1796e7b747c19cc2e6ddd3092a95ea61f61cbc9c8cf",
+      "argument_contract_sha256": "c6855c462d431d47cfea4fd4b653cd712c1c7b24e6bf1b39d6a7ced8193b113a",
       "audit_evidence": null,
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "9df545db5e26230c15b8c5816d428e21b44ab100fa2b9eb8ddebd6de70386f88",
+      "contract_sha256": "afe6d4180a7ce3ffb039c90273f94e05bb05a7303da3f634266d19ddcb2c0ce6",
       "disposition": "migration_required",
-      "input_mode": "composer",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "wire_type",
         "dependency_order",
@@ -187717,12 +186623,12 @@
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "56308c4230a31516690dd1796e7b747c19cc2e6ddd3092a95ea61f61cbc9c8cf",
+      "argument_contract_sha256": "c6855c462d431d47cfea4fd4b653cd712c1c7b24e6bf1b39d6a7ced8193b113a",
       "audit_evidence": null,
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "9df545db5e26230c15b8c5816d428e21b44ab100fa2b9eb8ddebd6de70386f88",
+      "contract_sha256": "5fdec48ef1b0e0a2ba7c02069e83357ec360b7575ffe20449d8b39fdb2bc56ee",
       "disposition": "migration_required",
-      "input_mode": "composer",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "wire_type",
         "dependency_order",
@@ -187748,12 +186654,12 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "a3ef38e62ffd64a23d137d2c977f08fa31ad6140ccf51c59bb2f66e5fec4b362",
+      "argument_contract_sha256": "5593588c6d1ab9b5eff4a4d1504247da4e776efc900a1623b2a76fcc99d11585",
       "audit_evidence": null,
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "4a25d70c7503da9f5e415a0cbeed6e65d28e1af40c18951b77213d47ca0b7890",
+      "contract_sha256": "f67652351f27c96b2112dbf08d777d34185137a87cdef66ed8cc03925c2c536b",
       "disposition": "migration_required",
-      "input_mode": "composer",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "wire_type",
         "dependency_order",
@@ -187779,12 +186685,12 @@
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "a3ef38e62ffd64a23d137d2c977f08fa31ad6140ccf51c59bb2f66e5fec4b362",
+      "argument_contract_sha256": "5593588c6d1ab9b5eff4a4d1504247da4e776efc900a1623b2a76fcc99d11585",
       "audit_evidence": null,
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "4a25d70c7503da9f5e415a0cbeed6e65d28e1af40c18951b77213d47ca0b7890",
+      "contract_sha256": "8ced459d78296a581889091ac27286c7c6570407719759219ec070fb39b9ea3b",
       "disposition": "migration_required",
-      "input_mode": "composer",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "wire_type",
         "dependency_order",
@@ -187810,12 +186716,12 @@
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "a3ef38e62ffd64a23d137d2c977f08fa31ad6140ccf51c59bb2f66e5fec4b362",
+      "argument_contract_sha256": "5593588c6d1ab9b5eff4a4d1504247da4e776efc900a1623b2a76fcc99d11585",
       "audit_evidence": null,
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "4a25d70c7503da9f5e415a0cbeed6e65d28e1af40c18951b77213d47ca0b7890",
+      "contract_sha256": "6850bb724738f5571b71ded4de7687476d83f1ce476c6cc4cc7c0ae4b824d791",
       "disposition": "migration_required",
-      "input_mode": "composer",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "wire_type",
         "dependency_order",
@@ -187841,12 +186747,12 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "b36da1833a1e31e2448f27dab952fdc0ae2e1d412717015def633dcffc9a63c3",
+      "argument_contract_sha256": "3ad4db3f9159b9b1e5a5f5a63861a9e8b5496bc0854800b5609a7687ed4ad8e5",
       "audit_evidence": null,
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "8634e41ad3e65800d852b247a61bf2064d0920626e0a3c34e7aff0944b83bc64",
+      "contract_sha256": "ddb0ff09e453d1ae892589fc00dd71739228c714aea8e37e458947b4f4e8bf32",
       "disposition": "migration_required",
-      "input_mode": "composer",
+      "input_mode": "business_declaration",
       "leaked_mechanics": [
         "wire_type",
         "dependency_order",
@@ -190862,9 +189768,9 @@
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request."
   },
   "source_contracts": {
-    "gateway_parser_sha256": "55a7782a003a35a97ad6ef2e47781444c0b93c6835658666e1dfa5facccf2bb9",
-    "operation_contract_sha256": "4ceef731d52c943bc5a28042bb7eec2c3471b675b97817565fca1cc55772ad2a",
-    "public_continuation_sha256": "38dd64ac0ed30ed52c153f28d340d5fe1173df07c03778ea0827f29221c74eff",
+    "gateway_parser_sha256": "89c08dbc56e1fab6a60b23eb2c817ad37d68c99502b94816cf4007179758e86a",
+    "operation_contract_sha256": "a6412129056339c6f23796f81bceb5ac8c6d123727e3154e81f346beaa566c41",
+    "public_continuation_sha256": "20e1eb8e2426240eb29faac3ed197d7578a971cf312bceb05c8a31ba24de8812",
     "typed_request_surface_sha256": "6d05d64e95a6e0f7099ddd03f1da42c763e9c06f33f93cac7581c7c061a83af8"
   },
   "summary": {
