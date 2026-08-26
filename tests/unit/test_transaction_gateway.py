@@ -1599,19 +1599,17 @@ def test_soundbank_inclusion_schema_exposes_one_scoped_replace_for_complete_post
 
     assert exit_code == 0
     assert payload["ok"] is True
-    operation = payload["operation"]
-    assert operation["constraints"][0] == (
-        "replace is one transaction scoped only to the selected SoundBank: "
-        "submit its complete desired post-state; omitted existing rows are "
-        "removed without naming them, every other SoundBank is unaffected, "
-        "and the list may be empty"
-    )
-    assert operation["selection_guidance"]["use_when"][1] == (
-        "The user gives one SoundBank's complete desired final inclusion set "
-        "and asks to remove Debug or any other omitted rows; use one replace "
-        "transaction and never split that final-state request into add and "
-        "remove transactions."
-    )
+    adapter = payload["business_adapter"]
+    declaration = adapter["declaration"]
+    schema = declaration["schema"]
+    assert declaration["subcommand"] == "draft-declare-soundbank-plan"
+    assert declaration["submit_once"] is True
+    assert schema["properties"]["mode"]["enum"] == ["add", "remove", "replace"]
+    assert schema["properties"]["inclusions"]["emptyAllowedWhen"] == {
+        "mode": "replace"
+    }
+    assert schema["properties"]["inclusions"]["maxItems"] == 128
+    assert "composer" not in payload
 
 
 @pytest.mark.parametrize("version", tuple(UNDO_GROUP_INNER_URIS_BY_VERSION))
@@ -1843,29 +1841,27 @@ def test_soundbank_generate_operation_schema_closes_batch_language_scope(
     )
 
     assert exit_code == 0
-    root_fields = {
-        tuple(field["path"]): field
-        for field in _composer_fields(payload)
-        if len(field["path"]) == 2
-    }
-    assert root_fields[("args", "soundbanks")]["maximum_items"] == 64
-    assert root_fields[("args", "platforms")]["maximum_items"] == 16
-    assert root_fields[("args", "languages")]["maximum_items"] == 64
-    assert root_fields[("args", "skip_languages")]["accepted_types"] == ["boolean"]
-    assert root_fields[("args", "write_to_disk")]["constant_values"] == [True]
-    assert any(
-        "batch-level rebuild_soundbanks and per-Bank soundbanks[].rebuild are independent"
-        in constraint
-        for constraint in payload["operation"]["constraints"]
-    )
-    assert any(
-        "language selection is batch-wide" in constraint
-        and "never SFX" in constraint
-        for constraint in payload["operation"]["constraints"]
-    )
+    adapter = payload["business_adapter"]
+    declaration = adapter["declaration"]
+    fields = declaration["schema"]["properties"]
+    assert fields["soundbanks"]["maxItems"] == 64
+    assert fields["platforms"]["maxItems"] == 16
+    assert fields["languages"]["maxItems"] == 64
+    assert "skip_languages" not in fields
+    assert "write_to_disk" not in fields
+    bank_fields = fields["soundbanks"]["items"]["properties"]
+    assert bank_fields["artifact_expectation"]["enum"] == [
+        "nonlocalized",
+        "localized",
+        "mixed",
+    ]
+    assert bank_fields["rebuild"] == {"type": "boolean"}
+    assert fields["rebuild_soundbanks"] == {"type": "boolean"}
+    assert "language_skip_and_artifact_plan" in adapter["gateway_derivations"]
     assert "request_envelope" not in payload
-    assert payload["composer"]["start"]["subcommand"] == "draft-start"
-    assert payload["composer"]["seal"]["subcommand"] == "preview-from-draft"
+    assert "composer" not in payload
+    assert adapter["start"]["subcommand"] == "draft-start"
+    assert declaration["subcommand"] == "draft-declare-soundbank-plan"
 
 
 @pytest.mark.parametrize("version", ["2024.1", "2025.1"])
