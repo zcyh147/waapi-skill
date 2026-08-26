@@ -368,6 +368,19 @@ default 60-second WAAPI readiness window, pass an explicit finite
 campaign seals and forwards that value. Do not rely on an ambient environment
 override or treat an unrecorded timeout increase as equivalent evidence.
 
+The scoped residual-process check does not cover CrossOver bottle services
+that reparent to PID 1. If macOS Wwise stays running but readiness times out
+and its output stops at the bottle link or project-loading banner, first prove
+that no WwiseConsole or Authoring project process is active, then count the
+Audiokinetic `Wwise2019x64` Wine helpers (`wineserver`, `services.exe`,
+`winedevice.exe`, `rpcss.exe`, and related bottle services). A large
+cross-campaign residue is an infrastructure fault even when every campaign
+root reports zero scoped processes. Terminate only that proved-idle
+Audiokinetic bottle set, prove its helper count reaches zero, and require the
+matching version's real smoke lane to pass before opening another Fresh root.
+Never kill bottle helpers while a Wwise project process is active, and never
+credit the cleanup or smoke as semantic PASS.
+
 ### Failure-first campaign scheduling
 
 After a frozen full-profile root exposes ordinary semantic failures, repair the
