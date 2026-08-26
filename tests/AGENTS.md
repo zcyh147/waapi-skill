@@ -368,6 +368,17 @@ default 60-second WAAPI readiness window, pass an explicit finite
 campaign seals and forwards that value. Do not rely on an ambient environment
 override or treat an unrecorded timeout increase as equivalent evidence.
 
+On native Windows, a large project can spend several minutes enumerating
+missing plug-ins before the WAAPI server becomes reachable. A launch may print
+`Wwise Authoring API server started` only while the timed-out helper is already
+collecting diagnostics; that late log line does not turn the frozen root into a
+PASS. Preserve the BLOCKED root, confirm that its source hash and mtime are
+unchanged and its scoped descendants are gone, then use a new root with a
+larger explicit finite `--wwise-readiness-timeout` when the diagnostics prove
+that project loading merely exceeded the sealed limit. Never resume or replay
+the timed-out root, and never change the Skill, fixture, PATH, sandbox, or
+failed unit to hide this infrastructure boundary.
+
 The scoped residual-process check does not cover CrossOver bottle services
 that reparent to PID 1. If macOS Wwise stays running but readiness times out
 and its output stops at the bottle link or project-loading banner, first prove
