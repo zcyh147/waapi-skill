@@ -42,6 +42,14 @@ PID, parent, process-group ID, and command line; terminate only the exact stale
 owned group. A run that overlapped a stale gate or a changing worktree is not
 evidence and must be restarted from a stable candidate.
 
+Freeze the exact Git candidate before starting a cross-host or Fresh Agent
+attempt, and keep the worktree read-only until every selected host has sealed
+its result. If HEAD or any candidate-owned file changes while a child process
+is running, freeze that root as candidate-drift evidence with no PASS credit,
+even when its raw semantic assertions passed. Start a new root only after the
+candidate is clean and stable; never combine the drifting result with the new
+candidate.
+
 Do not inspect or regenerate source-derived inventories while a Program or
 Non-live pytest process is still running. Isolation tests may temporarily
 rewrite packaged Gateway or Registry files and restore them during teardown;
@@ -114,6 +122,12 @@ unknown string by replacing slashes:
   `tests/semantic/support/codex_archive_paths.py`; persist only its canonical
   POSIX spelling. Do not use host `Path` semantics or `replace("\\", "/")` to
   derive an archive identity.
+- Archived business-Draft replay preserves the public abstraction boundary.
+  Only an Adapter that owns cleaned-file evidence may materialize its Preview
+  from a sealed pre-cleanup witness. A request whose identities were bound from
+  live project state must replay the sealed Draft state through the existing
+  state directory. Never add raw GUIDs, Wwise paths, or native request fields to
+  a public receipt merely to make offline replay easier.
 - Wwise object hierarchy paths, JSON Pointers, WAQL expressions, URI strings,
   and similar domain values are not filesystem paths. Preserve their domain
   separators and validate them with the owning parser instead of `pathlib`.
@@ -229,6 +243,11 @@ this is process-launch recovery inside one task, not a Gateway or campaign-root
 retry. A second 267, a changed command, or an Agent that stops instead freezes
 the root as infrastructure-blocked. Preserve the failed command index and exact
 reported `cwd` in evidence; do not repair, resume, or rerun that failed root.
+If the Agent itself repeats the command, retain both attempts: the later command
+may reach the Broker successfully while the unit still fails its sealed command
+count or copy-integrity contract. Record that as a semantic FAIL with a
+pre-Broker infrastructure precursor, not as successful recovery and not as a
+reason to retry the same root.
 
 Do not match the literal English `Active` in `quser`: its state column is
 localized. On `fusion-win11`, prove the desktop from a user-owned `console`

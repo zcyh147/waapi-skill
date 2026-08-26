@@ -264,6 +264,23 @@ diagnostic root `imac-sab-d10dc23-r1` stopped after a successful schema result
 without issuing `draft-start`; it remains frozen without verify-only and has no
 PASS credit.
 
+The final #93 public-integration boundary is exact candidate
+`3a31a05dd3636319cd228c648d462b5e1799fef6`. The 2022.1 and 2025.1 Footsteps
+units each passed fresh plus identical `--resume --verify-only` on both hosts:
+macOS roots `imac-int-footsteps-3a31a05-r20-int22` and
+`imac-int-footsteps-3a31a05-r21-int25`, and native-Windows roots
+`iwin-int-footsteps-3a31a05-r21-int22` and
+`iwin-int-footsteps-3a31a05-r22-int25`. This is cumulative 2/2 evidence per
+host, not a single two-unit root. Each workflow separately previewed and
+executed the Snow import/assignment mutation and the obsolete Mud-assignment
+removal, then passed the runner-owned business oracle. Every source full-tree
+hash and project mtime was unchanged, each PASS sandbox was removed, lifecycle
+errors were empty, temporary launch resources were deleted, and scoped
+residual-process checks were empty. Earlier diagnostic and repair roots remain
+frozen without PASS credit. Native-Windows r20 reached the correct Wwise
+business state but failed the exact continuation-copy contract and therefore
+was not replayed or counted.
+
 The production business-declaration `audio.import` cutover has a later,
 single-candidate Fresh Agent result. Exact packaged-Skill candidate
 `4be64fd80fb14d800a8890012f65fca666ab98f4` passed all eight
