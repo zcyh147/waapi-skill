@@ -764,6 +764,7 @@ def test_closed_gateway_workflows_across_selected_version(
             encoding="utf-8",
             newline="\n",
         )
+        _save_sandbox_project(runtime)
         _complete_transaction(
             runtime,
             operation="soundbank.processDefinitionFiles",
