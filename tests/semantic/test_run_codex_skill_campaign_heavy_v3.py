@@ -4219,6 +4219,23 @@ def test_passing_tab_import_draft_replays_after_owned_files_are_cleaned(
     )
 
 
+def test_campaign_routes_single_business_draft_to_current_archive_validator() -> None:
+    from tests.semantic.support.codex_typed_draft_evidence_v3 import (
+        BUSINESS_DRAFT_EVIDENCE_CONTRACT,
+        TYPED_DRAFT_EVIDENCE_CONTRACT,
+    )
+
+    assert campaign._is_current_draft_evidence(
+        {"contract": BUSINESS_DRAFT_EVIDENCE_CONTRACT}
+    )
+    assert campaign._is_current_draft_evidence(
+        {"contract": TYPED_DRAFT_EVIDENCE_CONTRACT}
+    )
+    assert not campaign._is_current_draft_evidence(
+        {"contract": "waapi-skill.operation-draft-archive/v3"}
+    )
+
+
 def test_campaign_archive_rejects_equivalent_requoted_continuation(
     tmp_path: Path,
 ) -> None:

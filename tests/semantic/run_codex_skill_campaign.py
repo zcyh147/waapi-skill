@@ -170,6 +170,7 @@ from tests.semantic.support.codex_direct_business_plan_v3 import (  # noqa: E402
     validate_direct_status_archive_binding,
 )
 from tests.semantic.support.codex_typed_draft_evidence_v3 import (  # noqa: E402
+    BUSINESS_DRAFT_EVIDENCE_CONTRACT,
     TYPED_DRAFT_EVIDENCE_CONTRACT,
     TypedDraftEvidenceError,
     validate_typed_draft_evidence,
@@ -5597,9 +5598,8 @@ def _validate_heavy_v3_task_result(
         if not isinstance(broker_records, list) or not isinstance(consumed_names, list):
             raise CampaignEvidenceError("passing Composer Broker evidence is malformed")
         sealed_composer = value.get("composer_evidence")
-        is_current_typed_evidence = (
-            isinstance(sealed_composer, Mapping)
-            and sealed_composer.get("contract") == TYPED_DRAFT_EVIDENCE_CONTRACT
+        is_current_typed_evidence = _is_current_draft_evidence(
+            sealed_composer
         )
         try:
             validator_arguments = {
@@ -5639,6 +5639,15 @@ def _validate_heavy_v3_task_result(
                 "passing Composer task-result evidence differs from offline replay"
             )
     return prompt_evidence
+
+
+def _is_current_draft_evidence(value: Any) -> bool:
+    """Recognize both current single-flow and multi-flow Draft archives."""
+
+    return isinstance(value, Mapping) and value.get("contract") in {
+        BUSINESS_DRAFT_EVIDENCE_CONTRACT,
+        TYPED_DRAFT_EVIDENCE_CONTRACT,
+    }
 
 
 def _validate_heavy_v3_broker_result(
