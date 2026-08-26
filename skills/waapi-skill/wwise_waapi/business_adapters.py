@@ -204,6 +204,12 @@ class BusinessAdapter:
     requires_wwise_path_discipline: bool = False
     role_declaration: BusinessRoleDeclaration | None = None
 
+    @property
+    def supports_cleaned_file_evidence(self) -> bool:
+        """Whether archive replay may materialize after owned files are gone."""
+
+        return self._cleaned_file_evidence_materializer is not None
+
     def contract(self, version: str) -> dict[str, Any]:
         return self._contract_builder(self.operation, version)
 

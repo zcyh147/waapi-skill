@@ -2157,9 +2157,13 @@ def _materialize_draft_composition(
     ):
         try:
             session = BusinessDeclarationSession.from_dict(raw_business_session)
-            return business_adapter(operation).materialize(
+            adapter = business_adapter(operation)
+            return adapter.materialize(
                 session,
-                allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+                allow_cleaned_file_evidence=(
+                    allow_cleaned_file_evidence
+                    and adapter.supports_cleaned_file_evidence
+                ),
             )
         except (TypeError, ValueError) as exc:
             raise OperationComposerError(

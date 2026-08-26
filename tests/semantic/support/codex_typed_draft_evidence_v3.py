@@ -720,7 +720,8 @@ def _validate_business_draft_evidence(
             _fail("Business Draft session is not an object")
         try:
             session = BusinessDeclarationSession.from_dict(raw_session)
-            canonical_request = business_adapter(operation).materialize(
+            canonical_request = _materialize_archived_business_request(
+                operation,
                 session,
                 allow_cleaned_file_evidence=allow_cleaned_file_evidence,
             )
@@ -786,6 +787,24 @@ def _validate_business_draft_evidence(
     if len(canonical_json_bytes(evidence)) > MAX_TYPED_DRAFT_EVIDENCE_BYTES:
         _fail("Business Draft evidence exceeds its fixed archive byte ceiling")
     return evidence
+
+
+def _materialize_archived_business_request(
+    operation: str,
+    session: BusinessDeclarationSession,
+    *,
+    allow_cleaned_file_evidence: bool,
+) -> Mapping[str, Any]:
+    """Apply cleaned-file replay only to an Adapter that owns that aperture."""
+
+    adapter = business_adapter(operation)
+    return adapter.materialize(
+        session,
+        allow_cleaned_file_evidence=(
+            allow_cleaned_file_evidence
+            and adapter.supports_cleaned_file_evidence
+        ),
+    )
 
 
 def _validate_typed_draft_evidence(
