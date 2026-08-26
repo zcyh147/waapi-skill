@@ -53,6 +53,9 @@ from tests.semantic.support.typed_gateway_input import (  # pyright: ignore[repo
     create_object_metadata_business_preview,
     create_typed_transaction_preview,
 )
+from tests.support.host_path_relatives import (  # pyright: ignore[reportMissingImports]  # noqa: E402
+    relative_host_path,
+)
 from tests.semantic.support.codex_project_prelaunch_v3 import (  # pyright: ignore[reportMissingImports]  # noqa: E402
     ProjectPrelaunchRequest,
     WWISE_2025_SOUNDBANK_AURO_PROFILE,
@@ -1935,11 +1938,9 @@ def _write_external_sources_document(
     source_relative = source_file.resolve(strict=True).relative_to(
         media_root.resolve(strict=True)
     ).as_posix()
-    root_value = Path(
-        os.path.relpath(
-            media_root.resolve(strict=True),
-            project_root.resolve(strict=True),
-        )
+    root_value = relative_host_path(
+        media_root.resolve(strict=True),
+        project_root.resolve(strict=True),
     ).as_posix()
     root = ET.Element(
         "ExternalSourcesList",
