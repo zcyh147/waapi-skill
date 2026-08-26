@@ -1565,7 +1565,7 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
     assert "request_envelope_policy" not in unsupported
 
 
-def test_operation_schema_exposes_tab_import_path_only_progression(
+def test_operation_schema_exposes_tab_import_business_progression(
     tmp_path: Path,
 ) -> None:
     exit_code, payload = execute(
@@ -1577,13 +1577,21 @@ def test_operation_schema_exposes_tab_import_path_only_progression(
     assert exit_code == 0
     assert payload["offline"] is True
     assert "request_envelope" not in payload
-    assert payload["typed_operation"]["continuation"]["subcommand"] == (
-        "typed-operation"
+    adapter = payload["business_adapter"]
+    assert adapter["start"]["next_command"]["gateway_argv"] == (
+        ["draft-start", "audio.importTabDelimited"]
     )
-    continuation = payload["typed_operation"]["continuation"]
-    assert continuation["operation"] == "audio.importTabDelimited"
-    assert "--import-file ABSOLUTE_PATH" in continuation["fields"]
-    assert "--import-location SELECTOR_KIND SELECTOR_VALUES..." in continuation["fields"]
+    assert adapter["binding"]["roles"] == ["import_location"]
+    assert adapter["declaration"]["subcommand"] == (
+        "draft-declare-artifact-plan"
+    )
+    assert adapter["declaration"]["required_fields"] == [
+        "table_file",
+        "location_handle",
+        "language",
+    ]
+    assert adapter["legacy_inline_typed_public"] is False
+    assert "typed_operation" not in payload
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])

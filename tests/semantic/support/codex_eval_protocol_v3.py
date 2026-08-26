@@ -2417,19 +2417,16 @@ def materialize_typed_transaction_protocol_requests(
             protocol.steps[terminal_index].expected_operation_request
             is not None
         ):
-            request = json.loads(
-                json.dumps(
-                    dict(
-                        protocol.steps[
-                            terminal_index
-                        ].expected_operation_request
-                    ),
-                    ensure_ascii=False,
-                    allow_nan=False,
-                    sort_keys=True,
-                    separators=(",", ":"),
-                )
+            request = _validate_operation_request(
+                protocol.steps[terminal_index].expected_operation_request
             )
+            if (
+                request["operation"] != operation
+                or request["version"] != version
+            ):
+                raise V3ProtocolError(
+                    "business request witness differs from its Draft binding"
+                )
         else:
             composition = new_composition(operation, version)
             issued_handles: dict[tuple[str, str], str] = {}

@@ -560,11 +560,16 @@ def test_compound_use_existing_tab_seals_exact_dynamic_cell_matrix(
         ),
         equivalence="audio_import_tab_v1",
     )
-    assert tuple(step.name for step in protocol.steps[:3]) == (
+    assert tuple(step.name for step in protocol.steps[:7]) == (
         "metadata.discover",
         "tx01.operation-schema",
+        "tx01.draft-start",
+        "tx01.bind-import-location",
+        "tx01.declare-artifact-plan",
+        "tx01.check",
         "tx01.preview",
     )
+    assert all(step.subcommand != "typed-operation" for step in protocol.steps)
 
 
 def test_compound_tab_dynamic_header_rejects_unknown_row_key(

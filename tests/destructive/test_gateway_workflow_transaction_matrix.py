@@ -1017,15 +1017,77 @@ def test_exact_inline_lua_is_result_schema_only_or_explicitly_host_blocked(
     runtime = workflow_sandbox_runtime
     if runtime.version != "2025.1":
         pytest.skip("lua.executeCoreInline is reflected only in Wwise 2025.1")
-    request = {
-        "contract": OPERATION_REQUEST_CONTRACT,
-        "version": runtime.version,
-        "operation": "lua.executeCoreInline",
-        "arguments": {
+    _complete_result_schema_operation(
+        runtime,
+        operation="lua.executeCoreInline",
+        arguments={
             "lua_code": "return { waapi_skill_probe = 'ok' }\n",
             "io_root": str(runtime.sandbox.sandbox_path),
             "source_authority": "user_supplied_verbatim",
         },
+        category="lua-inline-code",
+    )
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_exact_lua_file_business_drafts_preserve_source_and_loader_boundary(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    """Exercise both file loaders through their sole exact-artifact ingress."""
+
+    runtime = workflow_sandbox_runtime
+    if runtime.version not in {"2023.1", "2025.1"}:
+        pytest.skip("representative Lua file shapes use Wwise 2023.1 and 2025.1")
+    root = runtime.sandbox.sandbox_path / "GatewayExactLua"
+    root.mkdir()
+    scripts = {
+        "lua.executeCoreFile": root / "core exact 用户.lua",
+        "lua.executeCliFile": root / "cli exact 用户.lua",
+    }
+    scripts["lua.executeCoreFile"].write_bytes(
+        b"return { profile = 'core-file', count = wa_args.count }\n"
+    )
+    scripts["lua.executeCliFile"].write_bytes(
+        b"return { profile = 'cli-file', count = wa_args.count }\n"
+    )
+    before = {
+        operation: hashlib.sha256(path.read_bytes()).hexdigest()
+        for operation, path in scripts.items()
+    }
+    for operation, script in scripts.items():
+        arguments: dict[str, Any] = {
+            "script_file": str(script),
+            "io_root": str(root),
+            "source_authority": "user_supplied_verbatim",
+            "wa_args": {"count": 3, "optional": None},
+        }
+        if operation == "lua.executeCliFile" and runtime.version == "2025.1":
+            arguments["watchdog_seconds"] = 30
+        _complete_result_schema_operation(
+            runtime,
+            operation=operation,
+            arguments=arguments,
+            category=operation,
+        )
+    assert {
+        operation: hashlib.sha256(path.read_bytes()).hexdigest()
+        for operation, path in scripts.items()
+    } == before
+
+
+def _complete_result_schema_operation(
+    runtime: _WorkflowSandboxRuntime,
+    *,
+    operation: str,
+    arguments: Mapping[str, Any],
+    category: str,
+) -> None:
+    request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": runtime.version,
+        "operation": operation,
+        "arguments": dict(arguments),
     }
     preview = create_typed_transaction_preview(
         lambda command: runtime.gateway(
@@ -1074,7 +1136,7 @@ def test_exact_inline_lua_is_result_schema_only_or_explicitly_host_blocked(
         assert executed["automatic_retry"] is False, executed
         runtime.category_results.append(
             {
-                "category": "lua-code",
+                "category": category,
                 "status": "blocked",
                 "verifier_strength": "host_unavailable",
                 "reason": "matching WwiseConsole returned ak.wwise.unavailable",
@@ -1095,7 +1157,11 @@ def test_exact_inline_lua_is_result_schema_only_or_explicitly_host_blocked(
         "partial_reflected_schema",
     }, verification
     runtime.category_results.append(
-        {"category": "lua-code", "status": "PASS", "verifier_strength": "result_schema_only"}
+        {
+            "category": category,
+            "status": "PASS",
+            "verifier_strength": "result_schema_only",
+        }
     )
 
 

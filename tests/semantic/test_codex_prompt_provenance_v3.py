@@ -2486,10 +2486,15 @@ def test_tab_import_metadata_equivalence_round_trips_and_rejects_wrong_route() -
         equivalence="audio_import_tab_v1",
     )
     serialized = serialize_protocol(protocol)
-    argument = serialized["steps"][2]["arguments"][-1]
+    declaration = serialized["steps"][4]
+    preview = serialized["steps"][6]
 
-    assert argument["kind"] == "inline_typed_operation"
-    assert serialized["steps"][2]["metadata_binding"]["required_tokens"] == [
+    assert declaration["subcommand"] == "draft-declare-artifact-plan"
+    assert all(
+        argument.get("value") != "--source-authority"
+        for argument in declaration["arguments"]
+    )
+    assert preview["metadata_binding"]["required_tokens"] == [
         "IsLoopingEnabled"
     ]
     assert deserialize_protocol(serialized) == protocol
@@ -2498,11 +2503,11 @@ def test_tab_import_metadata_equivalence_round_trips_and_rejects_wrong_route() -
     )
 
     wrong_route = json.loads(json.dumps(serialized))
-    wrong_argument = wrong_route["steps"][2]["arguments"][-1]
-    wrong_argument["value"]["operation"] = "audio.import"
-    wrong_argument["sha256"] = hashlib.sha256(
+    wrong_witness = wrong_route["steps"][6]["expected_operation_request"]
+    wrong_witness["value"]["operation"] = "audio.import"
+    wrong_witness["sha256"] = hashlib.sha256(
         json.dumps(
-            wrong_argument["value"],
+            wrong_witness["value"],
             ensure_ascii=False,
             allow_nan=False,
             sort_keys=True,
@@ -2511,7 +2516,7 @@ def test_tab_import_metadata_equivalence_round_trips_and_rejects_wrong_route() -
     ).hexdigest()
     with pytest.raises(
         PromptProvenanceError,
-        match="inline typed operation",
+        match="Business request witness",
     ):
         _protocol_requests(wrong_route, version=VERSION)
 
