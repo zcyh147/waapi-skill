@@ -482,6 +482,53 @@ def test_archived_business_replay_rebinds_check_to_latest_batch_revision(
     )
 
 
+def test_archived_broker_replay_precomputes_switch_assignment_after_cleanup() -> None:
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "switchContainer.removeAssignment",
+        "arguments": {
+            "switch_container": {
+                "kind": "path",
+                "value": r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps",
+            },
+            "child": {
+                "kind": "path",
+                "value": r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps\Mud",
+            },
+            "state_or_switch": {
+                "kind": "path",
+                "value": r"\Switches\Default Work Unit\Surface\Mud",
+            },
+        },
+    }
+    protocol = build_transaction_protocol((request,))
+    preview = next(
+        step
+        for step in protocol.steps
+        if step.subcommand == "preview-from-draft"
+    )
+    execution_steps = campaign._steps_in_consumed_order(
+        protocol.steps,
+        tuple(step.name for step in protocol.steps),
+    )
+
+    replay = campaign._build_heavy_v3_broker_replay(
+        skill_source=Path("skills/waapi-skill"),
+        invocation_skill_source=Path("skills/waapi-skill"),
+        canonical_steps=protocol.steps,
+        execution_steps=execution_steps,
+        commutative_read_only_step_groups=(),
+        commutative_composer_setup_step_groups=(),
+        expected_wwise_version="2022.1",
+        project_modification_policy="ask_before_changes",
+    )
+
+    assert replay._offline_replay_preview_requests[preview.name] == (  # noqa: SLF001
+        preview.expected_operation_request
+    )
+
+
 def test_archived_broker_replay_rejects_undeclared_composer_interruption() -> None:
     schema = ExpectedGatewayStep(
         "tx01.operation-schema",

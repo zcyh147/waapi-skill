@@ -4380,21 +4380,20 @@ def _build_heavy_v3_broker_replay(
 
     offline_replay_preview_requests: dict[str, Mapping[str, Any]] = {}
     for start_index, step in enumerate(execution):
-        if (
-            step.subcommand != "draft-start"
-            or not step.arguments
-            or step.arguments[0]
-            not in {
-                "audio.import",
-                "lua.executeCliFile",
-                "lua.executeCoreFile",
-            }
-        ):
+        if step.subcommand != "draft-start":
             continue
-        preview_index = next(
+        next_start_index = next(
             (
                 index
                 for index in range(start_index + 1, len(execution))
+                if execution[index].subcommand == "draft-start"
+            ),
+            len(execution),
+        )
+        preview_index = next(
+            (
+                index
+                for index in range(start_index + 1, next_start_index)
                 if execution[index].subcommand == "preview-from-draft"
             ),
             None,
