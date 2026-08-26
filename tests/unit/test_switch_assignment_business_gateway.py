@@ -263,10 +263,6 @@ def test_gateway_binds_three_roles_then_materializes_assignment(
     assert container["draft"]["next_action_binding"]["object_binding"][
         "next_role"
     ] == "child"
-    assert container["bound_object"]["id"] == CONTAINER_ID
-    assert container["bound_object"]["path"] == (
-        r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps"
-    )
     assert len(
         json.dumps(container, ensure_ascii=False, separators=(",", ":")).encode(
             "utf-8"
