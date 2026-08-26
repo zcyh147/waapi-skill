@@ -512,7 +512,7 @@ def test_closed_gateway_workflows_across_selected_version(
     try:
         runtime.packaged_status()
         if runtime.version == "2021.1":
-            _save_legacy_sandbox_project(runtime)
+            _save_sandbox_project(runtime)
         import_name = f"WAAPI_GATEWAY_AUDIO_{runtime.version.replace('.', '_')}_{unique_suffix}"
         audio_file = _write_fixture_wav(runtime.sandbox.sandbox_path / "GatewayWorkflowAudio", import_name)
         assert path_is_under(audio_file.resolve(strict=True), runtime.sandbox.sandbox_path.resolve(strict=True))
@@ -692,6 +692,7 @@ def test_closed_gateway_workflows_across_selected_version(
             expected=[],
         )
 
+        _save_sandbox_project(runtime)
         # SoundBank file authority must own both the active sandbox project and
         # every exact input/output artifact.  The sandbox is already unique to
         # this test attempt, so it is the narrowest valid I/O root.
@@ -1734,8 +1735,8 @@ def test_object_graph_business_draft_executes_weather_graph_plugin_bulk_set_and_
             _delete_if_present_via_transaction(runtime, weather_id)
 
 
-def _save_legacy_sandbox_project(runtime: _WorkflowSandboxRuntime) -> None:
-    """Make Wwise 2021.1's on-disk language list authoritative for import."""
+def _save_sandbox_project(runtime: _WorkflowSandboxRuntime) -> None:
+    """Persist prior sandbox mutations before a file-authority operation."""
 
     api = "ak.wwise.core.project.save"
     schema = runtime.gateway(["request-schema", api], live=False)
