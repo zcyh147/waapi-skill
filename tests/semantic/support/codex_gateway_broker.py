@@ -11301,7 +11301,14 @@ class CodexGatewayBroker:
                         "Business request replay is missing its durable Draft binding"
                     )
                 try:
-                    record = OperationDraftStore(self.state_directory).inspect(
+                    state_directory = (
+                        self._state_directory or self._existing_state_directory
+                    )
+                    if state_directory is None:
+                        raise GatewayBrokerError(
+                            "offline replay has no sealed Draft state directory"
+                        )
+                    record = OperationDraftStore(state_directory).inspect(
                         draft_id,
                         task_authority=authority,
                     )

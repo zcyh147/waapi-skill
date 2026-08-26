@@ -133,7 +133,10 @@ from wwise_waapi.operation_composer import (
     operation_draft_public_projection,
     typed_action_cli_arguments,
 )
-from wwise_waapi.operation_drafts import OperationDraftStore
+from wwise_waapi.operation_drafts import (
+    OperationDraftStore,
+    load_operation_draft_archive_record,
+)
 from wwise_waapi.operation_registry import operation_request_schema_digest
 from wwise_waapi.business_adapters import business_adapter
 from wwise_waapi.business_declaration_state import BusinessDeclarationSession
@@ -583,7 +586,7 @@ def test_archived_broker_replay_uses_sealed_switch_assignment_state(
             "state_or_switch_handle": state_or_switch.handle,
         },
     )
-    store.apply_business_update(
+    declared_record = store.apply_business_update(
         started.record.draft_id,
         task_authority=started.task_authority,
         expected_revision=bound_record.revision,
@@ -593,6 +596,59 @@ def test_archived_broker_replay_uses_sealed_switch_assignment_state(
         update=lambda _session: declared_session,
         event_type="declaration.added",
     )
+    materialized = store.materialize_request(
+        started.record.draft_id,
+        task_authority=started.task_authority,
+        expected_revision=declared_record.revision,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+    )
+    checked = store.record_check(
+        started.record.draft_id,
+        task_authority=started.task_authority,
+        expected_revision=declared_record.revision,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+        request_digest=materialized.request_digest,
+        project_guard={},
+        runtime_guard_fingerprint="b" * 64,
+        prepared_digest="c" * 64,
+    )
+    reservation = store.reserve_seal(
+        started.record.draft_id,
+        task_authority=started.task_authority,
+        expected_revision=checked.revision,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+        transaction_id="synthetic-transaction",
+        apply=True,
+        ttl_seconds=1800,
+        policy="ask_before_changes",
+    )
+    store.commit_seal(
+        started.record.draft_id,
+        task_authority=started.task_authority,
+        source_revision=reservation.source_revision,
+        transaction_id="synthetic-transaction",
+        artifact_hash="a" * 64,
+        transaction_state="awaiting_confirmation",
+    )
+
+    archived = load_operation_draft_archive_record(
+        state_directory,
+        started.record.draft_id,
+        allow_cleaned_file_evidence=True,
+    )
+    assert archived.seal is not None
+    from tests.semantic.support.codex_typed_draft_evidence_v3 import (
+        _materialize_archived_business_request,
+    )
+
+    assert _materialize_archived_business_request(
+        operation,
+        declared_session,
+        allow_cleaned_file_evidence=True,
+    ) == business_adapter(operation).materialize(declared_session)
 
     replay = campaign._build_heavy_v3_broker_replay(
         skill_source=Path("skills/waapi-skill"),
@@ -607,14 +663,13 @@ def test_archived_broker_replay_uses_sealed_switch_assignment_state(
     )
 
     start = next(step for step in protocol.steps if step.subcommand == "draft-start")
-    with replay:
-        replay._payloads_by_step[start.name] = {  # noqa: SLF001
-            "draft": {"draft_id": started.record.draft_id},
-            "task_authority": started.task_authority,
-        }
-        replayed = replay._replay_expected_operation_draft_request(  # noqa: SLF001
-            preview
-        )
+    replay._payloads_by_step[start.name] = {  # noqa: SLF001
+        "draft": {"draft_id": started.record.draft_id},
+        "task_authority": started.task_authority,
+    }
+    replayed = replay._replay_expected_operation_draft_request(  # noqa: SLF001
+        preview
+    )
 
     assert replayed == business_adapter(operation).materialize(declared_session)
 
