@@ -1141,6 +1141,13 @@ def test_exact_tab_import_business_draft_binds_location_and_preserves_table(
     finally:
         if imported_id is not None:
             _delete_if_present_via_transaction(runtime, imported_id)
+    runtime.category_results.append(
+        {
+            "category": "audio-import-tab-delimited",
+            "status": "PASS",
+            "verifier_strength": "exact_guid_path_and_cleanup",
+        }
+    )
 
 
 def _complete_result_schema_operation(

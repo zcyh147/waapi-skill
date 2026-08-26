@@ -182,6 +182,15 @@ WwiseConsole stdout/stderr is drained as UTF-8 with replacement for malformed
 bytes. Keep that explicit decoder on Windows; the locale default can be GBK
 and can terminate the drain thread on platform labels such as `Windows®`.
 
+`ak.wwise.cli.executeLuaScript` can end the macOS WwiseConsole WAAPI transport
+after one non-retry indeterminate result. Record that operation as a host
+boundary and never retry it. A module-scoped destructive fixture may then shut
+down the lost lifecycle and relaunch the same sandbox on the same sealed port
+solely to restore infrastructure for later, different tests. Teardown must own
+the replacement lifecycle; otherwise later cases inherit a dead endpoint or
+the replacement process escapes cleanup. A later PASS is evidence only for its
+own operation, never retroactive credit for the blocked CLI Lua call.
+
 ### SoundBank file-operation fixtures
 
 Keep the file-authority sequence explicit in real SoundBank workflows. The
