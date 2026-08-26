@@ -11521,7 +11521,20 @@ def dispatch_business_object_binding(
     adapter = business_adapter(binding.record.operation)
     role_declaration = adapter.role_declaration
     if role_declaration is None:
-        if args.role is not None:
+        business_contract = adapter.contract(detected_version)
+        contract_binding = business_contract.get("binding")
+        soundbank_roles = (
+            tuple(contract_binding.get("roles", ()))
+            if adapter.family == "soundbank-planning"
+            and isinstance(contract_binding, Mapping)
+            else ()
+        )
+        if soundbank_roles and args.role not in soundbank_roles:
+            raise GatewayInputError(
+                "SoundBank object binding requires one disclosed business role: "
+                + ", ".join(soundbank_roles)
+            )
+        if not soundbank_roles and args.role is not None:
             raise GatewayInputError(
                 f"Business object roles are unavailable for {binding.record.operation}"
             )
@@ -16625,30 +16638,58 @@ def _business_next_action_binding(
             ),
         }
     if adapter.family == "soundbank-planning":
-        soundbank_exact_type_name = operation_draft_prefix_copy_binding(
-            object_bind_prefix
-        )
-        soundbank_exact_type_name["append"] = [
-            "--exact-type-name",
-            "<exact-wwise-type>",
-            "<exact-object-name>",
-        ]
+        def soundbank_role_route(role: str) -> dict[str, Any]:
+            role_prefix = [*object_bind_prefix, "--role", role]
+            role_by_id = operation_draft_prefix_copy_binding(role_prefix)
+            role_by_id["append"] = ["--object-id", "<exact-guid>"]
+            role_by_path_segments = operation_draft_prefix_copy_binding(
+                role_prefix
+            )
+            role_by_path_segments["append_repeated"] = [
+                "--object-path-segment",
+                "<one-exact-user-path-segment-without-separators>",
+            ]
+            role_by_path_segments["segment_order"] = "root_to_leaf"
+            route: dict[str, Any] = {
+                "fixed_role": role,
+                "by_id": role_by_id,
+                "by_path_segments": role_by_path_segments,
+                "result": "copy_the_returned_bound_object.handle",
+            }
+            if role == "soundbank":
+                role_exact_type_name = operation_draft_prefix_copy_binding(
+                    role_prefix
+                )
+                role_exact_type_name["append"] = [
+                    "--exact-type-name",
+                    "<exact-wwise-type>",
+                    "<exact-object-name>",
+                ]
+                route["by_exact_type_name"] = role_exact_type_name
+            return route
+
         soundbank_object_binding = {
-            **object_binding,
             "direct_query_before_binding": "forbidden",
             "route_by_user_fact": {
-                "complete_object_path": "by_path_segments",
-                "exact_type_and_unscoped_name": "by_exact_type_name",
-                "selected_guid": "by_id",
+                "complete_object_path": "role_routes.<role>.by_path_segments",
+                "exact_soundbank_name": (
+                    "role_routes.soundbank.by_exact_type_name"
+                ),
+                "selected_guid": "role_routes.<role>.by_id",
             },
-            "by_exact_type_name": soundbank_exact_type_name,
+            "role_routes": {
+                role: soundbank_role_route(role)
+                for role in business_contract["binding"]["roles"]
+            },
             "selection_rule": (
-                "user_supplied_complete_path_requires_by_path_segments; "
-                "user_supplied_exact_type_and_name_requires_by_exact_type_name; "
-                "user_selected_guid_uses_by_id"
+                "choose_the_business_role_first_then_copy_its_disclosed_identity_route"
             ),
             "name_rule": (
-                "an_unscoped_name_is_valid_only_when_paired_with_one_exact_wwise_type"
+                "an_unscoped_soundbank_name_uses_the_soundbank_exact_type_name_route"
+            ),
+            "result_validation_rule": (
+                "compare_returned_name_type_path_to_the_user_target_before_using_"
+                "the_handle"
             ),
         }
         shared = {

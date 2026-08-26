@@ -1598,7 +1598,12 @@ def build_soundbank_business_transaction_steps(
     bound: dict[str, ResponseBinding] = {}
     binding_index = 0
 
-    def bind(selector: Any, *, object_type: str | None = None) -> ResponseBinding:
+    def bind(
+        selector: Any,
+        *,
+        role: str,
+        object_type: str | None = None,
+    ) -> ResponseBinding:
         nonlocal binding_index
         if object_type is not None:
             if not isinstance(selector, str) or not selector:
@@ -1611,7 +1616,7 @@ def build_soundbank_business_transaction_steps(
         if not isinstance(selector, Mapping):
             raise V3ProtocolError("SoundBank object identity is invalid")
         key = json.dumps(
-            dict(selector),
+            {"role": role, "selector": dict(selector)},
             ensure_ascii=False,
             sort_keys=True,
             separators=(",", ":"),
@@ -1624,6 +1629,7 @@ def build_soundbank_business_transaction_steps(
             selector,
             step_name=f"{label}.bind-object.{binding_index:03d}",
             error_subject="SoundBank business",
+            role=role,
         )
         bound[key] = result
         return result
@@ -1635,11 +1641,11 @@ def build_soundbank_business_transaction_steps(
                 "--mode",
                 str(arguments["mode"]),
                 "--soundbank-handle",
-                bind(arguments["soundbank"]),
+                bind(arguments["soundbank"], role="soundbank"),
             )
         )
         for row in arguments["inclusions"]:
-            object_handle = bind(row["object"])
+            object_handle = bind(row["object"], role="inclusion_object")
             declaration_arguments.extend(
                 (
                     "--inclusion",
@@ -1650,7 +1656,11 @@ def build_soundbank_business_transaction_steps(
     elif operation == "soundbank.generate":
         bank_handles: list[tuple[Mapping[str, Any], ResponseBinding]] = []
         for bank in arguments["soundbanks"]:
-            handle = bind(str(bank["name"]), object_type="SoundBank")
+            handle = bind(
+                str(bank["name"]),
+                role="soundbank",
+                object_type="SoundBank",
+            )
             bank_handles.append((bank, handle))
         declaration_arguments = [*draft.prefix()]
         inclusion_names = {
@@ -1668,11 +1678,11 @@ def build_soundbank_business_transaction_steps(
             )
             for selector in bank.get("events", []):
                 declaration_arguments.extend(
-                    ("--event", handle, bind(selector))
+                    ("--event", handle, bind(selector, role="event"))
                 )
             for selector in bank.get("aux_busses", []):
                 declaration_arguments.extend(
-                    ("--aux-bus", handle, bind(selector))
+                    ("--aux-bus", handle, bind(selector, role="aux_bus"))
                 )
             inclusions = tuple(bank.get("inclusions", []))
             if inclusions:

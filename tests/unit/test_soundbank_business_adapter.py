@@ -52,24 +52,28 @@ def _session(
             name="Harbor",
             object_type="SoundBank",
             path=r"\SoundBanks\Default Work Unit\Harbor",
+            role="soundbank",
         ).handle,
         "event": session.handles.bind_object(
             object_id=EVENT_ID,
             name="Play_Harbor",
             object_type="Event",
             path=r"\Events\Default Work Unit\Play_Harbor",
+            role="event",
         ).handle,
         "aux": session.handles.bind_object(
             object_id=AUX_ID,
             name="Harbor_Reverb",
             object_type="AuxBus",
             path=r"\Master-Mixer Hierarchy\Default Work Unit\Harbor_Reverb",
+            role="aux_bus",
         ).handle,
         "object": session.handles.bind_object(
             object_id=OBJECT_ID,
             name="Harbor_Ambience",
             object_type="ActorMixer",
             path=r"\Actor-Mixer Hierarchy\Default Work Unit\Harbor_Ambience",
+            role="inclusion_object",
         ).handle,
     }
     return session, handles
@@ -251,6 +255,7 @@ def test_inclusion_plan_accepts_128_rows_and_rejects_row_129() -> None:
             name=f"Object_{index}",
             object_type="Event",
             path=rf"\Events\Default Work Unit\Object_{index}",
+            role="inclusion_object",
         ).handle
         rows.append({"object_handle": handle, "filters": ["events"]})
     accepted = session.with_settings(
@@ -274,6 +279,7 @@ def test_inclusion_plan_accepts_128_rows_and_rejects_row_129() -> None:
         name="Overflow",
         object_type="Event",
         path=r"\Events\Default Work Unit\Overflow",
+        role="inclusion_object",
     ).handle
     overflow = session.with_settings(
         {

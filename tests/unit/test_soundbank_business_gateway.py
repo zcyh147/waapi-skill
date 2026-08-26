@@ -196,6 +196,7 @@ def _bind(
     name: str,
     object_type: str,
     path: str,
+    role: str,
 ) -> dict[str, Any]:
     client = FakeClient(
         {
@@ -227,6 +228,8 @@ def _bind(
             str(revision),
             "--object-id",
             object_id,
+            "--role",
+            role,
         ],
         env=_env(tmp_path),
         client_factory=lambda _url: client,
@@ -411,6 +414,7 @@ def test_set_inclusions_binds_objects_then_declares_only_business_rows(
         name="Harbor",
         object_type="SoundBank",
         path=r"\SoundBanks\Default Work Unit\Harbor",
+        role="soundbank",
     )
     inclusion = _bind(
         tmp_path,
@@ -421,6 +425,7 @@ def test_set_inclusions_binds_objects_then_declares_only_business_rows(
         name="Harbor_Ambience",
         object_type="ActorMixer",
         path=r"\Actor-Mixer Hierarchy\Default Work Unit\Harbor_Ambience",
+        role="inclusion_object",
     )
     code, declared = _declare_plan(
         tmp_path,
@@ -466,6 +471,57 @@ def test_set_inclusions_binds_objects_then_declares_only_business_rows(
     }
 
 
+def test_set_inclusions_rejects_handles_bound_for_the_wrong_business_roles(
+    tmp_path: Path,
+) -> None:
+    code, started = _offline(tmp_path, "draft-start", "soundbank.setInclusions")
+    assert code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    bank = _bind(
+        tmp_path,
+        draft_id=draft_id,
+        authority=authority,
+        revision=1,
+        object_id=BANK_ID,
+        name="Harbor",
+        object_type="SoundBank",
+        path=r"\SoundBanks\Default Work Unit\Harbor",
+        role="inclusion_object",
+    )
+    inclusion = _bind(
+        tmp_path,
+        draft_id=draft_id,
+        authority=authority,
+        revision=2,
+        object_id=OBJECT_ID,
+        name="Harbor_Ambience",
+        object_type="ActorMixer",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\Harbor_Ambience",
+        role="soundbank",
+    )
+
+    code, rejected = _declare_plan(
+        tmp_path,
+        "draft-declare-soundbank-plan",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "3",
+        "--mode",
+        "replace",
+        "--soundbank-handle",
+        bank["bound_object"]["handle"],
+        "--inclusion",
+        inclusion["bound_object"]["handle"],
+        "events",
+    )
+
+    assert code == 2, rejected
+    assert rejected["error_code"] == "BOUND_OBJECT_ROLE_MISMATCH"
+
+
 def test_soundbank_draft_binds_one_exact_type_name_without_a_separate_query(
     tmp_path: Path,
 ) -> None:
@@ -473,16 +529,14 @@ def test_soundbank_draft_binds_one_exact_type_name_without_a_separate_query(
     assert code == 0, started
     binding = started["draft"]["next_action_binding"]["object_binding"]
     assert binding["direct_query_before_binding"] == "forbidden"
-    assert binding["route_by_user_fact"] == {
-        "complete_object_path": "by_path_segments",
-        "exact_type_and_unscoped_name": "by_exact_type_name",
-        "selected_guid": "by_id",
-    }
-    assert binding["by_exact_type_name"]["append"] == [
+    assert binding["role_routes"]["soundbank"]["by_exact_type_name"]["append"] == [
         "--exact-type-name",
         "<exact-wwise-type>",
         "<exact-object-name>",
     ]
+    assert binding["role_routes"]["soundbank"]["fixed_role"] == "soundbank"
+    assert binding["role_routes"]["event"]["fixed_role"] == "event"
+    assert binding["role_routes"]["aux_bus"]["fixed_role"] == "aux_bus"
     client = FakeClient(
         {
             "ak.wwise.core.getInfo": [_info()],
@@ -511,6 +565,8 @@ def test_soundbank_draft_binds_one_exact_type_name_without_a_separate_query(
             started["task_authority"],
             "--expected-revision",
             "1",
+            "--role",
+            "soundbank",
             "--exact-type-name",
             "SoundBank",
             "Harbor",
@@ -549,6 +605,7 @@ def test_generate_plan_binds_business_objects_and_derives_native_switches(
         name="Harbor",
         object_type="SoundBank",
         path=r"\SoundBanks\Default Work Unit\Harbor",
+        role="soundbank",
     )
     event = _bind(
         tmp_path,
@@ -559,6 +616,7 @@ def test_generate_plan_binds_business_objects_and_derives_native_switches(
         name="Play_Harbor",
         object_type="Event",
         path=r"\Events\Default Work Unit\Play_Harbor",
+        role="event",
     )
     aux_id = "{33333333-3333-3333-3333-333333333333}"
     aux = _bind(
@@ -570,6 +628,7 @@ def test_generate_plan_binds_business_objects_and_derives_native_switches(
         name="Harbor_Reverb",
         object_type="AuxBus",
         path=r"\Master-Mixer Hierarchy\Default Work Unit\Harbor_Reverb",
+        role="aux_bus",
     )
     io_root = tmp_path / "io"
     io_root.mkdir()
@@ -752,6 +811,7 @@ def test_generate_plan_preserves_every_explicit_false_rebuild_choice(
         name="Harbor",
         object_type="SoundBank",
         path=r"\SoundBanks\Default Work Unit\Harbor",
+        role="soundbank",
     )
     io_root = tmp_path / "io"
     io_root.mkdir()
@@ -830,6 +890,7 @@ def test_business_inclusion_plan_checks_and_seals_one_immutable_preview(
         name="Harbor",
         object_type="SoundBank",
         path=r"\SoundBanks\Default Work Unit\Harbor",
+        role="soundbank",
     )
     inclusion = _bind(
         tmp_path,
@@ -840,6 +901,7 @@ def test_business_inclusion_plan_checks_and_seals_one_immutable_preview(
         name="Play_Harbor",
         object_type="Event",
         path=r"\Events\Default Work Unit\Play_Harbor",
+        role="inclusion_object",
     )
     code, declared = _declare_plan(
         tmp_path,

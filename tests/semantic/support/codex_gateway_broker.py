@@ -5817,8 +5817,9 @@ def _normalize_bound_business_reference_paths(
     value: Any,
     *,
     path_to_id: Mapping[str, str],
+    type_name_to_id: Mapping[tuple[str, str], str] | None = None,
 ) -> Any:
-    """Replace only exact live-bound path identities with their sealed GUIDs."""
+    """Replace exact live-bound business identities with their sealed GUIDs."""
 
     if isinstance(value, Mapping):
         if (
@@ -5828,10 +5829,23 @@ def _normalize_bound_business_reference_paths(
             and value["value"] in path_to_id
         ):
             return {"kind": "id", "value": path_to_id[value["value"]]}
+        if (
+            set(value) == {"kind", "type", "name"}
+            and value.get("kind") == "exact-type-name"
+            and isinstance(value.get("type"), str)
+            and isinstance(value.get("name"), str)
+            and type_name_to_id is not None
+            and (value["type"], value["name"]) in type_name_to_id
+        ):
+            return {
+                "kind": "id",
+                "value": type_name_to_id[(value["type"], value["name"])],
+            }
         return {
             str(key): _normalize_bound_business_reference_paths(
                 nested,
                 path_to_id=path_to_id,
+                type_name_to_id=type_name_to_id,
             )
             for key, nested in value.items()
         }
@@ -5840,6 +5854,7 @@ def _normalize_bound_business_reference_paths(
             _normalize_bound_business_reference_paths(
                 nested,
                 path_to_id=path_to_id,
+                type_name_to_id=type_name_to_id,
             )
             for nested in value
         ]
@@ -11322,9 +11337,30 @@ class CodexGatewayBroker:
                     and isinstance(row.get("path"), str)
                     and isinstance(row.get("object_id"), str)
                 }
+                type_name_rows: dict[tuple[str, str], set[str]] = {}
+                for row in handle_rows:
+                    if not isinstance(row, Mapping):
+                        continue
+                    object_type = row.get("object_type")
+                    name = row.get("name")
+                    object_id = row.get("object_id")
+                    if not all(
+                        isinstance(item, str)
+                        for item in (object_type, name, object_id)
+                    ):
+                        continue
+                    type_name_rows.setdefault((object_type, name), set()).add(
+                        object_id
+                    )
+                type_name_to_id = {
+                    key: next(iter(object_ids))
+                    for key, object_ids in type_name_rows.items()
+                    if len(object_ids) == 1
+                }
                 bound_witness = _normalize_bound_business_reference_paths(
                     preview_step.expected_operation_request,
                     path_to_id=path_to_id,
+                    type_name_to_id=type_name_to_id,
                 )
                 if _normalize_audio_import_request_named_fields(
                     replayed

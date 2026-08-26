@@ -143,6 +143,7 @@ def _bound(
     *,
     field: str,
     object_types: set[str] | None = None,
+    role: str | None = None,
 ) -> BoundObjectHandle:
     if not isinstance(handle, str):
         _error(
@@ -160,6 +161,14 @@ def _bound(
             "bind one live object of the disclosed business type",
             expected_types=sorted(object_types),
             actual_type=bound.object_type,
+        )
+    if role is not None and bound.role != role:
+        _error(
+            "BOUND_OBJECT_ROLE_MISMATCH",
+            field,
+            "bind the object through the matching Gateway-owned role route",
+            expected_role=role,
+            actual_role=bound.role,
         )
     return bound
 
@@ -220,6 +229,7 @@ def _materialize_generate(
             bank["soundbank_handle"],
             field=f"soundbanks[{index}].soundbank_handle",
             object_types={"SoundBank"},
+            role="soundbank",
         )
         expectation = _text(
             bank["artifact_expectation"],
@@ -243,9 +253,9 @@ def _materialize_generate(
                     "provide true or false",
                 )
             row["rebuild"] = bank["rebuild"]
-        for public, output, object_type in (
-            ("event_handles", "events", "Event"),
-            ("aux_bus_handles", "aux_busses", "AuxBus"),
+        for public, output, object_type, role in (
+            ("event_handles", "events", "Event", "event"),
+            ("aux_bus_handles", "aux_busses", "AuxBus", "aux_bus"),
         ):
             if public not in bank:
                 continue
@@ -262,6 +272,7 @@ def _materialize_generate(
                         handle,
                         field=f"soundbanks[{index}].{public}[{handle_index}]",
                         object_types={object_type},
+                        role=role,
                     ).handle,
                     field=f"soundbanks[{index}].{public}[{handle_index}]",
                     action="bind the exact live object and copy its returned handle",
@@ -349,6 +360,7 @@ def _materialize_inclusions(
         source["soundbank_handle"],
         field="soundbank_handle",
         object_types={"SoundBank"},
+        role="soundbank",
     )
     inclusions: list[dict[str, Any]] = []
     for index, raw in enumerate(
@@ -368,6 +380,7 @@ def _materialize_inclusions(
             session,
             row["object_handle"],
             field=f"inclusions[{index}].object_handle",
+            role="inclusion_object",
         )
         inclusions.append(
             {

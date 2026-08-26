@@ -3315,6 +3315,27 @@ def test_soundbank_business_plan_witness_replays_the_exact_canonical_request(
     ) == request
 
 
+def test_soundbank_exact_type_name_witness_normalizes_to_bound_guid() -> None:
+    expected = {
+        "kind": "exact-type-name",
+        "type": "SoundBank",
+        "name": "Harbor_Release",
+    }
+
+    assert broker_module._normalize_bound_business_reference_paths(  # noqa: SLF001
+        expected,
+        path_to_id={},
+        type_name_to_id={
+            ("SoundBank", "Harbor_Release"): (
+                "{00000000-0000-0000-0000-000000000001}"
+            )
+        },
+    ) == {
+        "kind": "id",
+        "value": "{00000000-0000-0000-0000-000000000001}",
+    }
+
+
 def _archive_test_object_set_protocol_batches_independent_targets_through_public_gateway(
     tmp_path: Path,
 ) -> None:

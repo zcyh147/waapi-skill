@@ -1035,7 +1035,9 @@ def test_soundbank_generate_transaction_uses_one_complete_business_plan() -> Non
     binding = next(
         step for step in protocol.steps if step.subcommand == "draft-bind-object"
     )
-    assert binding.arguments[-3:] == (
+    assert binding.arguments[-5:] == (
+        "--role",
+        "soundbank",
         "--exact-type-name",
         "SoundBank",
         "Main_UI",
@@ -1087,9 +1089,9 @@ def test_multi_bank_business_plan_binds_each_bank_once_before_one_declaration() 
 
     assert all(step.subcommand != "query-object" for step in protocol.steps)
     assert len(bindings) == 2
-    assert [step.arguments[-3:] for step in bindings] == [
-        ("--exact-type-name", "SoundBank", "Main_UI"),
-        ("--exact-type-name", "SoundBank", "Dialogue"),
+    assert [step.arguments[-5:] for step in bindings] == [
+        ("--role", "soundbank", "--exact-type-name", "SoundBank", "Main_UI"),
+        ("--role", "soundbank", "--exact-type-name", "SoundBank", "Dialogue"),
     ]
     assert len(declarations) == 1
     declare = declarations[0]
@@ -1138,10 +1140,12 @@ def test_set_inclusions_business_plan_binds_ids_without_typed_disclosure() -> No
         "--object-id",
         "{00000000-0000-0000-0000-000000000001}",
     )
+    assert bindings[0].arguments[-4:-2] == ("--role", "soundbank")
     assert bindings[1].arguments[-2:] == (
         "--object-id",
         "{00000000-0000-0000-0000-000000000002}",
     )
+    assert bindings[1].arguments[-4:-2] == ("--role", "inclusion_object")
     assert declare.arguments[-9:] == (
         "--mode",
         "replace",
