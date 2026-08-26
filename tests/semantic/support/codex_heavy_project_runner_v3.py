@@ -4655,6 +4655,7 @@ def _prepare_case(
                 and (
                     "未验证" in folded
                     or "不能声称已验证" in folded
+                    or "不代表已验证" in folded
                     or (
                         "不能" in folded
                         and "声称" in folded

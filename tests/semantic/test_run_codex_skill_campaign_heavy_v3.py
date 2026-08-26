@@ -4079,7 +4079,7 @@ def test_campaign_broker_seal_binds_confirmation_to_archived_transaction_store(
 def test_passing_lua_draft_replays_after_owned_files_are_cleaned(
     tmp_path: Path,
 ) -> None:
-    options = _options(tmp_path)
+    options = replace(_options(tmp_path), skill_source=campaign.SKILL_ROOT)
     task_root = tmp_path / "task"
     task_root.mkdir()
     io_root = tmp_path / "scenario" / "owned" / "assets" / "lua"
@@ -4154,6 +4154,69 @@ def test_passing_lua_draft_replays_after_owned_files_are_cleaned(
         allow_cleaned_file_evidence=True,
     )
     assert replayed is not None
+
+
+def test_passing_tab_import_draft_replays_after_owned_files_are_cleaned(
+    tmp_path: Path,
+) -> None:
+    options = replace(_options(tmp_path), skill_source=campaign.SKILL_ROOT)
+    task_root = tmp_path / "task"
+    task_root.mkdir()
+    table_root = tmp_path / "scenario" / "owned" / "assets" / "tab"
+    table_root.mkdir(parents=True)
+    table = table_root / "import.tsv"
+    table.write_text("Audio File\tObject Path\tObject Type\n", encoding="utf-8")
+    protocol = build_transaction_protocol(
+        (
+            {
+                "contract": "waapi-skill.operation-request/v1",
+                "version": "2025.1",
+                "operation": "audio.importTabDelimited",
+                "arguments": {
+                    "import_file": str(table),
+                    "import_location": {
+                        "kind": "path",
+                        "value": r"\Containers\Default Work Unit",
+                    },
+                    "import_language": "SFX",
+                },
+            },
+        )
+    )
+    records = _synthetic_gateway_records(
+        options=options,
+        task_root=task_root,
+        protocol=protocol,
+        version="2025.1",
+    )
+    command_records = completed_command_records(
+        parse_jsonl_events(
+            _synthetic_events(
+                thread_id="thread-tab-cleanup-replay",
+                records=records,
+                final_response="tab import completed",
+                windows_powershell_core_host=options.windows_powershell_core_host,
+            )
+        ),
+        windows_powershell_core_host=options.windows_powershell_core_host,
+    )
+    serialized_commands = [
+        campaign._json_canonical_value(asdict(record))
+        for record in command_records
+    ]
+
+    table.unlink()
+    table_root.rmdir()
+
+    campaign._validate_heavy_v3_broker_records(
+        records,
+        task_root=task_root,
+        steps=protocol.steps,
+        command_records=serialized_commands,
+        options=options,
+        version="2025.1",
+        label="passing cleaned tab import",
+    )
 
 
 def test_campaign_archive_rejects_equivalent_requoted_continuation(

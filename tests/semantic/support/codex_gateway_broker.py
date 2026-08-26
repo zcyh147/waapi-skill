@@ -11322,8 +11322,13 @@ class CodexGatewayBroker:
                         else None
                     )
                     session = BusinessDeclarationSession.from_dict(raw_session)
-                    replayed = business_adapter(expected_operation).materialize(
-                        session
+                    adapter = business_adapter(expected_operation)
+                    replayed = adapter.materialize(
+                        session,
+                        allow_cleaned_file_evidence=(
+                            self._runner_environment == {}
+                            and adapter.supports_cleaned_file_evidence
+                        ),
                     )
                 except Exception as exc:
                     raise GatewayInvocationError(

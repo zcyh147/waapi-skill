@@ -4408,6 +4408,7 @@ def _build_heavy_v3_broker_replay(
                 "audio.import",
                 "lua.executeCliFile",
                 "lua.executeCoreFile",
+                "lua.executeCoreInline",
             }
         ):
             continue

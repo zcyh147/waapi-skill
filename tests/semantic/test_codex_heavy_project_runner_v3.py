@@ -1540,6 +1540,18 @@ def test_prepare_lua_case_seals_source_and_preserves_result_schema_only_boundary
     )
     assert reflected_result_boundary.passed is True
 
+    equivalent_not_representative_boundary = prepared.verify_turn(
+        2,
+        SimpleNamespace(
+            final_response=(
+                "profile：typed_input；count：3。"
+                "验证仅限脚本返回结果的结构；"
+                "不代表已验证脚本的全部业务副作用。"
+            )
+        ),
+    )
+    assert equivalent_not_representative_boundary.passed is True
+
     broader_overclaim = prepared.verify_turn(
         2,
         SimpleNamespace(
