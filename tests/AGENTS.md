@@ -50,6 +50,13 @@ even when its raw semantic assertions passed. Start a new root only after the
 candidate is clean and stable; never combine the drifting result with the new
 candidate.
 
+Candidate Skill immutability is source immutability, not a ban on interpreter
+caches. Hash and compare the Skill tree with the same repository-declared
+runtime exclusions used to make the detached task copy (`.venv`,
+`__pycache__`, `.pytest_cache`, `.coverage`, and `.DS_Store`). Generated
+bytecode or cache files therefore cannot create a false Agent-write failure,
+while every non-excluded source or resource change still fails the gate.
+
 Do not inspect or regenerate source-derived inventories while a Program or
 Non-live pytest process is still running. Isolation tests may temporarily
 rewrite packaged Gateway or Registry files and restore them during teardown;
@@ -348,6 +355,18 @@ sealed attempt manifest and digest, the expected consolidated result, and zero
 scoped Codex/Wwise/campaign processes; then boot out the job and remove its
 temporary plist. Freeze any interrupted or unsealed root without resume or
 verify-only replay.
+
+When macOS TCC denies a background process access to a candidate below
+`Documents`, make a clean detached clone at a no-space path outside that
+protected tree and prove its exact commit before launch. Prepare both runtime
+layers there: `setup_environment.py` provides the packaged Skill/campaign
+interpreter, while Poetry provides the repository smoke/readiness probes. Run
+the matching real smoke lane from that exact clone before spending a Fresh
+Agent attempt. If the selected fixture legitimately needs longer than the
+default 60-second WAAPI readiness window, pass an explicit finite
+`--wwise-readiness-timeout` on the campaign command (for example, `180`); the
+campaign seals and forwards that value. Do not rely on an ambient environment
+override or treat an unrecorded timeout increase as equivalent evidence.
 
 ### Failure-first campaign scheduling
 

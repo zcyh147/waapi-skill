@@ -489,6 +489,7 @@ class CampaignOptions:
     offline_only: bool
     lock_timeout_seconds: float
     max_pre_action_retries: int
+    wwise_readiness_timeout_seconds: float = 60.0
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None
     protocol_manifest_revision: str | None = None
 
@@ -1302,6 +1303,9 @@ def load_heavy_v3_campaign_units(options: CampaignOptions) -> tuple[Any, ...]:
         pair_ids=(),
         offline_only=False,
         overwrite=False,
+        wwise_readiness_timeout_seconds=(
+            options.wwise_readiness_timeout_seconds
+        ),
     )
     return tuple(matrix.load_heavy_v3_units(matrix_options))
 
@@ -1340,6 +1344,8 @@ def build_heavy_v3_child_argv(
         options.service_tier,
         "--timeout",
         str(options.timeout_seconds),
+        "--wwise-readiness-timeout",
+        str(options.wwise_readiness_timeout_seconds),
     ]
     if windows_powershell_core_host is not None:
         argv.extend(
@@ -1383,6 +1389,9 @@ def heavy_v3_child_request(
             "reasoning_effort": options.reasoning_effort,
             "service_tier": options.service_tier,
             "timeout_seconds": options.timeout_seconds,
+            "wwise_readiness_timeout_seconds": (
+                options.wwise_readiness_timeout_seconds
+            ),
             "memory": "disabled",
             **(
                 {"approval_policy": "never"}
@@ -1824,6 +1833,9 @@ def build_effective_config(
         "live_config": {
             "path": str(options.live_config),
             "sha256": sha256_file(options.live_config),
+            "readiness_timeout_seconds": (
+                options.wwise_readiness_timeout_seconds
+            ),
         },
         "codex": {
             "path": str(options.codex_binary),
@@ -2121,6 +2133,9 @@ def heavy_v3_immutable_options(options: CampaignOptions) -> dict[str, Any]:
         "reasoning_effort": options.reasoning_effort,
         "service_tier": options.service_tier,
         "timeout_seconds": options.timeout_seconds,
+        "wwise_readiness_timeout_seconds": (
+            options.wwise_readiness_timeout_seconds
+        ),
         "case_ids": list(options.case_ids),
         "versions": list(options.versions),
         "pair_ids": [],
@@ -2639,6 +2654,7 @@ def _validate_heavy_v3_run_config(
         "reasoning_effort",
         "service_tier",
         "timeout_seconds",
+        "wwise_readiness_timeout_seconds",
         "memory",
         "fresh_process_thread_and_task_per_scenario",
         "sequential_wwise_lifecycles",
@@ -2668,6 +2684,9 @@ def _validate_heavy_v3_run_config(
         "reasoning_effort": options.reasoning_effort,
         "service_tier": options.service_tier,
         "timeout_seconds": options.timeout_seconds,
+        "wwise_readiness_timeout_seconds": (
+            options.wwise_readiness_timeout_seconds
+        ),
         "memory": "disabled",
         "fresh_process_thread_and_task_per_scenario": True,
         "sequential_wwise_lifecycles": True,
@@ -14123,6 +14142,8 @@ def build_child_argv(
         options.service_tier,
         "--timeout",
         str(options.timeout_seconds),
+        "--wwise-readiness-timeout",
+        str(options.wwise_readiness_timeout_seconds),
     ]
     if windows_powershell_core_host is not None:
         argv.extend(
@@ -14521,6 +14542,11 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     )
     parser.add_argument("--service-tier")
     parser.add_argument("--timeout", type=float)
+    parser.add_argument(
+        "--wwise-readiness-timeout",
+        type=float,
+        default=60.0,
+    )
     parser.add_argument("--case-id", action="append", default=[])
     parser.add_argument("--version", action="append", choices=SUPPORTED_VERSIONS, default=[])
     parser.add_argument("--pair-id", action="append", default=[])
@@ -14553,6 +14579,11 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         parser.error("--verify-only requires --resume")
     if timeout_seconds <= 0 or args.lock_timeout <= 0:
         parser.error("--timeout and --lock-timeout must be greater than zero")
+    if (
+        not math.isfinite(args.wwise_readiness_timeout)
+        or args.wwise_readiness_timeout <= 0
+    ):
+        parser.error("--wwise-readiness-timeout must be positive and finite")
     max_pre_action_retries = (
         0
         if args.max_pre_action_retries is None
@@ -14694,6 +14725,9 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         offline_only=bool(args.offline_only),
         lock_timeout_seconds=float(args.lock_timeout),
         max_pre_action_retries=max_pre_action_retries,
+        wwise_readiness_timeout_seconds=float(
+            args.wwise_readiness_timeout
+        ),
         windows_powershell_core_host=windows_powershell_core_host,
     )
 

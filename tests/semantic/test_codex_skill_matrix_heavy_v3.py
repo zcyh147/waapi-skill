@@ -126,6 +126,26 @@ def test_parse_args_preserves_v2_defaults_and_selects_v3_defaults(
     assert heavy.service_tier == "default"
 
 
+def test_heavy_run_config_records_readiness_timeout(tmp_path: Path) -> None:
+    options = replace(
+        _options(tmp_path),
+        wwise_readiness_timeout_seconds=180.0,
+    )
+
+    config = matrix._heavy_v3_run_config(
+        options,
+        unit_rows=(),
+        records=(),
+        run_errors=(),
+        stop_reason="",
+        preflight_state="passed",
+        started_at="2026-08-26T00:00:00Z",
+        completed_at="2026-08-26T00:00:01Z",
+    )
+
+    assert config["wwise_readiness_timeout_seconds"] == 180.0
+
+
 @pytest.mark.parametrize("forbidden", [("--offline-only",), ("--pair-id", "pair-1")])
 def test_parse_args_rejects_v2_only_filters_for_heavy_profile(
     forbidden: tuple[str, ...],

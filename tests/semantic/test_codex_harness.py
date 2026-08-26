@@ -27,6 +27,7 @@ from .support.codex_harness import (  # pyright: ignore[reportMissingImports]
     CodexGatewayErrorExpectation,
     CodexHarnessError,
     CodexHarnessConfig,
+    WORKSPACE_SKILL_EXCLUDED_NAMES,
     WindowsPowerShellCoreHost,
     audit_prompt_input_payload,
     audit_session_events,
@@ -1509,7 +1510,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "fixed_argv_prefix" in instructions
     assert "never reconstruct" in instructions
     assert "Keep cwd" in instructions
-    assert "Reads now; no future/pre-read reply/questions" in instructions
+    assert "Read now; no pre-read reply/questions" in instructions
     assert "Typed facts: one argv/fact" in instructions
     assert "every prompt field/item/map/bool" in instructions
     assert "batch_size=6" in instructions
@@ -1529,6 +1530,8 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "--object-type only new/imported/plural" in instructions
     assert "reread selected pre-schema" in instructions
     assert "path=>by_path_segments one arg/segment" in instructions
+    assert "SoundBank=>role_route" in instructions
+    assert "exact bank=>soundbank.by_exact_type_name" in instructions
     assert "name=>query>ID=>by_id" in instructions
     assert "GUID=>by_id" in instructions
     assert "Else exact path=>path" in instructions
@@ -1558,7 +1561,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
         "Preview-now: finish schema/metadata/Preview now; "
         "only execution waits for confirmation"
     ) in instructions
-    assert "Editable draft same turn" in instructions
+    assert "Draft same turn" in instructions
     assert "no progress reply" in instructions
     assert "requires_later_user_message" in instructions
 
@@ -5573,6 +5576,25 @@ def test_output_snapshot_and_skill_tree_hash_detect_created_and_modified_source(
 
     assert created == ("helper.py",)
     assert snapshot_tree_hash(after_skill) != before_hash
+
+
+def test_skill_snapshot_excludes_generated_runtime_state(tmp_path: Path) -> None:
+    skill = tmp_path / "skill"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text("stable\n", encoding="utf-8")
+    before = snapshot_workspace(
+        skill,
+        exclude_names=WORKSPACE_SKILL_EXCLUDED_NAMES,
+    )
+
+    cache = skill / "__pycache__"
+    cache.mkdir()
+    (cache / "gateway.pyc").write_bytes(b"generated")
+
+    assert snapshot_workspace(
+        skill,
+        exclude_names=WORKSPACE_SKILL_EXCLUDED_NAMES,
+    ) == before
 
 
 def test_workspace_snapshot_uses_platform_write_then_restore_contract(tmp_path: Path) -> None:

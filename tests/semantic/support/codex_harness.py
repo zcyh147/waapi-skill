@@ -46,10 +46,10 @@ DEFAULT_SERVICE_TIER = "priority"
 DEFAULT_TIMEOUT_SECONDS = 180.0
 SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "First read SKILL.md once, standalone. "
-    "Reads now; no future/pre-read reply/questions. "
+    "Read now; no pre-read reply/questions. "
     "copy source_field/fixed_argv_prefix_copy verbatim; keep quotes/runner; never reconstruct; "
     "opaque IDs/handles/tokens/digests. Typed facts: one argv/fact; batch_size=6; "
-    "final=remaining; cover every prompt field/item/map/bool. Composer: one action/call. "
+    "final=remaining; every prompt field/item/map/bool. Composer: one action/call. "
     "allowed_action_argv owns TYPE; not Real64/int16. unapplied "
     "ancestor deferred_fact; execute_after=all_pending_ancestor_facts_in_response_"
     "tree_preorder. branch constant/value. "
@@ -58,8 +58,9 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "composer.start.preconditions; absent=none; prompt/schema!=live; all dynamic tokens "
     "pre-draft; single existing=>--object GUID; --object-type "
     "only new/imported/plural. "
-    "ID: business_declaration path=>by_path_segments one arg/segment; "
-    "name=>query>ID=>by_id; GUID=>by_id. "
+    "SoundBank=>role_route; exact bank=>soundbank.by_exact_type_name. "
+    "path=>by_path_segments one "
+    "arg/segment; name=>query>ID=>by_id; GUID=>by_id. "
     "Else exact path=>path; never exact-type-name; reread selected "
     "pre-schema; one query/hop; no merge. "
     "enum/const exact. typed_operation: copy gateway_argv_prefix incl --apply; "
@@ -67,10 +68,10 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "Import object_type=Sound SFX; query type=Sound. Events initial; parents first. "
     "POSIX paths single-quoted; keep backslashes; add one/child. "
     "Files absolute; no relative/traversal. "
-    "timeout_ms>=30000; shell_tool_timeout_ms wins. terminal scalars first. "
-    "Editable draft same turn; no progress reply. "
+    "timeout_ms>=30000; shell_tool_timeout_ms. terminal scalars first. "
+    "Draft same turn; no progress reply. "
     "draft-check!=Preview. Preview-now: finish schema/metadata/Preview now; "
-    "only execution waits for confirmation. run next_command unless "
+    "only execution waits for confirmation. next_command unless "
     "requires_later_user_message. Keep cwd."
 )
 
@@ -1772,7 +1773,10 @@ class CodexCliHarness:
         output_dir.mkdir(parents=True, exist_ok=True)
         before_workspace = snapshot_workspace(self.config.workspace)
         before_outputs = snapshot_workspace(output_dir)
-        before_skill = snapshot_workspace(self.config.skill_source)
+        before_skill = snapshot_workspace(
+            self.config.skill_source,
+            exclude_names=WORKSPACE_SKILL_EXCLUDED_NAMES,
+        )
         skill_tree_sha256_before = snapshot_tree_hash(before_skill)
 
         with isolated_codex_environment(self.config.auth_json, extra_env=extra_env) as audit_env:
@@ -1791,7 +1795,12 @@ class CodexCliHarness:
             raise CodexHarnessError("codex debug prompt-input modified the isolated agent workspace")
         if snapshot_workspace(output_dir) != before_outputs:
             raise CodexHarnessError("codex debug prompt-input modified the evaluation output directory")
-        if snapshot_tree_hash(snapshot_workspace(self.config.skill_source)) != skill_tree_sha256_before:
+        if snapshot_tree_hash(
+            snapshot_workspace(
+                self.config.skill_source,
+                exclude_names=WORKSPACE_SKILL_EXCLUDED_NAMES,
+            )
+        ) != skill_tree_sha256_before:
             raise CodexHarnessError("codex debug prompt-input modified the target Skill tree")
         with isolated_codex_environment(self.config.auth_json, extra_env=extra_env) as exec_env:
             exec_env = codex_process_environment(
@@ -2022,7 +2031,10 @@ class CodexCliTask:
         output_dir.mkdir(parents=True, exist_ok=True)
         before_workspace = snapshot_workspace(self.config.workspace)
         before_outputs = snapshot_workspace(output_dir)
-        before_skill = snapshot_workspace(self.config.skill_source)
+        before_skill = snapshot_workspace(
+            self.config.skill_source,
+            exclude_names=WORKSPACE_SKILL_EXCLUDED_NAMES,
+        )
         skill_tree_sha256_before = snapshot_tree_hash(before_skill)
 
         with isolated_codex_environment(self.config.auth_json, extra_env=self._extra_env) as audit_env:
@@ -2046,7 +2058,12 @@ class CodexCliTask:
             raise CodexHarnessError("codex debug prompt-input modified the isolated agent workspace")
         if snapshot_workspace(output_dir) != before_outputs:
             raise CodexHarnessError("codex debug prompt-input modified the evaluation output directory")
-        if snapshot_tree_hash(snapshot_workspace(self.config.skill_source)) != skill_tree_sha256_before:
+        if snapshot_tree_hash(
+            snapshot_workspace(
+                self.config.skill_source,
+                exclude_names=WORKSPACE_SKILL_EXCLUDED_NAMES,
+            )
+        ) != skill_tree_sha256_before:
             raise CodexHarnessError("codex debug prompt-input modified the target Skill tree")
 
         completed = run_process(
@@ -2101,7 +2118,10 @@ def _finalize_codex_run(
     )
     after_workspace = snapshot_workspace(config.workspace)
     after_outputs = snapshot_workspace(output_dir)
-    after_skill = snapshot_workspace(config.skill_source)
+    after_skill = snapshot_workspace(
+        config.skill_source,
+        exclude_names=WORKSPACE_SKILL_EXCLUDED_NAMES,
+    )
     skill_tree_sha256_after = snapshot_tree_hash(after_skill)
     workspace_created, workspace_modified = workspace_changes(before_workspace, after_workspace)
     output_created, output_modified = workspace_changes(before_outputs, after_outputs)
@@ -4634,7 +4654,11 @@ def turn_usage(events: Sequence[Mapping[str, Any]]) -> dict[str, int]:
     return {}
 
 
-def snapshot_workspace(root: Path) -> dict[str, str]:
+def snapshot_workspace(
+    root: Path,
+    *,
+    exclude_names: Sequence[str] = (),
+) -> dict[str, str]:
     """Hash final file state and link targets without following Skill symlinks.
 
     File bytes are the portable change boundary.  On filesystems where ctime
@@ -4644,11 +4668,14 @@ def snapshot_workspace(root: Path) -> dict[str, str]:
     """
 
     resolved = root.expanduser().resolve(strict=True)
+    excluded = frozenset(str(name) for name in exclude_names)
     snapshot: dict[str, str] = {}
     for directory, dirnames, filenames in os.walk(resolved, followlinks=False):
         directory_path = Path(directory)
         retained_dirnames: list[str] = []
         for name in dirnames:
+            if name in excluded:
+                continue
             path = directory_path / name
             if path.is_symlink():
                 relative = path.relative_to(resolved).as_posix()
@@ -4662,6 +4689,8 @@ def snapshot_workspace(root: Path) -> dict[str, str]:
                 retained_dirnames.append(name)
         dirnames[:] = retained_dirnames
         for filename in filenames:
+            if filename in excluded:
+                continue
             path = directory_path / filename
             relative = path.relative_to(resolved).as_posix()
             if path.is_symlink():

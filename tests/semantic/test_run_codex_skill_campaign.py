@@ -48,6 +48,31 @@ def test_typed_input_profile_uses_a_bounded_long_form_turn_budget(
     assert options.max_pre_action_retries == 0
 
 
+def test_campaign_readiness_timeout_is_explicit_positive_and_finite(
+    tmp_path: Path,
+) -> None:
+    explicit = campaign.parse_args(
+        [
+            "--campaign-root",
+            str(tmp_path / "campaign"),
+            "--wwise-readiness-timeout",
+            "180",
+        ]
+    )
+
+    assert explicit.wwise_readiness_timeout_seconds == 180.0
+    for invalid in ("0", "-1", "nan", "inf"):
+        with pytest.raises(SystemExit):
+            campaign.parse_args(
+                [
+                    "--campaign-root",
+                    str(tmp_path / invalid),
+                    "--wwise-readiness-timeout",
+                    invalid,
+                ]
+            )
+
+
 @pytest.mark.parametrize(
     "semantic_tree_sha256",
     [
@@ -492,6 +517,7 @@ def test_ordinary_effective_config_records_shell_policy(
         required_units={_C1.pair_id: (_C1.phase,)},
     )
 
+    assert effective["live_config"]["readiness_timeout_seconds"] == 60.0
     assert effective["codex"]["allow_login_shell"] is False
     if os.name == "nt":
         assert effective["codex"]["windows_shell_backend"] == (
@@ -625,7 +651,10 @@ def test_invalid_pair_exits_two_before_creating_campaign_root(
 
 
 def test_build_child_argv_never_requests_overwrite(tmp_path: Path) -> None:
-    options = _options(tmp_path)
+    options = replace(
+        _options(tmp_path),
+        wwise_readiness_timeout_seconds=180.0,
+    )
     group = campaign.ChildGroup(
         group_id="offline",
         version=None,
@@ -642,6 +671,7 @@ def test_build_child_argv_never_requests_overwrite(tmp_path: Path) -> None:
     assert "--overwrite" not in argv
     assert argv.count("--pair-id") == 1
     assert argv[argv.index("--pair-id") + 1] == _C1.pair_id
+    assert argv[argv.index("--wwise-readiness-timeout") + 1] == "180.0"
 
 
 def test_windows_shell_seal_round_trips_into_matrix_child_argv(

@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import importlib
 import json
+import math
 import os
 import re
 import shutil
@@ -534,6 +535,7 @@ class RunnerOptions:
     pair_ids: tuple[str, ...]
     offline_only: bool
     overwrite: bool
+    wwise_readiness_timeout_seconds: float = 60.0
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None
 
 
@@ -967,7 +969,12 @@ def run_heavy_v3_unit(
             options=runner_options,
         )
     live_environment = trusted_gateway_environment(
-        {"WWISE_TEST_CONFIG": str(options.live_config)}
+        {
+            "WWISE_TEST_CONFIG": str(options.live_config),
+            "WWISE_READINESS_TIMEOUT": str(
+                options.wwise_readiness_timeout_seconds
+            ),
+        }
     )
     if api.startswith("ak.wwise.cli."):
         module_name = "tests.semantic.support.codex_heavy_cli_case_runner_v3"
@@ -1224,6 +1231,9 @@ def _heavy_v3_run_config(
         "reasoning_effort": options.reasoning_effort,
         "service_tier": options.service_tier,
         "timeout_seconds": options.timeout_seconds,
+        "wwise_readiness_timeout_seconds": (
+            options.wwise_readiness_timeout_seconds
+        ),
         "memory": "disabled",
         "fresh_process_thread_and_task_per_scenario": True,
         "sequential_wwise_lifecycles": True,
@@ -2727,6 +2737,9 @@ def live_version_environment(
             "WWISE_VERSION": version,
             "WWISE_TEST_CONFIG": str(options.live_config),
             "WWISE_SANDBOX_ROOT": str(version_root / "sandbox-root"),
+            "WWISE_READINESS_TIMEOUT": str(
+                options.wwise_readiness_timeout_seconds
+            ),
         }
     )
 
@@ -3732,6 +3745,11 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     )
     parser.add_argument("--service-tier")
     parser.add_argument("--timeout", type=float)
+    parser.add_argument(
+        "--wwise-readiness-timeout",
+        type=float,
+        default=60.0,
+    )
     parser.add_argument("--case-id", action="append", default=[])
     parser.add_argument("--version", action="append", choices=SUPPORTED_VERSIONS, default=[])
     parser.add_argument("--pair-id", action="append", default=[])
@@ -3774,6 +3792,11 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     )
     if timeout_seconds <= 0:
         parser.error("--timeout must be greater than zero")
+    if (
+        not math.isfinite(args.wwise_readiness_timeout)
+        or args.wwise_readiness_timeout <= 0
+    ):
+        parser.error("--wwise-readiness-timeout must be positive and finite")
     if len(set(args.version)) != len(args.version):
         parser.error("--version values must be unique")
     if len(set(args.pair_id)) != len(args.pair_id):
@@ -3936,6 +3959,9 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         pair_ids=tuple(str(value) for value in args.pair_id),
         offline_only=bool(args.offline_only),
         overwrite=bool(args.overwrite),
+        wwise_readiness_timeout_seconds=float(
+            args.wwise_readiness_timeout
+        ),
         windows_powershell_core_host=windows_powershell_core_host,
     )
 
