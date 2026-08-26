@@ -699,8 +699,9 @@ def test_prepare_seals_baseline_inputs_and_exact_two_transaction_protocol(
         expected_import_witness
     )
     batch_arguments = import_declarations[0].arguments
-    assert batch_arguments.count("--new-root-row") == 1
-    assert batch_arguments.count("--new-child-row") == 4
+    assert batch_arguments.count("--new-row") == 5
+    assert "--new-root-row" not in batch_arguments
+    assert "--new-child-row" not in batch_arguments
     assert batch_arguments.count("--row-order") == 5
     assert batch_arguments.count("--switch-value") == 1
     assert batch_arguments.count("--media-directory") == 1

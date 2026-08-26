@@ -373,6 +373,7 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     ]
     assert batch_action["complete_on_first_submission"] is True
     assert batch_action["submit_once"] is True
+    assert set(batch_action["row_forms"]) == {"new", "existing"}
     assert batch_action["media_source"]["directory"] == [
         "--media-directory",
         "<one-absolute-source-directory>",
@@ -383,6 +384,18 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
         "<one-file-name-without-separators>",
     ]
     assert "switch_assignment" in batch_action["row_fields"]
+    assert bound_next["object_binding"]["use_only_for"] == [
+        "existing_import_row_target",
+        "new_import_row_parent",
+        "output_bus_reference",
+        "new_event_parent",
+        "custom_reference_value",
+    ]
+    assert bound_next["object_binding"]["forbidden_for"] == [
+        "switch_group",
+        "switch_value",
+        "preservation_only_object",
+    ]
     assert all(
         name not in bound_next
         for name in (
@@ -631,7 +644,7 @@ def test_audio_import_batch_declaration_is_atomic_complete_and_compact(
         "1",
         "--row-order",
         "snow",
-        "--new-root-row",
+        "--new-row",
         "snow",
         parent_handle,
         "Snow",
@@ -648,7 +661,7 @@ def test_audio_import_batch_declaration_is_atomic_complete_and_compact(
             (
                 "--row-order",
                 declaration_id,
-                "--new-child-row",
+                "--new-row",
                 declaration_id,
                 "snow",
                 f"Snow_Step_{index:02d}",
@@ -687,6 +700,12 @@ def test_audio_import_batch_declaration_is_atomic_complete_and_compact(
     assert batch["draft"]["next_action_binding"]["required_next_phase"] == (
         "check_complete_business_declaration"
     )
+    assert batch["draft"]["next_command"]["command"] == "draft-check"
+    assert batch["draft"]["next_command"]["copy_exactly"] is True
+    assert batch["draft"]["next_command"]["gateway_argv"][:2] == [
+        "draft-check",
+        started["draft"]["draft_id"],
+    ]
     assert len(
         json.dumps(batch, ensure_ascii=False, separators=(",", ":")).encode(
             "utf-8"

@@ -1909,6 +1909,13 @@ def build_parser() -> argparse.ArgumentParser:
         metavar=("ID", "PARENT_ID", "NAME", "KIND"),
     )
     draft_declare_import_batch.add_argument(
+        "--new-row",
+        action="append",
+        nargs=4,
+        default=[],
+        metavar=("ID", "PARENT_HANDLE_OR_ID", "NAME", "KIND"),
+    )
+    draft_declare_import_batch.add_argument(
         "--existing-row",
         action="append",
         nargs=2,
@@ -10700,6 +10707,12 @@ def dispatch_offline_business_draft_update(
                 "new-child",
                 (parent_id, name, kind),
             )
+        for declaration_id, parent_reference, name, kind in args.new_row:
+            add_row(
+                declaration_id,
+                "new-auto",
+                (parent_reference, name, kind),
+            )
         for declaration_id, object_handle in args.existing_row:
             add_row(declaration_id, "existing", (object_handle,))
 
@@ -10714,6 +10727,18 @@ def dispatch_offline_business_draft_update(
         if args.expected_declaration_count != len(row_order):
             raise GatewayInputError(
                 "Expected declaration count does not match the complete import batch"
+            )
+        for declaration_id, (form, values) in tuple(row_specs.items()):
+            if form != "new-auto":
+                continue
+            parent_reference, name, kind = values
+            row_specs[declaration_id] = (
+                (
+                    "new-child"
+                    if parent_reference in row_specs
+                    else "new-root"
+                ),
+                (parent_reference, name, kind),
             )
 
         fields_by_id: dict[str, list[tuple[str, str]]] = {}
@@ -17089,13 +17114,28 @@ def _business_next_action_binding(
             },
         }
     if adapter.family == "audio-import":
+        audio_object_binding = {
+            **object_binding,
+            "use_only_for": [
+                "existing_import_row_target",
+                "new_import_row_parent",
+                "output_bus_reference",
+                "new_event_parent",
+                "custom_reference_value",
+            ],
+            "forbidden_for": [
+                "switch_group",
+                "switch_value",
+                "preservation_only_object",
+            ],
+        }
         return {
             "contract": "waapi-skill.business-draft-next-action/v1",
             "required_next_phase": (
                 "bind_only_additional_handle_typed_business_values_then_submit_"
                 "one_complete_import_batch"
             ),
-            "object_binding": object_binding,
+            "object_binding": audio_object_binding,
             "field_binding": {
                 "object_scope": {
                     **operation_draft_prefix_copy_binding(field_bind_prefix),
@@ -17146,17 +17186,10 @@ def _business_next_action_binding(
                     "repeat_once_per_row_in_exact_import_order",
                 ],
                 "row_forms": {
-                    "new_root": [
-                        "--new-root-row",
+                    "new": [
+                        "--new-row",
                         "<id>",
-                        "<bound-parent-handle>",
-                        "<name>",
-                        "<semantic-kind>",
-                    ],
-                    "new_child": [
-                        "--new-child-row",
-                        "<id>",
-                        "<earlier-parent-id>",
+                        "<bound-parent-handle-or-earlier-parent-id>",
                         "<name>",
                         "<semantic-kind>",
                     ],
@@ -18203,6 +18236,10 @@ def operation_draft_payload(
                 "projection": "business_declaration_batch_receipt_and_check",
                 "compact_projection_is_not_truncation": True,
             }
+            draft["next_command"] = transaction_next_command(
+                "draft-check",
+                check_argv[3:],
+            )
         elif (
             record.operation == "audio.import"
             and record.check is None

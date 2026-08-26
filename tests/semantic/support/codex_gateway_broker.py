@@ -9404,6 +9404,7 @@ class CodexGatewayBroker:
             "--row-order": 1,
             "--new-root-row": 4,
             "--new-child-row": 4,
+            "--new-row": 4,
             "--existing-row": 2,
             "--field": 3,
             "--field-value": 3,
@@ -9511,6 +9512,13 @@ class CodexGatewayBroker:
                 if canonical_parent_id is None:
                     return None
                 canonical[2] = canonical_parent_id
+            elif option == "--new-row":
+                parent_id = group[2]
+                if not isinstance(parent_id, str):
+                    return None
+                canonical_parent_id = declaration_id_map.get(parent_id)
+                if canonical_parent_id is not None:
+                    canonical[2] = canonical_parent_id
             return tuple(canonical)
 
         canonical_actual_groups = [

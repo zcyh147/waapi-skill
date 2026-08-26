@@ -949,7 +949,7 @@ def build_audio_import_composer_transaction_steps(
         if row["form"] == "new-root":
             batch_arguments.extend(
                 (
-                    "--new-root-row",
+                    "--new-row",
                     declaration_id,
                     row["target"],
                     row["name"],
@@ -959,7 +959,7 @@ def build_audio_import_composer_transaction_steps(
         elif row["form"] == "new-child":
             batch_arguments.extend(
                 (
-                    "--new-child-row",
+                    "--new-row",
                     declaration_id,
                     row["target"],
                     row["name"],

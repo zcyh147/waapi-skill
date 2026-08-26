@@ -3842,7 +3842,9 @@ def test_audio_import_numbered_declarations_remain_strictly_ordered(
         for index, value in enumerate(declaration.arguments)
         if value == "--row-order"
     ] == ["row-001", "row-002"]
-    assert declaration.arguments.count("--new-root-row") == 2
+    assert declaration.arguments.count("--new-row") == 2
+    assert "--new-root-row" not in declaration.arguments
+    assert "--new-child-row" not in declaration.arguments
     assert all(step.subcommand != "draft-apply" for step in steps)
 
 
@@ -3949,7 +3951,13 @@ def test_audio_import_nested_declaration_binds_compact_parent_receipt() -> None:
         if isinstance(argument, ResponseBinding)
     )
 
-    child_index = declaration.arguments.index("--new-child-row")
+    new_row_indexes = [
+        index
+        for index, value in enumerate(declaration.arguments)
+        if value == "--new-row"
+    ]
+    assert len(new_row_indexes) == 2
+    child_index = new_row_indexes[1]
     assert declaration.arguments[child_index + 2] == "row-001"
     assert all(
         "/draft/declaration_receipt/" not in binding.pointer
@@ -4223,7 +4231,7 @@ def test_import_batch_group_order_is_transport_but_row_order_is_business_meaning
             "/tmp/incoming",
             "--row-order",
             "snow",
-            "--new-root-row",
+            "--new-row",
             "snow",
             "parent",
             "Snow",
@@ -4233,7 +4241,7 @@ def test_import_batch_group_order_is_transport_but_row_order_is_business_meaning
             "Snow",
             "--row-order",
             "snow-step-01",
-            "--new-child-row",
+            "--new-row",
             "snow-step-01",
             "snow",
             "Snow_Step_01",
@@ -4255,12 +4263,12 @@ def test_import_batch_group_order_is_transport_but_row_order_is_business_meaning
         "--switch-value",
         "snow",
         "Snow",
-        "--new-child-row",
+        "--new-row",
         "snow-step-01",
         "snow",
         "Snow_Step_01",
         "sound-sfx",
-        "--new-root-row",
+        "--new-row",
         "snow",
         "parent",
         "Snow",
@@ -4310,16 +4318,14 @@ def test_import_batch_group_order_is_transport_but_row_order_is_business_meaning
         duplicate,
     ) == duplicate
     broken_parent = list(renamed)
-    parent_index = broken_parent.index(
-        "container-snow",
-        broken_parent.index("--new-child-row") + 2,
-    )
+    parent_index = broken_parent.index("--new-row") + 2
+    assert broken_parent[parent_index] == "container-snow"
     broken_parent[parent_index] = "another-container"
     assert CodexGatewayBroker._normalize_business_declaration_fact_order(
         broker,
         step,
         tuple(broken_parent),
-    ) == tuple(broken_parent)
+    ) != step.arguments
 
 
 def test_business_request_normalizes_only_exact_live_bound_reference_paths() -> None:

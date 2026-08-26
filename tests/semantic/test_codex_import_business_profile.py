@@ -347,7 +347,9 @@ def test_implicit_create_uses_the_planned_parent_instead_of_live_binding_it() ->
         if step.subcommand == "draft-declare-import-batch"
     )
     assert "sound-sfx" in batch.arguments
-    assert "--new-child-row" in batch.arguments
+    assert "--new-row" in batch.arguments
+    assert "--new-root-row" not in batch.arguments
+    assert "--new-child-row" not in batch.arguments
     assert "language" not in batch.arguments
 
 
