@@ -470,7 +470,7 @@ def _business_binding_suffix_matches(
     for item in append:
         if not isinstance(item, str) or not item:
             return False
-        if item.startswith("["):
+        if item.startswith("[") or " required_when_" in item:
             has_optional = True
             break
         mandatory.append(item)

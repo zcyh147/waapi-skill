@@ -10,6 +10,9 @@ from typing import Any, Mapping, Sequence
 from wwise_waapi.operation_composer import operation_composer_digest
 from wwise_waapi.canonical import canonical_sha256
 from wwise_waapi.operation_registry import audio_import_business_contract
+from tests.semantic.support.typed_gateway_input import (
+    _business_copy_binding_was_used,
+)
 
 
 def test_audio_import_draft_digest_binds_only_the_registry_business_adapter() -> None:
@@ -347,6 +350,9 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
     assert parent_handle.startswith("boh1-")
     assert bound["draft"]["revision"] == 2
     bound_next = bound["draft"]["next_action_binding"]
+    assert bound_next["contract"] == (
+        "waapi-skill.business-draft-next-action/v1"
+    )
     assert bound_next["required_next_phase"] == (
         "complete_business_declarations_then_check"
     )
@@ -374,6 +380,24 @@ def test_audio_import_business_gateway_binds_and_declares_without_native_facts(
             "fixed_argv_prefix_copy"
         )
         assert action["fixed_argv_prefix_copy"]
+    declare_prefix = bound_next["declare_new"]["fixed_argv_prefix"][3:]
+    assert _business_copy_binding_was_used(
+        bound,
+        [
+            *declare_prefix,
+            "--declaration-id",
+            "row-001",
+            "--parent-handle",
+            parent_handle,
+            "--name",
+            "Rain",
+            "--kind",
+            "sound-sfx",
+            "--field",
+            "media_file",
+            str(media),
+        ],
+    )
     assert all(
         "--default" not in value
         for value in bound_next["configure"]["append"]
