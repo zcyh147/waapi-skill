@@ -4277,6 +4277,18 @@ def test_import_batch_group_order_is_transport_but_row_order_is_business_meaning
         step,
         reordered,
     ) == step.arguments
+    renamed = tuple(
+        {
+            "snow": "container-snow",
+            "snow-step-01": "sound-snow-01",
+        }.get(value, value)
+        for value in reordered
+    )
+    assert CodexGatewayBroker._normalize_business_declaration_fact_order(
+        broker,
+        step,
+        renamed,
+    ) == step.arguments
     wrong_order = list(reordered)
     first = wrong_order.index("snow", len(fixed))
     second = wrong_order.index("snow-step-01", first + 1)
@@ -4295,6 +4307,17 @@ def test_import_batch_group_order_is_transport_but_row_order_is_business_meaning
         step,
         duplicate,
     ) == duplicate
+    broken_parent = list(renamed)
+    parent_index = broken_parent.index(
+        "container-snow",
+        broken_parent.index("--new-child-row") + 2,
+    )
+    broken_parent[parent_index] = "another-container"
+    assert CodexGatewayBroker._normalize_business_declaration_fact_order(
+        broker,
+        step,
+        tuple(broken_parent),
+    ) == tuple(broken_parent)
 
 
 def test_business_request_normalizes_only_exact_live_bound_reference_paths() -> None:

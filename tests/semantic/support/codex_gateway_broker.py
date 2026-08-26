@@ -9468,10 +9468,55 @@ class CodexGatewayBroker:
         actual_groups = parse(tuple(actual))
         if expected_groups is None or actual_groups is None:
             return tuple(actual)
-        expected_order = [group[1] for group in expected_groups if group[0] == "--row-order"]
-        actual_order = [group[1] for group in actual_groups if group[0] == "--row-order"]
-        if actual_order != expected_order:
+        expected_order = [
+            group[1] for group in expected_groups if group[0] == "--row-order"
+        ]
+        actual_order = [
+            group[1] for group in actual_groups if group[0] == "--row-order"
+        ]
+        if (
+            len(actual_order) != len(expected_order)
+            or len(set(actual_order)) != len(actual_order)
+            or len(set(expected_order)) != len(expected_order)
+        ):
             return tuple(actual)
+        declaration_id_map = dict(zip(actual_order, expected_order, strict=True))
+
+        def canonicalize_declaration_ids(
+            group: tuple[Any, ...],
+        ) -> tuple[Any, ...] | None:
+            option = group[0]
+            if option in {
+                "--expected-declaration-count",
+                "--expected-switch-assignment-count",
+            }:
+                return group
+            declaration_id = group[1]
+            if not isinstance(declaration_id, str):
+                return None
+            canonical_id = declaration_id_map.get(declaration_id)
+            if canonical_id is None:
+                return None
+            canonical = list(group)
+            canonical[1] = canonical_id
+            if option == "--new-child-row":
+                parent_id = group[2]
+                if not isinstance(parent_id, str):
+                    return None
+                canonical_parent_id = declaration_id_map.get(parent_id)
+                if canonical_parent_id is None:
+                    return None
+                canonical[2] = canonical_parent_id
+            return tuple(canonical)
+
+        canonical_actual_groups = [
+            canonicalize_declaration_ids(group) for group in actual_groups
+        ]
+        if any(group is None for group in canonical_actual_groups):
+            return tuple(actual)
+        actual_groups = [
+            group for group in canonical_actual_groups if group is not None
+        ]
         expected_keys = [key(group, expected=True) for group in expected_groups]
         actual_keys = [key(group, expected=False) for group in actual_groups]
         if (
