@@ -135,6 +135,13 @@ from wwise_waapi.operation_composer import (
 )
 from wwise_waapi.operation_drafts import OperationDraftStore
 from wwise_waapi.operation_registry import operation_request_schema_digest
+from wwise_waapi.business_adapters import business_adapter
+from wwise_waapi.business_declaration_state import BusinessDeclarationSession
+from wwise_waapi.business_declarations import (
+    BusinessContext,
+    BusinessHandleRegistry,
+    ExistingObjectTarget,
+)
 from wwise_waapi.transaction_cleanup import transaction_cleanup_payload
 from wwise_waapi.typed_operations import inline_operation_cli_arguments
 from wwise_waapi.typed_requests import typed_request_construction_for_values
@@ -482,7 +489,9 @@ def test_archived_business_replay_rebinds_check_to_latest_batch_revision(
     )
 
 
-def test_archived_broker_replay_precomputes_switch_assignment_after_cleanup() -> None:
+def test_archived_broker_replay_uses_sealed_switch_assignment_state(
+    tmp_path: Path,
+) -> None:
     request = {
         "contract": "waapi-skill.operation-request/v1",
         "version": "2022.1",
@@ -512,6 +521,78 @@ def test_archived_broker_replay_precomputes_switch_assignment_after_cleanup() ->
         protocol.steps,
         tuple(step.name for step in protocol.steps),
     )
+    state_directory = tmp_path / "state"
+    operation = "switchContainer.removeAssignment"
+    version = "2022.1"
+    schema_digest = operation_request_schema_digest(operation, version)
+    composer_digest = operation_composer_digest(operation, version)
+    store = OperationDraftStore(state_directory)
+    started = store.start(
+        operation=operation,
+        version=version,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+    )
+    context = BusinessContext.create(
+        task_authority=started.task_authority,
+        project_id="{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+        project_path=str(tmp_path / "SampleProject.wproj"),
+        wwise_version=version,
+        wwise_build="2022.1.19.8584",
+    )
+    handles = BusinessHandleRegistry(context)
+    switch_container = handles.bind_object(
+        object_id="{11111111-1111-1111-1111-111111111111}",
+        name="Footsteps",
+        object_type="SwitchContainer",
+        path=request["arguments"]["switch_container"]["value"],
+        role="switch_container",
+    )
+    child = handles.bind_object(
+        object_id="{22222222-2222-2222-2222-222222222222}",
+        name="Mud",
+        object_type="RandomSequenceContainer",
+        path=request["arguments"]["child"]["value"],
+        role="child",
+    )
+    state_or_switch = handles.bind_object(
+        object_id="{33333333-3333-3333-3333-333333333333}",
+        name="Mud",
+        object_type="Switch",
+        path=request["arguments"]["state_or_switch"]["value"],
+        role="state_or_switch",
+    )
+    bound_session = BusinessDeclarationSession.create(
+        context
+    ).with_handle_registry(handles)
+    bound_record = store.apply_business_update(
+        started.record.draft_id,
+        task_authority=started.task_authority,
+        expected_revision=started.record.revision,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+        context=context,
+        update=lambda _session: bound_session,
+        event_type="handles.bound",
+    )
+    declared_session = bound_session.with_existing_declaration(
+        declaration_id="mud_assignment",
+        target=ExistingObjectTarget(switch_container.handle),
+        fields={
+            "child_handle": child.handle,
+            "state_or_switch_handle": state_or_switch.handle,
+        },
+    )
+    store.apply_business_update(
+        started.record.draft_id,
+        task_authority=started.task_authority,
+        expected_revision=bound_record.revision,
+        schema_digest=schema_digest,
+        composer_digest=composer_digest,
+        context=context,
+        update=lambda _session: declared_session,
+        event_type="declaration.added",
+    )
 
     replay = campaign._build_heavy_v3_broker_replay(
         skill_source=Path("skills/waapi-skill"),
@@ -522,11 +603,20 @@ def test_archived_broker_replay_precomputes_switch_assignment_after_cleanup() ->
         commutative_composer_setup_step_groups=(),
         expected_wwise_version="2022.1",
         project_modification_policy="ask_before_changes",
+        existing_state_directory=state_directory,
     )
 
-    assert replay._offline_replay_preview_requests[preview.name] == (  # noqa: SLF001
-        preview.expected_operation_request
-    )
+    start = next(step for step in protocol.steps if step.subcommand == "draft-start")
+    with replay:
+        replay._payloads_by_step[start.name] = {  # noqa: SLF001
+            "draft": {"draft_id": started.record.draft_id},
+            "task_authority": started.task_authority,
+        }
+        replayed = replay._replay_expected_operation_draft_request(  # noqa: SLF001
+            preview
+        )
+
+    assert replayed == business_adapter(operation).materialize(declared_session)
 
 
 def test_archived_broker_replay_rejects_undeclared_composer_interruption() -> None:

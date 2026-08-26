@@ -4337,6 +4337,7 @@ def _build_heavy_v3_broker_replay(
     commutative_composer_setup_step_groups: Sequence[Sequence[str]],
     expected_wwise_version: str,
     project_modification_policy: str,
+    existing_state_directory: Path | None = None,
 ) -> CodexGatewayBroker:
     """Build an offline replay from canonical policy and observed order.
 
@@ -4380,7 +4381,16 @@ def _build_heavy_v3_broker_replay(
 
     offline_replay_preview_requests: dict[str, Mapping[str, Any]] = {}
     for start_index, step in enumerate(execution):
-        if step.subcommand != "draft-start":
+        if (
+            step.subcommand != "draft-start"
+            or not step.arguments
+            or step.arguments[0]
+            not in {
+                "audio.import",
+                "lua.executeCliFile",
+                "lua.executeCoreFile",
+            }
+        ):
             continue
         next_start_index = next(
             (
@@ -4420,6 +4430,7 @@ def _build_heavy_v3_broker_replay(
         expected_wwise_version=expected_wwise_version,
         project_modification_policy=project_modification_policy,
         runner_environment={},
+        existing_state_directory=existing_state_directory,
         offline_replay_preview_requests=offline_replay_preview_requests,
     )
     # Offline replay never starts the Broker.  Its Draft payload validator must
@@ -5873,6 +5884,7 @@ def _validate_heavy_v3_broker_records(
         project_modification_policy=(
             expected_project_modification_policy or "ask_before_changes"
         ),
+        existing_state_directory=task_root / "broker" / "state",
     )
     record_keys = {
         "sequence",
