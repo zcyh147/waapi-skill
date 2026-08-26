@@ -2151,6 +2151,10 @@ _DRAFT_SUBCOMMANDS = frozenset(
         "preview-from-draft",
     }
 )
+DRAFT_REVISION_SUBCOMMANDS = _DRAFT_SUBCOMMANDS - {
+    "draft-start",
+    "draft-inspect",
+}
 _DRAFT_ID_RE = re.compile(r"^od1-[0-9a-f]{32}$")
 _DRAFT_AUTHORITY_RE = re.compile(r"^da1-[0-9a-f]{40}$")
 _DRAFT_HANDLE_RE = re.compile(
@@ -2160,24 +2164,10 @@ _NUMBERED_DRAFT_ACTION_STEP_RE = re.compile(r"^(?P<prefix>.+\.action\.)\d{3}$")
 _BUSINESS_DRAFT_SETUP_STEP_RE = re.compile(
     r"^(?P<prefix>.+)\.(?:configure|bind-(?:object|field)\.\d{3})$"
 )
-_BUSINESS_DRAFT_REVISION_SUBCOMMANDS = frozenset(
-    {
-        "draft-bind-object",
-        "draft-bind-field",
-        "draft-business-configure",
-        "draft-declare-import-batch",
-        "draft-declare-field-change",
-        "draft-declare-object-change",
-        "draft-declare-switch-assignment",
-        "draft-discover-fields",
-        "draft-declare-new",
-        "draft-declare-existing",
-        "draft-revise-declaration",
-        "draft-remove-declaration",
-        "draft-check",
-        "preview-from-draft",
-    }
-)
+_BUSINESS_DRAFT_REVISION_SUBCOMMANDS = DRAFT_REVISION_SUBCOMMANDS - {
+    "draft-apply",
+    "draft-cancel",
+}
 _TASK_LOCAL_DECLARATION_ID_RE = re.compile(
     r"^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$"
 )

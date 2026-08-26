@@ -281,6 +281,7 @@ from tests.semantic.support.codex_harness import (  # noqa: E402
 )
 from tests.semantic.support.codex_gateway_broker import (  # noqa: E402
     CodexGatewayBroker,
+    DRAFT_REVISION_SUBCOMMANDS,
     GatewayInvocationError,
     ResponseBinding,
     SemanticJsonArgument,
@@ -4302,12 +4303,7 @@ def _steps_in_consumed_order(
                     "consumed Draft inspect precedes draft-start"
                 )
             latest_revision_step = step.name
-        elif step.subcommand in {
-            "draft-apply",
-            "draft-check",
-            "draft-cancel",
-            "preview-from-draft",
-        }:
+        elif step.subcommand in DRAFT_REVISION_SUBCOMMANDS:
             if latest_revision_step is None:
                 raise CampaignEvidenceError(
                     "consumed Draft mutation precedes draft-start"
