@@ -98,6 +98,30 @@ class _LuaClient:
         pass
 
 
+class _TabClient(_LuaClient):
+    location_id = "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}"
+
+    def call(
+        self,
+        uri: str,
+        args: Mapping[str, Any] | None = None,
+        options: Mapping[str, Any] | None = None,
+    ) -> Mapping[str, Any]:
+        if uri == "ak.wwise.core.object.get":
+            self.calls.append(uri)
+            return {
+                "return": [
+                    {
+                        "id": self.location_id,
+                        "name": "Default Work Unit",
+                        "type": "WorkUnit",
+                        "path": r"\Containers\Default Work Unit",
+                    }
+                ]
+            }
+        return super().call(uri, args, options)
+
+
 @pytest.mark.parametrize(
     "version",
     ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
@@ -118,6 +142,7 @@ def test_tab_delimited_import_has_one_public_business_entry(
         "draft-declare-artifact-plan"
     )
     assert payload["business_adapter"]["legacy_inline_typed_public"] is False
+    assert payload["business_adapter"]["binding"]["role_required"] is True
     assert "typed_operation" not in payload
 
 
@@ -164,6 +189,72 @@ def test_retired_typed_ingresses_are_not_callable() -> None:
         )
     with pytest.raises(TypedOperationInputError, match="No typed Draft adapter"):
         draft_operation_request_contract("lua.executeCoreInline", "2025.1")
+
+
+def test_tab_business_draft_binds_the_disclosed_import_location_role(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "tab-business-state"
+    start_code, started = gateway.execute_gateway(
+        [
+            "--version",
+            "2025.1",
+            "--state-dir",
+            str(state_dir),
+            "draft-start",
+            "audio.importTabDelimited",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda url: pytest.fail(f"draft-start connected to {url}"),
+    )
+    assert start_code == 0, started
+    client = _TabClient(tmp_path)
+
+    missing_role_code, missing_role = gateway.execute_gateway(
+        [
+            "--version",
+            "2025.1",
+            "--state-dir",
+            str(state_dir),
+            "draft-bind-object",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(started["draft"]["revision"]),
+            "--object-id",
+            client.location_id,
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+    assert missing_role_code == 2, missing_role
+    assert "requires one disclosed role: import_location" in missing_role["message"]
+
+    bind_code, bound = gateway.execute_gateway(
+        [
+            "--version",
+            "2025.1",
+            "--state-dir",
+            str(state_dir),
+            "draft-bind-object",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(started["draft"]["revision"]),
+            "--role",
+            "import_location",
+            "--object-id",
+            client.location_id,
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert bind_code == 0, bound
+    assert bound["bound_object"]["role"] == "import_location"
+    assert bound["bound_object"]["type"] == "WorkUnit"
 
 
 def _preview_public_cli_lua_file(

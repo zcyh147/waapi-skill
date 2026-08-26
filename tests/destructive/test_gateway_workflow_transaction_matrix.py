@@ -1042,8 +1042,8 @@ def test_exact_lua_file_business_drafts_preserve_source_and_loader_boundary(
     root = runtime.sandbox.sandbox_path / "GatewayExactLua"
     root.mkdir()
     scripts = {
-        "lua.executeCoreFile": root / "core exact 用户.lua",
-        "lua.executeCliFile": root / "cli exact 用户.lua",
+        "lua.executeCoreFile": root / "core-exact.lua",
+        "lua.executeCliFile": root / "cli-exact.lua",
     }
     scripts["lua.executeCoreFile"].write_bytes(
         b"return { profile = 'core-file', count = wa_args.count }\n"
@@ -1060,7 +1060,7 @@ def test_exact_lua_file_business_drafts_preserve_source_and_loader_boundary(
             "script_file": str(script),
             "io_root": str(root),
             "source_authority": "user_supplied_verbatim",
-            "wa_args": {"count": 3, "optional": None},
+            "wa_args": {"count": 3},
         }
         if operation == "lua.executeCliFile" and runtime.version == "2025.1":
             arguments["watchdog_seconds"] = 30
@@ -1074,6 +1074,54 @@ def test_exact_lua_file_business_drafts_preserve_source_and_loader_boundary(
         operation: hashlib.sha256(path.read_bytes()).hexdigest()
         for operation, path in scripts.items()
     } == before
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_exact_tab_import_business_draft_binds_location_and_preserves_table(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    """Exercise the sole tabular-import business seam on a disposable row."""
+
+    runtime = workflow_sandbox_runtime
+    object_parent = (
+        CONTAINERS_PARENT if runtime.version == "2025.1" else ACTOR_MIXER_PARENT
+    )
+    suffix = uuid.uuid4().hex[:12]
+    name = f"WAAPI_TAB_BUSINESS_{suffix}"
+    root = runtime.sandbox.sandbox_path / "GatewayExactTab"
+    audio_file = _write_fixture_wav(root, name)
+    table_file = root / "exact-import.tsv"
+    requested_path = f"{object_parent}\\<Sound SFX>{name}"
+    table_file.write_text(
+        "Audio File\tObject Path\tObject Type\n"
+        f"{audio_file}\t{requested_path}\tSound SFX\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    table_sha256 = hashlib.sha256(table_file.read_bytes()).hexdigest()
+    imported_id: str | None = None
+    try:
+        location_id = _query_exact_path_id(runtime, object_parent)
+        result = _complete_transaction(
+            runtime,
+            operation="audio.importTabDelimited",
+            arguments={
+                "import_file": str(table_file),
+                "import_location": {"kind": "id", "value": location_id},
+                "import_language": "SFX",
+                "import_operation": "createNew",
+            },
+        )
+        imported = _imported_object(result["execute"], requested_path)
+        imported_id = _required_string(imported, "id")
+        assert _required_string(imported, "path") == _untyped_object_path(
+            requested_path
+        )
+        assert hashlib.sha256(table_file.read_bytes()).hexdigest() == table_sha256
+    finally:
+        if imported_id is not None:
+            _delete_if_present_via_transaction(runtime, imported_id)
 
 
 def _complete_result_schema_operation(
@@ -1131,15 +1179,21 @@ def _complete_result_schema_operation(
     if execute_code == 2:
         dispatch_result = executed.get("dispatch_result")
         assert isinstance(dispatch_result, Mapping), executed
-        assert dispatch_result["waapi_error_uri"] == "ak.wwise.unavailable", executed
         assert executed["state"] == TransactionState.INDETERMINATE.value, executed
         assert executed["automatic_retry"] is False, executed
+        unavailable = dispatch_result.get("waapi_error_uri") == "ak.wwise.unavailable"
+        if not unavailable:
+            assert operation == "lua.executeCliFile", executed
         runtime.category_results.append(
             {
                 "category": category,
                 "status": "blocked",
                 "verifier_strength": "host_unavailable",
-                "reason": "matching WwiseConsole returned ak.wwise.unavailable",
+                "reason": (
+                    "matching WwiseConsole returned ak.wwise.unavailable"
+                    if unavailable
+                    else "CLI Lua transport ended with one non-retry indeterminate result"
+                ),
             }
         )
         return

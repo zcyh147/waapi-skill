@@ -216,6 +216,7 @@ def soundbank_business_contract_data(
         "binding": {
             "subcommand": "draft-bind-object",
             "roles": list(declaration["binding_roles"]),
+            "role_required": bool(declaration["binding_roles"]),
             "identity": "live_bound_object_handle",
             "validation": "exact_guid_name_type_path",
         },

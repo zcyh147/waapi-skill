@@ -72,6 +72,7 @@ def exact_artifact_business_contract_data(
         "binding": {
             "subcommand": "draft-bind-object",
             "roles": list(_BINDING_ROLES[operation]),
+            "role_required": bool(_BINDING_ROLES[operation]),
             "identity": "live_bound_object_handle",
             "validation": "exact_guid_name_type_path",
         },

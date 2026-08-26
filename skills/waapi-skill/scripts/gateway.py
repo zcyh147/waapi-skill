@@ -11634,20 +11634,29 @@ def dispatch_business_object_binding(
     if role_declaration is None:
         business_contract = adapter.contract(detected_version)
         contract_binding = business_contract.get("binding")
-        soundbank_roles = (
+        contract_roles = (
             tuple(contract_binding.get("roles", ()))
-            if adapter.family == "soundbank-planning"
-            and isinstance(contract_binding, Mapping)
+            if isinstance(contract_binding, Mapping)
             else ()
         )
-        if soundbank_roles and args.role not in soundbank_roles:
-            raise GatewayInputError(
-                "SoundBank object binding requires one disclosed business role: "
-                + ", ".join(soundbank_roles)
-            )
-        if not soundbank_roles and args.role is not None:
+        role_required = (
+            contract_binding.get("role_required") is True
+            if isinstance(contract_binding, Mapping)
+            else False
+        )
+        if args.role is not None and not contract_roles:
             raise GatewayInputError(
                 f"Business object roles are unavailable for {binding.record.operation}"
+            )
+        if args.role is not None and args.role not in contract_roles:
+            raise GatewayInputError(
+                "Business object binding requires one disclosed role: "
+                + ", ".join(contract_roles)
+            )
+        if role_required and args.role is None:
+            raise GatewayInputError(
+                "Business object binding requires one disclosed role: "
+                + ", ".join(contract_roles)
             )
     else:
         raw_session = (
