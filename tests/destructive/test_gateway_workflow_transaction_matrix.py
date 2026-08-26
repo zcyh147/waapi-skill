@@ -692,12 +692,10 @@ def test_closed_gateway_workflows_across_selected_version(
             expected=[],
         )
 
-        soundbank_io_root = (
-            runtime.sandbox.sandbox_path
-            / "GatewayWorkflowSoundBank"
-            / unique_suffix
-        )
-        soundbank_io_root.mkdir(parents=True, exist_ok=False)
+        # SoundBank file authority must own both the active sandbox project and
+        # every exact input/output artifact.  The sandbox is already unique to
+        # this test attempt, so it is the narrowest valid I/O root.
+        soundbank_io_root = runtime.sandbox.sandbox_path
         soundbank_name = (
             f"WAAPI_GATEWAY_BANK_{runtime.version.replace('.', '_')}_{unique_suffix}"
         )
