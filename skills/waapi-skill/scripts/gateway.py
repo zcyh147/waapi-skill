@@ -11545,7 +11545,9 @@ def dispatch_business_object_binding(
             "project_call": dispatch_call_summary(binding.project_call),
             "bound_object": {
                 "handle": bound.handle,
+                "id": bound.object_id,
                 "name": bound.name,
+                "path": bound.path,
                 "type": bound.object_type,
                 "semantic_kind": bound.semantic_kind,
                 **({} if bound.role is None else {"role": bound.role}),
