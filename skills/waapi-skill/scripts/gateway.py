@@ -11179,6 +11179,7 @@ def dispatch_business_object_binding(
             object_type=str(row["type"]),
             path=str(row["path"]),
             semantic_kind=semantic_kind,
+            role=args.role,
         )
         captured.append(bound)
         return current.with_handle_registry(handles)
@@ -11218,6 +11219,7 @@ def dispatch_business_object_binding(
                 "name": bound.name,
                 "type": bound.object_type,
                 "semantic_kind": bound.semantic_kind,
+                **({} if bound.role is None else {"role": bound.role}),
             },
         }
     )

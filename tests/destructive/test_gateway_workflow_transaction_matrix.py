@@ -235,6 +235,7 @@ def _bind_business_object(
     *,
     object_id: str | None = None,
     path_segments: Sequence[str] = (),
+    role: str | None = None,
 ) -> str:
     assert (object_id is None) != (not path_segments)
     arguments = (
@@ -250,7 +251,7 @@ def _bind_business_object(
         runtime,
         draft,
         "draft-bind-object",
-        arguments,
+        [*(() if role is None else ("--role", role)), *arguments],
         live=True,
     )
     bound = payload.get("bound_object")
@@ -1162,7 +1163,12 @@ def _create_switch_assignment_business_preview(
 
     draft = _start_business_draft(runtime, operation)
     handles = {
-        role: _bind_business_object(runtime, draft, object_id=object_id)
+        role: _bind_business_object(
+            runtime,
+            draft,
+            object_id=object_id,
+            role=role,
+        )
         for role, object_id in identities.items()
     }
     _update_business_draft(

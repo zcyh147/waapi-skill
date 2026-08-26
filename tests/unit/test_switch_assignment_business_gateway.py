@@ -392,6 +392,79 @@ def test_switch_assignment_binding_rejects_missing_or_wrong_role_atomically(
     }
 
 
+def test_switch_assignment_declaration_rejects_swapped_role_handles_atomically(
+    tmp_path: Path,
+) -> None:
+    start_code, started = _offline(
+        tmp_path,
+        "draft-start",
+        "switchContainer.addAssignment",
+    )
+    assert start_code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    container = _bind(
+        tmp_path,
+        draft_id=draft_id,
+        authority=authority,
+        revision=1,
+        role="switch_container",
+        object_id=CONTAINER_ID,
+        name="Footsteps",
+        object_type="SwitchContainer",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps",
+    )
+    child = _bind(
+        tmp_path,
+        draft_id=draft_id,
+        authority=authority,
+        revision=2,
+        role="child",
+        object_id=CHILD_ID,
+        name="Snow_Step",
+        object_type="Sound",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit\Footsteps\Snow_Step",
+    )
+    value = _bind(
+        tmp_path,
+        draft_id=draft_id,
+        authority=authority,
+        revision=3,
+        role="state_or_switch",
+        object_id=VALUE_ID,
+        name="Snow",
+        object_type="Switch",
+        path=r"\Switches\Default Work Unit\Surface\Snow",
+    )
+
+    code, rejected = _offline(
+        tmp_path,
+        "draft-declare-switch-assignment",
+        draft_id,
+        "--task-authority",
+        authority,
+        "--expected-revision",
+        "4",
+        "--switch-container-handle",
+        child["bound_object"]["handle"],
+        "--child-handle",
+        container["bound_object"]["handle"],
+        "--state-or-switch-handle",
+        value["bound_object"]["handle"],
+    )
+
+    assert code == 2
+    assert rejected["error_code"] == "BOUND_OBJECT_ROLE_MISMATCH"
+    record = OperationDraftStore(tmp_path / "state").inspect(
+        draft_id,
+        task_authority=authority,
+    )
+    assert record.revision == 4
+    assert record.composition is not None
+    session = record.composition["business_session"]
+    assert session["declarations"] == []
+
+
 def test_switch_assignment_draft_check_rejects_bound_role_drift(
     tmp_path: Path,
 ) -> None:

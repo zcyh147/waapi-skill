@@ -222,6 +222,7 @@ class BoundObjectHandle:
     object_type: str
     path: str
     semantic_kind: str | None
+    role: str | None
     binding_digest: str
 
 
@@ -457,6 +458,7 @@ class BusinessHandleRegistry:
         object_type: str,
         path: str,
         semantic_kind: str | None = None,
+        role: str | None = None,
     ) -> BoundObjectHandle:
         if not isinstance(object_id, str) or not _CANONICAL_GUID.fullmatch(object_id):
             raise ValueError("object_id must be a canonical Wwise GUID")
@@ -476,6 +478,15 @@ class BusinessHandleRegistry:
                 raise ValueError("semantic_kind must be a closed Sound kind")
             if _type_token(normalized_type) != "sound":
                 raise ValueError("semantic_kind is valid only for live Sound objects")
+        normalized_role = (
+            None
+            if role is None
+            else _bounded_required_text(
+                role,
+                field="role",
+                maximum_bytes=MAX_FIELD_TOKEN_BYTES,
+            )
+        )
         material = {
             "contract": BOUND_OBJECT_HANDLE_CONTRACT,
             "context": self.context.as_binding_dict(),
@@ -484,6 +495,7 @@ class BusinessHandleRegistry:
             "object_type": normalized_type,
             "path": normalized_path,
             "semantic_kind": semantic_kind,
+            **({} if normalized_role is None else {"role": normalized_role}),
         }
         digest = canonical_sha256(material)
         handle = self._new_handle("boh1", digest)
@@ -495,6 +507,7 @@ class BusinessHandleRegistry:
             object_type=normalized_type,
             path=normalized_path,
             semantic_kind=semantic_kind,
+            role=normalized_role,
             binding_digest=digest,
         )
         self._objects[handle] = bound
@@ -513,6 +526,7 @@ class BusinessHandleRegistry:
                     "object_type": row.object_type,
                     "path": row.path,
                     "semantic_kind": row.semantic_kind,
+                    **({} if row.role is None else {"role": row.role}),
                     "binding_digest": row.binding_digest,
                 }
                 for row in sorted(self._objects.values(), key=lambda item: item.handle)
@@ -1633,7 +1647,10 @@ def _bound_object_from_dict(
         "semantic_kind",
         "binding_digest",
     }
-    if not isinstance(payload, Mapping) or set(payload) != expected:
+    if (
+        not isinstance(payload, Mapping)
+        or set(payload) not in (expected, {*expected, "role"})
+    ):
         raise ValueError("bound object handle fields are invalid")
     handle = payload.get("handle")
     object_id = payload.get("object_id")
@@ -1658,6 +1675,13 @@ def _bound_object_from_dict(
             raise ValueError("bound object semantic kind is invalid")
         if _type_token(object_type) != "sound":
             raise ValueError("bound object semantic kind requires a Sound")
+    role = payload.get("role")
+    if role is not None:
+        role = _bounded_required_text(
+            role,
+            field="role",
+            maximum_bytes=MAX_FIELD_TOKEN_BYTES,
+        )
     path = _bounded_required_text(
         payload.get("path"), field="path", maximum_bytes=MAX_BUSINESS_PATH_BYTES
     )
@@ -1671,6 +1695,7 @@ def _bound_object_from_dict(
         "object_type": object_type,
         "path": path,
         "semantic_kind": semantic_kind,
+        **({} if role is None else {"role": role}),
     }
     expected_digest = canonical_sha256(material)
     if (
@@ -1687,6 +1712,7 @@ def _bound_object_from_dict(
         object_type=object_type,
         path=path,
         semantic_kind=semantic_kind,
+        role=role,
         binding_digest=digest,
     )
 

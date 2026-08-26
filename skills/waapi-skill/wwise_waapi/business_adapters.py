@@ -7,7 +7,7 @@ from typing import Any, Callable, Mapping
 
 from .audio_import_business_contracts import audio_import_business_contract_data
 from .business_declaration_state import BusinessDeclarationSession
-from .business_declarations import ExistingObjectTarget
+from .business_declarations import ExistingObjectTarget, business_repair
 from .object_lifecycle_business_contracts import (
     object_lifecycle_business_contract_data,
 )
@@ -54,6 +54,20 @@ class BusinessRoleDeclaration:
     ) -> BusinessDeclarationSession:
         if set(values) != set(self.required_fields):
             raise TypeError("role declaration values do not match its Adapter contract")
+        for role, field in zip(self.roles, self.required_fields, strict=True):
+            bound = session.handles.resolve_object(values[field])
+            if bound.role != role:
+                raise business_repair(
+                    "BOUND_OBJECT_ROLE_MISMATCH",
+                    field=field,
+                    draft_revision=session.revision,
+                    expected_role=role,
+                    actual_role=bound.role,
+                    action=(
+                        "copy the handle returned by the matching Gateway-owned "
+                        "role continuation"
+                    ),
+                )
         return session.with_existing_declaration(
             declaration_id=self.declaration_id,
             target=ExistingObjectTarget(values[self.target_field]),
