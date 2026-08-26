@@ -430,6 +430,8 @@ class HeadlessLifecycle:
                 "stdout": subprocess.PIPE,
                 "stderr": subprocess.PIPE,
                 "text": True,
+                "encoding": "utf-8",
+                "errors": "replace",
                 "bufsize": 1,
             }
             if self.launch_cwd is not None:

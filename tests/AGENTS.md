@@ -171,6 +171,10 @@ Audit rows include the pid, port, command, sandbox project, `getInfo` version pr
 
 During WwiseConsole startup, repeated `ConnectionRefusedError` lines from WAAPI probes can be normal while Wwise loads the project, missing-plugin warnings, or WAAPI server listeners. Do not treat those probe errors as failure by themselves; judge the run by the final `smoke ok`/`getInfo` proof, `ReadinessTimeout`, or `EarlyProcessExit` diagnostics. For slow 2021.1 launches, `WWISE_READINESS_TIMEOUT=180` and optional `WWISE_WAAPI_PORT=<port>` are valid debugging overrides.
 
+WwiseConsole stdout/stderr is drained as UTF-8 with replacement for malformed
+bytes. Keep that explicit decoder on Windows; the locale default can be GBK
+and can terminate the drain thread on platform labels such as `Windows®`.
+
 ### SoundBank file-operation fixtures
 
 Keep the file-authority sequence explicit in real SoundBank workflows. The

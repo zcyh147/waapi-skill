@@ -426,6 +426,8 @@ def test_launch_passes_launch_env_to_process_factory(tmp_path: Path) -> None:
     lifecycle.launch()
 
     assert seen_kwargs[0]["env"]["WINEPREFIX"] == str(tmp_path / ".wine-prefix")
+    assert seen_kwargs[0]["encoding"] == "utf-8"
+    assert seen_kwargs[0]["errors"] == "replace"
     lifecycle.shutdown(suppress_errors=True)
 
 
