@@ -50,7 +50,6 @@ INLINE_OPERATIONS = frozenset(
         "object.delete",
         "object.copy",
         "object.move",
-        "soundbank.processDefinitionFiles",
         "audio.importTabDelimited",
         "ui.captureScreen",
         "ui.commands.execute",
@@ -58,9 +57,6 @@ INLINE_OPERATIONS = frozenset(
 )
 DRAFT_TYPED_OPERATIONS = frozenset(
     {
-        "soundbank.convertExternalSources",
-        "soundbank.generate",
-        "soundbank.setInclusions",
         "ui.commands.register",
         "ui.commands.unregister",
         "lua.executeCliFile",
@@ -337,26 +333,6 @@ def materialize_inline_operation_request(
             raise TypedOperationInputError("command files are available only in Wwise 2025.1")
         if "value" in values:
             arguments["value"] = _typed_scalar(values["value_type"], values["value"])
-    elif operation == "soundbank.processDefinitionFiles":
-        _require_keys(values, required=frozenset({"files", "io_root"}))
-        files = values["files"]
-        if (
-            not isinstance(files, Sequence)
-            or isinstance(files, (str, bytes))
-            or not files
-            or len(files) > 32
-        ):
-            raise TypedOperationInputError(
-                "soundbank.processDefinitionFiles requires 1-32 caller-owned files"
-            )
-        arguments = {
-            "files": [
-                _bounded_text(path, field="file", allow_empty=False) for path in files
-            ],
-            "io_root": _bounded_text(
-                values["io_root"], field="io_root", allow_empty=False
-            ),
-        }
     elif operation in {"object.setName", "object.setNotes"}:
         _require_keys(values, required=frozenset({"object", "text"}))
         arguments = {
@@ -699,10 +675,7 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
         else ["--enable true|false"]
         if operation in {"debug.setAsserts", "debug.setAutomationMode"}
         else (
-            ["--file ABSOLUTE_PATH (repeat 1-32)", "--io-root ABSOLUTE_PATH"]
-            if operation == "soundbank.processDefinitionFiles"
-            else (
-                [
+            [
                     "--import-file ABSOLUTE_PATH",
                     "--import-location SELECTOR_KIND SELECTOR_VALUES...",
                     "--import-language LANGUAGE",
@@ -720,7 +693,6 @@ def inline_operation_contract(operation: str, version: str) -> dict[str, Any]:
                 else ["--command ID", "--command-object VALUE (repeat)", "--command-platform VALUE (repeat)", "--value TYPE VALUE (optional)", "--file ABSOLUTE_PATH (2025.1 only; repeat)"]
                 if operation == "ui.commands.execute"
                 else ["--object SELECTOR"]
-            )
         )
     )
     schema_digest = operation_request_schema_digest(operation, version)

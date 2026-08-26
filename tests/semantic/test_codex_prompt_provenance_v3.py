@@ -2063,10 +2063,9 @@ def test_soundbank_generate_equivalence_round_trips_and_rejects_wrong_route() ->
     )
     protocol = build_transaction_protocol((request,))
     serialized = serialize_protocol(protocol)
-    assert [step["subcommand"] for step in serialized["steps"][:7]] == [
+    assert [step["subcommand"] for step in serialized["steps"][:6]] == [
         "operation-schema",
         "draft-start",
-        "query-object",
         "draft-bind-object",
         "draft-declare-soundbank-plan",
         "draft-check",

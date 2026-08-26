@@ -595,17 +595,17 @@ def test_typed_definition_files_is_not_public_after_business_cutover(
     definition = str((tmp_path / "Definition File.tsv").resolve())
     io_root = str(tmp_path.resolve())
     client = FakeClient({"ak.wwise.core.getInfo": [live_info()]})
-    code, payload = waapi_gateway.execute_gateway(
-        [
-            "typed-operation", operation, "--schema-digest", digest, "--apply",
-            "--file", definition, "--io-root", io_root,
-        ],
-        env=gateway_env(tmp_path),
-        client_factory=lambda _url: client,
-    )
+    with pytest.raises(SystemExit) as removed:
+        waapi_gateway.execute_gateway(
+            [
+                "typed-operation", operation, "--schema-digest", digest, "--apply",
+                "--file", definition, "--io-root", io_root,
+            ],
+            env=gateway_env(tmp_path),
+            client_factory=lambda _url: client,
+        )
 
-    assert code == 2, payload
-    assert payload["error_code"] == "GatewayInputError"
+    assert removed.value.code == 2
     assert captured == []
 
 

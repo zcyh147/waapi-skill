@@ -213,6 +213,13 @@ from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[re
     validate_prepared_roles,
     verify_prepared_operation,
 )
+from wwise_waapi.operation_object import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    ObjectOperationContractError,
+    normalize_object_identity,
+)
+from wwise_waapi.waql import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    quote_waql_literal,
+)
 from wwise_waapi.typed_operations import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     DRAFT_TYPED_OPERATIONS,
     INLINE_OPERATIONS,
@@ -2150,6 +2157,11 @@ def build_parser() -> argparse.ArgumentParser:
     object_selector.add_argument("--object-id")
     object_selector.add_argument("--object-path")
     object_selector.add_argument("--object-path-segment", action="append")
+    object_selector.add_argument(
+        "--exact-type-name",
+        nargs=2,
+        metavar=("TYPE", "NAME"),
+    )
     draft_bind_object.add_argument("--role")
 
     draft_bind_field = subparsers.add_parser(
@@ -11540,12 +11552,37 @@ def dispatch_business_object_binding(
     object_path = args.object_path
     if args.object_path_segment is not None:
         object_path = _business_object_path_from_segments(args.object_path_segment)
+    exact_type_name: tuple[str, str] | None = None
+    if args.exact_type_name is not None:
+        try:
+            identity = normalize_object_identity(
+                {
+                    "kind": "exact-type-name",
+                    "type": args.exact_type_name[0],
+                    "name": args.exact_type_name[1],
+                },
+                path="draft-bind-object.exact-type-name",
+            )
+        except ObjectOperationContractError as exc:
+            raise GatewayInputError(str(exc)) from exc
+        assert identity.type is not None and identity.name is not None
+        exact_type_name = (identity.type, identity.name)
     if args.object_id is not None:
         selector = {"from": {"id": [args.object_id]}}
     elif object_path is not None:
         selector = {"from": {"path": [object_path]}}
+    elif exact_type_name is not None:
+        object_type, object_name = exact_type_name
+        selector = {
+            "waql": (
+                f"from type {object_type} where name = "
+                f"{quote_waql_literal(object_name)} take 2"
+            )
+        }
     else:
-        raise GatewayInputError("Business object binding requires an exact GUID or path")
+        raise GatewayInputError(
+            "Business object binding requires an exact GUID, path, or typed name"
+        )
     raw = binding.read_call(
         OBJECT_GET_URI,
         selector,
@@ -11579,6 +11616,10 @@ def dispatch_business_object_binding(
         )
         or (args.object_id is not None and str(row["id"]).upper() != args.object_id.upper())
         or (object_path is not None and row["path"] != object_path)
+        or (
+            exact_type_name is not None
+            and (row["type"], row["name"]) != exact_type_name
+        )
     ):
         raise GatewayResultShapeError(
             "Live business object row does not match its exact selector.",
@@ -16584,6 +16625,26 @@ def _business_next_action_binding(
             ),
         }
     if adapter.family == "soundbank-planning":
+        soundbank_exact_type_name = operation_draft_prefix_copy_binding(
+            object_bind_prefix
+        )
+        soundbank_exact_type_name["append"] = [
+            "--exact-type-name",
+            "<exact-wwise-type>",
+            "<exact-object-name>",
+        ]
+        soundbank_object_binding = {
+            **object_binding,
+            "by_exact_type_name": soundbank_exact_type_name,
+            "selection_rule": (
+                "user_supplied_complete_path_requires_by_path_segments; "
+                "user_supplied_exact_type_and_name_requires_by_exact_type_name; "
+                "user_selected_guid_uses_by_id"
+            ),
+            "name_rule": (
+                "an_unscoped_name_is_valid_only_when_paired_with_one_exact_wwise_type"
+            ),
+        }
         shared = {
             "contract": "waapi-skill.business-draft-next-action/v1",
             "responsibility_split": {
@@ -16592,7 +16653,12 @@ def _business_next_action_binding(
             },
             "business_contract": business_contract,
             "forbidden_inputs": [
-                *forbidden_inputs,
+                *(
+                    item
+                    for item in forbidden_inputs
+                    if item != "object_type"
+                ),
+                "native_object_type_field",
                 "native_soundbank_row",
                 "identity_selector",
                 "skip_languages",
@@ -16665,7 +16731,7 @@ def _business_next_action_binding(
         }
         if binding_roles:
             result["object_binding"] = {
-                **object_binding,
+                **soundbank_object_binding,
                 "use_only_for": binding_roles,
                 "repeat_until": "every_object_named_by_the_business_plan_is_bound",
             }

@@ -11,7 +11,6 @@ import socket
 import subprocess
 import threading
 import time
-from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Mapping
@@ -3314,49 +3313,6 @@ def test_soundbank_business_plan_witness_replays_the_exact_canonical_request(
     assert broker._replay_expected_operation_draft_request(  # noqa: SLF001
         preview
     ) == request
-
-
-def test_in_draft_name_query_must_feed_the_later_soundbank_binding() -> None:
-    request = {
-        "contract": "waapi-skill.operation-request/v1",
-        "version": "2025.1",
-        "operation": "soundbank.generate",
-        "arguments": {
-            "soundbanks": [
-                {
-                    "name": "Harbor",
-                    "artifact_expectation": "nonlocalized",
-                    "rebuild": False,
-                }
-            ],
-            "platforms": ["Windows"],
-            "skip_languages": True,
-            "write_to_disk": True,
-            "io_root": native_absolute_test_path("soundbank-output"),
-        },
-    }
-    protocol = build_transaction_protocol((request,))
-    broker_module.validate_operation_draft_protocol_steps(protocol.steps)
-    bind_index = next(
-        index
-        for index, step in enumerate(protocol.steps)
-        if step.subcommand == "draft-bind-object"
-    )
-    bind = protocol.steps[bind_index]
-    tampered = (
-        *protocol.steps[:bind_index],
-        replace(
-            bind,
-            arguments=(
-                *bind.arguments[:-1],
-                "{11111111-1111-1111-1111-111111111111}",
-            ),
-        ),
-        *protocol.steps[bind_index + 1 :],
-    )
-
-    with pytest.raises(ValueError, match="must feed a later object binding"):
-        broker_module.validate_operation_draft_protocol_steps(tampered)
 
 
 def _archive_test_object_set_protocol_batches_independent_targets_through_public_gateway(

@@ -1031,11 +1031,16 @@ def test_soundbank_generate_transaction_uses_one_complete_business_plan() -> Non
     assert "--no-rebuild-soundbanks" in declare.arguments
     assert "--no-clear-audio-file-cache" in declare.arguments
     assert "--no-rebuild-init-bank" in declare.arguments
-    assert any(step.subcommand == "query-object" for step in protocol.steps)
     assert any(step.subcommand == "draft-bind-object" for step in protocol.steps)
-    subcommands = [step.subcommand for step in protocol.steps]
-    assert subcommands.index("draft-start") < subcommands.index("query-object")
-    assert subcommands.index("query-object") < subcommands.index("draft-bind-object")
+    binding = next(
+        step for step in protocol.steps if step.subcommand == "draft-bind-object"
+    )
+    assert binding.arguments[-3:] == (
+        "--exact-type-name",
+        "SoundBank",
+        "Main_UI",
+    )
+    assert all(step.subcommand != "query-object" for step in protocol.steps)
     assert any(step.subcommand == "preview-from-draft" for step in protocol.steps)
     assert all(step.subcommand != "draft-apply" for step in protocol.steps)
     assert all(step.subcommand != "typed-operation" for step in protocol.steps)
@@ -1071,9 +1076,6 @@ def test_multi_bank_business_plan_binds_each_bank_once_before_one_declaration() 
     }
 
     protocol = build_transaction_protocol([request])
-    queries = [
-        step for step in protocol.steps if step.subcommand == "query-object"
-    ]
     bindings = [
         step for step in protocol.steps if step.subcommand == "draft-bind-object"
     ]
@@ -1083,8 +1085,12 @@ def test_multi_bank_business_plan_binds_each_bank_once_before_one_declaration() 
         if step.subcommand == "draft-declare-soundbank-plan"
     ]
 
-    assert [step.arguments[6] for step in queries] == ["Main_UI", "Dialogue"]
+    assert all(step.subcommand != "query-object" for step in protocol.steps)
     assert len(bindings) == 2
+    assert [step.arguments[-3:] for step in bindings] == [
+        ("--exact-type-name", "SoundBank", "Main_UI"),
+        ("--exact-type-name", "SoundBank", "Dialogue"),
+    ]
     assert len(declarations) == 1
     declare = declarations[0]
     assert declare.arguments.count("--soundbank") == 2

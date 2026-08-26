@@ -1617,6 +1617,21 @@ def _normalize_identity(
     return ObjectIdentityDescriptor(kind=kind, name=name, type=object_type, parent=parent)
 
 
+def normalize_object_identity(
+    payload: Any,
+    *,
+    path: str = "identity",
+    limits: ObjectTreeLimits | None = None,
+) -> ObjectIdentityDescriptor:
+    """Validate one public closed object identity without materializing WAAPI."""
+
+    return _normalize_identity(
+        payload,
+        path=path,
+        limits=ObjectTreeLimits() if limits is None else limits,
+    )
+
+
 def _flatten_result_node(
     payload: Any,
     *,
@@ -1952,6 +1967,7 @@ __all__ = [
     "normalize_conflict_policy",
     "normalize_object_forest",
     "normalize_object_import",
+    "normalize_object_identity",
     "normalize_object_list_name",
     "normalize_object_lists",
     "normalize_object_node",

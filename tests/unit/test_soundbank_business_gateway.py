@@ -48,8 +48,10 @@ class FakeClient:
         self.responses = {
             uri: deque(values) for uri, values in responses.items()
         }
+        self.calls: list[tuple[str, Any, Any]] = []
 
     def call(self, uri: str, args: Any = None, options: Any = None) -> Any:
+        self.calls.append((uri, args, options))
         values = self.responses.get(uri)
         if not values:
             raise AssertionError(f"Unexpected WAAPI call: {uri} {args!r} {options!r}")
@@ -297,23 +299,26 @@ def test_shallow_soundbank_input_commands_are_rejected_without_state_change(
             "trh1-" + "0" * 24,
         )
     else:
-        code, rejected = gateway.execute_gateway(
-            [
-                "typed-operation",
-                operation,
-                "--schema-digest",
-                operation_request_schema_digest(operation, "2025.1"),
-                "--apply",
-                "--file",
-                str(tmp_path / "Harbor.tsv"),
-                "--io-root",
-                str(tmp_path),
-            ],
-            env=_env(tmp_path),
-            client_factory=lambda url: pytest.fail(
-                f"retired typed operation connected to {url}"
-            ),
-        )
+        with pytest.raises(SystemExit) as removed:
+            gateway.execute_gateway(
+                [
+                    "typed-operation",
+                    operation,
+                    "--schema-digest",
+                    operation_request_schema_digest(operation, "2025.1"),
+                    "--apply",
+                    "--file",
+                    str(tmp_path / "Harbor.tsv"),
+                    "--io-root",
+                    str(tmp_path),
+                ],
+                env=_env(tmp_path),
+                client_factory=lambda url: pytest.fail(
+                    f"retired typed operation connected to {url}"
+                ),
+            )
+        assert removed.value.code == 2
+        code, rejected = 2, {"removed_from_parser": True}
 
     assert code == 2, rejected
     after = store.inspect(
@@ -461,6 +466,67 @@ def test_set_inclusions_binds_objects_then_declares_only_business_rows(
             }
         ],
     }
+
+
+def test_soundbank_draft_binds_one_exact_type_name_without_a_separate_query(
+    tmp_path: Path,
+) -> None:
+    code, started = _offline(tmp_path, "draft-start", "soundbank.generate")
+    assert code == 0, started
+    binding = started["draft"]["next_action_binding"]["object_binding"]
+    assert binding["by_exact_type_name"]["append"] == [
+        "--exact-type-name",
+        "<exact-wwise-type>",
+        "<exact-object-name>",
+    ]
+    client = FakeClient(
+        {
+            "ak.wwise.core.getInfo": [_info()],
+            "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+            "ak.wwise.core.object.get": [
+                {
+                    "return": [
+                        {
+                            "id": BANK_ID,
+                            "name": "Harbor",
+                            "type": "SoundBank",
+                            "path": r"\SoundBanks\Default Work Unit\Harbor",
+                        }
+                    ]
+                }
+            ],
+        }
+    )
+    code, bound = gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(tmp_path / "state"),
+            "draft-bind-object",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            "1",
+            "--exact-type-name",
+            "SoundBank",
+            "Harbor",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert code == 0, bound
+    assert bound["bound_object"]["handle"].startswith("boh1-")
+    object_calls = [
+        call for call in client.calls if call[0] == "ak.wwise.core.object.get"
+    ]
+    assert object_calls == [
+        (
+            "ak.wwise.core.object.get",
+            {"waql": 'from type SoundBank where name = "Harbor" take 2'},
+            {"return": ["id", "name", "type", "path"]},
+        )
+    ]
 
 
 def test_generate_plan_binds_business_objects_and_derives_native_switches(

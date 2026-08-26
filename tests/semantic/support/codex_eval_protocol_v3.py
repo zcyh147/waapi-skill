@@ -168,11 +168,25 @@ class _BusinessDraftSteps:
             )
         kind = selector.get("kind")
         value = selector.get("value")
-        if kind not in {"id", "path"} or not isinstance(value, str) or not value:
-            raise V3ProtocolError(
-                f"{error_subject} identity must be exact id or path"
+        if kind == "exact-type-name":
+            object_type = selector.get("type")
+            name = selector.get("name")
+            if (
+                set(selector) != {"kind", "type", "name"}
+                or not isinstance(object_type, str)
+                or not object_type
+                or not isinstance(name, str)
+                or not name
+            ):
+                raise V3ProtocolError(
+                    f"{error_subject} exact typed name is invalid"
+                )
+            selector_arguments = (
+                "--exact-type-name",
+                object_type,
+                name,
             )
-        if kind == "path":
+        elif kind == "path" and isinstance(value, str) and value:
             segments = tuple(segment for segment in value.split("\\") if segment)
             if not segments or "\\" + "\\".join(segments) != value:
                 raise V3ProtocolError(
@@ -183,8 +197,12 @@ class _BusinessDraftSteps:
                 for segment in segments
                 for item in ("--object-path-segment", segment)
             )
-        else:
+        elif kind == "id" and isinstance(value, str) and value:
             selector_arguments = ("--object-id", value)
+        else:
+            raise V3ProtocolError(
+                f"{error_subject} identity must be exact id, path, or typed name"
+            )
         role_arguments: tuple[Any, ...] = () if role is None else ("--role", role)
         self.steps.append(
             ExpectedGatewayStep(
@@ -1579,134 +1597,19 @@ def build_soundbank_business_transaction_steps(
     steps = draft.steps
     bound: dict[str, ResponseBinding] = {}
     binding_index = 0
-    name_queries: dict[str, ResponseBinding] = {}
-    exact_names: list[tuple[str, str]] = []
-
-    def collect_exact_names(value: Any) -> None:
-        if isinstance(value, Mapping):
-            if (
-                value.get("kind") == "exact-type-name"
-                and isinstance(value.get("type"), str)
-                and isinstance(value.get("name"), str)
-            ):
-                exact_names.append((str(value["type"]), str(value["name"])))
-                return
-            for nested in value.values():
-                collect_exact_names(nested)
-        elif isinstance(value, list):
-            for nested in value:
-                collect_exact_names(nested)
-
-    collect_exact_names(arguments)
-    if operation == "soundbank.generate":
-        exact_names.extend(
-            ("SoundBank", str(bank["name"]))
-            for bank in arguments["soundbanks"]
-        )
-    seen_names: set[tuple[str, str]] = set()
-    for object_type, name in exact_names:
-        identity = (object_type, name)
-        if identity in seen_names:
-            continue
-        seen_names.add(identity)
-        query_name = f"{label}.query-object.{len(seen_names):03d}"
-        query_arguments: list[str] = [
-            "--type",
-            object_type,
-            "--where",
-            "name",
-            "=",
-            "string",
-            name,
-            "--take",
-            "2",
-        ]
-        for field in ("id", "name", "type", "path"):
-            query_arguments.extend(("--return-field", field))
-        steps.append(
-            ExpectedGatewayStep(
-                name=query_name,
-                subcommand="query-object",
-                arguments=tuple(query_arguments),
-            ),
-        )
-        key = json.dumps(
-            ["exact-type-name", object_type, name],
-            ensure_ascii=False,
-            separators=(",", ":"),
-        )
-        name_queries[key] = ResponseBinding(query_name, "/objects/0/id")
 
     def bind(selector: Any, *, object_type: str | None = None) -> ResponseBinding:
         nonlocal binding_index
         if object_type is not None:
             if not isinstance(selector, str) or not selector:
                 raise V3ProtocolError("SoundBank name binding is invalid")
-            key = json.dumps(
-                ["exact-type-name", object_type, selector],
-                ensure_ascii=False,
-                separators=(",", ":"),
-            )
-            existing = bound.get(key)
-            if existing is not None:
-                return existing
-            query_binding = name_queries.get(key)
-            if query_binding is None:
-                raise V3ProtocolError("SoundBank name query is unavailable")
-            binding_index += 1
-            bind_name = f"{label}.bind-object.{binding_index:03d}"
-            steps.append(
-                ExpectedGatewayStep(
-                    name=bind_name,
-                    subcommand="draft-bind-object",
-                    arguments=(
-                        *draft.prefix(),
-                        "--object-id",
-                        query_binding,
-                    ),
-                )
-            )
-            draft.advance(bind_name)
-            result = ResponseBinding(bind_name, "/bound_object/handle")
-            bound[key] = result
-            return result
+            selector = {
+                "kind": "exact-type-name",
+                "type": object_type,
+                "name": selector,
+            }
         if not isinstance(selector, Mapping):
             raise V3ProtocolError("SoundBank object identity is invalid")
-        if selector.get("kind") == "exact-type-name":
-            object_type_value = selector.get("type")
-            name_value = selector.get("name")
-            if not isinstance(object_type_value, str) or not isinstance(
-                name_value, str
-            ):
-                raise V3ProtocolError("SoundBank exact name identity is invalid")
-            key = json.dumps(
-                ["exact-type-name", object_type_value, name_value],
-                ensure_ascii=False,
-                separators=(",", ":"),
-            )
-            existing = bound.get(key)
-            if existing is not None:
-                return existing
-            query_binding = name_queries.get(key)
-            if query_binding is None:
-                raise V3ProtocolError("SoundBank exact name query is unavailable")
-            binding_index += 1
-            bind_name = f"{label}.bind-object.{binding_index:03d}"
-            steps.append(
-                ExpectedGatewayStep(
-                    name=bind_name,
-                    subcommand="draft-bind-object",
-                    arguments=(
-                        *draft.prefix(),
-                        "--object-id",
-                        query_binding,
-                    ),
-                )
-            )
-            draft.advance(bind_name)
-            result = ResponseBinding(bind_name, "/bound_object/handle")
-            bound[key] = result
-            return result
         key = json.dumps(
             dict(selector),
             ensure_ascii=False,
