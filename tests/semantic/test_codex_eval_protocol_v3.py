@@ -1033,6 +1033,9 @@ def test_soundbank_generate_transaction_uses_one_complete_business_plan() -> Non
     assert "--no-rebuild-init-bank" in declare.arguments
     assert any(step.subcommand == "query-object" for step in protocol.steps)
     assert any(step.subcommand == "draft-bind-object" for step in protocol.steps)
+    subcommands = [step.subcommand for step in protocol.steps]
+    assert subcommands.index("draft-start") < subcommands.index("query-object")
+    assert subcommands.index("query-object") < subcommands.index("draft-bind-object")
     assert any(step.subcommand == "preview-from-draft" for step in protocol.steps)
     assert all(step.subcommand != "draft-apply" for step in protocol.steps)
     assert all(step.subcommand != "typed-operation" for step in protocol.steps)

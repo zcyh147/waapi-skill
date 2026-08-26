@@ -26,6 +26,12 @@ for Wwise Authoring. Read this file before changing the Skill or running tests.
 - Prefer deterministic code and structured results over prompt-only knowledge.
   When a capability is unavailable through the packaged interface, return a
   clear boundary instead of teaching the model how to synthesize a workaround.
+- Judge migration depth at the public Gateway interface. Every supported named
+  operation and non-named lane must expose the accepted Gateway-owned business
+  seam or an explicit prohibited/host/version boundary. Historical PASS
+  evidence, a small request, an existing dedicated route, or a syntactically
+  typed request does not establish that migration; generated inventories must
+  retain and assign those rows until their caller interface is uniformly deep.
 - Read-only work should be direct and bounded. Every project change uses an
   immutable preview, at most one execution, and verification. `read_only`
   blocks changes but still permits catalog-proven read transactions;

@@ -3036,14 +3036,66 @@ def validate_operation_draft_protocol_steps(
         if terminal_draft_indexes
         else indexes[draft_steps[-1].name]
     )
+    composition_steps = steps[start_index : draft_end_index + 1]
     if any(
         step.subcommand not in _DRAFT_SUBCOMMANDS
-        | {"request-map-container", "request-array-item"}
-        for step in steps[start_index : draft_end_index + 1]
+        | {"request-map-container", "request-array-item", "query-object"}
+        for step in composition_steps
     ):
         raise ValueError(
             "typed Draft composition cannot be interrupted by another Gateway route"
         )
+    for query in (
+        step for step in composition_steps if step.subcommand == "query-object"
+    ):
+        expected_arguments = query.arguments
+        if (
+            len(expected_arguments) != 17
+            or not isinstance(expected_arguments[1], str)
+            or not expected_arguments[1]
+            or not isinstance(expected_arguments[6], str)
+            or not expected_arguments[6]
+            or expected_arguments[:6] != (
+                "--type",
+                expected_arguments[1],
+                "--where",
+                "name",
+                "=",
+                "string",
+            )
+            or expected_arguments[7:9] != ("--take", "2")
+            or expected_arguments[9:] != (
+                "--return-field",
+                "id",
+                "--return-field",
+                "name",
+                "--return-field",
+                "type",
+                "--return-field",
+                "path",
+            )
+        ):
+            raise ValueError(
+                "an in-Draft query must be one bounded exact-type-name lookup"
+            )
+        query_index = indexes[query.name]
+        consumers = tuple(
+            step
+            for step in draft_steps
+            if indexes[step.name] > query_index
+            and step.subcommand == "draft-bind-object"
+            and any(
+                argument == "--object-id"
+                and position + 1 < len(step.arguments)
+                and step.arguments[position + 1]
+                == ResponseBinding(query.name, "/objects/0/id")
+                for position, argument in enumerate(step.arguments)
+            )
+        )
+        if not consumers:
+            raise ValueError(
+                "an in-Draft exact-type-name query must feed a later object binding"
+            )
 
     def require_prior_binding(
         value: Any,

@@ -9,6 +9,7 @@ import subprocess
 import sys
 import uuid
 import wave
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterator, Mapping, Sequence
@@ -62,6 +63,7 @@ GATEWAY_PATH = REPO_ROOT / "skills" / "waapi-skill" / "scripts" / "gateway.py"
 ACTOR_MIXER_PARENT = r"\Actor-Mixer Hierarchy\Default Work Unit"
 CONTAINERS_PARENT = r"\Containers\Default Work Unit"
 SOUNDBANK_PARENT = r"\SoundBanks\Default Work Unit"
+EVENTS_PARENT = r"\Events\Default Work Unit"
 FIXTURE_SWITCH_GROUP_PATH = r"\Switches\SS_Impact\SS_FS_Type"
 FIXTURE_SWITCH_PATH = FIXTURE_SWITCH_GROUP_PATH + r"\Crawl"
 SWITCH_GROUP_REFERENCE = "SwitchGroupOrStateGroup"
@@ -501,6 +503,7 @@ def test_closed_gateway_workflows_across_selected_version(
     soundbank_id: str | None = None
     included_id: str | None = None
     included_second_id: str | None = None
+    definition_event_id: str | None = None
     switch_container_id: str | None = None
     switch_group_id: str | None = None
     switch_id: str | None = None
@@ -689,6 +692,88 @@ def test_closed_gateway_workflows_across_selected_version(
             expected=[],
         )
 
+        soundbank_io_root = (
+            runtime.sandbox.sandbox_path
+            / "GatewayWorkflowSoundBank"
+            / unique_suffix
+        )
+        soundbank_io_root.mkdir(parents=True, exist_ok=False)
+        soundbank_name = (
+            f"WAAPI_GATEWAY_BANK_{runtime.version.replace('.', '_')}_{unique_suffix}"
+        )
+        _complete_transaction(
+            runtime,
+            operation="soundbank.generate",
+            arguments={
+                "soundbanks": [
+                    {
+                        "name": soundbank_name,
+                        "artifact_expectation": "nonlocalized",
+                        "rebuild": False,
+                    }
+                ],
+                "platforms": ["Windows"],
+                "skip_languages": True,
+                "write_to_disk": True,
+                "io_root": str(soundbank_io_root),
+                "rebuild_soundbanks": False,
+                "clear_audio_file_cache": False,
+                "rebuild_init_bank": False,
+            },
+        )
+
+        external_media_root = soundbank_io_root / "external-media"
+        external_audio = _write_fixture_wav(
+            external_media_root,
+            f"WAAPI_GATEWAY_EXTERNAL_{unique_suffix}",
+        )
+        source_list = soundbank_io_root / "gateway-external.wsources"
+        destination = f"Gateway/{unique_suffix}.wav"
+        _write_external_sources_document(
+            source_list,
+            media_root=external_media_root,
+            project_root=runtime.sandbox.sandbox_path,
+            source_file=external_audio,
+            destination=destination,
+        )
+        external_output = soundbank_io_root / "external-output"
+        _complete_transaction(
+            runtime,
+            operation="soundbank.convertExternalSources",
+            arguments={
+                "sources": [
+                    {
+                        "input": str(source_list),
+                        "platform": "Windows",
+                        "output": str(external_output),
+                    }
+                ],
+                "io_root": str(soundbank_io_root),
+            },
+        )
+
+        definition_event_name = f"WAAPI_GATEWAY_EVENT_{unique_suffix}"
+        definition_event_id = _create_object(
+            runtime,
+            parent=EVENTS_PARENT,
+            object_type="Event",
+            name=definition_event_name,
+        )
+        definition_file = soundbank_io_root / "gateway-banks.tsv"
+        definition_file.write_text(
+            f'{soundbank_name}\t"{definition_event_name}"\tEvent\tStructure\tMedia\n',
+            encoding="utf-8",
+            newline="\n",
+        )
+        _complete_transaction(
+            runtime,
+            operation="soundbank.processDefinitionFiles",
+            arguments={
+                "files": [str(definition_file)],
+                "io_root": str(soundbank_io_root),
+            },
+        )
+
         switch_container_id = _create_object(
             runtime,
             parent=object_parent,
@@ -765,6 +850,7 @@ def test_closed_gateway_workflows_across_selected_version(
             soundbank_id,
             included_id,
             included_second_id,
+            definition_event_id,
             assignment_child_id,
             switch_container_id,
         )
@@ -1795,6 +1881,38 @@ def _untyped_object_path(object_path: str) -> str:
             part = part.split(">", 1)[1]
         parts.append(part)
     return "\\".join(parts)
+
+
+def _write_external_sources_document(
+    path: Path,
+    *,
+    media_root: Path,
+    project_root: Path,
+    source_file: Path,
+    destination: str,
+) -> Path:
+    assert not path.exists()
+    source_relative = source_file.resolve(strict=True).relative_to(
+        media_root.resolve(strict=True)
+    ).as_posix()
+    root_value = os.path.relpath(
+        media_root.resolve(strict=True),
+        project_root.resolve(strict=True),
+    ).replace(os.sep, "/")
+    root = ET.Element(
+        "ExternalSourcesList",
+        {"SchemaVersion": "1", "Root": root_value},
+    )
+    ET.SubElement(
+        root,
+        "Source",
+        {"Path": source_relative, "Destination": destination},
+    )
+    ET.indent(root, space="  ")
+    data = ET.tostring(root, encoding="utf-8", xml_declaration=True) + b"\n"
+    assert b"<!DOCTYPE" not in data and b"<!ENTITY" not in data and b"\x00" not in data
+    path.write_bytes(data)
+    return path.resolve(strict=True)
 
 
 def _write_fixture_wav(root: Path, name: str) -> Path:

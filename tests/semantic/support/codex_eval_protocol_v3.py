@@ -1623,8 +1623,7 @@ def build_soundbank_business_transaction_steps(
         ]
         for field in ("id", "name", "type", "path"):
             query_arguments.extend(("--return-field", field))
-        steps.insert(
-            -1,
+        steps.append(
             ExpectedGatewayStep(
                 name=query_name,
                 subcommand="query-object",
