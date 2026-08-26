@@ -11300,9 +11300,31 @@ class CodexGatewayBroker:
                         else None
                     )
                     session = BusinessDeclarationSession.from_dict(raw_session)
-                    replayed = business_adapter(expected_operation).materialize(
-                        session
+                    sealed_request = (
+                        record.seal.get("request")
+                        if isinstance(record.seal, Mapping)
+                        else None
                     )
+                    if sealed_request is None:
+                        replayed = business_adapter(
+                            expected_operation
+                        ).materialize(session)
+                    else:
+                        sealed_digest = record.seal.get("request_digest")
+                        if (
+                            not isinstance(sealed_request, Mapping)
+                            or not isinstance(sealed_digest, str)
+                            or sealed_digest
+                            != _sha256_bytes(
+                                _canonical_json_bytes(sealed_request)
+                            )
+                            or sealed_request.get("operation")
+                            != expected_operation
+                        ):
+                            raise GatewayInvocationError(
+                                "Durable business Draft seal request is invalid"
+                            )
+                        replayed = dict(sealed_request)
                 except Exception as exc:
                     raise GatewayInvocationError(
                         "Business request cannot be replayed from the durable Draft"

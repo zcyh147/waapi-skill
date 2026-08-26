@@ -5071,6 +5071,95 @@ def test_draft_replay_is_scoped_to_the_preview_flow_in_multi_transaction_protoco
     ) == expected_audio_witness
 
 
+def test_sealed_business_draft_replay_survives_successful_media_cleanup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from wwise_waapi.business_declaration_state import BusinessDeclarationSession
+    from wwise_waapi.business_declarations import BusinessContext, NewDescendantTarget
+
+    media = tmp_path / "rain.wav"
+    media.write_bytes(b"RIFF-test")
+    request = {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": "2022.1",
+        "operation": "audio.import",
+        "arguments": {
+            "import_operation": "createNew",
+            "imports": [
+                {
+                    "audio_file": str(media),
+                    "object_path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain",
+                    "object_type": "Sound SFX",
+                    "import_language": "SFX",
+                }
+            ],
+        },
+    }
+    steps = build_audio_import_composer_transaction_steps(request, label="tx01")
+    start = next(step for step in steps if step.subcommand == "draft-start")
+    preview = next(
+        step for step in steps if step.subcommand == "preview-from-draft"
+    )
+    expected = preview.expected_operation_request
+    assert expected is not None
+    expected = dict(expected)
+
+    session = BusinessDeclarationSession.create(
+        BusinessContext.create(
+            task_authority="da1-" + "2" * 40,
+            project_id="{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+            project_path=str(tmp_path / "SampleProject.wproj"),
+            wwise_version="2022.1",
+            wwise_build="2022.1.fixture",
+        )
+    )
+    parent = session.handles.bind_object(
+        object_id="{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}",
+        name="Default Work Unit",
+        object_type="WorkUnit",
+        path=r"\Actor-Mixer Hierarchy\Default Work Unit",
+    )
+    session = session.with_new_declaration(
+        declaration_id="rain",
+        target=NewDescendantTarget(
+            parent_handle=parent.handle,
+            name="Rain",
+            kind="sound-sfx",
+        ),
+        fields={"media_file": str(media)},
+    )
+    media.unlink()
+
+    record = SimpleNamespace(
+        composition={"business_session": session.as_dict()},
+        seal={
+            "request": expected,
+            "request_digest": canonical_sha256(expected),
+        },
+    )
+    store = SimpleNamespace(inspect=lambda *_args, **_kwargs: record)
+    monkeypatch.setattr(
+        broker_module,
+        "OperationDraftStore",
+        lambda *_args, **_kwargs: store,
+    )
+    broker = CodexGatewayBroker(
+        skill_source=Path(__file__).resolve().parents[2] / "skills" / "waapi-skill",
+        expected_steps=steps,
+        expected_wwise_version="2022.1",
+    )
+    broker._state_directory = tmp_path / "state"  # noqa: SLF001
+    broker._payloads_by_step[start.name] = {  # noqa: SLF001
+        "task_authority": "da1-" + "2" * 40,
+        "draft": {"draft_id": "od1-" + "1" * 32},
+    }
+
+    assert broker._replay_expected_operation_draft_request(  # noqa: SLF001
+        preview
+    ) == expected
+
+
 def test_broker_rejects_stale_draft_revision_before_runner_dispatch(
     tmp_path: Path,
 ) -> None:
