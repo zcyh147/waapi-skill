@@ -108,11 +108,14 @@ def test_fresh_runner_allows_only_the_one_initial_operations_discovery(
     steps = build_preview_only_compound_undo_steps(runtime)
     spec = _compound_undo_business_run_spec()
 
-    assert spec.allow_optional_initial_operations_discovery is True
+    assert (
+        spec.optional_initial_operations_discovery_operation
+        == "waapi.undoGroup"
+    )
     subcommands = _expected_gateway_subcommands(
         steps,
-        allow_optional_initial_operations_discovery=(
-            spec.allow_optional_initial_operations_discovery
+        optional_initial_operations_discovery_operation=(
+            spec.optional_initial_operations_discovery_operation
         ),
     )
     assert subcommands[0] == "operations"

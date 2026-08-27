@@ -219,7 +219,7 @@ def _compound_undo_business_run_spec() -> BusinessAgentRunSpec:
         transaction_count=lambda _runtime: 1,
         preview_gates=_compound_undo_preview_gates,
         outcome_factory=CompoundUndoBusinessAgentOutcome,
-        allow_optional_initial_operations_discovery=True,
+        optional_initial_operations_discovery_operation="waapi.undoGroup",
     )
 
 

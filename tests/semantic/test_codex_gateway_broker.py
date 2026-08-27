@@ -2493,7 +2493,7 @@ def test_broker_accepts_one_optional_initial_operations_discovery(
     with CodexGatewayBroker(
         skill_source=skill,
         expected_steps=steps,
-        allow_optional_initial_operations_discovery=True,
+        optional_initial_operations_discovery_operation="waapi.undoGroup",
         transport="tcp",
     ) as broker:
         for arguments in (*discovery_arguments, ("operation-schema", "waapi.undoGroup")):
@@ -2543,13 +2543,32 @@ def test_broker_optional_initial_operations_discovery_stays_fail_closed(
     with CodexGatewayBroker(
         skill_source=skill,
         expected_steps=steps,
-        allow_optional_initial_operations_discovery=True,
+        optional_initial_operations_discovery_operation="waapi.undoGroup",
         transport="tcp",
     ) as broker:
         results = [run_model_command(broker, list(arguments)) for arguments in commands]
 
     assert results[-1].returncode == 126
     assert broker.evidence().terminal_state == "FAILED"
+
+
+def test_broker_optional_initial_operations_discovery_binds_one_exact_operation(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    with pytest.raises(ValueError, match="bind the exact first operation-schema"):
+        CodexGatewayBroker(
+            skill_source=skill,
+            expected_steps=(
+                ExpectedGatewayStep(
+                    "tx03.operation-schema",
+                    "operation-schema",
+                    ("object.setName",),
+                ),
+            ),
+            optional_initial_operations_discovery_operation="waapi.undoGroup",
+            transport="tcp",
+        )
 
 
 def native_pwsh_73_or_skip() -> str:

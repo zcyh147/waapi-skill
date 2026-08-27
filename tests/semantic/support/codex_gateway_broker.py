@@ -7738,7 +7738,7 @@ class CodexGatewayBroker:
         offline_replay_preview_requests: (
             Mapping[str, Mapping[str, Any]] | None
         ) = None,
-        allow_optional_initial_operations_discovery: bool = False,
+        optional_initial_operations_discovery_operation: str | None = None,
     ) -> None:
         self.skill_source = _absolute_lexical(skill_source)
         self.runner_path = self.skill_source / "scripts" / "run.py"
@@ -7764,12 +7764,16 @@ class CodexGatewayBroker:
         )
         self._execution_steps = list(self.expected_steps)
         self._selected_expected_steps = list(self.expected_steps)
-        if type(allow_optional_initial_operations_discovery) is not bool:
+        if optional_initial_operations_discovery_operation is not None and (
+            not isinstance(optional_initial_operations_discovery_operation, str)
+            or not optional_initial_operations_discovery_operation.strip()
+        ):
             raise TypeError(
-                "allow_optional_initial_operations_discovery must be a bool"
+                "optional_initial_operations_discovery_operation must be a "
+                "non-empty operation name or None"
             )
-        self.allow_optional_initial_operations_discovery = (
-            allow_optional_initial_operations_discovery
+        self.optional_initial_operations_discovery_operation = (
+            optional_initial_operations_discovery_operation
         )
         self._optional_initial_operations_step: ExpectedGatewayStep | None = None
         self._commutative_read_only_step_sets = tuple(
@@ -7874,12 +7878,14 @@ class CodexGatewayBroker:
         names = [step.name for step in self.expected_steps]
         if len(names) != len(set(names)):
             raise ValueError("ExpectedGatewayStep names must be unique")
-        if self.allow_optional_initial_operations_discovery:
+        if self.optional_initial_operations_discovery_operation is not None:
             first = self.expected_steps[0]
-            if first.subcommand != "operation-schema":
+            if first.subcommand != "operation-schema" or first.arguments != (
+                self.optional_initial_operations_discovery_operation,
+            ):
                 raise ValueError(
-                    "optional operations discovery requires operation-schema as "
-                    "the first required step"
+                    "optional operations discovery must bind the exact first "
+                    "operation-schema operation"
                 )
             label = first.name.rsplit(".", 1)[0]
             discovery = ExpectedGatewayStep(
