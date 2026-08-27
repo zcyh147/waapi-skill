@@ -563,6 +563,21 @@ _EXACT_ARTIFACT_DEFINITION = {
     "settings_are_complete_declaration": True,
 }
 
+_EXACT_ARTIFACT_CODE_DEFINITION = {
+    **_EXACT_ARTIFACT_DEFINITION,
+    "initial_projection_actions": (
+        "declare-artifact-plan",
+        "inspect",
+        "cancel",
+    ),
+    "active_projection_actions": (
+        "declare-artifact-plan",
+        "check",
+        "inspect",
+        "cancel",
+    ),
+}
+
 
 def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdapter:
     values = dict(definition)
@@ -578,10 +593,13 @@ def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdap
 
 _BUSINESS_ADAPTERS = {
     "audio.import": _bind_adapter("audio.import", _AUDIO_IMPORT_DEFINITION),
+    "audio.importTabDelimited": _bind_adapter(
+        "audio.importTabDelimited",
+        _EXACT_ARTIFACT_DEFINITION,
+    ),
     **{
-        operation: _bind_adapter(operation, _EXACT_ARTIFACT_DEFINITION)
+        operation: _bind_adapter(operation, _EXACT_ARTIFACT_CODE_DEFINITION)
         for operation in (
-            "audio.importTabDelimited",
             "lua.executeCliFile",
             "lua.executeCoreFile",
             "lua.executeCoreInline",

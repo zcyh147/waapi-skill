@@ -44,6 +44,26 @@ _BINDING_ROLES = {
     "lua.executeCoreInline": [],
 }
 
+_STRICT_JSON_VALUE_SCHEMA: dict[str, Any] = {
+    "anyOf": [
+        {"type": "null"},
+        {"type": "boolean"},
+        {"type": "string"},
+        {"type": "integer"},
+        {"type": "number", "finite": True},
+        {
+            "type": "array",
+            "items": {"$ref": "#/$defs/strictJsonValue"},
+        },
+        {
+            "type": "object",
+            "additionalProperties": {
+                "$ref": "#/$defs/strictJsonValue",
+            },
+        },
+    ]
+}
+
 
 def exact_artifact_business_contract_data(
     operation: str,
@@ -73,6 +93,7 @@ def exact_artifact_business_contract_data(
             "subcommand": "draft-bind-object",
             "roles": list(_BINDING_ROLES[operation]),
             "role_required": bool(_BINDING_ROLES[operation]),
+            "available": bool(_BINDING_ROLES[operation]),
             "identity": "live_bound_object_handle",
             "validation": "exact_guid_name_type_path",
         },
@@ -135,6 +156,9 @@ def _schema(operation: str, version: str) -> dict[str, Any]:
                 "type": "object",
                 "maxProperties": MAX_LUA_WA_ARGS_KEYS,
                 "maximumBytes": MAX_LUA_WA_ARGS_BYTES,
+                "additionalProperties": {
+                    "$ref": "#/$defs/strictJsonValue",
+                },
             }
         }
         if operation.endswith("File"):
@@ -158,12 +182,17 @@ def _schema(operation: str, version: str) -> dict[str, Any]:
                     "io_root": {"type": "string", "minLength": 1},
                 }
             )
-    return {
+    schema = {
         "type": "object",
         "additionalProperties": False,
         "required": list(_REQUIRED_FIELDS[operation]),
         "properties": properties,
     }
+    if operation.startswith("lua."):
+        schema["$defs"] = {
+            "strictJsonValue": deepcopy(_STRICT_JSON_VALUE_SCHEMA),
+        }
+    return schema
 
 
 __all__ = [

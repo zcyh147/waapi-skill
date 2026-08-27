@@ -1624,22 +1624,10 @@
     {
       "model_values": [
         {
-          "name": "lua_source",
+          "name": "script_file",
           "path": [
             "declaration",
-            "lua_source"
-          ],
-          "required": true,
-          "schema_sha256": "d80b4c3f15e1df8c955c901fbdc093f124a71be7452b58a461d7f383dcbae834",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "io_root",
-          "path": [
-            "declaration",
-            "io_root"
+            "script_file"
           ],
           "required": true,
           "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
@@ -1654,13 +1642,13 @@
             "arguments"
           ],
           "required": false,
-          "schema_sha256": "c03bc16f5a46306ddb20f95734201d50be2949d9c1922cf993abc10c868b2d55",
+          "schema_sha256": "014e7fc901faaacee4e11f3edc9634e5caccee9ea8eee2d6bd0ef0965ca7a49d",
           "shape": "map",
           "transport_ownership": "gateway_derivation",
           "value_ownership": "exact_user_artifact"
         }
       ],
-      "sha256": "3ad4db3f9159b9b1e5a5f5a63861a9e8b5496bc0854800b5609a7687ed4ad8e5"
+      "sha256": "39195dce3ec4289e5d1ab4525be0195c4002cb10d5480546a86774a1fd37c1fa"
     },
     {
       "model_values": [
@@ -2281,6 +2269,47 @@
     {
       "model_values": [
         {
+          "name": "lua_source",
+          "path": [
+            "declaration",
+            "lua_source"
+          ],
+          "required": true,
+          "schema_sha256": "d80b4c3f15e1df8c955c901fbdc093f124a71be7452b58a461d7f383dcbae834",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "name": "io_root",
+          "path": [
+            "declaration",
+            "io_root"
+          ],
+          "required": true,
+          "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "name": "arguments",
+          "path": [
+            "declaration",
+            "arguments"
+          ],
+          "required": false,
+          "schema_sha256": "014e7fc901faaacee4e11f3edc9634e5caccee9ea8eee2d6bd0ef0965ca7a49d",
+          "shape": "map",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        }
+      ],
+      "sha256": "4de8c28e93926c5e24fb209cf5a96214be2e5cba14c5b78071198920375d12f5"
+    },
+    {
+      "model_values": [
+        {
           "name": "soundbanks",
           "path": [
             "soundbank_plan",
@@ -2454,35 +2483,6 @@
     {
       "model_values": [
         {
-          "name": "script_file",
-          "path": [
-            "declaration",
-            "script_file"
-          ],
-          "required": true,
-          "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "arguments",
-          "path": [
-            "declaration",
-            "arguments"
-          ],
-          "required": false,
-          "schema_sha256": "c03bc16f5a46306ddb20f95734201d50be2949d9c1922cf993abc10c868b2d55",
-          "shape": "map",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        }
-      ],
-      "sha256": "5593588c6d1ab9b5eff4a4d1504247da4e776efc900a1623b2a76fcc99d11585"
-    },
-    {
-      "model_values": [
-        {
           "name": "object_handle",
           "path": [
             "declaration",
@@ -2588,6 +2588,47 @@
         }
       ],
       "sha256": "6082513bdce5ae47199a65fd5872fed1a376432c4de197700c5f6d1b03b41ff7"
+    },
+    {
+      "model_values": [
+        {
+          "name": "script_file",
+          "path": [
+            "declaration",
+            "script_file"
+          ],
+          "required": true,
+          "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "name": "arguments",
+          "path": [
+            "declaration",
+            "arguments"
+          ],
+          "required": false,
+          "schema_sha256": "014e7fc901faaacee4e11f3edc9634e5caccee9ea8eee2d6bd0ef0965ca7a49d",
+          "shape": "map",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "name": "watchdog_seconds",
+          "path": [
+            "declaration",
+            "watchdog_seconds"
+          ],
+          "required": false,
+          "schema_sha256": "0d3ac1e9e006c0119b57d0512759bd7e261ea0d8cb38951a5183d17cdb4391f0",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "62773e914053f94aa1c27a3487fef4263e8d84482420e57b83c34253d435e3ff"
     },
     {
       "model_values": [
@@ -4745,47 +4786,6 @@
         }
       ],
       "sha256": "c612a7ac64a630e531e4e38892c3dd7fea49447bf9079cacb15f01d80691a0f5"
-    },
-    {
-      "model_values": [
-        {
-          "name": "script_file",
-          "path": [
-            "declaration",
-            "script_file"
-          ],
-          "required": true,
-          "schema_sha256": "9ac136edb99a2063b3091602181c8d2022fdccb5b514991319d58544c2e57e95",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "arguments",
-          "path": [
-            "declaration",
-            "arguments"
-          ],
-          "required": false,
-          "schema_sha256": "c03bc16f5a46306ddb20f95734201d50be2949d9c1922cf993abc10c868b2d55",
-          "shape": "map",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "watchdog_seconds",
-          "path": [
-            "declaration",
-            "watchdog_seconds"
-          ],
-          "required": false,
-          "schema_sha256": "0d3ac1e9e006c0119b57d0512759bd7e261ea0d8cb38951a5183d17cdb4391f0",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "c6855c462d431d47cfea4fd4b653cd712c1c7b24e6bf1b39d6a7ced8193b113a"
     },
     {
       "model_values": [
@@ -156715,7 +156715,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "81ee3825818f8494b6fdcdb2c014c92764b070c845181446438dc5dbaa555446",
+  "inventory_sha256": "3feb4218e75b7029395d36d7aa4e0332a53501b2c339074110e463b18a3cc4c8",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -185765,7 +185765,7 @@
       "argument_contract_sha256": "a454803a11289dcc1c12a68b011d696ce3774a9d371b0733fb44a2a6d9005324",
       "audit_evidence": "The public exact-artifact-business/v1 Adapters accept exact tabular files, Lua files or source, bounded script argument maps, live-bound import locations, and stable language/mode/source-control/watchdog values; derive source authority, I/O roots, native loader fields, import identity/mode, request order, serialization, revisions, and the one immutable Preview inside the Gateway; and remove normal tabular inline_typed and Lua Composer ingress for all 12 lanes. #80 retains five-version deterministic and non-bypass coverage, exact macOS/native-Windows Wwise 2025.1 inline/Core/tab execution, an explicit dual-host CLI Lua transport boundary, and cumulative native-Windows Terra Fresh Agent PASS for all four targeted tab/Lua units on the same packaged Skill candidate.",
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "72fce97c8bd202b0ca243e9cee706916b5e07062deac1ef3ce891e907af7c04e",
+      "contract_sha256": "758aac27ec4493abab1b7efa0afc4fcbf0a9f70c657e4ca549ee9b81dab1f3d0",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -185790,7 +185790,7 @@
       "argument_contract_sha256": "a454803a11289dcc1c12a68b011d696ce3774a9d371b0733fb44a2a6d9005324",
       "audit_evidence": "The public exact-artifact-business/v1 Adapters accept exact tabular files, Lua files or source, bounded script argument maps, live-bound import locations, and stable language/mode/source-control/watchdog values; derive source authority, I/O roots, native loader fields, import identity/mode, request order, serialization, revisions, and the one immutable Preview inside the Gateway; and remove normal tabular inline_typed and Lua Composer ingress for all 12 lanes. #80 retains five-version deterministic and non-bypass coverage, exact macOS/native-Windows Wwise 2025.1 inline/Core/tab execution, an explicit dual-host CLI Lua transport boundary, and cumulative native-Windows Terra Fresh Agent PASS for all four targeted tab/Lua units on the same packaged Skill candidate.",
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "9ed48b4394467791083c66e0afad3b2db737acf9e249e75ef4bcde1c6cad254e",
+      "contract_sha256": "5d459cf0723e0da93392a620e198944bb704c2d0038516e94dd0d347e74fca7b",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -185815,7 +185815,7 @@
       "argument_contract_sha256": "2e26aaa8fc7f4688882739f8998dd75c3665c2b9197144298e560aa58b1d8999",
       "audit_evidence": "The public exact-artifact-business/v1 Adapters accept exact tabular files, Lua files or source, bounded script argument maps, live-bound import locations, and stable language/mode/source-control/watchdog values; derive source authority, I/O roots, native loader fields, import identity/mode, request order, serialization, revisions, and the one immutable Preview inside the Gateway; and remove normal tabular inline_typed and Lua Composer ingress for all 12 lanes. #80 retains five-version deterministic and non-bypass coverage, exact macOS/native-Windows Wwise 2025.1 inline/Core/tab execution, an explicit dual-host CLI Lua transport boundary, and cumulative native-Windows Terra Fresh Agent PASS for all four targeted tab/Lua units on the same packaged Skill candidate.",
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "5ca4c057a8b63a769a7570812e31e6b4eff7cd1b03cda7bb2427d6bdd1fe98fa",
+      "contract_sha256": "1ba9181073256c3fb92f979bb24ba263ff8567e8f978a326979ebb801f99b2f3",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -185840,7 +185840,7 @@
       "argument_contract_sha256": "2e26aaa8fc7f4688882739f8998dd75c3665c2b9197144298e560aa58b1d8999",
       "audit_evidence": "The public exact-artifact-business/v1 Adapters accept exact tabular files, Lua files or source, bounded script argument maps, live-bound import locations, and stable language/mode/source-control/watchdog values; derive source authority, I/O roots, native loader fields, import identity/mode, request order, serialization, revisions, and the one immutable Preview inside the Gateway; and remove normal tabular inline_typed and Lua Composer ingress for all 12 lanes. #80 retains five-version deterministic and non-bypass coverage, exact macOS/native-Windows Wwise 2025.1 inline/Core/tab execution, an explicit dual-host CLI Lua transport boundary, and cumulative native-Windows Terra Fresh Agent PASS for all four targeted tab/Lua units on the same packaged Skill candidate.",
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "f80b98d17f86152cf8a08e8a8c3bd8cecad19b7544a68e8fd7f094906f4bdb4b",
+      "contract_sha256": "681b08cb7e09135ebfe144573141f7d4a310fd758d81564ee66e4bf9f1015c04",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -185865,7 +185865,7 @@
       "argument_contract_sha256": "2e26aaa8fc7f4688882739f8998dd75c3665c2b9197144298e560aa58b1d8999",
       "audit_evidence": "The public exact-artifact-business/v1 Adapters accept exact tabular files, Lua files or source, bounded script argument maps, live-bound import locations, and stable language/mode/source-control/watchdog values; derive source authority, I/O roots, native loader fields, import identity/mode, request order, serialization, revisions, and the one immutable Preview inside the Gateway; and remove normal tabular inline_typed and Lua Composer ingress for all 12 lanes. #80 retains five-version deterministic and non-bypass coverage, exact macOS/native-Windows Wwise 2025.1 inline/Core/tab execution, an explicit dual-host CLI Lua transport boundary, and cumulative native-Windows Terra Fresh Agent PASS for all four targeted tab/Lua units on the same packaged Skill candidate.",
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "b45a250b7aea9a24d689cb2e4d56cf53723157471229d5100caba1514d1d09a3",
+      "contract_sha256": "527f8b06255e7c471c3b0b8150fe2ea9e298a637a2eb5e76dbcd11301056417e",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -186531,10 +186531,10 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "5593588c6d1ab9b5eff4a4d1504247da4e776efc900a1623b2a76fcc99d11585",
+      "argument_contract_sha256": "39195dce3ec4289e5d1ab4525be0195c4002cb10d5480546a86774a1fd37c1fa",
       "audit_evidence": "The public exact-artifact-business/v1 Adapters accept exact tabular files, Lua files or source, bounded script argument maps, live-bound import locations, and stable language/mode/source-control/watchdog values; derive source authority, I/O roots, native loader fields, import identity/mode, request order, serialization, revisions, and the one immutable Preview inside the Gateway; and remove normal tabular inline_typed and Lua Composer ingress for all 12 lanes. #80 retains five-version deterministic and non-bypass coverage, exact macOS/native-Windows Wwise 2025.1 inline/Core/tab execution, an explicit dual-host CLI Lua transport boundary, and cumulative native-Windows Terra Fresh Agent PASS for all four targeted tab/Lua units on the same packaged Skill candidate.",
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "6203ec88c09e7c5a40f0d88ad39278ea30fb736d3ce5df408a63bd2d385c5ff3",
+      "contract_sha256": "aafb0b9179e77eedaec80d59d8ed0a2c138864dbd25a2029c0ae6bc18b771e8d",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -186556,10 +186556,10 @@
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "c6855c462d431d47cfea4fd4b653cd712c1c7b24e6bf1b39d6a7ced8193b113a",
+      "argument_contract_sha256": "62773e914053f94aa1c27a3487fef4263e8d84482420e57b83c34253d435e3ff",
       "audit_evidence": "The public exact-artifact-business/v1 Adapters accept exact tabular files, Lua files or source, bounded script argument maps, live-bound import locations, and stable language/mode/source-control/watchdog values; derive source authority, I/O roots, native loader fields, import identity/mode, request order, serialization, revisions, and the one immutable Preview inside the Gateway; and remove normal tabular inline_typed and Lua Composer ingress for all 12 lanes. #80 retains five-version deterministic and non-bypass coverage, exact macOS/native-Windows Wwise 2025.1 inline/Core/tab execution, an explicit dual-host CLI Lua transport boundary, and cumulative native-Windows Terra Fresh Agent PASS for all four targeted tab/Lua units on the same packaged Skill candidate.",
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "fea18fedce3648ac60ae708f441eaf6610c7231b9405d203de42b577ff891f60",
+      "contract_sha256": "85788ba7d492efb1637be37c6176171c7453de3ac427013f4f92adc4df813abf",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -186581,10 +186581,10 @@
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "c6855c462d431d47cfea4fd4b653cd712c1c7b24e6bf1b39d6a7ced8193b113a",
+      "argument_contract_sha256": "62773e914053f94aa1c27a3487fef4263e8d84482420e57b83c34253d435e3ff",
       "audit_evidence": "The public exact-artifact-business/v1 Adapters accept exact tabular files, Lua files or source, bounded script argument maps, live-bound import locations, and stable language/mode/source-control/watchdog values; derive source authority, I/O roots, native loader fields, import identity/mode, request order, serialization, revisions, and the one immutable Preview inside the Gateway; and remove normal tabular inline_typed and Lua Composer ingress for all 12 lanes. #80 retains five-version deterministic and non-bypass coverage, exact macOS/native-Windows Wwise 2025.1 inline/Core/tab execution, an explicit dual-host CLI Lua transport boundary, and cumulative native-Windows Terra Fresh Agent PASS for all four targeted tab/Lua units on the same packaged Skill candidate.",
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "bb2ddcc34828bf2a4d3f45ea3f32ebac148409da58100b80f8fde6e5f42a5566",
+      "contract_sha256": "20d6812898aa6cdc51fecd81f7a0d821af2ace0d3d1cc11aa8adb615fe871288",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -186606,10 +186606,10 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "5593588c6d1ab9b5eff4a4d1504247da4e776efc900a1623b2a76fcc99d11585",
+      "argument_contract_sha256": "39195dce3ec4289e5d1ab4525be0195c4002cb10d5480546a86774a1fd37c1fa",
       "audit_evidence": "The public exact-artifact-business/v1 Adapters accept exact tabular files, Lua files or source, bounded script argument maps, live-bound import locations, and stable language/mode/source-control/watchdog values; derive source authority, I/O roots, native loader fields, import identity/mode, request order, serialization, revisions, and the one immutable Preview inside the Gateway; and remove normal tabular inline_typed and Lua Composer ingress for all 12 lanes. #80 retains five-version deterministic and non-bypass coverage, exact macOS/native-Windows Wwise 2025.1 inline/Core/tab execution, an explicit dual-host CLI Lua transport boundary, and cumulative native-Windows Terra Fresh Agent PASS for all four targeted tab/Lua units on the same packaged Skill candidate.",
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "45be0847269a9793483a39201e72b343bed0e134f8665b10b0802ab62384e25e",
+      "contract_sha256": "badb7e8d3c2250459af4b14c052939b9838644c7e5ff4fa81def5f73307d4790",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -186631,10 +186631,10 @@
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "5593588c6d1ab9b5eff4a4d1504247da4e776efc900a1623b2a76fcc99d11585",
+      "argument_contract_sha256": "39195dce3ec4289e5d1ab4525be0195c4002cb10d5480546a86774a1fd37c1fa",
       "audit_evidence": "The public exact-artifact-business/v1 Adapters accept exact tabular files, Lua files or source, bounded script argument maps, live-bound import locations, and stable language/mode/source-control/watchdog values; derive source authority, I/O roots, native loader fields, import identity/mode, request order, serialization, revisions, and the one immutable Preview inside the Gateway; and remove normal tabular inline_typed and Lua Composer ingress for all 12 lanes. #80 retains five-version deterministic and non-bypass coverage, exact macOS/native-Windows Wwise 2025.1 inline/Core/tab execution, an explicit dual-host CLI Lua transport boundary, and cumulative native-Windows Terra Fresh Agent PASS for all four targeted tab/Lua units on the same packaged Skill candidate.",
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "a44aea355de40c62c7f66ad85b7911dc67fddf1b9046aeb53ae265cb420e8f84",
+      "contract_sha256": "6b35795a798eaad2cc0c1c056f832815eafbb246f53658640fdf02863e91d428",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -186656,10 +186656,10 @@
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "5593588c6d1ab9b5eff4a4d1504247da4e776efc900a1623b2a76fcc99d11585",
+      "argument_contract_sha256": "39195dce3ec4289e5d1ab4525be0195c4002cb10d5480546a86774a1fd37c1fa",
       "audit_evidence": "The public exact-artifact-business/v1 Adapters accept exact tabular files, Lua files or source, bounded script argument maps, live-bound import locations, and stable language/mode/source-control/watchdog values; derive source authority, I/O roots, native loader fields, import identity/mode, request order, serialization, revisions, and the one immutable Preview inside the Gateway; and remove normal tabular inline_typed and Lua Composer ingress for all 12 lanes. #80 retains five-version deterministic and non-bypass coverage, exact macOS/native-Windows Wwise 2025.1 inline/Core/tab execution, an explicit dual-host CLI Lua transport boundary, and cumulative native-Windows Terra Fresh Agent PASS for all four targeted tab/Lua units on the same packaged Skill candidate.",
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "0888602a806f8fbf386a444e4f382f862f8320286fc0e8ec645644d6fbf401ab",
+      "contract_sha256": "f1ed169195a8667c5d18403cd85967a279048ca0d7cf337b826a13b192ff6036",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -186681,10 +186681,10 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "3ad4db3f9159b9b1e5a5f5a63861a9e8b5496bc0854800b5609a7687ed4ad8e5",
+      "argument_contract_sha256": "4de8c28e93926c5e24fb209cf5a96214be2e5cba14c5b78071198920375d12f5",
       "audit_evidence": "The public exact-artifact-business/v1 Adapters accept exact tabular files, Lua files or source, bounded script argument maps, live-bound import locations, and stable language/mode/source-control/watchdog values; derive source authority, I/O roots, native loader fields, import identity/mode, request order, serialization, revisions, and the one immutable Preview inside the Gateway; and remove normal tabular inline_typed and Lua Composer ingress for all 12 lanes. #80 retains five-version deterministic and non-bypass coverage, exact macOS/native-Windows Wwise 2025.1 inline/Core/tab execution, an explicit dual-host CLI Lua transport boundary, and cumulative native-Windows Terra Fresh Agent PASS for all four targeted tab/Lua units on the same packaged Skill candidate.",
       "classification": "named-exact-artifact-code",
-      "contract_sha256": "1bcfd826e7ebcb8880c14e914dba06b07df9fdc35d26f19983eedf0972f336f4",
+      "contract_sha256": "8bcd2cec9778ee30c255b0a5166177514dcc8113743840245432b9d2d89d29dd",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -189697,7 +189697,7 @@
   },
   "source_contracts": {
     "gateway_parser_sha256": "89c08dbc56e1fab6a60b23eb2c817ad37d68c99502b94816cf4007179758e86a",
-    "operation_contract_sha256": "674ed1b393b98b4df227af69b25b43389c3d7b237a91a084ab4f112930920f91",
+    "operation_contract_sha256": "37545e2a6fb504e9110267fd8b406479ed1494c1687bcf98a0a4d10abee44d3e",
     "public_continuation_sha256": "20e1eb8e2426240eb29faac3ed197d7578a971cf312bceb05c8a31ba24de8812",
     "typed_request_surface_sha256": "6d05d64e95a6e0f7099ddd03f1da42c763e9c06f33f93cac7581c7c061a83af8"
   },

@@ -8,6 +8,7 @@ from typing import Any, Mapping
 
 import pytest
 
+from wwise_waapi.business_adapters import business_adapter
 from wwise_waapi.operation_composer import operation_composer_digest
 from wwise_waapi.operation_drafts import OperationDraftStore
 from wwise_waapi.typed_operations import (
@@ -122,6 +123,19 @@ class _TabClient(_LuaClient):
         return super().call(uri, args, options)
 
 
+class _AuthoringLuaClient(_LuaClient):
+    def call(
+        self,
+        uri: str,
+        args: Mapping[str, Any] | None = None,
+        options: Mapping[str, Any] | None = None,
+    ) -> Mapping[str, Any]:
+        result = super().call(uri, args, options)
+        if uri == "ak.wwise.core.getInfo":
+            return {**result, "displayName": "Wwise", "isCommandLine": False}
+        return result
+
+
 @pytest.mark.parametrize(
     "version",
     ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
@@ -178,6 +192,24 @@ def test_lua_lanes_have_one_public_business_draft(
         assert adapter["legacy_composer_public"] is False
         assert "source_authority" not in adapter["declaration"]["public_fields"]
         assert "composer" not in payload
+        assert "bind-object" not in business_adapter(operation).projection_actions(
+            session_bound=False
+        )
+
+
+def test_tab_lane_retains_its_required_object_binding_action(
+    tmp_path: Path,
+) -> None:
+    code, payload = gateway.execute_gateway(
+        ["--version", "2025.1", "operation-schema", "audio.importTabDelimited"],
+        env=_env(tmp_path),
+        client_factory=lambda url: pytest.fail(f"schema connected to {url}"),
+    )
+
+    assert code == 0, payload
+    assert "bind-object" in business_adapter(
+        "audio.importTabDelimited"
+    ).projection_actions(session_bound=False)
 
 
 def test_retired_typed_ingresses_are_not_callable() -> None:
@@ -255,6 +287,138 @@ def test_tab_business_draft_binds_the_disclosed_import_location_role(
     assert bind_code == 0, bound
     assert bound["bound_object"]["role"] == "import_location"
     assert bound["bound_object"]["type"] == "WorkUnit"
+
+
+def test_lua_business_draft_rejects_roleless_object_binding(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "lua-no-object-state"
+    start_code, started = gateway.execute_gateway(
+        [
+            "--version",
+            "2025.1",
+            "--state-dir",
+            str(state_dir),
+            "draft-start",
+            "lua.executeCoreFile",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda url: pytest.fail(f"draft-start connected to {url}"),
+    )
+    assert start_code == 0, started
+    client = _LuaClient(tmp_path)
+
+    code, payload = gateway.execute_gateway(
+        [
+            "--version",
+            "2025.1",
+            "--state-dir",
+            str(state_dir),
+            "draft-bind-object",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(started["draft"]["revision"]),
+            "--object-id",
+            "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert code == 2, payload
+    assert "roles are unavailable" in payload["message"]
+    assert "ak.wwise.core.object.get" not in client.calls
+
+
+def test_cli_lua_declaration_rejects_authoring_before_project_read(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "cli-authoring-boundary"
+    script = tmp_path / "script.lua"
+    script.write_text("return true\n", encoding="utf-8")
+    start_code, started = gateway.execute_gateway(
+        [
+            "--version",
+            "2025.1",
+            "--state-dir",
+            str(state_dir),
+            "draft-start",
+            "lua.executeCliFile",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda url: pytest.fail(f"draft-start connected to {url}"),
+    )
+    assert start_code == 0, started
+    client = _AuthoringLuaClient(tmp_path)
+
+    code, payload = gateway.execute_gateway(
+        [
+            "--version",
+            "2025.1",
+            "--state-dir",
+            str(state_dir),
+            "draft-declare-artifact-plan",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(started["draft"]["revision"]),
+            "--script-file",
+            str(script),
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert code == 2, payload
+    assert payload["error_code"] == "COMMAND_LINE_HOST_REQUIRED"
+    assert payload["details"]["required_host"] == "wwise-console"
+    assert client.calls == ["ak.wwise.core.getInfo"]
+
+
+@pytest.mark.parametrize("command", ("preview-from-draft", "execute"))
+def test_cli_lua_preview_and_dispatch_require_console_host(command: str) -> None:
+    payload = gateway.live_authoring_transaction_boundary(
+        {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": "2025.1",
+            "operation": "lua.executeCliFile",
+            "arguments": {},
+        },
+        command=command,
+        live_info={"isCommandLine": False},
+        common={"offline": False},
+    )
+
+    assert payload is not None
+    assert payload["error_code"] == "COMMAND_LINE_HOST_REQUIRED"
+    assert payload["command"] == command
+    assert payload["executed"] is False
+    assert payload["verified"] is False
+
+
+def test_lua_continuation_discloses_top_level_null_argument(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "lua-null-continuation"
+    code, payload = gateway.execute_gateway(
+        [
+            "--version",
+            "2025.1",
+            "--state-dir",
+            str(state_dir),
+            "draft-start",
+            "lua.executeCoreInline",
+        ],
+        env=_env(tmp_path),
+        client_factory=lambda url: pytest.fail(f"draft-start connected to {url}"),
+    )
+
+    assert code == 0, payload
+    append = payload["draft"]["next_action_binding"]["declaration"]["append"]
+    assert any("string|boolean|integer|number|json|null" in row for row in append)
 
 
 def _preview_public_cli_lua_file(

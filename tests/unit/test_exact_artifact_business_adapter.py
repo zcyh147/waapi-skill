@@ -204,6 +204,82 @@ def test_lua_business_cli_preserves_every_strict_json_value_kind() -> None:
         _typed_value("null", '"null"')
 
 
+def test_lua_contract_discloses_recursive_strict_json_values() -> None:
+    contract = exact_artifact_business_contract_data(
+        "lua.executeCoreInline",
+        "2025.1",
+    )
+    schema = contract["declaration"]["schema"]
+
+    assert schema["properties"]["arguments"]["additionalProperties"] == {
+        "$ref": "#/$defs/strictJsonValue"
+    }
+    value_schema = schema["$defs"]["strictJsonValue"]
+    assert {row["type"] for row in value_schema["anyOf"]} == {
+        "array",
+        "boolean",
+        "integer",
+        "null",
+        "number",
+        "object",
+        "string",
+    }
+    array = next(row for row in value_schema["anyOf"] if row["type"] == "array")
+    object_value = next(
+        row for row in value_schema["anyOf"] if row["type"] == "object"
+    )
+    assert array["items"] == {"$ref": "#/$defs/strictJsonValue"}
+    assert object_value["additionalProperties"] == {
+        "$ref": "#/$defs/strictJsonValue"
+    }
+
+
+@pytest.mark.parametrize(
+    ("script_file", "sealed_io_root"),
+    (
+        ("/owned/sub/../script.lua", "/owned"),
+        (r"C:\owned\script.lua", r"C:\owned"),
+        (r"\\server\share\owned\script.lua", r"\\server\share\owned"),
+    ),
+)
+def test_cleaned_file_replay_uses_persisted_canonical_root_without_host_parsing(
+    script_file: str,
+    sealed_io_root: str,
+) -> None:
+    session = _session("2025.1").with_settings(
+        {
+            "artifact_plan": {"script_file": script_file},
+            "artifact_evidence": {
+                "contract": "waapi-skill.exact-artifact-evidence/v1",
+                "io_root": sealed_io_root,
+            },
+        }
+    )
+
+    request = materialize_exact_artifact_business_request(
+        "lua.executeCoreFile",
+        session,
+        allow_cleaned_file_evidence=True,
+    )
+
+    assert request["arguments"]["script_file"] == script_file
+    assert request["arguments"]["io_root"] == sealed_io_root
+
+
+def test_cleaned_file_replay_requires_persisted_canonical_root() -> None:
+    session = _session("2025.1").with_settings(
+        {"artifact_plan": {"script_file": "/owned/script.lua"}}
+    )
+
+    with pytest.raises(BusinessDeclarationError) as exc_info:
+        materialize_exact_artifact_business_request(
+            "lua.executeCoreFile",
+            session,
+            allow_cleaned_file_evidence=True,
+        )
+    assert exc_info.value.repair["error_code"] == "ARCHIVE_EVIDENCE_REQUIRED"
+
+
 @pytest.mark.parametrize("reserved", ("luaScript", "doFiles", "requires"))
 def test_lua_business_plan_rejects_reserved_loader_fields(
     tmp_path: Path,

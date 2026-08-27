@@ -28,6 +28,10 @@ _IMPORT_MODES = {
     "replace": "replaceExisting",
 }
 
+EXACT_ARTIFACT_EVIDENCE_CONTRACT = (
+    "waapi-skill.exact-artifact-evidence/v1"
+)
+
 
 def materialize_exact_artifact_business_request(
     operation: str,
@@ -41,7 +45,13 @@ def materialize_exact_artifact_business_request(
         raise ValueError("unsupported exact-artifact operation")
     if not isinstance(session, BusinessDeclarationSession):
         raise TypeError("session must be BusinessDeclarationSession")
-    if set(session.settings) != {"artifact_plan"}:
+    setting_fields = set(session.settings)
+    allowed_setting_fields = (
+        ({"artifact_plan"},)
+        if operation == "audio.importTabDelimited"
+        else ({"artifact_plan"}, {"artifact_plan", "artifact_evidence"})
+    )
+    if setting_fields not in allowed_setting_fields:
         raise _repair(
             session,
             "BUSINESS_DECLARATION_INCOMPLETE",
@@ -83,6 +93,7 @@ def materialize_exact_artifact_business_request(
             session,
             operation,
             plan,
+            evidence=session.settings.get("artifact_evidence"),
             allow_cleaned_file_evidence=allow_cleaned_file_evidence,
         )
     return {
@@ -181,6 +192,7 @@ def _materialize_lua(
     operation: str,
     plan: Mapping[str, Any],
     *,
+    evidence: Any,
     allow_cleaned_file_evidence: bool,
 ) -> dict[str, Any]:
     reserved = (
@@ -200,14 +212,17 @@ def _materialize_lua(
                     "INVALID_ARGUMENT",
                     "script_file must be one exact absolute file path.",
                 )
-            io_root = str(Path(script_file).parent)
-            if not allow_cleaned_file_evidence:
+            if allow_cleaned_file_evidence:
+                io_root = _sealed_io_root(session, evidence)
+            else:
+                io_root = str(Path(script_file).parent)
                 proof = seal_isolated_lua_file(
                     script_file,
                     io_root=io_root,
                     source_authority=LUA_SOURCE_AUTHORITY,
                 )
                 io_root = str(proof["io_root"])
+                _require_matching_io_root(session, evidence, io_root)
             arguments: dict[str, Any] = {
                 "script_file": script_file,
                 "io_root": io_root,
@@ -216,13 +231,16 @@ def _materialize_lua(
         else:
             source = plan.get("lua_source")
             io_root = plan.get("io_root")
-            if not allow_cleaned_file_evidence:
+            if allow_cleaned_file_evidence:
+                io_root = _sealed_io_root(session, evidence)
+            else:
                 proof = seal_inline_lua_source(
                     source,
                     io_root=io_root,
                     source_authority=LUA_SOURCE_AUTHORITY,
                 )
                 io_root = proof["io_root"]
+                _require_matching_io_root(session, evidence, io_root)
             arguments = {
                 "lua_code": source,
                 "io_root": io_root,
@@ -261,6 +279,63 @@ def _materialize_lua(
     return arguments
 
 
+def exact_artifact_evidence_from_request(
+    operation: str,
+    request: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    """Persist the live-sealed root needed for file-free archive replay."""
+
+    if operation == "audio.importTabDelimited":
+        return None
+    arguments = request.get("arguments")
+    io_root = arguments.get("io_root") if isinstance(arguments, Mapping) else None
+    if not isinstance(io_root, str) or not io_root:
+        raise ValueError("exact-artifact request lacks its sealed io_root")
+    return {
+        "contract": EXACT_ARTIFACT_EVIDENCE_CONTRACT,
+        "io_root": io_root,
+    }
+
+
+def _sealed_io_root(
+    session: BusinessDeclarationSession,
+    evidence: Any,
+) -> str:
+    if (
+        not isinstance(evidence, Mapping)
+        or set(evidence) != {"contract", "io_root"}
+        or evidence.get("contract") != EXACT_ARTIFACT_EVIDENCE_CONTRACT
+        or not isinstance(evidence.get("io_root"), str)
+        or not evidence["io_root"]
+    ):
+        raise _repair(
+            session,
+            "ARCHIVE_EVIDENCE_REQUIRED",
+            field="artifact_evidence",
+            action="replay the durable Draft that recorded the live-sealed root",
+        )
+    return str(evidence["io_root"])
+
+
+def _require_matching_io_root(
+    session: BusinessDeclarationSession,
+    evidence: Any,
+    actual: str,
+) -> None:
+    if evidence is None:
+        return
+    expected = _sealed_io_root(session, evidence)
+    if expected != actual:
+        raise _repair(
+            session,
+            "ARTIFACT_EVIDENCE_DRIFT",
+            field="artifact_evidence.io_root",
+            action="declare the exact artifact again against the current filesystem",
+            expected=expected,
+            actual=actual,
+        )
+
+
 def _repair(
     session: BusinessDeclarationSession,
     error_code: str,
@@ -278,4 +353,8 @@ def _repair(
     )
 
 
-__all__ = ["materialize_exact_artifact_business_request"]
+__all__ = [
+    "EXACT_ARTIFACT_EVIDENCE_CONTRACT",
+    "exact_artifact_evidence_from_request",
+    "materialize_exact_artifact_business_request",
+]

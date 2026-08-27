@@ -268,6 +268,9 @@ from wwise_waapi.exact_artifact_business_cli import (  # noqa: E402  # pyright: 
     add_exact_artifact_plan_arguments,
     exact_artifact_plan_from_namespace,
 )
+from wwise_waapi.exact_artifact_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    exact_artifact_evidence_from_request,
+)
 from wwise_waapi.operation_composer import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_TYPED_ACTIONS_PER_APPLY,
     OperationComposerError,
@@ -3555,6 +3558,38 @@ def authoring_host_required_payload(
     return payload
 
 
+def command_line_host_required_payload(
+    *,
+    command: str,
+    live_info: Mapping[str, Any],
+    common: Mapping[str, Any] | None = None,
+    operation: str,
+) -> dict[str, Any]:
+    """Return the closed boundary for Console-only operations."""
+
+    payload: dict[str, Any] = {
+        "contract": GATEWAY_RESULT_CONTRACT,
+        "ok": False,
+        "status": "command_line_host_required",
+        "command": command,
+        "error_code": "COMMAND_LINE_HOST_REQUIRED",
+        "message": (
+            "This operation requires WwiseConsole; Wwise Authoring cannot "
+            "preview or execute it."
+        ),
+        "details": {
+            "is_command_line": live_info.get("isCommandLine"),
+            "required_host": "wwise-console",
+        },
+        "operation": operation,
+        "executed": False,
+        "verified": False,
+    }
+    if common is not None:
+        payload.update(dict(common))
+    return payload
+
+
 def authoring_host_platform(live_info: Mapping[str, Any]) -> str:
     """Map only the official live getInfo platform values used by Authoring."""
 
@@ -3609,6 +3644,13 @@ def live_authoring_transaction_boundary(
     common: Mapping[str, Any],
 ) -> dict[str, Any] | None:
     operation = request_payload.get("operation")
+    if operation == "lua.executeCliFile" and live_info.get("isCommandLine") is not True:
+        return command_line_host_required_payload(
+            command=command,
+            live_info=live_info,
+            common=common,
+            operation=operation,
+        )
     if operation not in {*UI_COMMAND_OPERATIONS, "ui.captureScreen"}:
         return None
     if live_info.get("isCommandLine") is not False:
@@ -11415,6 +11457,22 @@ def dispatch_business_exact_artifact_plan(
 ) -> dict[str, Any]:
     """Bind one exact artifact plan without exposing its native loader."""
 
+    state_dir = resolve_transaction_state_directory(args, env=env)
+    pending = OperationDraftStore(state_dir).inspect(
+        args.draft_id,
+        task_authority=args.task_authority,
+    )
+    if (
+        pending.operation == "lua.executeCliFile"
+        and live_info.get("isCommandLine") is not True
+    ):
+        return command_line_host_required_payload(
+            command=args.command,
+            live_info=live_info,
+            common=common,
+            operation=pending.operation,
+        )
+
     binding = _open_business_binding(
         args,
         env=env,
@@ -11453,7 +11511,16 @@ def dispatch_business_exact_artifact_plan(
     def update(
         current: BusinessDeclarationSession,
     ) -> BusinessDeclarationSession:
-        candidate = current.with_settings({"artifact_plan": plan})
+        provisional = current.with_settings({"artifact_plan": plan})
+        request = adapter.materialize(provisional)
+        settings: dict[str, Any] = {"artifact_plan": plan}
+        evidence = exact_artifact_evidence_from_request(
+            binding.record.operation,
+            request,
+        )
+        if evidence is not None:
+            settings["artifact_evidence"] = evidence
+        candidate = current.with_settings(settings)
         adapter.materialize(candidate)
         return candidate
 
@@ -11644,6 +11711,13 @@ def dispatch_business_object_binding(
             if isinstance(contract_binding, Mapping)
             else False
         )
+        if (
+            isinstance(contract_binding, Mapping)
+            and contract_binding.get("available") is False
+        ):
+            raise GatewayInputError(
+                f"Business object roles are unavailable for {binding.record.operation}"
+            )
         if args.role is not None and not contract_roles:
             raise GatewayInputError(
                 f"Business object roles are unavailable for {binding.record.operation}"
@@ -16830,17 +16904,17 @@ def _business_next_action_binding(
             ],
             "lua.executeCliFile": [
                 "--script-file <exact-user-supplied-lua-file>",
-                "[--argument <key> string|boolean|integer|number|json <exact-value>]...",
+                "[--argument <key> string|boolean|integer|number|json|null <exact-value>]...",
                 "[--watchdog-seconds <non-negative-integer>] (2024.1+)",
             ],
             "lua.executeCoreFile": [
                 "--script-file <exact-user-supplied-lua-file>",
-                "[--argument <key> string|boolean|integer|number|json <exact-value>]...",
+                "[--argument <key> string|boolean|integer|number|json|null <exact-value>]...",
             ],
             "lua.executeCoreInline": [
                 "--lua-source <exact-user-supplied-utf8-source>",
                 "--io-root <exact-isolated-transaction-root>",
-                "[--argument <key> string|boolean|integer|number|json <exact-value>]...",
+                "[--argument <key> string|boolean|integer|number|json|null <exact-value>]...",
             ],
         }
         return {

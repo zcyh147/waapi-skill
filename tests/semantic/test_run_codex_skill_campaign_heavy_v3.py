@@ -141,6 +141,9 @@ from wwise_waapi.operation_drafts import (
 from wwise_waapi.operation_registry import operation_request_schema_digest
 from wwise_waapi.business_adapters import business_adapter
 from wwise_waapi.business_declaration_state import BusinessDeclarationSession
+from wwise_waapi.exact_artifact_business import (
+    exact_artifact_evidence_from_request,
+)
 from wwise_waapi.business_declarations import (
     BusinessContext,
     BusinessHandleRegistry,
@@ -2741,8 +2744,15 @@ def _synthetic_gateway_records(
             def declare_artifact(
                 current: BusinessDeclarationSession,
             ) -> BusinessDeclarationSession:
-                candidate = current.with_settings({"artifact_plan": plan})
-                business_adapter(operation).materialize(candidate)
+                adapter = business_adapter(operation)
+                provisional = current.with_settings({"artifact_plan": plan})
+                request = adapter.materialize(provisional)
+                settings: dict[str, Any] = {"artifact_plan": plan}
+                evidence = exact_artifact_evidence_from_request(operation, request)
+                if evidence is not None:
+                    settings["artifact_evidence"] = evidence
+                candidate = current.with_settings(settings)
+                adapter.materialize(candidate)
                 return candidate
 
             updated = draft_store.apply_business_update(
