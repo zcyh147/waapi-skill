@@ -99,6 +99,7 @@ def compound_undo_business_contract_data(version: str) -> dict[str, Any]:
             "inner_failure_attempts_cancel": True,
             "cancel_is_not_rollback_verification": True,
             "every_eligible_child_requires_business_state_verification": True,
+            "overlapping_final_outcomes": "reject_before_preview",
             "immutable_preview": True,
             "single_execute": True,
         },

@@ -63,6 +63,18 @@ def _child_request(version: str, *, notes: str) -> dict[str, object]:
     }
 
 
+def _rename_request(version: str, *, name: str) -> dict[str, object]:
+    return {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": version,
+        "operation": "object.setName",
+        "arguments": {
+            "object": {"kind": "id", "value": OBJECT_GUID},
+            "value": name,
+        },
+    }
+
+
 def _native_child_request(version: str) -> dict[str, object]:
     return {
         "contract": "waapi-skill.operation-request/v1",
@@ -125,6 +137,9 @@ def test_every_eligible_child_family_has_one_checked_closed_draft_route(
     assert contract["safety"][
         "every_eligible_child_requires_business_state_verification"
     ] is True
+    assert contract["safety"]["overlapping_final_outcomes"] == (
+        "reject_before_preview"
+    )
 
 
 @pytest.mark.parametrize("version", VERSIONS)
@@ -139,7 +154,7 @@ def test_checked_child_snapshots_materialize_in_exact_declared_order(version: st
         version=version,
         source_draft_id="od1-22222222222222222222222222222222",
         source_revision=7,
-        request=_child_request(version, notes="second"),
+        request=_rename_request(version, name="Second"),
     )
     request = materialize_compound_undo_business_request(
         "waapi.undoGroup",
@@ -150,7 +165,7 @@ def test_checked_child_snapshots_materialize_in_exact_declared_order(version: st
     calls = request["arguments"]["calls"]
     assert [row["request"]["operation"] for row in calls] == [
         "object.setNotes",
-        "object.setNotes",
+        "object.setName",
     ]
     assert all("handle" not in row for row in calls)
     parse_operation_request(request, expected_version=version)

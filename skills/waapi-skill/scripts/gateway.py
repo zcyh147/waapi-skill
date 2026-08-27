@@ -17265,9 +17265,9 @@ def _business_next_action_binding(
                 },
                 "child_prerequisite": (
                     "each_child_is_a_current_revision_draft-check-passed_closed_"
-                    "draft_for_this_project_and_version; named_children_use_their_"
-                    "business_declaration_and_generic_children_retain_their_separate_"
-                    "interface_depth_boundary"
+                    "business_draft_for_this_project_and_version_with_a_supported_"
+                    "business_outcome_verifier; generic_typed_children_are_"
+                    "prohibited_until_their_separate_interface_depth_migration"
                 ),
                 "submit_once": True,
                 "native_request_input": "forbidden",

@@ -7970,6 +7970,55 @@ def _dedupe_fields(fields: Sequence[Any]) -> list[str]:
     return result
 
 
+def _compound_business_outcome_key(plan: Mapping[str, Any]) -> str:
+    """Name one final business outcome that a child verifier owns."""
+
+    kind = plan.get("kind")
+    if kind == "same-guid-renamed":
+        identity = {"object_id": plan.get("object_id"), "field": "name"}
+    elif kind == "same-guid-notes":
+        identity = {"object_id": plan.get("object_id"), "field": "notes"}
+    elif kind in {"same-guid-property", "same-guid-reference"}:
+        identity = {
+            "object_id": plan.get("object_id"),
+            "field_kind": kind,
+            "field": plan.get("field"),
+            "platform": plan.get("platform"),
+        }
+    elif kind == "object-linked-state":
+        identity = {
+            "object_id": plan.get("object_id"),
+            "field_kind": kind,
+            "field": plan.get("property"),
+            "platform": plan.get("platform"),
+        }
+    elif kind == "soundbank-inclusions-exact":
+        identity = {
+            "soundbank_id": plan.get("soundbank_id"),
+            "field": "inclusions",
+        }
+    elif kind == "switch-assignment-pair":
+        identity = {
+            "switch_container_id": plan.get("switch_container_id"),
+            "child_id": plan.get("child_id"),
+            "field": "assignment",
+        }
+    else:
+        raise OperationContractError(
+            "UNDO_GROUP_CHILD_VERIFIER_REQUIRED",
+            "Compound Undo accepts only child operations with a supported "
+            "final business-outcome verifier.",
+            details={"verification_kind": kind},
+        )
+    if any(value is None for value in identity.values()):
+        raise OperationContractError(
+            "UNDO_GROUP_CHILD_VERIFIER_REQUIRED",
+            "Compound Undo child verification lacks its complete outcome identity.",
+            details={"verification_kind": kind},
+        )
+    return canonical_sha256(identity)
+
+
 def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> PreparedOperation:
     """Resolve live identities/metadata and build one immutable semantic preview."""
 
@@ -7996,6 +8045,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
     if request.operation == "waapi.undoGroup":
         execution_plan = build_undo_group_execution_plan(request.version, arguments)
         prepared_children: list[Mapping[str, Any]] = []
+        outcome_owners: dict[str, int] = {}
         for index, child_plan in enumerate(execution_plan["calls"]):
             child_request = parse_operation_request(
                 child_plan["child_request"],
@@ -8005,6 +8055,22 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 prepared_children.append(dict(child_plan))
                 continue
             child_prepared = prepare_operation(child_request, read_call=read)
+            outcome_key = _compound_business_outcome_key(
+                child_prepared.verification_plan
+            )
+            previous = outcome_owners.get(outcome_key)
+            if previous is not None:
+                raise OperationContractError(
+                    "UNDO_GROUP_OVERLAPPING_OUTCOME",
+                    "Compound Undo children cannot independently verify two "
+                    "writes to the same final business outcome.",
+                    details={
+                        "first_index": previous,
+                        "second_index": index,
+                        "operation": child_request.operation,
+                    },
+                )
+            outcome_owners[outcome_key] = index
             child_dispatch = child_prepared.semantic_preview.dispatch_payload()
             if child_dispatch.get("uri") != child_plan["api"]:
                 raise OperationContractError(

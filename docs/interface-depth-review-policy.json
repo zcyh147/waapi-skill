@@ -17,7 +17,7 @@
   },
   "source_contracts": {
     "gateway_parser_sha256": "78007b801e768a0fba9ef8e64fbf0614118620dd81f16352b3015970b9f77a2f",
-    "operation_contract_sha256": "644c8900ac39ce46a4a6c565e7593e9f18981cccbd16ddf4f24da7ec12317a68",
+    "operation_contract_sha256": "bd3f63201dec616a6b57dbd4be326a6e72fbf0642367c773a331491a56c914f5",
     "public_continuation_sha256": "2fa739b8ede432490e6474de7477fb77a933cd99f5d57a8e07a5e7e2fd365e52",
     "typed_request_surface_sha256": "6d05d64e95a6e0f7099ddd03f1da42c763e9c06f33f93cac7581c7c061a83af8"
   },
@@ -129,7 +129,7 @@
       "owner_issue": null,
       "operations": ["waapi.undoGroup"],
       "leaked_mechanics": [],
-      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered user-requested business sequence of already checked closed Business Draft capabilities; snapshots each exact child request and schema at declaration time; derives child bindings, revisions, the fixed native begin/child/end phase dependency order with cancel-on-failure, one aggregate business-outcome verification, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, dependency edges, and Composer action ordering grammar for all five lanes. Generic typed children are explicitly prohibited until their separate #57 migration supplies closed business parameters and business-outcome verification."
+      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered user-requested business sequence of already checked closed Business Draft capabilities; snapshots each exact child request and schema at declaration time; rejects children that own the same final outcome before Preview; derives child bindings, revisions, the fixed native begin/child/end phase dependency order with cancel-on-failure, one aggregate business-outcome verification, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, dependency edges, and Composer action ordering grammar for all five lanes. Generic typed children are explicitly prohibited until their separate #57 migration supplies closed business parameters and business-outcome verification."
     }
   ],
   "native_lane_rules": [

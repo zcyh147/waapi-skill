@@ -314,6 +314,63 @@ def test_compound_undo_repair_preserves_hostile_business_values_exactly(
     ] == hostile_notes
 
 
+def test_compound_undo_rejects_two_children_that_own_the_same_final_outcome(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "state"
+    client = ObjectLifecycleClient()
+    first = _checked_object_child(
+        tmp_path,
+        state_dir,
+        operation="object.setNotes",
+        value_flag="--notes",
+        value="first",
+        client=client,
+    )
+    second = _checked_object_child(
+        tmp_path,
+        state_dir,
+        operation="object.setNotes",
+        value_flag="--notes",
+        value="second",
+        client=client,
+    )
+    code, parent = offline_execute(
+        tmp_path,
+        "--state-dir", str(state_dir),
+        "--version", "2022.1",
+        "draft-start", "waapi.undoGroup",
+    )
+    assert code == 0, parent
+    code, declared = waapi_gateway.execute_gateway(
+        [
+            "--state-dir", str(state_dir),
+            "draft-declare-undo-plan", parent["draft"]["draft_id"],
+            "--task-authority", parent["task_authority"],
+            "--expected-revision", str(parent["draft"]["revision"]),
+            "--display-name", "overlapping notes",
+            "--child-draft", first[0], first[1],
+            "--child-draft", second[0], second[1],
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+    assert code == 0, declared
+    code, rejected = waapi_gateway.execute_gateway(
+        [
+            "--state-dir", str(state_dir),
+            "draft-check", parent["draft"]["draft_id"],
+            "--task-authority", parent["task_authority"],
+            "--expected-revision", str(declared["draft"]["revision"]),
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert code == 2, rejected
+    assert rejected["error_code"] == "UNDO_GROUP_OVERLAPPING_OUTCOME"
+
+
 def test_generic_undo_child_is_not_promoted_to_a_checked_business_draft(
     tmp_path: Path,
 ) -> None:
