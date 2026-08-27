@@ -11,7 +11,6 @@ import pytest
 from tests.semantic import run_codex_skill_matrix as matrix
 from tests.semantic import run_codex_skill_campaign as campaign
 from tests.semantic.support.codex_authoring_ui_business_agent_runner import (
-    _authoring_ui_commutative_read_groups,
     _command_choice_came_from_inventory,
     prepare_authoring_ui_business_runtime,
 )
@@ -83,7 +82,7 @@ def test_each_unit_compiles_to_one_closed_public_business_preview(
         "preview-from-draft",
     ]
     if unit.operation == "ui.commands.execute":
-        expected[1:1] = ["request-schema", "typed-zero-call"]
+        expected[2:2] = ["request-schema", "typed-zero-call"]
     assert [step.subcommand for step in steps] == expected
     assert (
         "ak.wwise.ui.commands.getCommands"
@@ -93,21 +92,6 @@ def test_each_unit_compiles_to_one_closed_public_business_preview(
     fixture = json.loads(runtime.fixture_path.read_text(encoding="utf-8"))
     assert fixture["is_command_line"] is False
     assert fixture["command_ids"] == ["SaveProject"]
-
-
-def test_authoring_command_discovery_reads_are_commutative(tmp_path: Path) -> None:
-    unit = load_authoring_ui_business_profile(
-        PROFILE,
-        unit_ids=("AUI25-SAVE-PREVIEW",),
-    ).units[0]
-    runtime = prepare_authoring_ui_business_runtime(unit, tmp_path / "runtime")
-    assert _authoring_ui_commutative_read_groups(runtime) == (
-        (
-            "tx01.operation-schema",
-            "tx01.command-inventory-schema",
-            "tx01.command-inventory",
-        ),
-    )
 
 
 def test_profile_rejects_prompt_level_gateway_mechanics(tmp_path: Path) -> None:

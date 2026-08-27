@@ -1659,7 +1659,7 @@ def build_authoring_ui_business_transaction_steps(
     draft = _BusinessDraftSteps.start(operation=operation, label=label)
     steps = draft.steps
     if operation == "ui.commands.execute":
-        steps[:0] = [
+        steps[1:1] = [
             request_schema_step(
                 f"{label}.command-inventory-schema",
                 "ak.wwise.ui.commands.getCommands",

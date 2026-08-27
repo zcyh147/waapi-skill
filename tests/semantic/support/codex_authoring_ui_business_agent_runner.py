@@ -188,23 +188,6 @@ def run_authoring_ui_business_agent_unit(
             transaction_count=lambda _runtime: 1,
             preview_gates=_authoring_ui_preview_gates,
             outcome_factory=AuthoringUiBusinessAgentOutcome,
-            commutative_read_only_step_groups=(
-                _authoring_ui_commutative_read_groups
-            ),
-        ),
-    )
-
-
-def _authoring_ui_commutative_read_groups(
-    runtime: AuthoringUiBusinessRuntime,
-) -> Sequence[Sequence[str]]:
-    if runtime.request["operation"] != "ui.commands.execute":
-        return ()
-    return (
-        (
-            "tx01.operation-schema",
-            "tx01.command-inventory-schema",
-            "tx01.command-inventory",
         ),
     )
 
