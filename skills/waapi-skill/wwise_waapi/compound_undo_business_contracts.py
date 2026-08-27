@@ -16,16 +16,16 @@ def compound_undo_business_contract_data(version: str) -> dict[str, Any]:
     from .operation_registry import (
         UNDO_GROUP_MAX_CALLS,
         UNDO_GROUP_MAX_DISPLAY_NAME_LENGTH,
-        operation_uses_business_declaration,
     )
-    from .typed_operations import compound_child_operations
+    from .typed_operations import (
+        compound_business_child_operations,
+        compound_child_operations,
+    )
 
     all_children = sorted(compound_child_operations(version))
-    eligible = [
-        operation
-        for operation in all_children
-        if not operation.startswith("ak.")
-        and operation_uses_business_declaration(operation, version)
+    eligible = sorted(compound_business_child_operations(version))
+    prohibited_generic = [
+        operation for operation in all_children if operation.startswith("ak.")
     ]
     return {
         "contract": COMPOUND_UNDO_BUSINESS_CONTRACT,
@@ -56,13 +56,10 @@ def compound_undo_business_contract_data(version: str) -> dict[str, Any]:
                 "native_dependency_edges_input": "forbidden",
             },
             "eligible_child_operations": eligible,
-            "generic_typed_child_operations": [
-                operation for operation in all_children if operation.startswith("ak.")
-            ],
+            "prohibited_generic_child_operations": prohibited_generic,
             "generic_child_boundary": (
-                "generic child parameters remain owned by their separate #57 "
-                "migration family; this Adapter accepts only their checked "
-                "closed Draft snapshot"
+                "prohibited_until_the_separate_#57_business_migration_supplies_"
+                "closed_parameters_and_business_outcome_verification"
             ),
             "native_request_input": "forbidden",
             "child_call_handle_input": "forbidden",
@@ -101,6 +98,7 @@ def compound_undo_business_contract_data(version: str) -> dict[str, Any]:
             "automatic_retry": False,
             "inner_failure_attempts_cancel": True,
             "cancel_is_not_rollback_verification": True,
+            "every_eligible_child_requires_business_state_verification": True,
             "immutable_preview": True,
             "single_execute": True,
         },

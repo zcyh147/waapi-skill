@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping, Sequence
 
 from .business_declaration_state import BusinessDeclarationSession
-from .business_declarations import business_repair
+from .business_declarations import (
+    BusinessContext,
+    BusinessDeclarationError,
+    business_repair,
+)
 from .canonical import canonical_sha256
 
 
@@ -45,6 +49,112 @@ class CheckedChildDraftBinding:
         return cls(draft_id=value[0], task_authority=value[1])
 
 
+@dataclass(frozen=True, slots=True)
+class CompoundUndoSnapshotScope:
+    """Trusted parent context required to snapshot checked child Drafts."""
+
+    store: Any
+    parent_draft_id: str
+    parent_context: BusinessContext
+    project_guard: Mapping[str, Any]
+    version: str
+    schema_digest_for: Callable[[str, str], str]
+    composer_digest_for: Callable[[str, str], str]
+
+
+def snapshot_checked_compound_undo_children(
+    scope: CompoundUndoSnapshotScope,
+    bindings: Sequence[CheckedChildDraftBinding],
+) -> tuple[dict[str, Any], ...]:
+    """Validate and freeze all child capabilities behind the domain seam."""
+
+    from .operation_drafts import OperationDraftBindingDrift
+    from .operation_registry import operation_uses_business_declaration
+
+    snapshots: list[dict[str, Any]] = []
+    for index, binding in enumerate(bindings):
+        child_record = scope.store.inspect(
+            binding.draft_id,
+            task_authority=binding.task_authority,
+        )
+        if child_record.draft_id == scope.parent_draft_id:
+            raise ValueError("A Compound Undo plan cannot include itself")
+        if not operation_uses_business_declaration(
+            child_record.operation,
+            child_record.version,
+        ):
+            raise ValueError(
+                "Compound Undo children must use a checked closed Business Draft "
+                "with business-outcome verification"
+            )
+        check = child_record.check
+        if (
+            not isinstance(check, Mapping)
+            or check.get("source_revision") != child_record.revision - 1
+            or check.get("schema_digest") != child_record.schema_digest
+            or check.get("composer_digest") != child_record.composer_digest
+            or check.get("live_version") != child_record.version
+            or check.get("project_guard") != scope.project_guard
+        ):
+            raise ValueError(
+                f"Compound Undo child {index} must be checked at its current revision"
+            )
+        materialized = scope.store.materialize_request(
+            child_record.draft_id,
+            task_authority=binding.task_authority,
+            expected_revision=child_record.revision,
+            schema_digest=scope.schema_digest_for(
+                child_record.operation,
+                child_record.version,
+            ),
+            composer_digest=scope.composer_digest_for(
+                child_record.operation,
+                child_record.version,
+            ),
+        )
+        if check.get("request_digest") != materialized.request_digest:
+            raise ValueError(
+                f"Compound Undo child {index} must be checked at its current revision"
+            )
+        raw_composition = child_record.composition
+        raw_session = (
+            raw_composition.get("business_session")
+            if isinstance(raw_composition, Mapping)
+            else None
+        )
+        if not isinstance(raw_session, Mapping):
+            raise ValueError(
+                f"Compound Undo child {index} lacks a Business Declaration session"
+            )
+        child_context = BusinessDeclarationSession.from_dict(raw_session).context
+        if any(
+            getattr(child_context, field) != getattr(scope.parent_context, field)
+            for field in (
+                "project_id",
+                "project_path",
+                "wwise_version",
+                "wwise_build",
+            )
+        ):
+            raise OperationDraftBindingDrift(
+                f"Compound Undo child {index} belongs to another live project or Wwise build."
+            )
+        try:
+            snapshot = build_compound_undo_child_snapshot(
+                version=scope.version,
+                source_draft_id=child_record.draft_id,
+                source_revision=child_record.revision,
+                request=materialized.request,
+            )
+        except BusinessDeclarationError as exc:
+            raise ValueError(
+                f"Compound Undo child {index} is not an eligible checked "
+                f"business mutation: {exc}"
+            ) from exc
+        snapshots.append(snapshot)
+    return tuple(snapshots)
+
+
 def build_compound_undo_child_snapshot(
     *,
     version: str,
@@ -55,11 +165,10 @@ def build_compound_undo_child_snapshot(
     """Freeze one checked closed child request for ordered reuse."""
 
     from .operation_registry import (
-        operation_uses_business_declaration,
         parse_operation_request,
     )
     from .typed_operations import (
-        compound_child_operations,
+        compound_business_child_operations,
         compound_child_request_contract,
     )
 
@@ -71,16 +180,9 @@ def build_compound_undo_child_snapshot(
     except (TypeError, ValueError) as exc:
         raise _repair("UNDO_CHILD_INVALID", field="child_drafts") from exc
     operation = parsed.operation
-    child_operation = operation
-    if operation == "waapi.call":
-        child_operation = parsed.arguments.get("api")
     if (
-        not isinstance(child_operation, str)
-        or child_operation not in compound_child_operations(version)
-        or (
-            operation != "waapi.call"
-            and not operation_uses_business_declaration(operation, version)
-        )
+        operation == "waapi.call"
+        or operation not in compound_business_child_operations(version)
     ):
         raise _repair("UNDO_CHILD_BUSINESS_REQUIRED", field="child_drafts")
     if not isinstance(source_draft_id, str) or not source_draft_id:
@@ -91,9 +193,9 @@ def build_compound_undo_child_snapshot(
     return {
         "source_draft_id": source_draft_id,
         "source_revision": source_revision,
-        "operation": child_operation,
+        "operation": operation,
         "child_schema_digest": compound_child_request_contract(
-            child_operation,
+            operation,
             version,
         ).schema_digest,
         "request_sha256": canonical_sha256(normalized),
@@ -202,6 +304,8 @@ def _session_repair(
 
 __all__ = [
     "CheckedChildDraftBinding",
+    "CompoundUndoSnapshotScope",
     "build_compound_undo_child_snapshot",
     "materialize_compound_undo_business_request",
+    "snapshot_checked_compound_undo_children",
 ]

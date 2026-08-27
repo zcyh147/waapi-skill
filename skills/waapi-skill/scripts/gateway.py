@@ -225,8 +225,6 @@ from wwise_waapi.typed_operations import (  # noqa: E402  # pyright: ignore[repo
     DRAFT_TYPED_OPERATIONS,
     INLINE_OPERATIONS,
     TypedOperationInputError,
-    compound_child_operations,
-    compound_child_request_contract,
     draft_operation_request_contract,
     inline_operation_contract,
     materialize_inline_operation_request,
@@ -292,7 +290,8 @@ from wwise_waapi.debug_business_cli import (  # noqa: E402  # pyright: ignore[re
 )
 from wwise_waapi.compound_undo_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     CheckedChildDraftBinding,
-    build_compound_undo_child_snapshot,
+    CompoundUndoSnapshotScope,
+    snapshot_checked_compound_undo_children,
 )
 from wwise_waapi.operation_composer import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_TYPED_ACTIONS_PER_APPLY,
@@ -5056,8 +5055,6 @@ def operation_draft_schema_digest(operation: str, version: str) -> str:
     """Bind named-operation and exact-URI Drafts to their owning schema."""
 
     if operation.startswith("ak."):
-        if operation in compound_child_operations(version):
-            return compound_child_request_contract(operation, version).schema_digest
         return request_contract(version, operation).schema_digest
     if operation in DRAFT_TYPED_OPERATIONS:
         return draft_operation_request_contract(operation, version).schema_digest
@@ -5079,8 +5076,6 @@ def public_typed_contract(version: str, api: str) -> Any:
         return topic_match_contract(
             version, api.removeprefix(TOPIC_MATCH_OPERATION_PREFIX)
         )
-    if api in compound_child_operations(version):
-        return compound_child_request_contract(api, version)
     if api in DRAFT_TYPED_OPERATIONS:
         return draft_operation_request_contract(api, version)
     return request_contract(version, api)
@@ -11823,91 +11818,21 @@ def dispatch_business_compound_undo_plan(
         )
     except ValueError as exc:
         raise GatewayInputError(str(exc)) from exc
-    snapshots: list[dict[str, Any]] = []
-    for index, child_binding in enumerate(checked_child_bindings):
-        child_draft_id = child_binding.draft_id
-        child_authority = child_binding.task_authority
-        child_record = binding.store.inspect(
-            child_draft_id,
-            task_authority=child_authority,
-        )
-        if child_record.draft_id == binding.record.draft_id:
-            raise GatewayInputError("A Compound Undo plan cannot include itself")
-        child_is_business = operation_uses_business_declaration(
-            child_record.operation,
-            child_record.version,
-        )
-        if not child_is_business and not child_record.operation.startswith("ak."):
-            raise GatewayInputError(
-                "Compound Undo children must use a checked closed child Draft"
-            )
-        check = child_record.check
-        if (
-            not isinstance(check, Mapping)
-            or check.get("source_revision") != child_record.revision - 1
-            or check.get("schema_digest") != child_record.schema_digest
-            or check.get("composer_digest") != child_record.composer_digest
-            or check.get("live_version") != child_record.version
-            or check.get("project_guard") != current_project_guard
-        ):
-            raise GatewayInputError(
-                f"Compound Undo child {index} must be checked at its current revision"
-            )
-        materialized = binding.store.materialize_request(
-            child_record.draft_id,
-            task_authority=child_authority,
-            expected_revision=child_record.revision,
-            schema_digest=operation_draft_schema_digest(
-                child_record.operation,
-                child_record.version,
-            ),
-            composer_digest=operation_composer_digest(
-                child_record.operation,
-                child_record.version,
-            ),
-        )
-        if (
-            check.get("request_digest") != materialized.request_digest
-        ):
-            raise GatewayInputError(
-                f"Compound Undo child {index} must be checked at its current revision"
-            )
-        raw_composition = child_record.composition
-        raw_session = (
-            raw_composition.get("business_session")
-            if isinstance(raw_composition, Mapping)
-            else None
-        )
-        if child_is_business:
-            if not isinstance(raw_session, Mapping):
-                raise GatewayInputError(
-                    f"Compound Undo child {index} lacks a Business Declaration session"
-                )
-            child_context = BusinessDeclarationSession.from_dict(raw_session).context
-            if any(
-                getattr(child_context, field) != getattr(binding.context, field)
-                for field in (
-                    "project_id",
-                    "project_path",
-                    "wwise_version",
-                    "wwise_build",
-                )
-            ):
-                raise OperationDraftBindingDrift(
-                    f"Compound Undo child {index} belongs to another live project or Wwise build."
-                )
-        try:
-            snapshot = build_compound_undo_child_snapshot(
+    try:
+        snapshots = snapshot_checked_compound_undo_children(
+            CompoundUndoSnapshotScope(
+                store=binding.store,
+                parent_draft_id=binding.record.draft_id,
+                parent_context=binding.context,
+                project_guard=current_project_guard,
                 version=detected_version,
-                source_draft_id=child_record.draft_id,
-                source_revision=child_record.revision,
-                request=materialized.request,
-            )
-        except BusinessDeclarationError as exc:
-            raise GatewayInputError(
-                f"Compound Undo child {index} is not an eligible checked business mutation: {exc}"
-            ) from exc
-        snapshots.append(snapshot)
+                schema_digest_for=operation_draft_schema_digest,
+                composer_digest_for=operation_composer_digest,
+            ),
+            checked_child_bindings,
+        )
+    except ValueError as exc:
+        raise GatewayInputError(str(exc)) from exc
 
     def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
         candidate = current.with_settings(

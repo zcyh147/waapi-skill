@@ -6,6 +6,7 @@ import pytest
 
 from tests.support.platform_filesystem import native_absolute_test_path
 from tests.semantic.support.codex_eval_protocol_v3 import (
+    CompoundUndoChildExpectation,
     StructuredRefusal,
     V3GatewayProtocol,
     V3ProtocolError,
@@ -240,7 +241,7 @@ def test_switch_assignment_business_steps_bind_three_paths_before_declaration() 
 
 def test_compound_undo_steps_check_children_before_one_parent_preview() -> None:
     object_path = r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\Rain"
-    children = (
+    requests = (
         {
             "contract": "waapi-skill.operation-request/v1",
             "version": "2022.1",
@@ -259,6 +260,13 @@ def test_compound_undo_steps_check_children_before_one_parent_preview() -> None:
                 "value": "Rain_Exterior",
             },
         },
+    )
+    children = tuple(
+        CompoundUndoChildExpectation(
+            request=request,
+            selector={"kind": "path", "value": object_path},
+        )
+        for request in requests
     )
     steps = build_compound_undo_business_transaction_steps(
         children,

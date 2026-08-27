@@ -17,6 +17,7 @@ from tests.semantic.support.codex_compound_undo_business_profile import (
     CompoundUndoBusinessUnit,
 )
 from tests.semantic.support.codex_eval_protocol_v3 import (
+    CompoundUndoChildExpectation,
     build_compound_undo_business_transaction_steps,
 )
 
@@ -29,8 +30,7 @@ CompoundUndoBusinessAgentOptions = BusinessAgentOptions
 class CompoundUndoBusinessRuntime:
     fixture_path: Path
     prompt: str
-    child_requests: tuple[Mapping[str, Any], ...]
-    child_selectors: tuple[Mapping[str, Any], ...]
+    children: tuple[CompoundUndoChildExpectation, ...]
     display_name: str
     object_id: str
 
@@ -91,7 +91,31 @@ def prepare_compound_undo_business_runtime(
     )
     object_id = str(unit.object["id"])
     object_path = str(unit.object["path"])
-    child_requests = (
+    children = compound_undo_business_child_expectations(unit)
+    return CompoundUndoBusinessRuntime(
+        fixture_path=fixture_path,
+        prompt=unit.prompt_template.format_map(
+            {
+                "object_path": object_path,
+                "notes_value": unit.notes_value,
+                "name_value": unit.name_value,
+                "display_name": unit.display_name,
+            }
+        ),
+        children=children,
+        display_name=unit.display_name,
+        object_id=object_id,
+    )
+
+
+def compound_undo_business_child_expectations(
+    unit: CompoundUndoBusinessUnit,
+) -> tuple[CompoundUndoChildExpectation, ...]:
+    """Build the one shared runner and campaign oracle for both child Drafts."""
+
+    object_id = str(unit.object["id"])
+    object_path = str(unit.object["path"])
+    requests = (
         {
             "contract": "waapi-skill.operation-request/v1",
             "version": unit.version,
@@ -111,24 +135,12 @@ def prepare_compound_undo_business_runtime(
             },
         },
     )
-    child_selectors = (
-        {"kind": "path", "value": object_path},
-        {"kind": "path", "value": object_path},
-    )
-    return CompoundUndoBusinessRuntime(
-        fixture_path=fixture_path,
-        prompt=unit.prompt_template.format_map(
-            {
-                "object_path": object_path,
-                "notes_value": unit.notes_value,
-                "name_value": unit.name_value,
-                "display_name": unit.display_name,
-            }
-        ),
-        child_requests=child_requests,
-        child_selectors=child_selectors,
-        display_name=unit.display_name,
-        object_id=object_id,
+    return tuple(
+        CompoundUndoChildExpectation(
+            request=request,
+            selector={"kind": "path", "value": object_path},
+        )
+        for request in requests
     )
 
 
@@ -136,10 +148,9 @@ def build_preview_only_compound_undo_steps(
     runtime: CompoundUndoBusinessRuntime,
 ) -> tuple[Any, ...]:
     return build_compound_undo_business_transaction_steps(
-        runtime.child_requests,
+        runtime.children,
         display_name=runtime.display_name,
         label="tx03",
-        child_selectors=runtime.child_selectors,
     )
 
 
@@ -234,6 +245,7 @@ __all__ = [
     "CompoundUndoBusinessAgentOutcome",
     "CompoundUndoBusinessRuntime",
     "build_preview_only_compound_undo_steps",
+    "compound_undo_business_child_expectations",
     "prepare_compound_undo_business_runtime",
     "run_compound_undo_business_agent_unit",
 ]

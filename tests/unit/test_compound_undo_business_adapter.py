@@ -18,8 +18,8 @@ from wwise_waapi.operation_registry import (
     operation_input_mode,
     parse_operation_request,
 )
-from wwise_waapi.operation_composer import operation_composer_contract
 from wwise_waapi.typed_operations import (
+    compound_business_child_operations,
     compound_child_operations,
     draft_operation_request_contract,
 )
@@ -115,16 +115,16 @@ def test_every_eligible_child_family_has_one_checked_closed_draft_route(
     contract = compound_undo_business_contract_data(version)
     declaration = contract["declaration"]
     eligible = set(declaration["eligible_child_operations"])
-    generic = set(declaration["generic_typed_child_operations"])
+    prohibited_generic = set(declaration["prohibited_generic_child_operations"])
 
-    assert eligible | generic == set(compound_child_operations(version))
-    assert eligible.isdisjoint(generic)
+    assert eligible == set(compound_business_child_operations(version))
+    assert eligible | prohibited_generic == set(compound_child_operations(version))
+    assert eligible.isdisjoint(prohibited_generic)
     assert all(not operation.startswith("ak.") for operation in eligible)
-    for operation in generic:
-        composer = operation_composer_contract(operation, version)
-        assert composer["operation"] == operation
-        assert composer["version"] == version
-        assert composer["complete_request_is_never_an_action"] is True
+    assert all(operation.startswith("ak.") for operation in prohibited_generic)
+    assert contract["safety"][
+        "every_eligible_child_requires_business_state_verification"
+    ] is True
 
 
 @pytest.mark.parametrize("version", VERSIONS)
@@ -141,28 +141,17 @@ def test_checked_child_snapshots_materialize_in_exact_declared_order(version: st
         source_revision=7,
         request=_child_request(version, notes="second"),
     )
-    native = build_compound_undo_child_snapshot(
-        version=version,
-        source_draft_id="od1-33333333333333333333333333333333",
-        source_revision=2,
-        request=_native_child_request(version),
-    )
-
     request = materialize_compound_undo_business_request(
         "waapi.undoGroup",
-        _session(version, [first, native, second]),
+        _session(version, [first, second]),
     )
 
     assert request["arguments"]["display_name"] == "Reviewed batch"
     calls = request["arguments"]["calls"]
     assert [row["request"]["operation"] for row in calls] == [
         "object.setNotes",
-        "waapi.call",
         "object.setNotes",
     ]
-    assert calls[1]["request"]["arguments"]["api"] == (
-        "ak.wwise.core.object.setRandomizer"
-    )
     assert all("handle" not in row for row in calls)
     parse_operation_request(request, expected_version=version)
 
@@ -180,6 +169,21 @@ def test_undo_business_rejects_non_allowlisted_native_child_requests() -> None:
             source_draft_id="od1-11111111111111111111111111111111",
             source_revision=1,
             request=native,
+        )
+
+    assert exc_info.value.repair["error_code"] == "UNDO_CHILD_BUSINESS_REQUIRED"
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_undo_business_rejects_generic_children_until_business_verifier_parity(
+    version: str,
+) -> None:
+    with pytest.raises(BusinessDeclarationError) as exc_info:
+        build_compound_undo_child_snapshot(
+            version=version,
+            source_draft_id="od1-11111111111111111111111111111111",
+            source_revision=1,
+            request=_native_child_request(version),
         )
 
     assert exc_info.value.repair["error_code"] == "UNDO_CHILD_BUSINESS_REQUIRED"

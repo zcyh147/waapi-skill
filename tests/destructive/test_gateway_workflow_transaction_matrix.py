@@ -64,7 +64,6 @@ from tests.semantic.support.codex_project_prelaunch_v3 import (  # pyright: igno
 from wwise_waapi.headless import HeadlessLifecycle  # pyright: ignore[reportMissingImports]  # noqa: E402
 from wwise_waapi.operation_registry import OPERATION_REQUEST_CONTRACT  # pyright: ignore[reportMissingImports]  # noqa: E402
 from wwise_waapi.transactions import TransactionState, TransactionStore  # pyright: ignore[reportMissingImports]  # noqa: E402
-from wwise_waapi.typed_operations import compound_child_request_contract  # pyright: ignore[reportMissingImports]  # noqa: E402
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS  # pyright: ignore[reportMissingImports]  # noqa: E402
 
 
@@ -271,74 +270,6 @@ def _checked_object_lifecycle_child(
         ["--object-handle", object_handle, flag, value],
         live=False,
     )
-    _update_business_draft(runtime, draft, "draft-check", live=True)
-    return draft
-
-
-def _checked_generic_randomizer_child(
-    runtime: _WorkflowSandboxRuntime,
-    *,
-    object_path: str,
-    property_name: str,
-) -> _BusinessDraft:
-    operation = "ak.wwise.core.object.setRandomizer"
-    schema = runtime.gateway(["request-schema", operation], live=False)
-    assert schema["input_shape"] == "draft"
-    assert schema["draft_requirement"] == "checked_compound_child_capability"
-    draft = _start_business_draft(runtime, operation)
-    contract = compound_child_request_contract(operation, runtime.version)
-    object_field = next(
-        field
-        for field in contract.fields
-        if field.path == ("object",)
-        and field.shape == "scalar"
-        and any(variant.get("pattern") == r"^\\" for variant in field.variants)
-    )
-    facts = (
-        ("choose", object_field.parent_handle, None, object_field.handle),
-        ("set", object_field.handle, "string", object_path),
-        (
-            "set",
-            next(
-                field.handle
-                for field in contract.fields
-                if field.path == ("property",) and field.shape == "scalar"
-            ),
-            "string",
-            property_name,
-        ),
-        (
-            "set",
-            next(
-                field.handle
-                for field in contract.fields
-                if field.path == ("enabled",) and field.shape == "scalar"
-            ),
-            "boolean",
-            "true",
-        ),
-    )
-    for fact_action, field_handle, value_type, value in facts:
-        arguments = [
-            "--facts",
-            "--action",
-            "add_typed_fact",
-            "--fact-action",
-            fact_action,
-            "--field-handle",
-            str(field_handle),
-            "--fact-value",
-            value,
-        ]
-        if value_type is not None:
-            arguments.extend(("--value-type", value_type))
-        _update_business_draft(
-            runtime,
-            draft,
-            "draft-apply",
-            arguments,
-            live=False,
-        )
     _update_business_draft(runtime, draft, "draft-check", live=True)
     return draft
 
@@ -1788,6 +1719,7 @@ def test_compound_undo_business_draft_executes_and_cancels_without_retry(
     suffix = uuid.uuid4().hex[:12]
     success_id: str | None = None
     failure_id: str | None = None
+    conflict_id: str | None = None
     try:
         success_original_name = f"WAAPI_UNDO_SUCCESS_{suffix}"
         success_final_name = f"WAAPI_UNDO_RENAMED_{suffix}"
@@ -1840,6 +1772,7 @@ def test_compound_undo_business_draft_executes_and_cancels_without_retry(
         assert success_readback["objects"][0]["notes"] == success_notes
 
         failure_name = f"WAAPI_UNDO_CANCEL_{suffix}"
+        conflict_name = f"WAAPI_UNDO_CONFLICT_{suffix}"
         failure_notes = f"before cancelled child {runtime.version} {suffix}"
         failure_id = _create_object(
             runtime,
@@ -1847,17 +1780,23 @@ def test_compound_undo_business_draft_executes_and_cancels_without_retry(
             object_type="ActorMixer",
             name=failure_name,
         )
-        failure_path = f"{parent_root}\\{failure_name}"
+        conflict_id = _create_object(
+            runtime,
+            parent=parent_root,
+            object_type="ActorMixer",
+            name=conflict_name,
+        )
         first_child = _checked_object_lifecycle_child(
             runtime,
             operation="object.setNotes",
             object_id=failure_id,
             value=failure_notes,
         )
-        rejected_child = _checked_generic_randomizer_child(
+        rejected_child = _checked_object_lifecycle_child(
             runtime,
-            object_path=failure_path,
-            property_name=f"DefinitelyNotAProperty_{suffix}",
+            operation="object.setName",
+            object_id=failure_id,
+            value=conflict_name,
         )
         failure_parent = _declare_compound_undo(
             runtime,
@@ -1898,7 +1837,7 @@ def test_compound_undo_business_draft_executes_and_cancels_without_retry(
         assert failure["automatic_retry"] is False
         assert failure["rollback_verified"] is False
         assert failure["compound_execution"]["failed_phase"]["uri"] == (
-            "ak.wwise.core.object.setRandomizer"
+            "ak.wwise.core.object.setName"
         )
         retry_code, retry = runtime.raw_gateway(["execute", transaction_id])
         assert retry_code == 2, retry
@@ -1913,7 +1852,7 @@ def test_compound_undo_business_draft_executes_and_cancels_without_retry(
             }
         )
     finally:
-        for object_id in (failure_id, success_id):
+        for object_id in (conflict_id, failure_id, success_id):
             if object_id is not None:
                 _delete_if_present_via_transaction(runtime, object_id)
 

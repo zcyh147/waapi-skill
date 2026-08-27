@@ -83,6 +83,14 @@ _SEALED_FILE_REPLAY_OPERATIONS = frozenset(
 )
 
 
+@dataclass(frozen=True, slots=True)
+class CompoundUndoChildExpectation:
+    """One canonical child request and its Agent-visible binding selector."""
+
+    request: Mapping[str, Any]
+    selector: Mapping[str, Any]
+
+
 def _typed_fact_cli_arguments(
     facts: Sequence[TypedRequestFact],
     *,
@@ -1500,29 +1508,22 @@ def build_object_lifecycle_business_transaction_steps(
 
 
 def build_compound_undo_business_transaction_steps(
-    child_requests: Sequence[Mapping[str, Any]],
+    children: Sequence[CompoundUndoChildExpectation],
     *,
     display_name: str,
     label: str,
-    child_selectors: Sequence[Mapping[str, Any]] | None = None,
 ) -> tuple[ExpectedGatewayStep, ...]:
     """Compose checked child Business Drafts into one compound Preview."""
 
-    if not 1 <= len(child_requests) <= 32:
+    if not 1 <= len(children) <= 32:
         raise V3ProtocolError("compound Undo requires 1..32 child requests")
     if not isinstance(display_name, str) or not display_name.strip():
         raise V3ProtocolError("compound Undo display name is invalid")
     if not isinstance(label, str) or not re.fullmatch(r"tx[0-9]{2}", label):
         raise V3ProtocolError("business transaction label must be txNN")
     normalized_children = tuple(
-        _validate_operation_request(request) for request in child_requests
+        _validate_operation_request(child.request) for child in children
     )
-    if child_selectors is not None and len(child_selectors) != len(
-        normalized_children
-    ):
-        raise V3ProtocolError(
-            "compound Undo child selectors must match child request count"
-        )
     versions = {str(request["version"]) for request in normalized_children}
     if len(versions) != 1:
         raise V3ProtocolError("compound Undo children must share one version")
@@ -1564,15 +1565,13 @@ def build_compound_undo_business_transaction_steps(
     checked_child_labels: list[str] = []
     for index, request in enumerate(normalized_children, start=1):
         child_label = f"tx{index:02d}"
-        flow_request = request
-        if child_selectors is not None:
-            flow_request = {
-                **request,
-                "arguments": {
-                    **dict(request["arguments"]),
-                    "object": dict(child_selectors[index - 1]),
-                },
-            }
+        flow_request = {
+            **request,
+            "arguments": {
+                **dict(request["arguments"]),
+                "object": dict(children[index - 1].selector),
+            },
+        }
         child_steps = list(
             build_object_lifecycle_business_transaction_steps(
                 flow_request,
@@ -4573,6 +4572,7 @@ def _format_timeout(value: float) -> str:
 
 
 __all__ = [
+    "CompoundUndoChildExpectation",
     "StructuredRefusal",
     "V3GatewayProtocol",
     "V3ProtocolError",

@@ -1,8 +1,8 @@
-"""Test-only helpers for canonical compound Undo requests.
+"""Test-only helpers for canonical compound Undo transaction requests.
 
-The public Gateway accepts checked child Draft identities.  Unit tests that
-exercise lower transaction layers do not own a Draft store, so they construct
-the same immutable child snapshots directly through the production Adapter.
+The public Gateway accepts only verified Business Draft children. Lower-layer
+transaction tests may still need the internal generic-child boundary, so this
+helper constructs that canonical request without advertising a public route.
 """
 
 from __future__ import annotations
@@ -10,12 +10,9 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from wwise_waapi.business_declaration_state import BusinessDeclarationSession
-from wwise_waapi.business_declarations import BusinessContext
-from wwise_waapi.compound_undo_business import (
-    build_compound_undo_child_snapshot,
-    materialize_compound_undo_business_request,
-)
+from wwise_waapi.compound_undo_business import build_compound_undo_child_snapshot
+from wwise_waapi.operation_registry import parse_operation_request
+from wwise_waapi.typed_requests import request_contract
 
 
 def compound_undo_request(
@@ -24,36 +21,38 @@ def compound_undo_request(
     child_requests: Sequence[Mapping[str, Any]],
     display_name: str = "Program Undo Group",
 ) -> dict[str, Any]:
-    """Wrap closed child requests in the production checked-snapshot seam."""
+    """Wrap child requests for transaction-layer tests only."""
 
-    snapshots = [
-        build_compound_undo_child_snapshot(
+    calls: list[dict[str, Any]] = []
+    for index, request in enumerate(child_requests, start=1):
+        parsed = parse_operation_request(request, expected_version=version)
+        if parsed.operation == "waapi.call":
+            api = str(parsed.arguments["api"])
+            calls.append(
+                {
+                    "schema_digest": request_contract(version, api).schema_digest,
+                    "request": parsed.as_dict(),
+                }
+            )
+            continue
+        snapshot = build_compound_undo_child_snapshot(
             version=version,
             source_draft_id=f"od1-{index:032x}",
             source_revision=1,
-            request=request,
+            request=parsed.as_dict(),
         )
-        for index, request in enumerate(child_requests, start=1)
-    ]
-    session = BusinessDeclarationSession.create(
-        BusinessContext.create(
-            task_authority="da1-" + "1" * 40,
-            project_id="{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
-            project_path="/fixtures/SampleProject.wproj",
-            wwise_version=version,
-            wwise_build=f"{version}.fixture",
-        )
-    ).with_settings(
-        {
-            "undo_plan": {
-                "display_name": display_name,
-                "children": snapshots,
+        calls.append(
+            {
+                "schema_digest": snapshot["child_schema_digest"],
+                "request": snapshot["request"],
             }
-        }
-    )
-    return dict(
-        materialize_compound_undo_business_request("waapi.undoGroup", session)
-    )
+        )
+    return {
+        "contract": "waapi-skill.operation-request/v1",
+        "version": version,
+        "operation": "waapi.undoGroup",
+        "arguments": {"display_name": display_name, "calls": calls},
+    }
 
 
 __all__ = ["compound_undo_request"]

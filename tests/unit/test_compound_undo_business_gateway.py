@@ -12,7 +12,6 @@ from tests.unit.test_operation_input_gateway import (
 from wwise_waapi.business_declaration_state import BusinessDeclarationSession
 from wwise_waapi.operation_drafts import OperationDraftStore
 from wwise_waapi.transactions import TransactionState, TransactionStore
-from wwise_waapi.typed_operations import compound_child_request_contract
 
 
 def _checked_object_child(
@@ -223,10 +222,101 @@ def test_compound_undo_rejects_unchecked_or_stale_child_before_parent_write(
     assert "business_session" not in parent_record.composition
 
 
-def test_generic_compound_child_uses_its_own_checked_draft_before_parent_snapshot(
+def test_compound_undo_repair_preserves_hostile_business_values_exactly(
     tmp_path: Path,
 ) -> None:
     state_dir = tmp_path / "state"
+    client = ObjectLifecycleClient()
+    code, unchecked = offline_execute(
+        tmp_path,
+        "--state-dir", str(state_dir),
+        "--version", "2022.1",
+        "draft-start", "object.setNotes",
+    )
+    assert code == 0, unchecked
+    code, parent = offline_execute(
+        tmp_path,
+        "--state-dir", str(state_dir),
+        "--version", "2022.1",
+        "draft-start", "waapi.undoGroup",
+    )
+    assert code == 0, parent
+    parent_id = parent["draft"]["draft_id"]
+    parent_authority = parent["task_authority"]
+    parent_revision = parent["draft"]["revision"]
+    code, rejected = waapi_gateway.execute_gateway(
+        [
+            "--state-dir", str(state_dir),
+            "draft-declare-undo-plan", parent_id,
+            "--task-authority", parent_authority,
+            "--expected-revision", str(parent_revision),
+            "--display-name", "first rejected declaration",
+            "--child-draft", unchecked["draft"]["draft_id"],
+            unchecked["task_authority"],
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+    assert code == 2, rejected
+
+    hostile_notes = "原样备注 \"quoted\"\n$(not-a-command) & | < > \\"
+    hostile_display_name = "撤销 \"quoted\"\n$(not-a-command) & | < > \\"
+    repaired_child = _checked_object_child(
+        tmp_path,
+        state_dir,
+        operation="object.setNotes",
+        value_flag="--notes",
+        value=hostile_notes,
+        client=client,
+    )
+    code, declared = waapi_gateway.execute_gateway(
+        [
+            "--state-dir", str(state_dir),
+            "draft-declare-undo-plan", parent_id,
+            "--task-authority", parent_authority,
+            "--expected-revision", str(parent_revision),
+            "--display-name", hostile_display_name,
+            "--child-draft", repaired_child[0], repaired_child[1],
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+    assert code == 0, declared
+    code, checked = waapi_gateway.execute_gateway(
+        [
+            "--state-dir", str(state_dir),
+            "draft-check", parent_id,
+            "--task-authority", parent_authority,
+            "--expected-revision", str(declared["draft"]["revision"]),
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+    assert code == 0, checked
+    code, previewed = waapi_gateway.execute_gateway(
+        [
+            "--state-dir", str(state_dir),
+            "preview-from-draft", parent_id,
+            "--task-authority", parent_authority,
+            "--expected-revision", str(checked["draft"]["revision"]),
+            "--apply",
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+    assert code == 0, previewed
+    request = TransactionStore(state_dir).load_preview(
+        previewed["transaction_id"]
+    ).artifact["request"]
+    assert request["arguments"]["display_name"] == hostile_display_name
+    assert request["arguments"]["calls"][0]["request"]["arguments"][
+        "value"
+    ] == hostile_notes
+
+
+def test_generic_undo_child_is_not_promoted_to_a_checked_business_draft(
+    tmp_path: Path,
+) -> None:
     operation = "ak.wwise.core.object.setRandomizer"
     code, schema = offline_execute(
         tmp_path,
@@ -236,133 +326,8 @@ def test_generic_compound_child_uses_its_own_checked_draft_before_parent_snapsho
         operation,
     )
     assert code == 0, schema
-    assert schema["input_shape"] == "draft"
-    assert schema["draft_requirement"] == "checked_compound_child_capability"
-    code, started = offline_execute(
-        tmp_path,
-        "--state-dir",
-        str(state_dir),
-        "--version",
-        "2022.1",
-        "draft-start",
-        operation,
-    )
-    assert code == 0, started
-    child_id = started["draft"]["draft_id"]
-    child_authority = started["task_authority"]
-    revision = started["draft"]["revision"]
-    contract = compound_child_request_contract(operation, "2022.1")
-    object_field = next(
-        field
-        for field in contract.fields
-        if field.path == ("object",)
-        and field.shape == "scalar"
-        and any(variant.get("pattern") == r"^\\" for variant in field.variants)
-    )
-    facts = (
-        ("choose", object_field.parent_handle, None, object_field.handle),
-        ("set", object_field.handle, "string", r"\Actor-Mixer Hierarchy\A"),
-        (
-            "set",
-            next(
-                field.handle
-                for field in contract.fields
-                if field.path == ("property",) and field.shape == "scalar"
-            ),
-            "string",
-            "Volume",
-        ),
-        (
-            "set",
-            next(
-                field.handle
-                for field in contract.fields
-                if field.path == ("enabled",) and field.shape == "scalar"
-            ),
-            "boolean",
-            "true",
-        ),
-    )
-    for fact_action, field_handle, value_type, value in facts:
-        argv = [
-            "--state-dir",
-            str(state_dir),
-            "draft-apply",
-            child_id,
-            "--task-authority",
-            child_authority,
-            "--expected-revision",
-            str(revision),
-            "--facts",
-            "--action",
-            "add_typed_fact",
-            "--fact-action",
-            fact_action,
-            "--field-handle",
-            field_handle,
-            "--fact-value",
-            value,
-        ]
-        if value_type is not None:
-            argv.extend(("--value-type", value_type))
-        code, applied = offline_execute(tmp_path, *argv)
-        assert code == 0, applied
-        revision = applied["draft"]["revision"]
-    client = ObjectLifecycleClient()
-    code, checked = waapi_gateway.execute_gateway(
-        [
-            "--state-dir",
-            str(state_dir),
-            "draft-check",
-            child_id,
-            "--task-authority",
-            child_authority,
-            "--expected-revision",
-            str(revision),
-        ],
-        env=gateway_env(tmp_path),
-        client_factory=lambda _url: client,
-    )
-    assert code == 0, checked
-    code, parent = offline_execute(
-        tmp_path,
-        "--state-dir",
-        str(state_dir),
-        "--version",
-        "2022.1",
-        "draft-start",
-        "waapi.undoGroup",
-    )
-    assert code == 0, parent
-    code, declared = waapi_gateway.execute_gateway(
-        [
-            "--state-dir",
-            str(state_dir),
-            "draft-declare-undo-plan",
-            parent["draft"]["draft_id"],
-            "--task-authority",
-            parent["task_authority"],
-            "--expected-revision",
-            str(parent["draft"]["revision"]),
-            "--display-name",
-            "Generic child",
-            "--child-draft",
-            child_id,
-            child_authority,
-        ],
-        env=gateway_env(tmp_path),
-        client_factory=lambda _url: client,
-    )
-
-    assert code == 0, declared
-    record = OperationDraftStore(state_dir).inspect(
-        parent["draft"]["draft_id"],
-        task_authority=parent["task_authority"],
-    )
-    session = BusinessDeclarationSession.from_dict(
-        record.composition["business_session"]
-    )
-    assert session.settings["undo_plan"]["children"][0]["operation"] == operation
+    assert schema["input_shape"] == "inline"
+    assert "draft_requirement" not in schema
 
 
 def test_compound_undo_rejects_child_changed_after_check_before_parent_snapshot(

@@ -1608,7 +1608,9 @@ def test_operation_schema_discloses_checked_child_business_contract_offline(
     assert "composer" not in payload
     assert all(
         not operation.startswith("ak.wwise.core.object.setNotes")
-        for operation in adapter["declaration"]["generic_typed_child_operations"]
+        for operation in adapter["declaration"][
+            "prohibited_generic_child_operations"
+        ]
     )
 
 

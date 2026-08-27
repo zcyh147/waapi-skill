@@ -12,7 +12,6 @@ import json
 import math
 import re
 from copy import deepcopy
-from dataclasses import replace
 from typing import Any, Mapping, Sequence
 
 from .canonical import canonical_json_bytes
@@ -28,6 +27,7 @@ from .operation_registry import (
     UNDO_GROUP_INNER_URIS_BY_VERSION,
     OperationContractError,
     list_operation_specs,
+    operation_uses_business_declaration,
     operation_request_schema_digest,
     operation_request_machine_contract,
     parse_operation_request,
@@ -674,6 +674,17 @@ def compound_child_operations(version: str) -> Mapping[str, str]:
     return result
 
 
+def compound_business_child_operations(version: str) -> Mapping[str, str]:
+    """Return only child operations with a closed business verifier seam."""
+
+    return {
+        operation: uri
+        for operation, uri in compound_child_operations(version).items()
+        if not operation.startswith("ak.")
+        and operation_uses_business_declaration(operation, version)
+    }
+
+
 def compound_child_request_contract(
     child_operation: str,
     version: str,
@@ -686,7 +697,7 @@ def compound_child_request_contract(
             f"{child_operation!r} is not an approved typed Undo Group child"
         )
     if child_operation.startswith("ak."):
-        return replace(request_contract(version, uri), force_draft=True)
+        return request_contract(version, uri)
     machine = operation_request_machine_contract(child_operation, version)
     arguments = _compound_child_typed_schema(
         deepcopy(machine["argument_contract"])
@@ -771,6 +782,7 @@ __all__ = [
     "inline_operation_contract",
     "draft_operation_request_contract",
     "compound_child_operations",
+    "compound_business_child_operations",
     "compound_child_request_contract",
     "materialize_inline_operation_request",
     "inline_operation_cli_arguments",

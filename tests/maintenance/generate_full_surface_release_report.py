@@ -418,7 +418,19 @@ def _continuation_error(
         elif "request-schema" in commands:
             contract = gateway.public_typed_contract(version, uri)
             payload = contract.as_gateway_payload()
-            public_input_shape = payload["input_shape"]
+            public_input_shape = (
+                "inline"
+                if (
+                    construction_shape != "zero"
+                    and (
+                        construction_shape == "inline"
+                        or capability.execution_contract["route"]
+                        == "isolated_transaction"
+                        or uri == gateway.TYPED_REQUEST_COMPLEX_TRACER_URI
+                    )
+                )
+                else construction_shape
+            )
             if payload["input_shape"] != public_input_shape:
                 return "typed continuation shape differs from the inventory"
             subcommand = payload.get("continuation", {}).get("subcommand")
