@@ -2470,6 +2470,88 @@ def run_model_command(
     )
 
 
+@pytest.mark.parametrize(
+    "discovery_arguments",
+    ((), (("operations",),)),
+    ids=("direct-schema", "one-operations-discovery"),
+)
+def test_broker_accepts_one_optional_initial_operations_discovery(
+    tmp_path: Path,
+    discovery_arguments: tuple[tuple[str, ...], ...],
+) -> None:
+    """The Skill permits one bounded catalog read before an exact schema read."""
+
+    skill = make_fake_skill(tmp_path)
+    steps = (
+        ExpectedGatewayStep(
+            "tx03.operation-schema",
+            "operation-schema",
+            ("waapi.undoGroup",),
+        ),
+    )
+    observed: list[list[str]] = []
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        allow_optional_initial_operations_discovery=True,
+        transport="tcp",
+    ) as broker:
+        for arguments in (*discovery_arguments, ("operation-schema", "waapi.undoGroup")):
+            result = run_model_command(broker, list(arguments))
+            assert result.returncode == 0, result.stderr
+            observed.append(
+                [
+                    "python",
+                    str(broker.invocation_runner_path),
+                    "gateway.py",
+                    *arguments,
+                ]
+            )
+        evidence = broker.evidence()
+        reconciliation = broker.reconcile(observed)
+
+    assert evidence.passed
+    assert reconciliation.passed
+    assert evidence.expected_step_names == (
+        *(("tx03.operations",) if discovery_arguments else ()),
+        "tx03.operation-schema",
+    )
+
+
+@pytest.mark.parametrize(
+    "commands",
+    (
+        (("operations",), ("operations",)),
+        (("operation-schema", "waapi.undoGroup"), ("operations",)),
+        (("operation-schema", "waapi.notUndoGroup"),),
+    ),
+    ids=("repeated-discovery", "discovery-after-schema", "wrong-operation"),
+)
+def test_broker_optional_initial_operations_discovery_stays_fail_closed(
+    tmp_path: Path,
+    commands: tuple[tuple[str, ...], ...],
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    steps = (
+        ExpectedGatewayStep(
+            "tx03.operation-schema",
+            "operation-schema",
+            ("waapi.undoGroup",),
+        ),
+        ExpectedGatewayStep("tx03.next", "capabilities"),
+    )
+    with CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        allow_optional_initial_operations_discovery=True,
+        transport="tcp",
+    ) as broker:
+        results = [run_model_command(broker, list(arguments)) for arguments in commands]
+
+    assert results[-1].returncode == 126
+    assert broker.evidence().terminal_state == "FAILED"
+
+
 def native_pwsh_73_or_skip() -> str:
     pwsh = shutil.which("pwsh.exe") or shutil.which("pwsh")
     if pwsh is None:

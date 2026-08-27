@@ -7738,6 +7738,7 @@ class CodexGatewayBroker:
         offline_replay_preview_requests: (
             Mapping[str, Mapping[str, Any]] | None
         ) = None,
+        allow_optional_initial_operations_discovery: bool = False,
     ) -> None:
         self.skill_source = _absolute_lexical(skill_source)
         self.runner_path = self.skill_source / "scripts" / "run.py"
@@ -7762,6 +7763,15 @@ class CodexGatewayBroker:
             )
         )
         self._execution_steps = list(self.expected_steps)
+        self._selected_expected_steps = list(self.expected_steps)
+        if type(allow_optional_initial_operations_discovery) is not bool:
+            raise TypeError(
+                "allow_optional_initial_operations_discovery must be a bool"
+            )
+        self.allow_optional_initial_operations_discovery = (
+            allow_optional_initial_operations_discovery
+        )
+        self._optional_initial_operations_step: ExpectedGatewayStep | None = None
         self._commutative_read_only_step_sets = tuple(
             frozenset(group)
             for group in self.commutative_read_only_step_groups
@@ -7864,6 +7874,24 @@ class CodexGatewayBroker:
         names = [step.name for step in self.expected_steps]
         if len(names) != len(set(names)):
             raise ValueError("ExpectedGatewayStep names must be unique")
+        if self.allow_optional_initial_operations_discovery:
+            first = self.expected_steps[0]
+            if first.subcommand != "operation-schema":
+                raise ValueError(
+                    "optional operations discovery requires operation-schema as "
+                    "the first required step"
+                )
+            label = first.name.rsplit(".", 1)[0]
+            discovery = ExpectedGatewayStep(
+                name=f"{label}.operations",
+                subcommand="operations",
+            )
+            if discovery.name in names:
+                raise ValueError(
+                    "optional operations discovery step name collides with a "
+                    "required step"
+                )
+            self._optional_initial_operations_step = discovery
         validate_operation_draft_protocol_steps(self.expected_steps)
         terminal_execute_steps = tuple(
             index
@@ -8315,14 +8343,16 @@ class CodexGatewayBroker:
             successful_count = sum(record.succeeded for record in records)
             complete = (
                 self._terminal_state == _BROKER_COMPLETE
-                and self._next_step == len(self.expected_steps)
-                and successful_count == len(self.expected_steps)
-                and len(records) == len(self.expected_steps)
+                and self._next_step == len(self._selected_expected_steps)
+                and successful_count == len(self._selected_expected_steps)
+                and len(records) == len(self._selected_expected_steps)
                 and all(record.succeeded for record in records)
             )
             terminal_state = self._terminal_state
         return GatewayBrokerEvidence(
-            expected_step_names=tuple(step.name for step in self.expected_steps),
+            expected_step_names=tuple(
+                step.name for step in self._selected_expected_steps
+            ),
             consumed_step_names=consumed,
             records=records,
             state_directory=str(self.state_directory),
@@ -8843,6 +8873,20 @@ class CodexGatewayBroker:
                     authenticated=True,
                 )
             try:
+                if (
+                    self._next_step == 0
+                    and not self._records
+                    and self._optional_initial_operations_step is not None
+                    and resolved.gateway_arguments == ("operations",)
+                ):
+                    self._execution_steps.insert(
+                        0,
+                        self._optional_initial_operations_step,
+                    )
+                    self._selected_expected_steps.insert(
+                        0,
+                        self._optional_initial_operations_step,
+                    )
                 step = self._execution_steps[self._next_step]
                 step = self._rebase_business_draft_revision(step)
                 step = self._bind_task_local_declaration_id(
@@ -10894,7 +10938,7 @@ class CodexGatewayBroker:
                 self._next_step += 1
                 if terminal_indeterminate:
                     self._terminal_state = _BROKER_INDETERMINATE
-                elif self._next_step == len(self.expected_steps):
+                elif self._next_step == len(self._execution_steps):
                     self._terminal_state = _BROKER_COMPLETE
             else:
                 self._terminal_state = _BROKER_FAILED

@@ -208,13 +208,18 @@ def run_compound_undo_business_agent_unit(
         unit,
         scenario_root=scenario_root,
         options=options,
-        spec=BusinessAgentRunSpec(
-            prepare_runtime=prepare_compound_undo_business_runtime,
-            build_steps=build_preview_only_compound_undo_steps,
-            transaction_count=lambda _runtime: 1,
-            preview_gates=_compound_undo_preview_gates,
-            outcome_factory=CompoundUndoBusinessAgentOutcome,
-        ),
+        spec=_compound_undo_business_run_spec(),
+    )
+
+
+def _compound_undo_business_run_spec() -> BusinessAgentRunSpec:
+    return BusinessAgentRunSpec(
+        prepare_runtime=prepare_compound_undo_business_runtime,
+        build_steps=build_preview_only_compound_undo_steps,
+        transaction_count=lambda _runtime: 1,
+        preview_gates=_compound_undo_preview_gates,
+        outcome_factory=CompoundUndoBusinessAgentOutcome,
+        allow_optional_initial_operations_discovery=True,
     )
 
 

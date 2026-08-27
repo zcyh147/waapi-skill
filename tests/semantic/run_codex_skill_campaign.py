@@ -226,6 +226,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (  # noqa: E402
     operation_request_equivalence,
 )
 from tests.semantic.support.codex_gateway_broker import (  # noqa: E402
+    ExpectedGatewayStep,
     InlineTypedOperationArgument,
     TypedRequestFactsArgument,
 )
@@ -3412,6 +3413,25 @@ def _validate_bound_business_agent_protocol(
         raise CampaignEvidenceError("unknown bound Business Agent profile")
 
     expected_names = tuple(step.name for step in steps)
+    audited_steps = tuple(steps)
+    if profile == matrix.COMPOUND_UNDO_BUSINESS_PROFILE_ID:
+        optional_discovery = ExpectedGatewayStep(
+            name="tx03.operations",
+            subcommand="operations",
+        )
+        raw_expected_names = broker.get("expected_step_names")
+        observed_expected_names = (
+            tuple(raw_expected_names)
+            if isinstance(raw_expected_names, list)
+            else ()
+        )
+        if observed_expected_names == (optional_discovery.name, *expected_names):
+            audited_steps = (optional_discovery, *audited_steps)
+            expected_names = observed_expected_names
+        elif observed_expected_names != expected_names:
+            raise CampaignEvidenceError(
+                "compound Undo Broker used an unreviewed discovery prefix"
+            )
     consumed_names = broker.get("consumed_step_names")
     records = broker.get("records")
     if (
@@ -3428,7 +3448,7 @@ def _validate_bound_business_agent_protocol(
     }
     if len(by_name) != len(expected_names):
         raise CampaignEvidenceError("bound Business Agent Broker step identity drifted")
-    for step in steps:
+    for step in audited_steps:
         record = by_name.get(step.name)
         arguments = record.get("gateway_arguments") if isinstance(record, Mapping) else None
         if (
@@ -3439,6 +3459,7 @@ def _validate_bound_business_agent_protocol(
             or record.get("exit_code") != 0
             or not isinstance(arguments, list)
             or arguments[:1] != [step.subcommand]
+            or (step.subcommand == "operations" and arguments != ["operations"])
         ):
             raise CampaignEvidenceError("bound Business Agent Broker record is not successful")
         if step.subcommand == "preview-from-draft":

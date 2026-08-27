@@ -45,6 +45,20 @@ class BusinessAgentRunSpec:
     transaction_count: Callable[[Any], int]
     preview_gates: Callable[[Any, Any, Any, Any], Mapping[str, bool]]
     outcome_factory: Callable[..., Any]
+    allow_optional_initial_operations_discovery: bool = False
+
+
+def _expected_gateway_subcommands(
+    steps: Sequence[Any],
+    *,
+    allow_optional_initial_operations_discovery: bool,
+) -> tuple[str, ...]:
+    prefix = (
+        ("operations",)
+        if allow_optional_initial_operations_discovery
+        else ()
+    )
+    return tuple(dict.fromkeys((*prefix, *(step.subcommand for step in steps))))
 
 
 def run_business_agent_unit(
@@ -91,6 +105,9 @@ def run_business_agent_unit(
         working_root=task_root / "broker",
         transport="tcp",
         runner_timeout_seconds=max(120.0, options.timeout_seconds),
+        allow_optional_initial_operations_discovery=(
+            spec.allow_optional_initial_operations_discovery
+        ),
     )
     developer_instructions = semantic_task_developer_instructions(
         options.skill_source / "scripts" / "run.py",
@@ -107,7 +124,12 @@ def run_business_agent_unit(
         reasoning_effort=options.reasoning_effort,
         service_tier=options.service_tier,
         timeout_seconds=options.timeout_seconds,
-        expected_gateway_subcommands=tuple(step.subcommand for step in steps),
+        expected_gateway_subcommands=_expected_gateway_subcommands(
+            steps,
+            allow_optional_initial_operations_discovery=(
+                spec.allow_optional_initial_operations_discovery
+            ),
+        ),
         expected_wwise_version=unit.version,
         sandbox_mode="workspace-write",
         allow_output_write=False,

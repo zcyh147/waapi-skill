@@ -4,9 +4,15 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from tests.semantic import run_codex_skill_campaign as campaign
 from tests.semantic import run_codex_skill_matrix as matrix
+from tests.semantic.support.codex_business_agent_runner import (
+    _expected_gateway_subcommands,
+)
 from tests.semantic.support.codex_compound_undo_business_agent_runner import (
+    _compound_undo_business_run_spec,
     build_preview_only_compound_undo_steps,
     prepare_compound_undo_business_runtime,
 )
@@ -92,6 +98,84 @@ def test_unit_checks_children_then_emits_only_parent_preview(tmp_path: Path) -> 
     assert all(unit.object["id"] not in token for token in runtime.prompt.split())
     fixture = json.loads(runtime.fixture_path.read_text(encoding="utf-8"))
     assert fixture["objects"] == [dict(unit.object)]
+
+
+def test_fresh_runner_allows_only_the_one_initial_operations_discovery(
+    tmp_path: Path,
+) -> None:
+    unit = load_compound_undo_business_profile(PROFILE).units[0]
+    runtime = prepare_compound_undo_business_runtime(unit, tmp_path / "runtime")
+    steps = build_preview_only_compound_undo_steps(runtime)
+    spec = _compound_undo_business_run_spec()
+
+    assert spec.allow_optional_initial_operations_discovery is True
+    subcommands = _expected_gateway_subcommands(
+        steps,
+        allow_optional_initial_operations_discovery=(
+            spec.allow_optional_initial_operations_discovery
+        ),
+    )
+    assert subcommands[0] == "operations"
+    assert subcommands.count("operations") == 1
+    assert set(subcommands[1:]) == {step.subcommand for step in steps}
+
+
+@pytest.mark.parametrize("with_discovery", (False, True))
+def test_campaign_audit_accepts_only_the_optional_initial_operations_read(
+    tmp_path: Path,
+    with_discovery: bool,
+) -> None:
+    unit = load_compound_undo_business_profile(PROFILE).units[0]
+    runtime = prepare_compound_undo_business_runtime(unit, tmp_path / "runtime")
+    steps = build_preview_only_compound_undo_steps(runtime)
+    audited_steps = (
+        (("tx03.operations", "operations"),)
+        if with_discovery
+        else ()
+    ) + tuple((step.name, step.subcommand) for step in steps)
+    names = [name for name, _subcommand in audited_steps]
+    records = [
+        {
+            "step_name": name,
+            "gateway_arguments": [subcommand],
+            "accepted": True,
+            "authenticated": True,
+            "succeeded": True,
+            "exit_code": 0,
+            "payload": (
+                {"agent_result": {"request": steps[-1].expected_operation_request}}
+                if name == "tx03.preview"
+                else {}
+            ),
+        }
+        for name, subcommand in audited_steps
+    ]
+    campaign._validate_bound_business_agent_protocol(  # noqa: SLF001
+        {
+            "expected_step_names": names,
+            "consumed_step_names": names,
+            "records": records,
+        },
+        expected_unit=unit,
+        profile=matrix.COMPOUND_UNDO_BUSINESS_PROFILE_ID,
+    )
+
+
+def test_campaign_audit_rejects_repeated_operations_discovery(tmp_path: Path) -> None:
+    unit = load_compound_undo_business_profile(PROFILE).units[0]
+    runtime = prepare_compound_undo_business_runtime(unit, tmp_path / "runtime")
+    steps = build_preview_only_compound_undo_steps(runtime)
+    names = ["tx03.operations", "tx03.operations-again", *(step.name for step in steps)]
+    with pytest.raises(campaign.CampaignEvidenceError, match="unreviewed discovery"):
+        campaign._validate_bound_business_agent_protocol(  # noqa: SLF001
+            {
+                "expected_step_names": names,
+                "consumed_step_names": names,
+                "records": [],
+            },
+            expected_unit=unit,
+            profile=matrix.COMPOUND_UNDO_BUSINESS_PROFILE_ID,
+        )
 
 
 def test_profile_filters_and_formal_lane_registration_are_exact() -> None:
