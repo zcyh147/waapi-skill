@@ -47,6 +47,7 @@ def authoring_ui_business_contract_data(
     if version not in SUPPORTED_WWISE_VERSIONS:
         raise ValueError("unsupported Wwise version")
     declaration = _declaration(operation, version)
+    responsibility, derivations = _ownership(operation)
     return {
         "contract": AUTHORING_UI_BUSINESS_CONTRACT,
         "operation": operation,
@@ -64,24 +65,8 @@ def authoring_ui_business_contract_data(
             "role_required": False,
         },
         "declaration": declaration,
-        "responsibility_split": {
-            "agent": (
-                "choose_capture_outcomes_or_live_command_business_values_and_"
-                "copy_exact_user_handler_paths"
-            ),
-            "gateway": (
-                "derive_authoring_host_guards_command_ids_platform_source_"
-                "authority_revision_order_native_payload_and_cleanup"
-            ),
-        },
-        "gateway_derivations": [
-            "authoring_host_and_platform_guard",
-            "project_scoped_command_ids",
-            "source_authority_and_unknown_ownership_acknowledgement",
-            "native_version_fields_and_serialization",
-            "fresh_inventory_preconditions_and_postconditions",
-            "registration_cleanup_companion",
-        ],
+        "responsibility_split": responsibility,
+        "gateway_derivations": derivations,
         "legacy_inline_typed_public": False,
         "legacy_composer_public": False,
         "safety": {
@@ -91,9 +76,78 @@ def authoring_ui_business_contract_data(
             "immutable_preview": True,
             "single_execute": True,
             "paired_unregister": operation == "ui.commands.register",
-            "exact_handler_paths": True,
+            "exact_handler_paths": operation == "ui.commands.register",
         },
     }
+
+
+def _ownership(operation: str) -> tuple[dict[str, str], list[str]]:
+    shared = ["authoring_host_guard", "native_version_fields_and_serialization"]
+    if operation == "ui.captureScreen":
+        return (
+            {
+                "agent": "choose_capture_view_channel_and_rectangle_outcome",
+                "gateway": (
+                    "derive_authoring_host_guard_native_capture_payload_"
+                    "revision_and_result_bound"
+                ),
+            },
+            [*shared, "capture_result_bound"],
+        )
+    if operation == "ui.commands.execute":
+        return (
+            {
+                "agent": (
+                    "choose_one_id_from_fresh_command_inventory_and_bounded_"
+                    "command_operands_or_exact_files"
+                ),
+                "gateway": (
+                    "derive_authoring_host_guard_native_command_payload_"
+                    "fresh_inventory_precondition_and_revision"
+                ),
+            },
+            [*shared, "fresh_inventory_precondition", "bounded_command_operands"],
+        )
+    if operation == "ui.commands.register":
+        return (
+            {
+                "agent": (
+                    "choose_stable_command_keys_display_menu_and_handler_"
+                    "business_values_and_copy_exact_user_handler_paths"
+                ),
+                "gateway": (
+                    "derive_authoring_platform_project_scoped_command_ids_"
+                    "source_authority_native_registration_payload_fresh_"
+                    "inventory_checks_revision_order_and_cleanup_companion"
+                ),
+            },
+            [
+                *shared,
+                "authoring_platform_guard",
+                "project_scoped_command_ids",
+                "source_authority",
+                "fresh_inventory_preconditions_and_postconditions",
+                "registration_cleanup_companion",
+            ],
+        )
+    return (
+        {
+            "agent": (
+                "choose_owned_registration_keys_or_exact_existing_command_ids_"
+                "and_confirm_unknown_ownership_as_a_business_decision"
+            ),
+            "gateway": (
+                "derive_project_scoped_command_ids_or_unknown_ownership_"
+                "acknowledgement_native_unregister_payload_fresh_inventory_"
+                "checks_and_revision"
+            ),
+        },
+        [
+            *shared,
+            "project_scoped_command_ids_or_unknown_ownership_acknowledgement",
+            "fresh_inventory_preconditions_and_postconditions",
+        ],
+    )
 
 
 def _declaration(operation: str, version: str) -> dict[str, Any]:

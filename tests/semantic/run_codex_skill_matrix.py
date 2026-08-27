@@ -168,6 +168,14 @@ DEFAULT_SWITCH_ASSIGNMENT_BUSINESS_SUITE = (
     / "switch-assignment-business"
     / "profile.json"
 )
+DEFAULT_AUTHORING_UI_BUSINESS_SUITE = (
+    REPO_ROOT
+    / "tests"
+    / "semantic"
+    / "data"
+    / "authoring-ui-business"
+    / "profile.json"
+)
 DEFAULT_DEEP_INTERFACE_MVP_SKILL = (
     REPO_ROOT / "tests" / "semantic" / "data" / "deep-interface-mvp" / "skill"
 )
@@ -223,6 +231,9 @@ DEFAULT_OBJECT_GRAPH_BUSINESS_ITERATION_ROOT = (
 DEFAULT_SWITCH_ASSIGNMENT_BUSINESS_ITERATION_ROOT = (
     SKILL_ROOT.parent / "waapi-skill-workspace" / "switch-assignment-business-1"
 )
+DEFAULT_AUTHORING_UI_BUSINESS_ITERATION_ROOT = (
+    SKILL_ROOT.parent / "waapi-skill-workspace" / "authoring-ui-business-2"
+)
 DEFAULT_INTEGRATION_WORKFLOWS_V1_ITERATION_ROOT = (
     SKILL_ROOT.parent
     / "waapi-skill-workspace"
@@ -275,6 +286,7 @@ OBJECT_LIFECYCLE_BUSINESS_PROFILE_ID = "object_lifecycle_business_3"
 OBJECT_METADATA_BUSINESS_PROFILE_ID = "object_metadata_business_1"
 OBJECT_GRAPH_BUSINESS_PROFILE_ID = "object_graph_business_1"
 SWITCH_ASSIGNMENT_BUSINESS_PROFILE_ID = "switch_assignment_business_1"
+AUTHORING_UI_BUSINESS_PROFILE_ID = "authoring_ui_business_2"
 INTEGRATION_WORKFLOWS_V1_PROFILE_ID = "integration_workflows_cross_version_6"
 INTEGRATION_WORKFLOWS_V2_PROFILE_ID = "integration_workflows_v2_cross_version_6"
 INTEGRATION_PROFILE_ID = "integration"
@@ -365,6 +377,21 @@ OFFLINE_BUSINESS_AGENT_PROFILES = {
         options_name="SwitchAssignmentBusinessAgentOptions",
         run_name="run_switch_assignment_business_agent_unit",
     ),
+    AUTHORING_UI_BUSINESS_PROFILE_ID: OfflineBusinessAgentProfileDescriptor(
+        suite_path=DEFAULT_AUTHORING_UI_BUSINESS_SUITE,
+        iteration_root=DEFAULT_AUTHORING_UI_BUSINESS_ITERATION_ROOT,
+        supported_versions=frozenset({"2022.1", "2025.1"}),
+        preflight_contract="waapi-skill.authoring-ui-business-preflight/v1",
+        profile_module=(
+            "tests.semantic.support.codex_authoring_ui_business_profile"
+        ),
+        loader_name="load_authoring_ui_business_profile",
+        runner_module=(
+            "tests.semantic.support.codex_authoring_ui_business_agent_runner"
+        ),
+        options_name="AuthoringUiBusinessAgentOptions",
+        run_name="run_authoring_ui_business_agent_unit",
+    ),
 }
 SEMANTIC_BOOTSTRAP_PROFILE_IDS = frozenset(
     {TYPED_INPUT_PROFILE_ID, INTEGRATION_PROFILE_ID}
@@ -384,6 +411,7 @@ EXECUTABLE_V3_PROFILE_IDS = frozenset(
         OBJECT_METADATA_BUSINESS_PROFILE_ID,
         OBJECT_GRAPH_BUSINESS_PROFILE_ID,
         SWITCH_ASSIGNMENT_BUSINESS_PROFILE_ID,
+        AUTHORING_UI_BUSINESS_PROFILE_ID,
         INTEGRATION_WORKFLOWS_V1_PROFILE_ID,
         INTEGRATION_WORKFLOWS_V2_PROFILE_ID,
         INTEGRATION_PROFILE_ID,

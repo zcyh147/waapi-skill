@@ -617,13 +617,26 @@ _AUTHORING_UI_DEFINITION = {
     "contract_builder": _authoring_ui_contract,
     "materializer": _materialize_authoring_ui,
     "completeness_check": _authoring_ui_is_complete,
-    "update_commands": frozenset(
-        {"draft-declare-ui-plan", "draft-add-ui-command"}
-    ),
+    "update_commands": frozenset({"draft-declare-ui-plan"}),
     "initial_projection_actions": (
         "declare-ui-plan",
         "inspect",
         "cancel",
+    ),
+    "active_projection_actions": (
+        "declare-ui-plan",
+        "check",
+        "inspect",
+        "cancel",
+    ),
+    "auto_apply_preview": True,
+    "settings_are_complete_declaration": True,
+}
+
+_AUTHORING_UI_REGISTER_DEFINITION = {
+    **_AUTHORING_UI_DEFINITION,
+    "update_commands": frozenset(
+        {"draft-declare-ui-plan", "draft-add-ui-command"}
     ),
     "active_projection_actions": (
         "declare-ui-plan",
@@ -632,8 +645,6 @@ _AUTHORING_UI_DEFINITION = {
         "inspect",
         "cancel",
     ),
-    "auto_apply_preview": True,
-    "settings_are_complete_declaration": True,
 }
 
 
@@ -669,10 +680,13 @@ _BUSINESS_ADAPTERS = {
         for operation in (
             "ui.captureScreen",
             "ui.commands.execute",
-            "ui.commands.register",
             "ui.commands.unregister",
         )
     },
+    "ui.commands.register": _bind_adapter(
+        "ui.commands.register",
+        _AUTHORING_UI_REGISTER_DEFINITION,
+    ),
     "object.create": _bind_adapter("object.create", _OBJECT_GRAPH_DEFINITION),
     "object.createPlugin": _bind_adapter(
         "object.createPlugin", _OBJECT_PLUGIN_DEFINITION

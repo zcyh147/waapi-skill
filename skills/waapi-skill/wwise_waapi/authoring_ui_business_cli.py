@@ -125,6 +125,15 @@ def authoring_ui_command_from_namespace(args: argparse.Namespace) -> dict[str, A
             raise AuthoringUiBusinessCliError(
                 "notification handlers do not accept --handler-path"
             )
+        if (
+            args.argument_token
+            or args.working_directory is not None
+            or args.start_mode is not None
+        ):
+            raise AuthoringUiBusinessCliError(
+                "notification handlers do not accept arguments, a working "
+                "directory, or a start mode"
+            )
         handler: dict[str, Any] = {"kind": kind}
     else:
         if args.handler_path is None:

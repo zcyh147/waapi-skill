@@ -94,6 +94,12 @@ def test_every_authoring_ui_lane_has_one_deep_business_entry(
     adapter = business_adapter(operation)
     assert adapter.family == "authoring-ui-business"
     assert adapter.accepts_update_command("draft-declare-ui-plan")
+    assert adapter.accepts_update_command("draft-add-ui-command") is (
+        operation == "ui.commands.register"
+    )
+    assert ("add-ui-command" in adapter.active_projection_actions) is (
+        operation == "ui.commands.register"
+    )
 
 
 @pytest.mark.parametrize("operation", ("ui.captureScreen", "ui.commands.execute"))
@@ -435,3 +441,33 @@ def test_cli_rejects_cross_operation_and_unknown_ownership_shortcuts() -> None:
     )
     with pytest.raises(AuthoringUiBusinessCliError, match="does not accept"):
         authoring_ui_plan_from_namespace(args, operation="ui.captureScreen")
+
+
+@pytest.mark.parametrize(
+    "irrelevant",
+    (
+        ["--argument-token", "ignored"],
+        ["--working-directory", "/tmp"],
+        ["--start-mode", "SingleSelectionSingleProcess"],
+    ),
+)
+def test_cli_rejects_irrelevant_notification_handler_fields(
+    irrelevant: list[str],
+) -> None:
+    args = _parser(command=True).parse_args(
+        [
+            "--key",
+            "notify",
+            "--display-name",
+            "Notify",
+            "--handler-kind",
+            "notification",
+            *irrelevant,
+        ]
+    )
+
+    with pytest.raises(
+        AuthoringUiBusinessCliError,
+        match="notification handlers do not accept",
+    ):
+        authoring_ui_command_from_namespace(args)

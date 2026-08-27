@@ -52,6 +52,9 @@ from wwise_waapi.operation_registry import (
     operation_input_mode,
     parse_operation_request,
 )
+from wwise_waapi.authoring_ui_business_contracts import (
+    authoring_ui_business_contract_data,
+)
 from wwise_waapi.exact_artifact_business_contracts import (
     EXACT_ARTIFACT_BUSINESS_OPERATIONS,
     exact_artifact_business_contract_data,
@@ -1552,6 +1555,127 @@ def build_switch_assignment_business_transaction_steps(
                 "--state-or-switch-handle",
                 handles["state_or_switch"],
             ),
+        )
+    )
+    draft.advance(declaration_name)
+    check_name = f"{label}.check"
+    steps.append(
+        ExpectedGatewayStep(
+            name=check_name,
+            subcommand="draft-check",
+            arguments=draft.prefix(),
+        )
+    )
+    draft.advance(check_name)
+    steps.append(
+        ExpectedGatewayStep(
+            name=f"{label}.preview",
+            subcommand="preview-from-draft",
+            arguments=draft.prefix(),
+            expected_operation_request=normalized,
+        )
+    )
+    return tuple(steps)
+
+
+def build_authoring_ui_business_transaction_steps(
+    request: Mapping[str, Any],
+    *,
+    label: str,
+) -> tuple[ExpectedGatewayStep, ...]:
+    """Translate one capture or live-command choice into one UI Business Draft."""
+
+    normalized = _validate_operation_request(request)
+    operation = str(normalized["operation"])
+    if operation not in {"ui.captureScreen", "ui.commands.execute"}:
+        raise V3ProtocolError(
+            "Authoring UI Fresh builder supports capture and execute previews"
+        )
+    if not isinstance(label, str) or not re.fullmatch(r"tx[0-9]{2}", label):
+        raise V3ProtocolError("business transaction label must be txNN")
+    version = str(normalized["version"])
+    try:
+        authoring_ui_business_contract_data(operation, version)
+        parsed = parse_operation_request(normalized)
+    except (OperationContractError, ValueError) as exc:
+        raise V3ProtocolError(
+            f"Authoring UI business request is invalid: {exc}"
+        ) from exc
+    arguments = parsed.arguments
+    declaration: list[Any] = []
+    if operation == "ui.captureScreen":
+        if set(arguments) - {"view_name", "view_channel", "rect"}:
+            raise V3ProtocolError("capture business request fields are not closed")
+        if "view_name" in arguments:
+            declaration.extend(("--view-name", str(arguments["view_name"])))
+        if "view_channel" in arguments:
+            declaration.extend(("--view-channel", str(arguments["view_channel"])))
+        if "rect" in arguments:
+            rect = arguments["rect"]
+            if not isinstance(rect, Mapping):
+                raise V3ProtocolError("capture rectangle is invalid")
+            declaration.extend(
+                (
+                    "--rect",
+                    str(rect["x"]),
+                    str(rect["y"]),
+                    str(rect["width"]),
+                    str(rect["height"]),
+                )
+            )
+    else:
+        if "command" not in arguments or set(arguments) - {
+            "command",
+            "objects",
+            "platforms",
+            "value",
+            "files",
+        }:
+            raise V3ProtocolError("command business request fields are not closed")
+        declaration.extend(("--command-id", str(arguments["command"])))
+        for field, flag in (
+            ("objects", "--command-object"),
+            ("platforms", "--command-platform"),
+            ("files", "--command-file"),
+        ):
+            for value in arguments.get(field, []):
+                declaration.extend((flag, str(value)))
+        if "value" in arguments:
+            value = arguments["value"]
+            if value is None:
+                kind, encoded = "null", "null"
+            elif type(value) is bool:
+                kind, encoded = "boolean", "true" if value else "false"
+            elif type(value) is int:
+                kind, encoded = "integer", str(value)
+            elif type(value) is float:
+                kind, encoded = "number", json.dumps(value, allow_nan=False)
+            elif isinstance(value, str):
+                kind, encoded = "string", value
+            else:  # pragma: no cover - canonical parser rejects this first
+                raise V3ProtocolError("command value is not a strict scalar")
+            declaration.extend(("--value", kind, encoded))
+
+    draft = _BusinessDraftSteps.start(operation=operation, label=label)
+    steps = draft.steps
+    if operation == "ui.commands.execute":
+        steps[:0] = [
+            request_schema_step(
+                f"{label}.command-inventory-schema",
+                "ak.wwise.ui.commands.getCommands",
+            ),
+            call_step(
+                f"{label}.command-inventory",
+                "ak.wwise.ui.commands.getCommands",
+                version=version,
+            ),
+        ]
+    declaration_name = f"{label}.declare-ui-plan"
+    steps.append(
+        ExpectedGatewayStep(
+            name=declaration_name,
+            subcommand="draft-declare-ui-plan",
+            arguments=(*draft.prefix(), *declaration),
         )
     )
     draft.advance(declaration_name)
@@ -4332,6 +4456,7 @@ __all__ = [
     "build_direct_protocol",
     "build_audio_import_composer_protocol",
     "build_audio_import_composer_transaction_steps",
+    "build_authoring_ui_business_transaction_steps",
     "OBJECT_LIFECYCLE_BUSINESS_OPERATIONS",
     "build_object_lifecycle_business_transaction_steps",
     "build_object_metadata_business_transaction_steps",

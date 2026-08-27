@@ -64,7 +64,7 @@ class WaapiClient:
             year, major = self.fixture["version"].split(".")
             return {
                 "displayName": "Wwise",
-                "isCommandLine": True,
+                "isCommandLine": bool(self.fixture.get("is_command_line", True)),
                 "sessionId": "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}",
                 "processId": 4242,
                 "processPath": str(self.fixture["process_path"]),
@@ -197,4 +197,12 @@ class WaapiClient:
             return {"return": result}
         if uri == "ak.wwise.core.switchContainer.getAssignments":
             return {"return": list(self.fixture.get("assignments", []))}
+        if uri == "ak.wwise.ui.commands.getCommands":
+            commands = self.fixture.get("command_ids", [])
+            if not isinstance(commands, list) or any(
+                not isinstance(command, str) or not command
+                for command in commands
+            ):
+                raise WaapiRequestFailed("fixture command inventory is invalid")
+            return {"commands": list(commands)}
         raise WaapiRequestFailed(f"unexpected fixture call: {uri}")

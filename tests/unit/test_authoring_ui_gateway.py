@@ -746,6 +746,205 @@ def test_business_register_draft_seals_gateway_id_and_fresh_inventory_is_authori
     ]
 
 
+def _run_public_business_registration_change(
+    tmp_path: Path,
+    *,
+    operation: str,
+    key: str,
+    inventory_before: Sequence[str],
+    inventory_after: Sequence[str] | None,
+) -> tuple[str, dict[str, Any]]:
+    version = "2024.1"
+    state_dir = tmp_path / f"successful-{operation}"
+    info = live_info()
+    code, started = execute(
+        ["draft-start", operation],
+        tmp_path=tmp_path,
+        version=version,
+        state_dir=state_dir,
+    )
+    assert code == 0, started
+    declaration = (
+        ["--command-count", "1"]
+        if operation == "ui.commands.register"
+        else ["--registered-command-key", key]
+    )
+    code, declared = execute(
+        [
+            "draft-declare-ui-plan",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(started["draft"]["revision"]),
+            *declaration,
+        ],
+        tmp_path=tmp_path,
+        version=version,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                GET_INFO_URI: [info],
+                GET_PROJECT_INFO_URI: [project(tmp_path)],
+            }
+        ),
+    )
+    assert code == 0, declared
+    current = declared["draft"]
+    if operation == "ui.commands.register":
+        code, added = execute(
+            [
+                "draft-add-ui-command",
+                started["draft"]["draft_id"],
+                "--task-authority",
+                started["task_authority"],
+                "--expected-revision",
+                str(current["revision"]),
+                "--key",
+                key,
+                "--display-name",
+                "Notify",
+                "--handler-kind",
+                "notification",
+            ],
+            tmp_path=tmp_path,
+            version=version,
+            state_dir=state_dir,
+            client=FakeClient(
+                {
+                    GET_INFO_URI: [info],
+                    GET_PROJECT_INFO_URI: [project(tmp_path)],
+                }
+            ),
+        )
+        assert code == 0, added
+        current = added["draft"]
+    code, checked = execute(
+        [
+            "draft-check",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(current["revision"]),
+        ],
+        tmp_path=tmp_path,
+        version=version,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                GET_INFO_URI: [info, info],
+                GET_PROJECT_INFO_URI: [project(tmp_path)],
+            }
+        ),
+    )
+    assert code == 0, checked
+    code, preview = execute(
+        [
+            "preview-from-draft",
+            started["draft"]["draft_id"],
+            "--task-authority",
+            started["task_authority"],
+            "--expected-revision",
+            str(checked["draft"]["revision"]),
+            "--apply",
+        ],
+        tmp_path=tmp_path,
+        version=version,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                GET_INFO_URI: [info, info],
+                GET_PROJECT_INFO_URI: [project(tmp_path)],
+            }
+        ),
+    )
+    assert code == 0, preview
+    arguments = preview["agent_result"]["request"]["arguments"]
+    command_id = (
+        arguments["commands"][0]["id"]
+        if operation == "ui.commands.register"
+        else arguments["command_ids"][0]
+    )
+    expected_inventory_after = (
+        [*inventory_before, command_id]
+        if inventory_after is None
+        else list(inventory_after)
+    )
+    code, confirmed = execute(
+        [
+            "confirm",
+            preview["transaction_id"],
+            "--artifact-hash",
+            preview["artifact_hash"],
+        ],
+        tmp_path=tmp_path,
+        version=version,
+        state_dir=state_dir,
+    )
+    assert code == 0, confirmed
+    mutation_uri = {
+        "ui.commands.register": "ak.wwise.ui.commands.register",
+        "ui.commands.unregister": "ak.wwise.ui.commands.unregister",
+    }[operation]
+    code, executed = execute(
+        ["execute", preview["transaction_id"]],
+        tmp_path=tmp_path,
+        version=version,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                GET_INFO_URI: [info, info],
+                GET_PROJECT_INFO_URI: [project(tmp_path)],
+                GET_COMMANDS_URI: [{"commands": list(inventory_before)}],
+                mutation_uri: [{}],
+            }
+        ),
+    )
+    assert code == 0, executed
+    code, verified = execute(
+        ["verify", preview["transaction_id"]],
+        tmp_path=tmp_path,
+        version=version,
+        state_dir=state_dir,
+        client=FakeClient(
+            {
+                GET_INFO_URI: [info],
+                GET_PROJECT_INFO_URI: [project(tmp_path)],
+                GET_COMMANDS_URI: [{"commands": expected_inventory_after}],
+            }
+        ),
+    )
+    assert code == 0, verified
+    assert verified["state"] == TransactionState.VERIFIED.value
+    return command_id, verified
+
+
+def test_public_business_register_succeeds_then_public_cleanup_unregisters(
+    tmp_path: Path,
+) -> None:
+    key = "successful-notification"
+    command_id, registered = _run_public_business_registration_change(
+        tmp_path,
+        operation="ui.commands.register",
+        key=key,
+        inventory_before=["Copy"],
+        inventory_after=None,
+    )
+    assert registered["verified"] is True
+    assert command_id.startswith("waapi.skill.successful.notification.")
+
+    cleanup_id, cleaned = _run_public_business_registration_change(
+        tmp_path,
+        operation="ui.commands.unregister",
+        key=key,
+        inventory_before=["Copy", command_id],
+        inventory_after=["Copy"],
+    )
+    assert cleanup_id == command_id
+    assert cleaned["verified"] is True
+
+
 def test_business_capture_screen_finishes_as_result_schema_only(
     tmp_path: Path,
 ) -> None:

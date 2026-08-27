@@ -395,6 +395,9 @@ BUSINESS_AGENT_OUTCOME_CONTRACTS = {
     matrix.SWITCH_ASSIGNMENT_BUSINESS_PROFILE_ID: (
         "waapi-skill.switch-assignment-business-agent-outcome/v1"
     ),
+    matrix.AUTHORING_UI_BUSINESS_PROFILE_ID: (
+        "waapi-skill.authoring-ui-business-agent-outcome/v1"
+    ),
 }
 HEAVY_V3_PROJECT_LIFECYCLE_CONTRACT = (
     "waapi-skill.codex-semantic-scenario-lifecycle/v3"
@@ -3372,6 +3375,22 @@ def _validate_bound_business_agent_protocol(
             steps[-1].expected_operation_request,
             objects=tuple(expected_unit.objects.values()),
         )
+    elif profile == matrix.AUTHORING_UI_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_eval_protocol_v3 import (
+            build_authoring_ui_business_transaction_steps,
+        )
+
+        request = {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": expected_unit.version,
+            "operation": expected_unit.operation,
+            "arguments": dict(expected_unit.request_arguments),
+        }
+        steps = build_authoring_ui_business_transaction_steps(
+            request,
+            label="tx01",
+        )
+        preview_request = request
     else:
         raise CampaignEvidenceError("unknown bound Business Agent profile")
 
