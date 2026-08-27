@@ -73,7 +73,9 @@ from .support.codex_gateway_contracts import (
     task_local_runner_matches_normalized,
 )
 from .support.codex_eval_protocol_v3 import (  # pyright: ignore[reportMissingImports]
+    CompoundUndoChildExpectation,
     build_audio_import_composer_transaction_steps,
+    build_compound_undo_business_transaction_steps,
     build_object_set_composer_transaction_steps,
     build_transaction_protocol,
     typed_read_draft_steps,
@@ -2568,6 +2570,87 @@ def test_broker_optional_initial_operations_discovery_binds_one_exact_operation(
             ),
             optional_initial_operations_discovery_operation="waapi.undoGroup",
             transport="tcp",
+        )
+
+
+def test_compound_parent_revision_binding_ignores_later_child_draft_receipts(
+    tmp_path: Path,
+) -> None:
+    skill = make_fake_skill(tmp_path)
+    object_id = "{11111111-2222-3333-4444-555555555555}"
+    children = tuple(
+        CompoundUndoChildExpectation(
+            request={
+                "contract": "waapi-skill.operation-request/v1",
+                "version": "2022.1",
+                "operation": operation,
+                "arguments": {
+                    "object": {"kind": "id", "value": object_id},
+                    "value": value,
+                },
+            },
+            selector={"kind": "id", "value": object_id},
+        )
+        for operation, value in (
+            ("object.setNotes", "Exterior rain loop"),
+            ("object.setName", "Rain_Exterior"),
+        )
+    )
+    steps = build_compound_undo_business_transaction_steps(
+        children,
+        display_name="Weather rain cleanup",
+        label="tx03",
+    )
+    declaration_index = next(
+        index
+        for index, step in enumerate(steps)
+        if step.name == "tx03.declare-undo-plan"
+    )
+    broker = CodexGatewayBroker(
+        skill_source=skill,
+        expected_steps=steps,
+        transport="tcp",
+    )
+    broker._next_step = declaration_index  # noqa: SLF001
+    broker._payloads_by_step.update(  # noqa: SLF001
+        {
+            "tx03.draft-start": {
+                "draft": {"draft_id": "parent-draft", "revision": 1},
+                "task_authority": "parent-authority",
+            },
+            "tx01.draft-start": {
+                "draft": {"draft_id": "child-one", "revision": 1},
+                "task_authority": "child-one-authority",
+            },
+            "tx02.draft-start": {
+                "draft": {"draft_id": "child-two", "revision": 1},
+                "task_authority": "child-two-authority",
+            },
+            "tx02.check": {"draft": {"draft_id": "child-two", "revision": 4}},
+        }
+    )
+    correct = (
+        "draft-declare-undo-plan",
+        "parent-draft",
+        "--task-authority",
+        "parent-authority",
+        "--expected-revision",
+        "1",
+        "--display-name",
+        "Weather rain cleanup",
+        "--child-draft",
+        "child-one",
+        "child-one-authority",
+        "--child-draft",
+        "child-two",
+        "child-two-authority",
+    )
+
+    broker._validate_step(steps[declaration_index], correct)  # noqa: SLF001
+    with pytest.raises(GatewayInvocationError, match="tx03.draft-start/draft/revision"):
+        broker._validate_step(  # noqa: SLF001
+            steps[declaration_index],
+            (*correct[:5], "4", *correct[6:]),
         )
 
 

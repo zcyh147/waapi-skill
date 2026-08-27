@@ -9041,6 +9041,60 @@ class CodexGatewayBroker:
         arguments[4] = ResponseBinding(previous.name, "/draft/revision")
         return replace(step, arguments=tuple(arguments))
 
+    def _latest_payload_for_bound_draft(
+        self,
+        step: ExpectedGatewayStep,
+        source: Mapping[str, Any] | None,
+    ) -> Mapping[str, Any] | None:
+        """Select the latest receipt for this step's exact Draft identity."""
+
+        source_draft = source.get("draft") if isinstance(source, Mapping) else None
+        source_draft_id = (
+            source_draft.get("draft_id")
+            if isinstance(source_draft, Mapping)
+            else None
+        )
+        if not isinstance(source_draft_id, str):
+            draft_identity_binding = next(
+                (
+                    argument
+                    for argument in step.arguments
+                    if isinstance(argument, ResponseBinding)
+                    and argument.pointer == "/draft/draft_id"
+                ),
+                None,
+            )
+            identity_source = (
+                self._payloads_by_step.get(draft_identity_binding.step)
+                if draft_identity_binding is not None
+                else None
+            )
+            identity_draft = (
+                identity_source.get("draft")
+                if isinstance(identity_source, Mapping)
+                else None
+            )
+            source_draft_id = (
+                identity_draft.get("draft_id")
+                if isinstance(identity_draft, Mapping)
+                else None
+            )
+        if not isinstance(source_draft_id, str):
+            return source
+        for prior in reversed(self._execution_steps[: self._next_step]):
+            prior_payload = self._payloads_by_step.get(prior.name)
+            prior_draft = (
+                prior_payload.get("draft")
+                if isinstance(prior_payload, Mapping)
+                else None
+            )
+            if (
+                isinstance(prior_draft, Mapping)
+                and prior_draft.get("draft_id") == source_draft_id
+            ):
+                return prior_payload
+        return source
+
     def _bind_task_local_declaration_id(
         self,
         step: ExpectedGatewayStep,
@@ -10581,25 +10635,10 @@ class CodexGatewayBroker:
                         and validation_arguments[index - 1]
                         == "--expected-revision"
                     ):
-                        latest_source = next(
-                            (
-                                self._payloads_by_step.get(prior.name)
-                                for prior in reversed(
-                                    self._execution_steps[: self._next_step]
-                                )
-                                if isinstance(
-                                    self._payloads_by_step.get(prior.name),
-                                    Mapping,
-                                )
-                                and isinstance(
-                                    self._payloads_by_step[prior.name].get("draft"),
-                                    Mapping,
-                                )
-                            ),
-                            None,
+                        source = self._latest_payload_for_bound_draft(
+                            step,
+                            source,
                         )
-                        if latest_source is not None:
-                            source = latest_source
                     if source is None:
                         raise GatewayInvocationError(
                             f"step {step.name!r} binding source {expected.step!r} is unavailable"
