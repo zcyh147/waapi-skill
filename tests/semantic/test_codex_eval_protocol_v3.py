@@ -10,6 +10,7 @@ from tests.semantic.support.codex_eval_protocol_v3 import (
     V3GatewayProtocol,
     V3ProtocolError,
     build_audio_import_composer_transaction_steps,
+    build_compound_undo_business_transaction_steps,
     build_direct_protocol,
     build_exact_artifact_business_transaction_steps,
     build_metadata_transaction_protocol,
@@ -235,6 +236,68 @@ def test_switch_assignment_business_steps_bind_three_paths_before_declaration() 
         ResponseBinding("tx01.bind-state-or-switch", "/bound_object/handle"),
     )
     assert steps[-1].expected_operation_request == request
+
+
+def test_compound_undo_steps_check_children_before_one_parent_preview() -> None:
+    object_path = r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\Rain"
+    children = (
+        {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": "2022.1",
+            "operation": "object.setNotes",
+            "arguments": {
+                "object": {"kind": "path", "value": object_path},
+                "value": "Exterior rain loop",
+            },
+        },
+        {
+            "contract": "waapi-skill.operation-request/v1",
+            "version": "2022.1",
+            "operation": "object.setName",
+            "arguments": {
+                "object": {"kind": "path", "value": object_path},
+                "value": "Rain_Exterior",
+            },
+        },
+    )
+    steps = build_compound_undo_business_transaction_steps(
+        children,
+        display_name="Weather rain cleanup",
+        label="tx03",
+    )
+
+    assert [step.subcommand for step in steps] == [
+        "operations",
+        "operation-schema",
+        "draft-start",
+        "operation-schema",
+        "draft-start",
+        "draft-bind-object",
+        "draft-declare-object-change",
+        "draft-check",
+        "operation-schema",
+        "draft-start",
+        "draft-bind-object",
+        "draft-declare-object-change",
+        "draft-check",
+        "draft-declare-undo-plan",
+        "draft-check",
+        "preview-from-draft",
+    ]
+    declaration = steps[-3]
+    assert declaration.arguments[-6:] == (
+        "--child-draft",
+        ResponseBinding("tx01.draft-start", "/draft/draft_id"),
+        ResponseBinding("tx01.draft-start", "/task_authority"),
+        "--child-draft",
+        ResponseBinding("tx02.draft-start", "/draft/draft_id"),
+        ResponseBinding("tx02.draft-start", "/task_authority"),
+    )
+    assert steps[-1].expected_operation_request["operation"] == "waapi.undoGroup"
+    assert [
+        row["request"]["operation"]
+        for row in steps[-1].expected_operation_request["arguments"]["calls"]
+    ] == ["object.setNotes", "object.setName"]
 
 
 def test_real_gateway_helper_reuses_soundbank_plan_cli_grammar() -> None:

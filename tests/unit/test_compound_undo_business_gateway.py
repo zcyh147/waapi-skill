@@ -12,6 +12,7 @@ from tests.unit.test_operation_input_gateway import (
 from wwise_waapi.business_declaration_state import BusinessDeclarationSession
 from wwise_waapi.operation_drafts import OperationDraftStore
 from wwise_waapi.transactions import TransactionState, TransactionStore
+from wwise_waapi.typed_operations import compound_child_request_contract
 
 
 def _checked_object_child(
@@ -220,6 +221,148 @@ def test_compound_undo_rejects_unchecked_or_stale_child_before_parent_write(
     )
     assert parent_record.revision == parent["draft"]["revision"]
     assert "business_session" not in parent_record.composition
+
+
+def test_generic_compound_child_uses_its_own_checked_draft_before_parent_snapshot(
+    tmp_path: Path,
+) -> None:
+    state_dir = tmp_path / "state"
+    operation = "ak.wwise.core.object.setRandomizer"
+    code, schema = offline_execute(
+        tmp_path,
+        "--version",
+        "2022.1",
+        "request-schema",
+        operation,
+    )
+    assert code == 0, schema
+    assert schema["input_shape"] == "draft"
+    assert schema["draft_requirement"] == "checked_compound_child_capability"
+    code, started = offline_execute(
+        tmp_path,
+        "--state-dir",
+        str(state_dir),
+        "--version",
+        "2022.1",
+        "draft-start",
+        operation,
+    )
+    assert code == 0, started
+    child_id = started["draft"]["draft_id"]
+    child_authority = started["task_authority"]
+    revision = started["draft"]["revision"]
+    contract = compound_child_request_contract(operation, "2022.1")
+    object_field = next(
+        field
+        for field in contract.fields
+        if field.path == ("object",)
+        and field.shape == "scalar"
+        and any(variant.get("pattern") == r"^\\" for variant in field.variants)
+    )
+    facts = (
+        ("choose", object_field.parent_handle, None, object_field.handle),
+        ("set", object_field.handle, "string", r"\Actor-Mixer Hierarchy\A"),
+        (
+            "set",
+            next(
+                field.handle
+                for field in contract.fields
+                if field.path == ("property",) and field.shape == "scalar"
+            ),
+            "string",
+            "Volume",
+        ),
+        (
+            "set",
+            next(
+                field.handle
+                for field in contract.fields
+                if field.path == ("enabled",) and field.shape == "scalar"
+            ),
+            "boolean",
+            "true",
+        ),
+    )
+    for fact_action, field_handle, value_type, value in facts:
+        argv = [
+            "--state-dir",
+            str(state_dir),
+            "draft-apply",
+            child_id,
+            "--task-authority",
+            child_authority,
+            "--expected-revision",
+            str(revision),
+            "--facts",
+            "--action",
+            "add_typed_fact",
+            "--fact-action",
+            fact_action,
+            "--field-handle",
+            field_handle,
+            "--fact-value",
+            value,
+        ]
+        if value_type is not None:
+            argv.extend(("--value-type", value_type))
+        code, applied = offline_execute(tmp_path, *argv)
+        assert code == 0, applied
+        revision = applied["draft"]["revision"]
+    client = ObjectLifecycleClient()
+    code, checked = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(state_dir),
+            "draft-check",
+            child_id,
+            "--task-authority",
+            child_authority,
+            "--expected-revision",
+            str(revision),
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+    assert code == 0, checked
+    code, parent = offline_execute(
+        tmp_path,
+        "--state-dir",
+        str(state_dir),
+        "--version",
+        "2022.1",
+        "draft-start",
+        "waapi.undoGroup",
+    )
+    assert code == 0, parent
+    code, declared = waapi_gateway.execute_gateway(
+        [
+            "--state-dir",
+            str(state_dir),
+            "draft-declare-undo-plan",
+            parent["draft"]["draft_id"],
+            "--task-authority",
+            parent["task_authority"],
+            "--expected-revision",
+            str(parent["draft"]["revision"]),
+            "--display-name",
+            "Generic child",
+            "--child-draft",
+            child_id,
+            child_authority,
+        ],
+        env=gateway_env(tmp_path),
+        client_factory=lambda _url: client,
+    )
+
+    assert code == 0, declared
+    record = OperationDraftStore(state_dir).inspect(
+        parent["draft"]["draft_id"],
+        task_authority=parent["task_authority"],
+    )
+    session = BusinessDeclarationSession.from_dict(
+        record.composition["business_session"]
+    )
+    assert session.settings["undo_plan"]["children"][0]["operation"] == operation
 
 
 def test_compound_undo_rejects_child_changed_after_check_before_parent_snapshot(

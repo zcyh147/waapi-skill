@@ -12,6 +12,7 @@ import json
 import math
 import re
 from copy import deepcopy
+from dataclasses import replace
 from typing import Any, Mapping, Sequence
 
 from .canonical import canonical_json_bytes
@@ -685,7 +686,7 @@ def compound_child_request_contract(
             f"{child_operation!r} is not an approved typed Undo Group child"
         )
     if child_operation.startswith("ak."):
-        return request_contract(version, uri)
+        return replace(request_contract(version, uri), force_draft=True)
     machine = operation_request_machine_contract(child_operation, version)
     arguments = _compound_child_typed_schema(
         deepcopy(machine["argument_contract"])

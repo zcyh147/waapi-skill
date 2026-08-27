@@ -64,6 +64,7 @@ from tests.semantic.support.codex_project_prelaunch_v3 import (  # pyright: igno
 from wwise_waapi.headless import HeadlessLifecycle  # pyright: ignore[reportMissingImports]  # noqa: E402
 from wwise_waapi.operation_registry import OPERATION_REQUEST_CONTRACT  # pyright: ignore[reportMissingImports]  # noqa: E402
 from wwise_waapi.transactions import TransactionState, TransactionStore  # pyright: ignore[reportMissingImports]  # noqa: E402
+from wwise_waapi.typed_operations import compound_child_request_contract  # pyright: ignore[reportMissingImports]  # noqa: E402
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS  # pyright: ignore[reportMissingImports]  # noqa: E402
 
 
@@ -101,6 +102,22 @@ class _WorkflowSandboxRuntime:
         return self.lifecycle.port
 
     def gateway(self, command: Sequence[str], *, live: bool) -> dict[str, Any]:
+        exit_code, payload = self.raw_gateway(command)
+        assert exit_code == 0, json.dumps(payload, ensure_ascii=False, sort_keys=True)
+        assert payload["ok"] is True, payload
+        if live:
+            assert payload["endpoint"] == {
+                "host": self.lifecycle.host,
+                "port": self.port,
+                "url": self.lifecycle.waapi_url,
+            }
+            assert payload["detected_version"] == self.version
+        return payload
+
+    def raw_gateway(
+        self,
+        command: Sequence[str],
+    ) -> tuple[int, dict[str, Any]]:
         argv = [
             "--host",
             self.lifecycle.host,
@@ -115,16 +132,8 @@ class _WorkflowSandboxRuntime:
             *command,
         ]
         exit_code, payload = waapi_gateway.execute_gateway(argv, env=self.env)
-        assert exit_code == 0, json.dumps(payload, ensure_ascii=False, sort_keys=True)
-        assert payload["ok"] is True, payload
-        if live:
-            assert payload["endpoint"] == {
-                "host": self.lifecycle.host,
-                "port": self.port,
-                "url": self.lifecycle.waapi_url,
-            }
-            assert payload["detected_version"] == self.version
-        return payload
+        assert isinstance(payload, dict), payload
+        return exit_code, payload
 
     def packaged_status(self) -> dict[str, Any]:
         completed = subprocess.run(
@@ -238,6 +247,126 @@ def _complete_business_draft(
     assert verified["state"] == TransactionState.VERIFIED.value, verified
     assert verified["verification"]["business_state_verified"] is True, verified
     return {"preview": preview, "execute": executed, "verify": verified}
+
+
+def _checked_object_lifecycle_child(
+    runtime: _WorkflowSandboxRuntime,
+    *,
+    operation: str,
+    object_id: str,
+    value: str,
+) -> _BusinessDraft:
+    assert operation in {"object.setName", "object.setNotes"}
+    draft = _start_business_draft(runtime, operation)
+    object_handle = _bind_business_object(
+        runtime,
+        draft,
+        object_id=object_id,
+    )
+    flag = "--new-name" if operation == "object.setName" else "--notes"
+    _update_business_draft(
+        runtime,
+        draft,
+        "draft-declare-object-change",
+        ["--object-handle", object_handle, flag, value],
+        live=False,
+    )
+    _update_business_draft(runtime, draft, "draft-check", live=True)
+    return draft
+
+
+def _checked_generic_randomizer_child(
+    runtime: _WorkflowSandboxRuntime,
+    *,
+    object_path: str,
+    property_name: str,
+) -> _BusinessDraft:
+    operation = "ak.wwise.core.object.setRandomizer"
+    schema = runtime.gateway(["request-schema", operation], live=False)
+    assert schema["input_shape"] == "draft"
+    assert schema["draft_requirement"] == "checked_compound_child_capability"
+    draft = _start_business_draft(runtime, operation)
+    contract = compound_child_request_contract(operation, runtime.version)
+    object_field = next(
+        field
+        for field in contract.fields
+        if field.path == ("object",)
+        and field.shape == "scalar"
+        and any(variant.get("pattern") == r"^\\" for variant in field.variants)
+    )
+    facts = (
+        ("choose", object_field.parent_handle, None, object_field.handle),
+        ("set", object_field.handle, "string", object_path),
+        (
+            "set",
+            next(
+                field.handle
+                for field in contract.fields
+                if field.path == ("property",) and field.shape == "scalar"
+            ),
+            "string",
+            property_name,
+        ),
+        (
+            "set",
+            next(
+                field.handle
+                for field in contract.fields
+                if field.path == ("enabled",) and field.shape == "scalar"
+            ),
+            "boolean",
+            "true",
+        ),
+    )
+    for fact_action, field_handle, value_type, value in facts:
+        arguments = [
+            "--facts",
+            "--action",
+            "add_typed_fact",
+            "--fact-action",
+            fact_action,
+            "--field-handle",
+            str(field_handle),
+            "--fact-value",
+            value,
+        ]
+        if value_type is not None:
+            arguments.extend(("--value-type", value_type))
+        _update_business_draft(
+            runtime,
+            draft,
+            "draft-apply",
+            arguments,
+            live=False,
+        )
+    _update_business_draft(runtime, draft, "draft-check", live=True)
+    return draft
+
+
+def _declare_compound_undo(
+    runtime: _WorkflowSandboxRuntime,
+    *,
+    display_name: str,
+    children: Sequence[_BusinessDraft],
+) -> _BusinessDraft:
+    parent = _start_business_draft(runtime, "waapi.undoGroup")
+    child_arguments = [
+        value
+        for child in children
+        for value in (
+            "--child-draft",
+            child.draft_id,
+            child.task_authority,
+        )
+    ]
+    _update_business_draft(
+        runtime,
+        parent,
+        "draft-declare-undo-plan",
+        ["--display-name", display_name, *child_arguments],
+        live=True,
+    )
+    return parent
 
 
 def _bind_business_object(
@@ -1641,6 +1770,150 @@ def test_object_lifecycle_business_draft_executes_all_five_verifiers(
             destination_parent,
             source_parent,
         ):
+            if object_id is not None:
+                _delete_if_present_via_transaction(runtime, object_id)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_compound_undo_business_draft_executes_and_cancels_without_retry(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    runtime = workflow_sandbox_runtime
+    if runtime.version not in {"2022.1", "2025.1"}:
+        pytest.skip("compound Undo evidence targets Wwise 2022.1 and 2025.1")
+    parent_root = (
+        CONTAINERS_PARENT if runtime.version == "2025.1" else ACTOR_MIXER_PARENT
+    )
+    suffix = uuid.uuid4().hex[:12]
+    success_id: str | None = None
+    failure_id: str | None = None
+    try:
+        success_original_name = f"WAAPI_UNDO_SUCCESS_{suffix}"
+        success_final_name = f"WAAPI_UNDO_RENAMED_{suffix}"
+        success_notes = f"compound success {runtime.version} {suffix}"
+        success_id = _create_object(
+            runtime,
+            parent=parent_root,
+            object_type="ActorMixer",
+            name=success_original_name,
+        )
+        notes_child = _checked_object_lifecycle_child(
+            runtime,
+            operation="object.setNotes",
+            object_id=success_id,
+            value=success_notes,
+        )
+        rename_child = _checked_object_lifecycle_child(
+            runtime,
+            operation="object.setName",
+            object_id=success_id,
+            value=success_final_name,
+        )
+        success_parent = _declare_compound_undo(
+            runtime,
+            display_name=f"Compound success {suffix}",
+            children=(notes_child, rename_child),
+        )
+        success = _complete_business_draft(runtime, success_parent)
+        assert success["verify"]["verification"]["verification_strength"] == (
+            "compound_child_readback"
+        )
+        success_readback = runtime.gateway(
+            [
+                "query-object",
+                "--object-id",
+                success_id,
+                "--return-field",
+                "id",
+                "--return-field",
+                "name",
+                "--return-field",
+                "notes",
+                "--return-field",
+                "path",
+            ],
+            live=True,
+        )
+        assert success_readback["count"] == 1, success_readback
+        assert success_readback["objects"][0]["name"] == success_final_name
+        assert success_readback["objects"][0]["notes"] == success_notes
+
+        failure_name = f"WAAPI_UNDO_CANCEL_{suffix}"
+        failure_notes = f"before cancelled child {runtime.version} {suffix}"
+        failure_id = _create_object(
+            runtime,
+            parent=parent_root,
+            object_type="ActorMixer",
+            name=failure_name,
+        )
+        failure_path = f"{parent_root}\\{failure_name}"
+        first_child = _checked_object_lifecycle_child(
+            runtime,
+            operation="object.setNotes",
+            object_id=failure_id,
+            value=failure_notes,
+        )
+        rejected_child = _checked_generic_randomizer_child(
+            runtime,
+            object_path=failure_path,
+            property_name=f"DefinitelyNotAProperty_{suffix}",
+        )
+        failure_parent = _declare_compound_undo(
+            runtime,
+            display_name=f"Compound cancel {suffix}",
+            children=(first_child, rejected_child),
+        )
+        _update_business_draft(
+            runtime,
+            failure_parent,
+            "draft-check",
+            live=True,
+        )
+        preview = _update_business_draft(
+            runtime,
+            failure_parent,
+            "preview-from-draft",
+            live=True,
+        )
+        transaction_id = _required_string(preview, "transaction_id")
+        shown = runtime.gateway(
+            ["transaction-show", transaction_id, "--summary-only"],
+            live=False,
+        )
+        runtime.gateway(
+            [
+                "confirm",
+                transaction_id,
+                "--confirmation-token",
+                _required_string(shown["confirmation"], "token"),
+            ],
+            live=False,
+        )
+        failure_code, failure = runtime.raw_gateway(
+            ["execute", transaction_id]
+        )
+        assert failure_code == 2, failure
+        assert failure["state"] == TransactionState.EXECUTION_CANCELLED.value
+        assert failure["automatic_retry"] is False
+        assert failure["rollback_verified"] is False
+        assert failure["compound_execution"]["failed_phase"]["uri"] == (
+            "ak.wwise.core.object.setRandomizer"
+        )
+        retry_code, retry = runtime.raw_gateway(["execute", transaction_id])
+        assert retry_code == 2, retry
+        assert retry["error_code"] == "InvalidTransition"
+        runtime.category_results.append(
+            {
+                "category": "compound-undo-business",
+                "status": "PASS",
+                "verifier_strength": (
+                    "named_child_readbacks_plus_real_cancel_no_retry"
+                ),
+            }
+        )
+    finally:
+        for object_id in (failure_id, success_id):
             if object_id is not None:
                 _delete_if_present_via_transaction(runtime, object_id)
 

@@ -38,6 +38,8 @@ from .typed_requests import (
 )
 from .typed_operations import (
     DRAFT_TYPED_OPERATIONS,
+    compound_child_operations,
+    compound_child_request_contract,
     draft_operation_request_contract,
 )
 
@@ -1018,7 +1020,9 @@ def operation_composer_contract(operation: str, version: str) -> dict[str, Any]:
 
     if operation.startswith("ak.") or operation in DRAFT_TYPED_OPERATIONS:
         typed = (
-            request_contract(version, operation)
+            compound_child_request_contract(operation, version)
+            if operation in compound_child_operations(version)
+            else request_contract(version, operation)
             if operation.startswith("ak.")
             else draft_operation_request_contract(operation, version)
         )
@@ -1235,6 +1239,8 @@ def _normalize_generic_typed_composition(
     contract = (
         draft_operation_request_contract(operation, version)
         if operation in DRAFT_TYPED_OPERATIONS
+        else compound_child_request_contract(operation, version)
+        if operation in compound_child_operations(version)
         else request_contract(version, operation)
     )
     if composition.get("typed_request_schema_digest") != contract.schema_digest:
@@ -1467,7 +1473,9 @@ def materialize_operation_request(
     normalized = _normalize_composition(composition, operation=operation, version=version)
     if operation.startswith("ak.") or operation in DRAFT_TYPED_OPERATIONS:
         typed = (
-            request_contract(version, operation)
+            compound_child_request_contract(operation, version)
+            if operation in compound_child_operations(version)
+            else request_contract(version, operation)
             if operation.startswith("ak.")
             else draft_operation_request_contract(operation, version)
         )

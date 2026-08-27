@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Mapping
 
 from .business_declaration_state import BusinessDeclarationSession
@@ -9,8 +10,6 @@ from .business_declarations import business_repair
 from .canonical import canonical_sha256
 
 
-MAX_UNDO_CHILDREN = 32
-MAX_UNDO_DISPLAY_NAME = 256
 _SNAPSHOT_FIELDS = {
     "source_draft_id",
     "source_revision",
@@ -19,6 +18,31 @@ _SNAPSHOT_FIELDS = {
     "request_sha256",
     "request",
 }
+
+
+@dataclass(frozen=True, slots=True)
+class CheckedChildDraftBinding:
+    """One exact task-local capability copied from a checked child Draft."""
+
+    draft_id: str
+    task_authority: str
+
+    @classmethod
+    def from_cli_pair(
+        cls,
+        value: object,
+        *,
+        index: int,
+    ) -> "CheckedChildDraftBinding":
+        if (
+            not isinstance(value, list)
+            or len(value) != 2
+            or not all(isinstance(item, str) and item for item in value)
+        ):
+            raise ValueError(
+                f"Compound Undo child {index} binding is malformed"
+            )
+        return cls(draft_id=value[0], task_authority=value[1])
 
 
 def build_compound_undo_child_snapshot(
@@ -81,6 +105,11 @@ def materialize_compound_undo_business_request(
     operation: str,
     session: BusinessDeclarationSession,
 ) -> Mapping[str, Any]:
+    from .operation_registry import (
+        UNDO_GROUP_MAX_CALLS,
+        UNDO_GROUP_MAX_DISPLAY_NAME_LENGTH,
+    )
+
     if operation != "waapi.undoGroup":
         raise ValueError("compound Undo Adapter received the wrong operation")
     if not isinstance(session, BusinessDeclarationSession):
@@ -98,11 +127,11 @@ def materialize_compound_undo_business_request(
         not isinstance(display_name, str)
         or not display_name.strip()
         or display_name != display_name.strip()
-        or len(display_name) > MAX_UNDO_DISPLAY_NAME
+        or len(display_name) > UNDO_GROUP_MAX_DISPLAY_NAME_LENGTH
     ):
         raise _session_repair(session, "INVALID_ARGUMENT", "display_name")
     children = raw_plan.get("children")
-    if not isinstance(children, list) or not 1 <= len(children) <= MAX_UNDO_CHILDREN:
+    if not isinstance(children, list) or not 1 <= len(children) <= UNDO_GROUP_MAX_CALLS:
         raise _session_repair(session, "INVALID_ARGUMENT", "children")
     calls: list[dict[str, Any]] = []
     source_ids: set[str] = set()
@@ -172,8 +201,7 @@ def _session_repair(
 
 
 __all__ = [
-    "MAX_UNDO_CHILDREN",
-    "MAX_UNDO_DISPLAY_NAME",
+    "CheckedChildDraftBinding",
     "build_compound_undo_child_snapshot",
     "materialize_compound_undo_business_request",
 ]

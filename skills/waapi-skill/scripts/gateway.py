@@ -197,6 +197,7 @@ from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[re
     OPERATION_REQUEST_CONTRACT,
     PACKAGED_TRANSACTION_READBACK_URIS,
     PREPARED_OPERATION_CONTRACT,
+    UNDO_GROUP_MAX_CALLS,
     UI_COMMAND_OPERATIONS,
     OperationContractError,
     VerificationResult,
@@ -224,6 +225,8 @@ from wwise_waapi.typed_operations import (  # noqa: E402  # pyright: ignore[repo
     DRAFT_TYPED_OPERATIONS,
     INLINE_OPERATIONS,
     TypedOperationInputError,
+    compound_child_operations,
+    compound_child_request_contract,
     draft_operation_request_contract,
     inline_operation_contract,
     materialize_inline_operation_request,
@@ -288,6 +291,7 @@ from wwise_waapi.debug_business_cli import (  # noqa: E402  # pyright: ignore[re
     debug_intent_from_namespace,
 )
 from wwise_waapi.compound_undo_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    CheckedChildDraftBinding,
     build_compound_undo_child_snapshot,
 )
 from wwise_waapi.operation_composer import (  # noqa: E402  # pyright: ignore[reportMissingImports]
@@ -5052,6 +5056,8 @@ def operation_draft_schema_digest(operation: str, version: str) -> str:
     """Bind named-operation and exact-URI Drafts to their owning schema."""
 
     if operation.startswith("ak."):
+        if operation in compound_child_operations(version):
+            return compound_child_request_contract(operation, version).schema_digest
         return request_contract(version, operation).schema_digest
     if operation in DRAFT_TYPED_OPERATIONS:
         return draft_operation_request_contract(operation, version).schema_digest
@@ -5073,6 +5079,8 @@ def public_typed_contract(version: str, api: str) -> Any:
         return topic_match_contract(
             version, api.removeprefix(TOPIC_MATCH_OPERATION_PREFIX)
         )
+    if api in compound_child_operations(version):
+        return compound_child_request_contract(api, version)
     if api in DRAFT_TYPED_OPERATIONS:
         return draft_operation_request_contract(api, version)
     return request_contract(version, api)
@@ -11794,9 +11802,13 @@ def dispatch_business_compound_undo_plan(
             f"{binding.record.operation} does not expose {args.command}"
         )
     child_bindings = args.child_draft
-    if not isinstance(child_bindings, list) or not 1 <= len(child_bindings) <= 32:
+    if (
+        not isinstance(child_bindings, list)
+        or not 1 <= len(child_bindings) <= UNDO_GROUP_MAX_CALLS
+    ):
         raise GatewayInputError(
-            "Compound Undo requires between 1 and 32 checked child Business Drafts"
+            "Compound Undo requires between 1 and "
+            f"{UNDO_GROUP_MAX_CALLS} checked child Drafts"
         )
     current_project_guard = build_project_guard(
         endpoint=common["endpoint"],
@@ -11804,13 +11816,17 @@ def dispatch_business_compound_undo_plan(
         live_info=live_info,
         project=binding.project,
     )
+    try:
+        checked_child_bindings = tuple(
+            CheckedChildDraftBinding.from_cli_pair(pair, index=index)
+            for index, pair in enumerate(child_bindings)
+        )
+    except ValueError as exc:
+        raise GatewayInputError(str(exc)) from exc
     snapshots: list[dict[str, Any]] = []
-    for index, pair in enumerate(child_bindings):
-        if not isinstance(pair, list) or len(pair) != 2:
-            raise GatewayInputError(
-                f"Compound Undo child {index} binding is malformed"
-            )
-        child_draft_id, child_authority = pair
+    for index, child_binding in enumerate(checked_child_bindings):
+        child_draft_id = child_binding.draft_id
+        child_authority = child_binding.task_authority
         child_record = binding.store.inspect(
             child_draft_id,
             task_authority=child_authority,
@@ -17314,6 +17330,14 @@ def _business_next_action_binding(
                     "--child-draft <checked-child-draft-id> <its-task-authority> [--child-draft ...]",
                 ],
                 "order_rule": "repeat_child_draft_in_exact_user_requested_execution_order",
+                "order_ownership": {
+                    "business_sequence": "caller_owned_stable_business_value",
+                    "native_phase_dependencies": (
+                        "gateway_owned_begin_then_business_sequence_then_end_"
+                        "with_cancel_on_failure"
+                    ),
+                    "dependency_edges_input": "forbidden",
+                },
                 "child_prerequisite": (
                     "each_child_is_a_current_revision_draft-check-passed_closed_"
                     "draft_for_this_project_and_version; named_children_use_their_"

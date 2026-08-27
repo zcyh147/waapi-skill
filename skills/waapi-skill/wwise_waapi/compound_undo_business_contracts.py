@@ -13,7 +13,11 @@ COMPOUND_UNDO_BUSINESS_CONTRACT = "waapi-skill.compound-undo-business/v1"
 def compound_undo_business_contract_data(version: str) -> dict[str, Any]:
     if version not in SUPPORTED_WWISE_VERSIONS:
         raise ValueError("unsupported Wwise version")
-    from .operation_registry import operation_uses_business_declaration
+    from .operation_registry import (
+        UNDO_GROUP_MAX_CALLS,
+        UNDO_GROUP_MAX_DISPLAY_NAME_LENGTH,
+        operation_uses_business_declaration,
+    )
     from .typed_operations import compound_child_operations
 
     all_children = sorted(compound_child_operations(version))
@@ -41,8 +45,16 @@ def compound_undo_business_contract_data(version: str) -> dict[str, Any]:
             "submit_once": True,
             "required_fields": ["display_name", "child_drafts"],
             "child_input": "ordered_checked_closed_draft_snapshot",
-            "child_count": {"minimum": 1, "maximum": 32},
-            "display_name": {"minimum_characters": 1, "maximum_characters": 256},
+            "child_count": {"minimum": 1, "maximum": UNDO_GROUP_MAX_CALLS},
+            "display_name": {
+                "minimum_characters": 1,
+                "maximum_characters": UNDO_GROUP_MAX_DISPLAY_NAME_LENGTH,
+            },
+            "business_sequence": {
+                "caller_owned": True,
+                "meaning": "user_requested_relative_child_outcome_sequence",
+                "native_dependency_edges_input": "forbidden",
+            },
             "eligible_child_operations": eligible,
             "generic_typed_child_operations": [
                 operation for operation in all_children if operation.startswith("ak.")
@@ -58,19 +70,19 @@ def compound_undo_business_contract_data(version: str) -> dict[str, Any]:
         },
         "responsibility_split": {
             "agent": (
-                "choose_the_display_name_and_order_of_already_checked_closed_"
-                "child_drafts"
+                "choose_the_display_name_and_user_requested_business_sequence_"
+                "of_already_checked_closed_child_drafts"
             ),
             "gateway": (
-                "snapshot_child_requests_derive_schema_bindings_dependency_order_"
-                "begin_end_cancel_calls_revisions_and_one_preview"
+                "snapshot_child_requests_derive_schema_bindings_fixed_native_"
+                "phase_dependency_order_revisions_and_one_preview"
             ),
         },
         "gateway_derivations": [
             "immutable_child_request_snapshots",
             "child_schema_digests",
             "child_handles",
-            "dependency_order",
+            "native_phase_dependency_order",
             "batch_and_revision_mechanics",
             "begin_end_cancel_native_calls",
             "single_immutable_preview",

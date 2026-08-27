@@ -14334,8 +14334,6 @@ def verify_prepared_operation(
                 details={"operation": ui_operation},
             )
     elif kind == "undo-group-result-schemas":
-        success_status = "result_schema_checked"
-        business_state_verified = False
         version = plan.get("version")
         execution_plan = plan.get("execution_plan")
         compound_payload = execution_result.get("result")
@@ -14371,6 +14369,8 @@ def verify_prepared_operation(
             {"expected": expected_uris, "actual": actual_uris},
         )
         partial_schema = False
+        child_business_state_verified = True
+        verified_child_count = 0
         if actual_uris == expected_uris:
             for index, phase in enumerate(phases):
                 if not isinstance(phase, Mapping):
@@ -14409,8 +14409,66 @@ def verify_prepared_operation(
                         True,
                         validation.as_dict(),
                     )
+            for index, child_plan in enumerate(inner_plan):
+                if not isinstance(child_plan, Mapping):
+                    child_business_state_verified = False
+                    continue
+                prepared_child = child_plan.get("prepared_operation")
+                child_phase = phases[index + 1]
+                dispatch_result = (
+                    child_phase.get("dispatch_result")
+                    if isinstance(child_phase, Mapping)
+                    else None
+                )
+                if not isinstance(prepared_child, Mapping) or not isinstance(
+                    dispatch_result, Mapping
+                ):
+                    child_business_state_verified = False
+                    continue
+                child_verification = verify_prepared_operation(
+                    prepared_child,
+                    execution_result=dispatch_result,
+                    read_call=read_call,
+                )
+                verified_child_count += 1
+                child_business_state_verified = (
+                    child_business_state_verified
+                    and child_verification.business_state_verified
+                )
+                assertions.extend(
+                    {
+                        **dict(assertion),
+                        "name": (
+                            f"Undo Group child[{index}] "
+                            f"{assertion.get('name', 'postcondition')}"
+                        ),
+                    }
+                    for assertion in child_verification.assertions
+                )
+                readbacks.extend(
+                    {
+                        **dict(readback),
+                        "compound_child_index": index,
+                    }
+                    for readback in child_verification.readbacks
+                )
+        business_state_verified = (
+            child_business_state_verified
+            and verified_child_count == len(inner_plan)
+        )
+        success_status = (
+            "verified" if business_state_verified else "result_schema_checked"
+        )
         verification_strength = (
-            "partial_reflected_schema" if partial_schema else "complete_reflected_schema"
+            "compound_child_readback"
+            if business_state_verified
+            else "compound_mixed_child_verification"
+            if verified_child_count
+            else (
+                "partial_reflected_schema"
+                if partial_schema
+                else "complete_reflected_schema"
+            )
         )
     elif kind == "result-schema":
         success_status = "result_schema_checked"

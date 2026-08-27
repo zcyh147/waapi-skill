@@ -18,7 +18,11 @@ from wwise_waapi.operation_registry import (
     operation_input_mode,
     parse_operation_request,
 )
-from wwise_waapi.typed_operations import draft_operation_request_contract
+from wwise_waapi.operation_composer import operation_composer_contract
+from wwise_waapi.typed_operations import (
+    compound_child_operations,
+    draft_operation_request_contract,
+)
 
 
 VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
@@ -91,11 +95,36 @@ def test_every_undo_lane_uses_one_ordered_business_plan(version: str) -> None:
     assert contract["legacy_composer_public"] is False
     assert contract["legacy_child_schema_public"] is False
     assert contract["legacy_action_grammar_public"] is False
+    assert contract["declaration"]["business_sequence"]["caller_owned"] is True
+    assert contract["declaration"]["business_sequence"][
+        "native_dependency_edges_input"
+    ] == "forbidden"
+    assert "native_phase_dependency_order" in contract["gateway_derivations"]
+    assert "dependency_order" not in contract["gateway_derivations"]
     adapter = business_adapter("waapi.undoGroup")
     assert adapter.family == "compound-undo-business"
     assert adapter.accepts_update_command("draft-declare-undo-plan")
     with pytest.raises(ValueError, match="No typed Draft adapter"):
         draft_operation_request_contract("waapi.undoGroup", version)
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_every_eligible_child_family_has_one_checked_closed_draft_route(
+    version: str,
+) -> None:
+    contract = compound_undo_business_contract_data(version)
+    declaration = contract["declaration"]
+    eligible = set(declaration["eligible_child_operations"])
+    generic = set(declaration["generic_typed_child_operations"])
+
+    assert eligible | generic == set(compound_child_operations(version))
+    assert eligible.isdisjoint(generic)
+    assert all(not operation.startswith("ak.") for operation in eligible)
+    for operation in generic:
+        composer = operation_composer_contract(operation, version)
+        assert composer["operation"] == operation
+        assert composer["version"] == version
+        assert composer["complete_request_is_never_an_action"] is True
 
 
 @pytest.mark.parametrize("version", VERSIONS)

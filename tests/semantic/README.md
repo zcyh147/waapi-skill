@@ -559,6 +559,7 @@ The separately approved V3 executable profiles are:
 | `integration` | 12 | 36 | Six cross-operation workflows on Wwise 2022.1 and 2025.1; 20 previewed transactions and no additional per-API coverage credit |
 | `modification_policy_9` | 9 | 15 | Three isolated repetitions of each canonical project-modification policy on one reviewed object.create business case |
 | `switch_assignment_business_1` | 1 | 1 | Preview-only routing proof for one independent Switch assignment through three opaque business-object handles and Gateway-owned native materialization |
+| `compound_undo_business_1` | 1 | 1 | Preview-only routing proof that two checked child business changes become one Gateway-compiled Undo Group and one immutable Preview |
 
 The two older six-task integration profile IDs remain internal compatibility
 entrypoints for their exact sealed roots. They are deliberately absent from the
@@ -585,6 +586,7 @@ skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py -
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile integration --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-integration-new-candidate-r1
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile modification_policy_9 --campaign-root skills/waapi-skill-workspace/campaign-modification-policy-9
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile switch_assignment_business_1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-switch-assignment-business
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py --profile compound_undo_business_1 --model gpt-5.6-terra --reasoning-effort medium --service-tier default --campaign-root skills/waapi-skill-workspace/campaign-compound-undo-business
 ```
 
 `modification_policy_9` is one closed nine-task campaign; its public campaign
@@ -605,6 +607,15 @@ It starts no Wwise process and grants no real-host coverage credit. The Agent
 receives only the Switch Container, direct child, and Switch paths; the
 production Gateway must bind all three identities and own the exact GUID
 relationship, opposite precondition, native request, and immutable Preview.
+
+`compound_undo_business_1` is a single 2022.1 preview-only routing probe. It
+starts no Wwise process and grants no real-host coverage credit. The Agent
+receives one object path, two requested business outcomes, and the user's Undo
+display name. It must produce two checked child Drafts and exactly one compound
+parent Preview; the Gateway owns each bound child request, the fixed native
+begin/business-sequence/end dependency plan, cancellation boundary, and the
+aggregate verification contract. Child Previews and model-authored native
+dependency edges are rejected by the Broker protocol.
 
 Resume with the same profile, filters, candidate, model, reasoning, service
 tier, timeout, and retry policy plus `--resume`. Use `--resume --verify-only` to

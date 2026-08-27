@@ -1684,6 +1684,41 @@ def test_undo_group_builds_one_exact_versioned_immutable_plan(
     assert plan["automatic_retry"] is False
 
 
+def test_generic_undo_child_retains_explicit_partial_verification_boundary() -> None:
+    parsed = parse_operation_request(_typed_undo_group_request("2022.1"))
+    prepared = prepare_operation(parsed, read_call=lambda *_: {}).as_dict()
+    verification = verify_prepared_operation(
+        prepared,
+        execution_result={
+            "ok": True,
+            "result": {
+                "phases": [
+                    {
+                        "uri": "ak.wwise.core.undo.beginGroup",
+                        "dispatch_result": {"ok": True, "result": {}},
+                    },
+                    {
+                        "uri": "ak.wwise.core.object.setRandomizer",
+                        "dispatch_result": {"ok": True, "result": {}},
+                    },
+                    {
+                        "uri": "ak.wwise.core.undo.endGroup",
+                        "dispatch_result": {"ok": True, "result": {}},
+                    },
+                ]
+            },
+        },
+        read_call=lambda *_: {},
+    )
+
+    assert verification.ok is True
+    assert verification.status == "result_schema_checked"
+    assert verification.business_state_verified is False
+    assert verification.verification_strength == (
+        "complete_reflected_schema"
+    )
+
+
 def test_undo_group_rejects_independent_members_version_drift_and_large_requests() -> None:
     with pytest.raises(OperationContractError) as independent:
         parse_operation_request(

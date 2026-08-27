@@ -61,6 +61,7 @@ from wwise_waapi.exact_artifact_business_contracts import (
 )
 from wwise_waapi.typed_operations import (
     INLINE_OPERATIONS,
+    compound_child_request_contract,
     draft_operation_request_contract,
     inline_operation_cli_arguments,
 )
@@ -1493,6 +1494,134 @@ def build_object_lifecycle_business_transaction_steps(
             subcommand="preview-from-draft",
             arguments=draft.prefix(),
             expected_operation_request=normalized,
+        )
+    )
+    return tuple(steps)
+
+
+def build_compound_undo_business_transaction_steps(
+    child_requests: Sequence[Mapping[str, Any]],
+    *,
+    display_name: str,
+    label: str,
+    child_selectors: Sequence[Mapping[str, Any]] | None = None,
+) -> tuple[ExpectedGatewayStep, ...]:
+    """Compose checked child Business Drafts into one compound Preview."""
+
+    if not 1 <= len(child_requests) <= 32:
+        raise V3ProtocolError("compound Undo requires 1..32 child requests")
+    if not isinstance(display_name, str) or not display_name.strip():
+        raise V3ProtocolError("compound Undo display name is invalid")
+    if not isinstance(label, str) or not re.fullmatch(r"tx[0-9]{2}", label):
+        raise V3ProtocolError("business transaction label must be txNN")
+    normalized_children = tuple(
+        _validate_operation_request(request) for request in child_requests
+    )
+    if child_selectors is not None and len(child_selectors) != len(
+        normalized_children
+    ):
+        raise V3ProtocolError(
+            "compound Undo child selectors must match child request count"
+        )
+    versions = {str(request["version"]) for request in normalized_children}
+    if len(versions) != 1:
+        raise V3ProtocolError("compound Undo children must share one version")
+    (version,) = tuple(versions)
+    if any(
+        request["operation"] not in OBJECT_LIFECYCLE_BUSINESS_OPERATIONS
+        for request in normalized_children
+    ):
+        raise V3ProtocolError(
+            "Fresh compound Undo profile accepts object lifecycle children only"
+        )
+    parent_request = {
+        "contract": OPERATION_REQUEST_CONTRACT,
+        "version": version,
+        "operation": "waapi.undoGroup",
+        "arguments": {
+            "display_name": display_name,
+            "calls": [
+                {
+                    "schema_digest": compound_child_request_contract(
+                        str(request["operation"]), version
+                    ).schema_digest,
+                    "request": request,
+                }
+                for request in normalized_children
+            ],
+        },
+    }
+    try:
+        normalized_parent = parse_operation_request(parent_request).as_dict()
+    except OperationContractError as exc:
+        raise V3ProtocolError(f"compound Undo request is invalid: {exc}") from exc
+
+    parent = _BusinessDraftSteps.start(operation="waapi.undoGroup", label=label)
+    steps: list[ExpectedGatewayStep] = [
+        ExpectedGatewayStep(name=f"{label}.operations", subcommand="operations"),
+        *parent.steps,
+    ]
+    checked_child_labels: list[str] = []
+    for index, request in enumerate(normalized_children, start=1):
+        child_label = f"tx{index:02d}"
+        flow_request = request
+        if child_selectors is not None:
+            flow_request = {
+                **request,
+                "arguments": {
+                    **dict(request["arguments"]),
+                    "object": dict(child_selectors[index - 1]),
+                },
+            }
+        child_steps = list(
+            build_object_lifecycle_business_transaction_steps(
+                flow_request,
+                label=child_label,
+            )
+        )
+        if not child_steps or child_steps[-1].subcommand != "preview-from-draft":
+            raise V3ProtocolError("compound Undo child protocol lacks Preview terminal")
+        child_steps.pop()
+        steps.extend(child_steps)
+        checked_child_labels.append(child_label)
+
+    declaration_arguments: list[Any] = [
+        *parent.prefix(),
+        "--display-name",
+        display_name,
+    ]
+    for child_label in checked_child_labels:
+        declaration_arguments.extend(
+            (
+                "--child-draft",
+                ResponseBinding(f"{child_label}.draft-start", "/draft/draft_id"),
+                ResponseBinding(f"{child_label}.draft-start", "/task_authority"),
+            )
+        )
+    declaration_name = f"{label}.declare-undo-plan"
+    steps.append(
+        ExpectedGatewayStep(
+            name=declaration_name,
+            subcommand="draft-declare-undo-plan",
+            arguments=tuple(declaration_arguments),
+        )
+    )
+    parent.advance(declaration_name)
+    check_name = f"{label}.check"
+    steps.append(
+        ExpectedGatewayStep(
+            name=check_name,
+            subcommand="draft-check",
+            arguments=parent.prefix(),
+        )
+    )
+    parent.advance(check_name)
+    steps.append(
+        ExpectedGatewayStep(
+            name=f"{label}.preview",
+            subcommand="preview-from-draft",
+            arguments=parent.prefix(),
+            expected_operation_request=normalized_parent,
         )
     )
     return tuple(steps)
@@ -4451,6 +4580,7 @@ __all__ = [
     "build_audio_import_composer_protocol",
     "build_audio_import_composer_transaction_steps",
     "build_authoring_ui_business_transaction_steps",
+    "build_compound_undo_business_transaction_steps",
     "OBJECT_LIFECYCLE_BUSINESS_OPERATIONS",
     "build_object_lifecycle_business_transaction_steps",
     "build_object_metadata_business_transaction_steps",

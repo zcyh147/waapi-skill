@@ -154998,7 +154998,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 824
   },
-  "inventory_sha256": "82f2c0a2d4000a02201e6781bf6a1b08a7e6e1de0f2dfc9f4ec95cde633b0808",
+  "inventory_sha256": "37677bd8bf4128e765d2e35b46444fe6b5f13ecdf50000a4d39e943fd8a63251",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -187621,9 +187621,9 @@
     },
     {
       "argument_contract_sha256": "c6045ce498260deea17abbadb38b8f701a21164fa97491e0d158400a1519430c",
-      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered list of already checked closed child Draft capabilities; snapshots each exact child request and schema at declaration time; derives child bindings, dependency order, revisions, begin/end/cancel phases, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, and Composer action ordering grammar for all five lanes. Generic child request depth remains assigned to #57 rather than leaking through the compound parent.",
+      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered user-requested business sequence of already checked closed child Draft capabilities; snapshots each exact child request and schema at declaration time; derives child bindings, revisions, the fixed native begin/child/end phase dependency order with cancel-on-failure, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, dependency edges, and Composer action ordering grammar for all five lanes. Generic child request depth remains assigned to #57 rather than leaking through the compound parent.",
       "classification": "named-compound-undo",
-      "contract_sha256": "225931e90ad42d4a73439cea81b55bef47c7b2f0029b6b725a70f17cadd93fa2",
+      "contract_sha256": "fb4e621b2a34e2af08fc946fa5a32a0556cf82fe65f2663ea0efc846caf75849",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -187646,9 +187646,9 @@
     },
     {
       "argument_contract_sha256": "c6045ce498260deea17abbadb38b8f701a21164fa97491e0d158400a1519430c",
-      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered list of already checked closed child Draft capabilities; snapshots each exact child request and schema at declaration time; derives child bindings, dependency order, revisions, begin/end/cancel phases, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, and Composer action ordering grammar for all five lanes. Generic child request depth remains assigned to #57 rather than leaking through the compound parent.",
+      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered user-requested business sequence of already checked closed child Draft capabilities; snapshots each exact child request and schema at declaration time; derives child bindings, revisions, the fixed native begin/child/end phase dependency order with cancel-on-failure, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, dependency edges, and Composer action ordering grammar for all five lanes. Generic child request depth remains assigned to #57 rather than leaking through the compound parent.",
       "classification": "named-compound-undo",
-      "contract_sha256": "cb68ab89222aba3c723bf98066cd146122e6ebffdfdd72c3ca1c6cac53f1dc76",
+      "contract_sha256": "dd3ff13af0779eb3da18e7acb4b4126135651bc6b0e363ab422754e5b35ed881",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -187671,9 +187671,9 @@
     },
     {
       "argument_contract_sha256": "c6045ce498260deea17abbadb38b8f701a21164fa97491e0d158400a1519430c",
-      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered list of already checked closed child Draft capabilities; snapshots each exact child request and schema at declaration time; derives child bindings, dependency order, revisions, begin/end/cancel phases, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, and Composer action ordering grammar for all five lanes. Generic child request depth remains assigned to #57 rather than leaking through the compound parent.",
+      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered user-requested business sequence of already checked closed child Draft capabilities; snapshots each exact child request and schema at declaration time; derives child bindings, revisions, the fixed native begin/child/end phase dependency order with cancel-on-failure, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, dependency edges, and Composer action ordering grammar for all five lanes. Generic child request depth remains assigned to #57 rather than leaking through the compound parent.",
       "classification": "named-compound-undo",
-      "contract_sha256": "81413b90f4eee5cf9580ca3609266b1ae70cd300c41850e3e7399a73fd63bc9d",
+      "contract_sha256": "a3e8d743eb4ac40081994dfd296e08ea194dbb8ddc1ce4b83b3e83813b448c56",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -187696,9 +187696,9 @@
     },
     {
       "argument_contract_sha256": "c6045ce498260deea17abbadb38b8f701a21164fa97491e0d158400a1519430c",
-      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered list of already checked closed child Draft capabilities; snapshots each exact child request and schema at declaration time; derives child bindings, dependency order, revisions, begin/end/cancel phases, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, and Composer action ordering grammar for all five lanes. Generic child request depth remains assigned to #57 rather than leaking through the compound parent.",
+      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered user-requested business sequence of already checked closed child Draft capabilities; snapshots each exact child request and schema at declaration time; derives child bindings, revisions, the fixed native begin/child/end phase dependency order with cancel-on-failure, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, dependency edges, and Composer action ordering grammar for all five lanes. Generic child request depth remains assigned to #57 rather than leaking through the compound parent.",
       "classification": "named-compound-undo",
-      "contract_sha256": "f432fbdfa85ac4fae58e9555e8962dae73be6e5358ccd4639b8de5f935a78586",
+      "contract_sha256": "938a5da5b6296142fc505acca242e512ae7d457e24045e724ad4b1677cc73632",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -187721,9 +187721,9 @@
     },
     {
       "argument_contract_sha256": "c6045ce498260deea17abbadb38b8f701a21164fa97491e0d158400a1519430c",
-      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered list of already checked closed child Draft capabilities; snapshots each exact child request and schema at declaration time; derives child bindings, dependency order, revisions, begin/end/cancel phases, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, and Composer action ordering grammar for all five lanes. Generic child request depth remains assigned to #57 rather than leaking through the compound parent.",
+      "audit_evidence": "The public compound-undo-business/v1 Adapter accepts one display name plus an ordered user-requested business sequence of already checked closed child Draft capabilities; snapshots each exact child request and schema at declaration time; derives child bindings, revisions, the fixed native begin/child/end phase dependency order with cancel-on-failure, and one immutable Preview inside the Gateway; and removes public Undo child schemas, call handles, native request fragments, dependency edges, and Composer action ordering grammar for all five lanes. Generic child request depth remains assigned to #57 rather than leaking through the compound parent.",
       "classification": "named-compound-undo",
-      "contract_sha256": "823139b4b2377f4e1513d92c17624d76220cc0a911d284b34c4ba93b634c9268",
+      "contract_sha256": "bbd3cf93149b98f42bd3ae424d0e87cfeb59d5b583c65792c7edfb0019d2143e",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -187756,7 +187756,7 @@
   },
   "source_contracts": {
     "gateway_parser_sha256": "78007b801e768a0fba9ef8e64fbf0614118620dd81f16352b3015970b9f77a2f",
-    "operation_contract_sha256": "89b30fa11cbe0bbd3263841e60bb171e685018c43f298fd032da2fddbdcd97fa",
+    "operation_contract_sha256": "b97f16fe432b2f4119c2b89a5783993a884daee55218a246ebb782ec9727363e",
     "public_continuation_sha256": "2fa739b8ede432490e6474de7477fb77a933cd99f5d57a8e07a5e7e2fd365e52",
     "typed_request_surface_sha256": "6d05d64e95a6e0f7099ddd03f1da42c763e9c06f33f93cac7581c7c061a83af8"
   },

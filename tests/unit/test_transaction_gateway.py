@@ -7276,7 +7276,7 @@ def test_project_transition_mismatch_stays_executed_unverified_for_manual_verify
     assert "agent_result" not in payload
 
 
-def test_undo_group_success_uses_one_client_and_verifies_only_result_schemas(
+def test_undo_group_success_uses_one_client_and_aggregates_child_verification(
     tmp_path: Path,
 ) -> None:
     state_dir = tmp_path / "state"
@@ -7336,17 +7336,25 @@ def test_undo_group_success_uses_one_client_and_verifies_only_result_schemas(
             {
                 "ak.wwise.core.getInfo": [live_info(year=2023)],
                 "ak.wwise.core.getProjectInfo": [project()],
+                "ak.wwise.core.object.get": [
+                    {"return": [object_row(notes="after")]}
+                ],
             }
         ),
         version="2023.1",
     )
 
     assert verify_exit == 0, verify_payload
-    assert verify_payload["state"] == TransactionState.RESULT_SCHEMA_CHECKED.value
-    assert verify_payload["verified"] is False
-    assert verify_payload["result_schema_checked"] is True
-    assert verify_payload["verification"]["business_state_verified"] is False
-    assert verify_payload["agent_result"]["verified"] is False
+    assert verify_payload["state"] == TransactionState.VERIFIED.value
+    assert verify_payload["verified"] is True
+    assert verify_payload["verification"]["business_state_verified"] is True
+    assert verify_payload["verification"]["verification_strength"] == (
+        "compound_child_readback"
+    )
+    assert any(
+        assertion["name"].startswith("Undo Group child[0]")
+        for assertion in verify_payload["verification"]["assertions"]
+    )
 
 
 def test_undo_group_success_keeps_one_phase_copy_below_the_final_gateway_ceiling(

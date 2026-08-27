@@ -395,6 +395,9 @@ BUSINESS_AGENT_OUTCOME_CONTRACTS = {
     matrix.SWITCH_ASSIGNMENT_BUSINESS_PROFILE_ID: (
         "waapi-skill.switch-assignment-business-agent-outcome/v1"
     ),
+    matrix.COMPOUND_UNDO_BUSINESS_PROFILE_ID: (
+        "waapi-skill.compound-undo-business-agent-outcome/v1"
+    ),
     matrix.AUTHORING_UI_BUSINESS_PROFILE_ID: (
         "waapi-skill.authoring-ui-business-agent-outcome/v1"
     ),
@@ -3375,6 +3378,43 @@ def _validate_bound_business_agent_protocol(
             steps[-1].expected_operation_request,
             objects=tuple(expected_unit.objects.values()),
         )
+    elif profile == matrix.COMPOUND_UNDO_BUSINESS_PROFILE_ID:
+        from tests.semantic.support.codex_eval_protocol_v3 import (
+            build_compound_undo_business_transaction_steps,
+        )
+
+        object_id = str(expected_unit.object["id"])
+        object_path = str(expected_unit.object["path"])
+        child_requests = (
+            {
+                "contract": "waapi-skill.operation-request/v1",
+                "version": expected_unit.version,
+                "operation": "object.setNotes",
+                "arguments": {
+                    "object": {"kind": "id", "value": object_id},
+                    "value": expected_unit.notes_value,
+                },
+            },
+            {
+                "contract": "waapi-skill.operation-request/v1",
+                "version": expected_unit.version,
+                "operation": "object.setName",
+                "arguments": {
+                    "object": {"kind": "id", "value": object_id},
+                    "value": expected_unit.name_value,
+                },
+            },
+        )
+        steps = build_compound_undo_business_transaction_steps(
+            child_requests,
+            display_name=expected_unit.display_name,
+            label="tx03",
+            child_selectors=(
+                {"kind": "path", "value": object_path},
+                {"kind": "path", "value": object_path},
+            ),
+        )
+        preview_request = steps[-1].expected_operation_request
     elif profile == matrix.AUTHORING_UI_BUSINESS_PROFILE_ID:
         from tests.semantic.support.codex_eval_protocol_v3 import (
             build_authoring_ui_business_transaction_steps,

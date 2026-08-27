@@ -330,6 +330,7 @@ class TypedRequestContract:
     route: str = "bounded_call"
     gateway_commands: tuple[str, ...] = ()
     timeout_seconds: float = 10.0
+    force_draft: bool = False
 
     @property
     def fields_by_handle(self) -> Mapping[str, TypedFieldContract]:
@@ -783,7 +784,7 @@ class TypedRequestContract:
                     "map_remove": "--map-remove <map_handle> <key>",
                 }
             if (
-                flat_inline
+                (flat_inline and not self.force_draft)
                 or self.uri == TYPED_REQUEST_COMPLEX_TRACER_URI
                 or self.route == "isolated_transaction"
             ):
@@ -927,6 +928,11 @@ class TypedRequestContract:
             "version": self.version,
             "uri": self.uri,
             "input_shape": input_shape,
+            **(
+                {"draft_requirement": "checked_compound_child_capability"}
+                if self.force_draft
+                else {}
+            ),
             "schema_digest": self.schema_digest,
             **(
                 {
