@@ -109,10 +109,11 @@
     },
     {
       "id": "named-authoring-ui-registration",
-      "disposition": "migration_required",
-      "owner_issue": 56,
+      "disposition": "already_deep",
+      "owner_issue": null,
       "operations": ["ui.captureScreen", "ui.commands.execute", "ui.commands.register", "ui.commands.unregister"],
-      "leaked_mechanics": ["wire_type", "dependency_order", "batch_layout", "revision_arithmetic", "request_fragment"]
+      "leaked_mechanics": [],
+      "audit_evidence": "The public authoring-ui-business/v1 Adapter accepts capture outcomes, exact installed command choices, bounded command descriptors, exact Program/Lua handler artifacts, and explicit registration ownership decisions; derives host/platform checks, project-scoped registration IDs, source authority, native request fields, revisions, dependency order, fresh command-inventory guards, paired unregister cleanup, and the one immutable Preview inside the Gateway; and removes normal UI inline_typed and Composer ingress for all 20 lanes. #81 retains five-version deterministic and non-bypass coverage, a matching native-Windows Wwise Authoring 2022.1 capture/execute/register/unregister PASS, candid macOS 2022.1/2025.1 readiness BLOCKED evidence with no behavior credit, and proportional Terra Fresh Agent capture/SaveProject evidence on both hosts."
     },
     {
       "id": "named-dangerous-debug-controls",
@@ -219,15 +220,6 @@
     }
   ],
   "ticket_blueprints": {
-    "named-authoring-ui-registration": {
-      "title": "Migrate Authoring UI capture and command lifecycles to business declarations",
-      "parent_issue": 56,
-      "blocked_by_family": "named-exact-artifact-code",
-      "public_behavior": "Accept capture view/rectangle outcomes, live command choices, bounded command operands/descriptors, and exact program/Lua handlers; derive host checks, IDs, revision/order mechanics, payloads, output isolation, and paired unregister plans from fresh Authoring state.",
-      "deterministic_tests": "Five-version capture/execute/register/unregister schemas, collision/ownership/repair/stale inventory cases, exact handler preservation, lifecycle cleanup, output bounds, limits, prohibited generic bypass, and no legacy inline_typed or Composer normal input.",
-      "removal_boundary": "Delete old inline_typed and Composer UI inputs plus caller-authored revision/request fragments; retain fresh getCommands authority and explicit Authoring-only boundaries.",
-      "proportional_evidence": "Matching real Authoring capture, execute, register, and unregister behavior on macOS and Windows where available, plus targeted Fresh Agent command and capture workflows."
-    },
     "named-dangerous-debug-controls": {
       "title": "Migrate every named Debug host control to the unified business compiler",
       "parent_issue": 56,
@@ -330,7 +322,6 @@
   },
   "ticket_issue_numbers": {
     "generic-fixed-query-metadata": 96,
-    "named-authoring-ui-registration": 81,
     "named-dangerous-debug-controls": 82,
     "named-compound-undo": 83,
     "generic-core-project-object": 84,

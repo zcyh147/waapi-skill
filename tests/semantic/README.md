@@ -785,6 +785,20 @@ the real sandbox. Matrix-created Skill symlinks are verified against the frozen
 candidate and replaced with regular attestations before the attempt manifest is
 sealed. No campaign cleanup uses a global Wwise kill.
 
+The targeted `authoring_ui_business_2` profile is proportional Agent-interface
+evidence for #81, not a full Authoring API matrix. On macOS, frozen predecessor
+root `imac-aui-f157f15-r8` passed capture plus SaveProject and its identical
+verify-only audit; exact candidate `cba7507` then passed SaveProject and replay
+in `imac-aui-cba7507-r9-save`. On native Windows, predecessor root
+`iwin-aui-f157f15-r1` passed capture but froze a semantic SaveProject failure;
+exact candidate root `iwin-aui-cba7507-r2-save` passed SaveProject and replay
+through an attested `InteractiveToken` / `Limited` task. These roots establish
+cumulative proportional route evidence, not one current-candidate 2/2 root.
+The Windows task and independent process audit ended cleanly. Separate real
+Authoring evidence passed capture, execute, register, and unregister on Windows
+2022.1; macOS 2022.1/2025.1 Authoring readiness remained BLOCKED and receives
+no behavior credit.
+
 ## CI-safe focused checks
 
 These checks validate the suite, isolation harness, broker, grader, fixtures,
