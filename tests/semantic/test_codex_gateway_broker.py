@@ -2612,26 +2612,29 @@ def test_compound_parent_revision_binding_ignores_later_child_draft_receipts(
         transport="tcp",
     )
     broker._next_step = declaration_index  # noqa: SLF001
+    parent_draft = "od1-" + "a" * 32
+    child_one = "od1-" + "b" * 32
+    child_two = "od1-" + "c" * 32
     broker._payloads_by_step.update(  # noqa: SLF001
         {
             "tx03.draft-start": {
-                "draft": {"draft_id": "parent-draft", "revision": 1},
+                "draft": {"draft_id": parent_draft, "revision": 1},
                 "task_authority": "parent-authority",
             },
             "tx01.draft-start": {
-                "draft": {"draft_id": "child-one", "revision": 1},
+                "draft": {"draft_id": child_one, "revision": 1},
                 "task_authority": "child-one-authority",
             },
             "tx02.draft-start": {
-                "draft": {"draft_id": "child-two", "revision": 1},
+                "draft": {"draft_id": child_two, "revision": 1},
                 "task_authority": "child-two-authority",
             },
-            "tx02.check": {"draft": {"draft_id": "child-two", "revision": 4}},
+            "tx02.check": {"draft": {"draft_id": child_two, "revision": 4}},
         }
     )
     correct = (
         "draft-declare-undo-plan",
-        "parent-draft",
+        parent_draft,
         "--task-authority",
         "parent-authority",
         "--expected-revision",
@@ -2639,18 +2642,47 @@ def test_compound_parent_revision_binding_ignores_later_child_draft_receipts(
         "--display-name",
         "Weather rain cleanup",
         "--child-draft",
-        "child-one",
+        child_one,
         "child-one-authority",
         "--child-draft",
-        "child-two",
+        child_two,
         "child-two-authority",
     )
 
     broker._validate_step(steps[declaration_index], correct)  # noqa: SLF001
+    broker._validate_operation_draft_payload(  # noqa: SLF001
+        steps[declaration_index],
+        {
+            "draft": {
+                "draft_id": parent_draft,
+                "revision": 2,
+                "lifecycle_state": "editable",
+                "binding": {
+                    "operation": "waapi.undoGroup",
+                    "version": "2022.1",
+                },
+            }
+        },
+    )
     with pytest.raises(GatewayInvocationError, match="tx03.draft-start/draft/revision"):
         broker._validate_step(  # noqa: SLF001
             steps[declaration_index],
             (*correct[:5], "4", *correct[6:]),
+        )
+    with pytest.raises(GatewayInvocationError, match="ID does not match draft-start"):
+        broker._validate_operation_draft_payload(  # noqa: SLF001
+            steps[declaration_index],
+            {
+                "draft": {
+                    "draft_id": child_two,
+                    "revision": 2,
+                    "lifecycle_state": "editable",
+                    "binding": {
+                        "operation": "waapi.undoGroup",
+                        "version": "2022.1",
+                    },
+                }
+            },
         )
 
 

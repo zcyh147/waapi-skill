@@ -441,6 +441,21 @@ full-profile order instead of adding a second campaign path. A failed root stays
 frozen without verify-only replay; final acceptance still requires one complete
 passing root per host followed by its identical verify-only audit.
 
+### Multi-Draft Broker flow identity
+
+Compound business protocols may keep one parent Draft alive while several child
+Drafts are started, revised, checked, and then consumed. The semantic Broker
+must resolve every revision binding, response projection, read-only
+classification, and Preview replay through the command's exact owning
+`draft-start` and `draft_id`. Never infer ownership from the most recently
+started or most recently updated Draft. Same-Draft dependency-ready reordering
+may use the latest prior receipt with that exact `draft_id`; a receipt from any
+other Draft must remain invisible to the flow and cannot satisfy a stale
+revision. Focused Broker regressions must cover an interleaved parent plus at
+least two children, a wrong child/parent identity, a stale revision, and the
+existing single-Draft reordering path before a new compound Fresh campaign is
+opened.
+
 The focused `modification_policy_9` campaign is separate from those historical
 v2 totals. Its sealed
 `campaign-modification-policy-9-c7` run passed 9/9 Wwise 2022.1 tasks and all

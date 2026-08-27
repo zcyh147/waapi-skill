@@ -9095,6 +9095,36 @@ class CodexGatewayBroker:
                 return prior_payload
         return source
 
+    def _draft_start_for_step(
+        self,
+        step: ExpectedGatewayStep,
+    ) -> ExpectedGatewayStep:
+        """Resolve a Draft command to its exact owning draft-start step."""
+
+        if step.subcommand == "draft-start":
+            return step
+        binding = step.arguments[0] if step.arguments else None
+        if (
+            not isinstance(binding, ResponseBinding)
+            or binding.pointer != "/draft/draft_id"
+        ):
+            raise GatewayInvocationError(
+                "Draft response is missing its flow-local draft-start binding"
+            )
+        matches = tuple(
+            candidate
+            for candidate in self._execution_steps[
+                : self._execution_steps.index(step) + 1
+            ]
+            if candidate.name == binding.step
+            and candidate.subcommand == "draft-start"
+        )
+        if len(matches) != 1:
+            raise GatewayInvocationError(
+                "Draft response is missing its flow-local draft-start"
+            )
+        return matches[0]
+
     def _bind_task_local_declaration_id(
         self,
         step: ExpectedGatewayStep,
@@ -11082,16 +11112,7 @@ class CodexGatewayBroker:
             raise GatewayInvocationError("Draft response is missing its immutable binding")
 
         step_index = self._execution_steps.index(step)
-        prior_starts = tuple(
-            value
-            for value in self._execution_steps[: step_index + 1]
-            if value.subcommand == "draft-start"
-        )
-        if not prior_starts:
-            raise GatewayInvocationError(
-                "Draft response is missing its flow-local draft-start"
-            )
-        start = prior_starts[-1]
+        start = self._draft_start_for_step(step)
         operation = start.arguments[0]
         version = binding.get("version")
         if binding.get("operation") != operation:
@@ -11136,7 +11157,10 @@ class CodexGatewayBroker:
             if not isinstance(prior_payload, Mapping):
                 continue
             candidate = prior_payload.get("draft")
-            if isinstance(candidate, Mapping):
+            if (
+                isinstance(candidate, Mapping)
+                and candidate.get("draft_id") == draft_id
+            ):
                 previous_draft = candidate
                 break
         if previous_draft is None or type(previous_draft.get("revision")) is not int:
@@ -11167,17 +11191,7 @@ class CodexGatewayBroker:
     ) -> bool:
         """Classify one Draft flow from its exact prior start binding."""
 
-        step_index = self._execution_steps.index(step)
-        starts = tuple(
-            candidate
-            for candidate in self._execution_steps[: step_index + 1]
-            if candidate.subcommand == "draft-start"
-        )
-        if not starts:
-            raise GatewayInvocationError(
-                "Draft response is missing its flow-local draft-start"
-            )
-        start = starts[-1]
+        start = self._draft_start_for_step(step)
         operation = start.arguments[0] if start.arguments else None
         if not isinstance(operation, str) or not operation.startswith("ak."):
             return False
@@ -11211,17 +11225,7 @@ class CodexGatewayBroker:
     ) -> None:
         """Bind a direct read terminal to its exact typed Draft composition."""
 
-        step_index = self._execution_steps.index(step)
-        starts = tuple(
-            candidate
-            for candidate in self._execution_steps[: step_index + 1]
-            if candidate.subcommand == "draft-start"
-        )
-        if not starts:
-            raise GatewayInvocationError(
-                "read-only Draft result is missing its flow-local draft-start"
-            )
-        start = starts[-1]
+        start = self._draft_start_for_step(step)
         start_payload = self._payloads_by_step.get(start.name)
         start_draft = (
             start_payload.get("draft")
@@ -11446,16 +11450,8 @@ class CodexGatewayBroker:
                 raise GatewayInvocationError(
                     "Business request witness has no exact operation"
                 )
-            preview_index = self._execution_steps.index(preview_step)
-            prior_starts = tuple(
-                step
-                for step in self._execution_steps[:preview_index]
-                if step.subcommand == "draft-start"
-            )
-            if (
-                not prior_starts
-                or prior_starts[-1].arguments != (expected_operation,)
-            ):
+            start = self._draft_start_for_step(preview_step)
+            if start.arguments != (expected_operation,):
                 raise GatewayInvocationError(
                     "Business request witness is missing its exact flow-local "
                     "draft-start"
@@ -11474,7 +11470,7 @@ class CodexGatewayBroker:
                     )
                 return offline_request
             if (self.skill_source / "wwise_waapi").is_dir():
-                start_payload = self._payloads_by_step.get(prior_starts[-1].name)
+                start_payload = self._payloads_by_step.get(start.name)
                 start_draft = (
                     start_payload.get("draft")
                     if isinstance(start_payload, Mapping)
@@ -11572,16 +11568,7 @@ class CodexGatewayBroker:
         if sealed_request is not None:
             return sealed_request
         preview_index = self._execution_steps.index(preview_step)
-        prior_starts = tuple(
-            step
-            for step in self._execution_steps[:preview_index]
-            if step.subcommand == "draft-start"
-        )
-        if not prior_starts:
-            raise GatewayInvocationError(
-                "Draft canonical replay is missing its flow-local draft-start"
-            )
-        start = prior_starts[-1]
+        start = self._draft_start_for_step(preview_step)
         start_index = self._execution_steps.index(start)
         operation = str(start.arguments[0])
         start_payload = self._payloads_by_step.get(start.name)
