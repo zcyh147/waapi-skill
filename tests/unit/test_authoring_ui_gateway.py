@@ -274,6 +274,27 @@ def test_execute_start_keeps_fresh_command_inventory_gateway_owned(
     assert "fresh-getCommands" not in json.dumps(next_action)
 
 
+def test_compact_inventory_keeps_named_ui_command_ids_on_the_ui_route(
+    tmp_path: Path,
+) -> None:
+    code, payload = execute(
+        ["operations"],
+        tmp_path=tmp_path,
+        version="2025.1",
+    )
+
+    assert code == 0, payload
+    execute_row = next(
+        row for row in payload["operations"] if row["name"] == "ui.commands.execute"
+    )
+    assert "SaveProject" in execute_row["summary"]
+    assert "without translating" in execute_row["summary"]
+    assert execute_row["next_command"] == [
+        "operation-schema",
+        "ui.commands.execute",
+    ]
+
+
 def test_offline_capability_profile_is_explicit_and_defaults_to_console(
     tmp_path: Path,
 ) -> None:

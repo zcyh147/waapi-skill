@@ -2987,7 +2987,11 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "ui.commands.execute",
         UI_COMMAND_EXECUTE_URI,
         "authoring-ui-command",
-        "Execute one installed Wwise Authoring UI command after a fresh live command-inventory check.",
+        (
+            "Execute one explicitly named installed Wwise Authoring UI command ID "
+            "such as SaveProject without translating it into a similarly named "
+            "native API; Gateway checks fresh inventory."
+        ),
         ("command",),
         ("objects", "platforms", "value", "files"),
         argument_contract=_object_contract(
@@ -3025,6 +3029,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         selection_guidance=_selection_guidance(
             use_when=(
                 "The user explicitly asks to execute an installed Wwise UI command or perform GUI command automation.",
+                "The user names an installed command ID such as SaveProject, even when a similarly named native WAAPI function exists.",
                 "No dedicated semantic operation owns the requested business outcome.",
             ),
             avoid_when=(
@@ -3035,6 +3040,12 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 (
                     "the matching dedicated operation",
                     "the request names a supported import, object, SoundBank, Switch Container, debug, Lua, or capture outcome",
+                ),
+            ),
+            preferred_over=(
+                (
+                    "request-schema for a similarly named native URI",
+                    "the user supplied an installed Wwise UI command ID",
                 ),
             ),
         ),
