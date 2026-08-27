@@ -19,6 +19,7 @@ from tests.semantic.support.codex_business_agent_runner import (
 from tests.semantic.support.codex_eval_protocol_v3 import (
     build_authoring_ui_business_transaction_steps,
 )
+from wwise_waapi.operation_ui_commands import MAX_LIVE_COMMANDS
 
 
 OUTCOME_CONTRACT = "waapi-skill.authoring-ui-business-agent-outcome/v1"
@@ -150,10 +151,21 @@ def _command_choice_came_from_inventory(
     ]
     if unit.operation == "ui.captureScreen":
         return not inventory
+    if len(inventory) != 1 or not isinstance(inventory[0].payload, Mapping):
+        return False
+    agent_result = inventory[0].payload.get("agent_result")
+    commands = (
+        agent_result.get("commands")
+        if isinstance(agent_result, Mapping)
+        else None
+    )
+    expected = unit.request_arguments.get("command")
     return bool(
-        len(inventory) == 1
-        and isinstance(inventory[0].payload, Mapping)
-        and "SaveProject" in json.dumps(inventory[0].payload, ensure_ascii=False)
+        isinstance(commands, list)
+        and 0 < len(commands) <= MAX_LIVE_COMMANDS
+        and all(isinstance(command, str) and command for command in commands)
+        and isinstance(expected, str)
+        and expected in commands
     )
 
 
@@ -176,6 +188,23 @@ def run_authoring_ui_business_agent_unit(
             transaction_count=lambda _runtime: 1,
             preview_gates=_authoring_ui_preview_gates,
             outcome_factory=AuthoringUiBusinessAgentOutcome,
+            commutative_read_only_step_groups=(
+                _authoring_ui_commutative_read_groups
+            ),
+        ),
+    )
+
+
+def _authoring_ui_commutative_read_groups(
+    runtime: AuthoringUiBusinessRuntime,
+) -> Sequence[Sequence[str]]:
+    if runtime.request["operation"] != "ui.commands.execute":
+        return ()
+    return (
+        (
+            "tx01.operation-schema",
+            "tx01.command-inventory-schema",
+            "tx01.command-inventory",
         ),
     )
 

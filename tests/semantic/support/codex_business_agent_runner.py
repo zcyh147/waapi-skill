@@ -45,6 +45,9 @@ class BusinessAgentRunSpec:
     transaction_count: Callable[[Any], int]
     preview_gates: Callable[[Any, Any, Any, Any], Mapping[str, bool]]
     outcome_factory: Callable[..., Any]
+    commutative_read_only_step_groups: (
+        Callable[[Any], Sequence[Sequence[str]]] | None
+    ) = None
 
 
 def run_business_agent_unit(
@@ -85,6 +88,11 @@ def run_business_agent_unit(
         skill_source=options.skill_source,
         invocation_skill_source=skill_install,
         expected_steps=steps,
+        commutative_read_only_step_groups=(
+            ()
+            if spec.commutative_read_only_step_groups is None
+            else spec.commutative_read_only_step_groups(runtime)
+        ),
         expected_wwise_version=unit.version,
         project_modification_policy="ask_before_changes",
         runner_environment=runner_environment,

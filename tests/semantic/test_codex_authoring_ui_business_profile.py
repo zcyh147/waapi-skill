@@ -11,6 +11,8 @@ import pytest
 from tests.semantic import run_codex_skill_matrix as matrix
 from tests.semantic import run_codex_skill_campaign as campaign
 from tests.semantic.support.codex_authoring_ui_business_agent_runner import (
+    _authoring_ui_commutative_read_groups,
+    _command_choice_came_from_inventory,
     prepare_authoring_ui_business_runtime,
 )
 from tests.semantic.support.codex_authoring_ui_business_profile import (
@@ -79,7 +81,9 @@ def test_each_unit_compiles_to_one_closed_public_business_preview(
         "draft-check",
         "preview-from-draft",
     ]
-    if unit.operation == "ui.commands.execute":
+    if unit.operation == "ui.captureScreen":
+        expected[:0] = ["operations"]
+    else:
         expected[:0] = ["request-schema", "typed-zero-call"]
     assert [step.subcommand for step in steps] == expected
     assert (
@@ -90,6 +94,21 @@ def test_each_unit_compiles_to_one_closed_public_business_preview(
     fixture = json.loads(runtime.fixture_path.read_text(encoding="utf-8"))
     assert fixture["is_command_line"] is False
     assert fixture["command_ids"] == ["SaveProject"]
+
+
+def test_authoring_command_discovery_reads_are_commutative(tmp_path: Path) -> None:
+    unit = load_authoring_ui_business_profile(
+        PROFILE,
+        unit_ids=("AUI25-SAVE-PREVIEW",),
+    ).units[0]
+    runtime = prepare_authoring_ui_business_runtime(unit, tmp_path / "runtime")
+    assert _authoring_ui_commutative_read_groups(runtime) == (
+        (
+            "tx01.operation-schema",
+            "tx01.command-inventory-schema",
+            "tx01.command-inventory",
+        ),
+    )
 
 
 def test_profile_rejects_prompt_level_gateway_mechanics(tmp_path: Path) -> None:
@@ -134,3 +153,32 @@ def test_authoring_fixture_shim_reports_host_and_bounded_command_inventory(
     assert client.call("ak.wwise.ui.commands.getCommands") == {
         "commands": ["SaveProject"]
     }
+
+
+def test_command_choice_oracle_requires_exact_structured_inventory_membership() -> None:
+    unit = load_authoring_ui_business_profile(
+        PROFILE,
+        unit_ids=("AUI25-SAVE-PREVIEW",),
+    ).units[0]
+
+    assert _command_choice_came_from_inventory(
+        unit,
+        [
+            SimpleNamespace(
+                step_name="tx01.command-inventory",
+                payload={"agent_result": {"commands": ["SaveProject"]}},
+            )
+        ],
+    )
+    assert not _command_choice_came_from_inventory(
+        unit,
+        [
+            SimpleNamespace(
+                step_name="tx01.command-inventory",
+                payload={
+                    "agent_result": {"commands": ["Copy"]},
+                    "diagnostic": "SaveProject",
+                },
+            )
+        ],
+    )
