@@ -1658,14 +1658,7 @@ def build_authoring_ui_business_transaction_steps(
 
     draft = _BusinessDraftSteps.start(operation=operation, label=label)
     steps = draft.steps
-    if operation == "ui.captureScreen":
-        steps[:0] = [
-            ExpectedGatewayStep(
-                name=f"{label}.operations",
-                subcommand="operations",
-            )
-        ]
-    else:
+    if operation == "ui.commands.execute":
         steps[:0] = [
             request_schema_step(
                 f"{label}.command-inventory-schema",
@@ -1677,6 +1670,12 @@ def build_authoring_ui_business_transaction_steps(
                 version=version,
             ),
         ]
+    steps[:0] = [
+        ExpectedGatewayStep(
+            name=f"{label}.operations",
+            subcommand="operations",
+        )
+    ]
     declaration_name = f"{label}.declare-ui-plan"
     steps.append(
         ExpectedGatewayStep(

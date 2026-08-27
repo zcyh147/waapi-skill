@@ -75,16 +75,15 @@ def test_each_unit_compiles_to_one_closed_public_business_preview(
     )
 
     expected = [
+        "operations",
         "operation-schema",
         "draft-start",
         "draft-declare-ui-plan",
         "draft-check",
         "preview-from-draft",
     ]
-    if unit.operation == "ui.captureScreen":
-        expected[:0] = ["operations"]
-    else:
-        expected[:0] = ["request-schema", "typed-zero-call"]
+    if unit.operation == "ui.commands.execute":
+        expected[1:1] = ["request-schema", "typed-zero-call"]
     assert [step.subcommand for step in steps] == expected
     assert (
         "ak.wwise.ui.commands.getCommands"
