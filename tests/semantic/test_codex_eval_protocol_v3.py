@@ -37,6 +37,7 @@ from tests.semantic.support.codex_gateway_broker import (
     MetadataQueryArgument,
     MetadataTokenProjection,
     ResponseBinding,
+    validate_operation_draft_protocol_steps,
     TypedRequestFactsArgument,
     validate_commutative_composer_setup_step_groups,
 )
@@ -273,6 +274,7 @@ def test_compound_undo_steps_check_children_before_one_parent_preview() -> None:
         display_name="Weather rain cleanup",
         label="tx03",
     )
+    validate_operation_draft_protocol_steps(steps)
 
     assert [step.subcommand for step in steps] == [
         "operations",
@@ -306,6 +308,11 @@ def test_compound_undo_steps_check_children_before_one_parent_preview() -> None:
         row["request"]["operation"]
         for row in steps[-1].expected_operation_request["arguments"]["calls"]
     ] == ["object.setNotes", "object.setName"]
+
+    with pytest.raises(ValueError, match="child Draft must end checked"):
+        validate_operation_draft_protocol_steps(
+            tuple(step for step in steps if step.name != "tx01.check")
+        )
 
 
 def test_real_gateway_helper_reuses_soundbank_plan_cli_grammar() -> None:

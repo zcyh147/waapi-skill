@@ -2899,6 +2899,102 @@ def draft_compact_action_result(
     return _draft_compact_action_result(draft)
 
 
+def _validate_compound_undo_draft_protocol_steps(
+    steps: tuple[ExpectedGatewayStep, ...],
+    starts: tuple[ExpectedGatewayStep, ...],
+) -> None:
+    """Validate checked child Draft flows consumed by one parent Preview."""
+
+    indexes = {step.name: index for index, step in enumerate(steps)}
+    declarations = tuple(
+        step for step in steps if step.subcommand == "draft-declare-undo-plan"
+    )
+    if len(declarations) != 1:
+        raise ValueError("compound Undo protocol requires one parent declaration")
+    declaration = declarations[0]
+    if not declaration.arguments or not isinstance(
+        declaration.arguments[0], ResponseBinding
+    ):
+        raise ValueError("compound Undo declaration must bind its parent Draft")
+    parent_start_name = declaration.arguments[0].step
+    starts_by_name = {step.name: step for step in starts}
+    parent_start = starts_by_name.get(parent_start_name)
+    if parent_start is None:
+        raise ValueError("compound Undo declaration names an unknown parent Draft")
+
+    child_start_names: list[str] = []
+    arguments = declaration.arguments
+    for index, value in enumerate(arguments):
+        if value != "--child-draft":
+            continue
+        if index + 2 >= len(arguments):
+            raise ValueError("compound Undo child capability is incomplete")
+        draft_id = arguments[index + 1]
+        authority = arguments[index + 2]
+        if (
+            not isinstance(draft_id, ResponseBinding)
+            or draft_id.pointer != "/draft/draft_id"
+            or not isinstance(authority, ResponseBinding)
+            or authority.pointer != "/task_authority"
+            or authority.step != draft_id.step
+            or draft_id.step == parent_start_name
+            or draft_id.step not in starts_by_name
+        ):
+            raise ValueError(
+                "compound Undo children must bind one exact checked child capability"
+            )
+        child_start_names.append(draft_id.step)
+    expected_children = {step.name for step in starts if step is not parent_start}
+    if (
+        not child_start_names
+        or len(child_start_names) != len(set(child_start_names))
+        or set(child_start_names) != expected_children
+    ):
+        raise ValueError(
+            "compound Undo declaration must consume every child Draft exactly once"
+        )
+
+    covered: set[str] = set()
+    for start in starts:
+        owned = [start]
+        for step in steps:
+            if step.subcommand not in _DRAFT_SUBCOMMANDS or step is start:
+                continue
+            first = step.arguments[0] if step.arguments else None
+            if isinstance(first, ResponseBinding) and first.step == start.name:
+                owned.append(step)
+        owned.sort(key=lambda step: indexes[step.name])
+        schema = next(
+            (
+                step
+                for step in reversed(steps[: indexes[start.name]])
+                if step.subcommand == "operation-schema"
+                and step.arguments == start.arguments
+            ),
+            None,
+        )
+        segment = tuple(([schema] if schema is not None else []) + owned)
+        validate_operation_draft_protocol_steps(segment)
+        covered.update(step.name for step in owned)
+        if start is parent_start:
+            if owned[-1].subcommand != "preview-from-draft":
+                raise ValueError("compound Undo parent must end in one Preview")
+        else:
+            if owned[-1].subcommand != "draft-check":
+                raise ValueError(
+                    "compound Undo child Draft must end checked without a child Preview"
+                )
+            if indexes[owned[-1].name] >= indexes[declaration.name]:
+                raise ValueError(
+                    "compound Undo children must be checked before parent declaration"
+                )
+    draft_names = {
+        step.name for step in steps if step.subcommand in _DRAFT_SUBCOMMANDS
+    }
+    if covered != draft_names:
+        raise ValueError("compound Undo Draft command has no owning flow")
+
+
 def validate_operation_draft_protocol_steps(
     expected_steps: Sequence[ExpectedGatewayStep],
 ) -> None:
@@ -2910,6 +3006,11 @@ def validate_operation_draft_protocol_steps(
         return
     starts = tuple(step for step in draft_steps if step.subcommand == "draft-start")
     if len(starts) > 1:
+        if any(
+            step.subcommand == "draft-declare-undo-plan" for step in draft_steps
+        ):
+            _validate_compound_undo_draft_protocol_steps(steps, starts)
+            return
         indexes = {step.name: index for index, step in enumerate(steps)}
         start_indexes = tuple(indexes[step.name] for step in starts)
         terminal_indexes: list[int] = []

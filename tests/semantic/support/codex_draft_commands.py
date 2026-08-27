@@ -19,6 +19,7 @@ DRAFT_GATEWAY_SUBCOMMANDS = frozenset(
         "draft-declare-new",
         "draft-declare-object-change",
         "draft-declare-rtpc",
+        "draft-declare-undo-plan",
         "draft-declare-switch-assignment",
         "draft-declare-soundbank-plan",
         "draft-declare-artifact-plan",
