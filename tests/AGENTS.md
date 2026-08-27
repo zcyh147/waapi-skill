@@ -178,6 +178,17 @@ Audit rows include the pid, port, command, sandbox project, `getInfo` version pr
 
 During WwiseConsole startup, repeated `ConnectionRefusedError` lines from WAAPI probes can be normal while Wwise loads the project, missing-plugin warnings, or WAAPI server listeners. Do not treat those probe errors as failure by themselves; judge the run by the final `smoke ok`/`getInfo` proof, `ReadinessTimeout`, or `EarlyProcessExit` diagnostics. For slow 2021.1 launches, `WWISE_READINESS_TIMEOUT=180` and optional `WWISE_WAAPI_PORT=<port>` are valid debugging overrides.
 
+On macOS, do not overlap a Fresh Agent campaign with any smoke, live, or
+destructive pytest process, even when their campaign roots, sandboxes, ports,
+or Wwise versions differ. Audiokinetic's wrappers share the
+`Wwise2019x64` CrossOver bottle: one lane can switch or hold that bottle while
+the other is starting, causing Broker prefix loss, a direct client that cannot
+close, or a long `ConnectionRefusedError` readiness timeout. Before launching
+the one-shot Fresh LaunchAgent, prove that no real-test driver, matching pytest,
+WwiseConsole wrapper, or campaign process is active. If overlap is discovered,
+freeze the affected roots without replay, let the already-running owner finish,
+then clean only proved-idle bottle helpers before starting a new root.
+
 WwiseConsole stdout/stderr is drained as UTF-8 with replacement for malformed
 bytes. Keep that explicit decoder on Windows; the locale default can be GBK
 and can terminate the drain thread on platform labels such as `Windows®`.
